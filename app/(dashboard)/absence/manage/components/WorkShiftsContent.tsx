@@ -17,7 +17,7 @@ import { applyWorkShiftTemplate, createWorkShiftTemplate, deleteWorkShiftTemplat
 import { cloneWorkShiftPattern, STANDARD_WORK_SHIFT_PATTERN } from '@/lib/utils/work-shifts';
 import type { EmployeeWorkShiftRow, WorkShiftPattern, WorkShiftTemplate } from '@/types/work-shifts';
 import { WORK_SHIFT_DAY_LABELS, WORK_SHIFT_DAY_ORDER } from '@/types/work-shifts';
-import { Check, Copy, Loader2, Minus, Pencil, Plus, RefreshCcw, Trash2, Users } from 'lucide-react';
+import { ArrowRight, Check, Copy, Loader2, Minus, Pencil, Plus, RefreshCcw, Trash2, Users } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface TemplateDialogState {
@@ -93,6 +93,10 @@ function TemplatePatternEditor({
   );
 }
 
+function isFirstSessionOfDay(_day: (typeof WORK_SHIFT_DAY_ORDER)[number], session: 'am' | 'pm'): boolean {
+  return session === 'am';
+}
+
 export function WorkShiftsContent() {
   const [templates, setTemplates] = useState<WorkShiftTemplate[]>([]);
   const [employees, setEmployees] = useState<EmployeeWorkShiftRow[]>([]);
@@ -118,8 +122,7 @@ export function WorkShiftsContent() {
         if (current && payload.templates.some((template) => template.id === current)) {
           return current;
         }
-
-        return payload.templates.find((template) => template.is_default)?.id || payload.templates[0]?.id || '';
+        return '';
       });
     } catch (error) {
       console.error('Error loading work shifts:', error);
@@ -493,19 +496,19 @@ export function WorkShiftsContent() {
             <div className="py-8 text-center text-muted-foreground">No employees match the current search.</div>
           ) : (
             <div className="overflow-auto rounded-lg border border-slate-700">
-              <table className="min-w-max table-fixed text-sm">
+              <table className="w-full min-w-[980px] table-fixed text-sm">
                 <colgroup>
-                  <col style={{ width: 260 }} />
+                  <col style={{ width: 'max(320px, calc(100% - 728px))' }} />
                   {WORK_SHIFT_DAY_ORDER.flatMap((day) => [
-                    <col key={`${day}-am`} style={{ width: 44 }} />,
-                    <col key={`${day}-pm`} style={{ width: 44 }} />,
+                    <col key={`${day}-am`} style={{ width: 52 }} />,
+                    <col key={`${day}-pm`} style={{ width: 52 }} />,
                   ])}
                 </colgroup>
                 <thead>
                   <tr className="bg-slate-800/60">
                     <th
                       rowSpan={2}
-                      className="sticky left-0 z-10 border-b border-slate-700 bg-slate-800 px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground"
+                      className="sticky left-0 z-10 border-b border-slate-700 bg-slate-800 px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground"
                     >
                       Employee
                     </th>
@@ -521,10 +524,13 @@ export function WorkShiftsContent() {
                   </tr>
                   <tr className="border-b border-slate-700">
                     {WORK_SHIFT_DAY_ORDER.flatMap((day) => [
-                      <th key={`${day}-am-header`} className="px-1 py-2 text-[10px] uppercase text-slate-500">
+                      <th
+                        key={`${day}-am-header`}
+                        className="border-l border-slate-600/70 px-2 py-2 text-[10px] uppercase text-slate-500"
+                      >
                         AM
                       </th>,
-                      <th key={`${day}-pm-header`} className="px-1 py-2 text-[10px] uppercase text-slate-500">
+                      <th key={`${day}-pm-header`} className="px-2 py-2 text-[10px] uppercase text-slate-500">
                         PM
                       </th>,
                     ])}
@@ -533,23 +539,23 @@ export function WorkShiftsContent() {
                 <tbody>
                   {filteredEmployees.map((employee) => (
                     <tr key={employee.profile_id} className="border-b border-slate-700/50 hover:bg-slate-800/30">
-                      <td className="sticky left-0 z-10 bg-slate-900/95 px-3 py-2 align-top">
-                        <div className="font-medium text-white">{employee.full_name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {employee.employee_id || 'No employee ID'}
-                        </div>
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <span className="rounded border border-slate-700 px-2 py-0.5 text-[10px] uppercase tracking-wide text-slate-300">
-                            {employee.template_name || 'Custom'}
-                          </span>
+                      <td className="sticky left-0 z-10 bg-slate-900/95 px-4 py-1.5 align-middle">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0 text-sm font-medium text-white">
+                            <span className="truncate">
+                              {employee.full_name}
+                              {employee.employee_id ? ` (${employee.employee_id})` : ''}
+                            </span>
+                          </div>
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => handleApplyTemplateToEmployee(employee.profile_id)}
                             disabled={!selectedTemplate}
-                            className="h-7 border-slate-600 px-2 text-xs"
+                            className="h-7 shrink-0 border-slate-600 px-2 text-xs"
                           >
-                            Apply Selected
+                            Apply
+                            <ArrowRight className="ml-1 h-3.5 w-3.5" />
                           </Button>
                         </div>
                       </td>
@@ -560,7 +566,12 @@ export function WorkShiftsContent() {
                           const isSaving = savingCells.has(`${employee.profile_id}:${day}:${session}`);
 
                           return (
-                            <td key={`${employee.profile_id}-${cellKey}`} className="px-0 py-1 text-center">
+                            <td
+                              key={`${employee.profile_id}-${cellKey}`}
+                              className={`px-1 py-1 text-center ${
+                                isFirstSessionOfDay(day, session) ? 'border-l border-slate-600/70' : ''
+                              }`}
+                            >
                               <button
                                 type="button"
                                 onClick={() => toggleEmployeeCell(employee.profile_id, cellKey)}

@@ -60,6 +60,8 @@ describe('Bulk Absence API Route', () => {
       reasonId: 'reason-1',
       reasonName: 'Training',
       requestedDays: 1,
+      requestedDaysMin: 1,
+      requestedDaysMax: 1,
       totalEmployees: 10,
       targetedEmployees: 4,
       wouldCreate: 3,

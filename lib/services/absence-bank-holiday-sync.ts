@@ -80,6 +80,8 @@ export interface BulkAbsenceBookingResult {
   reasonId: string;
   reasonName: string;
   requestedDays: number;
+  requestedDaysMin: number;
+  requestedDaysMax: number;
   totalEmployees: number;
   targetedEmployees: number;
   wouldCreate: number;
@@ -680,8 +682,6 @@ export async function bookBulkAbsence(
     throw new Error('End date cannot be before start date');
   }
 
-  const requestedDays = calculateDurationDays(start, end, false);
-
   const reason = await getAbsenceReasonById(options.supabase, options.reasonId);
   const allEmployees = await getBulkAbsenceEmployees(options.supabase);
   if (allEmployees.length === 0) {
@@ -690,7 +690,9 @@ export async function bookBulkAbsence(
       endDate,
       reasonId: reason.id,
       reasonName: reason.name,
-      requestedDays,
+      requestedDays: 0,
+      requestedDaysMin: 0,
+      requestedDaysMax: 0,
       totalEmployees: 0,
       targetedEmployees: 0,
       wouldCreate: 0,
@@ -717,10 +719,16 @@ export async function bookBulkAbsence(
 
   const profileIds = employees.map((employee) => employee.id);
   const workShiftPatterns = await loadEmployeeWorkShiftPatternMap(createAdminClient(), profileIds);
-  const hasAnyWorkingTime = employees.some((employee) => {
+  const requestedDaysByEmployee = new Map<string, number>();
+  for (const employee of employees) {
     const pattern = workShiftPatterns.get(employee.id);
-    return calculateDurationDays(start, end, false, { pattern }) > 0;
-  });
+    requestedDaysByEmployee.set(employee.id, calculateDurationDays(start, end, false, { pattern }));
+  }
+  const requestedDayValues = employees.map((employee) => requestedDaysByEmployee.get(employee.id) || 0);
+  const requestedDays = requestedDayValues.length > 0 ? Math.max(...requestedDayValues) : 0;
+  const requestedDaysMin = requestedDayValues.length > 0 ? Math.min(...requestedDayValues) : 0;
+  const requestedDaysMax = requestedDays;
+  const hasAnyWorkingTime = requestedDaysMax > 0;
 
   if (!hasAnyWorkingTime) {
     throw new Error('Selected date range does not include a working day');
@@ -821,9 +829,7 @@ export async function bookBulkAbsence(
 
   for (const employee of employees) {
     const employeePattern = workShiftPatterns.get(employee.id);
-    const requestedDaysForEmployee = calculateDurationDays(start, end, false, {
-      pattern: employeePattern,
-    });
+    const requestedDaysForEmployee = requestedDaysByEmployee.get(employee.id) || 0;
     const blockedIntervals = blockedIntervalsByProfile.get(employee.id) || [];
     const mergedBlockedIntervals = mergeDateIntervals(blockedIntervals);
     const availableIntervals = subtractDateIntervals(requestedRange, mergedBlockedIntervals);
@@ -892,6 +898,8 @@ export async function bookBulkAbsence(
       reasonId: reason.id,
       reasonName: reason.name,
       requestedDays,
+      requestedDaysMin,
+      requestedDaysMax,
       totalEmployees: allEmployees.length,
       targetedEmployees: employees.length,
       wouldCreate: rowsToInsert.length,
@@ -960,6 +968,8 @@ export async function bookBulkAbsence(
     reasonId: reason.id,
     reasonName: reason.name,
     requestedDays,
+    requestedDaysMin,
+    requestedDaysMax,
     totalEmployees: allEmployees.length,
     targetedEmployees: employees.length,
     wouldCreate: rowsToInsert.length,

@@ -104,6 +104,8 @@ interface ShutdownPreviewResult {
   reasonId: string;
   reasonName: string;
   requestedDays: number;
+  requestedDaysMin: number;
+  requestedDaysMax: number;
   totalEmployees: number;
   targetedEmployees: number;
   wouldCreate: number;
@@ -116,6 +118,14 @@ interface ShutdownPreviewResult {
   warnings: ShutdownWarningRow[];
   conflicts: ShutdownConflictRow[];
   batchId: string | null;
+}
+
+function formatRequestedDaysSummary(preview: ShutdownPreviewResult): string {
+  if (preview.requestedDaysMin === preview.requestedDaysMax) {
+    return `${preview.requestedDaysMax} working day${preview.requestedDaysMax === 1 ? '' : 's'}`;
+  }
+
+  return `${preview.requestedDaysMin}-${preview.requestedDaysMax} working days depending on work pattern`;
 }
 
 interface BulkAbsenceBatchSummary {
@@ -1430,7 +1440,7 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
                   Preview for <span className="text-foreground font-medium">{shutdownPreview.reasonName}</span> from{' '}
                   <span className="text-foreground font-medium">{shutdownPreview.startDate}</span> to{' '}
                   <span className="text-foreground font-medium">{shutdownPreview.endDate}</span> (
-                  {shutdownPreview.requestedDays} working day{shutdownPreview.requestedDays === 1 ? '' : 's'})
+                  {formatRequestedDaysSummary(shutdownPreview)})
                 </p>
                 <div className="grid grid-cols-2 md:grid-cols-7 gap-3 text-sm">
                   <div>

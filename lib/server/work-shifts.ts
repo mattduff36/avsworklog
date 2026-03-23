@@ -163,6 +163,28 @@ async function saveTemplateSlots(
   }
 }
 
+async function loadTemplatePattern(
+  supabase: AnySupabase,
+  templateId: string
+): Promise<WorkShiftPattern | null> {
+  const { data, error } = await supabase
+    .from('work_shift_template_slots')
+    .select('template_id, day_of_week, am_working, pm_working')
+    .eq('template_id', templateId)
+    .order('day_of_week', { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  const slotRows = (data || []) as WorkShiftTemplateSlotDbRow[];
+  if (slotRows.length === 0) {
+    return null;
+  }
+
+  return normalizePatternFromTemplateSlots(slotRows);
+}
+
 async function fetchTemplateSummaries(supabase: AnySupabase): Promise<WorkShiftTemplateSummary[]> {
   const [{ data: templates, error: templateError }, { data: slots, error: slotError }] = await Promise.all([
     supabase
@@ -212,6 +234,7 @@ export async function ensureStandardWorkShiftTemplate(supabase: AnySupabase): Pr
   }
 
   let defaultTemplate = existingDefault as WorkShiftTemplateDbRow | null;
+  let defaultPattern: WorkShiftPattern | null = null;
 
   if (!defaultTemplate) {
     const { data: inserted, error: insertError } = await supabase
@@ -229,13 +252,19 @@ export async function ensureStandardWorkShiftTemplate(supabase: AnySupabase): Pr
     }
 
     defaultTemplate = inserted as WorkShiftTemplateDbRow;
+    defaultPattern = cloneWorkShiftPattern(STANDARD_WORK_SHIFT_PATTERN);
+    await saveTemplateSlots(supabase, defaultTemplate.id, defaultPattern);
+  } else {
+    defaultPattern = await loadTemplatePattern(supabase, defaultTemplate.id);
+    if (!defaultPattern) {
+      defaultPattern = cloneWorkShiftPattern(STANDARD_WORK_SHIFT_PATTERN);
+      await saveTemplateSlots(supabase, defaultTemplate.id, defaultPattern);
+    }
   }
-
-  await saveTemplateSlots(supabase, defaultTemplate.id, STANDARD_WORK_SHIFT_PATTERN);
 
   return {
     ...defaultTemplate,
-    pattern: cloneWorkShiftPattern(STANDARD_WORK_SHIFT_PATTERN),
+    pattern: defaultPattern,
   };
 }
 

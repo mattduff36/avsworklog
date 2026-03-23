@@ -1,5 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { bookBulkAbsence } from '@/lib/services/absence-bank-holiday-sync';
+import { loadEmployeeWorkShiftPatternMap } from '@/lib/server/work-shifts';
+import { STANDARD_WORK_SHIFT_PATTERN } from '@/lib/utils/work-shifts';
+
+vi.mock('@/lib/supabase/admin', () => ({
+  createAdminClient: vi.fn(() => ({})),
+}));
+
+vi.mock('@/lib/server/work-shifts', () => ({
+  loadEmployeeWorkShiftPatternMap: vi.fn(),
+}));
 
 interface MockProfile {
   id: string;
@@ -124,6 +134,40 @@ function buildMockSupabase(options: BuildMockSupabaseOptions) {
 }
 
 describe('bookBulkAbsence partial conflict handling', () => {
+  const weekendOnlyPattern = {
+    ...STANDARD_WORK_SHIFT_PATTERN,
+    monday_am: false,
+    monday_pm: false,
+    tuesday_am: false,
+    tuesday_pm: false,
+    wednesday_am: false,
+    wednesday_pm: false,
+    thursday_am: false,
+    thursday_pm: false,
+    friday_am: false,
+    friday_pm: false,
+    saturday_am: true,
+    saturday_pm: true,
+    sunday_am: true,
+    sunday_pm: true,
+  };
+
+  const mondayOnlyPattern = {
+    ...STANDARD_WORK_SHIFT_PATTERN,
+    tuesday_am: false,
+    tuesday_pm: false,
+    wednesday_am: false,
+    wednesday_pm: false,
+    thursday_am: false,
+    thursday_pm: false,
+    friday_am: false,
+    friday_pm: false,
+    saturday_am: false,
+    saturday_pm: false,
+    sunday_am: false,
+    sunday_pm: false,
+  };
+
   const profiles: MockProfile[] = [
     {
       id: 'emp-a',
@@ -147,6 +191,12 @@ describe('bookBulkAbsence partial conflict handling', () => {
       roles: null,
     },
   ];
+
+  beforeEach(() => {
+    vi.mocked(loadEmployeeWorkShiftPatternMap).mockResolvedValue(
+      new Map(profiles.map((profile) => [profile.id, { ...STANDARD_WORK_SHIFT_PATTERN }]))
+    );
+  });
 
   const existingRows: MockAbsenceRow[] = [
     {
@@ -183,6 +233,8 @@ describe('bookBulkAbsence partial conflict handling', () => {
     });
 
     expect(result.requestedDays).toBe(5);
+    expect(result.requestedDaysMin).toBe(5);
+    expect(result.requestedDaysMax).toBe(5);
     expect(result.wouldCreate).toBe(3);
     expect(result.createdCount).toBe(0);
     expect(result.duplicateCount).toBe(1);
@@ -227,5 +279,36 @@ describe('bookBulkAbsence partial conflict handling', () => {
     expect(dateRanges).toContain('2026-12-14:2026-12-15');
     expect(dateRanges).toContain('2026-12-17:2026-12-18');
     expect(dateRanges).toContain('2026-12-14:2026-12-18');
+  });
+
+  it('returns an employee-specific requested-day range for mixed work patterns', async () => {
+    vi.mocked(loadEmployeeWorkShiftPatternMap).mockResolvedValue(
+      new Map([
+        ['emp-a', { ...STANDARD_WORK_SHIFT_PATTERN }],
+        ['emp-b', weekendOnlyPattern],
+        ['emp-c', mondayOnlyPattern],
+      ])
+    );
+
+    const { supabase } = buildMockSupabase({
+      profiles,
+      annualAbsences: [],
+      existingRows: [],
+    });
+
+    const result = await bookBulkAbsence({
+      supabase: supabase as never,
+      actorProfileId: 'manager-1',
+      reasonId: 'reason-annual',
+      startDate: '2026-12-12',
+      endDate: '2026-12-14',
+      applyToAll: true,
+      confirm: false,
+    });
+
+    expect(result.requestedDays).toBe(2);
+    expect(result.requestedDaysMin).toBe(1);
+    expect(result.requestedDaysMax).toBe(2);
+    expect(result.wouldCreate).toBe(3);
   });
 });
