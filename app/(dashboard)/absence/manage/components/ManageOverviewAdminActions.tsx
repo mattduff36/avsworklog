@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { TeamToggleMenu } from '@/components/ui/team-toggle-menu';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { createClient } from '@/lib/supabase/client';
 import { Loader2, Sparkles, Trash2, Users } from 'lucide-react';
@@ -29,6 +30,8 @@ interface BulkEmployeeOption {
   id: string;
   full_name: string;
   employee_id: string | null;
+  team_id: string | null;
+  team_name: string | null;
   role_id: string | null;
   role_name: string | null;
   role_display_name: string | null;
@@ -159,12 +162,15 @@ export function ManageOverviewAdminActions() {
         id: string;
         full_name: string;
         employee_id: string | null;
+        team?: { id?: string | null; name?: string | null } | null;
         role?: { id?: string | null; name?: string | null; display_name?: string | null } | null;
       };
       const nextEmployees = ((profiles || []) as ProfileData[]).map((profile) => ({
         id: profile.id,
         full_name: profile.full_name || 'Unknown User',
         employee_id: profile.employee_id,
+        team_id: profile.team?.id || null,
+        team_name: profile.team?.name || null,
         role_id: profile.role?.id || null,
         role_name: profile.role?.name || null,
         role_display_name: profile.role?.display_name || null,
@@ -202,6 +208,50 @@ export function ManageOverviewAdminActions() {
     void Promise.all([loadGenerationStatus(), loadBulkOptions()]);
   }, [loadGenerationStatus, loadBulkOptions]);
 
+  const bulkTeamOptions = useMemo(() => {
+    const teamMap = new Map<string, { id: string; name: string; hasAccess: boolean }>();
+
+    bulkEmployeeOptions.forEach((employee) => {
+      if (!employee.team_id) return;
+
+      const existing = teamMap.get(employee.team_id);
+      if (existing) {
+        existing.hasAccess = existing.hasAccess || employee.has_module_access !== false;
+        return;
+      }
+
+      teamMap.set(employee.team_id, {
+        id: employee.team_id,
+        name: employee.team_name || employee.team_id,
+        hasAccess: employee.has_module_access !== false,
+      });
+    });
+
+    return Array.from(teamMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [bulkEmployeeOptions]);
+  const accessibleBulkTeams = useMemo(
+    () => bulkTeamOptions.filter((team) => team.hasAccess),
+    [bulkTeamOptions]
+  );
+  const selectedBulkTeamCount = useMemo(
+    () =>
+      accessibleBulkTeams.filter((team) =>
+        bulkEmployeeOptions
+          .filter((employee) => employee.team_id === team.id && employee.has_module_access !== false)
+          .every((employee) => shutdownEmployeeFilters.includes(employee.id))
+      ).length,
+    [accessibleBulkTeams, bulkEmployeeOptions, shutdownEmployeeFilters]
+  );
+  const selectableBulkTeamEmployeeIds = useMemo(
+    () =>
+      bulkEmployeeOptions
+        .filter((employee) => employee.team_id && employee.has_module_access !== false)
+        .map((employee) => employee.id),
+    [bulkEmployeeOptions]
+  );
+  const allBulkTeamsSelected =
+    accessibleBulkTeams.length > 0 && selectedBulkTeamCount === accessibleBulkTeams.length;
+
   function toggleShutdownRole(roleId: string) {
     setShutdownRoleFilters((prev) => (prev.includes(roleId) ? prev.filter((role) => role !== roleId) : [...prev, roleId]));
     setShutdownPreview(null);
@@ -209,6 +259,34 @@ export function ManageOverviewAdminActions() {
 
   function toggleShutdownEmployee(profileId: string) {
     setShutdownEmployeeFilters((prev) => (prev.includes(profileId) ? prev.filter((id) => id !== profileId) : [...prev, profileId]));
+    setShutdownPreview(null);
+  }
+
+  function toggleShutdownTeam(teamId: string) {
+    const teamEmployeeIds = bulkEmployeeOptions
+      .filter((employee) => employee.team_id === teamId && employee.has_module_access !== false)
+      .map((employee) => employee.id);
+
+    if (teamEmployeeIds.length === 0) return;
+
+    setShutdownEmployeeFilters((prev) => {
+      const allSelected = teamEmployeeIds.every((employeeId) => prev.includes(employeeId));
+      return allSelected
+        ? prev.filter((id) => !teamEmployeeIds.includes(id))
+        : Array.from(new Set([...prev, ...teamEmployeeIds]));
+    });
+    setShutdownPreview(null);
+  }
+
+  function toggleAllShutdownTeams() {
+    if (selectableBulkTeamEmployeeIds.length === 0) return;
+
+    setShutdownEmployeeFilters((prev) => {
+      const allSelected = selectableBulkTeamEmployeeIds.every((employeeId) => prev.includes(employeeId));
+      return allSelected
+        ? prev.filter((id) => !selectableBulkTeamEmployeeIds.includes(id))
+        : Array.from(new Set([...prev, ...selectableBulkTeamEmployeeIds]));
+    });
     setShutdownPreview(null);
   }
 
@@ -494,7 +572,7 @@ export function ManageOverviewAdminActions() {
             </div>
 
             {shutdownApplyMode === 'selection' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-foreground font-medium">Job roles (union filter)</Label>
                   <DropdownMenu>
@@ -523,6 +601,28 @@ export function ManageOverviewAdminActions() {
                       )}
                     </DropdownMenuContent>
                   </DropdownMenu>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-foreground font-medium">Teams (bulk toggle)</Label>
+                  <TeamToggleMenu
+                    teams={bulkTeamOptions.map((team) => ({
+                      ...team,
+                      selected: (() => {
+                        const teamEmployees = bulkEmployeeOptions.filter(
+                          (employee) => employee.team_id === team.id && employee.has_module_access !== false
+                        );
+                        return teamEmployees.length > 0 && teamEmployees.every((employee) => shutdownEmployeeFilters.includes(employee.id));
+                      })(),
+                    }))}
+                    selectedTeamCount={selectedBulkTeamCount}
+                    allTeamsSelected={allBulkTeamsSelected}
+                    onToggleTeam={toggleShutdownTeam}
+                    onToggleAllTeams={toggleAllShutdownTeams}
+                    disabled={bulkTeamOptions.length === 0}
+                    triggerLabel="Select Teams"
+                    triggerClassName="w-full justify-start bg-slate-950 border-absence text-absence hover:bg-absence hover:text-white"
+                    activeItemClassName="bg-absence text-white"
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-foreground font-medium">Employees (union filter)</Label>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { TeamToggleMenu } from '@/components/ui/team-toggle-menu';
 import { Loader2, Save, Users, X, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { createClient } from '@/lib/supabase/client';
@@ -23,6 +24,10 @@ import type { MaintenanceCategory } from '@/types/maintenance';
 interface Profile {
   id: string;
   full_name: string | null;
+  team: {
+    id: string;
+    name: string;
+  } | null;
   role: {
     name: string;
     is_manager_admin: boolean;
@@ -70,6 +75,12 @@ export function CategoryRecipientsDialog({
             profilesData.map((profile) => ({
               id: profile.id,
               full_name: profile.full_name,
+              team: profile.team?.id
+                ? {
+                    id: profile.team.id,
+                    name: profile.team.name || profile.team.id,
+                  }
+                : null,
               role: profile.role?.name
                 ? {
                     name: profile.role.name,
@@ -90,6 +101,33 @@ export function CategoryRecipientsDialog({
       fetchData();
     }
   }, [open, category.id]);
+
+  const teamOptions = useMemo(() => {
+    const teamMap = new Map<string, { id: string; name: string; hasAccess: boolean }>();
+
+    profiles.forEach((profile) => {
+      if (!profile.team?.id) return;
+
+      const existing = teamMap.get(profile.team.id);
+      if (existing) {
+        existing.hasAccess = existing.hasAccess || profile.hasModuleAccess !== false;
+        return;
+      }
+
+      teamMap.set(profile.team.id, {
+        id: profile.team.id,
+        name: profile.team.name,
+        hasAccess: profile.hasModuleAccess !== false,
+      });
+    });
+
+    return Array.from(teamMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [profiles]);
+
+  const accessibleTeamOptions = useMemo(
+    () => teamOptions.filter((team) => team.hasAccess),
+    [teamOptions]
+  );
   
   const handleToggleUser = (userId: string) => {
     const profile = profiles.find((candidate) => candidate.id === userId);
@@ -151,6 +189,52 @@ export function CategoryRecipientsDialog({
   const handleClearAll = () => {
     setSelectedUserIds(new Set());
   };
+
+  const handleToggleTeam = (teamId: string) => {
+    const teamUserIds = profiles
+      .filter((profile) => profile.team?.id === teamId && profile.hasModuleAccess !== false)
+      .map((profile) => profile.id);
+
+    if (teamUserIds.length === 0) {
+      return;
+    }
+
+    const nextSelected = new Set(selectedUserIds);
+    const allTeamUsersSelected = teamUserIds.every((userId) => nextSelected.has(userId));
+
+    if (allTeamUsersSelected) {
+      teamUserIds.forEach((userId) => nextSelected.delete(userId));
+    } else {
+      teamUserIds.forEach((userId) => nextSelected.add(userId));
+    }
+
+    setSelectedUserIds(nextSelected);
+  };
+
+  const handleToggleAllTeams = () => {
+    if (accessibleTeamOptions.length === 0) {
+      return;
+    }
+
+    const nextSelected = new Set(selectedUserIds);
+    const allTeamsSelected = accessibleTeamOptions.every((team) =>
+      profiles
+        .filter((profile) => profile.team?.id === team.id && profile.hasModuleAccess !== false)
+        .every((profile) => nextSelected.has(profile.id))
+    );
+
+    if (allTeamsSelected) {
+      profiles
+        .filter((profile) => profile.hasModuleAccess !== false)
+        .forEach((profile) => nextSelected.delete(profile.id));
+    } else {
+      profiles
+        .filter((profile) => profile.hasModuleAccess !== false)
+        .forEach((profile) => nextSelected.add(profile.id));
+    }
+
+    setSelectedUserIds(nextSelected);
+  };
   
   // Filter profiles by search query
   const filteredProfiles = profiles.filter(p => {
@@ -169,6 +253,12 @@ export function CategoryRecipientsDialog({
     
     return (a.full_name || '').localeCompare(b.full_name || '');
   });
+  const selectedTeamCount = accessibleTeamOptions.filter((team) =>
+    profiles
+      .filter((profile) => profile.team?.id === team.id && profile.hasModuleAccess !== false)
+      .every((profile) => selectedUserIds.has(profile.id))
+  ).length;
+  const allTeamsSelected = accessibleTeamOptions.length > 0 && selectedTeamCount === accessibleTeamOptions.length;
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -202,6 +292,25 @@ export function CategoryRecipientsDialog({
             
             {/* Quick actions */}
             <div className="flex gap-2">
+              <TeamToggleMenu
+                teams={teamOptions.map((team) => ({
+                  ...team,
+                  selected: (() => {
+                    const teamProfiles = profiles.filter(
+                      (profile) => profile.team?.id === team.id && profile.hasModuleAccess !== false
+                    );
+                    return teamProfiles.length > 0 && teamProfiles.every((profile) => selectedUserIds.has(profile.id));
+                  })(),
+                }))}
+                selectedTeamCount={selectedTeamCount}
+                allTeamsSelected={allTeamsSelected}
+                onToggleTeam={handleToggleTeam}
+                onToggleAllTeams={handleToggleAllTeams}
+                disabled={loading || teamOptions.length === 0}
+                triggerLabel="Select Teams"
+                triggerClassName="text-xs border-maintenance text-maintenance hover:bg-maintenance hover:text-white"
+                activeItemClassName="bg-maintenance text-white"
+              />
               <Button
                 type="button"
                 variant="outline"

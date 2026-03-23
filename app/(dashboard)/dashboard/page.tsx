@@ -24,7 +24,6 @@ import {
 } from 'lucide-react';
 import { getEnabledForms } from '@/lib/config/forms';
 import type { ModuleName } from '@/types/roles';
-import { ALL_MODULES } from '@/types/roles';
 import { managerNavItems, adminNavItems, getFilteredNavByPermissions } from '@/lib/config/navigation';
 
 type PendingApprovalCount = {
@@ -84,6 +83,7 @@ export default function DashboardPage() {
   const [errorLogsCount, setErrorLogsCount] = useState(0);
   const [userPermissions, setUserPermissions] = useState<Set<ModuleName>>(new Set());
   const [permissionsLoading, setPermissionsLoading] = useState(true);
+  const [effectiveTeamName, setEffectiveTeamName] = useState<string | null>(effectiveRole?.team_name || null);
   const [ramsLoading, setRamsLoading] = useState(true);
   const [badgesLoading, setBadgesLoading] = useState(true);
   
@@ -108,17 +108,11 @@ export default function DashboardPage() {
     async function fetchPermissions() {
       if (!profile?.id) {
         setPermissionsLoading(false);
+        setEffectiveTeamName(null);
         return;
       }
       
       setPermissionsLoading(true);
-      
-      // Admin keeps full access by definition.
-      if (isAdmin) {
-        setUserPermissions(new Set(ALL_MODULES));
-        setPermissionsLoading(false);
-        return;
-      }
       
       try {
         const response = await fetch('/api/me/permissions', { cache: 'no-store' });
@@ -128,15 +122,20 @@ export default function DashboardPage() {
         }
 
         setUserPermissions(new Set<ModuleName>((data.enabled_modules || []) as ModuleName[]));
+        setEffectiveTeamName(data.effective_team_name || effectiveRole?.team_name || null);
       } catch (error) {
         console.error('Error fetching permissions:', error);
         setUserPermissions(new Set());
+        setEffectiveTeamName(effectiveRole?.team_name || null);
       } finally {
         setPermissionsLoading(false);
       }
     }
     fetchPermissions();
   }, [profile?.id, isManager, isAdmin, isViewingAs, effectiveRole, supabase]);
+
+  const roleLabel = effectiveRole?.display_name || (isSuperAdmin ? 'SuperAdmin' : (profile?.role?.display_name || 'No Role Assigned'));
+  const headerSubtitle = effectiveTeamName ? `${effectiveTeamName} · ${roleLabel}` : roleLabel;
 
   const canViewApprovals = userPermissions.has('approvals');
   const canViewActions = userPermissions.has('actions');
@@ -492,7 +491,7 @@ export default function DashboardPage() {
               Welcome back, {profile?.full_name}
             </h1>
             <p className="text-slate-400 mt-1">
-              {isSuperAdmin ? 'SuperAdmin' : (profile?.role?.display_name || 'No Role Assigned')}
+              {headerSubtitle}
             </p>
           </div>
           <div className="flex items-center justify-end">

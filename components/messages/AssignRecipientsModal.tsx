@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { TeamToggleMenu } from '@/components/ui/team-toggle-menu';
 import { Loader2, Send, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
@@ -13,6 +14,10 @@ import { fetchUserDirectory } from '@/lib/client/user-directory';
 interface Employee {
   id: string;
   full_name: string;
+  team: {
+    id: string;
+    name: string;
+  } | null;
   role: {
     name: string;
     display_name: string;
@@ -56,6 +61,12 @@ export function AssignRecipientsModal({
           const typedEmployees = allEmployees.map((employee) => ({
             id: employee.id,
             full_name: employee.full_name || 'Unknown User',
+            team: employee.team?.id
+              ? {
+                  id: employee.team.id,
+                  name: employee.team.name || employee.team.id,
+                }
+              : null,
             role: employee.role?.name
               ? {
                   name: employee.role.name,
@@ -106,6 +117,33 @@ export function AssignRecipientsModal({
     }
   }, [searchQuery, employees]);
 
+  const teamOptions = useMemo(() => {
+    const teamMap = new Map<string, { id: string; name: string; hasAccess: boolean }>();
+
+    employees.forEach((employee) => {
+      if (!employee.team?.id) return;
+
+      const existing = teamMap.get(employee.team.id);
+      if (existing) {
+        existing.hasAccess = existing.hasAccess || employee.hasModuleAccess !== false;
+        return;
+      }
+
+      teamMap.set(employee.team.id, {
+        id: employee.team.id,
+        name: employee.team.name,
+        hasAccess: employee.hasModuleAccess !== false,
+      });
+    });
+
+    return Array.from(teamMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [employees]);
+
+  const accessibleTeamOptions = useMemo(
+    () => teamOptions.filter((team) => team.hasAccess),
+    [teamOptions]
+  );
+
   const handleToggleEmployee = (id: string) => {
     const employee = employees.find((candidate) => candidate.id === id);
     if (!employee || employee.hasModuleAccess === false) return;
@@ -119,14 +157,50 @@ export function AssignRecipientsModal({
     setSelectedIds(newSelected);
   };
 
-  const handleSelectAll = (checked: boolean) => {
-    const selectableEmployees = filteredEmployees.filter((employee) => employee.hasModuleAccess !== false);
-    if (checked) {
-      const allIds = selectableEmployees.map(emp => emp.id);
-      setSelectedIds(new Set(allIds));
-    } else {
-      setSelectedIds(new Set());
+  const handleToggleTeam = (teamId: string) => {
+    const teamEmployeeIds = employees
+      .filter((employee) => employee.team?.id === teamId && employee.hasModuleAccess !== false)
+      .map((employee) => employee.id);
+
+    if (teamEmployeeIds.length === 0) {
+      return;
     }
+
+    const nextSelected = new Set(selectedIds);
+    const allTeamEmployeesSelected = teamEmployeeIds.every((employeeId) => nextSelected.has(employeeId));
+
+    if (allTeamEmployeesSelected) {
+      teamEmployeeIds.forEach((employeeId) => nextSelected.delete(employeeId));
+    } else {
+      teamEmployeeIds.forEach((employeeId) => nextSelected.add(employeeId));
+    }
+
+    setSelectedIds(nextSelected);
+  };
+
+  const handleToggleAllTeams = () => {
+    if (accessibleTeamOptions.length === 0) {
+      return;
+    }
+
+    const nextSelected = new Set(selectedIds);
+    const allTeamsSelected = accessibleTeamOptions.every((team) =>
+      employees
+        .filter((employee) => employee.team?.id === team.id && employee.hasModuleAccess !== false)
+        .every((employee) => nextSelected.has(employee.id))
+    );
+
+    if (allTeamsSelected) {
+      employees
+        .filter((employee) => employee.hasModuleAccess !== false)
+        .forEach((employee) => nextSelected.delete(employee.id));
+    } else {
+      employees
+        .filter((employee) => employee.hasModuleAccess !== false)
+        .forEach((employee) => nextSelected.add(employee.id));
+    }
+
+    setSelectedIds(nextSelected);
   };
 
   const handleSelectRole = (role: string) => {
@@ -185,10 +259,12 @@ export function AssignRecipientsModal({
     onClose();
   };
 
-  const selectableFilteredEmployees = filteredEmployees.filter((employee) => employee.hasModuleAccess !== false);
-  const allSelected =
-    selectableFilteredEmployees.length > 0 &&
-    selectableFilteredEmployees.every((employee) => selectedIds.has(employee.id));
+  const selectedTeamCount = accessibleTeamOptions.filter((team) =>
+    employees
+      .filter((employee) => employee.team?.id === team.id && employee.hasModuleAccess !== false)
+      .every((employee) => selectedIds.has(employee.id))
+  ).length;
+  const allTeamsSelected = accessibleTeamOptions.length > 0 && selectedTeamCount === accessibleTeamOptions.length;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -252,20 +328,33 @@ export function AssignRecipientsModal({
               />
             </div>
 
-            {/* Select All */}
-            <div className="flex items-center space-x-2 border-b pb-2">
-              <Checkbox
-                id="select-all"
-                checked={allSelected}
-                onCheckedChange={handleSelectAll}
-                disabled={loading || fetching || filteredEmployees.length === 0}
+            <div className="flex items-center justify-between border-b pb-2">
+              <TeamToggleMenu
+                teams={teamOptions.map((team) => ({
+                  ...team,
+                  selected: (() => {
+                    const teamEmployees = employees.filter(
+                      (employee) => employee.team?.id === team.id && employee.hasModuleAccess !== false
+                    );
+                    return teamEmployees.length > 0 && teamEmployees.every((employee) => selectedIds.has(employee.id));
+                  })(),
+                }))}
+                selectedTeamCount={selectedTeamCount}
+                allTeamsSelected={allTeamsSelected}
+                onToggleTeam={handleToggleTeam}
+                onToggleAllTeams={handleToggleAllTeams}
+                disabled={loading || fetching || teamOptions.length === 0}
+                triggerLabel="Select Teams"
+                triggerClassName={
+                  messageType === 'TOOLBOX_TALK'
+                    ? 'border-red-600 text-red-500 hover:bg-red-600 hover:text-white text-xs'
+                    : 'border-blue-600 text-blue-500 hover:bg-blue-600 hover:text-white text-xs'
+                }
+                activeItemClassName={messageType === 'TOOLBOX_TALK' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white'}
               />
-              <label
-                htmlFor="select-all"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                Select All ({selectedIds.size} selected)
-              </label>
+              <span className="text-sm text-muted-foreground">
+                {selectedIds.size} selected
+              </span>
             </div>
 
             {/* Employees List */}
