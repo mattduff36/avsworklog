@@ -1676,6 +1676,123 @@ export interface Database {
           updated_at?: string
         }
       }
+      work_shift_templates: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          is_default: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          is_default?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+          is_default?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      work_shift_template_slots: {
+        Row: {
+          template_id: string
+          day_of_week: number
+          am_working: boolean
+          pm_working: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          template_id: string
+          day_of_week: number
+          am_working?: boolean
+          pm_working?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          template_id?: string
+          day_of_week?: number
+          am_working?: boolean
+          pm_working?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      employee_work_shifts: {
+        Row: {
+          id: string
+          profile_id: string
+          template_id: string | null
+          monday_am: boolean
+          monday_pm: boolean
+          tuesday_am: boolean
+          tuesday_pm: boolean
+          wednesday_am: boolean
+          wednesday_pm: boolean
+          thursday_am: boolean
+          thursday_pm: boolean
+          friday_am: boolean
+          friday_pm: boolean
+          saturday_am: boolean
+          saturday_pm: boolean
+          sunday_am: boolean
+          sunday_pm: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          profile_id: string
+          template_id?: string | null
+          monday_am?: boolean
+          monday_pm?: boolean
+          tuesday_am?: boolean
+          tuesday_pm?: boolean
+          wednesday_am?: boolean
+          wednesday_pm?: boolean
+          thursday_am?: boolean
+          thursday_pm?: boolean
+          friday_am?: boolean
+          friday_pm?: boolean
+          saturday_am?: boolean
+          saturday_pm?: boolean
+          sunday_am?: boolean
+          sunday_pm?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          profile_id?: string
+          template_id?: string | null
+          monday_am?: boolean
+          monday_pm?: boolean
+          tuesday_am?: boolean
+          tuesday_pm?: boolean
+          wednesday_am?: boolean
+          wednesday_pm?: boolean
+          thursday_am?: boolean
+          thursday_pm?: boolean
+          friday_am?: boolean
+          friday_pm?: boolean
+          saturday_am?: boolean
+          saturday_pm?: boolean
+          sunday_am?: boolean
+          sunday_pm?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
       absences: {
         Row: {
           id: string

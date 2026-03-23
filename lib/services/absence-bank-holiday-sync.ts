@@ -1,6 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { loadEmployeeWorkShiftPatternMap } from '@/lib/server/work-shifts';
 import { getBankHolidaysForYear } from '@/lib/utils/bank-holidays';
 import { calculateDurationDays } from '@/lib/utils/date';
+import type { WorkShiftPattern } from '@/types/work-shifts';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabase = SupabaseClient<any, any, any>;
@@ -163,10 +166,10 @@ function addDaysIso(isoDate: string, days: number): string {
   return formatIsoDate(date);
 }
 
-function countWeekdaysInInterval(interval: DateInterval): number {
+function countWeekdaysInInterval(interval: DateInterval, pattern?: WorkShiftPattern | null): number {
   const start = toDateAtMidnight(interval.start);
   const end = toDateAtMidnight(interval.end);
-  return calculateDurationDays(start, end, false);
+  return calculateDurationDays(start, end, false, { pattern: pattern || undefined });
 }
 
 function mergeDateIntervals(intervals: DateInterval[]): DateInterval[] {
@@ -678,9 +681,6 @@ export async function bookBulkAbsence(
   }
 
   const requestedDays = calculateDurationDays(start, end, false);
-  if (requestedDays <= 0) {
-    throw new Error('Selected date range does not include a working day');
-  }
 
   const reason = await getAbsenceReasonById(options.supabase, options.reasonId);
   const allEmployees = await getBulkAbsenceEmployees(options.supabase);
@@ -716,6 +716,16 @@ export async function bookBulkAbsence(
   }
 
   const profileIds = employees.map((employee) => employee.id);
+  const workShiftPatterns = await loadEmployeeWorkShiftPatternMap(createAdminClient(), profileIds);
+  const hasAnyWorkingTime = employees.some((employee) => {
+    const pattern = workShiftPatterns.get(employee.id);
+    return calculateDurationDays(start, end, false, { pattern }) > 0;
+  });
+
+  if (!hasAnyWorkingTime) {
+    throw new Error('Selected date range does not include a working day');
+  }
+
   const financialYear = buildFinancialYearBounds(getFinancialYearStartYear(start));
   const fyStartIso = formatIsoDate(financialYear.start);
   const fyEndIso = formatIsoDate(financialYear.end);
@@ -810,12 +820,16 @@ export async function bookBulkAbsence(
   let conflictingWorkingDaysSkipped = 0;
 
   for (const employee of employees) {
+    const employeePattern = workShiftPatterns.get(employee.id);
+    const requestedDaysForEmployee = calculateDurationDays(start, end, false, {
+      pattern: employeePattern,
+    });
     const blockedIntervals = blockedIntervalsByProfile.get(employee.id) || [];
     const mergedBlockedIntervals = mergeDateIntervals(blockedIntervals);
     const availableIntervals = subtractDateIntervals(requestedRange, mergedBlockedIntervals);
     const employeeRows = availableIntervals
       .map((interval) => {
-        const durationDays = countWeekdaysInInterval(interval);
+        const durationDays = countWeekdaysInInterval(interval, employeePattern);
         if (durationDays <= 0) {
           return null;
         }
@@ -839,7 +853,7 @@ export async function bookBulkAbsence(
       .filter((row): row is NonNullable<typeof row> => row !== null);
 
     const createdDaysForEmployee = employeeRows.reduce((total, row) => total + row.duration_days, 0);
-    const skippedDaysForEmployee = Math.max(0, requestedDays - createdDaysForEmployee);
+    const skippedDaysForEmployee = Math.max(0, requestedDaysForEmployee - createdDaysForEmployee);
 
     if (skippedDaysForEmployee > 0) {
       conflictingWorkingDaysSkipped += skippedDaysForEmployee;

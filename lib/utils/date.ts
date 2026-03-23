@@ -1,4 +1,6 @@
 import { format, startOfWeek, endOfWeek, addDays, parseISO, isValid, formatDistanceToNow } from 'date-fns';
+import { calculateDurationDaysForShiftPattern, STANDARD_WORK_SHIFT_PATTERN } from '@/lib/utils/work-shifts';
+import type { WorkShiftPattern, WorkShiftSession } from '@/types/work-shifts';
 
 /**
  * Get the Sunday (week ending) date for a given date
@@ -128,44 +130,27 @@ export function getCurrentFinancialYear(): {
 }
 
 /**
- * Calculate duration in days between two dates (inclusive, weekdays only)
- * @param startDate The start date
- * @param endDate The end date (if null, assumes single day)
- * @param isHalfDay Whether this is a half-day absence
- * @returns Duration in days (e.g., 1.0, 0.5, 2.5)
+ * Calculate duration in days between two dates (inclusive).
+ * Defaults to the standard Monday-Friday working week unless a work-shift pattern is provided.
  */
 export function calculateDurationDays(
   startDate: Date,
   endDate: Date | null,
-  isHalfDay: boolean = false
+  isHalfDay: boolean = false,
+  options: {
+    pattern?: WorkShiftPattern | null;
+    halfDaySession?: WorkShiftSession | null;
+  } = {}
 ): number {
-  // Single day
-  if (!endDate || startDate.getTime() === endDate.getTime()) {
-    if (!isWeekday(startDate)) {
-      return 0;
+  return calculateDurationDaysForShiftPattern(
+    startDate,
+    endDate,
+    options.pattern || STANDARD_WORK_SHIFT_PATTERN,
+    {
+      isHalfDay,
+      halfDaySession: options.halfDaySession,
     }
-    return isHalfDay ? 0.5 : 1.0;
-  }
-  
-  // Multi-day: count weekdays only (Mon-Fri), inclusive
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  
-  // Reset time to avoid timezone issues
-  start.setHours(0, 0, 0, 0);
-  end.setHours(0, 0, 0, 0);
-  
-  let weekdays = 0;
-  const current = new Date(start);
-
-  while (current <= end) {
-    if (isWeekday(current)) {
-      weekdays += 1;
-    }
-    current.setDate(current.getDate() + 1);
-  }
-
-  return weekdays;
+  );
 }
 
 export function isWeekday(date: Date): boolean {

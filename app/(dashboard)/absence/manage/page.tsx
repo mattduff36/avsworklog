@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
+import { fetchEmployeeWorkShift, fetchWorkShiftMatrix } from '@/lib/client/work-shifts';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -43,6 +44,8 @@ import { AllowancesContent } from '@/app/(dashboard)/absence/manage/components/A
 import { AbsenceCalendarAdmin } from '@/app/(dashboard)/absence/manage/components/AbsenceCalendarAdmin';
 import { AbsenceAboutHelper } from '@/app/(dashboard)/absence/components/AbsenceAboutHelper';
 import { ManageOverviewAdminActions } from '@/app/(dashboard)/absence/manage/components/ManageOverviewAdminActions';
+import { WorkShiftsContent } from '@/app/(dashboard)/absence/manage/components/WorkShiftsContent';
+import type { WorkShiftPattern } from '@/types/work-shifts';
 
 type ManageSortField = 'employee' | 'reason' | 'status' | 'date' | 'duration' | 'approved_at';
 type ManageSortDirection = 'asc' | 'desc';
@@ -68,7 +71,7 @@ export default function AdminAbsencePage() {
   const [sortDirection, setSortDirection] = useState<ManageSortDirection>('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 25;
-  const [activeTab, setActiveTab] = useState<'overview' | 'calendar' | 'reasons' | 'allowances'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'calendar' | 'reasons' | 'allowances' | 'work-shifts'>('overview');
   
   // Data
   const { data: absences, isLoading } = useAllAbsences({ 
@@ -141,6 +144,7 @@ export default function AdminAbsencePage() {
 
   const { data: reasons } = useAllAbsenceReasons();
   const [profiles, setProfiles] = useState<Array<{ id: string; full_name: string; employee_id: string | null; has_module_access?: boolean }>>([]);
+  const [workShiftPatternByProfileId, setWorkShiftPatternByProfileId] = useState<Record<string, WorkShiftPattern>>({});
   
   // Mutations
   const createAbsence = useCreateAbsence();
@@ -173,12 +177,12 @@ export default function AdminAbsencePage() {
     if (authLoading) return;
     const tabParam = searchParams.get('tab') || 'overview';
     const requestedTab = tabParam === 'records' ? 'overview' : tabParam;
-    const allowedTabs: Array<'overview' | 'calendar' | 'reasons' | 'allowances'> = ['overview', 'calendar'];
-    if (isAdmin) allowedTabs.push('reasons', 'allowances');
+    const allowedTabs: Array<'overview' | 'calendar' | 'reasons' | 'allowances' | 'work-shifts'> = ['overview', 'calendar'];
+    if (isAdmin) allowedTabs.push('reasons', 'allowances', 'work-shifts');
     else if (isManager) allowedTabs.push('allowances');
 
     if (allowedTabs.includes(requestedTab as typeof allowedTabs[number])) {
-      setActiveTab(requestedTab as 'overview' | 'calendar' | 'reasons' | 'allowances');
+      setActiveTab(requestedTab as 'overview' | 'calendar' | 'reasons' | 'allowances' | 'work-shifts');
     } else {
       const fallback = allowedTabs[0];
       const params = new URLSearchParams(searchParams.toString());
@@ -201,10 +205,14 @@ export default function AdminAbsencePage() {
     if (!isAdmin && activeTab === 'reasons') {
       setActiveTab('overview');
     }
+    if (!isAdmin && activeTab === 'work-shifts') {
+      setActiveTab('overview');
+    }
   }, [isAdmin, activeTab]);
 
-  function handleTabChange(nextTab: 'overview' | 'calendar' | 'reasons' | 'allowances') {
+  function handleTabChange(nextTab: 'overview' | 'calendar' | 'reasons' | 'allowances' | 'work-shifts') {
     if (!isAdmin && nextTab === 'reasons') return;
+    if (!isAdmin && nextTab === 'work-shifts') return;
     if (!canManage && nextTab === 'allowances') return;
     setActiveTab(nextTab);
     const params = new URLSearchParams(searchParams.toString());
@@ -233,15 +241,26 @@ export default function AdminAbsencePage() {
   useEffect(() => {
     async function fetchProfiles() {
       try {
-        const data = await fetchUserDirectory({ module: 'absence' });
+        const [directory, workShiftMatrix] = await Promise.all([
+          fetchUserDirectory({ module: 'absence' }),
+          isAdmin ? fetchWorkShiftMatrix() : Promise.resolve(null),
+        ]);
         setProfiles(
-          data.map((profile) => ({
+          directory.map((profile) => ({
             id: profile.id,
             full_name: profile.full_name || 'Unknown User',
             employee_id: profile.employee_id,
             has_module_access: profile.has_module_access,
           }))
         );
+
+        if (workShiftMatrix) {
+          const nextPatternByProfileId: Record<string, WorkShiftPattern> = {};
+          workShiftMatrix.employees.forEach((employee) => {
+            nextPatternByProfileId[employee.profile_id] = employee.pattern;
+          });
+          setWorkShiftPatternByProfileId(nextPatternByProfileId);
+        }
       } catch (error) {
         console.error('Error fetching profiles:', error);
         return;
@@ -249,14 +268,38 @@ export default function AdminAbsencePage() {
     }
     
     fetchProfiles();
-  }, [supabase]);
+  }, [supabase, isAdmin]);
+
+  useEffect(() => {
+    async function loadSelectedProfileShift() {
+      if (!selectedProfileId || workShiftPatternByProfileId[selectedProfileId]) {
+        return;
+      }
+
+      try {
+        const payload = await fetchEmployeeWorkShift(selectedProfileId);
+        setWorkShiftPatternByProfileId((current) => ({
+          ...current,
+          [selectedProfileId]: payload.pattern,
+        }));
+      } catch (error) {
+        console.error('Error loading selected employee work shift:', error);
+      }
+    }
+
+    void loadSelectedProfileShift();
+  }, [selectedProfileId, workShiftPatternByProfileId]);
   
   // Calculate duration
   const duration = startDate 
     ? calculateDurationDays(
         new Date(startDate),
         endDate ? new Date(endDate) : null,
-        isHalfDay
+        isHalfDay,
+        {
+          pattern: selectedProfileId ? workShiftPatternByProfileId[selectedProfileId] : undefined,
+          halfDaySession,
+        }
       )
     : 0;
   
@@ -385,13 +428,14 @@ export default function AdminAbsencePage() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as 'overview' | 'calendar' | 'reasons' | 'allowances')} className="space-y-6">
+      <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as 'overview' | 'calendar' | 'reasons' | 'allowances' | 'work-shifts')} className="space-y-6">
         <div className="flex items-center justify-end">
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="calendar">Calendar</TabsTrigger>
             {isAdmin && <TabsTrigger value="reasons">Reasons</TabsTrigger>}
             {canManage && <TabsTrigger value="allowances">Allowances</TabsTrigger>}
+            {isAdmin && <TabsTrigger value="work-shifts">Work Shifts</TabsTrigger>}
           </TabsList>
         </div>
 
@@ -781,6 +825,12 @@ export default function AdminAbsencePage() {
         {canManage && (
           <TabsContent value="allowances" className="space-y-6 mt-0">
             <AllowancesContent refreshKey={allowancesRefreshKey} />
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="work-shifts" className="space-y-6 mt-0">
+            <WorkShiftsContent />
           </TabsContent>
         )}
       </Tabs>

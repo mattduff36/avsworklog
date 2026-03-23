@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
+import { fetchCurrentWorkShift } from '@/lib/client/work-shifts';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -54,6 +55,7 @@ import {
 import { formatDate, formatDateISO, calculateDurationDays, getFinancialYearMonths, getCurrentFinancialYear } from '@/lib/utils/date';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isThisMonth } from 'date-fns';
 import { toast } from 'sonner';
+import type { WorkShiftPattern } from '@/types/work-shifts';
 
 type Employee = {
   id: string;
@@ -136,6 +138,7 @@ export default function AbsencePage() {
   const [activeTab, setActiveTab] = useState<'calendar' | 'bookings'>('calendar');
   const [showRequestDialog, setShowRequestDialog] = useState(false);
   const [generationStatus, setGenerationStatus] = useState<GenerationStatus | null>(null);
+  const [currentWorkShiftPattern, setCurrentWorkShiftPattern] = useState<WorkShiftPattern | null>(null);
   
   // Financial year months
   const currentFinancialYear = getCurrentFinancialYear();
@@ -337,6 +340,21 @@ export default function AbsencePage() {
   }, [availableRequestReasons, selectedReasonId]);
 
   useEffect(() => {
+    async function loadCurrentWorkShift() {
+      try {
+        const payload = await fetchCurrentWorkShift();
+        setCurrentWorkShiftPattern(payload.pattern);
+      } catch (error) {
+        console.error('Error loading current work shift:', error);
+      }
+    }
+
+    if (hasPermission) {
+      void loadCurrentWorkShift();
+    }
+  }, [hasPermission]);
+
+  useEffect(() => {
     const requestedTab = searchParams.get('tab') || 'calendar';
     if (requestedTab === 'calendar' || requestedTab === 'bookings') {
       setActiveTab(requestedTab);
@@ -359,8 +377,11 @@ export default function AbsencePage() {
     if (!startDate) return 0;
     const start = new Date(startDate);
     const end = endDate ? new Date(endDate) : null;
-    return calculateDurationDays(start, end, isHalfDay);
-  }, [startDate, endDate, isHalfDay]);
+    return calculateDurationDays(start, end, isHalfDay, {
+      pattern: currentWorkShiftPattern,
+      halfDaySession,
+    });
+  }, [startDate, endDate, isHalfDay, currentWorkShiftPattern, halfDaySession]);
   
   // Projected remaining after this request (annual leave only)
   const projectedRemaining = deductsAllowance

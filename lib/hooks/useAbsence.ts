@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { fetchCurrentWorkShift, fetchEmployeeWorkShift } from '@/lib/client/work-shifts';
 import { useAbsenceRealtime } from '@/lib/hooks/useRealtime';
 import { 
   AbsenceInsert, 
@@ -11,6 +12,7 @@ import {
   FinancialYear
 } from '@/types/absence';
 import { getCurrentFinancialYear, getFinancialYear } from '@/lib/utils/date';
+import { calculateDurationDays } from '@/lib/utils/date';
 import { isClosedFinancialYearDate } from '@/lib/services/absence-archive';
 
 const ANNUAL_LEAVE_REASON_NAME = 'annual leave';
@@ -314,27 +316,56 @@ export function useCreateAbsence() {
   
   return useMutation({
     mutationFn: async (absence: AbsenceInsert) => {
-      await assertNoAbsenceConflictBeforeInsert(supabase, absence);
+      const { data: { user } } = await supabase.auth.getUser();
+
+      const resolvedAbsence = { ...absence };
+      if (resolvedAbsence.profile_id && resolvedAbsence.date) {
+        try {
+          const workShift =
+            user?.id === resolvedAbsence.profile_id
+              ? await fetchCurrentWorkShift()
+              : await fetchEmployeeWorkShift(resolvedAbsence.profile_id);
+
+          resolvedAbsence.duration_days = calculateDurationDays(
+            new Date(`${resolvedAbsence.date}T00:00:00`),
+            resolvedAbsence.end_date ? new Date(`${resolvedAbsence.end_date}T00:00:00`) : null,
+            resolvedAbsence.is_half_day === true,
+            {
+              pattern: workShift.pattern,
+              halfDaySession: resolvedAbsence.half_day_session || null,
+            }
+          );
+        } catch (error) {
+          console.error('Error resolving work shift duration, falling back to provided duration:', error);
+        }
+      }
+
+      await assertNoAbsenceConflictBeforeInsert(supabase, resolvedAbsence);
 
       // Enforce annual leave allowance at mutation time to prevent stale UI bypasses.
-      if (absence.status === 'pending' && absence.reason_id && absence.profile_id && (absence.duration_days || 0) > 0) {
+      if (
+        resolvedAbsence.status === 'pending' &&
+        resolvedAbsence.reason_id &&
+        resolvedAbsence.profile_id &&
+        (resolvedAbsence.duration_days || 0) > 0
+      ) {
         const { data: reason, error: reasonError } = await supabase
           .from('absence_reasons')
           .select('id, name')
-          .eq('id', absence.reason_id)
+          .eq('id', resolvedAbsence.reason_id)
           .single();
 
         if (reasonError) throw reasonError;
 
         const isAnnualLeave = reason?.name?.trim().toLowerCase() === ANNUAL_LEAVE_REASON_NAME;
         if (isAnnualLeave) {
-          const requestDate = absence.date ? new Date(`${absence.date}T00:00:00`) : new Date();
+          const requestDate = resolvedAbsence.date ? new Date(`${resolvedAbsence.date}T00:00:00`) : new Date();
           const { start, end } = getFinancialYear(requestDate);
 
           const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('annual_holiday_allowance_days')
-            .eq('id', absence.profile_id)
+            .eq('id', resolvedAbsence.profile_id)
             .single();
 
           if (profileError) throw profileError;
@@ -344,7 +375,7 @@ export function useCreateAbsence() {
           const { data: annualAbsences, error: annualAbsencesError } = await supabase
             .from('absences')
             .select('duration_days')
-            .eq('profile_id', absence.profile_id)
+            .eq('profile_id', resolvedAbsence.profile_id)
             .eq('reason_id', reason.id)
             .in('status', ['approved', 'pending'])
             .gte('date', start.toISOString().split('T')[0])
@@ -356,7 +387,7 @@ export function useCreateAbsence() {
             (sum: number, entry: { duration_days: number | null }) => sum + (entry.duration_days || 0),
             0
           );
-          const requested = absence.duration_days || 0;
+          const requested = resolvedAbsence.duration_days || 0;
 
           if (usedOrPending + requested > allowance) {
             throw new Error('Annual leave request exceeds available allowance');
@@ -366,7 +397,7 @@ export function useCreateAbsence() {
 
       const { data, error } = await supabase
         .from('absences')
-        .insert(absence)
+        .insert(resolvedAbsence)
         .select()
         .single();
       
