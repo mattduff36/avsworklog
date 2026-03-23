@@ -33,6 +33,9 @@ export function AbsenceScrollingMessage({ message, className = '' }: AbsenceScro
           }
         >
           <span className="font-medium">{trimmedMessage}</span>
+          <span aria-hidden="true" className="ml-8 font-medium">
+            {trimmedMessage}
+          </span>
         </div>
       </div>
 
