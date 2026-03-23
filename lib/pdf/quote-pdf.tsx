@@ -216,33 +216,41 @@ interface LineItem {
 
 interface QuotePDFProps {
   quoteReference: string;
+  baseQuoteReference?: string;
   quoteDate: string;
   attentionName: string;
   attentionEmail: string;
   salutation: string;
   projectDescription: string;
   subjectLine: string;
+  siteAddress?: string;
+  managerEmail?: string;
   lineItems: LineItem[];
   subtotal: number;
   validityDays: number;
   signoffName: string;
   signoffTitle: string;
+  versionLabel?: string;
   customFooterText?: string;
 }
 
 export function QuotePDF({
   quoteReference,
+  baseQuoteReference,
   quoteDate,
   attentionName,
   attentionEmail,
   salutation,
   projectDescription,
   subjectLine,
+  siteAddress,
+  managerEmail,
   lineItems,
   subtotal,
   validityDays,
   signoffName,
   signoffTitle,
+  versionLabel,
   customFooterText,
 }: QuotePDFProps) {
   const formattedDate = (() => {
@@ -282,7 +290,15 @@ export function QuotePDF({
 
         {/* Quote reference + date */}
         <View style={styles.metaRow}>
-          <Text style={styles.quoteRef}>{quoteReference}</Text>
+          <View>
+            <Text style={styles.quoteRef}>{quoteReference}</Text>
+            {versionLabel && versionLabel !== 'Original' && (
+              <Text style={styles.quoteDate}>Version: {versionLabel}</Text>
+            )}
+            {baseQuoteReference && baseQuoteReference !== quoteReference && (
+              <Text style={styles.quoteDate}>Base Quote: {baseQuoteReference}</Text>
+            )}
+          </View>
           <Text style={styles.quoteDate}>{formattedDate}</Text>
         </View>
 
@@ -310,6 +326,8 @@ export function QuotePDF({
         <View style={styles.subjectBlock}>
           {projectDescription && <Text style={styles.subjectBold}>{projectDescription}</Text>}
           {subjectLine && <Text style={styles.subjectNormal}>{subjectLine}</Text>}
+          {siteAddress && <Text style={styles.subjectNormal}>Site address: {siteAddress}</Text>}
+          {managerEmail && <Text style={styles.subjectNormal}>Manager email: {managerEmail}</Text>}
         </View>
 
         {/* Line items table */}

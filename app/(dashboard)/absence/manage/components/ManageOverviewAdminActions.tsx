@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   DropdownMenu,
@@ -504,19 +505,33 @@ export function ManageOverviewAdminActions() {
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button onClick={() => setShowShutdownDialog(true)} variant="outline" className="border-border text-muted-foreground">
-          <Users className="h-4 w-4 mr-2" />
-          Bulk Absence
-        </Button>
-        <Button
-          onClick={() => setShowGenerateDialog(true)}
-          className="bg-absence hover:bg-absence-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
-        >
-          <Sparkles className="h-4 w-4 mr-2" />
-          Set up {generationStatus?.nextFinancialYearLabel || 'next year'}
-        </Button>
-      </div>
+      <CardHeader className="flex flex-row items-start justify-between gap-4">
+        <div>
+          <CardTitle className="text-foreground">Admin Actions</CardTitle>
+          <CardDescription className="text-muted-foreground">
+            Run bulk absence booking and prepare next-year setup actions.
+          </CardDescription>
+          {generationStatus ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Current booking horizon: {generationStatus.latestGeneratedFinancialYearLabel}. Next available generation:{' '}
+              {generationStatus.nextFinancialYearLabel}.
+            </p>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button onClick={() => setShowShutdownDialog(true)} variant="outline" className="border-border text-muted-foreground">
+            <Users className="h-4 w-4 mr-2" />
+            Bulk Absence
+          </Button>
+          <Button
+            onClick={() => setShowGenerateDialog(true)}
+            className="bg-absence hover:bg-absence-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
+          >
+            <Sparkles className="h-4 w-4 mr-2" />
+            Set up {generationStatus?.nextFinancialYearLabel || 'next year'}
+          </Button>
+        </div>
+      </CardHeader>
 
       <Dialog
         open={showShutdownDialog}

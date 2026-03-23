@@ -1,22 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import {
+  calculateQuoteTotals,
+  fetchQuoteBundle,
+  generateQuoteReferenceForManager,
+  getInitialsFromName,
+  getInvoiceSummary,
+  getQuoteManagerOption,
+} from '@/lib/server/quote-workflow';
 
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
     const customerId = searchParams.get('customer_id');
+    const includeVersions = searchParams.get('include_versions') === 'true';
 
     let query = supabase
       .from('quotes')
       .select(`
         *,
-        customer:customers(id, company_name, short_name)
+        customer:customers(
+          id,
+          company_name,
+          short_name,
+          contact_name,
+          contact_email,
+          address_line_1,
+          address_line_2,
+          city,
+          county,
+          postcode
+        )
       `)
       .order('created_at', { ascending: false });
 
@@ -24,10 +49,44 @@ export async function GET(request: NextRequest) {
       query = query.eq('customer_id', customerId);
     }
 
+    if (!includeVersions) {
+      query = query.eq('is_latest_version', true);
+    }
+
     const { data, error } = await query;
     if (error) throw error;
 
-    return NextResponse.json({ quotes: data || [] });
+    const quotes = data || [];
+    const quoteIds = quotes.map(quote => quote.id);
+
+    const summaries = new Map<string, ReturnType<typeof getInvoiceSummary>>();
+    if (quoteIds.length > 0) {
+      const { data: invoices, error: invoiceError } = await supabase
+        .from('quote_invoices')
+        .select('quote_id, amount, invoice_date')
+        .in('quote_id', quoteIds);
+
+      if (invoiceError) {
+        throw invoiceError;
+      }
+
+      for (const quote of quotes) {
+        summaries.set(
+          quote.id,
+          getInvoiceSummary({
+            total: Number(quote.total || 0),
+            invoices: (invoices || []).filter(invoice => invoice.quote_id === quote.id),
+          })
+        );
+      }
+    }
+
+    return NextResponse.json({
+      quotes: quotes.map(quote => ({
+        ...quote,
+        invoice_summary: summaries.get(quote.id) || getInvoiceSummary({ total: Number(quote.total || 0), invoices: [] }),
+      })),
+    });
   } catch (error) {
     console.error('Error fetching quotes:', error);
     return NextResponse.json({ error: 'Failed to fetch quotes' }, { status: 500 });
@@ -37,65 +96,107 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const admin = createAdminClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await request.json();
-    const { line_items, ...quoteData } = body;
+    const {
+      manager_profile_id,
+      approver_profile_id,
+      line_items,
+      ...quoteData
+    } = body as {
+      manager_profile_id?: string;
+      approver_profile_id?: string;
+      requester_initials?: string;
+      manager_name?: string;
+      manager_email?: string;
+      signoff_name?: string;
+      signoff_title?: string;
+      line_items?: Array<{ description?: string; quantity: number; unit?: string; unit_rate: number; sort_order?: number }>;
+      [key: string]: unknown;
+    };
 
-    // Generate quote reference
-    const initials = (quoteData.requester_initials || 'XX').toUpperCase();
-    const { generateQuoteReference } = await import('@/lib/utils/quote-number');
-    const quoteReference = await generateQuoteReference(initials);
+    const managerProfileId = manager_profile_id || user.id;
+    const managerOption = await getQuoteManagerOption(managerProfileId);
 
-    // Calculate totals
-    const items: Array<{ quantity: number; unit_rate: number }> = line_items || [];
-    const subtotal = items.reduce((sum: number, item: { quantity: number; unit_rate: number }) => sum + item.quantity * item.unit_rate, 0);
-    const vatRate = quoteData.vat_rate ?? 20;
-    const vatAmount = subtotal * (vatRate / 100);
-    const total = subtotal + vatAmount;
-
-    const { data: quote, error } = await supabase
-      .from('quotes')
-      .insert({
-        ...quoteData,
-        quote_reference: quoteReference,
-        subtotal: Math.round(subtotal * 100) / 100,
-        vat_amount: Math.round(vatAmount * 100) / 100,
-        total: Math.round(total * 100) / 100,
-        created_by: user.id,
-        updated_by: user.id,
-        requester_id: user.id,
-      })
-      .select()
+    const { data: managerProfile, error: managerProfileError } = await admin
+      .from('profiles')
+      .select('id, full_name, email')
+      .eq('id', managerProfileId)
       .single();
 
-    if (error) throw error;
-
-    // Insert line items
-    if (items.length > 0) {
-      const lineItemRows = items.map((item: { description?: string; quantity: number; unit?: string; unit_rate: number; sort_order?: number }, idx: number) => ({
-        quote_id: quote.id,
-        description: item.description || '',
-        quantity: item.quantity,
-        unit: item.unit || '',
-        unit_rate: item.unit_rate,
-        line_total: Math.round(item.quantity * item.unit_rate * 100) / 100,
-        sort_order: item.sort_order ?? idx,
-      }));
-
-      const { error: liError } = await supabase
-        .from('quote_line_items')
-        .insert(lineItemRows);
-
-      if (liError) {
-        console.error('Error inserting line items:', liError);
-      }
+    if (managerProfileError || !managerProfile) {
+      throw managerProfileError || new Error('Unable to load manager profile');
     }
 
-    return NextResponse.json({ quote }, { status: 201 });
+    const initials = managerOption?.initials
+      || quoteData.requester_initials
+      || getInitialsFromName(managerProfile.full_name || '');
+
+    const { quoteReference } = await generateQuoteReferenceForManager({
+      managerProfileId,
+      fallbackInitials: initials,
+    });
+
+    const items = line_items || [];
+    const totals = calculateQuoteTotals(items, Number(quoteData.vat_rate ?? 20));
+    const quoteId = crypto.randomUUID();
+
+    const insertPayload = {
+      ...quoteData,
+      id: quoteId,
+      quote_reference: quoteReference,
+      base_quote_reference: quoteReference,
+      quote_thread_id: quoteId,
+      parent_quote_id: null,
+      revision_number: 0,
+      revision_type: 'original',
+      version_label: 'Original',
+      requester_id: managerProfileId,
+      requester_initials: initials,
+      manager_name: quoteData.manager_name || managerOption?.profile?.full_name || managerProfile.full_name,
+      manager_email: quoteData.manager_email || managerOption?.manager_email || managerProfile.email,
+      approver_profile_id: approver_profile_id || managerOption?.approver_profile_id || null,
+      signoff_name: quoteData.signoff_name || managerOption?.signoff_name || managerProfile.full_name,
+      signoff_title: quoteData.signoff_title || managerOption?.signoff_title || null,
+      subtotal: totals.subtotal,
+      vat_rate: totals.vatRate,
+      vat_amount: totals.vatAmount,
+      total: totals.total,
+      status: quoteData.status || 'draft',
+      commercial_status: 'open',
+      created_by: user.id,
+      updated_by: user.id,
+    };
+
+    const { error: insertError } = await supabase.from('quotes').insert(insertPayload);
+    if (insertError) throw insertError;
+
+    if (items.length > 0) {
+      const rows = items.map((item, index) => ({
+        quote_id: quoteId,
+        description: item.description || '',
+        quantity: Number(item.quantity || 0),
+        unit: item.unit || '',
+        unit_rate: Number(item.unit_rate || 0),
+        line_total: Math.round(Number(item.quantity || 0) * Number(item.unit_rate || 0) * 100) / 100,
+        sort_order: item.sort_order ?? index,
+      }));
+
+      const { error: lineItemError } = await supabase.from('quote_line_items').insert(rows);
+      if (lineItemError) throw lineItemError;
+    }
+
+    const bundle = await fetchQuoteBundle(admin, quoteId);
+    return NextResponse.json({ quote: { ...bundle.quote, line_items: bundle.lineItems, invoice_summary: bundle.invoiceSummary } }, { status: 201 });
   } catch (error) {
     console.error('Error creating quote:', error);
     return NextResponse.json({ error: 'Failed to create quote' }, { status: 500 });

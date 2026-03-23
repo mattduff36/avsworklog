@@ -1647,6 +1647,26 @@ export interface Database {
           recorded_by?: string | null
         }
       }
+      absence_module_settings: {
+        Row: {
+          id: boolean
+          announcement_message: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: boolean
+          announcement_message?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: boolean
+          announcement_message?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
       absence_reasons: {
         Row: {
           id: string
@@ -2200,7 +2220,10 @@ export interface Database {
         Row: {
           id: string
           quote_reference: string
+          base_quote_reference: string
           customer_id: string
+          quote_thread_id: string
+          parent_quote_id: string | null
           requester_id: string | null
           requester_initials: string | null
           quote_date: string
@@ -2209,20 +2232,62 @@ export interface Database {
           subject_line: string | null
           project_description: string | null
           salutation: string | null
+          site_address: string | null
           validity_days: number
           subtotal: number
           vat_rate: number
           vat_amount: number
           total: number
-          status: 'draft' | 'pending_internal_approval' | 'sent' | 'won' | 'lost' | 'ready_to_invoice' | 'invoiced'
+          status:
+            | 'draft'
+            | 'pending_internal_approval'
+            | 'changes_requested'
+            | 'approved'
+            | 'sent'
+            | 'won'
+            | 'lost'
+            | 'ready_to_invoice'
+            | 'po_received'
+            | 'in_progress'
+            | 'completed_part'
+            | 'completed_full'
+            | 'partially_invoiced'
+            | 'invoiced'
+            | 'closed'
           accepted: boolean
           po_number: string | null
+          po_received_at: string | null
+          po_value: number | null
           started: boolean
+          start_date: string | null
+          start_alert_days: number | null
+          start_alert_sent_at: string | null
           invoice_number: string | null
           invoice_notes: string | null
+          last_invoice_at: string | null
           signoff_name: string | null
           signoff_title: string | null
           custom_footer_text: string | null
+          revision_number: number
+          revision_type: 'original' | 'revision' | 'extra' | 'variation' | 'future_work' | 'duplicate'
+          version_label: string | null
+          version_notes: string | null
+          is_latest_version: boolean
+          duplicate_source_quote_id: string | null
+          manager_name: string | null
+          manager_email: string | null
+          approver_profile_id: string | null
+          approved_by: string | null
+          approved_at: string | null
+          returned_at: string | null
+          return_comments: string | null
+          customer_sent_at: string | null
+          customer_sent_by: string | null
+          completion_status: 'not_completed' | 'approved_in_full' | 'approved_in_part'
+          completion_comments: string | null
+          commercial_status: 'open' | 'closed'
+          closed_at: string | null
+          rams_requested_at: string | null
           created_at: string
           updated_at: string
           created_by: string | null
@@ -2234,7 +2299,10 @@ export interface Database {
         Insert: {
           id?: string
           quote_reference: string
+          base_quote_reference?: string
           customer_id: string
+          quote_thread_id?: string
+          parent_quote_id?: string | null
           requester_id?: string | null
           requester_initials?: string | null
           quote_date?: string
@@ -2243,20 +2311,62 @@ export interface Database {
           subject_line?: string | null
           project_description?: string | null
           salutation?: string | null
+          site_address?: string | null
           validity_days?: number
           subtotal?: number
           vat_rate?: number
           vat_amount?: number
           total?: number
-          status?: 'draft' | 'pending_internal_approval' | 'sent' | 'won' | 'lost' | 'ready_to_invoice' | 'invoiced'
+          status?:
+            | 'draft'
+            | 'pending_internal_approval'
+            | 'changes_requested'
+            | 'approved'
+            | 'sent'
+            | 'won'
+            | 'lost'
+            | 'ready_to_invoice'
+            | 'po_received'
+            | 'in_progress'
+            | 'completed_part'
+            | 'completed_full'
+            | 'partially_invoiced'
+            | 'invoiced'
+            | 'closed'
           accepted?: boolean
           po_number?: string | null
+          po_received_at?: string | null
+          po_value?: number | null
           started?: boolean
+          start_date?: string | null
+          start_alert_days?: number | null
+          start_alert_sent_at?: string | null
           invoice_number?: string | null
           invoice_notes?: string | null
+          last_invoice_at?: string | null
           signoff_name?: string | null
           signoff_title?: string | null
           custom_footer_text?: string | null
+          revision_number?: number
+          revision_type?: 'original' | 'revision' | 'extra' | 'variation' | 'future_work' | 'duplicate'
+          version_label?: string | null
+          version_notes?: string | null
+          is_latest_version?: boolean
+          duplicate_source_quote_id?: string | null
+          manager_name?: string | null
+          manager_email?: string | null
+          approver_profile_id?: string | null
+          approved_by?: string | null
+          approved_at?: string | null
+          returned_at?: string | null
+          return_comments?: string | null
+          customer_sent_at?: string | null
+          customer_sent_by?: string | null
+          completion_status?: 'not_completed' | 'approved_in_full' | 'approved_in_part'
+          completion_comments?: string | null
+          commercial_status?: 'open' | 'closed'
+          closed_at?: string | null
+          rams_requested_at?: string | null
           created_at?: string
           updated_at?: string
           created_by?: string | null
@@ -2268,7 +2378,10 @@ export interface Database {
         Update: {
           id?: string
           quote_reference?: string
+          base_quote_reference?: string
           customer_id?: string
+          quote_thread_id?: string
+          parent_quote_id?: string | null
           requester_id?: string | null
           requester_initials?: string | null
           quote_date?: string
@@ -2277,20 +2390,62 @@ export interface Database {
           subject_line?: string | null
           project_description?: string | null
           salutation?: string | null
+          site_address?: string | null
           validity_days?: number
           subtotal?: number
           vat_rate?: number
           vat_amount?: number
           total?: number
-          status?: 'draft' | 'pending_internal_approval' | 'sent' | 'won' | 'lost' | 'ready_to_invoice' | 'invoiced'
+          status?:
+            | 'draft'
+            | 'pending_internal_approval'
+            | 'changes_requested'
+            | 'approved'
+            | 'sent'
+            | 'won'
+            | 'lost'
+            | 'ready_to_invoice'
+            | 'po_received'
+            | 'in_progress'
+            | 'completed_part'
+            | 'completed_full'
+            | 'partially_invoiced'
+            | 'invoiced'
+            | 'closed'
           accepted?: boolean
           po_number?: string | null
+          po_received_at?: string | null
+          po_value?: number | null
           started?: boolean
+          start_date?: string | null
+          start_alert_days?: number | null
+          start_alert_sent_at?: string | null
           invoice_number?: string | null
           invoice_notes?: string | null
+          last_invoice_at?: string | null
           signoff_name?: string | null
           signoff_title?: string | null
           custom_footer_text?: string | null
+          revision_number?: number
+          revision_type?: 'original' | 'revision' | 'extra' | 'variation' | 'future_work' | 'duplicate'
+          version_label?: string | null
+          version_notes?: string | null
+          is_latest_version?: boolean
+          duplicate_source_quote_id?: string | null
+          manager_name?: string | null
+          manager_email?: string | null
+          approver_profile_id?: string | null
+          approved_by?: string | null
+          approved_at?: string | null
+          returned_at?: string | null
+          return_comments?: string | null
+          customer_sent_at?: string | null
+          customer_sent_by?: string | null
+          completion_status?: 'not_completed' | 'approved_in_full' | 'approved_in_part'
+          completion_comments?: string | null
+          commercial_status?: 'open' | 'closed'
+          closed_at?: string | null
+          rams_requested_at?: string | null
           created_at?: string
           updated_at?: string
           created_by?: string | null
@@ -2356,6 +2511,146 @@ export interface Database {
           requester_initials?: string
           next_number?: number
           updated_at?: string
+        }
+      }
+      quote_manager_series: {
+        Row: {
+          profile_id: string
+          initials: string
+          next_number: number
+          number_start: number
+          signoff_name: string | null
+          signoff_title: string | null
+          manager_email: string | null
+          approver_profile_id: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          profile_id: string
+          initials: string
+          next_number: number
+          number_start: number
+          signoff_name?: string | null
+          signoff_title?: string | null
+          manager_email?: string | null
+          approver_profile_id?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          profile_id?: string
+          initials?: string
+          next_number?: number
+          number_start?: number
+          signoff_name?: string | null
+          signoff_title?: string | null
+          manager_email?: string | null
+          approver_profile_id?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      quote_attachments: {
+        Row: {
+          id: string
+          quote_id: string
+          file_name: string
+          file_path: string
+          content_type: string | null
+          file_size: number | null
+          uploaded_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          quote_id: string
+          file_name: string
+          file_path: string
+          content_type?: string | null
+          file_size?: number | null
+          uploaded_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          quote_id?: string
+          file_name?: string
+          file_path?: string
+          content_type?: string | null
+          file_size?: number | null
+          uploaded_by?: string | null
+          created_at?: string
+        }
+      }
+      quote_invoices: {
+        Row: {
+          id: string
+          quote_id: string
+          invoice_number: string
+          invoice_date: string
+          amount: number
+          invoice_scope: 'full' | 'partial'
+          comments: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          quote_id: string
+          invoice_number: string
+          invoice_date?: string
+          amount: number
+          invoice_scope?: 'full' | 'partial'
+          comments?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          quote_id?: string
+          invoice_number?: string
+          invoice_date?: string
+          amount?: number
+          invoice_scope?: 'full' | 'partial'
+          comments?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      quote_invoice_allocations: {
+        Row: {
+          id: string
+          quote_invoice_id: string
+          quote_line_item_id: string | null
+          quantity_invoiced: number | null
+          amount_invoiced: number
+          comments: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          quote_invoice_id: string
+          quote_line_item_id?: string | null
+          quantity_invoiced?: number | null
+          amount_invoiced: number
+          comments?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          quote_invoice_id?: string
+          quote_line_item_id?: string | null
+          quantity_invoiced?: number | null
+          amount_invoiced?: number
+          comments?: string | null
+          created_at?: string
         }
       }
     }

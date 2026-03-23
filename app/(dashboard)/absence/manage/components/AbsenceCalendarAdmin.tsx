@@ -30,7 +30,6 @@ import {
 } from '@/components/ui/dialog';
 import { useAllAbsenceReasons, useAllAbsences, useDeleteAbsence } from '@/lib/hooks/useAbsence';
 import { getCurrentFinancialYear, getFinancialYearMonths } from '@/lib/utils/date';
-import { createClient } from '@/lib/supabase/client';
 import {
   eachDayOfInterval,
   endOfMonth,
@@ -48,10 +47,8 @@ type Employee = {
   full_name: string;
   employee_id: string | null;
   annual_holiday_allowance_days: number | null;
-  role_id: string | null;
-  role_name: string | null;
-  role_display_name: string | null;
-  has_module_access?: boolean;
+  team_id: string | null;
+  team_name: string | null;
 };
 
 type GenerationStatus = {
@@ -92,12 +89,6 @@ type WeekSegment = {
   startCol: number;
   endCol: number;
   lane: number;
-};
-
-type RoleOption = {
-  id: string;
-  name: string;
-  display_name: string | null;
 };
 
 const DETAIL_VISIBILITY_STORAGE_KEY = 'absence-manage-calendar-detail-visibility';
@@ -174,12 +165,10 @@ function parseIsoDateAsLocalMidnight(isoDate: string): Date {
 }
 
 export function AbsenceCalendarAdmin() {
-  const supabase = createClient();
   const [generationStatus, setGenerationStatus] = useState<GenerationStatus | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [roles, setRoles] = useState<RoleOption[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('all');
-  const [selectedRole, setSelectedRole] = useState('all');
+  const [selectedTeamId, setSelectedTeamId] = useState('all');
   const [selectedReasonId, setSelectedReasonId] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [detailVisibility, setDetailVisibility] = useState<DetailVisibility>(DEFAULT_DETAIL_VISIBILITY);
@@ -241,7 +230,6 @@ export function AbsenceCalendarAdmin() {
   useEffect(() => {
     void loadGenerationStatus();
     void fetchEmployees();
-    void fetchRoles();
     try {
       const stored = localStorage.getItem(DETAIL_VISIBILITY_STORAGE_KEY);
       if (stored) {
@@ -251,7 +239,6 @@ export function AbsenceCalendarAdmin() {
     } catch {
       // Ignore parsing failures
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function loadGenerationStatus() {
@@ -270,39 +257,21 @@ export function AbsenceCalendarAdmin() {
 
   async function fetchEmployees() {
     try {
-    const data = await fetchUserDirectory({ includeRole: true, includeAllowance: true, module: 'absence' });
+    const data = await fetchUserDirectory({ includeAllowance: true });
     const list = data.map((row) => {
-      const roleRef = row.role as { id?: string | null; name?: string | null; display_name?: string | null } | null;
         return {
           id: String(row.id || ''),
           full_name: String(row.full_name || ''),
-        employee_id: row.employee_id || null,
-        annual_holiday_allowance_days: row.annual_holiday_allowance_days ?? null,
-        role_id: roleRef?.id || null,
-          role_name: roleRef?.name || null,
-          role_display_name: roleRef?.display_name || null,
-        has_module_access: row.has_module_access,
+          employee_id: row.employee_id || null,
+          annual_holiday_allowance_days: row.annual_holiday_allowance_days ?? null,
+          team_id: row.team?.id || null,
+          team_name: row.team?.name || null,
         };
       });
       setEmployees(list);
     } catch (error) {
       console.error('Error fetching employees:', error);
       toast.error('Failed to load employee filters');
-    }
-  }
-
-  async function fetchRoles() {
-    try {
-      const { data, error } = await supabase
-        .from('roles')
-        .select('id, name, display_name')
-        .order('display_name', { ascending: true });
-
-      if (error) throw error;
-      setRoles((data || []) as RoleOption[]);
-    } catch (error) {
-      console.error('Error fetching roles:', error);
-      toast.error('Failed to load job roles');
     }
   }
 
@@ -340,9 +309,13 @@ export function AbsenceCalendarAdmin() {
       if (selectedEmployeeId !== 'all' && absence.profile_id !== selectedEmployeeId) return false;
       if (selectedReasonId !== 'all' && absence.reason_id !== selectedReasonId) return false;
       if (selectedStatus !== 'all' && absence.status !== selectedStatus) return false;
-      if (selectedRole !== 'all') {
+      if (selectedTeamId !== 'all') {
         const employee = employees.find((emp) => emp.id === absence.profile_id);
-        if (!employee?.role_id || employee.role_id !== selectedRole) return false;
+        if (selectedTeamId === 'unassigned') {
+          if (employee?.team_id) return false;
+        } else if (!employee?.team_id || employee.team_id !== selectedTeamId) {
+          return false;
+        }
       }
       return true;
     });
@@ -357,7 +330,7 @@ export function AbsenceCalendarAdmin() {
         profileId: absence.profile_id,
         employeeName: absence.profiles?.full_name || 'Unknown',
         employeeId: absence.profiles?.employee_id || null,
-        roleName: employee?.role_name || null,
+        roleName: employee?.team_name || null,
         reasonId: absence.reason_id,
         reasonName: absence.absence_reasons.name,
         reasonColor: getReasonColor(absence.absence_reasons.name, absence.absence_reasons.color),
@@ -374,7 +347,20 @@ export function AbsenceCalendarAdmin() {
         end,
       } as CalendarEvent;
     });
-  }, [absences, employees, selectedEmployeeId, selectedReasonId, selectedRole, selectedStatus]);
+  }, [absences, employees, selectedEmployeeId, selectedReasonId, selectedTeamId, selectedStatus]);
+
+  const teamOptions = useMemo(() => {
+    const teamMap = new Map<string, string>();
+    employees.forEach((employee) => {
+      if (employee.team_id) {
+        teamMap.set(employee.team_id, employee.team_name || employee.team_id);
+      }
+    });
+
+    return Array.from(teamMap.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [employees]);
 
   const annualLeaveReasonIds = useMemo(() => {
     return new Set(
@@ -428,19 +414,6 @@ export function AbsenceCalendarAdmin() {
     }
     return grouped;
   }, [gridStart, gridEnd]);
-
-  const roleOptions = useMemo(
-    () =>
-      roles
-        .map((role) => {
-          const value = role.id;
-          const label = (role.display_name || role.name).trim();
-          return { value, label };
-        })
-        .filter((role) => role.value.length > 0 && role.label.length > 0)
-        .sort((a, b) => a.label.localeCompare(b.label)),
-    [roles]
-  );
 
   function buildWeekSegments(week: Date[]): WeekSegment[] {
     const weekStart = week[0];
@@ -498,13 +471,13 @@ export function AbsenceCalendarAdmin() {
             <Filter className="h-5 w-5" />
             Filters
           </CardTitle>
-          {(selectedEmployeeId !== 'all' || selectedRole !== 'all' || selectedReasonId !== 'all' || selectedStatus !== 'all') && (
+          {(selectedEmployeeId !== 'all' || selectedTeamId !== 'all' || selectedReasonId !== 'all' || selectedStatus !== 'all') && (
             <Button
               variant="outline"
               size="sm"
               onClick={() => {
                 setSelectedEmployeeId('all');
-                setSelectedRole('all');
+                setSelectedTeamId('all');
                 setSelectedReasonId('all');
                 setSelectedStatus('all');
               }}
@@ -525,9 +498,8 @@ export function AbsenceCalendarAdmin() {
                 <SelectContent>
                   <SelectItem value="all">All employees</SelectItem>
                   {employees.map((employee) => (
-                    <SelectItem key={employee.id} value={employee.id} disabled={employee.has_module_access === false}>
+                    <SelectItem key={employee.id} value={employee.id}>
                       {employee.full_name} {employee.employee_id ? `(${employee.employee_id})` : ''}
-                      {employee.has_module_access === false ? ' - No Absence access' : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -535,16 +507,17 @@ export function AbsenceCalendarAdmin() {
             </div>
 
             <div>
-              <p className="text-sm text-muted-foreground mb-2">Job Role</p>
-              <Select value={selectedRole} onValueChange={setSelectedRole}>
+              <p className="text-sm text-muted-foreground mb-2">Team Name</p>
+              <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
                 <SelectTrigger className="bg-background border-border text-foreground">
-                  <SelectValue placeholder="All roles" />
+                  <SelectValue placeholder="All teams" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All roles</SelectItem>
-                  {roleOptions.map((role) => (
-                    <SelectItem key={role.value} value={role.value}>
-                      {role.label}
+                  <SelectItem value="all">All teams</SelectItem>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                  {teamOptions.map((team) => (
+                    <SelectItem key={team.value} value={team.value}>
+                      {team.label}
                     </SelectItem>
                   ))}
                 </SelectContent>

@@ -3,6 +3,10 @@
     {
       "path": "/api/maintenance/sync-dvla-scheduled",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/quotes/start-alerts-scheduled",
+      "schedule": "0 6 * * *"
     }
   ]
 }

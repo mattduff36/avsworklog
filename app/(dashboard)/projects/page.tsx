@@ -40,7 +40,7 @@ function isDocumentComplete(doc: RAMSDocument): boolean {
 }
 
 export default function RAMSPage() {
-  const { isManager, isAdmin, loading: authLoading } = useAuth();
+  const { user, isManager, isAdmin, loading: authLoading } = useAuth();
   const [documents, setDocuments] = useState<RAMSDocument[]>([]);
   const [filteredDocuments, setFilteredDocuments] = useState<RAMSDocument[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,21 +70,25 @@ export default function RAMSPage() {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('Error fetching RAMS documents:', {
-        message: errorMessage,
-        timestamp: new Date().toISOString(),
-        endpoint: '/api/rams'
-      });
+      if (!errorMessage.includes('HTTP 401') && !errorMessage.includes('HTTP 403')) {
+        console.error('Error fetching RAMS documents:', {
+          message: errorMessage,
+          timestamp: new Date().toISOString(),
+          endpoint: '/api/rams'
+        });
+      }
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (!authLoading) {
+    if (!authLoading && user) {
       fetchDocuments();
+    } else if (!authLoading) {
+      setLoading(false);
     }
-  }, [authLoading, fetchDocuments]);
+  }, [authLoading, fetchDocuments, user]);
 
   useEffect(() => {
     let filtered = documents;

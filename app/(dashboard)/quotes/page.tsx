@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import { QuotesTable } from './components/QuotesTable';
 import { QuoteDetailsModal } from './components/QuoteDetailsModal';
 import { QuoteFormDialog } from './components/QuoteFormDialog';
-import type { Quote, QuoteFormData, QuoteStatus } from './types';
+import type { Quote, QuoteFormData, QuoteManagerOption, QuoteStatus } from './types';
 
 interface CustomerOption {
   id: string;
@@ -16,7 +16,18 @@ interface CustomerOption {
   short_name: string | null;
   contact_name: string | null;
   contact_email: string | null;
+  address_line_1: string | null;
+  address_line_2: string | null;
+  city: string | null;
+  county: string | null;
+  postcode: string | null;
   default_validity_days: number;
+}
+
+interface ApproverOption {
+  id: string;
+  full_name: string | null;
+  email: string | null;
 }
 
 export default function QuotesPage() {
@@ -26,6 +37,8 @@ export default function QuotesPage() {
 
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
+  const [managerOptions, setManagerOptions] = useState<QuoteManagerOption[]>([]);
+  const [approvers, setApprovers] = useState<ApproverOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<QuoteStatus | 'all'>('all');
 
@@ -40,9 +53,10 @@ export default function QuotesPage() {
   const fetchData = useCallback(async () => {
     try {
       const url = customerId ? `/api/quotes?customer_id=${customerId}` : '/api/quotes';
-      const [quotesRes, customersRes] = await Promise.all([
+      const [quotesRes, customersRes, metadataRes] = await Promise.all([
         fetch(url),
         fetch('/api/customers'),
+        fetch('/api/quotes/metadata'),
       ]);
 
       if (quotesRes.ok) {
@@ -52,6 +66,11 @@ export default function QuotesPage() {
       if (customersRes.ok) {
         const data = await customersRes.json();
         setCustomers(data.customers || []);
+      }
+      if (metadataRes.ok) {
+        const data = await metadataRes.json();
+        setManagerOptions(data.managerOptions || []);
+        setApprovers(data.approvers || []);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -169,6 +188,9 @@ export default function QuotesPage() {
         onSubmit={handleSubmit}
         quote={editingQuote}
         customers={customers}
+        managerOptions={managerOptions}
+        approvers={approvers}
+        initialCustomerId={customerId}
       />
     </div>
   );

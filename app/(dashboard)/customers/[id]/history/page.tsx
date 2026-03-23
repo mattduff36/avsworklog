@@ -27,10 +27,17 @@ import type { Customer, CustomerFormData } from '../../types';
 interface QuoteSummary {
   id: string;
   quote_reference: string;
+  base_quote_reference: string;
+  version_label: string | null;
   subject_line: string | null;
   status: string;
   total: number;
   quote_date: string;
+  po_number: string | null;
+  commercial_status: 'open' | 'closed';
+  invoice_summary?: {
+    remainingBalance: number;
+  };
 }
 
 interface PageProps {
@@ -104,7 +111,17 @@ export default function CustomerHistoryPage({ params }: PageProps) {
     ? 'border-green-500/30 text-green-400 bg-green-500/10'
     : 'border-slate-500/30 text-slate-400 bg-slate-500/10';
 
-  const wonQuotes = quotes.filter(q => ['won', 'ready_to_invoice', 'invoiced'].includes(q.status));
+  const wonStatuses = [
+    'won',
+    'ready_to_invoice',
+    'po_received',
+    'in_progress',
+    'completed_part',
+    'completed_full',
+    'partially_invoiced',
+    'invoiced',
+  ];
+  const wonQuotes = quotes.filter(q => wonStatuses.includes(q.status));
   const totalQuoteValue = wonQuotes.reduce((sum, q) => sum + Number(q.total || 0), 0);
 
   return (
@@ -257,13 +274,23 @@ export default function CustomerHistoryPage({ params }: PageProps) {
                   <div className="flex items-center justify-between p-3 rounded-lg bg-slate-900/50 hover:bg-slate-700/50 border border-slate-700/50 transition-colors">
                     <div className="flex items-center gap-3">
                       <span className="font-mono font-semibold text-avs-yellow text-sm">{q.quote_reference}</span>
-                      <span className="text-sm text-slate-300 truncate max-w-[200px]">{q.subject_line || 'Untitled'}</span>
+                      <div>
+                        <span className="text-sm text-slate-300 truncate max-w-[200px] block">{q.subject_line || 'Untitled'}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {q.version_label || 'Original'}{q.po_number ? ` • PO ${q.po_number}` : ''}{q.commercial_status === 'closed' ? ' • Closed' : ''}
+                        </span>
+                      </div>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-sm text-muted-foreground">{format(new Date(q.quote_date), 'dd/MM/yyyy')}</span>
                       <span className="text-sm font-semibold text-white">
                         £{Number(q.total || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
                       </span>
+                      {typeof q.invoice_summary?.remainingBalance === 'number' && (
+                        <span className="text-xs text-muted-foreground">
+                          Balance £{Number(q.invoice_summary.remainingBalance).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                        </span>
+                      )}
                       <Badge variant="outline" className="text-xs capitalize">
                         {q.status.replace(/_/g, ' ')}
                       </Badge>

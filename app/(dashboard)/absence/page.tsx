@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
-import { fetchUserDirectory } from '@/lib/client/user-directory';
+import { fetchAbsenceMessage } from '@/lib/client/absence-message';
 import { fetchCurrentWorkShift } from '@/lib/client/work-shifts';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,7 +12,6 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -20,11 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
 import {
   Dialog,
   DialogContent,
@@ -39,10 +33,10 @@ import {
   ChevronRight,
   AlertTriangle,
   Settings,
-  Users,
   Plus,
 } from 'lucide-react';
 import Link from 'next/link';
+import { AbsenceScrollingMessage } from '@/app/(dashboard)/absence/components/AbsenceScrollingMessage';
 import { 
   useAbsencesForUserFinancialYear,
   useAbsenceSummaryForUserFinancialYear,
@@ -56,13 +50,6 @@ import { formatDate, formatDateISO, calculateDurationDays, getFinancialYearMonth
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isThisMonth } from 'date-fns';
 import { toast } from 'sonner';
 import type { WorkShiftPattern } from '@/types/work-shifts';
-
-type Employee = {
-  id: string;
-  full_name: string;
-  employee_id: string | null;
-  has_module_access?: boolean;
-};
 
 type GenerationStatus = {
   latestGeneratedFinancialYearStartYear: number;
@@ -139,6 +126,7 @@ export default function AbsencePage() {
   const [showRequestDialog, setShowRequestDialog] = useState(false);
   const [generationStatus, setGenerationStatus] = useState<GenerationStatus | null>(null);
   const [currentWorkShiftPattern, setCurrentWorkShiftPattern] = useState<WorkShiftPattern | null>(null);
+  const [absenceAnnouncement, setAbsenceAnnouncement] = useState<string | null>(null);
   
   // Financial year months
   const currentFinancialYear = getCurrentFinancialYear();
@@ -192,9 +180,6 @@ export default function AbsencePage() {
     setCurrentMonthIndex(initialMonthIndex);
   }, [initialMonthIndex]);
   
-  // Employee filter for managers/admins
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
   const [showDayModal, setShowDayModal] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
@@ -221,28 +206,12 @@ export default function AbsencePage() {
   const cancelAbsence = useCancelAbsence();
   useAbsenceRealtimeQueryInvalidation();
   
-  // Determine which absences to show on calendar
   const calendarAbsences = useMemo(() => {
     if (!(isManager || isAdmin)) {
-      // Regular users only see their own absences
       return userAbsences?.filter(a => a.status !== 'cancelled') || [];
     }
-    
-    // Managers/admins see filtered employees' absences (exclude cancelled)
-    const allAbsences = allAbsencesData?.filter(a => a.status !== 'cancelled') || [];
-    
-    if (selectedEmployeeIds.length === 0) {
-      // Show all employees if none selected
-      return allAbsences;
-    }
-    
-    // Filter by selected employees
-    return allAbsences.filter(a => selectedEmployeeIds.includes(a.profile_id));
-  }, [isManager, isAdmin, userAbsences, allAbsencesData, selectedEmployeeIds]);
-  const accessibleEmployees = useMemo(
-    () => employees.filter((employee) => employee.has_module_access !== false),
-    [employees]
-  );
+    return allAbsencesData?.filter(a => a.status !== 'cancelled') || [];
+  }, [isManager, isAdmin, userAbsences, allAbsencesData]);
   
   const loadingAbsences = isManager || isAdmin ? loadingAllAbsences : loadingUserAbsences;
   // Form state
@@ -254,16 +223,12 @@ export default function AbsencePage() {
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   
-  // Fetch employees for managers/admins
   useEffect(() => {
     if (permissionLoading || !hasPermission) {
       return;
     }
     void loadGenerationStatus();
-    if (isManager || isAdmin) {
-      void fetchEmployees();
-    }
-  }, [isManager, isAdmin, permissionLoading, hasPermission]);
+  }, [permissionLoading, hasPermission]);
 
   async function loadGenerationStatus() {
     try {
@@ -276,42 +241,6 @@ export default function AbsencePage() {
     } catch (error) {
       console.error('Error loading absence generation status:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to load booking window');
-    }
-  }
-  
-  async function fetchEmployees() {
-    try {
-      const data = await fetchUserDirectory({ module: 'absence' });
-      const employees = data.map((employee) => ({
-        id: employee.id,
-        full_name: employee.full_name || 'Unknown User',
-        employee_id: employee.employee_id,
-        has_module_access: employee.has_module_access,
-      })) as Employee[];
-      setEmployees(employees);
-      setSelectedEmployeeIds(employees.filter((employee) => employee.has_module_access !== false).map(e => e.id));
-    } catch (err) {
-      console.error('Error fetching employees:', err);
-    }
-  }
-  
-  // Toggle employee selection
-  function toggleEmployee(employeeId: string) {
-    const employee = employees.find((candidate) => candidate.id === employeeId);
-    if (!employee || employee.has_module_access === false) return;
-
-    setSelectedEmployeeIds(prev => 
-      prev.includes(employeeId)
-        ? prev.filter(id => id !== employeeId)
-        : [...prev, employeeId]
-    );
-  }
-  
-  function toggleAllEmployees() {
-    if (selectedEmployeeIds.length === accessibleEmployees.length) {
-      setSelectedEmployeeIds([]);
-    } else {
-      setSelectedEmployeeIds(accessibleEmployees.map(e => e.id));
     }
   }
 
@@ -338,6 +267,21 @@ export default function AbsencePage() {
       setSelectedReasonId('');
     }
   }, [availableRequestReasons, selectedReasonId]);
+
+  useEffect(() => {
+    async function loadAbsenceAnnouncement() {
+      try {
+        const payload = await fetchAbsenceMessage();
+        setAbsenceAnnouncement(payload.message);
+      } catch (error) {
+        console.error('Error loading absence announcement:', error);
+      }
+    }
+
+    if (hasPermission) {
+      void loadAbsenceAnnouncement();
+    }
+  }, [hasPermission]);
 
   useEffect(() => {
     async function loadCurrentWorkShift() {
@@ -761,6 +705,7 @@ export default function AbsencePage() {
               <p className="text-xs text-purple-100">days</p>
             </div>
           </div>
+          <AbsenceScrollingMessage message={absenceAnnouncement} />
         </CardContent>
       </Card>
       
@@ -989,56 +934,6 @@ export default function AbsencePage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  {/* Employee Filter for Managers/Admins */}
-                  {(isManager || isAdmin) && employees.length > 0 && (
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" size="sm" className="border-border text-muted-foreground">
-                          <Users className="h-4 w-4 mr-2" />
-                          Filter ({selectedEmployeeIds.length}/{accessibleEmployees.length})
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-80 border-border" align="end">
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between pb-2 border-b border-border">
-                            <h4 className="font-semibold text-foreground text-sm">Filter Employees</h4>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={toggleAllEmployees}
-                              className="h-7 text-xs text-purple-400 hover:text-purple-300"
-                            >
-                              {selectedEmployeeIds.length === accessibleEmployees.length ? 'Deselect All' : 'Select All'}
-                            </Button>
-                          </div>
-                          <div className="max-h-60 overflow-y-auto space-y-2">
-                            {employees.map(emp => (
-                              <div key={emp.id} className="flex items-center space-x-2">
-                                <Checkbox
-                                  id={`emp-${emp.id}`}
-                                  checked={selectedEmployeeIds.includes(emp.id)}
-                                  onCheckedChange={() => toggleEmployee(emp.id)}
-                                  disabled={emp.has_module_access === false}
-                                  className="border-border"
-                                />
-                                <label
-                                  htmlFor={`emp-${emp.id}`}
-                                  className={`text-sm cursor-pointer flex-1 ${
-                                    emp.has_module_access === false ? 'text-slate-500' : 'text-muted-foreground'
-                                  }`}
-                                >
-                                  {emp.full_name}
-                                  {emp.employee_id ? ` (${emp.employee_id})` : ''}
-                                  {emp.has_module_access === false ? ' - No Absence access' : ''}
-                                </label>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  )}
-                  
                   <Button
                     variant="outline"
                     size="sm"

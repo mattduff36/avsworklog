@@ -243,6 +243,11 @@ export const DEMO_CUSTOMERS = [
     short_name: 'Acme',
     contact_name: 'Jordan Smith',
     contact_email: 'jordan.smith@example.com',
+    address_line_1: '1 Demo Street',
+    address_line_2: 'Industrial Estate',
+    city: 'Nottingham',
+    county: 'Nottinghamshire',
+    postcode: 'NG1 1AA',
     default_validity_days: 30,
   },
   {
@@ -251,6 +256,11 @@ export const DEMO_CUSTOMERS = [
     short_name: 'Northfield',
     contact_name: 'Taylor Brown',
     contact_email: 'taylor.brown@example.com',
+    address_line_1: '42 Sample Road',
+    address_line_2: '',
+    city: 'Lincoln',
+    county: 'Lincolnshire',
+    postcode: 'LN1 2BC',
     default_validity_days: 21,
   },
 ];

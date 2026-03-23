@@ -30,7 +30,7 @@ export async function requireAbsenceUser() {
   };
 }
 
-export async function requireAdminWorkShiftAccess() {
+export async function requireAdminAbsenceAccess() {
   const auth = await requireAbsenceUser();
   if (auth.response) {
     return auth;
@@ -45,6 +45,10 @@ export async function requireAdminWorkShiftAccess() {
   }
 
   return auth;
+}
+
+export async function requireAdminWorkShiftAccess() {
+  return requireAdminAbsenceAccess();
 }
 
 export async function requireManagerWorkShiftReadAccess() {

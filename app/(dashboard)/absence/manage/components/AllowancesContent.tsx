@@ -60,7 +60,6 @@ interface BulkEmployeeOption {
   role_id: string | null;
   role_name: string | null;
   role_display_name: string | null;
-  has_module_access?: boolean;
 }
 
 interface ReasonColumn {
@@ -341,7 +340,7 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
       const fyEnd = selectedFinancialYear.endIso;
 
       const [profiles, { data: reasons, error: reasonsError }] = await Promise.all([
-        fetchUserDirectory({ includeRole: true, includeAllowance: true, module: 'absence' }),
+        fetchUserDirectory({ includeRole: true, includeAllowance: true }),
         supabase
           .from('absence_reasons')
           .select('id, name, is_active, color')
@@ -435,6 +434,7 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
         full_name: profile.full_name || 'Unknown User',
         employee_id: profile.employee_id,
         annual_holiday_allowance_days: profile.annual_holiday_allowance_days ?? null,
+        team: profile.team || null,
         role: profile.role || null,
       })) as ProfileData[];
       const computedRows: ProfileRow[] = typedProfiles.map((profile) => {
@@ -467,7 +467,6 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
         role_id: profile.role?.id || null,
         role_name: profile.role?.name || null,
         role_display_name: profile.role?.display_name || null,
-        has_module_access: (profile as { has_module_access?: boolean }).has_module_access,
       }));
       setBulkEmployeeOptions(employeeOptions);
 
@@ -499,48 +498,39 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
     [reasonColumns]
   );
   const bulkTeamOptions = useMemo(() => {
-    const teamMap = new Map<string, { id: string; name: string; hasAccess: boolean }>();
+    const teamMap = new Map<string, { id: string; name: string }>();
 
     bulkEmployeeOptions.forEach((employee) => {
       if (!employee.team_id) return;
 
-      const existing = teamMap.get(employee.team_id);
-      if (existing) {
-        existing.hasAccess = existing.hasAccess || employee.has_module_access !== false;
-        return;
+      if (!teamMap.has(employee.team_id)) {
+        teamMap.set(employee.team_id, {
+          id: employee.team_id,
+          name: employee.team_name || employee.team_id,
+        });
       }
-
-      teamMap.set(employee.team_id, {
-        id: employee.team_id,
-        name: employee.team_name || employee.team_id,
-        hasAccess: employee.has_module_access !== false,
-      });
     });
 
     return Array.from(teamMap.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [bulkEmployeeOptions]);
-  const accessibleBulkTeams = useMemo(
-    () => bulkTeamOptions.filter((team) => team.hasAccess),
-    [bulkTeamOptions]
-  );
   const selectedBulkTeamCount = useMemo(
     () =>
-      accessibleBulkTeams.filter((team) =>
+      bulkTeamOptions.filter((team) =>
         bulkEmployeeOptions
-          .filter((employee) => employee.team_id === team.id && employee.has_module_access !== false)
+          .filter((employee) => employee.team_id === team.id)
           .every((employee) => shutdownEmployeeFilters.includes(employee.id))
       ).length,
-    [accessibleBulkTeams, bulkEmployeeOptions, shutdownEmployeeFilters]
+    [bulkTeamOptions, bulkEmployeeOptions, shutdownEmployeeFilters]
   );
   const selectableBulkTeamEmployeeIds = useMemo(
     () =>
       bulkEmployeeOptions
-        .filter((employee) => employee.team_id && employee.has_module_access !== false)
+        .filter((employee) => employee.team_id)
         .map((employee) => employee.id),
     [bulkEmployeeOptions]
   );
   const allBulkTeamsSelected =
-    accessibleBulkTeams.length > 0 && selectedBulkTeamCount === accessibleBulkTeams.length;
+    bulkTeamOptions.length > 0 && selectedBulkTeamCount === bulkTeamOptions.length;
 
   const otherReasonColumns = useMemo(
     () => reasonColumns.filter((r) => !DEFAULT_VISIBLE_REASON_NAMES.has(r.name.trim().toLowerCase())),
@@ -710,7 +700,7 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
 
   function toggleShutdownTeam(teamId: string) {
     const teamEmployeeIds = bulkEmployeeOptions
-      .filter((employee) => employee.team_id === teamId && employee.has_module_access !== false)
+      .filter((employee) => employee.team_id === teamId)
       .map((employee) => employee.id);
 
     if (teamEmployeeIds.length === 0) return;
@@ -937,16 +927,7 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
             <CardDescription className="text-muted-foreground">
               Manage annual leave allowances for all employees ({selectedFinancialYear.label})
             </CardDescription>
-            {generationStatus && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Current booking horizon: {generationStatus.latestGeneratedFinancialYearLabel}. Next available generation:{' '}
-                {generationStatus.nextFinancialYearLabel}.
-              </p>
-            )}
           </div>
-          <p className="text-xs text-muted-foreground md:text-right">
-            Bulk Absence and Set up actions are now available in the Overview tab.
-          </p>
         </CardHeader>
       </Card>
 
@@ -1252,7 +1233,7 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
           <DialogHeader>
             <DialogTitle className="text-foreground">Book Bulk Absence</DialogTitle>
             <DialogDescription className="text-slate-400/90">
-              Create approved absence bookings in bulk with filters for reason, job role, and selected employees.
+              Create approved absence bookings in bulk with filters for reason, team, role, and selected employees.
             </DialogDescription>
           </DialogHeader>
 
@@ -1337,9 +1318,10 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
                   <TeamToggleMenu
                     teams={bulkTeamOptions.map((team) => ({
                       ...team,
+                      hasAccess: true,
                       selected: (() => {
                         const teamEmployees = bulkEmployeeOptions.filter(
-                          (employee) => employee.team_id === team.id && employee.has_module_access !== false
+                          (employee) => employee.team_id === team.id
                         );
                         return teamEmployees.length > 0 && teamEmployees.every((employee) => shutdownEmployeeFilters.includes(employee.id));
                       })(),
@@ -1373,12 +1355,10 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
                           key={employee.id}
                           checked={shutdownEmployeeFilters.includes(employee.id)}
                           onCheckedChange={() => toggleShutdownEmployee(employee.id)}
-                          disabled={employee.has_module_access === false}
                           className="text-foreground focus:bg-slate-800/70 focus:text-foreground"
                         >
                           {employee.full_name}
                           {employee.employee_id ? ` (${employee.employee_id})` : ''}
-                          {employee.has_module_access === false ? ' - No Absence access' : ''}
                         </DropdownMenuCheckboxItem>
                       ))}
                     </DropdownMenuContent>

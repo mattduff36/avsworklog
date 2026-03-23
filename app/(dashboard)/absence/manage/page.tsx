@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { fetchAbsenceMessage, updateAbsenceMessage } from '@/lib/client/absence-message';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { fetchEmployeeWorkShift, fetchWorkShiftMatrix } from '@/lib/client/work-shifts';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -26,7 +27,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ArrowUpDown, Calendar, ChevronLeft, ChevronRight, Plus, Filter, Trash2, Search, ExternalLink } from 'lucide-react';
+import { ArrowUpDown, Calendar, ChevronLeft, ChevronRight, Plus, Filter, Trash2, Search, ExternalLink, Wrench, Briefcase, Clock } from 'lucide-react';
 import { 
   useAllAbsences, 
   useAllAbsenceReasons,
@@ -145,6 +146,11 @@ export default function AdminAbsencePage() {
   const { data: reasons } = useAllAbsenceReasons();
   const [profiles, setProfiles] = useState<Array<{ id: string; full_name: string; employee_id: string | null; has_module_access?: boolean }>>([]);
   const [workShiftPatternByProfileId, setWorkShiftPatternByProfileId] = useState<Record<string, WorkShiftPattern>>({});
+  const [absenceAnnouncementInput, setAbsenceAnnouncementInput] = useState('');
+  const [savedAbsenceAnnouncement, setSavedAbsenceAnnouncement] = useState('');
+  const [loadingAbsenceAnnouncement, setLoadingAbsenceAnnouncement] = useState(false);
+  const [savingAbsenceAnnouncement, setSavingAbsenceAnnouncement] = useState(false);
+  const [isAbsenceAnnouncementFocused, setIsAbsenceAnnouncementFocused] = useState(false);
   
   // Mutations
   const createAbsence = useCreateAbsence();
@@ -210,6 +216,29 @@ export default function AdminAbsencePage() {
     }
   }, [isAdmin, activeTab]);
 
+  useEffect(() => {
+    async function loadAbsenceAnnouncement() {
+      setLoadingAbsenceAnnouncement(true);
+      try {
+        const payload = await fetchAbsenceMessage();
+        const message = payload.message || '';
+        setAbsenceAnnouncementInput(message);
+        setSavedAbsenceAnnouncement(message);
+      } catch (error) {
+        console.error('Error loading absence announcement:', error);
+        toast.error('Failed to load absence message');
+      } finally {
+        setLoadingAbsenceAnnouncement(false);
+      }
+    }
+
+    if (isAdmin) {
+      void loadAbsenceAnnouncement();
+    }
+  }, [isAdmin]);
+
+  const hasUnsavedAbsenceAnnouncement = absenceAnnouncementInput.trim() !== savedAbsenceAnnouncement.trim();
+
   function handleTabChange(nextTab: 'overview' | 'calendar' | 'reasons' | 'allowances' | 'work-shifts') {
     if (!isAdmin && nextTab === 'reasons') return;
     if (!isAdmin && nextTab === 'work-shifts') return;
@@ -223,6 +252,25 @@ export default function AdminAbsencePage() {
       params.delete('archived');
     }
     router.replace(`/absence/manage?${params.toString()}`, { scroll: false });
+  }
+
+  async function handleSaveAbsenceAnnouncement(nextMessage: string | null = absenceAnnouncementInput) {
+    setIsAbsenceAnnouncementFocused(false);
+    setSavingAbsenceAnnouncement(true);
+    try {
+      const payload = await updateAbsenceMessage(nextMessage);
+      const message = payload.message || '';
+      setAbsenceAnnouncementInput(message);
+      setSavedAbsenceAnnouncement(message);
+      setIsAbsenceAnnouncementFocused(false);
+      toast.success(message ? 'Absence message updated' : 'Absence message cleared');
+    } catch (error) {
+      console.error('Error saving absence announcement:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to save absence message');
+    } finally {
+      setIsAbsenceAnnouncementFocused(false);
+      setSavingAbsenceAnnouncement(false);
+    }
   }
 
   function handleIncludeArchivedChange(nextValue: boolean) {
@@ -428,29 +476,97 @@ export default function AdminAbsencePage() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as 'overview' | 'calendar' | 'reasons' | 'allowances' | 'work-shifts')} className="space-y-6">
-        <div className="flex items-center justify-end">
-          <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="calendar">Calendar</TabsTrigger>
-            {isAdmin && <TabsTrigger value="reasons">Reasons</TabsTrigger>}
-            {canManage && <TabsTrigger value="allowances">Allowances</TabsTrigger>}
-            {isAdmin && <TabsTrigger value="work-shifts">Work Shifts</TabsTrigger>}
-          </TabsList>
+      {isAdmin && (
+        <div className="rounded-lg border border-[hsl(var(--absence-primary)/0.25)] bg-[hsl(var(--absence-primary)/0.06)] p-4">
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+              <div className="shrink-0">
+                <Label htmlFor="absence-announcement" className="text-base font-semibold text-foreground">
+                  Scrolling Absence Message:
+                </Label>
+              </div>
+              <div className="flex flex-1">
+                <Input
+                  id="absence-announcement"
+                  value={absenceAnnouncementInput}
+                  onChange={(event) => setAbsenceAnnouncementInput(event.target.value)}
+                  onFocus={() => setIsAbsenceAnnouncementFocused(true)}
+                  onBlur={() => setIsAbsenceAnnouncementFocused(false)}
+                  placeholder={loadingAbsenceAnnouncement ? 'Loading current message...' : 'Enter scrolling message'}
+                  disabled={loadingAbsenceAnnouncement || savingAbsenceAnnouncement}
+                  className={`bg-background border-border ${
+                    !hasUnsavedAbsenceAnnouncement && !isAbsenceAnnouncementFocused
+                      ? '!text-muted-foreground'
+                      : '!text-foreground'
+                  }`}
+                  maxLength={500}
+                />
+              </div>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-muted-foreground">
+                Shown on Absence & Leave module home page. Leave blank to hide it.
+              </p>
+              <div className="flex items-center gap-2 sm:justify-end">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => handleSaveAbsenceAnnouncement()}
+                  disabled={loadingAbsenceAnnouncement || savingAbsenceAnnouncement || !hasUnsavedAbsenceAnnouncement}
+                  className="h-8 bg-absence px-3 hover:bg-absence-dark text-white"
+                >
+                  {savingAbsenceAnnouncement ? 'Saving...' : 'Save'}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleSaveAbsenceAnnouncement('')}
+                  disabled={loadingAbsenceAnnouncement || savingAbsenceAnnouncement || savedAbsenceAnnouncement.trim().length === 0}
+                  className="h-8 border-border px-3 text-muted-foreground"
+                >
+                  Clear
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
+      )}
+
+      <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as 'overview' | 'calendar' | 'reasons' | 'allowances' | 'work-shifts')} className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="overview" className="gap-2">
+            <Wrench className="h-4 w-4" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="calendar" className="gap-2">
+            <Calendar className="h-4 w-4" />
+            Calendar
+          </TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="reasons" className="gap-2">
+              <Filter className="h-4 w-4" />
+              Reasons
+            </TabsTrigger>
+          )}
+          {canManage && (
+            <TabsTrigger value="allowances" className="gap-2">
+              <Briefcase className="h-4 w-4" />
+              Allowances
+            </TabsTrigger>
+          )}
+          {isAdmin && (
+            <TabsTrigger value="work-shifts" className="gap-2">
+              <Clock className="h-4 w-4" />
+              Work Shifts
+            </TabsTrigger>
+          )}
+        </TabsList>
 
         <TabsContent value="overview" className="space-y-6 mt-0">
           {canManage && (
             <Card className="border-border">
-              <CardHeader>
-                <CardTitle className="text-foreground">Admin Actions</CardTitle>
-                <CardDescription className="text-muted-foreground">
-                  Run bulk absence booking and prepare next-year setup actions.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ManageOverviewAdminActions />
-              </CardContent>
+              <ManageOverviewAdminActions />
             </Card>
           )}
 

@@ -23,7 +23,7 @@ import {
 import { Loader2, Plus, Trash2, GripVertical } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { toast } from 'sonner';
-import type { Quote, QuoteFormData, QuoteLineItem } from '../types';
+import type { Quote, QuoteFormData, QuoteLineItem, QuoteManagerOption } from '../types';
 
 interface Customer {
   id: string;
@@ -31,7 +31,18 @@ interface Customer {
   short_name: string | null;
   contact_name: string | null;
   contact_email: string | null;
+  address_line_1: string | null;
+  address_line_2: string | null;
+  city: string | null;
+  county: string | null;
+  postcode: string | null;
   default_validity_days: number;
+}
+
+interface ApproverOption {
+  id: string;
+  full_name: string | null;
+  email: string | null;
 }
 
 interface QuoteFormDialogProps {
@@ -40,12 +51,9 @@ interface QuoteFormDialogProps {
   onSubmit: (data: QuoteFormData, isEdit: boolean) => Promise<void>;
   quote?: Quote | null;
   customers: Customer[];
-}
-
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length === 0) return 'XX';
-  return ((parts[0]?.[0] || '') + (parts[parts.length - 1]?.[0] || '')).toUpperCase();
+  managerOptions: QuoteManagerOption[];
+  approvers: ApproverOption[];
+  initialCustomerId?: string | null;
 }
 
 const EMPTY_LINE_ITEM: QuoteLineItem = {
@@ -57,65 +65,140 @@ const EMPTY_LINE_ITEM: QuoteLineItem = {
   sort_order: 0,
 };
 
-export function QuoteFormDialog({ open, onClose, onSubmit, quote, customers }: QuoteFormDialogProps) {
+function buildAddress(customer?: Customer): string {
+  if (!customer) return '';
+  return [
+    customer.address_line_1,
+    customer.address_line_2,
+    [customer.city, customer.county].filter(Boolean).join(', ') || null,
+    customer.postcode,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+export function QuoteFormDialog({
+  open,
+  onClose,
+  onSubmit,
+  quote,
+  customers,
+  managerOptions,
+  approvers,
+  initialCustomerId,
+}: QuoteFormDialogProps) {
   const { profile } = useAuth();
   const isEditing = !!quote;
 
+  const defaultManager = managerOptions.find(option => option.profile_id === profile?.id) || managerOptions[0];
+
   const [form, setForm] = useState<QuoteFormData>({
     customer_id: '',
+    manager_profile_id: '',
     requester_initials: '',
     quote_date: new Date().toISOString().slice(0, 10),
     attention_name: '',
     attention_email: '',
+    site_address: '',
     subject_line: '',
     project_description: '',
     salutation: '',
     validity_days: 30,
+    manager_name: '',
+    manager_email: '',
+    approver_profile_id: '',
     signoff_name: '',
     signoff_title: '',
     custom_footer_text: '',
+    version_notes: '',
+    start_date: '',
+    start_alert_days: '',
     line_items: [{ ...EMPTY_LINE_ITEM }],
   });
   const [saving, setSaving] = useState(false);
+
+  function applyManager(profileId: string, currentForm: QuoteFormData): QuoteFormData {
+    const selected = managerOptions.find(option => option.profile_id === profileId);
+    if (!selected) return currentForm;
+
+    return {
+      ...currentForm,
+      manager_profile_id: selected.profile_id,
+      requester_initials: selected.initials,
+      manager_name: currentForm.manager_name || selected.profile?.full_name || selected.signoff_name || '',
+      manager_email: selected.manager_email || selected.profile?.email || currentForm.manager_email,
+      approver_profile_id: currentForm.approver_profile_id || selected.approver_profile_id || '',
+      signoff_name: currentForm.signoff_name || selected.signoff_name || selected.profile?.full_name || '',
+      signoff_title: currentForm.signoff_title || selected.signoff_title || '',
+    };
+  }
 
   useEffect(() => {
     if (quote) {
       setForm({
         customer_id: quote.customer_id,
+        manager_profile_id: quote.requester_id || '',
         requester_initials: quote.requester_initials || '',
         quote_date: quote.quote_date,
         attention_name: quote.attention_name || '',
         attention_email: quote.attention_email || '',
+        site_address: quote.site_address || '',
         subject_line: quote.subject_line || '',
         project_description: quote.project_description || '',
         salutation: quote.salutation || '',
         validity_days: quote.validity_days,
+        manager_name: quote.manager_name || '',
+        manager_email: quote.manager_email || '',
+        approver_profile_id: quote.approver_profile_id || '',
         signoff_name: quote.signoff_name || '',
         signoff_title: quote.signoff_title || '',
         custom_footer_text: quote.custom_footer_text || '',
+        version_notes: quote.version_notes || '',
+        start_date: quote.start_date || '',
+        start_alert_days: quote.start_alert_days || '',
         line_items: quote.line_items && quote.line_items.length > 0
           ? quote.line_items.map((li, i) => ({ ...li, sort_order: i }))
           : [{ ...EMPTY_LINE_ITEM }],
       });
     } else {
-      const initials = profile?.full_name ? getInitials(profile.full_name) : 'XX';
-      setForm({
+      const next = applyManager(defaultManager?.profile_id || '', {
         customer_id: '',
-        requester_initials: initials,
+        manager_profile_id: defaultManager?.profile_id || '',
+        requester_initials: defaultManager?.initials || 'XX',
         quote_date: new Date().toISOString().slice(0, 10),
         attention_name: '',
         attention_email: '',
+        site_address: '',
         subject_line: '',
         project_description: '',
         salutation: '',
         validity_days: 30,
-        signoff_name: profile?.full_name || '',
-        signoff_title: '',
+        manager_name: defaultManager?.profile?.full_name || profile?.full_name || '',
+        manager_email: defaultManager?.manager_email || defaultManager?.profile?.email || '',
+        approver_profile_id: defaultManager?.approver_profile_id || '',
+        signoff_name: defaultManager?.signoff_name || profile?.full_name || '',
+        signoff_title: defaultManager?.signoff_title || '',
         custom_footer_text: '',
+        version_notes: '',
+        start_date: '',
+        start_alert_days: '',
         line_items: [{ ...EMPTY_LINE_ITEM }],
       });
+
+      if (initialCustomerId) {
+        const customer = customers.find(item => item.id === initialCustomerId);
+        next.customer_id = initialCustomerId;
+        next.attention_name = customer?.contact_name || '';
+        next.attention_email = customer?.contact_email || '';
+        next.salutation = customer?.contact_name ? `Dear ${customer.contact_name.split(' ')[0]},` : '';
+        next.validity_days = customer?.default_validity_days || 30;
+        next.site_address = buildAddress(customer);
+      }
+
+      setForm(next);
     }
-  }, [quote, open, profile]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quote, open, profile, defaultManager, initialCustomerId, customers]);
 
   function updateField<K extends keyof QuoteFormData>(key: K, value: QuoteFormData[K]) {
     setForm(prev => ({ ...prev, [key]: value }));
@@ -128,8 +211,21 @@ export function QuoteFormDialog({ open, onClose, onSubmit, quote, customers }: Q
       customer_id: customerId,
       attention_name: customer?.contact_name || prev.attention_name,
       attention_email: customer?.contact_email || prev.attention_email,
+      site_address: buildAddress(customer) || prev.site_address,
       validity_days: customer?.default_validity_days || prev.validity_days,
       salutation: customer?.contact_name ? `Dear ${customer.contact_name.split(' ')[0]},` : prev.salutation,
+    }));
+  }
+
+  function handleManagerChange(managerProfileId: string) {
+    setForm(prev => applyManager(managerProfileId, {
+      ...prev,
+      manager_profile_id: managerProfileId,
+      manager_name: '',
+      manager_email: '',
+      signoff_name: '',
+      signoff_title: '',
+      approver_profile_id: '',
     }));
   }
 
@@ -203,20 +299,34 @@ export function QuoteFormDialog({ open, onClose, onSubmit, quote, customers }: Q
                 </Select>
               </div>
               <div className="space-y-2">
+                <Label>Manager *</Label>
+                <Select value={form.manager_profile_id} onValueChange={handleManagerChange}>
+                  <SelectTrigger className="bg-slate-800 border-slate-600">
+                    <SelectValue placeholder="Select manager" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {managerOptions.map(option => (
+                      <SelectItem key={option.profile_id} value={option.profile_id}>
+                        {(option.profile?.full_name || option.signoff_name || option.initials)} ({option.initials})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
                 <Label>Requester Initials</Label>
                 <Input
                   value={form.requester_initials}
-                  onChange={e => updateField('requester_initials', e.target.value.toUpperCase().slice(0, 10))}
-                  placeholder="GH"
+                  readOnly
                   maxLength={10}
                   className="bg-slate-800 border-slate-600 font-mono"
                 />
-                <p className="text-xs text-muted-foreground">Auto-generated from your name. Override if needed.</p>
+                <p className="text-xs text-muted-foreground">Linked to the selected manager’s quote number series.</p>
               </div>
             </div>
 
             {/* Quote header */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Date *</Label>
                 <Input
@@ -235,6 +345,21 @@ export function QuoteFormDialog({ open, onClose, onSubmit, quote, customers }: Q
                   onChange={e => updateField('validity_days', parseInt(e.target.value) || 30)}
                   className="bg-slate-800 border-slate-600"
                 />
+              </div>
+              <div className="space-y-2">
+                <Label>Approver</Label>
+                <Select value={form.approver_profile_id || undefined} onValueChange={value => updateField('approver_profile_id', value)}>
+                  <SelectTrigger className="bg-slate-800 border-slate-600">
+                    <SelectValue placeholder="Select approver" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {approvers.map(approver => (
+                      <SelectItem key={approver.id} value={approver.id}>
+                        {approver.full_name || approver.email || approver.id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -257,6 +382,36 @@ export function QuoteFormDialog({ open, onClose, onSubmit, quote, customers }: Q
                   className="bg-slate-800 border-slate-600"
                 />
               </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Manager Email</Label>
+                <Input
+                  type="email"
+                  value={form.manager_email}
+                  onChange={e => updateField('manager_email', e.target.value)}
+                  className="bg-slate-800 border-slate-600"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Manager Name</Label>
+                <Input
+                  value={form.manager_name}
+                  onChange={e => updateField('manager_name', e.target.value)}
+                  className="bg-slate-800 border-slate-600"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Site Address</Label>
+              <Textarea
+                value={form.site_address}
+                onChange={e => updateField('site_address', e.target.value)}
+                rows={3}
+                className="bg-slate-800 border-slate-600"
+              />
             </div>
 
             <div className="space-y-2">
@@ -287,6 +442,29 @@ export function QuoteFormDialog({ open, onClose, onSubmit, quote, customers }: Q
                   onChange={e => updateField('project_description', e.target.value)}
                   placeholder="e.g. Saint-Gobain Newark"
                   rows={2}
+                  className="bg-slate-800 border-slate-600"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Start Date</Label>
+                <Input
+                  type="date"
+                  value={form.start_date}
+                  onChange={e => updateField('start_date', e.target.value)}
+                  className="bg-slate-800 border-slate-600"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Alert Days Before Start</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={form.start_alert_days}
+                  onChange={e => updateField('start_alert_days', e.target.value ? Number(e.target.value) : '')}
+                  placeholder="7"
                   className="bg-slate-800 border-slate-600"
                 />
               </div>
@@ -397,6 +575,17 @@ export function QuoteFormDialog({ open, onClose, onSubmit, quote, customers }: Q
                 </div>
               </div>
             </div>
+
+            <div className="space-y-2">
+              <Label>Internal Notes / Version Notes</Label>
+              <Textarea
+                value={form.version_notes}
+                onChange={e => updateField('version_notes', e.target.value)}
+                rows={3}
+                placeholder="Use this for revision context, handover notes, or customer-specific context."
+                className="bg-slate-800 border-slate-600"
+              />
+            </div>
           </div>
 
           <DialogFooter className="gap-2">
@@ -405,7 +594,7 @@ export function QuoteFormDialog({ open, onClose, onSubmit, quote, customers }: Q
             </Button>
             <Button
               type="submit"
-              disabled={saving || !form.customer_id || !form.subject_line.trim()}
+              disabled={saving || !form.customer_id || !form.manager_profile_id || !form.subject_line.trim()}
               className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90 font-semibold"
             >
               {saving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : isEditing ? 'Update Quote' : 'Create Quote'}

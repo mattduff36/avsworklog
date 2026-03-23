@@ -28,6 +28,9 @@ type SortDir = 'asc' | 'desc';
 
 export function QuotesTable({ quotes, onAdd, onRowClick, statusFilter, onStatusFilterChange }: QuotesTableProps) {
   const [search, setSearch] = useState('');
+  const [poFilter, setPoFilter] = useState<'all' | 'with_po' | 'without_po'>('all');
+  const [invoiceFilter, setInvoiceFilter] = useState<'all' | 'not_invoiced' | 'partially_invoiced' | 'invoiced'>('all');
+  const [commercialFilter, setCommercialFilter] = useState<'all' | 'open' | 'closed'>('all');
   const [sortField, setSortField] = useState<SortField>('quote_date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
@@ -38,15 +41,31 @@ export function QuotesTable({ quotes, onAdd, onRowClick, statusFilter, onStatusF
       list = list.filter(q => q.status === statusFilter);
     }
 
+    if (poFilter === 'with_po') {
+      list = list.filter(q => Boolean(q.po_number));
+    } else if (poFilter === 'without_po') {
+      list = list.filter(q => !q.po_number);
+    }
+
+    if (invoiceFilter !== 'all') {
+      list = list.filter(q => q.invoice_summary?.status === invoiceFilter);
+    }
+
+    if (commercialFilter !== 'all') {
+      list = list.filter(q => q.commercial_status === commercialFilter);
+    }
+
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(quote =>
         quote.quote_reference.toLowerCase().includes(q) ||
+        quote.base_quote_reference.toLowerCase().includes(q) ||
         quote.customer?.company_name?.toLowerCase().includes(q) ||
         quote.subject_line?.toLowerCase().includes(q) ||
         quote.attention_name?.toLowerCase().includes(q) ||
         quote.po_number?.toLowerCase().includes(q) ||
-        quote.invoice_number?.toLowerCase().includes(q)
+        quote.invoice_number?.toLowerCase().includes(q) ||
+        quote.manager_name?.toLowerCase().includes(q)
       );
     }
 
@@ -73,7 +92,7 @@ export function QuotesTable({ quotes, onAdd, onRowClick, statusFilter, onStatusF
     });
 
     return list;
-  }, [quotes, search, statusFilter, sortField, sortDir]);
+  }, [quotes, search, statusFilter, poFilter, invoiceFilter, commercialFilter, sortField, sortDir]);
 
   function toggleSort(field: SortField) {
     if (sortField === field) {
@@ -115,9 +134,60 @@ export function QuotesTable({ quotes, onAdd, onRowClick, statusFilter, onStatusF
         </Button>
       </div>
 
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant={poFilter === 'all' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setPoFilter('all')}
+          className={poFilter === 'all' ? 'bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90' : 'border-slate-600 text-muted-foreground'}
+        >
+          All PO
+        </Button>
+        <Button
+          variant={poFilter === 'with_po' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setPoFilter('with_po')}
+          className={poFilter === 'with_po' ? 'bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90' : 'border-slate-600 text-muted-foreground'}
+        >
+          PO Received
+        </Button>
+        <Button
+          variant={poFilter === 'without_po' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setPoFilter('without_po')}
+          className={poFilter === 'without_po' ? 'bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90' : 'border-slate-600 text-muted-foreground'}
+        >
+          No PO
+        </Button>
+        <Button
+          variant={invoiceFilter === 'not_invoiced' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setInvoiceFilter(invoiceFilter === 'not_invoiced' ? 'all' : 'not_invoiced')}
+          className={invoiceFilter === 'not_invoiced' ? 'bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90' : 'border-slate-600 text-muted-foreground'}
+        >
+          Not Invoiced
+        </Button>
+        <Button
+          variant={invoiceFilter === 'partially_invoiced' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setInvoiceFilter(invoiceFilter === 'partially_invoiced' ? 'all' : 'partially_invoiced')}
+          className={invoiceFilter === 'partially_invoiced' ? 'bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90' : 'border-slate-600 text-muted-foreground'}
+        >
+          Partially Invoiced
+        </Button>
+        <Button
+          variant={commercialFilter === 'open' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setCommercialFilter(commercialFilter === 'open' ? 'all' : 'open')}
+          className={commercialFilter === 'open' ? 'bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90' : 'border-slate-600 text-muted-foreground'}
+        >
+          Open
+        </Button>
+      </div>
+
       {/* Status filter chips */}
       <div className="flex flex-wrap gap-2">
-        {(['all', 'draft', 'pending_internal_approval', 'sent', 'won', 'lost', 'ready_to_invoice', 'invoiced'] as const).map(s => {
+        {(['all', 'draft', 'pending_internal_approval', 'changes_requested', 'approved', 'sent', 'po_received', 'in_progress', 'completed_part', 'completed_full', 'partially_invoiced', 'invoiced', 'closed', 'lost'] as const).map(s => {
           const cfg = s === 'all' ? { label: 'All', color: '' } : QUOTE_STATUS_CONFIG[s];
           const count = statusCounts[s] || 0;
           const isActive = statusFilter === s;
@@ -146,6 +216,7 @@ export function QuotesTable({ quotes, onAdd, onRowClick, statusFilter, onStatusF
               <th className="text-left px-4 py-3 font-semibold text-muted-foreground cursor-pointer hover:text-white" onClick={() => toggleSort('quote_reference')}>
                 Reference {renderSortIcon('quote_reference')}
               </th>
+              <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Version</th>
               <th className="text-left px-4 py-3 font-semibold text-muted-foreground cursor-pointer hover:text-white" onClick={() => toggleSort('customer')}>
                 Customer {renderSortIcon('customer')}
               </th>
@@ -161,12 +232,13 @@ export function QuotesTable({ quotes, onAdd, onRowClick, statusFilter, onStatusF
                 Status {renderSortIcon('status')}
               </th>
               <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Invoice</th>
+              <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Balance</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-700/50">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={8} className="text-center py-12 text-muted-foreground">
+                <td colSpan={10} className="text-center py-12 text-muted-foreground">
                   {search ? 'No quotes match your search.' : 'No quotes yet. Create your first quote to get started.'}
                 </td>
               </tr>
@@ -180,6 +252,7 @@ export function QuotesTable({ quotes, onAdd, onRowClick, statusFilter, onStatusF
                     className="hover:bg-slate-800/50 cursor-pointer transition-colors"
                   >
                     <td className="px-4 py-3 font-mono font-semibold text-avs-yellow">{quote.quote_reference}</td>
+                    <td className="px-4 py-3 text-xs text-slate-300">{quote.version_label || 'Original'}</td>
                     <td className="px-4 py-3 text-white">{quote.customer?.company_name || '—'}</td>
                     <td className="px-4 py-3 text-slate-300 text-xs truncate max-w-[200px]">{quote.subject_line || '—'}</td>
                     <td className="px-4 py-3 text-slate-300 text-xs">{format(new Date(quote.quote_date), 'dd/MM/yyyy')}</td>
@@ -190,7 +263,10 @@ export function QuotesTable({ quotes, onAdd, onRowClick, statusFilter, onStatusF
                     <td className="px-4 py-3">
                       <Badge variant="outline" className={cfg.color}>{cfg.label}</Badge>
                     </td>
-                    <td className="px-4 py-3 text-xs text-slate-300">{quote.invoice_number || '—'}</td>
+                    <td className="px-4 py-3 text-xs text-slate-300">{quote.invoice_summary?.status.replace(/_/g, ' ') || quote.invoice_number || '—'}</td>
+                    <td className="px-4 py-3 text-xs text-slate-300">
+                      £{Number(quote.invoice_summary?.remainingBalance ?? quote.total ?? 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                    </td>
                   </tr>
                 );
               })
@@ -221,6 +297,7 @@ export function QuotesTable({ quotes, onAdd, onRowClick, statusFilter, onStatusF
                   </div>
                   <Badge variant="outline" className={cfg.color}>{cfg.label}</Badge>
                 </div>
+                <div className="text-xs text-slate-400">{quote.version_label || 'Original'}</div>
                 <div className="text-sm text-white">{quote.customer?.company_name}</div>
                 {quote.subject_line && (
                   <div className="text-xs text-muted-foreground truncate">{quote.subject_line}</div>
@@ -230,6 +307,9 @@ export function QuotesTable({ quotes, onAdd, onRowClick, statusFilter, onStatusF
                   <span className="font-semibold text-white">
                     £{Number(quote.total || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
                   </span>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Remaining: £{Number(quote.invoice_summary?.remainingBalance ?? quote.total ?? 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
                 </div>
               </div>
             );

@@ -9,6 +9,10 @@ function isTruthy(value: string | null): boolean {
   return value === '1' || value === 'true';
 }
 
+function isDeletedUserName(fullName: string | null | undefined): boolean {
+  return Boolean(fullName && fullName.includes('(Deleted User)'));
+}
+
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
   const {
@@ -27,6 +31,7 @@ export async function GET(request: NextRequest) {
 
   const includeRole = isTruthy(request.nextUrl.searchParams.get('includeRole'));
   const includeAllowance = isTruthy(request.nextUrl.searchParams.get('includeAllowance'));
+  const includeDeleted = isTruthy(request.nextUrl.searchParams.get('includeDeleted'));
   const moduleName = request.nextUrl.searchParams.get('module');
   const ids = request.nextUrl.searchParams
     .get('ids')
@@ -55,6 +60,10 @@ export async function GET(request: NextRequest) {
     query = query.in('id', ids);
   }
 
+  if (!includeDeleted) {
+    query = query.not('full_name', 'ilike', '%(Deleted User)%');
+  }
+
   const { data, error } = await query.order('full_name', { ascending: true });
 
   if (error) {
@@ -66,7 +75,10 @@ export async function GET(request: NextRequest) {
     : null;
 
   const userRows = ((data || []) as unknown) as Array<Record<string, unknown>>;
-  const users = userRows.map((userRow) => ({
+  const filtered = includeDeleted
+    ? userRows
+    : userRows.filter((row) => !isDeletedUserName(String(row.full_name || '')));
+  const users = filtered.map((userRow) => ({
     ...userRow,
     has_module_access: allowedUserIds ? allowedUserIds.has(String(userRow.id || '')) : undefined,
   }));

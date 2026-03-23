@@ -81,6 +81,16 @@ type ProfileWithRole = Omit<Profile, 'role'> & {
 type ProfileWithEmail = ProfileWithRole & { email?: string };
 
 type TabType = 'users' | 'roles' | 'teams' | 'permissions';
+type UserStatusTab = 'active' | 'deleted';
+
+function isDeletedUserProfile(user: { full_name?: string | null }): boolean {
+  return Boolean(user.full_name?.includes('(Deleted User)'));
+}
+
+function isExpectedUserAdminError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return error.message.includes('Forbidden:');
+}
 
 export default function UsersAdminPage() {
   const router = useRouter();
@@ -103,6 +113,7 @@ export default function UsersAdminPage() {
   const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'manager' | 'employee'>('all');
   const [teamFilter, setTeamFilter] = useState<string>('all');
   const [managerFilter, setManagerFilter] = useState<string>('all');
+  const [userStatusTab, setUserStatusTab] = useState<UserStatusTab>('active');
   const [availableRoles, setAvailableRoles] = useState<Array<{ id: string; name: string; display_name: string; role_class: 'admin' | 'manager' | 'employee' }>>([]);
   const [teamDirectory, setTeamDirectory] = useState<Array<{
     id: string;
@@ -164,12 +175,25 @@ export default function UsersAdminPage() {
   const [quickEditValue, setQuickEditValue] = useState('');
   const [quickEditSaving, setQuickEditSaving] = useState(false);
 
+  const activeUsers = useMemo(
+    () => users.filter((user) => !isDeletedUserProfile(user)),
+    [users]
+  );
+  const deletedUsers = useMemo(
+    () => users.filter((user) => isDeletedUserProfile(user)),
+    [users]
+  );
+  const usersForCurrentStatus = useMemo(
+    () => (userStatusTab === 'deleted' ? deletedUsers : activeUsers),
+    [activeUsers, deletedUsers, userStatusTab]
+  );
+
   // Stats
   const stats = {
-    total: users.length,
-    admins: users.filter((u) => u.role?.role_class === 'admin' || u.role?.name === 'admin').length,
-    managers: users.filter((u) => u.role?.role_class === 'manager').length,
-    employees: users.filter((u) => u.role?.role_class === 'employee').length,
+    total: usersForCurrentStatus.length,
+    admins: usersForCurrentStatus.filter((u) => u.role?.role_class === 'admin' || u.role?.name === 'admin').length,
+    managers: usersForCurrentStatus.filter((u) => u.role?.role_class === 'manager').length,
+    employees: usersForCurrentStatus.filter((u) => u.role?.role_class === 'employee').length,
   };
 
   const managerNameById = useMemo(() => {
@@ -242,8 +266,8 @@ export default function UsersAdminPage() {
   }, [teamDirectory]);
 
   const managerOptions = useMemo(
-    () => users.filter((u) => u.role?.role_class === 'manager' || u.role?.role_class === 'admin'),
-    [users]
+    () => activeUsers.filter((u) => u.role?.role_class === 'manager' || u.role?.role_class === 'admin'),
+    [activeUsers]
   );
 
   const getRoleOptionsForUser = useMemo(() => {
@@ -382,7 +406,7 @@ export default function UsersAdminPage() {
 
   // Search and role filter
   useEffect(function () {
-    let filtered = users;
+    let filtered = usersForCurrentStatus;
 
     // Apply role filter
     if (roleFilter !== 'all') {
@@ -430,7 +454,7 @@ export default function UsersAdminPage() {
     });
 
     setFilteredUsers(sorted);
-  }, [searchQuery, roleFilter, teamFilter, managerFilter, users, teamNameById, getUserRolePriority]);
+  }, [searchQuery, roleFilter, teamFilter, managerFilter, usersForCurrentStatus, teamNameById, getUserRolePriority]);
 
   function openQuickEdit(user: ProfileWithEmail, field: 'role' | 'team') {
     setQuickEditTarget({ userId: user.id, field });
@@ -586,7 +610,9 @@ export default function UsersAdminPage() {
       setEditDialogOpen(false);
       setSelectedUser(null);
     } catch (error) {
-      console.error('Error updating user:', error);
+      if (!isExpectedUserAdminError(error)) {
+        console.error('Error updating user:', error);
+      }
       setFormError(error instanceof Error ? error.message : 'Failed to update user');
     } finally {
       setFormLoading(false);
@@ -797,7 +823,26 @@ export default function UsersAdminPage() {
 
         {/* Users Tab Content */}
         <TabsContent value="users" className="space-y-6">
-          {/* Stats Cards - Now Filter Buttons */}
+          {/* Secondary tabs */}
+          <div className="flex justify-end">
+            <Tabs value={userStatusTab} onValueChange={(value) => setUserStatusTab(value as UserStatusTab)}>
+              <TabsList>
+                <TabsTrigger value="active" className="gap-2">
+                  Active Users ({activeUsers.length})
+                </TabsTrigger>
+                <TabsTrigger value="deleted" className="gap-2">
+                  Deleted Users ({deletedUsers.length})
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+
+          {userStatusTab === 'deleted' && (
+            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200">
+              Deleted users are hidden from operational pickers by default so they can no longer be selected in modules like absence.
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card 
           className={`border-border cursor-pointer hover:shadow-lg transition-all ${
@@ -808,7 +853,7 @@ export default function UsersAdminPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">All Users</p>
+                <p className="text-sm text-muted-foreground">{userStatusTab === 'deleted' ? 'Deleted Users' : 'Active Users'}</p>
                 <p className="text-2xl font-bold text-white">{stats.total}</p>
               </div>
               <User className="h-8 w-8 text-blue-500" />
@@ -870,32 +915,36 @@ export default function UsersAdminPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-white">All Users</CardTitle>
+              <CardTitle className="text-white">{userStatusTab === 'deleted' ? 'Deleted Users' : 'Active Users'}</CardTitle>
               <CardDescription className="text-muted-foreground">
-                View and manage user accounts, roles, and permissions
+                {userStatusTab === 'deleted'
+                  ? 'Review historical deleted accounts and remove them when it is safe to do so.'
+                  : 'View and manage active user accounts, roles, and permissions.'}
               </CardDescription>
             </div>
-            <div className="flex gap-2">
-              <Button
-                onClick={() => {
-                  setFormData({
-                    email: '',
-                    full_name: '',
-                    phone_number: '',
-                    employee_id: '',
-                    role_id: '',
-                    line_manager_id: '',
-                    team_id: '',
-                  });
-                  setFormError('');
-                  setAddDialogOpen(true);
-                }}
-                className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900"
-              >
-                <UserPlus className="h-4 w-4 mr-2" />
-                Add User
-              </Button>
-            </div>
+            {userStatusTab === 'active' && (
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => {
+                    setFormData({
+                      email: '',
+                      full_name: '',
+                      phone_number: '',
+                      employee_id: '',
+                      role_id: '',
+                      line_manager_id: '',
+                      team_id: '',
+                    });
+                    setFormError('');
+                    setAddDialogOpen(true);
+                  }}
+                  className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900"
+                >
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Add User
+                </Button>
+              </div>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -957,7 +1006,11 @@ export default function UsersAdminPage() {
               </div>
             ) : filteredUsers.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                {searchQuery ? 'No users found matching your search.' : 'No users yet.'}
+                {searchQuery
+                  ? 'No users found matching your search.'
+                  : userStatusTab === 'deleted'
+                    ? 'No deleted users found.'
+                    : 'No active users yet.'}
               </div>
             ) : (
               <div className="border border-slate-700 rounded-lg overflow-hidden">

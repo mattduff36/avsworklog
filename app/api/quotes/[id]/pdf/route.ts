@@ -41,12 +41,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const pdfDocument = QuotePDF({
       quoteReference: quote.quote_reference,
+      baseQuoteReference: quote.base_quote_reference || quote.quote_reference,
       quoteDate: quote.quote_date,
       attentionName: quote.attention_name || '',
       attentionEmail: quote.attention_email || '',
       salutation: quote.salutation || '',
       projectDescription: quote.project_description || '',
       subjectLine: quote.subject_line || '',
+      siteAddress: quote.site_address || '',
+      managerEmail: quote.manager_email || '',
       lineItems: (lineItems || []).map((li: { description: string; quantity: number; unit: string | null; unit_rate: number; line_total: number }) => ({
         description: li.description,
         quantity: Number(li.quantity),
@@ -58,6 +61,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       validityDays: quote.validity_days || 30,
       signoffName: quote.signoff_name || '',
       signoffTitle: quote.signoff_title || '',
+      versionLabel: quote.version_label || undefined,
       customFooterText: quote.custom_footer_text || undefined,
     });
 
