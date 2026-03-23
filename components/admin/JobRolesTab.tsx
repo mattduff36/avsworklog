@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,20 +32,21 @@ import {
   AlertTriangle,
   FileText,
   Search,
-  Users,
   Briefcase,
 } from 'lucide-react';
 import type { RoleMatrixRow } from '@/types/roles';
 import { toast } from 'sonner';
 import { TimesheetTypeOptions, getTimesheetTypeLabel } from '@/app/(dashboard)/timesheets/types/registry';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { getRoleSortPriority, isCoreRoleName } from '@/lib/config/roles-core';
 
 type RoleType = 'admin' | 'manager' | 'employee';
 
 export function JobRolesTab() {
-  const { isAdmin, profile } = useAuth();
-  const isManagerActor = !isAdmin && profile?.role?.is_manager_admin === true;
-  const canEditOrDeleteRoles = isAdmin;
+  const { isAdmin, isSuperAdmin, isActualSuperAdmin, profile } = useAuth();
+  const isAdminActor = isAdmin || isSuperAdmin || isActualSuperAdmin;
+  const isManagerActor = !isAdminActor && profile?.role?.is_manager_admin === true;
+  const canEditOrDeleteRoles = isAdminActor;
 
   const [roles, setRoles] = useState<RoleMatrixRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,6 +62,7 @@ export function JobRolesTab() {
     display_name: '',
     description: '',
     role_type: 'employee' as RoleType,
+    hierarchy_rank: '',
     timesheet_type: 'civils' as string,
   });
   const [formLoading, setFormLoading] = useState(false);
@@ -85,19 +87,29 @@ export function JobRolesTab() {
     fetchRoles();
   }, [fetchRoles]);
 
+  const sortedRoles = useMemo(() => {
+    return [...roles].sort((a, b) => {
+      const rankA = a.hierarchy_rank ?? Number.MAX_SAFE_INTEGER;
+      const rankB = b.hierarchy_rank ?? Number.MAX_SAFE_INTEGER;
+      if (rankA !== rankB) return rankA - rankB;
+      const byPriority = getRoleSortPriority(a.name) - getRoleSortPriority(b.name);
+      if (byPriority !== 0) return byPriority;
+      return a.display_name.localeCompare(b.display_name);
+    });
+  }, [roles]);
+
   const filtered = search.trim()
-    ? roles.filter(r =>
+    ? sortedRoles.filter(r =>
         r.display_name.toLowerCase().includes(search.toLowerCase()) ||
         r.name.toLowerCase().includes(search.toLowerCase()) ||
         r.description?.toLowerCase().includes(search.toLowerCase())
       )
-    : roles;
+    : sortedRoles;
 
   const stats = {
     total: roles.length,
-    admin: roles.filter(r => r.is_super_admin || r.name === 'admin').length,
-    manager: roles.filter(r => !r.is_super_admin && r.is_manager_admin && r.name !== 'admin').length,
-    employee: roles.filter(r => !r.is_super_admin && !r.is_manager_admin).length,
+    core: roles.filter((role) => isCoreRoleName(role.name)).length,
+    custom: roles.filter((role) => !isCoreRoleName(role.name)).length,
   };
 
   function resetForm() {
@@ -106,6 +118,7 @@ export function JobRolesTab() {
       display_name: '',
       description: '',
       role_type: 'employee',
+      hierarchy_rank: '',
       timesheet_type: 'civils',
     });
     setFormError('');
@@ -118,6 +131,7 @@ export function JobRolesTab() {
       display_name: role.display_name,
       description: role.description || '',
       role_type: role.role_class || (role.name === 'admin' ? 'admin' : (role.is_manager_admin ? 'manager' : 'employee')),
+      hierarchy_rank: role.hierarchy_rank != null ? String(role.hierarchy_rank) : '',
       timesheet_type: role.timesheet_type || 'civils',
     });
     setFormError('');
@@ -144,6 +158,7 @@ export function JobRolesTab() {
         body: JSON.stringify({
           ...formData,
           role_class: formData.role_type,
+          hierarchy_rank: formData.hierarchy_rank ? Number(formData.hierarchy_rank) : null,
         }),
       });
       const data = await response.json();
@@ -174,6 +189,7 @@ export function JobRolesTab() {
         body: JSON.stringify({
           ...formData,
           role_class: formData.role_type,
+          hierarchy_rank: formData.hierarchy_rank ? Number(formData.hierarchy_rank) : null,
         }),
       });
       const data = await response.json();
@@ -222,7 +238,7 @@ export function JobRolesTab() {
   return (
     <div className="space-y-6">
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="border-border">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -238,8 +254,8 @@ export function JobRolesTab() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Admins</p>
-                <p className="text-2xl font-bold text-white">{stats.admin}</p>
+                <p className="text-sm text-muted-foreground">Core Roles</p>
+                <p className="text-2xl font-bold text-white">{stats.core}</p>
               </div>
               <Shield className="h-8 w-8 text-amber-500" />
             </div>
@@ -249,21 +265,10 @@ export function JobRolesTab() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Managers</p>
-                <p className="text-2xl font-bold text-white">{stats.manager}</p>
+                <p className="text-sm text-muted-foreground">Custom Roles</p>
+                <p className="text-2xl font-bold text-white">{stats.custom}</p>
               </div>
               <Shield className="h-8 w-8 text-blue-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Employee Roles</p>
-                <p className="text-2xl font-bold text-white">{stats.employee}</p>
-              </div>
-              <Users className="h-8 w-8 text-green-500" />
             </div>
           </CardContent>
         </Card>
@@ -312,6 +317,7 @@ export function JobRolesTab() {
                       <TableHead className="text-muted-foreground">Role</TableHead>
                       <TableHead className="text-muted-foreground">Description</TableHead>
                       <TableHead className="text-muted-foreground">Timesheet</TableHead>
+                      <TableHead className="text-muted-foreground text-center">Tier</TableHead>
                       <TableHead className="text-muted-foreground text-center">Type</TableHead>
                       <TableHead className="text-muted-foreground text-center">Users</TableHead>
                       <TableHead className="text-right text-muted-foreground">Actions</TableHead>
@@ -335,11 +341,20 @@ export function JobRolesTab() {
                             {getTimesheetTypeLabel(role.timesheet_type || 'civils')}
                           </div>
                         </TableCell>
+                        <TableCell className="text-center text-slate-300">
+                          {role.name === 'admin' ? 'Bypass' : role.hierarchy_rank ?? '—'}
+                        </TableCell>
                         <TableCell className="text-center">
-                          {role.is_super_admin ? (
+                          {isCoreRoleName(role.name) ? (
+                            <Badge variant="default">Primary</Badge>
+                          ) : role.is_super_admin ? (
                             <Badge variant="destructive">Super Admin</Badge>
                           ) : role.name === 'admin' ? (
                             <Badge variant="destructive">Admin</Badge>
+                          ) : role.name === 'supervisor' ? (
+                            <Badge variant="outline" className="text-cyan-300 border-cyan-500/50 bg-cyan-500/10">Supervisor</Badge>
+                          ) : role.name === 'contractor' ? (
+                            <Badge variant="outline" className="text-orange-300 border-orange-500/50 bg-orange-500/10">Contractor</Badge>
                           ) : role.is_manager_admin ? (
                             <Badge variant="warning">Manager</Badge>
                           ) : (
@@ -418,10 +433,10 @@ export function JobRolesTab() {
                 id="jr-add-name"
                 value={formData.name}
                 onChange={e => setFormData({ ...formData, name: e.target.value })}
-                placeholder="employee-new-department"
+                placeholder="project-coordinator"
                 className="bg-input border-border text-white placeholder:text-muted-foreground"
               />
-              <p className="text-xs text-muted-foreground">Lowercase, hyphenated (e.g., employee-civils)</p>
+              <p className="text-xs text-muted-foreground">Lowercase, hyphenated (e.g., project-coordinator)</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="jr-add-display">Display Name *</Label>
@@ -429,7 +444,7 @@ export function JobRolesTab() {
                 id="jr-add-display"
                 value={formData.display_name}
                 onChange={e => setFormData({ ...formData, display_name: e.target.value })}
-                placeholder="Employee - New Department"
+                placeholder="Project Coordinator"
                 className="bg-input border-border text-white placeholder:text-muted-foreground"
               />
             </div>
@@ -488,6 +503,21 @@ export function JobRolesTab() {
                 </p>
               </div>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="jr-add-rank">Permission Tier Rank</Label>
+              <Input
+                id="jr-add-rank"
+                type="number"
+                min="1"
+                value={formData.hierarchy_rank}
+                onChange={e => setFormData({ ...formData, hierarchy_rank: e.target.value })}
+                className="bg-input border-border text-white"
+                placeholder="1"
+              />
+              <p className="text-xs text-muted-foreground">
+                Lower numbers are lower tiers. Ranked non-admin roles appear as permission matrix headers.
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setAddDialogOpen(false); resetForm(); }} className="border-slate-600 text-white hover:bg-slate-800">
@@ -523,7 +553,7 @@ export function JobRolesTab() {
                 onChange={e => setFormData({ ...formData, name: e.target.value })}
                 className="bg-input border-border text-white placeholder:text-muted-foreground"
               />
-              <p className="text-xs text-muted-foreground">Lowercase, hyphenated (e.g., employee-civils)</p>
+              <p className="text-xs text-muted-foreground">Lowercase, hyphenated (e.g., project-coordinator)</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="jr-edit-display">Display Name *</Label>
@@ -586,6 +616,20 @@ export function JobRolesTab() {
                     : 'Admins can set Admin, Manager, or Employee role type.'}
                 </p>
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="jr-edit-rank">Permission Tier Rank</Label>
+              <Input
+                id="jr-edit-rank"
+                type="number"
+                min="1"
+                value={formData.hierarchy_rank}
+                onChange={e => setFormData({ ...formData, hierarchy_rank: e.target.value })}
+                className="bg-input border-border text-white"
+              />
+              <p className="text-xs text-muted-foreground">
+                Lower numbers are lower tiers. Ranked non-admin roles appear as permission matrix headers.
+              </p>
             </div>
           </div>
           <DialogFooter>

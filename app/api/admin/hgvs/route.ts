@@ -8,6 +8,7 @@ import { createDVLAApiService } from '@/lib/services/dvla-api';
 import { createMotHistoryService } from '@/lib/services/mot-history-api';
 import { isRoadEligibleRegistration, runFleetDvlaSync } from '@/lib/services/fleet-dvla-sync';
 import type { Database } from '@/types/database';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
 // GET - List all HGVs with category info
 export async function GET(request: NextRequest) {
@@ -18,9 +19,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!effectiveRole.is_manager_admin) {
+    const canManageFleet = await canEffectiveRoleAccessModule('admin-vans');
+    if (!canManageFleet) {
       return NextResponse.json(
-        { error: 'Forbidden: Manager or Admin access required' },
+        { error: 'Forbidden: Fleet admin access required' },
         { status: 403 }
       );
     }
@@ -62,14 +64,20 @@ export async function GET(request: NextRequest) {
 // POST - Create a new HGV
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const effectiveRole = await getEffectiveRole();
+    if (!effectiveRole.user_id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const canManageFleet = await canEffectiveRoleAccessModule('admin-vans');
+    if (!canManageFleet) {
+      return NextResponse.json(
+        { error: 'Forbidden: Fleet admin access required' },
+        { status: 403 }
+      );
+    }
+
+    const supabase = await createServerClient();
 
     const body = await request.json();
     const {
@@ -123,7 +131,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`[INFO] HGV created: ${data.reg_number} (ID: ${data.id})`);
 
-    const syncResult = await syncHgvData(data.id, data.reg_number, user.id, supabase);
+    const syncResult = await syncHgvData(data.id, data.reg_number, effectiveRole.user_id, supabase);
 
     return NextResponse.json({
       hgv: data,

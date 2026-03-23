@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
 export async function POST(
   request: NextRequest,
@@ -20,16 +21,17 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check user role (must be manager or admin)
+    // Check Org V2 module access
     const profile = await getProfileWithRole(user.id);
 
     if (!profile) {
       return NextResponse.json({ error: 'Failed to verify user role' }, { status: 403 });
     }
 
-    if (!profile.role?.is_manager_admin) {
+    const canManageRams = await canEffectiveRoleAccessModule('rams');
+    if (!canManageRams) {
       return NextResponse.json(
-        { error: 'Only admins and managers can assign RAMS documents' },
+        { error: 'RAMS access required to assign documents' },
         { status: 403 }
       );
     }
@@ -210,16 +212,17 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check user role (must be manager or admin)
+    // Check Org V2 module access
     const profile = await getProfileWithRole(user.id);
 
     if (!profile) {
       return NextResponse.json({ error: 'Failed to verify user role' }, { status: 403 });
     }
 
-    if (!profile.role?.is_manager_admin) {
+    const canManageRams = await canEffectiveRoleAccessModule('rams');
+    if (!canManageRams) {
       return NextResponse.json(
-        { error: 'Only admins and managers can view assignments' },
+        { error: 'RAMS access required to view assignments' },
         { status: 403 }
       );
     }

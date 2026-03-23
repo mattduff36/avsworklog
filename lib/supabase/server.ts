@@ -1,10 +1,11 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { VIEW_AS_COOKIE_NAME } from '@/lib/utils/view-as-cookie'
+import { VIEW_AS_ROLE_COOKIE_NAME, VIEW_AS_TEAM_COOKIE_NAME } from '@/lib/utils/view-as-cookie'
 
 export async function createClient() {
   const cookieStore = await cookies()
-  const viewAsRoleId = cookieStore.get(VIEW_AS_COOKIE_NAME)?.value || ''
+  const viewAsRoleId = cookieStore.get(VIEW_AS_ROLE_COOKIE_NAME)?.value || ''
+  const viewAsTeamId = cookieStore.get(VIEW_AS_TEAM_COOKIE_NAME)?.value || ''
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,11 +27,16 @@ export async function createClient() {
         },
       },
       global: {
-        // Inject x-view-as-role-id header so PostgREST forwards it to the DB
+        // Inject view-as headers so PostgREST forwards them to the DB
         fetch: (input, init) => {
-          if (viewAsRoleId) {
+          if (viewAsRoleId || viewAsTeamId) {
             const headers = new Headers(init?.headers)
-            headers.set('x-view-as-role-id', viewAsRoleId)
+            if (viewAsRoleId) {
+              headers.set('x-view-as-role-id', viewAsRoleId)
+            }
+            if (viewAsTeamId) {
+              headers.set('x-view-as-team-id', viewAsTeamId)
+            }
             return fetch(input, { ...init, headers })
           }
           return fetch(input, init)

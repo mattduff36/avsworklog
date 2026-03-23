@@ -15,12 +15,16 @@ import {
   Shield,
   Check
 } from 'lucide-react';
-import { useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { ModuleName } from '@/types/roles';
 import { ALL_MODULES } from '@/types/roles';
 import { managerNavItems, adminNavItems, getFilteredNavByPermissions } from '@/lib/config/navigation';
-import { getViewAsRoleId, setViewAsRoleId } from '@/lib/utils/view-as-cookie';
+import {
+  clearViewAsSelection,
+  getViewAsSelection,
+  setViewAsSelection,
+} from '@/lib/utils/view-as-cookie';
 
 interface RoleOption {
   id: string;
@@ -30,6 +34,13 @@ interface RoleOption {
   is_manager_admin: boolean;
 }
 
+interface TeamOption {
+  id: string;
+  name: string;
+  code: string | null;
+  active: boolean;
+}
+
 interface SidebarNavProps {
   open: boolean;
   onToggle: () => void;
@@ -37,37 +48,43 @@ interface SidebarNavProps {
 
 export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   const pathname = usePathname();
-  const { isAdmin, isManager, effectiveRole, isViewingAs } = useAuth();
+  const { isAdmin, isManager, effectiveRole, isViewingAs, isActualSuperAdmin } = useAuth();
   const supabase = createClient();
-  const [userEmail, setUserEmail] = useState<string>('');
   const [viewAsRoleId, setViewAsRoleIdState] = useState<string>('');
+  const [viewAsTeamId, setViewAsTeamIdState] = useState<string>('');
+  const [draftRoleId, setDraftRoleId] = useState<string>('');
+  const [draftTeamId, setDraftTeamId] = useState<string>('');
   const [allRoles, setAllRoles] = useState<RoleOption[]>([]);
+  const [allTeams, setAllTeams] = useState<TeamOption[]>([]);
   const [userPermissions, setUserPermissions] = useState<Set<ModuleName>>(new Set());
   const [pendingAbsenceCount, setPendingAbsenceCount] = useState(0);
+  const [viewAsMenuOpen, setViewAsMenuOpen] = useState(false);
+  const [viewAsMenuPosition, setViewAsMenuPosition] = useState({ left: 0, bottom: 12, maxHeight: 320 });
+  const viewAsTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const viewAsMenuRef = useRef<HTMLDivElement | null>(null);
 
   // Fetch user email, all roles, and current view-as selection
   useEffect(() => {
-    async function fetchUserData() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.email) {
-        queueMicrotask(() => setUserEmail(user.email));
-      }
-    }
-    fetchUserData();
+    async function fetchViewAsOptions() {
+      try {
+        const response = await fetch('/api/superadmin/view-as/options', { cache: 'no-store' });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to load view-as options');
+        }
 
-    // Fetch all roles for the View As menu
-    async function fetchRoles() {
-      const { data, error } = await supabase
-        .from('roles')
-        .select('id, name, display_name, is_super_admin, is_manager_admin')
-        .order('is_super_admin', { ascending: false })
-        .order('is_manager_admin', { ascending: false })
-        .order('display_name', { ascending: true });
-      if (!error && data) {
-        queueMicrotask(() => setAllRoles(data));
+        queueMicrotask(() => {
+          setAllRoles((data.roles || []) as RoleOption[]);
+          setAllTeams((data.teams || []) as TeamOption[]);
+        });
+      } catch {
+        queueMicrotask(() => {
+          setAllRoles([]);
+          setAllTeams([]);
+        });
       }
     }
-    fetchRoles();
+    fetchViewAsOptions();
 
     async function fetchPermissions() {
       try {
@@ -76,39 +93,15 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
           return;
         }
 
-        let effectiveRoleId = isViewingAs ? getViewAsRoleId() : '';
-        if (!effectiveRoleId) {
-          const {
-            data: { user },
-          } = await supabase.auth.getUser();
-          if (!user?.id) {
-            queueMicrotask(() => setUserPermissions(new Set()));
-            return;
-          }
-          const { data: profileRow } = await supabase
-            .from('profiles')
-            .select('role_id')
-            .eq('id', user.id)
-            .single();
-          effectiveRoleId = profileRow?.role_id || '';
+        const response = await fetch('/api/me/permissions', { cache: 'no-store' });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to load permissions');
         }
 
-        if (!effectiveRoleId) {
-          queueMicrotask(() => setUserPermissions(new Set()));
-          return;
-        }
-
-        const { data: perms } = await supabase
-          .from('role_permissions')
-          .select('module_name, enabled')
-          .eq('role_id', effectiveRoleId)
-          .eq('enabled', true);
-
-        const enabledModules = new Set<ModuleName>();
-        (perms || []).forEach((perm: { module_name: string }) => {
-          enabledModules.add(perm.module_name as ModuleName);
-        });
-        queueMicrotask(() => setUserPermissions(enabledModules));
+        queueMicrotask(
+          () => setUserPermissions(new Set<ModuleName>((data.enabled_modules || []) as ModuleName[]))
+        );
       } catch {
         queueMicrotask(() => setUserPermissions(new Set()));
       }
@@ -131,10 +124,14 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
     fetchPendingAbsenceCount();
 
     // Read current selection from cookie (or legacy localStorage)
-    const cookieVal = getViewAsRoleId();
-    if (cookieVal) {
-      queueMicrotask(() => setViewAsRoleIdState(cookieVal));
-    } else {
+    const { roleId, teamId } = getViewAsSelection();
+    queueMicrotask(() => {
+      setViewAsRoleIdState(roleId);
+      setViewAsTeamIdState(teamId);
+      setDraftRoleId(roleId);
+      setDraftTeamId(teamId);
+    });
+    if (!roleId) {
       // Migrate legacy localStorage value if present
       const legacy = localStorage.getItem('viewAsRole');
       if (legacy && legacy !== 'actual') {
@@ -149,18 +146,79 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   useEffect(() => {
     if (prevPathnameRef.current !== pathname) {
       prevPathnameRef.current = pathname;
+      setViewAsMenuOpen(false);
       if (open) {
         onToggle();
       }
     }
   }, [pathname, open, onToggle]);
 
-  const isSuperAdmin = userEmail === 'admin@mpdee.co.uk';
-  const isViewingAsOtherRole = isSuperAdmin && viewAsRoleId !== '';
-  const showDeveloperTools = isSuperAdmin && !isViewingAsOtherRole;
+  useEffect(() => {
+    if (!viewAsMenuOpen) return;
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target as Node;
+      if (viewAsTriggerRef.current?.contains(target) || viewAsMenuRef.current?.contains(target)) {
+        return;
+      }
+      setViewAsMenuOpen(false);
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setViewAsMenuOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [viewAsMenuOpen]);
+
+  const updateViewAsMenuPosition = useCallback(() => {
+    const triggerRect = viewAsTriggerRef.current?.getBoundingClientRect();
+    if (!triggerRect) return;
+
+    const viewportHeight = window.innerHeight;
+    const bottomOffset = Math.max(12, Math.round(viewportHeight - triggerRect.bottom));
+    const maxHeight = Math.max(240, viewportHeight - bottomOffset - 24);
+
+    setViewAsMenuPosition({
+      left: Math.round(triggerRect.right + (open ? 16 : 12)),
+      bottom: bottomOffset,
+      maxHeight,
+    });
+  }, [open]);
+
+  useEffect(() => {
+    if (!viewAsMenuOpen) return;
+
+    updateViewAsMenuPosition();
+
+    function syncPosition() {
+      updateViewAsMenuPosition();
+    }
+
+    window.addEventListener('resize', syncPosition);
+    window.addEventListener('scroll', syncPosition, true);
+    return () => {
+      window.removeEventListener('resize', syncPosition);
+      window.removeEventListener('scroll', syncPosition, true);
+    };
+  }, [viewAsMenuOpen, open, updateViewAsMenuPosition]);
+
+  const isSuperAdmin = isActualSuperAdmin;
+  const isViewingAsOverride = isSuperAdmin && (viewAsRoleId !== '' || viewAsTeamId !== '');
+  const showDeveloperTools = isSuperAdmin && !isViewingAsOverride;
 
   // Find the currently-selected role object for display
   const selectedRole = allRoles.find((r) => r.id === viewAsRoleId) ?? null;
+  const selectedTeam = allTeams.find((team) => team.id === viewAsTeamId) ?? null;
+  const draftRole = allRoles.find((r) => r.id === draftRoleId) ?? null;
+  const draftTeam = allTeams.find((team) => team.id === draftTeamId) ?? null;
   
   // Show sidebar for managers/admins or superadmins (who need View As feature)
   if (!isManager && !isAdmin && !isSuperAdmin) return null;
@@ -171,57 +229,165 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   const hasAnyManagementLinks = sidebarManagerLinks.length > 0 || adminLinks.length > 0;
   const showSidebar = hasAnyManagementLinks || showDeveloperTools;
 
+  const selectionSummary =
+    selectedRole || selectedTeam
+      ? [selectedRole?.display_name, selectedTeam?.name].filter(Boolean).join(' / ')
+      : 'Actual Role & Team';
+  const draftSummary =
+    draftRole || draftTeam
+      ? [draftRole?.display_name, draftTeam?.name].filter(Boolean).join(' / ')
+      : 'Actual Role & Team';
+
+  const applyViewAsSelection = () => {
+    setViewAsSelection({
+      roleId: draftRoleId,
+      teamId: draftTeamId,
+    });
+    setViewAsRoleIdState(draftRoleId);
+    setViewAsTeamIdState(draftTeamId);
+    setTimeout(() => window.location.reload(), 100);
+  };
+
   const viewAsPopoverContent = (
-    <div className="space-y-1">
+    <div className="space-y-3">
       <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wider" style={{ color: '#cbd5e1' }}>
-        View As Role
+        View As
+      </div>
+      <div className="px-2 text-xs" style={{ color: '#94a3b8' }}>
+        Select both a role and team to mirror that combination.
       </div>
       <button
         type="button"
         onClick={() => {
-          setViewAsRoleIdState('');
-          setViewAsRoleId('');
-          setTimeout(() => window.location.reload(), 100);
+          setDraftRoleId('');
+          setDraftTeamId('');
         }}
         className={`w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${
-          viewAsRoleId === '' ? 'bg-avs-yellow' : 'hover:bg-slate-800 hover:text-white'
+          draftRoleId === '' && draftTeamId === '' ? 'bg-avs-yellow' : 'hover:bg-slate-800 hover:text-white'
         }`}
-        style={viewAsRoleId === '' ? { color: '#0f172a' } : { color: '#e2e8f0' }}
+        style={draftRoleId === '' && draftTeamId === '' ? { color: '#0f172a' } : { color: '#e2e8f0' }}
       >
-        <Crown className="w-4 h-4" style={viewAsRoleId === '' ? { color: '#0f172a' } : { color: '#e2e8f0' }} />
-        <span className="flex-1 text-left" style={viewAsRoleId === '' ? { color: '#0f172a' } : { color: '#e2e8f0' }}>
-          Actual Role (SuperAdmin)
+        <Crown
+          className="w-4 h-4"
+          style={draftRoleId === '' && draftTeamId === '' ? { color: '#0f172a' } : { color: '#e2e8f0' }}
+        />
+        <span
+          className="flex-1 text-left"
+          style={draftRoleId === '' && draftTeamId === '' ? { color: '#0f172a' } : { color: '#e2e8f0' }}
+        >
+          Actual Role & Team
         </span>
-        {viewAsRoleId === '' && <Check className="w-4 h-4" style={{ color: '#0f172a' }} />}
+        {draftRoleId === '' && draftTeamId === '' && <Check className="w-4 h-4" style={{ color: '#0f172a' }} />}
       </button>
 
-      <div className="border-t border-slate-700 my-1" />
+      <div className="border-t border-slate-700 pt-2">
+        <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider" style={{ color: '#94a3b8' }}>
+          Role
+        </div>
+        <div className="space-y-1 max-h-48 overflow-y-auto">
+          {allRoles.map((role) => {
+            const isActive = draftRoleId === role.id;
+            const RoleIcon = role.is_super_admin ? Shield : role.is_manager_admin ? Users : User;
+            return (
+              <button
+                key={role.id}
+                type="button"
+                onClick={() => setDraftRoleId(role.id)}
+                className={`w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${
+                  isActive ? 'bg-avs-yellow' : 'hover:bg-slate-800 hover:text-white'
+                }`}
+                style={isActive ? { color: '#0f172a' } : { color: '#e2e8f0' }}
+              >
+                <RoleIcon
+                  className="w-4 h-4 flex-shrink-0"
+                  style={isActive ? { color: '#0f172a' } : { color: '#e2e8f0' }}
+                />
+                <span className="flex-1 text-left truncate" style={isActive ? { color: '#0f172a' } : { color: '#e2e8f0' }}>
+                  {role.display_name}
+                </span>
+                {isActive && <Check className="w-4 h-4 flex-shrink-0" style={{ color: '#0f172a' }} />}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-      {allRoles.map((role) => {
-        const isActive = viewAsRoleId === role.id;
-        const RoleIcon = role.is_super_admin ? Shield : role.is_manager_admin ? Users : User;
-        return (
+      <div className="border-t border-slate-700 pt-2">
+        <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider" style={{ color: '#94a3b8' }}>
+          Team
+        </div>
+        <div className="space-y-1 max-h-48 overflow-y-auto">
           <button
-            key={role.id}
             type="button"
+            onClick={() => setDraftTeamId('')}
+            className={`w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${
+              draftTeamId === '' ? 'bg-avs-yellow' : 'hover:bg-slate-800 hover:text-white'
+            }`}
+            style={draftTeamId === '' ? { color: '#0f172a' } : { color: '#e2e8f0' }}
+          >
+            <Users
+              className="w-4 h-4 flex-shrink-0"
+              style={draftTeamId === '' ? { color: '#0f172a' } : { color: '#e2e8f0' }}
+            />
+            <span className="flex-1 text-left">Actual Team</span>
+            {draftTeamId === '' && <Check className="w-4 h-4 flex-shrink-0" style={{ color: '#0f172a' }} />}
+          </button>
+          {allTeams.map((team) => {
+            const isActive = draftTeamId === team.id;
+            return (
+              <button
+                key={team.id}
+                type="button"
+                onClick={() => setDraftTeamId(team.id)}
+                className={`w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${
+                  isActive ? 'bg-avs-yellow' : 'hover:bg-slate-800 hover:text-white'
+                }`}
+                style={isActive ? { color: '#0f172a' } : { color: '#e2e8f0' }}
+              >
+                <Users
+                  className="w-4 h-4 flex-shrink-0"
+                  style={isActive ? { color: '#0f172a' } : { color: '#e2e8f0' }}
+                />
+                <span className="flex-1 text-left truncate" style={isActive ? { color: '#0f172a' } : { color: '#e2e8f0' }}>
+                  {team.name}
+                </span>
+                {isActive && <Check className="w-4 h-4 flex-shrink-0" style={{ color: '#0f172a' }} />}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="border-t border-slate-700 pt-3 space-y-2">
+        <div className="px-2 text-xs" style={{ color: '#cbd5e1' }}>
+          Pending selection: {draftSummary}
+        </div>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="flex-1 border-slate-700 bg-slate-800 text-slate-100 hover:bg-slate-700"
+            onClick={applyViewAsSelection}
+          >
+            Apply
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="flex-1 text-slate-300 hover:bg-slate-800 hover:text-white"
             onClick={() => {
-              setViewAsRoleIdState(role.id);
-              setViewAsRoleId(role.id);
+              clearViewAsSelection();
+              setViewAsRoleIdState('');
+              setViewAsTeamIdState('');
+              setDraftRoleId('');
+              setDraftTeamId('');
               setTimeout(() => window.location.reload(), 100);
             }}
-            className={`w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${
-              isActive ? 'bg-avs-yellow' : 'hover:bg-slate-800 hover:text-white'
-            }`}
-            style={isActive ? { color: '#0f172a' } : { color: '#e2e8f0' }}
           >
-            <RoleIcon className="w-4 h-4 flex-shrink-0" style={isActive ? { color: '#0f172a' } : { color: '#e2e8f0' }} />
-            <span className="flex-1 text-left truncate" style={isActive ? { color: '#0f172a' } : { color: '#e2e8f0' }}>
-              {role.display_name}
-            </span>
-            {isActive && <Check className="w-4 h-4 flex-shrink-0" style={{ color: '#0f172a' }} />}
-          </button>
-        );
-      })}
+            Reset
+          </Button>
+        </div>
+      </div>
     </div>
   );
 
@@ -237,11 +403,11 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
               variant="ghost"
               size="icon"
               className={`h-10 w-10 ${
-                isViewingAsOtherRole ? 'bg-amber-600/30' : 'hover:bg-slate-800'
+                isViewingAsOverride ? 'bg-amber-600/30' : 'hover:bg-slate-800'
               }`}
-              title={selectedRole ? `Viewing as ${selectedRole.display_name}` : 'View As Role'}
+              title={selectedRole || selectedTeam ? `Viewing as ${selectionSummary}` : 'View As'}
             >
-              <Eye className={`w-5 h-5 ${isViewingAsOtherRole ? 'text-amber-300' : 'text-slate-400 hover:text-white'}`} />
+              <Eye className={`w-5 h-5 ${isViewingAsOverride ? 'text-amber-300' : 'text-slate-400 hover:text-white'}`} />
             </Button>
           </PopoverTrigger>
           <PopoverContent
@@ -422,39 +588,60 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
               <PopoverTrigger asChild>
                 {open ? (
                   <Button
+                    ref={viewAsTriggerRef}
                     variant="outline"
                     className={`w-full justify-start gap-2 border-border text-xs h-9 ${
-                      isViewingAsOtherRole
+                      isViewingAsOverride
                         ? 'bg-amber-600/30 border-amber-500/50 text-amber-200 hover:bg-amber-600/40 hover:text-amber-100'
                         : 'bg-slate-800/50 text-muted-foreground hover:bg-slate-700 hover:text-white'
                     }`}
+                    onClick={() => {
+                      const nextOpen = !viewAsMenuOpen;
+                      if (nextOpen) {
+                        requestAnimationFrame(() => updateViewAsMenuPosition());
+                      }
+                      setViewAsMenuOpen(nextOpen);
+                    }}
                   >
                     <Eye className="w-4 h-4 flex-shrink-0" />
                     <span className="flex-1 text-left truncate">
-                      {selectedRole ? `View as ${selectedRole.display_name}` : 'Actual Role'}
+                      {selectionSummary}
                     </span>
                   </Button>
                 ) : (
                   <Button
+                    ref={viewAsTriggerRef}
                     variant="ghost"
                     size="sm"
-                    className={`w-full h-10 p-0 ${isViewingAsOtherRole ? 'bg-amber-600/30' : 'hover:bg-slate-800'}`}
+                    className={`w-full h-10 p-0 ${isViewingAsOverride ? 'bg-amber-600/30' : 'hover:bg-slate-800'}`}
                     title="View As"
+                    onClick={() => {
+                      const nextOpen = !viewAsMenuOpen;
+                      if (nextOpen) {
+                        requestAnimationFrame(() => updateViewAsMenuPosition());
+                      }
+                      setViewAsMenuOpen(nextOpen);
+                    }}
                   >
-                    <Eye className={`w-5 h-5 ${isViewingAsOtherRole ? 'text-amber-300' : 'text-slate-400 hover:text-white'}`} />
+                    <Eye className={`w-5 h-5 ${isViewingAsOverride ? 'text-amber-300' : 'text-slate-400 hover:text-white'}`} />
                   </Button>
                 )}
               </PopoverTrigger>
-              <PopoverContent 
-                side="right"
-                align="start"
-                sideOffset={12}
-                className="w-64 p-2 bg-slate-900 border border-slate-700 shadow-2xl max-h-[70vh] overflow-y-auto"
-                style={{ color: '#e2e8f0' }}
+            </Popover>
+            {viewAsMenuOpen && (
+              <div
+                ref={viewAsMenuRef}
+                className="fixed z-[80] w-64 p-2 bg-slate-900 border border-slate-700 shadow-2xl overflow-y-auto rounded-md"
+                style={{
+                  left: `${viewAsMenuPosition.left}px`,
+                  bottom: `${viewAsMenuPosition.bottom}px`,
+                  maxHeight: `${viewAsMenuPosition.maxHeight}px`,
+                  color: '#e2e8f0',
+                }}
               >
                 {viewAsPopoverContent}
-              </PopoverContent>
-            </Popover>
+              </div>
+            )}
           </div>
         )}
       </div>

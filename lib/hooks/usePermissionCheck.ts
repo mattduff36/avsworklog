@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from './useAuth';
-import { createClient } from '@/lib/supabase/client';
 import type { ModuleName } from '@/types/roles';
 import { toast } from 'sonner';
 
@@ -16,7 +15,7 @@ import { toast } from 'sonner';
  * @returns Object with hasPermission and loading states
  */
 export function usePermissionCheck(moduleName: ModuleName, redirectOnFail = true) {
-  const { user, profile, isAdmin, isViewingAs, effectiveRole, loading: authLoading } = useAuth();
+  const { user, profile, isAdmin, isSuperAdmin, isViewingAs, effectiveRole, loading: authLoading } = useAuth();
   const router = useRouter();
   const [hasPermission, setHasPermission] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -34,64 +33,21 @@ export function usePermissionCheck(moduleName: ModuleName, redirectOnFail = true
         return;
       }
 
-      // Admin keeps full access by definition.
-      if (isAdmin) {
+      // Admin and superadmin keep full access by definition.
+      if (isAdmin || isSuperAdmin) {
         setHasPermission(true);
         setLoading(false);
         return;
       }
 
-      // Check user permission via client Supabase
       try {
-        const supabase = createClient();
-        let hasModulePermission = false;
-
-        // When viewing as another role, fetch permissions from the EFFECTIVE role
-        // (not the actual profile's role which is still admin/superadmin).
-        // If viewAsRoleId is empty (stale cookie), deny to avoid privilege escalation.
-        const viewAsRoleId =
-          isViewingAs && effectiveRole
-            ? (await import('@/lib/utils/view-as-cookie')).getViewAsRoleId()
-            : '';
-
-        if (viewAsRoleId) {
-          const { data: perms, error } = await supabase
-            .from('role_permissions')
-            .select('module_name, enabled')
-            .eq('role_id', viewAsRoleId)
-            .eq('module_name', moduleName)
-            .eq('enabled', true)
-            .maybeSingle();
-
-          if (error) throw error;
-          hasModulePermission = !!perms;
-        } else if (!(isViewingAs && effectiveRole)) {
-          // Normal flow: fetch from profile → role → permissions
-          const { data: profileData, error } = await supabase
-            .from('profiles')
-          .select(`
-            role_id,
-            role:roles!inner(
-              role_permissions!inner(
-                module_name,
-                enabled
-              )
-            )
-          `)
-            .eq('id', user.id)
-            .single();
-
-          if (error) throw error;
-
-          // Check if user has permission for this module
-          interface RoleWithPerms {
-            role_permissions?: Array<{ module_name: string; enabled: boolean }>;
-          }
-          const rolePerms = profileData?.role as RoleWithPerms | undefined;
-          hasModulePermission = rolePerms?.role_permissions?.some(
-            (p) => p.module_name === moduleName && p.enabled
-          ) ?? false;
+        const response = await fetch('/api/me/permissions', { cache: 'no-store' });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to load permissions');
         }
+
+        const hasModulePermission = Boolean(data.permissions?.[moduleName]);
 
         setHasPermission(hasModulePermission);
 
@@ -114,7 +70,7 @@ export function usePermissionCheck(moduleName: ModuleName, redirectOnFail = true
     }
 
     checkPermission();
-  }, [user, profile, isAdmin, isViewingAs, effectiveRole, authLoading, moduleName, redirectOnFail, router]);
+  }, [user, profile, isAdmin, isSuperAdmin, isViewingAs, effectiveRole, authLoading, moduleName, redirectOnFail, router]);
 
   return { hasPermission, loading };
 }

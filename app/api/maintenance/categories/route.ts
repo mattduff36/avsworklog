@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logger } from '@/lib/utils/logger';
-import { getProfileWithRole } from '@/lib/utils/permissions';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import type {
   CreateCategoryRequest,
   CategoriesListResponse
@@ -66,10 +66,10 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const profile = await getProfileWithRole(user.id);
-    if (!profile?.role || profile.role.role_class === 'employee') {
+    const canManageMaintenance = await canEffectiveRoleAccessModule('maintenance');
+    if (!canManageMaintenance) {
       return NextResponse.json(
-        { error: 'Only admins and managers can create categories' },
+        { error: 'Maintenance access required to create categories' },
         { status: 403 }
       );
     }

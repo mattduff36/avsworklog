@@ -4,6 +4,7 @@ import { getProfileWithRole } from '@/lib/utils/permissions';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { RAMSExportDocument } from '@/lib/pdf/RAMSExportDocument';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
 export async function GET(
   request: NextRequest,
@@ -22,16 +23,17 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check user role (must be manager or admin)
+    // Check Org V2 module access
     const profile = await getProfileWithRole(user.id);
 
     if (!profile) {
       return NextResponse.json({ error: 'Failed to verify user role' }, { status: 403 });
     }
 
-    if (!profile.role?.is_manager_admin) {
+    const canExportRams = await canEffectiveRoleAccessModule('rams');
+    if (!canExportRams) {
       return NextResponse.json(
-        { error: 'Only admins and managers can export RAMS documents' },
+        { error: 'RAMS access required to export documents' },
         { status: 403 }
       );
     }

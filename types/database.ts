@@ -58,6 +58,7 @@ export interface Database {
           display_name: string
           description: string | null
           role_class: 'admin' | 'manager' | 'employee'
+          hierarchy_rank: number | null
           is_super_admin: boolean
           is_manager_admin: boolean
           timesheet_type: string | null
@@ -70,6 +71,7 @@ export interface Database {
           display_name: string
           description?: string | null
           role_class?: 'admin' | 'manager' | 'employee'
+          hierarchy_rank?: number | null
           is_super_admin?: boolean
           is_manager_admin?: boolean
           timesheet_type?: string | null
@@ -82,9 +84,33 @@ export interface Database {
           display_name?: string
           description?: string | null
           role_class?: 'admin' | 'manager' | 'employee'
+          hierarchy_rank?: number | null
           is_super_admin?: boolean
           is_manager_admin?: boolean
           timesheet_type?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      permission_modules: {
+        Row: {
+          module_name: string
+          minimum_role_id: string
+          sort_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          module_name: string
+          minimum_role_id: string
+          sort_order: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          module_name?: string
+          minimum_role_id?: string
+          sort_order?: number
           created_at?: string
           updated_at?: string
         }
@@ -109,6 +135,29 @@ export interface Database {
         Update: {
           id?: string
           role_id?: string
+          module_name?: string
+          enabled?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      team_module_permissions: {
+        Row: {
+          team_id: string
+          module_name: string
+          enabled: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          team_id: string
+          module_name: string
+          enabled?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          team_id?: string
           module_name?: string
           enabled?: boolean
           created_at?: string

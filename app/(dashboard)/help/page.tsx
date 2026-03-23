@@ -150,29 +150,13 @@ export default function HelpPage() {
       }
       
       try {
-        const { data } = await supabase
-          .from('profiles')
-          .select(`
-            role_id,
-            roles!inner(
-              role_permissions(
-                module_name,
-                enabled
-              )
-            )
-          `)
-          .eq('id', profile.id)
-          .single();
-        
-        // Build Set of enabled permissions
-        const enabledModules = new Set<ModuleName>();
-        data?.roles?.role_permissions?.forEach((perm: { enabled: boolean; module_name: string }) => {
-          if (perm.enabled) {
-            enabledModules.add(perm.module_name as ModuleName);
-          }
-        });
-        
-        setUserPermissions(enabledModules);
+        const response = await fetch('/api/me/permissions', { cache: 'no-store' });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to load permissions');
+        }
+
+        setUserPermissions(new Set<ModuleName>((data.enabled_modules || []) as ModuleName[]));
       } catch (error) {
         console.error('Error fetching permissions:', error);
         setUserPermissions(new Set());

@@ -3,6 +3,7 @@ import { createClient as createSupabaseAdmin } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
 type Manager = {
   id: string;
@@ -44,9 +45,10 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!effectiveRole.is_manager_admin) {
+    const canAccessApprovals = await canEffectiveRoleAccessModule('approvals');
+    if (!canAccessApprovals) {
       return NextResponse.json(
-        { error: 'Only managers and admins can view this list' },
+        { error: 'Approvals access required' },
         { status: 403 }
       );
     }

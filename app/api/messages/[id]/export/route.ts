@@ -4,6 +4,7 @@ import { getProfileWithRole } from '@/lib/utils/permissions';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { ToolboxTalkExportDocument } from '@/lib/pdf/ToolboxTalkExportDocument';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
 interface SenderProfileShape {
   full_name?: string | null;
@@ -31,16 +32,17 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check user role (must be manager or admin)
+    // Check Org V2 module access
     const profile = await getProfileWithRole(user.id);
 
     if (!profile) {
       return NextResponse.json({ error: 'Failed to verify user role' }, { status: 403 });
     }
 
-    if (!profile.role?.is_manager_admin) {
+    const canExportToolboxTalks = await canEffectiveRoleAccessModule('toolbox-talks');
+    if (!canExportToolboxTalks) {
       return NextResponse.json(
-        { error: 'Only admins and managers can export toolbox talk reports' },
+        { error: 'Toolbox Talks access required' },
         { status: 403 }
       );
     }

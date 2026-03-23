@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { removeLatestGeneratedFinancialYear } from '@/lib/services/absence-bank-holiday-sync';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
 export async function POST(request: Request) {
   try {
@@ -15,9 +16,10 @@ export async function POST(request: Request) {
     }
 
     const profile = await getProfileWithRole(user.id);
-    if (!profile?.role?.is_manager_admin) {
+    const canAccessAbsence = await canEffectiveRoleAccessModule('absence');
+    if (!profile || !canAccessAbsence) {
       return NextResponse.json(
-        { error: 'Forbidden: Manager or Admin access required' },
+        { error: 'Forbidden: Absence access required' },
         { status: 403 }
       );
     }

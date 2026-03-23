@@ -12,7 +12,7 @@
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { VIEW_AS_COOKIE_NAME } from '@/lib/utils/view-as-cookie';
+import { VIEW_AS_ROLE_COOKIE_NAME, VIEW_AS_TEAM_COOKIE_NAME } from '@/lib/utils/view-as-cookie';
 
 export interface EffectiveRoleInfo {
   /** The effective role id (may differ from actual if viewing-as) */
@@ -27,6 +27,10 @@ export interface EffectiveRoleInfo {
   is_actual_super_admin: boolean;
   /** The authenticated user's id */
   user_id: string | null;
+  /** Effective team id (may differ from actual if viewing-as) */
+  team_id: string | null;
+  /** Effective team name for UI/debugging */
+  team_name: string | null;
 }
 
 /**
@@ -48,13 +52,17 @@ export async function getEffectiveRole(): Promise<EffectiveRoleInfo> {
     is_viewing_as: false,
     is_actual_super_admin: false,
     user_id: null,
+    team_id: null,
+    team_name: null,
   };
 
   try {
     // Authenticate via session
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) return none;
+    if (authError || !user) {
+      return none;
+    }
 
     // Fetch actual profile + role using admin client to bypass RLS
     const admin = createAdminClient();
@@ -64,6 +72,7 @@ export async function getEffectiveRole(): Promise<EffectiveRoleInfo> {
         id,
         super_admin,
         role_id,
+        team_id,
         role:roles(
           id,
           name,
@@ -75,9 +84,12 @@ export async function getEffectiveRole(): Promise<EffectiveRoleInfo> {
       .eq('id', user.id)
       .single();
 
-    if (profileError || !profile) return none;
+    if (profileError || !profile) {
+      return none;
+    }
     const typedProfile = profile as unknown as {
       super_admin: boolean | null;
+      team_id: string | null;
       role: {
         id: string;
         name: string;
@@ -88,6 +100,20 @@ export async function getEffectiveRole(): Promise<EffectiveRoleInfo> {
     };
 
     const actualRole = typedProfile.role;
+    const actualTeamId = typedProfile.team_id ?? null;
+    let actualTeam: { id: string; name: string } | null = null;
+
+    if (actualTeamId) {
+      const { data: teamRow, error: teamError } = await admin
+        .from('org_teams')
+        .select('id, name')
+        .eq('id', actualTeamId)
+        .maybeSingle();
+
+      if (!teamError && teamRow) {
+        actualTeam = teamRow as { id: string; name: string };
+      }
+    }
 
     const isActualSuperAdmin =
       typedProfile.super_admin === true ||
@@ -104,42 +130,68 @@ export async function getEffectiveRole(): Promise<EffectiveRoleInfo> {
       is_viewing_as: false,
       is_actual_super_admin: isActualSuperAdmin,
       user_id: user.id,
+      team_id: actualTeamId ?? actualTeam?.id ?? null,
+      team_name: actualTeam?.name ?? null,
     };
 
     // Only super admins may override
     if (!isActualSuperAdmin) return result;
 
     const cookieStore = await cookies();
-    const viewAsRoleId = cookieStore.get(VIEW_AS_COOKIE_NAME)?.value;
+    const viewAsRoleId = cookieStore.get(VIEW_AS_ROLE_COOKIE_NAME)?.value;
+    const viewAsTeamId = cookieStore.get(VIEW_AS_TEAM_COOKIE_NAME)?.value;
 
-    if (!viewAsRoleId) return result;
+    let effectiveRole = actualRole;
+    let effectiveTeamId = result.team_id;
+    let effectiveTeamName = result.team_name;
+    let isViewingAs = false;
 
-    // Fetch the override role
-    const { data: overrideRole, error: overrideError } = await admin
-      .from('roles')
-      .select('id, name, display_name, is_manager_admin, is_super_admin')
-      .eq('id', viewAsRoleId)
-      .single();
+    if (viewAsRoleId) {
+      const { data: overrideRole, error: overrideError } = await admin
+        .from('roles')
+        .select('id, name, display_name, is_manager_admin, is_super_admin')
+        .eq('id', viewAsRoleId)
+        .single();
 
-    if (overrideError || !overrideRole) return result;
-    const typedOverrideRole = overrideRole as {
-      id: string;
-      name: string;
-      display_name: string;
-      is_manager_admin: boolean;
-      is_super_admin: boolean;
-    };
+      if (!overrideError && overrideRole) {
+        effectiveRole = overrideRole as {
+          id: string;
+          name: string;
+          display_name: string;
+          is_manager_admin: boolean;
+          is_super_admin: boolean;
+        };
+        isViewingAs = true;
+      }
+    }
 
-    return {
-      role_id: typedOverrideRole.id,
-      role_name: typedOverrideRole.name,
-      display_name: typedOverrideRole.display_name,
-      is_manager_admin: typedOverrideRole.is_manager_admin,
-      is_super_admin: typedOverrideRole.is_super_admin,
-      is_viewing_as: true,
+    if (viewAsTeamId) {
+      const { data: overrideTeam, error: overrideTeamError } = await admin
+        .from('org_teams')
+        .select('id, name')
+        .eq('id', viewAsTeamId)
+        .maybeSingle();
+
+      if (!overrideTeamError && overrideTeam) {
+        effectiveTeamId = overrideTeam.id;
+        effectiveTeamName = overrideTeam.name;
+        isViewingAs = true;
+      }
+    }
+
+    const resolved = {
+      role_id: effectiveRole?.id ?? null,
+      role_name: effectiveRole?.name ?? null,
+      display_name: effectiveRole?.display_name ?? null,
+      is_manager_admin: effectiveRole?.is_manager_admin ?? false,
+      is_super_admin: effectiveRole?.is_super_admin ?? false,
+      is_viewing_as: isViewingAs,
       is_actual_super_admin: true,
       user_id: user.id,
+      team_id: effectiveTeamId,
+      team_name: effectiveTeamName,
     };
+    return resolved;
   } catch (error) {
     console.error('[getEffectiveRole] Error:', error);
     return none;

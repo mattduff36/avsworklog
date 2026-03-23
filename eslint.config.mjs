@@ -17,7 +17,10 @@ const eslintConfig = [
       sonarjs,
     },
     rules: {
-      // Keep only narrowly-scoped local overrides here.
+      "@typescript-eslint/no-unused-vars": ["warn", {
+        argsIgnorePattern: "^_",
+        varsIgnorePattern: "^_",
+      }],
     },
   },
   {

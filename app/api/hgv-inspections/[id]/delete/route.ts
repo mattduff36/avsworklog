@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { getProfileWithRole } from '@/lib/utils/permissions';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
 export async function DELETE(
   _request: NextRequest,
@@ -14,10 +14,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const profile = await getProfileWithRole(user.id);
-    if (!profile || !profile.role?.is_manager_admin) {
+    const canDeleteInspections = await canEffectiveRoleAccessModule('hgv-inspections');
+    if (!canDeleteInspections) {
       return NextResponse.json(
-        { error: 'Forbidden: Manager or Admin access required' },
+        { error: 'Forbidden: HGV inspections access required' },
         { status: 403 }
       );
     }

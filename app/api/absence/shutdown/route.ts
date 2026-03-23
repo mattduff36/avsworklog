@@ -6,6 +6,7 @@ import {
   listBulkAbsenceBatches,
   undoBulkAbsenceBatch,
 } from '@/lib/services/absence-bank-holiday-sync';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
 interface BulkAbsencePayload {
   reasonId?: string;
@@ -19,7 +20,7 @@ interface BulkAbsencePayload {
   confirm?: boolean;
 }
 
-async function requireManagerAdmin() {
+async function requireAbsenceAccess() {
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -30,12 +31,13 @@ async function requireManagerAdmin() {
   }
 
   const profile = await getProfileWithRole(user.id);
-  if (!profile?.role?.is_manager_admin) {
+  const canAccessAbsence = await canEffectiveRoleAccessModule('absence');
+  if (!profile || !canAccessAbsence) {
     return {
       supabase,
       profile: null,
       response: NextResponse.json(
-        { error: 'Forbidden: Manager or Admin access required' },
+        { error: 'Forbidden: Absence access required' },
         { status: 403 }
       ),
     };
@@ -46,7 +48,7 @@ async function requireManagerAdmin() {
 
 export async function GET() {
   try {
-    const auth = await requireManagerAdmin();
+    const auth = await requireAbsenceAccess();
     if (auth.response) {
       return auth.response;
     }
@@ -64,7 +66,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireManagerAdmin();
+    const auth = await requireAbsenceAccess();
     if (auth.response) {
       return auth.response;
     }
@@ -106,7 +108,7 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const auth = await requireManagerAdmin();
+    const auth = await requireAbsenceAccess();
     if (auth.response) {
       return auth.response;
     }

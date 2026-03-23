@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logger } from '@/lib/utils/logger';
 import type { UpdateCategoryRequest } from '@/types/maintenance';
-import { getProfileWithRole } from '@/lib/utils/permissions';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
 /**
  * PUT /api/maintenance/categories/[id]
@@ -21,10 +21,10 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    const profile = await getProfileWithRole(user.id);
-    if (!profile?.role || profile.role.role_class === 'employee') {
+    const canManageMaintenance = await canEffectiveRoleAccessModule('maintenance');
+    if (!canManageMaintenance) {
       return NextResponse.json(
-        { error: 'Only admins and managers can update categories' },
+        { error: 'Maintenance access required to update categories' },
         { status: 403 }
       );
     }
@@ -85,10 +85,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    const profile = await getProfileWithRole(user.id);
-    if (!profile?.role || profile.role.role_class === 'employee') {
+    const canManageMaintenance = await canEffectiveRoleAccessModule('maintenance');
+    if (!canManageMaintenance) {
       return NextResponse.json(
-        { error: 'Only admins and managers can delete categories' },
+        { error: 'Maintenance access required to delete categories' },
         { status: 403 }
       );
     }

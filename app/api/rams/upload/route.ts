@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { validateRAMSFile, generateSafeFilename } from '@/lib/utils/file-validation';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,16 +18,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check user role (must be manager or admin)
+    // Check Org V2 module access
     const profile = await getProfileWithRole(user.id);
 
     if (!profile) {
       return NextResponse.json({ error: 'Failed to verify user role' }, { status: 403 });
     }
 
-    if (!profile.role?.is_manager_admin) {
+    const canManageRams = await canEffectiveRoleAccessModule('rams');
+    if (!canManageRams) {
       return NextResponse.json(
-        { error: 'Only admins and managers can upload RAMS documents' },
+        { error: 'RAMS access required to upload documents' },
         { status: 403 }
       );
     }

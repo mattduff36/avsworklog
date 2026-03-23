@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/lib/supabase/server';
-import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
 // PUT - Restore an archived vehicle back to active status
 export async function PUT(
@@ -18,12 +18,10 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is admin or manager
-    const profile = await getProfileWithRole(user.id);
-
-    if (!profile || !profile.role?.is_manager_admin) {
+    const canManageFleet = await canEffectiveRoleAccessModule('admin-vans');
+    if (!canManageFleet) {
       return NextResponse.json(
-        { error: 'Forbidden: Manager or Admin access required' },
+        { error: 'Forbidden: Fleet admin access required' },
         { status: 403 }
       );
     }

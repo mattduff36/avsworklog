@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { getProfileWithRole } from '@/lib/utils/permissions';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
 /**
  * Send RAMS document via email to the logged-in user
@@ -63,12 +63,10 @@ export async function POST(
       .eq('employee_id', session.user.id)
       .single();
 
-    // Check if user is manager/admin
-    const profile = await getProfileWithRole(session.user.id);
+    // Check if user has Org V2 RAMS access
+    const canAccessRams = await canEffectiveRoleAccessModule('rams');
 
-    const isManagerOrAdmin = profile?.role?.is_manager_admin || false;
-
-    if (!assignment && !isManagerOrAdmin) {
+    if (!assignment && !canAccessRams) {
       return NextResponse.json(
         { error: 'Access denied' },
         { status: 403 }

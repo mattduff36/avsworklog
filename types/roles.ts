@@ -8,6 +8,7 @@ export interface Role {
   display_name: string;
   description: string | null;
   role_class: RoleClass;
+  hierarchy_rank?: number | null;
   is_super_admin: boolean;
   is_manager_admin: boolean;
   timesheet_type?: string;
@@ -37,6 +38,46 @@ export interface RoleWithUserCount extends Role {
 export interface RoleMatrixRow extends Role {
   user_count: number;
   permissions: Record<ModuleName, boolean>;
+}
+
+export interface PermissionTierRole {
+  id: string;
+  name: string;
+  display_name: string;
+  role_class: RoleClass;
+  hierarchy_rank: number;
+  is_super_admin: boolean;
+  is_manager_admin: boolean;
+}
+
+export interface PermissionModuleDefinition {
+  module_name: ModuleName;
+  display_name: string;
+  short_name: string;
+  description: string;
+  color_var: string;
+}
+
+export interface PermissionModuleMatrixColumn extends PermissionModuleDefinition {
+  minimum_role_id: string;
+  minimum_role_name: string;
+  minimum_hierarchy_rank: number;
+  sort_order: number;
+}
+
+export interface TeamPermissionMatrixRow {
+  id: string;
+  name: string;
+  code: string | null;
+  active: boolean;
+  permissions: Record<ModuleName, boolean>;
+}
+
+export interface TeamPermissionMatrixResponse {
+  success: boolean;
+  roles: PermissionTierRole[];
+  modules: PermissionModuleMatrixColumn[];
+  teams: TeamPermissionMatrixRow[];
 }
 
 export const STANDARD_MODULES: ModuleName[] = [
@@ -213,6 +254,7 @@ export interface CreateRoleRequest {
   description?: string;
   role_class?: RoleClass;
   role_type?: RoleClass;
+  hierarchy_rank?: number | null;
   timesheet_type?: string;
 }
 
@@ -221,6 +263,7 @@ export interface UpdateRoleRequest {
   display_name?: string;
   description?: string;
   role_class?: RoleClass;
+  hierarchy_rank?: number | null;
   timesheet_type?: string;
 }
 
@@ -230,6 +273,32 @@ export interface UpdatePermissionsRequest {
     enabled: boolean;
   }[];
 }
+
+export interface UpdateTeamPermissionsRequest {
+  permissions: {
+    module_name: ModuleName;
+    enabled: boolean;
+  }[];
+}
+
+export interface ShiftPermissionModuleRequest {
+  direction: 'left' | 'right';
+}
+
+export function createEmptyModulePermissionRecord(): Record<ModuleName, boolean> {
+  return ALL_MODULES.reduce((acc, moduleName) => {
+    acc[moduleName] = false;
+    return acc;
+  }, {} as Record<ModuleName, boolean>);
+}
+
+export const MODULE_DEFINITIONS: PermissionModuleDefinition[] = ALL_MODULES.map((module_name) => ({
+  module_name,
+  display_name: MODULE_DISPLAY_NAMES[module_name],
+  short_name: MODULE_SHORT_NAMES[module_name],
+  description: MODULE_DESCRIPTIONS[module_name],
+  color_var: MODULE_CSS_VAR[module_name],
+}));
 
 export interface UserPermissions {
   [key: string]: boolean;

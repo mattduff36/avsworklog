@@ -4,10 +4,12 @@ import { isEffectiveRoleAdminOrSuper } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type { GetRoleResponse, UpdateRoleRequest } from '@/types/roles';
 import { managerFlagFromRoleClass, normalizeRoleInternalName } from '@/lib/utils/role-name';
+import { isRetiredRoleName } from '@/lib/config/roles-core';
+import { defaultHierarchyRankForRole, normalizeHierarchyRankInput } from '@/lib/utils/permission-tiers';
 
 /**
  * GET /api/admin/roles/[id]
- * Get role details with permissions
+ * Get role details
  */
 export async function GET(
   request: NextRequest,
@@ -28,13 +30,10 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
     }
 
-    // Get role with permissions
+    // Get role details. Module access is managed by the team matrix.
     const { data: role, error: roleError } = await supabase
       .from('roles')
-      .select(`
-        *,
-        permissions:role_permissions(*)
-      `)
+      .select('*')
       .eq('id', id)
       .single();
 
@@ -106,7 +105,7 @@ export async function PATCH(
     // Check if role exists and is not super admin
     const { data: existingRole, error: fetchError } = await supabase
       .from('roles')
-      .select('is_super_admin, role_class, name')
+      .select('is_super_admin, role_class, name, hierarchy_rank')
       .eq('id', id)
       .single();
 
@@ -124,10 +123,21 @@ export async function PATCH(
     }
 
     const nextRoleClass = body.role_class ?? existingRole.role_class;
+    const nextRoleName = body.name ? normalizeRoleInternalName(body.name) : existingRole.name;
+    const nextHierarchyRank =
+      body.hierarchy_rank !== undefined
+        ? normalizeHierarchyRankInput(body.hierarchy_rank)
+        : existingRole.hierarchy_rank ?? defaultHierarchyRankForRole(nextRoleClass, nextRoleName);
 
     // If changing name, check it doesn't conflict
     if (body.name) {
       const normalizedName = normalizeRoleInternalName(body.name);
+      if (isRetiredRoleName(normalizedName)) {
+        return NextResponse.json(
+          { error: 'This retired role name cannot be reused. Use Employee, Manager, Admin, or a custom role name.' },
+          { status: 400 }
+        );
+      }
       const { data: conflictRole } = await supabase
         .from('roles')
         .select('id')
@@ -148,6 +158,25 @@ export async function PATCH(
       }
     }
 
+    if (nextHierarchyRank !== null && nextRoleClass !== 'admin') {
+      const { data: conflictingTier } = await supabase
+        .from('roles')
+        .select('id, display_name')
+        .eq('hierarchy_rank', nextHierarchyRank)
+        .neq('name', 'admin')
+        .neq('id', id)
+        .maybeSingle();
+
+      if (conflictingTier) {
+        return NextResponse.json(
+          {
+            error: `Hierarchy rank ${nextHierarchyRank} is already used by ${(conflictingTier as { display_name?: string }).display_name || 'another role'}.`,
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     // Update the role
     const updateData: Record<string, unknown> = {};
     if (body.name !== undefined) updateData.name = normalizeRoleInternalName(body.name);
@@ -159,6 +188,11 @@ export async function PATCH(
       if (body.role_class === 'admin' && updateData.name !== 'admin') {
         updateData.name = 'admin';
       }
+    }
+    if (body.hierarchy_rank !== undefined) {
+      updateData.hierarchy_rank = nextHierarchyRank;
+    } else if (body.role_class !== undefined || body.name !== undefined) {
+      updateData.hierarchy_rank = nextHierarchyRank;
     }
     if (body.timesheet_type !== undefined) updateData.timesheet_type = body.timesheet_type;
 

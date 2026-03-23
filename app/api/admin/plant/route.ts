@@ -7,14 +7,16 @@ import { createMotHistoryService } from '@/lib/services/mot-history-api';
 import { isRoadEligibleRegistration, runFleetDvlaSync } from '@/lib/services/fleet-dvla-sync';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
 export async function POST(request: NextRequest) {
   try {
     const effectiveRole = await getEffectiveRole();
     if (!effectiveRole.user_id)
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    if (!effectiveRole.is_manager_admin)
-      return NextResponse.json({ error: 'Forbidden: Manager or Admin access required' }, { status: 403 });
+    const canManageFleet = await canEffectiveRoleAccessModule('admin-vans');
+    if (!canManageFleet)
+      return NextResponse.json({ error: 'Forbidden: Fleet admin access required' }, { status: 403 });
 
     const supabase = await createServerClient();
     const body = await request.json();

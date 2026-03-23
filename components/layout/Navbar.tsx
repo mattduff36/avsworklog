@@ -182,53 +182,13 @@ export function Navbar() {
       }
 
       try {
-        const enabledModules = new Set<ModuleName>();
-
-        // When viewing as another role, fetch permissions from the EFFECTIVE role
-        // (not the actual profile's role which is still admin/superadmin).
-        // If viewAsRoleId is empty (stale cookie), deny to avoid privilege escalation.
-        if (isViewingAs && effectiveRole) {
-          const viewAsRoleId = (await import('@/lib/utils/view-as-cookie')).getViewAsRoleId();
-          if (viewAsRoleId) {
-            const { data: perms } = await supabase
-              .from('role_permissions')
-              .select('module_name, enabled')
-              .eq('role_id', viewAsRoleId);
-            perms?.forEach((perm: { module_name: string; enabled: boolean }) => {
-              if (perm.enabled) {
-                enabledModules.add(perm.module_name as ModuleName);
-              }
-            });
-            setUserPermissions(enabledModules);
-          } else {
-            setUserPermissions(new Set());
-          }
-          setPermissionsLoading(false);
-          return;
+        const response = await fetch('/api/me/permissions', { cache: 'no-store' });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to load permissions');
         }
 
-        // Normal flow: fetch from profile → role → permissions
-        const { data } = await supabase
-          .from('profiles')
-          .select(`
-            role_id,
-            roles!inner(
-              role_permissions(
-                module_name,
-                enabled
-              )
-            )
-          `)
-          .eq('id', profile.id)
-          .single();
-        
-        const rolePerms = data?.roles as { role_permissions?: { module_name?: string; enabled?: boolean }[] } | null;
-        rolePerms?.role_permissions?.forEach((perm: { module_name?: string; enabled?: boolean }) => {
-          if (perm.enabled) {
-            enabledModules.add(perm.module_name as ModuleName);
-          }
-        });
-        
+        const enabledModules = new Set<ModuleName>((data.enabled_modules || []) as ModuleName[]);
         setUserPermissions(enabledModules);
       } catch (error) {
         console.error('Error fetching permissions:', error);

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { sendTimesheetRejectionEmail } from '@/lib/utils/email';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
 export async function POST(
   request: NextRequest,
@@ -30,20 +31,10 @@ export async function POST(
       );
     }
 
-    // Verify user is a manager/admin
-    const { data: profile } = await db
-      .from('profiles')
-      .select(`
-        id,
-        roles!inner(is_manager_admin)
-      `)
-      .eq('id', user.id)
-      .single();
-
-    const typedProfile = profile as { roles: { is_manager_admin: boolean } | null } | null;
-    if (!typedProfile?.roles?.is_manager_admin) {
+    const canManageTimesheets = await canEffectiveRoleAccessModule('approvals');
+    if (!canManageTimesheets) {
       return NextResponse.json(
-        { error: 'Only managers and admins can reject timesheets' },
+        { error: 'Approvals access required to reject timesheets' },
         { status: 403 }
       );
     }

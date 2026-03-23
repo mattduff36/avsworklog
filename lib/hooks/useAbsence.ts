@@ -585,7 +585,7 @@ export function usePendingAbsences() {
         .order('date', { ascending: true });
       
       if (error) throw error;
-      return data as AbsenceWithRelations[];
+      return (data || []) as AbsenceWithRelations[];
     },
   });
 }

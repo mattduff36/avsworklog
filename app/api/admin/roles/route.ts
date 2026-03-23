@@ -3,8 +3,10 @@ import { createClient } from '@/lib/supabase/server';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type { GetRolesResponse, CreateRoleRequest, RoleWithUserCount, RoleMatrixRow, ModuleName, RoleClass } from '@/types/roles';
-import { ALL_MODULES } from '@/types/roles';
+import { createEmptyModulePermissionRecord } from '@/types/roles';
 import { managerFlagFromRoleClass, normalizeRoleInternalName, roleClassFromLegacyRoleType } from '@/lib/utils/role-name';
+import { isRetiredRoleName } from '@/lib/config/roles-core';
+import { defaultHierarchyRankForRole, normalizeHierarchyRankInput } from '@/lib/utils/permission-tiers';
 
 /**
  * GET /api/admin/roles
@@ -21,19 +23,19 @@ export async function GET(request: NextRequest) {
     }
 
     const effectiveRole = await getEffectiveRole();
-    const isAdminOrSuper = effectiveRole.is_super_admin || effectiveRole.role_name === 'admin';
+    const isAdminOrSuper =
+      effectiveRole.is_actual_super_admin || effectiveRole.is_super_admin || effectiveRole.role_name === 'admin';
     const isManager = effectiveRole.is_manager_admin && !isAdminOrSuper;
     if (!isAdminOrSuper && !isManager) {
       return NextResponse.json({ error: 'Forbidden - Admin or Manager access required' }, { status: 403 });
     }
 
-    // Get all roles with user counts and permissions
+    // Get all roles with user counts. Module access is managed by the team matrix.
     const { data: roles, error: rolesError } = await supabase
       .from('roles')
       .select(`
         *,
-        profiles:profiles(count),
-        role_permissions:role_permissions(module_name, enabled)
+        profiles:profiles(count)
       `)
       .order('is_super_admin', { ascending: false })
       .order('is_manager_admin', { ascending: false })
@@ -43,24 +45,19 @@ export async function GET(request: NextRequest) {
       throw rolesError;
     }
 
-    interface RolePermissionRow {
-      module_name: string;
-      enabled: boolean;
-    }
-
     interface RoleRow {
       id: string;
       name: string;
       display_name: string;
       description: string | null;
       role_class: RoleClass;
+      hierarchy_rank?: number | null;
       is_super_admin: boolean;
       is_manager_admin: boolean;
       timesheet_type?: string;
       created_at: string;
       updated_at: string;
       profiles?: Array<{ count: number }>;
-      role_permissions?: RolePermissionRow[];
     }
 
     const formattedRoles: RoleWithUserCount[] = (roles as RoleRow[]).map((role) => ({
@@ -71,24 +68,22 @@ export async function GET(request: NextRequest) {
       role_class: role.role_class,
       is_super_admin: role.is_super_admin,
       is_manager_admin: role.is_manager_admin,
+      hierarchy_rank: role.hierarchy_rank ?? null,
       created_at: role.created_at,
       updated_at: role.updated_at,
       user_count: role.profiles?.[0]?.count || 0,
-      permission_count: role.role_permissions?.filter((permission) => permission.enabled).length || 0,
+      permission_count: 0,
     }));
 
     const matrixRoles: RoleMatrixRow[] = (roles as RoleRow[]).map((role) => {
-      const perms: Record<ModuleName, boolean> = {} as Record<ModuleName, boolean>;
-      ALL_MODULES.forEach((mod) => {
-        const found = role.role_permissions?.find((p) => p.module_name === mod);
-        perms[mod] = found?.enabled ?? false;
-      });
+      const perms = createEmptyModulePermissionRecord() as Record<ModuleName, boolean>;
       return {
         id: role.id,
         name: role.name,
         display_name: role.display_name,
         description: role.description,
         role_class: role.role_class,
+        hierarchy_rank: role.hierarchy_rank ?? null,
         is_super_admin: role.is_super_admin,
         is_manager_admin: role.is_manager_admin,
         timesheet_type: role.timesheet_type,
@@ -138,7 +133,8 @@ export async function POST(request: NextRequest) {
     }
 
     const effectiveRole = await getEffectiveRole();
-    const isAdminOrSuper = effectiveRole.is_super_admin || effectiveRole.role_name === 'admin';
+    const isAdminOrSuper =
+      effectiveRole.is_actual_super_admin || effectiveRole.is_super_admin || effectiveRole.role_name === 'admin';
     const isManager = effectiveRole.is_manager_admin && !isAdminOrSuper;
     if (!isAdminOrSuper && !isManager) {
       return NextResponse.json({ error: 'Forbidden - Admin or Manager access required' }, { status: 403 });
@@ -154,11 +150,20 @@ export async function POST(request: NextRequest) {
     }
 
     const normalizedName = normalizeRoleInternalName(body.name);
+    if (isRetiredRoleName(normalizedName)) {
+      return NextResponse.json(
+        { error: 'This retired role name cannot be reused. Use Employee, Manager, Admin, or a new custom role name.' },
+        { status: 400 }
+      );
+    }
     const requestedRoleClass = roleClassFromLegacyRoleType(
       body.role_class ?? body.role_type,
       false,
       normalizedName
     );
+    const requestedHierarchyRank =
+      normalizeHierarchyRankInput(body.hierarchy_rank) ??
+      defaultHierarchyRankForRole(requestedRoleClass, normalizedName);
 
     if (isManager && requestedRoleClass !== 'employee') {
       return NextResponse.json({
@@ -166,10 +171,34 @@ export async function POST(request: NextRequest) {
       }, { status: 403 });
     }
 
+    if (isManager && requestedHierarchyRank !== defaultHierarchyRankForRole('employee', 'employee')) {
+      return NextResponse.json({
+        error: 'Managers cannot create new permission tiers'
+      }, { status: 403 });
+    }
+
     if (requestedRoleClass === 'admin' && normalizedName !== 'admin') {
       return NextResponse.json({
         error: 'Admin role must use internal name "admin"'
       }, { status: 400 });
+    }
+
+    if (requestedHierarchyRank !== null && requestedRoleClass !== 'admin') {
+      const { data: conflictingTier } = await supabase
+        .from('roles')
+        .select('id, display_name')
+        .eq('hierarchy_rank', requestedHierarchyRank)
+        .neq('name', 'admin')
+        .maybeSingle();
+
+      if (conflictingTier) {
+        return NextResponse.json(
+          {
+            error: `Hierarchy rank ${requestedHierarchyRank} is already used by ${(conflictingTier as { display_name?: string }).display_name || 'another role'}.`,
+          },
+          { status: 409 }
+        );
+      }
     }
 
     // Check if role name already exists
@@ -193,6 +222,7 @@ export async function POST(request: NextRequest) {
         display_name: body.display_name.trim(),
         description: body.description || null,
         role_class: requestedRoleClass,
+        hierarchy_rank: requestedHierarchyRank,
         is_super_admin: false, // Cannot create super admin via API
         is_manager_admin: managerFlagFromRoleClass(requestedRoleClass),
         timesheet_type: body.timesheet_type || 'civils',
@@ -202,24 +232,6 @@ export async function POST(request: NextRequest) {
 
     if (roleError) {
       throw roleError;
-    }
-
-    // Create default permissions for all modules
-    // New roles get access to employee-facing modules by default
-    const defaultPermissions = ALL_MODULES.map(module => ({
-      role_id: newRole.id,
-      module_name: module,
-      enabled: ['timesheets', 'inspections', 'rams', 'absence'].includes(module),
-    }));
-
-    const { error: permsError } = await supabase
-      .from('role_permissions')
-      .insert(defaultPermissions);
-
-    if (permsError) {
-      // Rollback: delete the role if permissions fail
-      await supabase.from('roles').delete().eq('id', newRole.id);
-      throw permsError;
     }
 
     return NextResponse.json({ 

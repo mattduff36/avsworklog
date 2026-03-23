@@ -1,133 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { isEffectiveRoleAdminOrSuper } from '@/lib/utils/rbac';
-import { logServerError } from '@/lib/utils/server-error-logger';
-import type { UpdatePermissionsRequest } from '@/types/roles';
-import { MANAGEMENT_MODULES } from '@/types/roles';
+import { NextResponse } from 'next/server';
 
 /**
  * PUT /api/admin/roles/[id]/permissions
- * Update role permissions (bulk update)
+ * Deprecated: use the team permission matrix instead.
  */
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-    const supabase = await createClient();
-
-    // Check authentication
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Only admin/super-admin can edit role permissions.
-    const isAuthorized = await isEffectiveRoleAdminOrSuper();
-    if (!isAuthorized) {
-      return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
-    }
-
-    const body: UpdatePermissionsRequest = await request.json();
-
-    // Validate request
-    if (!body.permissions || !Array.isArray(body.permissions)) {
-      return NextResponse.json({ 
-        error: 'Invalid request: permissions array required' 
-      }, { status: 400 });
-    }
-
-    // Check if role exists and is not super admin
-    const { data: existingRole, error: fetchError } = await supabase
-      .from('roles')
-      .select('name, role_class, is_super_admin')
-      .eq('id', id)
-      .single();
-
-    if (fetchError) {
-      if (fetchError.code === 'PGRST116') {
-        return NextResponse.json({ error: 'Role not found' }, { status: 404 });
-      }
-      throw fetchError;
-    }
-
-    // Cannot modify super admin or admin permissions.
-    if (existingRole.is_super_admin || existingRole.name === 'admin') {
-      return NextResponse.json({ 
-        error: 'Cannot modify permissions for super admin or admin roles' 
-      }, { status: 403 });
-    }
-
-    // Employee roles are restricted to standard modules only.
-    if (existingRole.role_class === 'employee') {
-      const managementEnabled = body.permissions.filter(
-        (perm) => MANAGEMENT_MODULES.includes(perm.module_name) && perm.enabled
-      );
-      if (managementEnabled.length > 0) {
-        return NextResponse.json(
-          { error: 'Employee roles cannot be granted management modules' },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Update permissions in bulk using upsert
-    const permissionsToUpdate = body.permissions.map(perm => ({
-      role_id: id,
-      module_name: perm.module_name,
-      enabled: perm.enabled,
-    }));
-
-    // Delete existing permissions for this role
-    const { error: deleteError } = await supabase
-      .from('role_permissions')
-      .delete()
-      .eq('role_id', id);
-
-    if (deleteError) {
-      throw deleteError;
-    }
-
-    // Insert new permissions
-    const { error: insertError } = await supabase
-      .from('role_permissions')
-      .insert(permissionsToUpdate);
-
-    if (insertError) {
-      throw insertError;
-    }
-
-    // Fetch updated permissions
-    const { data: updatedPermissions, error: fetchPermsError } = await supabase
-      .from('role_permissions')
-      .select('*')
-      .eq('role_id', id);
-
-    if (fetchPermsError) {
-      throw fetchPermsError;
-    }
-
-    return NextResponse.json({ 
-      success: true,
-      permissions: updatedPermissions,
-      message: 'Permissions updated successfully'
-    });
-
-  } catch (error) {
-    console.error('Error in PUT /api/admin/roles/[id]/permissions:', error);
-
-    await logServerError({
-      error: error as Error,
-      request,
-      componentName: '/api/admin/roles/[id]/permissions',
-      additionalData: {
-        endpoint: '/api/admin/roles/[id]/permissions',
-      },
-    });
-    return NextResponse.json({ 
-      error: error instanceof Error ? error.message : 'Internal server error' 
-    }, { status: 500 });
-  }
+export async function PUT() {
+  return NextResponse.json(
+    {
+      error: 'Role-based module permissions have been retired. Use the team permission matrix instead.',
+    },
+    { status: 410 }
+  );
 }
 

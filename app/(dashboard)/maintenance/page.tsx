@@ -52,27 +52,13 @@ function MaintenanceContent() {
       }
 
       try {
-        const { data } = await supabase
-          .from('profiles')
-          .select(`
-            role_id,
-            roles!inner(
-              role_permissions!inner(
-                module_name,
-                enabled
-              )
-            )
-          `)
-          .eq('id', profile.id)
-          .eq('roles.role_permissions.module_name', 'maintenance')
-          .single();
+        const response = await fetch('/api/me/permissions', { cache: 'no-store' });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to load permissions');
+        }
 
-        const maintenancePerm = data?.roles?.role_permissions?.find(
-          (p: { module_name: string; enabled: boolean }) =>
-            p.module_name === 'maintenance'
-        );
-
-        setHasModulePermission(maintenancePerm?.enabled || false);
+        setHasModulePermission(Boolean(data.permissions?.maintenance));
       } catch (err) {
         logger.error('Failed to check maintenance permission', err, 'MaintenancePage');
         setHasModulePermission(false);

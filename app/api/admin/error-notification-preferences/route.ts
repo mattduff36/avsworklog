@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
 export interface ErrorNotificationPreferences {
   user_id: string;
@@ -25,10 +25,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is admin
-    const profile = await getProfileWithRole(user.id);
-    if (!profile?.role || (!profile.role.is_manager_admin && profile.role.name !== 'admin' && !profile.role.is_super_admin)) {
-      return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
+    const canAccessErrorReports = await canEffectiveRoleAccessModule('error-reports');
+    if (!canAccessErrorReports) {
+      return NextResponse.json({ error: 'Forbidden: Error Reports access required' }, { status: 403 });
     }
 
     // Fetch or create preferences
@@ -96,10 +95,9 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is admin
-    const profile = await getProfileWithRole(user.id);
-    if (!profile?.role || (!profile.role.is_manager_admin && profile.role.name !== 'admin' && !profile.role.is_super_admin)) {
-      return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
+    const canAccessErrorReports = await canEffectiveRoleAccessModule('error-reports');
+    if (!canAccessErrorReports) {
+      return NextResponse.json({ error: 'Forbidden: Error Reports access required' }, { status: 403 });
     }
 
     // Parse request body

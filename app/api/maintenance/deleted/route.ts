@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logger } from '@/lib/utils/logger';
+import { userHasPermission } from '@/lib/utils/permissions';
 
 /**
  * GET /api/maintenance/deleted
@@ -19,17 +20,11 @@ export async function GET() {
       );
     }
     
-    // Check permission (RLS will handle this, but we check explicitly for better errors)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id, role:roles(name, role_permissions(module_name, enabled))')
-      .eq('id', user.id)
-      .single();
-    
-    if (!profile) {
+    const hasPermission = await userHasPermission(user.id, 'maintenance');
+    if (!hasPermission) {
       return NextResponse.json(
-        { error: 'Profile not found' },
-        { status: 404 }
+        { error: 'Forbidden' },
+        { status: 403 }
       );
     }
     

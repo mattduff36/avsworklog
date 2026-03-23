@@ -40,8 +40,8 @@ export default function DebugPage() {
         return;
       }
 
-      const { getViewAsRoleId } = await import('@/lib/utils/view-as-cookie');
-      const viewAsRoleId = getViewAsRoleId();
+      const { getViewAsSelection } = await import('@/lib/utils/view-as-cookie');
+      const { roleId: viewAsRoleId, teamId: viewAsTeamId } = getViewAsSelection();
 
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
@@ -76,7 +76,7 @@ export default function DebugPage() {
         return;
       }
 
-      if (viewAsRoleId) {
+      if (viewAsRoleId || viewAsTeamId) {
         toast.error('Debug console only available in Actual Role mode');
         router.push('/dashboard');
         return;

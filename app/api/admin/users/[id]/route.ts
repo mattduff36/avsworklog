@@ -4,6 +4,69 @@ import { sendProfileUpdateEmail } from '@/lib/utils/email';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { canEffectiveRoleAccessModule, canEffectiveRoleAssignRole } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { isMissingTeamManagerSchemaError, reconcileProfileHierarchy } from '@/lib/server/team-managers';
+
+function isMissingHierarchySchemaError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const code = 'code' in error ? String((error as { code?: unknown }).code || '') : '';
+  const message = 'message' in error ? String((error as { message?: unknown }).message || '').toLowerCase() : '';
+  return (
+    code === '42703' ||
+    code === '42P01' ||
+    message.includes('line_manager_id') ||
+    message.includes('team_id') ||
+    message.includes('column') ||
+    message.includes('does not exist')
+  );
+}
+
+async function validateHierarchyReferences(
+  supabaseAdmin: ReturnType<typeof getSupabaseAdmin>,
+  input: { profile_id: string; line_manager_id?: string | null; team_id?: string | null }
+): Promise<{ ok: boolean; error?: string; warning?: string }> {
+  const { profile_id, line_manager_id, team_id } = input;
+
+  if (line_manager_id && line_manager_id === profile_id) {
+    return { ok: false, error: 'A user cannot be their own line manager.' };
+  }
+
+  if (line_manager_id) {
+    const { data: managerRow, error: managerError } = await supabaseAdmin
+      .from('profiles')
+      .select('id, role:roles(role_class)')
+      .eq('id', line_manager_id)
+      .single();
+
+    if (managerError || !managerRow) {
+      return { ok: false, error: 'Selected line manager does not exist.' };
+    }
+
+    const roleClass = (managerRow as { role?: { role_class?: string } | null })?.role?.role_class;
+    if (roleClass !== 'manager' && roleClass !== 'admin') {
+      return { ok: false, error: 'Selected line manager must have a manager/admin role.' };
+    }
+  }
+
+  if (team_id) {
+    const { data: teamRow, error: teamError } = await supabaseAdmin
+      .from('org_teams')
+      .select('id')
+      .eq('id', team_id)
+      .single();
+
+    if (teamError) {
+      if (isMissingHierarchySchemaError(teamError)) {
+        return { ok: true, warning: 'Team validation skipped because hierarchy schema is not ready yet.' };
+      }
+      return { ok: false, error: 'Failed to validate selected team.' };
+    }
+    if (!teamRow) {
+      return { ok: false, error: 'Selected team does not exist.' };
+    }
+  }
+
+  return { ok: true };
+}
 
 // Helper to create admin client with service role key
 function getSupabaseAdmin() {
@@ -30,6 +93,8 @@ interface ProfileChanges {
   phone_number?: ProfileChangeEntry;
   employee_id?: ProfileChangeEntry;
   role?: ProfileChangeEntry;
+  line_manager?: ProfileChangeEntry;
+  team?: ProfileChangeEntry;
 }
 
 export async function PUT(
@@ -54,7 +119,7 @@ export async function PUT(
 
     const userId = (await params).id;
     const body = await request.json();
-    const { email, full_name, phone_number, employee_id, role_id } = body;
+    const { email, full_name, phone_number, employee_id, role_id, line_manager_id, team_id } = body;
 
     // Validate required fields
     if (!full_name) {
@@ -76,6 +141,21 @@ export async function PUT(
       return NextResponse.json(
         { error: 'Forbidden: you cannot assign this role' },
         { status: 403 }
+      );
+    }
+
+    const hierarchyValidation = await validateHierarchyReferences(supabaseAdmin, {
+      profile_id: userId,
+      line_manager_id: line_manager_id || null,
+      team_id: team_id || null,
+    });
+    if (!hierarchyValidation.ok) {
+      return NextResponse.json(
+        {
+          error: hierarchyValidation.error || 'Invalid hierarchy assignment',
+          code: 'INVALID_HIERARCHY_ASSIGNMENT',
+        },
+        { status: 400 }
       );
     }
 
@@ -111,6 +191,18 @@ export async function PUT(
     }
     if (employee_id !== existingUser.employee_id) {
       changes.employee_id = { old: existingUser.employee_id || '', new: employee_id || '' };
+    }
+    if ((line_manager_id || null) !== ((existingUser as { line_manager_id?: string | null }).line_manager_id || null)) {
+      changes.line_manager = {
+        old: String((existingUser as { line_manager_id?: string | null }).line_manager_id || ''),
+        new: String(line_manager_id || ''),
+      };
+    }
+    if ((team_id || null) !== ((existingUser as { team_id?: string | null }).team_id || null)) {
+      changes.team = {
+        old: String((existingUser as { team_id?: string | null }).team_id || ''),
+        new: String(team_id || ''),
+      };
     }
     if (role_id !== existingUser.role_id) {
       // Fetch role names for email (display_name instead of UUID)
@@ -150,15 +242,36 @@ export async function PUT(
 
     // Update profile data (email is only in auth, not in profiles table)
     // Use admin client to bypass RLS policies
-    const { error: profileError } = await supabaseAdmin
+    const baseUpdatePayload = {
+      full_name,
+      phone_number: phone_number || null,
+      employee_id: employee_id || null,
+      role_id,
+    };
+
+    const hierarchyUpdatePayload = {
+      ...baseUpdatePayload,
+      line_manager_id: line_manager_id || null,
+      team_id: team_id || null,
+    };
+
+    let hierarchyFieldsPersisted = true;
+    let hierarchyWarning: string | null = null;
+
+    let { error: profileError } = await supabaseAdmin
       .from('profiles')
-      .update({
-        full_name,
-        phone_number: phone_number || null,
-        employee_id: employee_id || null,
-        role_id,
-      })
+      .update(hierarchyUpdatePayload)
       .eq('id', userId);
+
+    if (profileError && isMissingHierarchySchemaError(profileError)) {
+      hierarchyFieldsPersisted = false;
+      hierarchyWarning = 'Hierarchy fields were ignored because the database schema is not ready yet.';
+      const fallbackResult = await supabaseAdmin
+        .from('profiles')
+        .update(baseUpdatePayload)
+        .eq('id', userId);
+      profileError = fallbackResult.error;
+    }
 
     if (profileError) {
       console.error('Profile update error:', profileError);
@@ -166,6 +279,19 @@ export async function PUT(
         { error: 'Failed to update user profile' },
         { status: 500 }
       );
+    }
+
+    if (hierarchyFieldsPersisted) {
+      try {
+        await reconcileProfileHierarchy(supabaseAdmin, userId);
+      } catch (error) {
+        if (!isMissingTeamManagerSchemaError(error) && !isMissingHierarchySchemaError(error)) {
+          return NextResponse.json(
+            { error: error instanceof Error ? error.message : 'Failed to reconcile hierarchy assignments' },
+            { status: 500 }
+          );
+        }
+      }
     }
 
     // Send notification email if there were changes
@@ -186,6 +312,8 @@ export async function PUT(
     return NextResponse.json({
       success: true,
       message: 'User updated successfully',
+      hierarchyFieldsPersisted,
+      hierarchyWarning: hierarchyWarning || hierarchyValidation.warning || null,
     });
   } catch (error) {
     console.error('Error updating user:', error);

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { isManagerOrAdmin } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
 /**
  * GET /api/workshop-tasks/subcategories
@@ -94,11 +94,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check manager/admin permission
-    const isManager = await isManagerOrAdmin(user.id);
-    if (!isManager) {
+    const canManageWorkshopTasks = await canEffectiveRoleAccessModule('workshop-tasks');
+    if (!canManageWorkshopTasks) {
       return NextResponse.json(
-        { error: 'Forbidden: Manager or Admin access required' },
+        { error: 'Forbidden: Workshop Tasks access required' },
         { status: 403 }
       );
     }

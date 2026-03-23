@@ -4,6 +4,7 @@ import { createClient as createServerClient } from '@/lib/supabase/server';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { validateRegistrationNumber, formatRegistrationForStorage } from '@/lib/utils/registration';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
 function getSupabaseAdmin() {
   return createClient(
@@ -30,9 +31,10 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!effectiveRole.is_manager_admin) {
+    const canManageFleet = await canEffectiveRoleAccessModule('admin-vans');
+    if (!canManageFleet) {
       return NextResponse.json(
-        { error: 'Forbidden: Manager or Admin access required' },
+        { error: 'Forbidden: Fleet admin access required' },
         { status: 403 }
       );
     }
@@ -137,9 +139,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!effectiveRole.is_manager_admin) {
+    const canManageFleet = await canEffectiveRoleAccessModule('admin-vans');
+    if (!canManageFleet) {
       return NextResponse.json(
-        { error: 'Forbidden: Manager or Admin access required' },
+        { error: 'Forbidden: Fleet admin access required' },
         { status: 403 }
       );
     }

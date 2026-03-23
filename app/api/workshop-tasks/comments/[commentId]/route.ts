@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { isManagerOrAdmin } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { UUIDSchema } from '@/lib/validation/schemas';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
 /**
  * PATCH /api/workshop-tasks/comments/:commentId
@@ -53,11 +53,11 @@ export async function PATCH(
       return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
     }
 
-    // Check permission: author or manager/admin
+    // Check permission: author or Org V2 workshop task access
     const isAuthor = typedExistingComment.author_id === user.id;
-    const isManager = await isManagerOrAdmin(user.id);
+    const canManageWorkshopTasks = await canEffectiveRoleAccessModule('workshop-tasks');
 
-    if (!isAuthor && !isManager) {
+    if (!isAuthor && !canManageWorkshopTasks) {
       return NextResponse.json(
         { error: 'Forbidden: You can only edit your own comments' },
         { status: 403 }
@@ -108,8 +108,8 @@ export async function PATCH(
           full_name: typedUpdatedComment.profiles.full_name,
         } : null,
         body: typedUpdatedComment?.body || '',
-        can_edit: isAuthor || isManager,
-        can_delete: isAuthor || isManager,
+        can_edit: isAuthor || canManageWorkshopTasks,
+        can_delete: isAuthor || canManageWorkshopTasks,
       },
     });
   } catch (error) {
@@ -166,11 +166,11 @@ export async function DELETE(
       return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
     }
 
-    // Check permission: author or manager/admin
+    // Check permission: author or Org V2 workshop task access
     const isAuthor = typedExistingComment.author_id === user.id;
-    const isManager = await isManagerOrAdmin(user.id);
+    const canManageWorkshopTasks = await canEffectiveRoleAccessModule('workshop-tasks');
 
-    if (!isAuthor && !isManager) {
+    if (!isAuthor && !canManageWorkshopTasks) {
       return NextResponse.json(
         { error: 'Forbidden: You can only delete your own comments' },
         { status: 403 }

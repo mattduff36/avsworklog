@@ -4,10 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { Database } from '@/types/database';
-import { getViewAsRoleId } from '@/lib/utils/view-as-cookie';
+import { getViewAsSelection } from '@/lib/utils/view-as-cookie';
 
 type Profile = Database['public']['Tables']['profiles']['Row'] & {
   super_admin?: boolean | null;
+  team_id?: string | null;
   role?: {
     name: string;
     display_name: string;
@@ -23,6 +24,8 @@ interface EffectiveRole {
   role_class?: 'admin' | 'manager' | 'employee';
   is_manager_admin: boolean;
   is_super_admin: boolean;
+  team_id?: string | null;
+  team_name?: string | null;
 }
 
 const isNetworkFetchError = (err: unknown): boolean => {
@@ -263,29 +266,70 @@ export function useAuth() {
     return () => clearInterval(interval);
   }, [user, supabase]);
 
-  // Fetch effective role when view-as cookie is set and user is actual super admin
+  // Fetch effective role/team when view-as cookies are set and user is actual super admin
   useEffect(() => {
-    const viewAsRoleId = getViewAsRoleId();
+    const { roleId: viewAsRoleId, teamId: viewAsTeamId } = getViewAsSelection();
     const isActualSuper =
       profile?.super_admin === true || profile?.role?.is_super_admin === true;
 
-    if (!viewAsRoleId || !isActualSuper) {
+    if ((!viewAsRoleId && !viewAsTeamId) || !isActualSuper) {
       setEffectiveRole(null);
       return;
     }
 
     async function fetchEffectiveRole() {
       try {
-        const { data, error } = await supabase
-          .from('roles')
-          .select('name, display_name, role_class, is_manager_admin, is_super_admin')
-          .eq('id', viewAsRoleId)
-          .single();
-        if (!error && data) {
-          setEffectiveRole(data);
-        } else {
-          setEffectiveRole(null);
+        let nextRole: EffectiveRole | null =
+          profile?.role
+            ? {
+                name: profile.role.name,
+                display_name: profile.role.display_name,
+                role_class: profile.role.role_class,
+                is_manager_admin: profile.role.is_manager_admin,
+                is_super_admin: profile.role.is_super_admin,
+                team_id: profile.team_id,
+                team_name: null,
+              }
+            : null;
+
+        if (viewAsRoleId) {
+          const { data, error } = await supabase
+            .from('roles')
+            .select('name, display_name, role_class, is_manager_admin, is_super_admin')
+            .eq('id', viewAsRoleId)
+            .single();
+          if (!error && data) {
+            nextRole = {
+              ...(data as EffectiveRole),
+              team_id: nextRole?.team_id ?? profile?.team_id ?? null,
+              team_name: null,
+            };
+          }
         }
+
+        if (viewAsTeamId) {
+          const { data: teamData, error: teamError } = await supabase
+            .from('org_teams')
+            .select('id, name')
+            .eq('id', viewAsTeamId)
+            .single();
+
+          if (!teamError && teamData) {
+            nextRole = {
+              ...(nextRole ?? {
+                name: profile?.role?.name || '',
+                display_name: profile?.role?.display_name || '',
+                role_class: profile?.role?.role_class,
+                is_manager_admin: profile?.role?.is_manager_admin || false,
+                is_super_admin: profile?.role?.is_super_admin || false,
+              }),
+              team_id: teamData.id,
+              team_name: teamData.name,
+            };
+          }
+        }
+
+        setEffectiveRole(nextRole);
       } catch {
         setEffectiveRole(null);
       }

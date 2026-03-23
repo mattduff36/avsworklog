@@ -212,22 +212,22 @@ describe('Database trigger SQL includes HGV support', () => {
     return fs.readFileSync(path.join(root, relativePath), 'utf-8');
   }
 
-  it('shared trigger function handles hgv_inspections table', () => {
-    const sql = readSource('supabase/migrations/20260311_fix_hgv_inspection_mileage_sync_trigger.sql');
-    expect(sql).toContain("TG_TABLE_NAME = 'hgv_inspections'");
+  it('split migration defines the HGV-specific maintenance function', () => {
+    const sql = readSource('supabase/migrations/20260322_split_maintenance_mileage_triggers.sql');
+    expect(sql).toContain('CREATE OR REPLACE FUNCTION update_hgv_maintenance_mileage()');
     expect(sql).toContain('NEW.hgv_id');
     expect(sql).toContain('WHERE hgv_id = NEW.hgv_id');
   });
 
   it('creates the HGV-specific trigger on hgv_inspections', () => {
-    const sql = readSource('supabase/migrations/20260311_fix_hgv_inspection_mileage_sync_trigger.sql');
+    const sql = readSource('supabase/migrations/20260322_split_maintenance_mileage_triggers.sql');
     expect(sql).toContain('trigger_update_maintenance_mileage_hgv');
     expect(sql).toContain('ON hgv_inspections');
-    expect(sql).toContain('EXECUTE FUNCTION update_vehicle_maintenance_mileage()');
+    expect(sql).toContain('EXECUTE FUNCTION update_hgv_maintenance_mileage()');
   });
 
   it('inserts a vehicle_maintenance row if no existing row found for HGV', () => {
-    const sql = readSource('supabase/migrations/20260311_fix_hgv_inspection_mileage_sync_trigger.sql');
+    const sql = readSource('supabase/migrations/20260322_split_maintenance_mileage_triggers.sql');
     expect(sql).toContain("INSERT INTO vehicle_maintenance (hgv_id, current_mileage, last_mileage_update)");
   });
 });

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to verify user' }, { status: 403 });
     }
 
-    const isManagerOrAdmin = profile.role?.is_manager_admin || false;
+    const canAccessRams = await canEffectiveRoleAccessModule('rams');
 
     // Get query parameters
     const searchParams = request.nextUrl.searchParams;
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
     const showAll = searchParams.get('all') === 'true'; // For manage page
 
     // Managers/Admins requesting all documents (for /projects/manage page)
-    if (isManagerOrAdmin && showAll) {
+    if (canAccessRams && showAll) {
       const q = searchParams.get('q')?.trim() || '';
       const typeFilter = searchParams.get('type') || '';
       const signatureFilter = searchParams.get('signature') || '';

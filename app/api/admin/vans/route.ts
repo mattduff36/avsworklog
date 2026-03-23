@@ -8,6 +8,7 @@ import { createMotHistoryService } from '@/lib/services/mot-history-api';
 import { formatRegistrationForStorage, validateRegistrationNumber } from '@/lib/utils/registration';
 import { isRoadEligibleRegistration, runFleetDvlaSync } from '@/lib/services/fleet-dvla-sync';
 import type { Database } from '@/types/database';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
 interface ProfileNameShape {
   full_name?: string | null;
@@ -30,9 +31,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!effectiveRole.is_manager_admin) {
+    const canManageFleet = await canEffectiveRoleAccessModule('admin-vans');
+    if (!canManageFleet) {
       return NextResponse.json(
-        { error: 'Forbidden: Manager or Admin access required' },
+        { error: 'Forbidden: Fleet admin access required' },
         { status: 403 }
       );
     }
@@ -102,14 +104,20 @@ export async function GET(request: NextRequest) {
 // POST - Create new van
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const effectiveRole = await getEffectiveRole();
+    if (!effectiveRole.user_id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const canManageFleet = await canEffectiveRoleAccessModule('admin-vans');
+    if (!canManageFleet) {
+      return NextResponse.json(
+        { error: 'Forbidden: Fleet admin access required' },
+        { status: 403 }
+      );
+    }
+
+    const supabase = await createServerClient();
 
     const body = await request.json();
     const { 
@@ -164,7 +172,7 @@ export async function POST(request: NextRequest) {
     console.log(`[INFO] Van created: ${data.reg_number} (ID: ${data.id})`);
 
     // Automatically sync TAX and MOT data from APIs (non-blocking)
-    const syncResult = await syncVanData(data.id, data.reg_number, user.id, supabase);
+    const syncResult = await syncVanData(data.id, data.reg_number, effectiveRole.user_id, supabase);
 
     return NextResponse.json({ 
       vehicle: data,

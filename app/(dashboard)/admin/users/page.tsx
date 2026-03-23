@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Fragment, useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   UserPlus,
   Search,
@@ -45,6 +46,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import type { Database } from '@/types/database';
+import { getRoleSortPriority } from '@/lib/config/roles-core';
 
 const RoleManagement = dynamic(() => import('@/components/admin/RoleManagement').then(m => ({ default: m.RoleManagement })), { 
   ssr: false,
@@ -52,6 +54,11 @@ const RoleManagement = dynamic(() => import('@/components/admin/RoleManagement')
 });
 
 const JobRolesTab = dynamic(() => import('@/components/admin/JobRolesTab').then(m => ({ default: m.JobRolesTab })), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin" /></div>
+});
+
+const TeamsTab = dynamic(() => import('@/components/admin/TeamsTab').then(m => ({ default: m.TeamsTab })), {
   ssr: false,
   loading: () => <div className="flex items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin" /></div>
 });
@@ -66,21 +73,27 @@ type ProfileWithRole = Omit<Profile, 'role'> & {
     is_manager_admin?: boolean;
   } | null;
   role_id?: string | null;
+  line_manager_id?: string | null;
+  secondary_manager_id?: string | null;
+  team_id?: string | null;
+  is_placeholder?: boolean | null;
 };
 type ProfileWithEmail = ProfileWithRole & { email?: string };
 
-type TabType = 'users' | 'roles' | 'permissions';
+type TabType = 'users' | 'roles' | 'teams' | 'permissions';
 
 export default function UsersAdminPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user: currentUser, profile, isAdmin, loading: authLoading } = useAuth();
+  const { user: currentUser, profile, isAdmin, isSuperAdmin, isActualSuperAdmin, loading: authLoading } = useAuth();
   const { hasPermission: canManageUsers, loading: permissionLoading } = usePermissionCheck('admin-users', false);
   const supabase = createClient();
   const [activeTab, setActiveTab] = useState<TabType>('users');
-  const isManagerActor = !isAdmin && profile?.role?.is_manager_admin === true;
-  const canManageRoleDefinitions = isAdmin || isManagerActor;
-  const canEditRolePermissions = isAdmin;
+  const isAdminActor = isAdmin || isSuperAdmin || isActualSuperAdmin;
+  const isManagerActor = !isAdminActor && profile?.role?.is_manager_admin === true;
+  const canManageRoleDefinitions = isAdminActor || isManagerActor;
+  const canEditRolePermissions = isAdminActor;
+  const canQuickEditAssignments = isAdminActor;
 
   // State
   const [users, setUsers] = useState<ProfileWithEmail[]>([]);
@@ -88,11 +101,22 @@ export default function UsersAdminPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'manager' | 'employee'>('all');
+  const [teamFilter, setTeamFilter] = useState<string>('all');
+  const [managerFilter, setManagerFilter] = useState<string>('all');
   const [availableRoles, setAvailableRoles] = useState<Array<{ id: string; name: string; display_name: string; role_class: 'admin' | 'manager' | 'employee' }>>([]);
+  const [teamDirectory, setTeamDirectory] = useState<Array<{
+    id: string;
+    name: string;
+    active: boolean;
+    manager_1_id?: string | null;
+    manager_2_id?: string | null;
+    manager_1_name?: string | null;
+    manager_2_name?: string | null;
+  }>>([]);
 
   useEffect(() => {
     const requestedTab = (searchParams.get('tab') || 'users') as TabType;
-    const validTabs: TabType[] = ['users', 'roles', 'permissions'];
+    const validTabs: TabType[] = ['users', 'roles', 'teams', 'permissions'];
     if (validTabs.includes(requestedTab)) {
       setActiveTab(requestedTab);
       return;
@@ -128,9 +152,17 @@ export default function UsersAdminPage() {
     phone_number: '',
     employee_id: '',
     role_id: '',
+    line_manager_id: '',
+    team_id: '',
   });
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState('');
+  const [quickEditTarget, setQuickEditTarget] = useState<{
+    userId: string;
+    field: 'role' | 'team';
+  } | null>(null);
+  const [quickEditValue, setQuickEditValue] = useState('');
+  const [quickEditSaving, setQuickEditSaving] = useState(false);
 
   // Stats
   const stats = {
@@ -139,6 +171,90 @@ export default function UsersAdminPage() {
     managers: users.filter((u) => u.role?.role_class === 'manager').length,
     employees: users.filter((u) => u.role?.role_class === 'employee').length,
   };
+
+  const managerNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    users.forEach((u) => {
+      map.set(u.id, u.full_name || u.email || 'Unknown');
+    });
+    return map;
+  }, [users]);
+
+  const getDisplayedManager = useMemo(() => {
+    return (managerId: string | null | undefined) => {
+      if (!managerId) return 'No Manager';
+      return managerNameById.get(managerId) || managerId;
+    };
+  }, [managerNameById]);
+
+  const getDisplayedManagers = useMemo(() => {
+    return (primaryManagerId: string | null | undefined, secondaryManagerId: string | null | undefined) => {
+      const managers = [primaryManagerId, secondaryManagerId]
+        .map((managerId) => getDisplayedManager(managerId))
+        .filter((managerName) => managerName !== 'No Manager');
+
+      return managers.join(', ');
+    };
+  }, [getDisplayedManager]);
+
+  const getUserRolePriority = useMemo(() => {
+    return (user: ProfileWithEmail) => {
+      if (user.email === 'admin@mpdee.co.uk') {
+        return getRoleSortPriority('admin');
+      }
+
+      return getRoleSortPriority(user.role?.name || user.role?.role_class || '');
+    };
+  }, []);
+
+  const teamOptions = useMemo(() => {
+    if (teamDirectory.length > 0) {
+      return teamDirectory
+        .filter((team) => team.active)
+        .map((team) => ({ id: team.id, name: team.name }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    }
+    const teams = new Set<string>();
+    users.forEach((u) => {
+      if (u.team_id) teams.add(u.team_id);
+    });
+    return Array.from(teams).sort().map((id) => ({ id, name: id }));
+  }, [teamDirectory, users]);
+
+  const teamNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    teamOptions.forEach((team) => map.set(team.id, team.name));
+    return map;
+  }, [teamOptions]);
+
+  const teamDetailsById = useMemo(() => {
+    const map = new Map<string, {
+      id: string;
+      name: string;
+      active: boolean;
+      manager_1_id?: string | null;
+      manager_2_id?: string | null;
+      manager_1_name?: string | null;
+      manager_2_name?: string | null;
+    }>();
+    teamDirectory.forEach((team) => map.set(team.id, team));
+    return map;
+  }, [teamDirectory]);
+
+  const managerOptions = useMemo(
+    () => users.filter((u) => u.role?.role_class === 'manager' || u.role?.role_class === 'admin'),
+    [users]
+  );
+
+  const getRoleOptionsForUser = useMemo(() => {
+    return (_user: ProfileWithEmail) => {
+      return availableRoles;
+    };
+  }, [availableRoles]);
+
+  const selectedAddTeamManagers = useMemo(() => {
+    return formData.team_id ? teamDetailsById.get(formData.team_id) || null : null;
+  }, [formData.team_id, teamDetailsById]);
 
   // Helper function to fetch users with emails
   async function fetchUsersWithEmails() {
@@ -190,7 +306,14 @@ export default function UsersAdminPage() {
           ? (data || []).filter((role: { role_class: string }) => role.role_class === 'employee')
           : (data || []);
 
-        setAvailableRoles(filteredRoles);
+        const rolesForAssignment = filteredRoles
+          .sort((a: { name: string; display_name: string }, b: { name: string; display_name: string }) => {
+            const byPriority = getRoleSortPriority(a.name) - getRoleSortPriority(b.name);
+            if (byPriority !== 0) return byPriority;
+            return a.display_name.localeCompare(b.display_name);
+          });
+
+        setAvailableRoles(rolesForAssignment);
       } catch (error) {
         console.error('Error fetching roles:', error);
       }
@@ -222,6 +345,41 @@ export default function UsersAdminPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canManageUsers]);
 
+  // Fetch team metadata used by the Org V2 admin UI
+  useEffect(function () {
+    async function fetchHierarchyMetadata() {
+      try {
+        const teamsRes = await fetch('/api/admin/hierarchy/teams');
+        if (teamsRes.ok) {
+          const teamsData = await teamsRes.json();
+          if (Array.isArray(teamsData?.teams)) {
+            const mapped = teamsData.teams
+              .filter((team: { id?: string; team_id?: string }) => Boolean(team?.id || team?.team_id))
+              .map((team: { id?: string; team_id?: string; name?: string; active?: boolean }) => {
+                const teamId = team.id || team.team_id || '';
+                return {
+                  id: teamId,
+                  name: team.name || teamId,
+                  active: team.active !== false,
+                  manager_1_id: (team as { manager_1_id?: string | null }).manager_1_id || null,
+                  manager_2_id: (team as { manager_2_id?: string | null }).manager_2_id || null,
+                  manager_1_name: (team as { manager_1_name?: string | null }).manager_1_name || null,
+                  manager_2_name: (team as { manager_2_name?: string | null }).manager_2_name || null,
+                };
+              });
+            setTeamDirectory(mapped);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching hierarchy metadata:', error);
+      }
+    }
+
+    if (canManageUsers) {
+      fetchHierarchyMetadata();
+    }
+  }, [canManageUsers]);
+
   // Search and role filter
   useEffect(function () {
     let filtered = users;
@@ -246,8 +404,80 @@ export default function UsersAdminPage() {
       );
     }
 
-    setFilteredUsers(filtered);
-  }, [searchQuery, roleFilter, users]);
+    if (teamFilter !== 'all') {
+      filtered = filtered.filter((user) => (user.team_id || 'unassigned') === teamFilter);
+    }
+
+    if (managerFilter !== 'all') {
+      filtered = filtered.filter(
+        (user) =>
+          (managerFilter === 'none' && !user.line_manager_id && !user.secondary_manager_id) ||
+          user.line_manager_id === managerFilter ||
+          user.secondary_manager_id === managerFilter
+      );
+    }
+
+    const sorted = [...filtered].sort((a, b) => {
+      const teamA = a.team_id ? (teamNameById.get(a.team_id) || a.team_id) : 'ZZZ Unassigned';
+      const teamB = b.team_id ? (teamNameById.get(b.team_id) || b.team_id) : 'ZZZ Unassigned';
+      const byTeam = teamA.localeCompare(teamB);
+      if (byTeam !== 0) return byTeam;
+
+      const byRole = getUserRolePriority(a) - getUserRolePriority(b);
+      if (byRole !== 0) return byRole;
+
+      return (a.full_name || a.email || '').localeCompare(b.full_name || b.email || '');
+    });
+
+    setFilteredUsers(sorted);
+  }, [searchQuery, roleFilter, teamFilter, managerFilter, users, teamNameById, getUserRolePriority]);
+
+  function openQuickEdit(user: ProfileWithEmail, field: 'role' | 'team') {
+    setQuickEditTarget({ userId: user.id, field });
+    setQuickEditValue(field === 'role' ? (user.role_id || '') : (user.team_id || ''));
+    setFormError('');
+  }
+
+  async function handleQuickEditSave(user: ProfileWithEmail) {
+    if (!quickEditTarget) return;
+
+    const nextRoleId = quickEditTarget.field === 'role' ? quickEditValue || null : (user.role_id || null);
+    const nextTeamId = quickEditTarget.field === 'team' ? quickEditValue || null : (user.team_id || null);
+
+    try {
+      setQuickEditSaving(true);
+      setFormError('');
+
+      const response = await fetch(`/api/admin/users/${user.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: user.email,
+          full_name: user.full_name,
+          phone_number: user.phone_number,
+          employee_id: user.employee_id,
+          role_id: nextRoleId,
+          line_manager_id: user.line_manager_id || null,
+          team_id: nextTeamId,
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update user');
+      }
+
+      const usersWithEmails = await fetchUsersWithEmails();
+      setUsers(usersWithEmails);
+      setFilteredUsers(usersWithEmails);
+      setQuickEditTarget(null);
+      setQuickEditValue('');
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Failed to update user');
+    } finally {
+      setQuickEditSaving(false);
+    }
+  }
 
   // Handle add user
   async function handleAddUser() {
@@ -260,7 +490,6 @@ export default function UsersAdminPage() {
       setFormError('Please select a role');
       return;
     }
-
     try {
       setFormLoading(true);
       setFormError('');
@@ -275,6 +504,8 @@ export default function UsersAdminPage() {
           phone_number: formData.phone_number,
           employee_id: formData.employee_id,
           role_id: formData.role_id,
+          line_manager_id: formData.line_manager_id || null,
+          team_id: formData.team_id || null,
         }),
       });
 
@@ -303,6 +534,8 @@ export default function UsersAdminPage() {
         phone_number: '',
         employee_id: '',
         role_id: '',
+        line_manager_id: '',
+        team_id: '',
       });
       setAddDialogOpen(false);
     } catch (error) {
@@ -334,6 +567,8 @@ export default function UsersAdminPage() {
           phone_number: formData.phone_number,
           employee_id: formData.employee_id,
           role_id: formData.role_id,
+          line_manager_id: formData.line_manager_id || null,
+          team_id: formData.team_id || null,
         }),
       });
 
@@ -411,6 +646,8 @@ export default function UsersAdminPage() {
       phone_number: userProfile.phone_number || '',
       employee_id: userProfile.employee_id || '',
       role_id: userProfile.role_id || '',
+      line_manager_id: userProfile.line_manager_id || '',
+      team_id: userProfile.team_id || '',
     });
     setFormError('');
     setEditDialogOpen(true);
@@ -519,7 +756,9 @@ export default function UsersAdminPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as TabType)} className="space-y-6">
-        <TabsList className={`grid w-full ${canEditRolePermissions ? 'max-w-xl grid-cols-3' : canManageRoleDefinitions ? 'max-w-md grid-cols-2' : 'max-w-sm grid-cols-1'} bg-slate-100 dark:bg-slate-800 p-0`}>
+        <TabsList className={`grid w-full ${
+          canEditRolePermissions ? 'max-w-2xl grid-cols-4' : canManageRoleDefinitions ? 'max-w-xl grid-cols-3' : 'max-w-sm grid-cols-1'
+        } bg-slate-100 dark:bg-slate-800 p-0`}>
           <TabsTrigger 
             value="users" 
             className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900"
@@ -534,6 +773,15 @@ export default function UsersAdminPage() {
             >
               <Briefcase className="h-4 w-4" />
               Roles
+            </TabsTrigger>
+          )}
+          {canManageRoleDefinitions && (
+            <TabsTrigger
+              value="teams"
+              className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900"
+            >
+              <Briefcase className="h-4 w-4" />
+              Teams
             </TabsTrigger>
           )}
           {canEditRolePermissions && (
@@ -636,6 +884,8 @@ export default function UsersAdminPage() {
                     phone_number: '',
                     employee_id: '',
                     role_id: '',
+                    line_manager_id: '',
+                    team_id: '',
                   });
                   setFormError('');
                   setAddDialogOpen(true);
@@ -663,6 +913,43 @@ export default function UsersAdminPage() {
               </div>
             </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Filter by Team</Label>
+                <Select value={teamFilter} onValueChange={setTeamFilter}>
+                  <SelectTrigger className="bg-input border-border text-white">
+                    <SelectValue placeholder="All teams" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All teams</SelectItem>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {teamOptions.map((team) => (
+                      <SelectItem key={team.id} value={team.id}>
+                        {team.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Filter by Line Manager</Label>
+                <Select value={managerFilter} onValueChange={setManagerFilter}>
+                  <SelectTrigger className="bg-input border-border text-white">
+                    <SelectValue placeholder="All managers" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All managers</SelectItem>
+                    <SelectItem value="none">No manager assigned</SelectItem>
+                    {managerOptions.map((managerUser) => (
+                      <SelectItem key={managerUser.id} value={managerUser.id}>
+                        {managerUser.full_name || managerUser.email || managerUser.id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             {/* User Table */}
             {loading ? (
               <div className="flex items-center justify-center py-8">
@@ -681,12 +968,28 @@ export default function UsersAdminPage() {
                       <TableHead className="text-muted-foreground">Email</TableHead>
                       <TableHead className="text-muted-foreground">Employee ID</TableHead>
                       <TableHead className="text-muted-foreground">Role</TableHead>
+                      <TableHead className="text-muted-foreground">Team</TableHead>
+                      <TableHead className="text-muted-foreground">Line Manager(s)</TableHead>
                       <TableHead className="text-muted-foreground">Created</TableHead>
                       <TableHead className="text-right text-muted-foreground">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredUsers.map((user) => (
+                    {filteredUsers.map((user, index) => {
+                      const currentTeamKey = user.team_id || 'unassigned';
+                      const previousTeamKey = index > 0 ? (filteredUsers[index - 1]?.team_id || 'unassigned') : null;
+                      const startsNewTeam = index === 0 || currentTeamKey !== previousTeamKey;
+                      const teamLabel = user.team_id ? (teamNameById.get(user.team_id) || user.team_id) : 'Unassigned';
+
+                      return (
+                      <Fragment key={user.id}>
+                        {startsNewTeam && (
+                          <TableRow key={`${currentTeamKey}-divider`} className="border-slate-600 bg-slate-950/40 hover:bg-slate-950/40">
+                            <TableCell colSpan={8} className="py-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                              {teamLabel}
+                            </TableCell>
+                          </TableRow>
+                        )}
                       <TableRow key={user.id} className="border-slate-700 hover:bg-slate-800/50">
                         <TableCell className="font-medium text-white">
                           <div className="flex items-center gap-2">
@@ -704,13 +1007,140 @@ export default function UsersAdminPage() {
                         </TableCell>
                         <TableCell className="text-muted-foreground">{user.employee_id || '-'}</TableCell>
                         <TableCell>
-                          <Badge variant={
-                            user.email === 'admin@mpdee.co.uk' ? 'destructive' :
-                            user.role?.role_class === 'admin' ? 'destructive' :
-                            user.role?.role_class === 'manager' ? 'warning' : 'secondary'
-                          }>
-                            {user.email === 'admin@mpdee.co.uk' ? 'SuperAdmin' : (user.role?.display_name || 'No Role')}
-                          </Badge>
+                          <Popover
+                            open={quickEditTarget?.userId === user.id && quickEditTarget.field === 'role'}
+                            onOpenChange={(open) => {
+                              if (!open) {
+                                setQuickEditTarget(null);
+                                setQuickEditValue('');
+                              }
+                            }}
+                          >
+                            <PopoverTrigger asChild>
+                              <button
+                                type="button"
+                                disabled={!canQuickEditAssignments}
+                                onClick={() => canQuickEditAssignments && openQuickEdit(user, 'role')}
+                                className="disabled:cursor-default enabled:cursor-pointer"
+                              >
+                                <Badge variant={
+                                  user.email === 'admin@mpdee.co.uk' ? 'destructive' :
+                                  user.role?.role_class === 'admin' ? 'destructive' :
+                                  user.role?.role_class === 'manager' ? 'warning' : 'secondary'
+                                }>
+                                  {user.email === 'admin@mpdee.co.uk' ? 'SuperAdmin' : (user.role?.display_name || 'No Role')}
+                                </Badge>
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent align="start" className="border-border bg-slate-900 text-white">
+                              <div className="space-y-3">
+                                <div>
+                                  <p className="text-sm font-medium">Change Job Role</p>
+                                  <p className="text-xs text-muted-foreground">{user.full_name || user.email}</p>
+                                </div>
+                                <Select value={quickEditValue} onValueChange={setQuickEditValue}>
+                                  <SelectTrigger className="bg-input border-border text-white">
+                                    <SelectValue placeholder="Select role" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {getRoleOptionsForUser(user).map((role) => (
+                                      <SelectItem key={role.id} value={role.id}>
+                                        {role.display_name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <div className="flex justify-end gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setQuickEditTarget(null);
+                                      setQuickEditValue('');
+                                    }}
+                                    className="border-slate-600 text-white hover:bg-slate-800"
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleQuickEditSave(user)}
+                                    disabled={quickEditSaving}
+                                    className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900"
+                                  >
+                                    {quickEditSaving ? 'Saving...' : 'Save'}
+                                  </Button>
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          <Popover
+                            open={quickEditTarget?.userId === user.id && quickEditTarget.field === 'team'}
+                            onOpenChange={(open) => {
+                              if (!open) {
+                                setQuickEditTarget(null);
+                                setQuickEditValue('');
+                              }
+                            }}
+                          >
+                            <PopoverTrigger asChild>
+                              <button
+                                type="button"
+                                disabled={!canQuickEditAssignments}
+                                onClick={() => canQuickEditAssignments && openQuickEdit(user, 'team')}
+                                className="text-left disabled:cursor-default enabled:cursor-pointer"
+                              >
+                                {user.team_id ? (teamNameById.get(user.team_id) || user.team_id) : 'Unassigned'}
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent align="start" className="border-border bg-slate-900 text-white">
+                              <div className="space-y-3">
+                                <div>
+                                  <p className="text-sm font-medium">Change Team</p>
+                                  <p className="text-xs text-muted-foreground">{user.full_name || user.email}</p>
+                                </div>
+                                <Select value={quickEditValue || 'none'} onValueChange={(value) => setQuickEditValue(value === 'none' ? '' : value)}>
+                                  <SelectTrigger className="bg-input border-border text-white">
+                                    <SelectValue placeholder="Select team" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">No team</SelectItem>
+                                    {teamOptions.map((team) => (
+                                      <SelectItem key={team.id} value={team.id}>
+                                        {team.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <div className="flex justify-end gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setQuickEditTarget(null);
+                                      setQuickEditValue('');
+                                    }}
+                                    className="border-slate-600 text-white hover:bg-slate-800"
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleQuickEditSave(user)}
+                                    disabled={quickEditSaving}
+                                    className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900"
+                                  >
+                                    {quickEditSaving ? 'Saving...' : 'Save'}
+                                  </Button>
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {getDisplayedManagers(user.line_manager_id, user.secondary_manager_id)}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           <div className="flex items-center gap-2 text-sm">
@@ -751,7 +1181,8 @@ export default function UsersAdminPage() {
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      </Fragment>
+                    )})}
                   </TableBody>
                 </Table>
               </div>
@@ -835,6 +1266,41 @@ export default function UsersAdminPage() {
                 </SelectContent>
               </Select>
             </div>
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="add-team-id">Primary Team</Label>
+                <Select
+                  value={formData.team_id || 'none'}
+                  onValueChange={(value) => setFormData({ ...formData, team_id: value === 'none' ? '' : value })}
+                >
+                  <SelectTrigger id="add-team-id" className="bg-input border-border text-white">
+                    <SelectValue placeholder="Select team" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No team</SelectItem>
+                    {teamOptions.map((team) => (
+                      <SelectItem key={team.id} value={team.id}>
+                        {team.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Manager 1</Label>
+                <div className="rounded-md border border-input bg-input px-3 py-2 text-sm text-white">
+                  {selectedAddTeamManagers?.manager_1_name || 'No Manager 1'}
+                </div>
+                <p className="text-xs text-muted-foreground">Inherited automatically from the selected team.</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Manager 2</Label>
+                <div className="rounded-md border border-input bg-input px-3 py-2 text-sm text-white">
+                  {selectedAddTeamManagers?.manager_2_name || 'No Manager 2'}
+                </div>
+                <p className="text-xs text-muted-foreground">Inherited automatically from the selected team.</p>
+              </div>
+            </>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddDialogOpen(false)} className="border-slate-600 text-white hover:bg-slate-800">
@@ -926,6 +1392,41 @@ export default function UsersAdminPage() {
                 </SelectContent>
               </Select>
             </div>
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="edit-team-id">Primary Team</Label>
+                <Select
+                  value={formData.team_id || 'none'}
+                  onValueChange={(value) => setFormData({ ...formData, team_id: value === 'none' ? '' : value })}
+                >
+                  <SelectTrigger id="edit-team-id" className="bg-input border-border text-white">
+                    <SelectValue placeholder="Select team" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No team</SelectItem>
+                    {teamOptions.map((team) => (
+                      <SelectItem key={team.id} value={team.id}>
+                        {team.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Manager 1</Label>
+                <div className="rounded-md border border-input bg-input px-3 py-2 text-sm text-white">
+                  {(formData.team_id ? teamDetailsById.get(formData.team_id)?.manager_1_name : null) || 'No Manager 1'}
+                </div>
+                <p className="text-xs text-muted-foreground">Inherited automatically from the selected team.</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Manager 2</Label>
+                <div className="rounded-md border border-input bg-input px-3 py-2 text-sm text-white">
+                  {(formData.team_id ? teamDetailsById.get(formData.team_id)?.manager_2_name : null) || 'No Manager 2'}
+                </div>
+                <p className="text-xs text-muted-foreground">Inherited automatically from the selected team.</p>
+              </div>
+            </>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditDialogOpen(false)} className="border-slate-600 text-white hover:bg-slate-800">
@@ -1239,6 +1740,12 @@ export default function UsersAdminPage() {
         {canManageRoleDefinitions && (
           <TabsContent value="roles">
             <JobRolesTab />
+          </TabsContent>
+        )}
+
+        {canManageRoleDefinitions && (
+          <TabsContent value="teams">
+            <TeamsTab />
           </TabsContent>
         )}
 

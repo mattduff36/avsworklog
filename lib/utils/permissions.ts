@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import type { ModuleName, UserPermissions } from '@/types/roles';
-import { ALL_MODULES } from '@/types/roles';
+import { getPermissionMapForUser, getPermissionSetForUser } from '@/lib/server/team-permissions';
 
 export type ProfileWithRole = {
   id: string;
@@ -17,6 +18,7 @@ export type ProfileWithRole = {
     name: string;
     display_name: string;
     role_class: 'admin' | 'manager' | 'employee';
+    hierarchy_rank?: number | null;
     is_manager_admin: boolean;
     is_super_admin: boolean;
   } | null;
@@ -77,34 +79,9 @@ export async function userHasPermission(
   userId: string,
   module: ModuleName
 ): Promise<boolean> {
-  const supabase = await createClient();
-
   try {
-    // Admin and super-admin always have full access.
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role_id, roles!inner(name, is_super_admin)')
-      .eq('id', userId)
-      .single();
-    const typedProfile = profile as {
-      role_id: string | null;
-      roles: { name: string; is_super_admin: boolean } | null;
-    } | null;
-
-    if (typedProfile?.roles?.is_super_admin || typedProfile?.roles?.name === 'admin') {
-      return true;
-    }
-
-    // Check specific permission
-    const { data: permission } = await supabase
-      .from('role_permissions')
-      .select('enabled')
-      .eq('role_id', (typedProfile?.role_id ?? '') as never)
-      .eq('module_name', module)
-      .single();
-    const typedPermission = permission as { enabled: boolean } | null;
-
-    return typedPermission?.enabled ?? false;
+    const permissionSet = await getPermissionSetForUser(userId, null, createAdminClient());
+    return permissionSet.has(module);
   } catch (error) {
     console.error('Error checking permission:', error);
     return false;
@@ -117,54 +94,8 @@ export async function userHasPermission(
 export async function getUserPermissions(
   userId: string
 ): Promise<UserPermissions> {
-  const supabase = await createClient();
-
   try {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select(`
-        role_id,
-        roles!inner(
-          name,
-          is_super_admin,
-          is_manager_admin
-        )
-      `)
-      .eq('id', userId)
-      .single();
-    const typedProfile = profile as {
-      role_id: string | null;
-      roles: { name: string; is_super_admin: boolean; is_manager_admin: boolean } | null;
-    } | null;
-
-    if (!typedProfile?.role_id) {
-      return {};
-    }
-
-    // Admin and super-admin are full access by definition.
-    if (typedProfile.roles?.is_super_admin || typedProfile.roles?.name === 'admin') {
-      const full: UserPermissions = {};
-      ALL_MODULES.forEach((moduleName) => {
-        full[moduleName] = true;
-      });
-      return full;
-    }
-
-    const { data: rolePermissions } = await supabase
-      .from('role_permissions')
-      .select('module_name, enabled')
-      .eq('role_id', typedProfile.role_id);
-
-    if (!rolePermissions) {
-      return {};
-    }
-
-    // Build permissions object from role_permissions
-    const permissions: UserPermissions = {};
-    (rolePermissions as Array<{ module_name: ModuleName; enabled: boolean }>).forEach((perm) => {
-      permissions[perm.module_name] = !!perm.enabled;
-    });
-
+    const permissions = await getPermissionMapForUser(userId, null, createAdminClient());
     return permissions;
   } catch (error) {
     console.error('Error getting user permissions:', error);
@@ -222,6 +153,7 @@ export async function getUsersWithPermission(
   module: ModuleName
 ): Promise<string[]> {
   const supabase = await createClient();
+  const admin = createAdminClient();
 
   try {
     // Get all users who either:
@@ -248,27 +180,16 @@ export async function getUsersWithPermission(
       return [];
     }
 
-    const roleIds = typedProfiles
-      .map((p) => p.role_id)
-      .filter((id): id is string => !!id);
+    const allowedUsers: string[] = [];
 
-    const { data: permissionRows } = await supabase
-      .from('role_permissions')
-      .select('role_id, module_name, enabled')
-      .in('role_id', roleIds)
-      .eq('module_name', module)
-      .eq('enabled', true);
+    for (const profileRow of typedProfiles) {
+      const permissionSet = await getPermissionSetForUser(profileRow.id, null, admin);
+      if (permissionSet.has(module)) {
+        allowedUsers.push(profileRow.id);
+      }
+    }
 
-    const allowedRoleIds = new Set((permissionRows || []).map((row: { role_id: string }) => row.role_id));
-
-    return typedProfiles
-      .filter((profileRow) => {
-        const role = profileRow.roles;
-        if (!role) return false;
-        if (role.is_super_admin || role.name === 'admin') return true;
-        return profileRow.role_id ? allowedRoleIds.has(profileRow.role_id) : false;
-      })
-      .map((profileRow) => profileRow.id);
+    return allowedUsers;
   } catch (error) {
     console.error('Error getting users with permission:', error);
     return [];
@@ -295,7 +216,7 @@ export async function validateUserAssignment(
 
     return {
       valid: false,
-      error: `${typedProfile?.full_name || 'This user'} (${typedProfile?.roles?.display_name}) does not have access to ${module}. Please update their role permissions or choose a different user.`,
+      error: `${typedProfile?.full_name || 'This user'} (${typedProfile?.roles?.display_name}) does not have access to ${module}. Please update their team permission matrix or choose a different user.`,
     };
   }
 

@@ -1,5 +1,5 @@
 import { createBrowserClient } from '@supabase/ssr'
-import { getViewAsRoleId } from '@/lib/utils/view-as-cookie'
+import { getViewAsRoleId, getViewAsTeamId } from '@/lib/utils/view-as-cookie'
 
 let client: ReturnType<typeof createBrowserClient> | null = null
 
@@ -27,12 +27,18 @@ export function createClient(): ReturnType<typeof createBrowserClient> | null {
     supabaseAnonKey,
     {
       global: {
-        // Inject x-view-as-role-id header on every request (read cookie dynamically)
+        // Inject view-as headers on every request (read cookies dynamically)
         fetch: (input, init) => {
           const viewAsRoleId = getViewAsRoleId()
-          if (viewAsRoleId) {
+          const viewAsTeamId = getViewAsTeamId()
+          if (viewAsRoleId || viewAsTeamId) {
             const headers = new Headers(init?.headers)
-            headers.set('x-view-as-role-id', viewAsRoleId)
+            if (viewAsRoleId) {
+              headers.set('x-view-as-role-id', viewAsRoleId)
+            }
+            if (viewAsTeamId) {
+              headers.set('x-view-as-team-id', viewAsTeamId)
+            }
             return globalThis.fetch(input, { ...init, headers })
           }
           return globalThis.fetch(input, init)

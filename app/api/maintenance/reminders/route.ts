@@ -4,6 +4,8 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { logger } from '@/lib/utils/logger';
 import { sendMaintenanceReminderEmail } from '@/lib/utils/email';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { getUsersWithPermission } from '@/lib/utils/permissions';
 
 // Helper to create service role client for bypassing RLS
 function getSupabaseServiceRole() {
@@ -55,6 +57,14 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendRemin
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
+    const canManageMaintenance = await canEffectiveRoleAccessModule('maintenance');
+    if (!canManageMaintenance) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: Maintenance access required' },
+        { status: 403 }
+      );
+    }
+
     // Get sender profile
     const { data: senderProfile, error: profileError } = await supabase
       .from('profiles')
@@ -64,19 +74,6 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendRemin
 
     if (profileError || !senderProfile) {
       return NextResponse.json({ success: false, error: 'Profile not found' }, { status: 403 });
-    }
-
-    // Check if user is manager/admin
-    const roleRaw = senderProfile.role as
-      | { name?: string; is_manager_admin?: boolean }
-      | Array<{ name?: string; is_manager_admin?: boolean }>
-      | null;
-    const roleData = Array.isArray(roleRaw) ? roleRaw[0] : roleRaw;
-    if (!roleData?.is_manager_admin && roleData?.name !== 'admin' && roleData?.name !== 'manager') {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Forbidden: Manager/Admin access required' 
-      }, { status: 403 });
     }
 
     // Parse request body
@@ -137,17 +134,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendRemin
 
     const recipientUserIds = recipientLinks?.map(r => r.user_id) || [];
 
-    // If no recipients configured, send to all managers/admins
+    // If no recipients are configured, fall back to all users with maintenance access.
     if (recipientUserIds.length === 0) {
-      // Fallback: get profiles where role is admin or manager
-      const { data: adminProfiles } = await supabaseServiceRole
-        .from('profiles')
-        .select('id, role:roles!inner(name, is_manager_admin)')
-        .or('role.name.eq.admin,role.name.eq.manager,role.is_manager_admin.eq.true');
-
-      if (adminProfiles && adminProfiles.length > 0) {
-        recipientUserIds.push(...adminProfiles.map((profile) => profile.id));
-      }
+      recipientUserIds.push(...(await getUsersWithPermission('maintenance')));
     }
 
     // Remove duplicates
@@ -156,7 +145,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendRemin
     if (uniqueRecipientIds.length === 0) {
       return NextResponse.json({ 
         success: false, 
-        error: 'No recipients configured and no managers found' 
+        error: 'No recipients configured and no maintenance users found' 
       }, { status: 400 });
     }
 

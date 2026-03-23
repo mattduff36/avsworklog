@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logger } from '@/lib/utils/logger';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
 /**
  * GET /api/maintenance/categories/[id]/recipients
@@ -17,6 +18,14 @@ export async function GET(
     
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const canManageMaintenance = await canEffectiveRoleAccessModule('maintenance');
+    if (!canManageMaintenance) {
+      return NextResponse.json(
+        { error: 'Maintenance access required' },
+        { status: 403 }
+      );
     }
     
     // Get recipients with profile info
@@ -64,22 +73,11 @@ export async function POST(
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    
-    // Check if user is admin/manager
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role:roles(name, is_manager_admin)')
-      .eq('id', user.id)
-      .single();
-    
-    const roleRaw = profile?.role as
-      | { name?: string; is_manager_admin?: boolean }
-      | Array<{ name?: string; is_manager_admin?: boolean }>
-      | null;
-    const roleData = Array.isArray(roleRaw) ? roleRaw[0] : roleRaw;
-    if (!roleData?.is_manager_admin && roleData?.name !== 'admin' && roleData?.name !== 'manager') {
+
+    const canManageMaintenance = await canEffectiveRoleAccessModule('maintenance');
+    if (!canManageMaintenance) {
       return NextResponse.json(
-        { error: 'Only admins and managers can manage recipients' },
+        { error: 'Maintenance access required' },
         { status: 403 }
       );
     }

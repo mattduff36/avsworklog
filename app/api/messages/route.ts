@@ -5,6 +5,7 @@ import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type { CreateMessageInput, CreateMessageResponse } from '@/types/messages';
 import { normalizeRoleInternalName } from '@/lib/utils/role-name';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
 /**
  * POST /api/messages
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is manager/admin
+    // Check Org V2 module access
     const profile = await getProfileWithRole(user.id);
     console.log('Profile fetched:', { 
       id: profile?.id, 
@@ -42,9 +43,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No role assigned to user' }, { status: 403 });
     }
 
-    if (!profile.role.is_manager_admin) {
-      console.error('User is not manager/admin:', user.id, profile.role);
-      return NextResponse.json({ error: 'Forbidden: Manager/Admin access required' }, { status: 403 });
+    const canManageToolboxTalks = await canEffectiveRoleAccessModule('toolbox-talks');
+    if (!canManageToolboxTalks) {
+      console.error('User lacks toolbox-talks access:', user.id, profile.role);
+      return NextResponse.json(
+        { error: 'Forbidden: Toolbox Talks access required' },
+        { status: 403 }
+      );
     }
 
     // Parse request body (could be JSON or FormData)

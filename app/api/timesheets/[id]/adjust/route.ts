@@ -5,6 +5,7 @@ import { sendTimesheetAdjustmentEmail } from '@/lib/utils/email';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type { Database } from '@/types/database';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
 function getSupabaseAdmin() {
   return createSupabaseAdmin<Database>(
@@ -46,9 +47,10 @@ export async function POST(
       );
     }
 
-    if (!effectiveRole.is_manager_admin) {
+    const canAdjustTimesheets = await canEffectiveRoleAccessModule('approvals');
+    if (!canAdjustTimesheets) {
       return NextResponse.json(
-        { error: 'Only managers and admins can adjust timesheets' },
+        { error: 'Approvals access required to adjust timesheets' },
         { status: 403 }
       );
     }

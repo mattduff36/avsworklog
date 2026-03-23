@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { POST } from '@/app/api/timesheets/[id]/adjust/route';
 import { createMockTimesheet, createMockManager, createMockAdmin } from '../../utils/factories';
-import { mockSupabaseAuthUser, mockSupabaseQuery, mockFetch, resetAllMocks } from '../../utils/test-helpers';
+import { mockSupabaseAuthUser, mockSupabaseQuery, mockFetch } from '../../utils/test-helpers';
 import type { EffectiveRoleInfo } from '@/lib/utils/view-as';
 
 vi.mock('@/lib/supabase/server');
@@ -47,6 +47,8 @@ async function mockEffectiveRole(overrides: Partial<EffectiveRoleInfo> = {}) {
     is_viewing_as: false,
     is_actual_super_admin: false,
     user_id: null,
+    team_id: null,
+    team_name: null,
   };
   const { getEffectiveRole } = await import('@/lib/utils/view-as');
   vi.mocked(getEffectiveRole).mockResolvedValue({ ...defaults, ...overrides });
