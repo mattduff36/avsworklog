@@ -345,7 +345,7 @@ export default function UsersAdminPage() {
     const { users: authUsers } = await response.json();
 
     // Create a map of auth details by user id.
-    const authUserMap = new Map(
+    const authUserMap = new Map<string, UserActivitySummary & { id: string }>(
       authUsers?.map((u: UserActivitySummary & { id: string }) => [u.id, u]) || []
     );
 
