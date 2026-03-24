@@ -24,7 +24,7 @@ import Link from 'next/link';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
 import { CustomerFormDialog } from '../../components/CustomerFormDialog';
 import type { Customer, CustomerFormData } from '../../types';
-import type { QuoteListSummary } from '@/app/(dashboard)/quotes/types';
+import { QUOTE_STATUS_CONFIG, type QuoteListSummary } from '@/app/(dashboard)/quotes/types';
 
 interface QuoteSummary {
   id: string;
@@ -301,7 +301,7 @@ export default function CustomerHistoryPage({ params }: PageProps) {
                         </span>
                       )}
                       <Badge variant="outline" className="text-xs capitalize">
-                        {q.status.replace(/_/g, ' ')}
+                        {QUOTE_STATUS_CONFIG[q.status as keyof typeof QUOTE_STATUS_CONFIG]?.label || q.status.replace(/_/g, ' ')}
                       </Badge>
                     </div>
                   </div>

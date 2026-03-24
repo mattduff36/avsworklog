@@ -201,7 +201,7 @@ export const QUOTE_STATUS_CONFIG: Record<QuoteStatus, { label: string; color: st
   won: { label: 'Won', color: 'border-green-500/30 text-green-400 bg-green-500/10' },
   lost: { label: 'Lost', color: 'border-red-500/30 text-red-400 bg-red-500/10' },
   ready_to_invoice: { label: 'Ready to Invoice', color: 'border-purple-500/30 text-purple-400 bg-purple-500/10' },
-  po_received: { label: 'PO Received', color: 'border-sky-500/30 text-sky-400 bg-sky-500/10' },
+  po_received: { label: 'Accepted', color: 'border-sky-500/30 text-sky-400 bg-sky-500/10' },
   in_progress: { label: 'In Progress', color: 'border-cyan-500/30 text-cyan-400 bg-cyan-500/10' },
   completed_part: { label: 'Completed In Part', color: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10' },
   completed_full: { label: 'Completed In Full', color: 'border-lime-500/30 text-lime-400 bg-lime-500/10' },
