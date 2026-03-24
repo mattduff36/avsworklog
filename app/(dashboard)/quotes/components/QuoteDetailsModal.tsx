@@ -38,6 +38,18 @@ import { toast } from 'sonner';
 import type { Quote, QuoteCompletionStatus, QuoteRevisionType } from '../types';
 import { QUOTE_STATUS_CONFIG } from '../types';
 
+const PO_EDITABLE_STATUSES = new Set([
+  'approved',
+  'sent',
+  'po_received',
+  'in_progress',
+  'completed_part',
+  'completed_full',
+  'partially_invoiced',
+  'invoiced',
+  'closed',
+]);
+
 interface QuoteDetailsModalProps {
   open: boolean;
   onClose: () => void;
@@ -67,6 +79,8 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }:
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const activeQuoteId = quote?.id || quoteId;
   const recipientEmail = quote?.attention_email || quote?.customer?.contact_email || '';
+  const canEditPoDetails = quote ? PO_EDITABLE_STATUSES.has(quote.status) : false;
+  const canTriggerRams = quote ? ['sent', 'approved'].includes(quote.status) : false;
 
   const fetchQuote = useCallback(async () => {
     const idToLoad = quote?.id || quoteId;
@@ -433,13 +447,26 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }:
                         </Button>
                       </>
                     )}
-                    {['sent', 'approved'].includes(quote.status) && (
+                    {canEditPoDetails && (
                       <Button
-                        onClick={() => callAction('mark_po_received', { po_number: poNumber, po_value: poValue ? Number(poValue) : null })}
+                        variant="outline"
+                        onClick={() => callAction('save_po_details', {
+                          po_number: poNumber.trim() || null,
+                          po_value: poValue ? Number(poValue) : null,
+                        })}
+                        disabled={actionLoading}
+                        className="border-slate-600 text-muted-foreground"
+                      >
+                        <FolderKanban className="mr-2 h-4 w-4" /> Save PO
+                      </Button>
+                    )}
+                    {canTriggerRams && (
+                      <Button
+                        onClick={() => callAction('trigger_rams')}
                         disabled={actionLoading}
                         className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90"
                       >
-                        <FolderKanban className="mr-2 h-4 w-4" /> Save PO And Trigger RAMS
+                        <FolderKanban className="mr-2 h-4 w-4" /> Trigger RAMS
                       </Button>
                     )}
                     {['po_received', 'in_progress'].includes(quote.status) && (

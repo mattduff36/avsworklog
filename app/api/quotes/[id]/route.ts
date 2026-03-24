@@ -71,6 +71,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     };
 
     const current = await fetchQuoteBundle(admin, id);
+    const normalizedPoNumber = typeof quoteUpdates.po_number === 'string'
+      ? quoteUpdates.po_number.trim() || null
+      : quoteUpdates.po_number ?? null;
+    const normalizedPoValue = typeof quoteUpdates.po_value === 'number'
+      ? quoteUpdates.po_value
+      : quoteUpdates.po_value ?? null;
 
     if (action === 'submit_for_approval') {
       const updates = {
@@ -168,17 +174,35 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         .eq('id', id);
 
       if (error) throw error;
-    } else if (action === 'mark_po_received') {
+    } else if (action === 'save_po_details') {
       const now = new Date().toISOString();
-      const poNumber = quoteUpdates.po_number || current.quote.po_number;
+      const hasPoDetails = normalizedPoNumber !== null || normalizedPoValue !== null;
+
+      const { error } = await supabase
+        .from('quotes')
+        .update({
+          po_number: normalizedPoNumber,
+          po_value: normalizedPoValue,
+          po_received_at: hasPoDetails ? (current.quote.po_received_at || now) : current.quote.po_received_at,
+          updated_by: user.id,
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+    } else if (action === 'trigger_rams' || action === 'mark_po_received') {
+      const now = new Date().toISOString();
+      const isLegacyCombinedAction = action === 'mark_po_received';
+      const hasPoDetails = normalizedPoNumber !== null || normalizedPoValue !== null;
 
       const { error } = await supabase
         .from('quotes')
         .update({
           status: 'po_received',
-          po_number: poNumber,
-          po_value: quoteUpdates.po_value ?? current.quote.po_value,
-          po_received_at: now,
+          po_number: isLegacyCombinedAction ? normalizedPoNumber : current.quote.po_number,
+          po_value: isLegacyCombinedAction ? normalizedPoValue : current.quote.po_value,
+          po_received_at: isLegacyCombinedAction && hasPoDetails
+            ? (current.quote.po_received_at || now)
+            : current.quote.po_received_at,
           rams_requested_at: now,
           updated_by: user.id,
         })
@@ -190,7 +214,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         quoteReference: current.quote.quote_reference,
         customerName: current.quote.customer?.company_name || 'Unknown customer',
         subjectLine: current.quote.subject_line || 'No subject provided',
-        poNumber: String(poNumber || 'Not supplied'),
+        poNumber: String(normalizedPoNumber || current.quote.po_number || 'Not supplied'),
         managerName: current.quote.manager_name || 'Unknown manager',
       });
     } else if (action === 'set_job_schedule') {
