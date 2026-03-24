@@ -210,13 +210,14 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   const suggestedInvoiceAmount = Number(quote?.invoice_summary?.remainingBalance ?? quote?.total ?? 0);
 
   const groupedTimeline = useMemo(() => {
-    if (!quote?.timeline?.length) {
+    const timeline = quote?.timeline ?? [];
+    if (!timeline.length) {
       return [];
     }
 
-    const groups = new Map<string, { label: string; events: typeof quote.timeline }>();
+    const groups = new Map<string, { label: string; events: typeof timeline }>();
 
-    quote.timeline.forEach((event) => {
+    timeline.forEach((event) => {
       const groupKey = format(new Date(event.created_at), 'yyyy-MM-dd');
       const existing = groups.get(groupKey);
       if (existing) {

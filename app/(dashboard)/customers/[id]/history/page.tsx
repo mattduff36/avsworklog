@@ -276,7 +276,7 @@ export default function CustomerHistoryPage({ params }: PageProps) {
                       <div>
                         <span className="text-sm text-slate-300 truncate max-w-[200px] block">{q.subject_line || 'Untitled'}</span>
                         <span className="text-xs text-muted-foreground">
-                          {q.version_label || 'Original'}{q.po_number ? ` • PO ${q.po_number}` : ''}{q.commercial_status === 'closed' ? ' • Closed' : ''}
+                          {q.version_label || 'Original'}{q.po_number ? ` • PO ${q.po_number}` : ''}
                         </span>
                       </div>
                     </div>

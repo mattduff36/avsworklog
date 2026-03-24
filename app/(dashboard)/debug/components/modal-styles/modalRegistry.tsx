@@ -626,6 +626,7 @@ const liveContextEntries: ModalShowcaseEntry[] = [
         open={open}
         onClose={() => onOpenChange(false)}
         quoteId="demo-quote-id"
+        onQuoteChange={createSafeAction('Quote change')}
         onEdit={createSafeAction('Quote edit')}
         onRefresh={createSafeAction('Quote refresh')}
       />

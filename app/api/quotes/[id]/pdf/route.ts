@@ -57,7 +57,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         unit_rate: Number(li.unit_rate),
         line_total: Number(li.line_total),
       })),
-      subtotal: Number(quote.subtotal),
+      total: Number(quote.total),
       validityDays: quote.validity_days || 30,
       signoffName: quote.signoff_name || '',
       signoffTitle: quote.signoff_title || '',

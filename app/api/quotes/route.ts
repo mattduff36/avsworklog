@@ -107,7 +107,6 @@ export async function GET(request: NextRequest) {
     if (summaryError) throw summaryError;
 
     const quotes = data || [];
-    const quoteIds = quotes.map(quote => quote.id);
     const threadIds = quotes.map(quote => quote.quote_thread_id).filter(Boolean);
     let previousVersionsByThreadId = new Map<string, typeof quotes>();
     let previousVersions: typeof quotes = [];
@@ -394,7 +393,6 @@ export async function POST(request: NextRequest) {
       description: 'Initial draft created.',
       toStatus: String(insertPayload.status),
       actorUserId: user.id,
-      createdAt: insertPayload.created_at as string | undefined,
     });
 
     const bundle = await fetchQuoteBundle(admin, quoteId);

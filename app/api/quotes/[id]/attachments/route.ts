@@ -11,7 +11,6 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
     const supabase = await createClient();
-    const admin = createAdminClient();
     const {
       data: { user },
       error: authError,
