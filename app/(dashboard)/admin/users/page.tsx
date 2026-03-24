@@ -25,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   UserPlus,
@@ -48,6 +49,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import type { Database } from '@/types/database';
 import { getRoleSortPriority } from '@/lib/config/roles-core';
+import { formatRelativeTime } from '@/lib/utils/date';
 
 const RoleManagement = dynamic(() => import('@/components/admin/RoleManagement').then(m => ({ default: m.RoleManagement })), { 
   ssr: false,
@@ -79,7 +81,12 @@ type ProfileWithRole = Omit<Profile, 'role'> & {
   team_id?: string | null;
   is_placeholder?: boolean | null;
 };
-type ProfileWithEmail = ProfileWithRole & { email?: string };
+interface UserActivitySummary {
+  email?: string;
+  last_sign_in_at?: string | null;
+  last_active_at?: string | null;
+}
+type ProfileWithEmail = ProfileWithRole & UserActivitySummary;
 
 type TabType = 'users' | 'roles' | 'teams' | 'permissions';
 type UserStatusTab = 'active' | 'deleted';
@@ -91,6 +98,26 @@ function isDeletedUserProfile(user: { full_name?: string | null }): boolean {
 function isExpectedUserAdminError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   return error.message.includes('Forbidden:');
+}
+
+function formatAdminActivityTimestamp(value?: string | null): string {
+  if (!value) return 'Never';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return 'Unknown';
+  }
+
+  const relative = formatRelativeTime(date);
+  const absolute = date.toLocaleString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  return relative ? `${absolute} (${relative})` : absolute;
 }
 
 export default function UsersAdminPage() {
@@ -317,13 +344,17 @@ export default function UsersAdminPage() {
     }
     const { users: authUsers } = await response.json();
 
-    // Create a map of user id to email
-    const emailMap = new Map(authUsers?.map((u: { id: string; email: string }) => [u.id, u.email]) || []);
+    // Create a map of auth details by user id.
+    const authUserMap = new Map(
+      authUsers?.map((u: UserActivitySummary & { id: string }) => [u.id, u]) || []
+    );
 
     // Merge profiles with emails
     return (profiles as unknown as ProfileWithRole[])?.map(profile => ({
       ...profile,
-      email: emailMap.get(profile.id) as string || ''
+      email: authUserMap.get(profile.id)?.email || '',
+      last_sign_in_at: authUserMap.get(profile.id)?.last_sign_in_at || null,
+      last_active_at: authUserMap.get(profile.id)?.last_active_at || null,
     })) || [] as ProfileWithEmail[];
   }
 
@@ -673,6 +704,20 @@ export default function UsersAdminPage() {
   }
 
   // Open edit dialog
+  function openAddDialog() {
+    setFormData({
+      email: '',
+      full_name: '',
+      phone_number: '',
+      employee_id: '',
+      role_id: '',
+      line_manager_id: '',
+      team_id: '',
+    });
+    setFormError('');
+    setAddDialogOpen(true);
+  }
+
   function openEditDialog(userProfile: ProfileWithEmail) {
     setSelectedUser(userProfile);
     // Email comes from auth (merged into ProfileWithEmail), not from the profiles table
@@ -788,6 +833,15 @@ export default function UsersAdminPage() {
               Manage users, roles, and permissions
             </p>
           </div>
+          {activeTab === 'users' && userStatusTab === 'active' && (
+            <Button
+              onClick={openAddDialog}
+              className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900"
+            >
+              <UserPlus className="h-4 w-4 mr-2" />
+              Add User
+            </Button>
+          )}
         </div>
       </div>
 
@@ -924,38 +978,13 @@ export default function UsersAdminPage() {
       {/* User Management Interface */}
       <Card className="border-border">
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-white">{userStatusTab === 'deleted' ? 'Deleted Users' : 'Active Users'}</CardTitle>
-              <CardDescription className="text-muted-foreground">
-                {userStatusTab === 'deleted'
-                  ? 'Review historical deleted accounts and remove them when it is safe to do so.'
-                  : 'View and manage active user accounts, roles, and permissions.'}
-              </CardDescription>
-            </div>
-            {userStatusTab === 'active' && (
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => {
-                    setFormData({
-                      email: '',
-                      full_name: '',
-                      phone_number: '',
-                      employee_id: '',
-                      role_id: '',
-                      line_manager_id: '',
-                      team_id: '',
-                    });
-                    setFormError('');
-                    setAddDialogOpen(true);
-                  }}
-                  className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900"
-                >
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Add User
-                </Button>
-              </div>
-            )}
+          <div>
+            <CardTitle className="text-white">{userStatusTab === 'deleted' ? 'Deleted Users' : 'Active Users'}</CardTitle>
+            <CardDescription className="text-muted-foreground">
+              {userStatusTab === 'deleted'
+                ? 'Review historical deleted accounts and remove them when it is safe to do so.'
+                : 'View and manage active user accounts, roles, and permissions.'}
+            </CardDescription>
           </div>
         </CardHeader>
         <CardContent>
@@ -1054,9 +1083,12 @@ export default function UsersAdminPage() {
                             </TableCell>
                           </TableRow>
                         )}
-                      <TableRow key={user.id} className="border-slate-700 hover:bg-slate-800/50">
+                      <TooltipProvider delayDuration={2000}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <TableRow key={user.id} className="border-slate-700 hover:bg-slate-800/50">
                         <TableCell className="font-medium text-white">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 w-full cursor-default">
                             <div className="h-8 w-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
                               <User className="h-4 w-4 text-slate-600 dark:text-muted-foreground" />
                             </div>
@@ -1244,7 +1276,25 @@ export default function UsersAdminPage() {
                             </Button>
                           </div>
                         </TableCell>
-                      </TableRow>
+                            </TableRow>
+                          </TooltipTrigger>
+                          <TooltipContent
+                            align="start"
+                            side="top"
+                            className="min-w-[360px] max-w-[420px] py-3"
+                          >
+                            <div className="space-y-2">
+                              <p className="font-medium text-white">{user.full_name || user.email || 'Unnamed User'}</p>
+                              <div className="grid grid-cols-[96px_1fr] gap-x-3 gap-y-1">
+                                <span className="text-slate-300">Last login</span>
+                                <span>{formatAdminActivityTimestamp(user.last_sign_in_at)}</span>
+                                <span className="text-slate-300">Last active</span>
+                                <span>{formatAdminActivityTimestamp(user.last_active_at)}</span>
+                              </div>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                       </Fragment>
                     )})}
                   </TableBody>

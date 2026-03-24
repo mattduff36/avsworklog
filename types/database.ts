@@ -786,6 +786,7 @@ export interface Database {
         Row: {
           id: string
           user_id: string
+          timesheet_type: string | null
           reg_number: string | null
           week_ending: string
           status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'processed' | 'adjusted'
@@ -805,6 +806,7 @@ export interface Database {
         Insert: {
           id?: string
           user_id: string
+          timesheet_type?: string | null
           reg_number?: string | null
           week_ending: string
           status?: 'draft' | 'submitted' | 'approved' | 'rejected' | 'processed' | 'adjusted'
@@ -824,6 +826,7 @@ export interface Database {
         Update: {
           id?: string
           user_id?: string
+          timesheet_type?: string | null
           reg_number?: string | null
           week_ending?: string
           status?: 'draft' | 'submitted' | 'approved' | 'rejected' | 'processed' | 'adjusted'

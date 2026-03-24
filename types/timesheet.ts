@@ -16,6 +16,7 @@ export interface TimesheetEntry {
 export interface Timesheet {
   id: string;
   user_id: string;
+  timesheet_type?: string | null;
   reg_number: string | null;
   week_ending: string; // Date string (Sunday of the week)
   status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'processed' | 'adjusted';

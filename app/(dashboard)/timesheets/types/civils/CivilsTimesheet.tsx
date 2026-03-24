@@ -39,9 +39,15 @@ interface CivilsTimesheetProps {
   weekEnding: string;
   existingId: string | null;
   userId?: string;
+  timesheetType?: 'civils' | 'plant';
 }
 
-export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: initialExistingId, userId: managerSelectedUserId }: CivilsTimesheetProps) {
+export function CivilsTimesheet({
+  weekEnding: initialWeekEnding,
+  existingId: initialExistingId,
+  userId: managerSelectedUserId,
+  timesheetType = 'civils',
+}: CivilsTimesheetProps) {
   const router = useRouter();
   const { user, profile, isManager, isAdmin, isSuperAdmin } = useAuth();
   
@@ -82,6 +88,13 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
   const [suggestedRegNumber, setSuggestedRegNumber] = useState<string | null>(null);
   const [showSuggestedVehiclePrompt, setShowSuggestedVehiclePrompt] = useState(false);
   const [vehiclePromptDismissed, setVehiclePromptDismissed] = useState(false);
+  const timesheetTypeLabel = timesheetType === 'plant' ? 'Plant' : 'Civils';
+  const timesheetHeaderTitle = existingTimesheetId
+    ? `Edit ${timesheetTypeLabel} Timesheet`
+    : `New ${timesheetTypeLabel} Timesheet`;
+  const detailsTitle = `${timesheetTypeLabel} Timesheet Details`;
+  const registrationLabel =
+    timesheetType === 'plant' ? 'Plant / Vehicle Registration (Optional)' : 'Vehicle Registration (Optional)';
 
   // Initialize entries for all 7 days (with didNotWorkReason tracking)
   const [entries, setEntries] = useState(
@@ -762,6 +775,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
         // Update existing timesheet
         type TimesheetUpdate = Database['public']['Tables']['timesheets']['Update'];
         const timesheetData: TimesheetUpdate = {
+          timesheet_type: timesheetType,
           reg_number: regNumber || null,
           week_ending: weekEnding,
           status,
@@ -787,6 +801,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
         type TimesheetInsert = Database['public']['Tables']['timesheets']['Insert'];
         const timesheetData: TimesheetInsert = {
           user_id: selectedEmployeeId,
+          timesheet_type: timesheetType,
           reg_number: regNumber || null,
           week_ending: weekEnding,
           status,
@@ -951,7 +966,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
             </Link>
             <div>
               <h1 className="text-xl md:text-3xl font-bold text-foreground">
-                {existingTimesheetId ? 'Edit Timesheet' : 'New Timesheet'}
+                {timesheetHeaderTitle}
               </h1>
               <p className="text-sm text-muted-foreground hidden md:block">
                 {profile?.full_name}
@@ -981,10 +996,20 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
         </Card>
       )}
 
+      {timesheetType === 'plant' && (
+        <Card className="border-blue-400/40 bg-blue-500/10">
+          <CardContent className="pt-4">
+            <p className="text-sm text-blue-100">
+              Plant timesheet routing is active for this team. This entry will be saved as a plant timesheet.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Basic Info Card */}
       <Card className="">
         <CardHeader className="pb-4">
-          <CardTitle className="text-foreground">Timesheet Details</CardTitle>
+          <CardTitle className="text-foreground">{detailsTitle}</CardTitle>
           <CardDescription className="text-muted-foreground">
             Week ending {new Date(weekEnding).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
           </CardDescription>
@@ -1020,7 +1045,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
           
           {/* Vehicle Registration */}
           <div className="space-y-2 max-w-full">
-            <Label htmlFor="reg_number" className="text-foreground text-lg">Vehicle Registration (Optional)</Label>
+            <Label htmlFor="reg_number" className="text-foreground text-lg">{registrationLabel}</Label>
             
             {/* Show suggestion prompt if available and not dismissed */}
             {showSuggestedVehiclePrompt && !vehiclePromptDismissed && suggestedRegNumber && !regNumber ? (

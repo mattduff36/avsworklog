@@ -18,6 +18,7 @@ type TimesheetProps = {
 };
 
 import { CivilsTimesheet } from './civils/CivilsTimesheet';
+import { PlantTimesheet } from './plant/PlantTimesheet';
 
 /**
  * Timesheet Registry
@@ -25,7 +26,7 @@ import { CivilsTimesheet } from './civils/CivilsTimesheet';
  */
 export const TimesheetRegistry: Record<string, React.ComponentType<TimesheetProps>> = {
   civils: CivilsTimesheet,
-  // plant: PlantTimesheet, // Coming in Phase 8
+  plant: PlantTimesheet,
 };
 
 /**
@@ -41,7 +42,7 @@ export const TimesheetTypeOptions = [
   { 
     value: 'plant', 
     label: 'Plant Timesheet',
-    description: 'Specialized timesheet for plant operators (Coming soon)'
+    description: 'Plant teams use the weekly timesheet flow with plant routing enabled'
   },
 ] as const;
 

@@ -47,6 +47,7 @@ import {
   useAbsenceRealtimeQueryInvalidation
 } from '@/lib/hooks/useAbsence';
 import { formatDate, formatDateISO, calculateDurationDays, getFinancialYearMonths, getCurrentFinancialYear } from '@/lib/utils/date';
+import { ANNUAL_LEAVE_MIN_REMAINING_DAYS } from '@/lib/utils/annual-leave';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isThisMonth } from 'date-fns';
 import { toast } from 'sonner';
 import type { WorkShiftPattern } from '@/types/work-shifts';
@@ -356,7 +357,7 @@ export default function AbsencePage() {
       return;
     }
 
-    if (deductsAllowance && projectedRemaining < 0) {
+    if (deductsAllowance && projectedRemaining < ANNUAL_LEAVE_MIN_REMAINING_DAYS) {
       toast.error('Insufficient annual leave allowance');
       return;
     }
@@ -862,11 +863,11 @@ export default function AbsencePage() {
                     </span>
                   </div>
                 </div>
-                {deductsAllowance && projectedRemaining < 0 && (
+                {deductsAllowance && projectedRemaining < ANNUAL_LEAVE_MIN_REMAINING_DAYS && (
                   <div className="flex items-start gap-2 bg-red-500/20 p-3 rounded border border-red-500/30">
                     <AlertTriangle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
                     <p className="text-sm text-red-300">
-                      This request exceeds your available allowance. Please adjust the dates or contact your manager.
+                      This request exceeds the allowed 2-day annual leave buffer. Please adjust the dates or contact your manager.
                     </p>
                   </div>
                 )}
@@ -893,7 +894,7 @@ export default function AbsencePage() {
               </Button>
               <Button
                 type="submit"
-                disabled={submitting || (deductsAllowance && projectedRemaining < 0) || !startDate || !selectedReasonId}
+                disabled={submitting || (deductsAllowance && projectedRemaining < ANNUAL_LEAVE_MIN_REMAINING_DAYS) || !startDate || !selectedReasonId}
                 className="bg-absence hover:bg-absence-dark text-white"
               >
                 {submitting ? 'Submitting...' : 'Submit Request'}

@@ -14,6 +14,7 @@ import {
 import { getCurrentFinancialYear, getFinancialYear } from '@/lib/utils/date';
 import { calculateDurationDays } from '@/lib/utils/date';
 import { isClosedFinancialYearDate } from '@/lib/services/absence-archive';
+import { ANNUAL_LEAVE_MIN_REMAINING_DAYS } from '@/lib/utils/annual-leave';
 
 const ANNUAL_LEAVE_REASON_NAME = 'annual leave';
 
@@ -389,7 +390,7 @@ export function useCreateAbsence() {
           );
           const requested = resolvedAbsence.duration_days || 0;
 
-          if (usedOrPending + requested > allowance) {
+          if (allowance - usedOrPending - requested < ANNUAL_LEAVE_MIN_REMAINING_DAYS) {
             throw new Error('Annual leave request exceeds available allowance');
           }
         }
