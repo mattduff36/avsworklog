@@ -17,6 +17,36 @@ interface UseTimesheetTypeReturn {
   error: string | null;
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    return String((error as { message?: unknown }).message ?? '');
+  }
+  return String(error ?? '');
+}
+
+function isMissingTeamTimesheetTypeError(error: unknown): boolean {
+  const message = getErrorMessage(error);
+  return /org_teams.*timesheet_type.*does not exist|timesheet_type.*does not exist/i.test(message);
+}
+
+async function fetchRoleTimesheetType(supabase: ReturnType<typeof createClient>, userId: string) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select(`
+      role:roles (
+        timesheet_type
+      )
+    `)
+    .eq('id', userId)
+    .single();
+
+  if (error) throw error;
+
+  const roleData = data?.role as { timesheet_type?: string | null } | null;
+  return (roleData?.timesheet_type || DEFAULT_TIMESHEET_TYPE) as TimesheetType;
+}
+
 export function useTimesheetType(userId?: string): UseTimesheetTypeReturn {
   const [timesheetType, setTimesheetType] = useState<TimesheetType | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,7 +77,15 @@ export function useTimesheetType(userId?: string): UseTimesheetTypeReturn {
           .eq('id', userId)
           .single();
 
-        if (fetchError) throw fetchError;
+        if (fetchError) {
+          if (isMissingTeamTimesheetTypeError(fetchError)) {
+            const fallbackType = await fetchRoleTimesheetType(supabase, userId);
+            setTimesheetType(fallbackType);
+            setError(null);
+            return;
+          }
+          throw fetchError;
+        }
 
         const teamData = data?.team as { timesheet_type?: string | null } | null;
         const roleData = data?.role as { timesheet_type?: string | null } | null;
@@ -61,7 +99,7 @@ export function useTimesheetType(userId?: string): UseTimesheetTypeReturn {
         setError(null);
       } catch (err) {
         console.error('Error fetching timesheet type:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch timesheet type');
+        setError(getErrorMessage(err) || 'Failed to fetch timesheet type');
         
         // Fallback to default on error
         setTimesheetType(DEFAULT_TIMESHEET_TYPE);

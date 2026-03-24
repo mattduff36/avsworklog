@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { sendTimesheetRejectionEmail } from '@/lib/utils/email';
 import { logServerError } from '@/lib/utils/server-error-logger';
@@ -49,8 +50,7 @@ export async function POST(
         status,
         profiles:user_id (
           id,
-          full_name,
-          email
+          full_name
         )
       `)
       .eq('id', timesheetId)
@@ -60,7 +60,7 @@ export async function POST(
       user_id: string;
       week_ending: string;
       status: string;
-      profiles: { id: string; full_name: string; email: string | null } | null;
+      profiles: { id: string; full_name: string } | null;
     } | null;
 
     if (timesheetError || !typedTimesheet) {
@@ -93,12 +93,23 @@ export async function POST(
       throw updateError;
     }
 
+    // Email addresses live in auth.users, not public.profiles.
+    const adminClient = createAdminClient();
+    const { data: employeeUserResult, error: employeeUserError } =
+      await adminClient.auth.admin.getUserById(typedTimesheet.user_id);
+
+    if (employeeUserError) {
+      console.error('Error fetching employee email:', employeeUserError);
+    }
+
+    const employeeProfile = typedTimesheet.profiles as unknown as { full_name: string } | null;
+    const employeeEmail = employeeUserResult.user?.email ?? null;
+
     // Send email notification
-    const employeeProfile = typedTimesheet.profiles as unknown as { full_name: string; email: string };
-    if (employeeProfile?.email) {
+    if (employeeEmail) {
       const emailResult = await sendTimesheetRejectionEmail({
-        to: employeeProfile.email,
-        employeeName: employeeProfile.full_name,
+        to: employeeEmail,
+        employeeName: employeeProfile?.full_name || 'Employee',
         weekEnding: new Date(typedTimesheet.week_ending).toLocaleDateString('en-GB', {
           weekday: 'long',
           day: 'numeric',

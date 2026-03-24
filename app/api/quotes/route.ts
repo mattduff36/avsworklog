@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { ACCEPTED_QUOTE_STATUSES, ACTIVE_QUOTE_STATUS_ORDER } from '@/app/(dashboard)/quotes/types';
 import {
+  appendQuoteTimelineEvent,
   calculateQuoteTotals,
   fetchQuoteBundle,
   generateQuoteReferenceForManager,
@@ -10,34 +12,34 @@ import {
   getQuoteManagerOption,
 } from '@/lib/server/quote-workflow';
 
-const QUOTE_STATUS_ORDER = [
-  'draft',
-  'pending_internal_approval',
-  'changes_requested',
-  'approved',
-  'sent',
-  'won',
-  'lost',
-  'ready_to_invoice',
-  'po_received',
-  'in_progress',
-  'completed_part',
-  'completed_full',
-  'partially_invoiced',
-  'invoiced',
-  'closed',
-] as const;
+type QuoteFieldErrors = Record<string, string>;
 
-const WON_QUOTE_STATUSES = new Set([
-  'won',
-  'ready_to_invoice',
-  'po_received',
-  'in_progress',
-  'completed_part',
-  'completed_full',
-  'partially_invoiced',
-  'invoiced',
-]);
+function normalizeOptionalString(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function normalizeOptionalInteger(value: unknown): number | null {
+  if (value === '' || value === null || typeof value === 'undefined') {
+    return null;
+  }
+
+  const parsed = typeof value === 'number' ? value : Number.parseInt(String(value), 10);
+  return Number.isInteger(parsed) ? parsed : Number.NaN;
+}
+
+function isMeaningfulLineItem(item: { description?: string; unit?: string; quantity?: number; unit_rate?: number }) {
+  return Boolean(
+    item.description?.trim()
+    || item.unit?.trim()
+    || Number(item.unit_rate || 0) !== 0
+    || Number(item.quantity || 1) !== 1
+  );
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -48,7 +50,7 @@ export async function GET(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'You must be signed in to use quotes.' }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -106,13 +108,53 @@ export async function GET(request: NextRequest) {
 
     const quotes = data || [];
     const quoteIds = quotes.map(quote => quote.id);
+    const threadIds = quotes.map(quote => quote.quote_thread_id).filter(Boolean);
+    let previousVersionsByThreadId = new Map<string, typeof quotes>();
+    let previousVersions: typeof quotes = [];
+
+    if (!includeVersions && threadIds.length > 0) {
+      const { data: olderVersions, error: olderVersionsError } = await supabase
+        .from('quotes')
+        .select(`
+          *,
+          customer:customers(
+            id,
+            company_name,
+            short_name,
+            contact_name,
+            contact_email,
+            address_line_1,
+            address_line_2,
+            city,
+            county,
+            postcode
+          )
+        `)
+        .in('quote_thread_id', threadIds)
+        .eq('is_latest_version', false)
+        .order('created_at', { ascending: false });
+
+      if (olderVersionsError) {
+        throw olderVersionsError;
+      }
+
+      previousVersions = olderVersions || [];
+      previousVersionsByThreadId = previousVersions.reduce((acc, version) => {
+        const existing = acc.get(version.quote_thread_id) || [];
+        existing.push(version);
+        acc.set(version.quote_thread_id, existing);
+        return acc;
+      }, new Map<string, typeof quotes>());
+    }
 
     const summaries = new Map<string, ReturnType<typeof getInvoiceSummary>>();
-    if (quoteIds.length > 0) {
+    const allVisibleQuotes = [...quotes, ...previousVersions];
+    const summaryQuoteIds = allVisibleQuotes.map(quote => quote.id);
+    if (summaryQuoteIds.length > 0) {
       const { data: invoices, error: invoiceError } = await supabase
         .from('quote_invoices')
         .select('quote_id, amount, invoice_date')
-        .in('quote_id', quoteIds);
+        .in('quote_id', summaryQuoteIds);
 
       if (invoiceError) {
         throw invoiceError;
@@ -126,7 +168,7 @@ export async function GET(request: NextRequest) {
         invoicesByQuoteId.get(invoice.quote_id)!.push(invoice);
       });
 
-      for (const quote of quotes) {
+      for (const quote of allVisibleQuotes) {
         summaries.set(
           quote.id,
           getInvoiceSummary({
@@ -137,20 +179,22 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const statusCounts = QUOTE_STATUS_ORDER.reduce<Record<string, number>>(
+    const statusCounts = ACTIVE_QUOTE_STATUS_ORDER.reduce<Record<string, number>>(
       (acc, status) => ({ ...acc, [status]: 0 }),
       { all: 0 }
     );
-    let wonQuotes = 0;
-    let wonValue = 0;
+    let acceptedQuotes = 0;
+    let acceptedValue = 0;
 
     (summaryRows || []).forEach((quote) => {
       statusCounts.all += 1;
-      statusCounts[quote.status] = (statusCounts[quote.status] || 0) + 1;
+      if (quote.status in statusCounts) {
+        statusCounts[quote.status] = (statusCounts[quote.status] || 0) + 1;
+      }
 
-      if (WON_QUOTE_STATUSES.has(quote.status)) {
-        wonQuotes += 1;
-        wonValue += Number(quote.total || 0);
+      if (ACCEPTED_QUOTE_STATUSES.has(quote.status)) {
+        acceptedQuotes += 1;
+        acceptedValue += Number(quote.total || 0);
       }
     });
 
@@ -158,12 +202,16 @@ export async function GET(request: NextRequest) {
       quotes: quotes.map(quote => ({
         ...quote,
         invoice_summary: summaries.get(quote.id) || getInvoiceSummary({ total: Number(quote.total || 0), invoices: [] }),
+        previous_versions: (previousVersionsByThreadId.get(quote.quote_thread_id) || []).map(version => ({
+          ...version,
+          invoice_summary: summaries.get(version.id) || getInvoiceSummary({ total: Number(version.total || 0), invoices: [] }),
+        })),
       })),
       summary: {
         total_quotes: statusCounts.all,
         status_counts: statusCounts,
-        won_quotes: wonQuotes,
-        won_value: wonValue,
+        accepted_quotes: acceptedQuotes,
+        accepted_value: acceptedValue,
       },
       pagination: {
         offset,
@@ -173,7 +221,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error fetching quotes:', error);
-    return NextResponse.json({ error: 'Failed to fetch quotes' }, { status: 500 });
+    return NextResponse.json({ error: 'Unable to load quotes right now.' }, { status: 500 });
   }
 }
 
@@ -187,7 +235,7 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'You must be signed in to use quotes.' }, { status: 401 });
     }
 
     const body = await request.json();
@@ -208,7 +256,53 @@ export async function POST(request: NextRequest) {
       [key: string]: unknown;
     };
 
-    const managerProfileId = manager_profile_id || user.id;
+    const fieldErrors: QuoteFieldErrors = {};
+    const customerId = typeof quoteData.customer_id === 'string' ? quoteData.customer_id.trim() : '';
+    const managerProfileId = typeof manager_profile_id === 'string' ? manager_profile_id.trim() : '';
+    const normalizedApproverProfileId = typeof approver_profile_id === 'string' && approver_profile_id.trim()
+      ? approver_profile_id.trim()
+      : null;
+    const normalizedStartAlertDays = normalizeOptionalInteger(quoteData.start_alert_days);
+
+    if (!customerId) {
+      fieldErrors.customer_id = 'Select a customer.';
+    }
+
+    if (!managerProfileId) {
+      fieldErrors.manager_profile_id = 'Select a manager.';
+    }
+
+    if (Number.isNaN(normalizedStartAlertDays)) {
+      fieldErrors.start_alert_days = 'Alert days before start must be a whole number.';
+    }
+
+    const normalizedItems = Array.isArray(line_items)
+      ? line_items.map((item, index) => ({
+        originalIndex: index,
+        description: item.description?.trim() || '',
+        quantity: Number(item.quantity || 0),
+        unit: item.unit?.trim() || '',
+        unit_rate: Number(item.unit_rate || 0),
+        sort_order: item.sort_order ?? index,
+      }))
+      : [];
+
+    normalizedItems.forEach((item) => {
+      if (isMeaningfulLineItem(item) && !item.description) {
+        fieldErrors[`line_items.${item.originalIndex}.description`] = 'Enter a description for this line item.';
+      }
+    });
+
+    if (Object.keys(fieldErrors).length > 0) {
+      return NextResponse.json(
+        {
+          error: 'Please correct the highlighted fields and try again.',
+          field_errors: fieldErrors,
+        },
+        { status: 400 }
+      );
+    }
+
     const managerOption = await getQuoteManagerOption(managerProfileId);
 
     const { data: managerProfile, error: managerProfileError } = await admin
@@ -230,12 +324,15 @@ export async function POST(request: NextRequest) {
       fallbackInitials: initials,
     });
 
-    const items = line_items || [];
-    const totals = calculateQuoteTotals(items, Number(quoteData.vat_rate ?? 20));
+    const items = normalizedItems
+      .filter(item => isMeaningfulLineItem(item))
+      .map(({ originalIndex: _originalIndex, ...item }) => item);
+    const totals = calculateQuoteTotals(items);
     const quoteId = crypto.randomUUID();
 
     const insertPayload = {
       ...quoteData,
+      customer_id: customerId,
       id: quoteId,
       quote_reference: quoteReference,
       base_quote_reference: quoteReference,
@@ -246,14 +343,23 @@ export async function POST(request: NextRequest) {
       version_label: 'Original',
       requester_id: managerProfileId,
       requester_initials: initials,
+      quote_date: normalizeOptionalString(quoteData.quote_date) || undefined,
+      attention_name: normalizeOptionalString(quoteData.attention_name),
+      attention_email: normalizeOptionalString(quoteData.attention_email),
+      site_address: normalizeOptionalString(quoteData.site_address),
+      subject_line: normalizeOptionalString(quoteData.subject_line),
+      project_description: normalizeOptionalString(quoteData.project_description),
+      salutation: normalizeOptionalString(quoteData.salutation),
       manager_name: quoteData.manager_name || managerOption?.profile?.full_name || managerProfile.full_name,
       manager_email: quoteData.manager_email || managerOption?.manager_email || null,
-      approver_profile_id: approver_profile_id || managerOption?.approver_profile_id || null,
+      approver_profile_id: normalizedApproverProfileId || managerOption?.approver_profile_id || null,
       signoff_name: quoteData.signoff_name || managerOption?.signoff_name || managerProfile.full_name,
-      signoff_title: quoteData.signoff_title || managerOption?.signoff_title || null,
+      signoff_title: normalizeOptionalString(quoteData.signoff_title) || managerOption?.signoff_title || null,
+      custom_footer_text: normalizeOptionalString(quoteData.custom_footer_text),
+      version_notes: normalizeOptionalString(quoteData.version_notes),
+      start_date: normalizeOptionalString(quoteData.start_date),
+      start_alert_days: normalizedStartAlertDays,
       subtotal: totals.subtotal,
-      vat_rate: totals.vatRate,
-      vat_amount: totals.vatAmount,
       total: totals.total,
       status: quoteData.status || 'draft',
       commercial_status: 'open',
@@ -279,10 +385,23 @@ export async function POST(request: NextRequest) {
       if (lineItemError) throw lineItemError;
     }
 
+    await appendQuoteTimelineEvent(admin, {
+      quoteId,
+      quoteThreadId: quoteId,
+      quoteReference,
+      eventType: 'quote_created',
+      title: 'Quote created',
+      description: 'Initial draft created.',
+      toStatus: String(insertPayload.status),
+      actorUserId: user.id,
+      createdAt: insertPayload.created_at as string | undefined,
+    });
+
     const bundle = await fetchQuoteBundle(admin, quoteId);
-    return NextResponse.json({ quote: { ...bundle.quote, line_items: bundle.lineItems, invoice_summary: bundle.invoiceSummary } }, { status: 201 });
+    return NextResponse.json({ quote: { ...bundle.quote, line_items: bundle.lineItems, invoice_summary: bundle.invoiceSummary, timeline: bundle.timeline } }, { status: 201 });
   } catch (error) {
     console.error('Error creating quote:', error);
-    return NextResponse.json({ error: 'Failed to create quote' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Unable to create this quote right now.';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

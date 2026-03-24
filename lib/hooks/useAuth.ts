@@ -10,6 +10,10 @@ type Profile = Database['public']['Tables']['profiles']['Row'] & {
   email?: string | null;
   super_admin?: boolean | null;
   team_id?: string | null;
+  team?: {
+    id: string;
+    name: string;
+  } | null;
   role?: {
     name: string;
     display_name: string;
@@ -65,6 +69,10 @@ export function useAuth() {
       role_id,
       super_admin,
       team_id,
+      team:org_teams!profiles_team_id_fkey(
+        id,
+        name
+      ),
       must_change_password,
       created_at,
       updated_at,

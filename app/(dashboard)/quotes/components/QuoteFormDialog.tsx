@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { Loader2, Plus, Trash2, GripVertical } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
 import type { Quote, QuoteFormData, QuoteLineItem, QuoteManagerOption } from '../types';
 
@@ -64,6 +65,8 @@ const EMPTY_LINE_ITEM: QuoteLineItem = {
   line_total: 0,
   sort_order: 0,
 };
+
+type QuoteFieldErrors = Record<string, string>;
 
 function buildAddress(customer?: Customer): string {
   if (!customer) return '';
@@ -116,6 +119,71 @@ export function QuoteFormDialog({
     line_items: [{ ...EMPTY_LINE_ITEM }],
   });
   const [saving, setSaving] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<QuoteFieldErrors>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  function clearFieldError(field: string) {
+    setFieldErrors(prev => {
+      if (!(field in prev)) {
+        return prev;
+      }
+
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  }
+
+  function getFieldClassName(field: string) {
+    return cn(
+      'bg-slate-800',
+      fieldErrors[field] ? 'border-red-500 focus-visible:ring-red-500/30' : 'border-slate-600'
+    );
+  }
+
+  function getSelectClassName(field: string) {
+    return cn(
+      'bg-slate-800',
+      fieldErrors[field] ? 'border-red-500 focus:ring-red-500/30' : 'border-slate-600'
+    );
+  }
+
+  function renderFieldError(field: string) {
+    if (!fieldErrors[field]) {
+      return null;
+    }
+
+    return <p className="text-xs text-red-300">{fieldErrors[field]}</p>;
+  }
+
+  function isMeaningfulLineItem(item: QuoteLineItem) {
+    return Boolean(
+      item.description.trim()
+      || item.unit.trim()
+      || Number(item.unit_rate) !== 0
+      || Number(item.quantity) !== 1
+    );
+  }
+
+  function validateForm(currentForm: QuoteFormData): QuoteFieldErrors {
+    const nextErrors: QuoteFieldErrors = {};
+
+    if (!currentForm.customer_id) {
+      nextErrors.customer_id = 'Select a customer.';
+    }
+
+    if (!currentForm.manager_profile_id) {
+      nextErrors.manager_profile_id = 'Select a manager.';
+    }
+
+    currentForm.line_items.forEach((item, index) => {
+      if (isMeaningfulLineItem(item) && !item.description.trim()) {
+        nextErrors[`line_items.${index}.description`] = 'Enter a description for this line item.';
+      }
+    });
+
+    return nextErrors;
+  }
 
   function applyManager(profileId: string, currentForm: QuoteFormData): QuoteFormData {
     const selected = managerOptions.find(option => option.profile_id === profileId);
@@ -134,6 +202,8 @@ export function QuoteFormDialog({
   }
 
   useEffect(() => {
+    setFieldErrors({});
+    setSubmitError(null);
     if (quote) {
       setForm({
         customer_id: quote.customer_id,
@@ -201,10 +271,14 @@ export function QuoteFormDialog({
   }, [quote, open, profile, defaultManager, initialCustomerId, customers]);
 
   function updateField<K extends keyof QuoteFormData>(key: K, value: QuoteFormData[K]) {
+    clearFieldError(String(key));
+    setSubmitError(null);
     setForm(prev => ({ ...prev, [key]: value }));
   }
 
   function handleCustomerChange(customerId: string) {
+    clearFieldError('customer_id');
+    setSubmitError(null);
     const customer = customers.find(c => c.id === customerId);
     setForm(prev => ({
       ...prev,
@@ -218,6 +292,8 @@ export function QuoteFormDialog({
   }
 
   function handleManagerChange(managerProfileId: string) {
+    clearFieldError('manager_profile_id');
+    setSubmitError(null);
     setForm(prev => applyManager(managerProfileId, {
       ...prev,
       manager_profile_id: managerProfileId,
@@ -230,6 +306,8 @@ export function QuoteFormDialog({
   }
 
   function updateLineItem(idx: number, field: keyof QuoteLineItem, value: string | number) {
+    clearFieldError(`line_items.${idx}.description`);
+    setSubmitError(null);
     setForm(prev => {
       const items = [...prev.line_items];
       const item = { ...items[idx], [field]: value };
@@ -240,6 +318,7 @@ export function QuoteFormDialog({
   }
 
   function addLineItem() {
+    setSubmitError(null);
     setForm(prev => ({
       ...prev,
       line_items: [...prev.line_items, { ...EMPTY_LINE_ITEM, sort_order: prev.line_items.length }],
@@ -247,6 +326,8 @@ export function QuoteFormDialog({
   }
 
   function removeLineItem(idx: number) {
+    clearFieldError(`line_items.${idx}.description`);
+    setSubmitError(null);
     setForm(prev => ({
       ...prev,
       line_items: prev.line_items.filter((_, i) => i !== idx).map((li, i) => ({ ...li, sort_order: i })),
@@ -257,12 +338,27 @@ export function QuoteFormDialog({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const validationErrors = validateForm(form);
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors);
+      setSubmitError('Please correct the highlighted fields and try again.');
+      toast.error('Please correct the highlighted fields and try again.');
+      return;
+    }
+
     setSaving(true);
+    setSubmitError(null);
     try {
       await onSubmit(form, isEditing);
       onClose();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to save quote';
+      const nextFieldErrors = error instanceof Error && 'fieldErrors' in error
+        ? ((error as Error & { fieldErrors?: QuoteFieldErrors }).fieldErrors || {})
+        : {};
+
+      setFieldErrors(nextFieldErrors);
+      setSubmitError(message);
       toast.error(message);
     } finally {
       setSaving(false);
@@ -282,13 +378,23 @@ export function QuoteFormDialog({
             </DialogDescription>
           </DialogHeader>
 
+          {submitError ? (
+            <div className="mt-4 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-100">
+              {submitError}
+            </div>
+          ) : null}
+
+          <p className="mt-4 text-xs text-muted-foreground">
+            Only fields marked with `*` are required to create the initial draft.
+          </p>
+
           <div className="grid gap-4 py-4">
             {/* Customer & Requester */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2 sm:col-span-2">
                 <Label>Customer *</Label>
                 <Select value={form.customer_id} onValueChange={handleCustomerChange}>
-                  <SelectTrigger className="bg-slate-800 border-slate-600">
+                  <SelectTrigger className={getSelectClassName('customer_id')} aria-invalid={!!fieldErrors.customer_id}>
                     <SelectValue placeholder="Select customer" />
                   </SelectTrigger>
                   <SelectContent>
@@ -297,11 +403,12 @@ export function QuoteFormDialog({
                     ))}
                   </SelectContent>
                 </Select>
+                {renderFieldError('customer_id')}
               </div>
               <div className="space-y-2">
                 <Label>Manager *</Label>
                 <Select value={form.manager_profile_id} onValueChange={handleManagerChange}>
-                  <SelectTrigger className="bg-slate-800 border-slate-600">
+                  <SelectTrigger className={getSelectClassName('manager_profile_id')} aria-invalid={!!fieldErrors.manager_profile_id}>
                     <SelectValue placeholder="Select manager" />
                   </SelectTrigger>
                   <SelectContent>
@@ -312,6 +419,7 @@ export function QuoteFormDialog({
                     ))}
                   </SelectContent>
                 </Select>
+                {renderFieldError('manager_profile_id')}
               </div>
               <div className="space-y-2">
                 <Label>Requester Initials</Label>
@@ -328,13 +436,14 @@ export function QuoteFormDialog({
             {/* Quote header */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label>Date *</Label>
+                <Label>Date</Label>
                 <Input
                   type="date"
                   value={form.quote_date}
                   onChange={e => updateField('quote_date', e.target.value)}
-                  className="bg-slate-800 border-slate-600"
+                  className={getFieldClassName('quote_date')}
                 />
+                {renderFieldError('quote_date')}
               </div>
               <div className="space-y-2">
                 <Label>Validity (days)</Label>
@@ -343,13 +452,14 @@ export function QuoteFormDialog({
                   min={1}
                   value={form.validity_days}
                   onChange={e => updateField('validity_days', parseInt(e.target.value) || 30)}
-                  className="bg-slate-800 border-slate-600"
+                  className={getFieldClassName('validity_days')}
                 />
+                {renderFieldError('validity_days')}
               </div>
               <div className="space-y-2">
                 <Label>Approver</Label>
                 <Select value={form.approver_profile_id || undefined} onValueChange={value => updateField('approver_profile_id', value)}>
-                  <SelectTrigger className="bg-slate-800 border-slate-600">
+                  <SelectTrigger className={getSelectClassName('approver_profile_id')} aria-invalid={!!fieldErrors.approver_profile_id}>
                     <SelectValue placeholder="Select approver" />
                   </SelectTrigger>
                   <SelectContent>
@@ -360,6 +470,7 @@ export function QuoteFormDialog({
                     ))}
                   </SelectContent>
                 </Select>
+                {renderFieldError('approver_profile_id')}
               </div>
             </div>
 
@@ -370,8 +481,9 @@ export function QuoteFormDialog({
                 <Input
                   value={form.attention_name}
                   onChange={e => updateField('attention_name', e.target.value)}
-                  className="bg-slate-800 border-slate-600"
+                  className={getFieldClassName('attention_name')}
                 />
+                {renderFieldError('attention_name')}
               </div>
               <div className="space-y-2">
                 <Label>Contact Email</Label>
@@ -379,8 +491,9 @@ export function QuoteFormDialog({
                   type="email"
                   value={form.attention_email}
                   onChange={e => updateField('attention_email', e.target.value)}
-                  className="bg-slate-800 border-slate-600"
+                  className={getFieldClassName('attention_email')}
                 />
+                {renderFieldError('attention_email')}
               </div>
             </div>
 
@@ -391,16 +504,18 @@ export function QuoteFormDialog({
                   type="email"
                   value={form.manager_email}
                   onChange={e => updateField('manager_email', e.target.value)}
-                  className="bg-slate-800 border-slate-600"
+                  className={getFieldClassName('manager_email')}
                 />
+                {renderFieldError('manager_email')}
               </div>
               <div className="space-y-2">
                 <Label>Manager Name</Label>
                 <Input
                   value={form.manager_name}
                   onChange={e => updateField('manager_name', e.target.value)}
-                  className="bg-slate-800 border-slate-600"
+                  className={getFieldClassName('manager_name')}
                 />
+                {renderFieldError('manager_name')}
               </div>
             </div>
 
@@ -410,8 +525,9 @@ export function QuoteFormDialog({
                 value={form.site_address}
                 onChange={e => updateField('site_address', e.target.value)}
                 rows={3}
-                className="bg-slate-800 border-slate-600"
+                className={getFieldClassName('site_address')}
               />
+              {renderFieldError('site_address')}
             </div>
 
             <div className="space-y-2">
@@ -420,20 +536,22 @@ export function QuoteFormDialog({
                 value={form.salutation}
                 onChange={e => updateField('salutation', e.target.value)}
                 placeholder="Dear Phil,"
-                className="bg-slate-800 border-slate-600"
+                className={getFieldClassName('salutation')}
               />
+              {renderFieldError('salutation')}
             </div>
 
             {/* Subject / Description */}
             <div className="grid grid-cols-1 gap-4">
               <div className="space-y-2">
-                <Label>Subject Line *</Label>
+                <Label>Subject Line</Label>
                 <Input
                   value={form.subject_line}
                   onChange={e => updateField('subject_line', e.target.value)}
                   placeholder="e.g. Supply of Fence Panels & Accessories"
-                  className="bg-slate-800 border-slate-600"
+                  className={getFieldClassName('subject_line')}
                 />
+                {renderFieldError('subject_line')}
               </div>
               <div className="space-y-2">
                 <Label>Project Description</Label>
@@ -442,8 +560,9 @@ export function QuoteFormDialog({
                   onChange={e => updateField('project_description', e.target.value)}
                   placeholder="e.g. Saint-Gobain Newark"
                   rows={2}
-                  className="bg-slate-800 border-slate-600"
+                  className={getFieldClassName('project_description')}
                 />
+                {renderFieldError('project_description')}
               </div>
             </div>
 
@@ -454,8 +573,9 @@ export function QuoteFormDialog({
                   type="date"
                   value={form.start_date}
                   onChange={e => updateField('start_date', e.target.value)}
-                  className="bg-slate-800 border-slate-600"
+                  className={getFieldClassName('start_date')}
                 />
+                {renderFieldError('start_date')}
               </div>
               <div className="space-y-2">
                 <Label>Alert Days Before Start</Label>
@@ -465,8 +585,9 @@ export function QuoteFormDialog({
                   value={form.start_alert_days}
                   onChange={e => updateField('start_alert_days', e.target.value ? Number(e.target.value) : '')}
                   placeholder="7"
-                  className="bg-slate-800 border-slate-600"
+                  className={getFieldClassName('start_alert_days')}
                 />
+                {renderFieldError('start_alert_days')}
               </div>
             </div>
 
@@ -492,14 +613,17 @@ export function QuoteFormDialog({
 
                 {form.line_items.map((item, idx) => (
                   <div key={idx} className="grid grid-cols-1 sm:grid-cols-[1fr_80px_80px_100px_100px_40px] gap-2 items-center bg-slate-800/30 rounded-lg p-2 sm:p-1">
-                    <div className="flex items-center gap-1">
-                      <GripVertical className="h-4 w-4 text-slate-600 hidden sm:block flex-shrink-0" />
-                      <Input
-                        value={item.description}
-                        onChange={e => updateLineItem(idx, 'description', e.target.value)}
-                        placeholder="Item description"
-                        className="bg-slate-800 border-slate-600 h-8 text-sm"
-                      />
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1">
+                        <GripVertical className="h-4 w-4 text-slate-600 hidden sm:block flex-shrink-0" />
+                        <Input
+                          value={item.description}
+                          onChange={e => updateLineItem(idx, 'description', e.target.value)}
+                          placeholder="Item description"
+                          className={cn('h-8 text-sm', getFieldClassName(`line_items.${idx}.description`))}
+                        />
+                      </div>
+                      {renderFieldError(`line_items.${idx}.description`)}
                     </div>
                     <Input
                       type="number"
@@ -542,7 +666,7 @@ export function QuoteFormDialog({
                 {/* Subtotal */}
                 <div className="flex justify-end pt-2 pr-12">
                   <div className="text-sm">
-                    <span className="text-muted-foreground mr-4">Subtotal (excl. VAT)</span>
+                    <span className="text-muted-foreground mr-4">Total</span>
                     <span className="font-bold text-white">
                       £{subtotal.toLocaleString('en-GB', { minimumFractionDigits: 2 })}
                     </span>
@@ -561,8 +685,9 @@ export function QuoteFormDialog({
                     value={form.signoff_name}
                     onChange={e => updateField('signoff_name', e.target.value)}
                     placeholder="George Healey"
-                    className="bg-slate-800 border-slate-600"
+                    className={getFieldClassName('signoff_name')}
                   />
+                  {renderFieldError('signoff_name')}
                 </div>
                 <div className="space-y-2">
                   <Label>Title</Label>
@@ -570,8 +695,9 @@ export function QuoteFormDialog({
                     value={form.signoff_title}
                     onChange={e => updateField('signoff_title', e.target.value)}
                     placeholder="Contracts Manager"
-                    className="bg-slate-800 border-slate-600"
+                    className={getFieldClassName('signoff_title')}
                   />
+                  {renderFieldError('signoff_title')}
                 </div>
               </div>
             </div>
@@ -583,8 +709,9 @@ export function QuoteFormDialog({
                 onChange={e => updateField('version_notes', e.target.value)}
                 rows={3}
                 placeholder="Use this for revision context, handover notes, or customer-specific context."
-                className="bg-slate-800 border-slate-600"
+                className={getFieldClassName('version_notes')}
               />
+              {renderFieldError('version_notes')}
             </div>
           </div>
 
@@ -594,7 +721,7 @@ export function QuoteFormDialog({
             </Button>
             <Button
               type="submit"
-              disabled={saving || !form.customer_id || !form.manager_profile_id || !form.subject_line.trim()}
+              disabled={saving}
               className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90 font-semibold"
             >
               {saving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : isEditing ? 'Update Quote' : 'Create Quote'}

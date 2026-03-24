@@ -2,10 +2,12 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { Loader2, Receipt } from 'lucide-react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Loader2, Plus, Receipt, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { QuotesTable } from './components/QuotesTable';
 import { QuoteDetailsModal } from './components/QuoteDetailsModal';
 import { QuoteFormDialog } from './components/QuoteFormDialog';
@@ -31,10 +33,29 @@ interface ApproverOption {
   email: string | null;
 }
 
+function buildFormRequestError(payload: { error?: string; field_errors?: Record<string, string> }, fallback: string) {
+  const error = new Error(payload.error || fallback) as Error & { fieldErrors?: Record<string, string> };
+  error.fieldErrors = payload.field_errors || {};
+  return error;
+}
+
 export default function QuotesPage() {
   const { hasPermission: canViewQuotes, loading: permissionLoading } = usePermissionCheck('quotes', false);
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
+  const syncQuoteQuery = useCallback((nextQuoteId: string | null) => {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    if (nextQuoteId) {
+      nextParams.set('quote_id', nextQuoteId);
+    } else {
+      nextParams.delete('quote_id');
+    }
+
+    const nextQuery = nextParams.toString();
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
+  }, [pathname, router, searchParams]);
+
 
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [quoteSummary, setQuoteSummary] = useState<QuoteListSummary | null>(null);
@@ -43,6 +64,7 @@ export default function QuotesPage() {
   const [approvers, setApprovers] = useState<ApproverOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<QuoteStatus | 'all'>('all');
+  const [pageTab, setPageTab] = useState<'overview' | 'settings'>('overview');
 
   // Modals
   const [detailQuoteId, setDetailQuoteId] = useState<string | null>(null);
@@ -77,7 +99,7 @@ export default function QuotesPage() {
       }
     } catch (error) {
       console.error('Error fetching data:', error);
-      toast.error('Failed to load quotes');
+      toast.error('Unable to load quotes right now.');
     } finally {
       setLoading(false);
     }
@@ -86,7 +108,7 @@ export default function QuotesPage() {
   useEffect(() => {
     if (permissionLoading) return;
     if (!canViewQuotes) {
-      toast.error('Access denied');
+      toast.error('You do not have access to quotes.');
       router.push('/dashboard');
       return;
     }
@@ -94,9 +116,7 @@ export default function QuotesPage() {
   }, [permissionLoading, canViewQuotes, router, fetchData]);
 
   useEffect(() => {
-    if (quoteIdFromQuery) {
-      setDetailQuoteId(quoteIdFromQuery);
-    }
+    setDetailQuoteId(quoteIdFromQuery);
   }, [quoteIdFromQuery]);
 
   async function handleCreate(data: QuoteFormData) {
@@ -107,7 +127,7 @@ export default function QuotesPage() {
     });
     if (!res.ok) {
       const err = await res.json();
-      throw new Error(err.error || 'Failed to create quote');
+      throw buildFormRequestError(err, 'Failed to create quote');
     }
     toast.success('Quote created');
     await fetchData();
@@ -122,7 +142,7 @@ export default function QuotesPage() {
     });
     if (!res.ok) {
       const err = await res.json();
-      throw new Error(err.error || 'Failed to update quote');
+      throw buildFormRequestError(err, 'Failed to update quote');
     }
     toast.success('Quote updated');
     setEditingQuote(null);
@@ -137,8 +157,18 @@ export default function QuotesPage() {
     }
   }
 
+  function handleOpenQuoteDetails(nextQuoteId: string) {
+    setDetailQuoteId(nextQuoteId);
+    syncQuoteQuery(nextQuoteId);
+  }
+
+  function handleCloseQuoteDetails() {
+    setDetailQuoteId(null);
+    syncQuoteQuery(null);
+  }
+
   function handleRowClick(quote: Quote) {
-    setDetailQuoteId(quote.id);
+    handleOpenQuoteDetails(quote.id);
   }
 
   function handleEditFromModal(quote: Quote) {
@@ -155,33 +185,67 @@ export default function QuotesPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-7xl">
-      {/* Page Header */}
-      <div className="flex items-center gap-3">
-        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-avs-yellow/10">
-          <Receipt className="h-5 w-5 text-avs-yellow" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-white">Quotes</h1>
-          <p className="text-sm text-muted-foreground">
-            {customerId ? 'Customer quotes' : 'Manage customer quotations'}
-          </p>
+    <div className="space-y-6 max-w-6xl">
+      <div className="bg-white dark:bg-slate-900 rounded-lg border border-border p-6">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-avs-yellow/10">
+              <Receipt className="h-5 w-5 text-avs-yellow" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Quotes</h1>
+              <p className="text-muted-foreground">
+                {customerId ? 'Track and manage quotes for this customer.' : 'Create, review, and manage customer quotations.'}
+              </p>
+            </div>
+          </div>
+          <Button
+            onClick={() => { setEditingQuote(null); setFormOpen(true); }}
+            className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90 font-semibold"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            New Quote
+          </Button>
         </div>
       </div>
 
-      <QuotesTable
-        quotes={quotes}
-        statusCounts={quoteSummary?.status_counts}
-        onAdd={() => { setEditingQuote(null); setFormOpen(true); }}
-        onRowClick={handleRowClick}
-        statusFilter={statusFilter}
-        onStatusFilterChange={setStatusFilter}
-      />
+      <Tabs value={pageTab} onValueChange={(value) => setPageTab(value as 'overview' | 'settings')}>
+        <TabsList>
+          <TabsTrigger value="overview" className="gap-2">
+            <Receipt className="h-4 w-4" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="settings" className="gap-2">
+            <Settings className="h-4 w-4" />
+            Settings
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-6 mt-0">
+          <QuotesTable
+            quotes={quotes}
+            statusCounts={quoteSummary?.status_counts}
+            onRowClick={handleRowClick}
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
+          />
+        </TabsContent>
+
+        <TabsContent value="settings" className="space-y-6 mt-0">
+          <div className="rounded-lg border border-slate-700 bg-slate-900/70 p-6">
+            <h2 className="text-xl font-semibold text-white">Quote Settings</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Quote settings will be added here in a later update.
+            </p>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       <QuoteDetailsModal
         open={!!detailQuoteId}
-        onClose={() => setDetailQuoteId(null)}
+        onClose={handleCloseQuoteDetails}
         quoteId={detailQuoteId}
+        onQuoteChange={handleOpenQuoteDetails}
         onEdit={handleEditFromModal}
         onRefresh={fetchData}
       />

@@ -3,9 +3,11 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
-import { Loader2, Building2 } from 'lucide-react';
+import { Loader2, Building2, Plus, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CustomersTable } from './components/CustomersTable';
 import { CustomerFormDialog } from './components/CustomerFormDialog';
 import type { Customer, CustomerFormData } from './types';
@@ -18,6 +20,7 @@ export default function CustomersPage() {
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [pageTab, setPageTab] = useState<'overview' | 'settings'>('overview');
 
   const fetchCustomers = useCallback(async () => {
     try {
@@ -87,23 +90,53 @@ export default function CustomersPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-7xl">
-      {/* Page Header */}
-      <div className="flex items-center gap-3">
-        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-avs-yellow/10">
-          <Building2 className="h-5 w-5 text-avs-yellow" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-white">Customers</h1>
-          <p className="text-sm text-muted-foreground">Manage your customer directory</p>
+    <div className="space-y-6 max-w-6xl">
+      <div className="bg-white dark:bg-slate-900 rounded-lg border border-border p-6">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-avs-yellow/10">
+              <Building2 className="h-5 w-5 text-avs-yellow" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Customers</h1>
+              <p className="text-muted-foreground">Manage your customer directory and key contact records.</p>
+            </div>
+          </div>
+          <Button onClick={() => { setEditingCustomer(null); setFormOpen(true); }} className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90 font-semibold">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Customer
+          </Button>
         </div>
       </div>
 
-      <CustomersTable
-        customers={customers}
-        onAdd={() => { setEditingCustomer(null); setFormOpen(true); }}
-        onRowClick={handleRowClick}
-      />
+      <Tabs value={pageTab} onValueChange={(value) => setPageTab(value as 'overview' | 'settings')}>
+        <TabsList>
+          <TabsTrigger value="overview" className="gap-2">
+            <Building2 className="h-4 w-4" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="settings" className="gap-2">
+            <Settings className="h-4 w-4" />
+            Settings
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-6 mt-0">
+          <CustomersTable
+            customers={customers}
+            onRowClick={handleRowClick}
+          />
+        </TabsContent>
+
+        <TabsContent value="settings" className="space-y-6 mt-0">
+          <div className="rounded-lg border border-slate-700 bg-slate-900/70 p-6">
+            <h2 className="text-xl font-semibold text-white">Customer Settings</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Customer settings will be added here in a later update.
+            </p>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       <CustomerFormDialog
         open={formOpen || !!editingCustomer}

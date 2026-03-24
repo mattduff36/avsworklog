@@ -2235,8 +2235,6 @@ export interface Database {
           site_address: string | null
           validity_days: number
           subtotal: number
-          vat_rate: number
-          vat_amount: number
           total: number
           status:
             | 'draft'
@@ -2314,8 +2312,6 @@ export interface Database {
           site_address?: string | null
           validity_days?: number
           subtotal?: number
-          vat_rate?: number
-          vat_amount?: number
           total?: number
           status?:
             | 'draft'
@@ -2393,8 +2389,6 @@ export interface Database {
           site_address?: string | null
           validity_days?: number
           subtotal?: number
-          vat_rate?: number
-          vat_amount?: number
           total?: number
           status?:
             | 'draft'
@@ -2552,6 +2546,47 @@ export interface Database {
           is_active?: boolean
           created_at?: string
           updated_at?: string
+        }
+      }
+      quote_timeline_events: {
+        Row: {
+          id: string
+          quote_id: string
+          quote_thread_id: string
+          quote_reference: string
+          event_type: string
+          title: string
+          description: string | null
+          from_status: string | null
+          to_status: string | null
+          actor_user_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          quote_id: string
+          quote_thread_id: string
+          quote_reference: string
+          event_type: string
+          title: string
+          description?: string | null
+          from_status?: string | null
+          to_status?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          quote_id?: string
+          quote_thread_id?: string
+          quote_reference?: string
+          event_type?: string
+          title?: string
+          description?: string | null
+          from_status?: string | null
+          to_status?: string | null
+          actor_user_id?: string | null
+          created_at?: string
         }
       }
       quote_attachments: {

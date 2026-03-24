@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     const expected = `Bearer ${process.env.CRON_SECRET}`;
 
     if (!process.env.CRON_SECRET || authHeader !== expected) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'You must be signed in to use quotes.' }, { status: 401 });
     }
 
     const admin = createAdminClient();
@@ -122,6 +122,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(responseBody);
   } catch (error) {
     console.error('Error processing quote start alerts:', error);
-    return NextResponse.json({ error: 'Failed to process quote start alerts' }, { status: 500 });
+    return NextResponse.json({ error: 'Unable to process quote start alerts right now.' }, { status: 500 });
   }
 }

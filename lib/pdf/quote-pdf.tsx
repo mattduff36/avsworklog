@@ -226,7 +226,7 @@ interface QuotePDFProps {
   siteAddress?: string;
   managerEmail?: string;
   lineItems: LineItem[];
-  subtotal: number;
+  total: number;
   validityDays: number;
   signoffName: string;
   signoffTitle: string;
@@ -246,7 +246,7 @@ export function QuotePDF({
   siteAddress,
   managerEmail,
   lineItems,
-  subtotal,
+  total,
   validityDays,
   signoffName,
   signoffTitle,
@@ -350,15 +350,15 @@ export function QuotePDF({
             </View>
           ))}
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total (excl. VAT)</Text>
-            <Text style={styles.totalValue}>{gbp(subtotal)}</Text>
+            <Text style={styles.totalLabel}>Total</Text>
+            <Text style={styles.totalValue}>{gbp(total)}</Text>
           </View>
         </View>
 
         {/* Disclaimer */}
         <Text style={styles.disclaimerText}>
           {customFooterText ||
-            `All prices are subject to the V.A.T. rates applicable at the time of invoice. Quotation valid for ${validityDays} days.`}
+            `Quotation valid for ${validityDays} days.`}
         </Text>
         <Text style={styles.disclaimerText}>
           We trust you will find this of interest and assure you of our close attention to your requirements.

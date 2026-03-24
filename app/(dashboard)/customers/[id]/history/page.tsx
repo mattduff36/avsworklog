@@ -24,7 +24,7 @@ import Link from 'next/link';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
 import { CustomerFormDialog } from '../../components/CustomerFormDialog';
 import type { Customer, CustomerFormData } from '../../types';
-import { QUOTE_STATUS_CONFIG, type QuoteListSummary } from '@/app/(dashboard)/quotes/types';
+import { ACCEPTED_QUOTE_STATUSES, getQuoteStatusConfig, type QuoteListSummary, type QuoteStatus } from '@/app/(dashboard)/quotes/types';
 
 interface QuoteSummary {
   id: string;
@@ -116,21 +116,11 @@ export default function CustomerHistoryPage({ params }: PageProps) {
     ? 'border-green-500/30 text-green-400 bg-green-500/10'
     : 'border-slate-500/30 text-slate-400 bg-slate-500/10';
 
-  const wonStatuses = new Set([
-    'won',
-    'ready_to_invoice',
-    'po_received',
-    'in_progress',
-    'completed_part',
-    'completed_full',
-    'partially_invoiced',
-    'invoiced',
-  ]);
   const totalQuotes = quoteSummary?.total_quotes ?? quotes.length;
-  const wonQuotesCount = quoteSummary?.won_quotes ?? quotes.filter((quote) => wonStatuses.has(quote.status)).length;
-  const totalQuoteValue = quoteSummary?.won_value
+  const acceptedQuotesCount = quoteSummary?.accepted_quotes ?? quotes.filter((quote) => ACCEPTED_QUOTE_STATUSES.has(quote.status as QuoteStatus)).length;
+  const totalQuoteValue = quoteSummary?.accepted_value
     ?? quotes
-      .filter((quote) => wonStatuses.has(quote.status))
+      .filter((quote) => ACCEPTED_QUOTE_STATUSES.has(quote.status as QuoteStatus))
       .reduce((sum, quote) => sum + Number(quote.total || 0), 0);
 
   return (
@@ -183,9 +173,9 @@ export default function CustomerHistoryPage({ params }: PageProps) {
           <CardContent className="pt-4 pb-4">
             <div className="flex items-center gap-2 mb-1">
               <Receipt className="h-4 w-4 text-green-400" />
-              <p className="text-xs text-muted-foreground font-medium">Won</p>
+              <p className="text-xs text-muted-foreground font-medium">Accepted</p>
             </div>
-            <p className="text-2xl font-bold text-white">{wonQuotesCount}</p>
+            <p className="text-2xl font-bold text-white">{acceptedQuotesCount}</p>
           </CardContent>
         </Card>
         <Card className="bg-slate-800/50 border-slate-700">
@@ -300,9 +290,16 @@ export default function CustomerHistoryPage({ params }: PageProps) {
                           Balance £{Number(q.invoice_summary.remainingBalance).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
                         </span>
                       )}
-                      <Badge variant="outline" className="text-xs capitalize">
-                        {QUOTE_STATUS_CONFIG[q.status as keyof typeof QUOTE_STATUS_CONFIG]?.label || q.status.replace(/_/g, ' ')}
-                      </Badge>
+                      <div className="flex flex-wrap gap-1">
+                        <Badge variant="outline" className="text-xs capitalize">
+                          {getQuoteStatusConfig(q.status).label}
+                        </Badge>
+                        {q.commercial_status === 'closed' && (
+                          <Badge variant="outline" className="text-xs border-slate-300/30 text-slate-200 bg-slate-400/10">
+                            Closed
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </Link>

@@ -1,0 +1,7 @@
+BEGIN;
+
+ALTER TABLE quotes
+  DROP COLUMN IF EXISTS vat_rate,
+  DROP COLUMN IF EXISTS vat_amount;
+
+COMMIT;

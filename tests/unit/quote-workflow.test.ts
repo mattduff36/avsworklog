@@ -7,20 +7,17 @@ import {
 } from '@/lib/utils/quote-workflow';
 
 describe('quote workflow helpers', () => {
-  it('calculates subtotal, VAT, and total for line items', () => {
+  it('calculates quote totals for line items', () => {
     expect(
       calculateQuoteTotals(
         [
           { quantity: 2, unit_rate: 125.5 },
           { quantity: 1.5, unit_rate: 80 },
-        ],
-        20
+        ]
       )
     ).toEqual({
       subtotal: 371,
-      vatRate: 20,
-      vatAmount: 74.2,
-      total: 445.2,
+      total: 371,
     });
   });
 

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { appendQuoteTimelineEvent, fetchQuoteBundle } from '@/lib/server/quote-workflow';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -9,13 +11,14 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
     const supabase = await createClient();
+    const admin = createAdminClient();
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'You must be signed in to use quotes.' }, { status: 401 });
     }
 
     const { data, error } = await supabase
@@ -28,7 +31,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ attachments: data || [] });
   } catch (error) {
     console.error('Error fetching quote attachments:', error);
-    return NextResponse.json({ error: 'Failed to fetch attachments' }, { status: 500 });
+    return NextResponse.json({ error: 'Unable to load attachments right now.' }, { status: 500 });
   }
 }
 
@@ -36,20 +39,26 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
     const supabase = await createClient();
+    const admin = createAdminClient();
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'You must be signed in to use quotes.' }, { status: 401 });
+    }
+
+    const bundle = await fetchQuoteBundle(admin, id);
+    if (!bundle.quote.is_latest_version) {
+      return NextResponse.json({ error: 'Only the latest quote version can be changed.' }, { status: 400 });
     }
 
     const formData = await request.formData();
     const file = formData.get('file');
 
     if (!(file instanceof File)) {
-      return NextResponse.json({ error: 'File is required' }, { status: 400 });
+      return NextResponse.json({ error: 'Choose a file to upload.' }, { status: 400 });
     }
 
     const sanitizedFilename = file.name.replace(/[^a-z0-9_.-]/gi, '_');
@@ -83,9 +92,23 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       throw insertError;
     }
 
+    await appendQuoteTimelineEvent(admin, {
+      quoteId: id,
+      quoteThreadId: bundle.quote.quote_thread_id,
+      quoteReference: bundle.quote.quote_reference,
+      eventType: 'attachment_uploaded',
+      title: 'Attachment uploaded',
+      description: file.name,
+      actorUserId: user.id,
+      createdAt: attachment.created_at,
+    });
+
     return NextResponse.json({ attachment }, { status: 201 });
   } catch (error) {
     console.error('Error uploading quote attachment:', error);
-    return NextResponse.json({ error: 'Failed to upload attachment' }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Unable to upload this attachment right now.' },
+      { status: 500 }
+    );
   }
 }

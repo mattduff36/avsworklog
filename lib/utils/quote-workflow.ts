@@ -5,18 +5,14 @@ export interface InvoiceSummary {
   status: 'not_invoiced' | 'partially_invoiced' | 'invoiced';
 }
 
-export function calculateQuoteTotals(lineItems: Array<{ quantity: number; unit_rate: number }>, vatRate = 20) {
+export function calculateQuoteTotals(lineItems: Array<{ quantity: number; unit_rate: number }>) {
   const subtotal = Math.round(
     lineItems.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_rate || 0), 0) * 100
   ) / 100;
-  const vatAmount = Math.round(subtotal * (Number(vatRate || 0) / 100) * 100) / 100;
-  const total = Math.round((subtotal + vatAmount) * 100) / 100;
 
   return {
     subtotal,
-    vatRate: Number(vatRate || 0),
-    vatAmount,
-    total,
+    total: subtotal,
   };
 }
 

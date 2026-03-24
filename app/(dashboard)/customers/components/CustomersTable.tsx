@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   Search,
-  Plus,
   ChevronUp,
   ChevronDown,
   Building2,
@@ -18,14 +17,13 @@ import type { Customer } from '../types';
 
 interface CustomersTableProps {
   customers: Customer[];
-  onAdd: () => void;
   onRowClick: (customer: Customer) => void;
 }
 
 type SortField = 'company_name' | 'contact_name' | 'city' | 'status' | 'created_at';
 type SortDir = 'asc' | 'desc';
 
-export function CustomersTable({ customers, onAdd, onRowClick }: CustomersTableProps) {
+export function CustomersTable({ customers, onRowClick }: CustomersTableProps) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [sortField, setSortField] = useState<SortField>('company_name');
@@ -79,9 +77,9 @@ export function CustomersTable({ customers, onAdd, onRowClick }: CustomersTableP
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -91,8 +89,11 @@ export function CustomersTable({ customers, onAdd, onRowClick }: CustomersTableP
             className="pl-9 bg-slate-800 border-slate-600 text-white placeholder:text-muted-foreground"
           />
         </div>
-        <div className="flex gap-2 items-center">
-          <div className="flex gap-1">
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Customer Status</p>
+        <div className="flex flex-wrap gap-2">
             {(['all', 'active', 'inactive'] as const).map(s => (
               <Button
                 key={s}
@@ -107,11 +108,6 @@ export function CustomersTable({ customers, onAdd, onRowClick }: CustomersTableP
                 {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
               </Button>
             ))}
-          </div>
-          <Button onClick={onAdd} className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90 font-semibold">
-            <Plus className="h-4 w-4 mr-1" />
-            Add Customer
-          </Button>
         </div>
       </div>
 

@@ -93,7 +93,8 @@ export default function DashboardPage() {
   const effectiveIsAdmin = isAdmin;
 
   const roleLabel = effectiveRole?.display_name || (isSuperAdmin ? 'SuperAdmin' : (profile?.role?.display_name || 'No Role Assigned'));
-  const headerSubtitle = effectiveTeamName ? `${effectiveTeamName} · ${roleLabel}` : roleLabel;
+  const dashboardTeamName = effectiveTeamName || profile?.team?.name || null;
+  const headerSubtitle = dashboardTeamName ? `${dashboardTeamName} · ${roleLabel}` : roleLabel;
 
   const canViewApprovals = userPermissions.has('approvals');
   const canViewActions = userPermissions.has('actions');

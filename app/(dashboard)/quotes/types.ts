@@ -65,6 +65,24 @@ export interface QuoteManagerOption {
   } | null;
 }
 
+export interface QuoteTimelineEvent {
+  id: string;
+  quote_id: string;
+  quote_thread_id: string;
+  quote_reference: string;
+  event_type: string;
+  title: string;
+  description: string | null;
+  from_status: string | null;
+  to_status: string | null;
+  actor_user_id: string | null;
+  created_at: string;
+  actor?: {
+    id: string;
+    full_name: string | null;
+  } | null;
+}
+
 export interface Quote {
   id: string;
   quote_reference: string;
@@ -83,8 +101,6 @@ export interface Quote {
   site_address: string | null;
   validity_days: number;
   subtotal: number;
-  vat_rate: number;
-  vat_amount: number;
   total: number;
   status: QuoteStatus;
   accepted: boolean;
@@ -145,6 +161,8 @@ export interface Quote {
   attachments?: QuoteAttachment[];
   invoices?: QuoteInvoice[];
   versions?: Quote[];
+  previous_versions?: Quote[];
+  timeline?: QuoteTimelineEvent[];
   invoice_summary?: {
     invoicedTotal: number;
     remainingBalance: number;
@@ -156,8 +174,8 @@ export interface Quote {
 export interface QuoteListSummary {
   total_quotes: number;
   status_counts: Record<QuoteStatus | 'all', number>;
-  won_quotes: number;
-  won_value: number;
+  accepted_quotes: number;
+  accepted_value: number;
 }
 
 export type QuoteRevisionType =
@@ -179,36 +197,57 @@ export type QuoteStatus =
   | 'draft'
   | 'pending_internal_approval'
   | 'changes_requested'
-  | 'approved'
   | 'sent'
-  | 'won'
-  | 'lost'
-  | 'ready_to_invoice'
   | 'po_received'
   | 'in_progress'
   | 'completed_part'
   | 'completed_full'
   | 'partially_invoiced'
-  | 'invoiced'
-  | 'closed';
+  | 'invoiced';
 
 export const QUOTE_STATUS_CONFIG: Record<QuoteStatus, { label: string; color: string }> = {
   draft: { label: 'Draft', color: 'border-slate-500/30 text-slate-400 bg-slate-500/10' },
   pending_internal_approval: { label: 'Pending Approval', color: 'border-amber-500/30 text-amber-400 bg-amber-500/10' },
   changes_requested: { label: 'Changes Requested', color: 'border-orange-500/30 text-orange-400 bg-orange-500/10' },
-  approved: { label: 'Approved', color: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' },
   sent: { label: 'Sent', color: 'border-blue-500/30 text-blue-400 bg-blue-500/10' },
-  won: { label: 'Won', color: 'border-green-500/30 text-green-400 bg-green-500/10' },
-  lost: { label: 'Lost', color: 'border-red-500/30 text-red-400 bg-red-500/10' },
-  ready_to_invoice: { label: 'Ready to Invoice', color: 'border-purple-500/30 text-purple-400 bg-purple-500/10' },
   po_received: { label: 'Accepted', color: 'border-sky-500/30 text-sky-400 bg-sky-500/10' },
   in_progress: { label: 'In Progress', color: 'border-cyan-500/30 text-cyan-400 bg-cyan-500/10' },
   completed_part: { label: 'Completed In Part', color: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10' },
   completed_full: { label: 'Completed In Full', color: 'border-lime-500/30 text-lime-400 bg-lime-500/10' },
   partially_invoiced: { label: 'Partially Invoiced', color: 'border-fuchsia-500/30 text-fuchsia-400 bg-fuchsia-500/10' },
   invoiced: { label: 'Invoiced', color: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' },
-  closed: { label: 'Closed', color: 'border-slate-300/30 text-slate-200 bg-slate-400/10' },
 };
+
+export const ACTIVE_QUOTE_STATUS_ORDER: QuoteStatus[] = [
+  'draft',
+  'pending_internal_approval',
+  'changes_requested',
+  'sent',
+  'po_received',
+  'in_progress',
+  'completed_part',
+  'completed_full',
+  'partially_invoiced',
+  'invoiced',
+];
+
+export const ACCEPTED_QUOTE_STATUSES = new Set<QuoteStatus>([
+  'po_received',
+  'in_progress',
+  'completed_part',
+  'completed_full',
+  'partially_invoiced',
+  'invoiced',
+]);
+
+const FALLBACK_QUOTE_STATUS_CONFIG = {
+  label: 'Legacy Status',
+  color: 'border-slate-500/30 text-slate-400 bg-slate-500/10',
+};
+
+export function getQuoteStatusConfig(status: string) {
+  return QUOTE_STATUS_CONFIG[status as QuoteStatus] || FALLBACK_QUOTE_STATUS_CONFIG;
+}
 
 export interface QuoteFormData {
   customer_id: string;

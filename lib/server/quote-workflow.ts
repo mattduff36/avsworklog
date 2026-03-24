@@ -19,6 +19,7 @@ export type QuoteAttachmentRow = Database['public']['Tables']['quote_attachments
 export type QuoteInvoiceRow = Database['public']['Tables']['quote_invoices']['Row'];
 export type QuoteInvoiceAllocationRow = Database['public']['Tables']['quote_invoice_allocations']['Row'];
 export type QuoteManagerSeriesRow = Database['public']['Tables']['quote_manager_series']['Row'];
+export type QuoteTimelineEventRow = Database['public']['Tables']['quote_timeline_events']['Row'];
 
 interface QuoteManagerOption {
   profile_id: string;
@@ -61,7 +62,41 @@ export interface QuoteBundle {
   attachments: QuoteAttachmentRow[];
   invoices: Array<QuoteInvoiceRow & { allocations: QuoteInvoiceAllocationRow[] }>;
   versions: QuoteRow[];
+  timeline: Array<QuoteTimelineEventRow & { actor?: { id: string; full_name: string | null } | null }>;
   invoiceSummary: InvoiceSummary;
+}
+
+export async function appendQuoteTimelineEvent(
+  supabase: ReturnType<typeof createAdminClient>,
+  input: {
+    quoteId: string;
+    quoteThreadId: string;
+    quoteReference: string;
+    eventType: string;
+    title: string;
+    description?: string | null;
+    fromStatus?: string | null;
+    toStatus?: string | null;
+    actorUserId?: string | null;
+    createdAt?: string;
+  }
+) {
+  const { error } = await supabase.from('quote_timeline_events').insert({
+    quote_id: input.quoteId,
+    quote_thread_id: input.quoteThreadId,
+    quote_reference: input.quoteReference,
+    event_type: input.eventType,
+    title: input.title,
+    description: input.description ?? null,
+    from_status: input.fromStatus ?? null,
+    to_status: input.toStatus ?? null,
+    actor_user_id: input.actorUserId ?? null,
+    created_at: input.createdAt ?? new Date().toISOString(),
+  });
+
+  if (error) {
+    console.error('Failed to append quote timeline event:', error);
+  }
 }
 
 function getConnectionString(): string {
@@ -242,17 +277,26 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
 
   const typedQuote = quote as QuoteBundle['quote'];
 
-  const [lineItemsResult, attachmentsResult, versionsResult, invoicesResult] = await Promise.all([
+  const [lineItemsResult, attachmentsResult, versionsResult, invoicesResult, timelineResult] = await Promise.all([
     supabase.from('quote_line_items').select('*').eq('quote_id', quoteId).order('sort_order', { ascending: true }),
     supabase.from('quote_attachments').select('*').eq('quote_id', quoteId).order('created_at', { ascending: false }),
     supabase.from('quotes').select('*').eq('quote_thread_id', typedQuote.quote_thread_id).order('created_at', { ascending: false }),
     supabase.from('quote_invoices').select('*').eq('quote_id', quoteId).order('invoice_date', { ascending: false }),
+    supabase
+      .from('quote_timeline_events')
+      .select(`
+        *,
+        actor:profiles!quote_timeline_events_actor_user_id_fkey(id, full_name)
+      `)
+      .eq('quote_thread_id', typedQuote.quote_thread_id)
+      .order('created_at', { ascending: false }),
   ]);
 
   if (lineItemsResult.error) throw lineItemsResult.error;
   if (attachmentsResult.error) throw attachmentsResult.error;
   if (versionsResult.error) throw versionsResult.error;
   if (invoicesResult.error) throw invoicesResult.error;
+  if (timelineResult.error) throw timelineResult.error;
 
   const invoices = (invoicesResult.data || []) as QuoteInvoiceRow[];
   const invoiceIds = invoices.map(invoice => invoice.id);
@@ -283,6 +327,7 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
     lineItems: (lineItemsResult.data || []) as QuoteLineItemRow[],
     attachments: (attachmentsResult.data || []) as QuoteAttachmentRow[],
     versions: (versionsResult.data || []) as QuoteRow[],
+    timeline: (timelineResult.data || []) as QuoteBundle['timeline'],
     invoices: invoices.map(invoice => ({
       ...invoice,
       allocations: allocationsByInvoice.get(invoice.id) || [],
@@ -356,7 +401,7 @@ export async function renderQuotePdfAttachment(bundle: QuoteBundle): Promise<Ema
       unit_rate: Number(item.unit_rate),
       line_total: Number(item.line_total),
     })),
-    subtotal: Number(bundle.quote.subtotal),
+    total: Number(bundle.quote.total),
     validityDays: bundle.quote.validity_days || 30,
     signoffName: bundle.quote.signoff_name || '',
     signoffTitle: bundle.quote.signoff_title || '',

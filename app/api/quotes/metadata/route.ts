@@ -12,7 +12,7 @@ export async function GET() {
     } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'You must be signed in to use quotes.' }, { status: 401 });
     }
 
     const [managerOptions, approversResult] = await Promise.all([
@@ -36,6 +36,6 @@ export async function GET() {
     });
   } catch (error) {
     console.error('Error fetching quote metadata:', error);
-    return NextResponse.json({ error: 'Failed to load quote metadata' }, { status: 500 });
+    return NextResponse.json({ error: 'Unable to load quote settings right now.' }, { status: 500 });
   }
 }

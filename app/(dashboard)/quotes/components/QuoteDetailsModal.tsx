@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -32,14 +32,23 @@ import {
   Pencil,
   Upload,
   FolderKanban,
+  Trash2,
+  Clock3,
+  CheckCircle2,
+  Mail,
+  Paperclip,
+  FileEdit,
+  GitBranch,
+  CircleDot,
+  ArrowRight,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils/cn';
 import type { Quote, QuoteCompletionStatus, QuoteRevisionType } from '../types';
-import { QUOTE_STATUS_CONFIG } from '../types';
+import { getQuoteStatusConfig } from '../types';
 
 const PO_EDITABLE_STATUSES = new Set([
-  'approved',
   'sent',
   'po_received',
   'in_progress',
@@ -47,19 +56,120 @@ const PO_EDITABLE_STATUSES = new Set([
   'completed_full',
   'partially_invoiced',
   'invoiced',
-  'closed',
 ]);
 
 interface QuoteDetailsModalProps {
   open: boolean;
   onClose: () => void;
   quoteId: string | null;
+  onQuoteChange: (quoteId: string) => void;
   onEdit: (quote: Quote) => void;
   onRefresh: () => void;
 }
 
-export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }: QuoteDetailsModalProps) {
+type DetailFieldErrors = Record<string, string>;
+
+function getTimelineEventMeta(eventType: string) {
+  switch (eventType) {
+    case 'quote_created':
+      return {
+        icon: FileEdit,
+        iconClassName: 'text-sky-300 bg-sky-500/10 border-sky-500/20',
+      };
+    case 'quote_updated':
+      return {
+        icon: Pencil,
+        iconClassName: 'text-slate-300 bg-slate-500/10 border-slate-500/20',
+      };
+    case 'submitted_for_approval':
+      return {
+        icon: Send,
+        iconClassName: 'text-amber-300 bg-amber-500/10 border-amber-500/20',
+      };
+    case 'approved_and_sent':
+      return {
+        icon: Mail,
+        iconClassName: 'text-blue-300 bg-blue-500/10 border-blue-500/20',
+      };
+    case 'returned_for_changes':
+      return {
+        icon: Pencil,
+        iconClassName: 'text-orange-300 bg-orange-500/10 border-orange-500/20',
+      };
+    case 'po_details_saved':
+      return {
+        icon: FolderKanban,
+        iconClassName: 'text-violet-300 bg-violet-500/10 border-violet-500/20',
+      };
+    case 'rams_triggered':
+      return {
+        icon: FolderKanban,
+        iconClassName: 'text-cyan-300 bg-cyan-500/10 border-cyan-500/20',
+      };
+    case 'schedule_updated':
+      return {
+        icon: CalendarClock,
+        iconClassName: 'text-indigo-300 bg-indigo-500/10 border-indigo-500/20',
+      };
+    case 'marked_complete':
+      return {
+        icon: CheckCircle2,
+        iconClassName: 'text-lime-300 bg-lime-500/10 border-lime-500/20',
+      };
+    case 'quote_closed':
+      return {
+        icon: CircleDot,
+        iconClassName: 'text-slate-200 bg-slate-400/10 border-slate-400/20',
+      };
+    case 'quote_reopened':
+      return {
+        icon: CircleDot,
+        iconClassName: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
+      };
+    case 'invoice_added':
+      return {
+        icon: Receipt,
+        iconClassName: 'text-fuchsia-300 bg-fuchsia-500/10 border-fuchsia-500/20',
+      };
+    case 'attachment_uploaded':
+      return {
+        icon: Upload,
+        iconClassName: 'text-teal-300 bg-teal-500/10 border-teal-500/20',
+      };
+    case 'attachment_removed':
+      return {
+        icon: Paperclip,
+        iconClassName: 'text-rose-300 bg-rose-500/10 border-rose-500/20',
+      };
+    case 'version_created':
+      return {
+        icon: GitBranch,
+        iconClassName: 'text-purple-300 bg-purple-500/10 border-purple-500/20',
+      };
+    case 'quote_duplicated':
+      return {
+        icon: Copy,
+        iconClassName: 'text-yellow-300 bg-yellow-500/10 border-yellow-500/20',
+      };
+    default:
+      return {
+        icon: Clock3,
+        iconClassName: 'text-slate-300 bg-slate-500/10 border-slate-500/20',
+      };
+  }
+}
+
+async function buildResponseError(response: Response, fallback: string) {
+  const payload = await response.json().catch(() => null) as { error?: string; field_errors?: DetailFieldErrors } | null;
+  const error = new Error(payload?.error || fallback) as Error & { fieldErrors?: DetailFieldErrors };
+  error.fieldErrors = payload?.field_errors || {};
+  return error;
+}
+
+export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdit, onRefresh }: QuoteDetailsModalProps) {
   const [quote, setQuote] = useState<Quote | null>(null);
+  const [currentQuoteId, setCurrentQuoteId] = useState<string | null>(quoteId);
+  const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [poNumber, setPoNumber] = useState('');
@@ -77,48 +187,227 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }:
   const [revisionType, setRevisionType] = useState<QuoteRevisionType>('revision');
   const [revisionNotes, setRevisionNotes] = useState('');
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
-  const activeQuoteId = quote?.id || quoteId;
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [workflowError, setWorkflowError] = useState<string | null>(null);
+  const [workflowFieldErrors, setWorkflowFieldErrors] = useState<DetailFieldErrors>({});
+  const [invoiceError, setInvoiceError] = useState<string | null>(null);
+  const [invoiceFieldErrors, setInvoiceFieldErrors] = useState<DetailFieldErrors>({});
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const activeQuoteId = currentQuoteId || quoteId || quote?.id || null;
   const recipientEmail = quote?.attention_email || quote?.customer?.contact_email || '';
-  const canEditPoDetails = quote ? PO_EDITABLE_STATUSES.has(quote.status) : false;
-  const canTriggerRams = quote ? ['sent', 'approved'].includes(quote.status) : false;
+  const isLatestVersion = Boolean(quote?.is_latest_version);
+  const isHistoricalVersion = Boolean(quote && !quote.is_latest_version);
+  const canEditPoDetails = quote ? isLatestVersion && PO_EDITABLE_STATUSES.has(quote.status) : false;
+  const canTriggerRams = Boolean(isLatestVersion && quote?.status === 'sent');
+  const canManageSchedule = Boolean(isLatestVersion && quote && ['po_received', 'in_progress'].includes(quote.status));
+  const canEditQuote = Boolean(isLatestVersion && quote && ['draft', 'pending_internal_approval', 'changes_requested'].includes(quote.status));
+  const canDeleteDraft = Boolean(isLatestVersion && quote?.status === 'draft');
+  const canManageInvoices = isLatestVersion;
+  const canManageAttachments = isLatestVersion;
+  const canCreateVersions = isLatestVersion;
+  const hasMultipleVersions = (quote?.versions?.length ?? 0) > 1;
+  const suggestedInvoiceAmount = Number(quote?.invoice_summary?.remainingBalance ?? quote?.total ?? 0);
+
+  const groupedTimeline = useMemo(() => {
+    if (!quote?.timeline?.length) {
+      return [];
+    }
+
+    const groups = new Map<string, { label: string; events: typeof quote.timeline }>();
+
+    quote.timeline.forEach((event) => {
+      const groupKey = format(new Date(event.created_at), 'yyyy-MM-dd');
+      const existing = groups.get(groupKey);
+      if (existing) {
+        existing.events.push(event);
+        return;
+      }
+
+      groups.set(groupKey, {
+        label: format(new Date(event.created_at), 'EEEE d MMM yyyy'),
+        events: [event],
+      });
+    });
+
+    return Array.from(groups.entries()).map(([key, value]) => ({
+      key,
+      label: value.label,
+      events: value.events,
+    }));
+  }, [quote?.timeline]);
+
+  function getFieldClassName(errors: DetailFieldErrors, field: string) {
+    return cn(
+      'bg-slate-800',
+      errors[field] ? 'border-red-500 focus-visible:ring-red-500/30' : 'border-slate-600'
+    );
+  }
+
+  function getSelectClassName(errors: DetailFieldErrors, field: string) {
+    return cn(
+      'bg-slate-800',
+      errors[field] ? 'border-red-500 focus:ring-red-500/30' : 'border-slate-600'
+    );
+  }
+
+  function renderFieldError(errors: DetailFieldErrors, field: string) {
+    if (!errors[field]) {
+      return null;
+    }
+
+    return <p className="text-xs text-red-300">{errors[field]}</p>;
+  }
+
+  function clearWorkflowError(field?: string) {
+    setWorkflowError(null);
+    if (!field) {
+      setWorkflowFieldErrors({});
+      return;
+    }
+
+    setWorkflowFieldErrors(prev => {
+      if (!(field in prev)) {
+        return prev;
+      }
+
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  }
+
+  function clearInvoiceError(field?: string) {
+    setInvoiceError(null);
+    if (!field) {
+      setInvoiceFieldErrors({});
+      return;
+    }
+
+    setInvoiceFieldErrors(prev => {
+      if (!(field in prev)) {
+        return prev;
+      }
+
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  }
+
+  function validateInvoiceFields() {
+    const errors: DetailFieldErrors = {};
+    if (!invoiceNumber.trim()) {
+      errors.invoice_number = 'Enter an invoice number.';
+    }
+
+    const amount = Number(invoiceAmount);
+    if (!invoiceAmount || !Number.isFinite(amount) || amount <= 0) {
+      errors.amount = 'Enter an invoice amount greater than 0.';
+    }
+
+    if (!invoiceDate) {
+      errors.invoice_date = 'Enter an invoice date.';
+    }
+
+    if (Number.isFinite(amount) && amount - suggestedInvoiceAmount > 0.005) {
+      errors.amount = `This quote has £${suggestedInvoiceAmount.toLocaleString('en-GB', { minimumFractionDigits: 2 })} remaining. Create a new version first if the amount has increased.`;
+    }
+
+    return errors;
+  }
+
+  const applyQuoteState = useCallback((nextQuote: Quote) => {
+    setQuote(nextQuote);
+    setPoNumber(nextQuote.po_number || '');
+    setPoValue(nextQuote.po_value ? String(nextQuote.po_value) : '');
+    setReturnComments(nextQuote.return_comments || '');
+    setStartDate(nextQuote.start_date || '');
+    setStartAlertDays(nextQuote.start_alert_days ? String(nextQuote.start_alert_days) : '');
+    setCompletionStatus(nextQuote.completion_status === 'approved_in_part' ? 'approved_in_part' : 'approved_in_full');
+    setCompletionComments(nextQuote.completion_comments || '');
+    setInvoiceNumber('');
+    setInvoiceAmount(nextQuote.invoice_summary?.remainingBalance ? String(nextQuote.invoice_summary.remainingBalance) : '');
+    setInvoiceDate(new Date().toISOString().slice(0, 10));
+    setInvoiceScope(nextQuote.invoice_summary?.remainingBalance === 0 ? 'partial' : 'full');
+    setInvoiceComments('');
+    setWorkflowError(null);
+    setWorkflowFieldErrors({});
+    setInvoiceError(null);
+    setInvoiceFieldErrors({});
+    setAttachmentError(null);
+    setDeleteError(null);
+  }, []);
+
+  const selectQuoteVersion = useCallback((nextQuoteId: string) => {
+    setCurrentQuoteId(nextQuoteId);
+    onQuoteChange(nextQuoteId);
+  }, [onQuoteChange]);
 
   const fetchQuote = useCallback(async () => {
-    const idToLoad = quote?.id || quoteId;
+    const idToLoad = activeQuoteId;
     if (!idToLoad) return;
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await fetch(`/api/quotes/${idToLoad}`);
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        throw await buildResponseError(res, 'Unable to load quote details right now.');
+      }
       const data = await res.json();
-      setQuote(data.quote);
-      setPoNumber(data.quote.po_number || '');
-      setPoValue(data.quote.po_value ? String(data.quote.po_value) : '');
-      setReturnComments(data.quote.return_comments || '');
-      setStartDate(data.quote.start_date || '');
-      setStartAlertDays(data.quote.start_alert_days ? String(data.quote.start_alert_days) : '');
-      setCompletionStatus(data.quote.completion_status === 'approved_in_part' ? 'approved_in_part' : 'approved_in_full');
-      setCompletionComments(data.quote.completion_comments || '');
-      setInvoiceNumber('');
-      setInvoiceAmount(data.quote.invoice_summary?.remainingBalance ? String(data.quote.invoice_summary.remainingBalance) : '');
-      setInvoiceDate(new Date().toISOString().slice(0, 10));
-      setInvoiceScope(data.quote.invoice_summary?.remainingBalance === 0 ? 'partial' : 'full');
-      setInvoiceComments('');
-    } catch {
-      toast.error('Failed to load quote details');
+      applyQuoteState(data.quote);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to load quote details right now.';
+      setLoadError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
-  }, [quote?.id, quoteId]);
+  }, [activeQuoteId, applyQuoteState]);
 
   useEffect(() => {
-    if (open && quoteId) {
+    if (open) {
+      setCurrentQuoteId(quoteId);
+    }
+  }, [open, quoteId]);
+
+  useEffect(() => {
+    if (open && activeQuoteId) {
+      setQuote(null);
       fetchQuote();
     }
-  }, [open, quoteId, fetchQuote]);
+  }, [open, activeQuoteId, fetchQuote]);
 
-  async function updateQuote(updates: Record<string, unknown>) {
+  useEffect(() => {
+    if (open && activeQuoteId) {
+      setActiveTab('overview');
+    }
+  }, [open, activeQuoteId]);
+
+  useEffect(() => {
+    if (!open) {
+      setCurrentQuoteId(null);
+      setActiveTab('overview');
+      setQuote(null);
+      setLoadError(null);
+      setWorkflowError(null);
+      setWorkflowFieldErrors({});
+      setInvoiceError(null);
+      setInvoiceFieldErrors({});
+      setAttachmentError(null);
+      setDeleteError(null);
+    }
+  }, [open]);
+
+  async function updateQuote(
+    updates: Record<string, unknown>,
+    scope: 'workflow' | 'versions' | 'general' = 'workflow'
+  ) {
     if (!activeQuoteId) return;
     setActionLoading(true);
+    if (scope === 'workflow') {
+      clearWorkflowError();
+    }
     try {
       const res = await fetch(`/api/quotes/${activeQuoteId}`, {
         method: 'PATCH',
@@ -126,27 +415,36 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }:
         body: JSON.stringify(updates),
       });
       if (!res.ok) {
-        const error = await res.json().catch(() => null) as { error?: string } | null;
-        throw new Error(error?.error || 'Failed to update quote');
+        throw await buildResponseError(res, 'Unable to update this quote right now.');
       }
       const data = await res.json();
       if (updates.action === 'create_revision' || updates.action === 'duplicate') {
-        setQuote(data.quote);
-      }
-      toast.success('Quote updated');
-      if (updates.action !== 'create_revision' && updates.action !== 'duplicate') {
+        applyQuoteState(data.quote);
+        selectQuoteVersion(data.quote.id);
+      } else {
         await fetchQuote();
       }
+      toast.success('Quote updated');
       onRefresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to update quote');
+      const message = error instanceof Error ? error.message : 'Unable to update this quote right now.';
+      const fieldErrors = error instanceof Error && 'fieldErrors' in error
+        ? ((error as Error & { fieldErrors?: DetailFieldErrors }).fieldErrors || {})
+        : {};
+
+      if (scope === 'workflow') {
+        setWorkflowError(message);
+        setWorkflowFieldErrors(fieldErrors);
+      }
+
+      toast.error(message);
     } finally {
       setActionLoading(false);
     }
   }
 
-  async function callAction(action: string, payload?: Record<string, unknown>) {
-    await updateQuote({ action, ...(payload || {}) });
+  async function callAction(action: string, payload?: Record<string, unknown>, scope: 'workflow' | 'versions' | 'general' = 'workflow') {
+    await updateQuote({ action, ...(payload || {}) }, scope);
   }
 
   async function handleAttachmentUpload(file: File) {
@@ -156,6 +454,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }:
     formData.append('file', file);
 
     setUploadingAttachment(true);
+    setAttachmentError(null);
     try {
       const res = await fetch(`/api/quotes/${activeQuoteId}/attachments`, {
         method: 'POST',
@@ -163,15 +462,16 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }:
       });
 
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || 'Failed to upload attachment');
+        throw await buildResponseError(res, 'Unable to upload this attachment right now.');
       }
 
       toast.success('Attachment uploaded');
       await fetchQuote();
       onRefresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to upload attachment');
+      const message = error instanceof Error ? error.message : 'Unable to upload this attachment right now.';
+      setAttachmentError(message);
+      toast.error(message);
     } finally {
       setUploadingAttachment(false);
     }
@@ -182,22 +482,32 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }:
 
     try {
       const res = await fetch(`/api/quotes/${activeQuoteId}/attachments/${attachmentId}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        throw await buildResponseError(res, 'Unable to remove this attachment right now.');
+      }
       toast.success('Attachment removed');
       await fetchQuote();
       onRefresh();
-    } catch {
-      toast.error('Failed to delete attachment');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to remove this attachment right now.';
+      setAttachmentError(message);
+      toast.error(message);
     }
   }
 
   async function addInvoice() {
-    if (!activeQuoteId || !invoiceNumber.trim() || !invoiceAmount) {
-      toast.error('Enter an invoice number and amount');
+    if (!activeQuoteId) return;
+
+    const nextInvoiceErrors = validateInvoiceFields();
+    if (Object.keys(nextInvoiceErrors).length > 0) {
+      setInvoiceFieldErrors(nextInvoiceErrors);
+      setInvoiceError('Please correct the highlighted fields and try again.');
+      toast.error('Please correct the highlighted fields and try again.');
       return;
     }
 
     setActionLoading(true);
+    clearInvoiceError();
     try {
       const res = await fetch(`/api/quotes/${activeQuoteId}/invoices`, {
         method: 'POST',
@@ -212,21 +522,62 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }:
       });
 
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || 'Failed to add invoice');
+        throw await buildResponseError(res, 'Unable to add this invoice right now.');
       }
 
       toast.success('Invoice added');
       setInvoiceNumber('');
+      setInvoiceAmount('');
       setInvoiceComments('');
       await fetchQuote();
       onRefresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to add invoice');
+      const message = error instanceof Error ? error.message : 'Unable to add this invoice right now.';
+      const fieldErrors = error instanceof Error && 'fieldErrors' in error
+        ? ((error as Error & { fieldErrors?: DetailFieldErrors }).fieldErrors || {})
+        : {};
+      setInvoiceFieldErrors(fieldErrors);
+      setInvoiceError(message);
+      toast.error(message);
     } finally {
       setActionLoading(false);
     }
   }
+
+  async function deleteQuote() {
+    if (!activeQuoteId || !quote || !canDeleteDraft) {
+      return;
+    }
+
+    const confirmMessage = hasMultipleVersions
+      ? `Delete draft version ${quote.quote_reference}? This will only remove this draft version, not the whole quote history. This cannot be undone.`
+      : `Delete draft quote ${quote.quote_reference}? This cannot be undone.`;
+
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    setActionLoading(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/quotes/${activeQuoteId}`, { method: 'DELETE' });
+      if (!res.ok) {
+        throw await buildResponseError(res, 'Unable to delete this quote right now.');
+      }
+
+      toast.success('Quote deleted');
+      onClose();
+      onRefresh();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to delete this quote right now.';
+      setDeleteError(message);
+      toast.error(message);
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  const statusConfig = quote ? getQuoteStatusConfig(quote.status) : null;
 
   if (!open) return null;
 
@@ -236,9 +587,23 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }:
         <DialogHeader className="sr-only">
           <DialogTitle>Quote Details</DialogTitle>
         </DialogHeader>
-        {loading || !quote ? (
+        {loading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-avs-yellow" />
+          </div>
+        ) : !quote ? (
+          <div className="space-y-4 py-8 text-center">
+            <p className="text-sm text-red-200">{loadError || 'Unable to load quote details right now.'}</p>
+            <div className="flex justify-center gap-2">
+              <Button variant="outline" onClick={onClose} className="border-slate-600 text-muted-foreground">
+                Close
+              </Button>
+              {quoteId ? (
+                <Button onClick={() => void fetchQuote()} className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90">
+                  Retry
+                </Button>
+              ) : null}
+            </div>
           </div>
         ) : (
           <>
@@ -246,14 +611,31 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }:
               <div className="flex items-center justify-between">
                 <DialogTitle className="text-white flex items-center gap-2">
                   <span className="font-mono text-avs-yellow">{quote.quote_reference}</span>
-                  <Badge variant="outline" className={QUOTE_STATUS_CONFIG[quote.status].color}>
-                    {QUOTE_STATUS_CONFIG[quote.status].label}
+                  <Badge variant="outline" className={statusConfig?.color}>
+                    {statusConfig?.label}
                   </Badge>
+                  {quote.commercial_status === 'closed' && (
+                    <Badge variant="outline" className="border-slate-300/30 text-slate-200 bg-slate-400/10">
+                      Closed
+                    </Badge>
+                  )}
                 </DialogTitle>
               </div>
             </DialogHeader>
 
             <div className="space-y-4">
+              {loadError ? (
+                <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-100">
+                  {loadError}
+                </div>
+              ) : null}
+
+              {isHistoricalVersion ? (
+                <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+                  You are viewing an older quote version. Switch back to the latest version to edit, invoice, upload files, or delete.
+                </div>
+              ) : null}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="text-muted-foreground">Customer</span>
@@ -302,12 +684,13 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }:
 
               <Separator className="bg-slate-700" />
 
-              <Tabs defaultValue="overview" className="w-full">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="bg-slate-800 text-slate-300">
                   <TabsTrigger value="overview">Overview</TabsTrigger>
                   <TabsTrigger value="workflow">Workflow</TabsTrigger>
                   <TabsTrigger value="invoices">Invoices</TabsTrigger>
                   <TabsTrigger value="attachments">Attachments</TabsTrigger>
+                  <TabsTrigger value="timeline">Timeline</TabsTrigger>
                   <TabsTrigger value="versions">Versions</TabsTrigger>
                 </TabsList>
 
@@ -373,37 +756,95 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }:
                 </TabsContent>
 
                 <TabsContent value="workflow" className="space-y-4">
+                  {workflowError ? (
+                    <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-100">
+                      {workflowError}
+                    </div>
+                  ) : null}
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>PO Number</Label>
-                      <Input value={poNumber} onChange={e => setPoNumber(e.target.value)} className="bg-slate-800 border-slate-600" />
+                      <Input
+                        value={poNumber}
+                        disabled={!canEditPoDetails}
+                        onChange={e => {
+                          clearWorkflowError('po_number');
+                          setPoNumber(e.target.value);
+                        }}
+                        className={getFieldClassName(workflowFieldErrors, 'po_number')}
+                      />
+                      {renderFieldError(workflowFieldErrors, 'po_number')}
                     </div>
                     <div className="space-y-2">
                       <Label>PO Value</Label>
-                      <Input value={poValue} onChange={e => setPoValue(e.target.value)} className="bg-slate-800 border-slate-600" />
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={poValue}
+                        disabled={!canEditPoDetails}
+                        onChange={e => {
+                          clearWorkflowError('po_value');
+                          setPoValue(e.target.value);
+                        }}
+                        className={getFieldClassName(workflowFieldErrors, 'po_value')}
+                      />
+                      {renderFieldError(workflowFieldErrors, 'po_value')}
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Start Date</Label>
-                      <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-slate-800 border-slate-600" />
+                      <Input
+                        type="date"
+                        value={startDate}
+                        disabled={!canManageSchedule}
+                        onChange={e => {
+                          clearWorkflowError('start_date');
+                          setStartDate(e.target.value);
+                        }}
+                        className={getFieldClassName(workflowFieldErrors, 'start_date')}
+                      />
+                      {renderFieldError(workflowFieldErrors, 'start_date')}
                     </div>
                     <div className="space-y-2">
                       <Label>Alert Days Before Start</Label>
-                      <Input value={startAlertDays} onChange={e => setStartAlertDays(e.target.value)} className="bg-slate-800 border-slate-600" />
+                      <Input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={startAlertDays}
+                        disabled={!canManageSchedule}
+                        onChange={e => {
+                          clearWorkflowError('start_alert_days');
+                          setStartAlertDays(e.target.value);
+                        }}
+                        className={getFieldClassName(workflowFieldErrors, 'start_alert_days')}
+                      />
+                      {renderFieldError(workflowFieldErrors, 'start_alert_days')}
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <Label>Return / Approval Comments</Label>
-                    <Textarea value={returnComments} onChange={e => setReturnComments(e.target.value)} rows={3} className="bg-slate-800 border-slate-600" />
+                    <Textarea
+                      value={returnComments}
+                      disabled={quote.status !== 'pending_internal_approval'}
+                      onChange={e => {
+                        clearWorkflowError('return_comments');
+                        setReturnComments(e.target.value);
+                      }}
+                      rows={3}
+                      className={getFieldClassName(workflowFieldErrors, 'return_comments')}
+                    />
+                    {renderFieldError(workflowFieldErrors, 'return_comments')}
                   </div>
 
                   <div className="space-y-2">
                     <Label>Completion Status</Label>
-                    <Select value={completionStatus} onValueChange={(value: QuoteCompletionStatus) => setCompletionStatus(value)}>
-                      <SelectTrigger className="bg-slate-800 border-slate-600">
+                    <Select value={completionStatus} onValueChange={(value: QuoteCompletionStatus) => setCompletionStatus(value)} disabled={!canManageSchedule}>
+                      <SelectTrigger className={getSelectClassName(workflowFieldErrors, 'completion_status')}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -411,15 +852,26 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }:
                         <SelectItem value="approved_in_part">Approve in part</SelectItem>
                       </SelectContent>
                     </Select>
+                    {renderFieldError(workflowFieldErrors, 'completion_status')}
                   </div>
 
                   <div className="space-y-2">
                     <Label>Completion Comments</Label>
-                    <Textarea value={completionComments} onChange={e => setCompletionComments(e.target.value)} rows={3} className="bg-slate-800 border-slate-600" />
+                    <Textarea
+                      value={completionComments}
+                      disabled={!canManageSchedule}
+                      onChange={e => {
+                        clearWorkflowError('completion_comments');
+                        setCompletionComments(e.target.value);
+                      }}
+                      rows={3}
+                      className={getFieldClassName(workflowFieldErrors, 'completion_comments')}
+                    />
+                    {renderFieldError(workflowFieldErrors, 'completion_comments')}
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    {['draft', 'changes_requested'].includes(quote.status) && (
+                    {isLatestVersion && ['draft', 'changes_requested'].includes(quote.status) && (
                       <Button
                         onClick={() => callAction('submit_for_approval')}
                         disabled={actionLoading}
@@ -428,7 +880,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }:
                         <Send className="mr-2 h-4 w-4" /> Submit For Approval
                       </Button>
                     )}
-                    {quote.status === 'pending_internal_approval' && (
+                    {isLatestVersion && quote.status === 'pending_internal_approval' && (
                       <>
                         <Button
                           onClick={() => callAction('approve_and_send')}
@@ -469,7 +921,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }:
                         <FolderKanban className="mr-2 h-4 w-4" /> Trigger RAMS
                       </Button>
                     )}
-                    {['po_received', 'in_progress'].includes(quote.status) && (
+                    {canManageSchedule && (
                       <>
                         <Button
                           variant="outline"
@@ -497,7 +949,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }:
                     <Button
                       variant="outline"
                       onClick={() => callAction('toggle_closed')}
-                      disabled={actionLoading}
+                      disabled={actionLoading || !isLatestVersion}
                       className="border-slate-600 text-muted-foreground"
                     >
                       {quote.commercial_status === 'closed' ? 'Reopen Quote' : 'Close Quote'}
@@ -518,26 +970,69 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }:
                 </TabsContent>
 
                 <TabsContent value="invoices" className="space-y-4">
+                  {invoiceError ? (
+                    <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-100">
+                      {invoiceError}
+                    </div>
+                  ) : null}
+
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                     <div className="space-y-2 sm:col-span-2">
-                      <Label>Invoice Number</Label>
-                      <Input value={invoiceNumber} onChange={e => setInvoiceNumber(e.target.value)} className="bg-slate-800 border-slate-600" />
+                      <Label>Invoice Number *</Label>
+                      <Input
+                        value={invoiceNumber}
+                        disabled={!canManageInvoices}
+                        onChange={e => {
+                          clearInvoiceError('invoice_number');
+                          setInvoiceNumber(e.target.value);
+                        }}
+                        className={getFieldClassName(invoiceFieldErrors, 'invoice_number')}
+                      />
+                      {renderFieldError(invoiceFieldErrors, 'invoice_number')}
                     </div>
                     <div className="space-y-2">
-                      <Label>Amount</Label>
-                      <Input value={invoiceAmount} onChange={e => setInvoiceAmount(e.target.value)} className="bg-slate-800 border-slate-600" />
+                      <Label>Amount *</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={invoiceAmount}
+                        disabled={!canManageInvoices}
+                        onChange={e => {
+                          clearInvoiceError('amount');
+                          const nextValue = e.target.value;
+                          setInvoiceAmount(nextValue);
+
+                          const numericValue = Number(nextValue);
+                          if (nextValue && Number.isFinite(numericValue) && numericValue < suggestedInvoiceAmount) {
+                            setInvoiceScope('partial');
+                          }
+                        }}
+                        className={getFieldClassName(invoiceFieldErrors, 'amount')}
+                      />
+                      {renderFieldError(invoiceFieldErrors, 'amount')}
                     </div>
                     <div className="space-y-2">
-                      <Label>Date</Label>
-                      <Input type="date" value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)} className="bg-slate-800 border-slate-600" />
+                      <Label>Date *</Label>
+                      <Input
+                        type="date"
+                        value={invoiceDate}
+                        disabled={!canManageInvoices}
+                        onChange={e => {
+                          clearInvoiceError('invoice_date');
+                          setInvoiceDate(e.target.value);
+                        }}
+                        className={getFieldClassName(invoiceFieldErrors, 'invoice_date')}
+                      />
+                      {renderFieldError(invoiceFieldErrors, 'invoice_date')}
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Invoice Scope</Label>
-                      <Select value={invoiceScope} onValueChange={(value: 'full' | 'partial') => setInvoiceScope(value)}>
-                        <SelectTrigger className="bg-slate-800 border-slate-600">
+                      <Select value={invoiceScope} onValueChange={(value: 'full' | 'partial') => setInvoiceScope(value)} disabled={!canManageInvoices}>
+                        <SelectTrigger className={getSelectClassName(invoiceFieldErrors, 'invoice_scope')}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -545,20 +1040,37 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }:
                           <SelectItem value="partial">Partial invoice</SelectItem>
                         </SelectContent>
                       </Select>
+                      {renderFieldError(invoiceFieldErrors, 'invoice_scope')}
                     </div>
                     <div className="space-y-2">
                       <Label>Comments</Label>
-                      <Textarea value={invoiceComments} onChange={e => setInvoiceComments(e.target.value)} rows={2} className="bg-slate-800 border-slate-600" />
+                      <Textarea
+                        value={invoiceComments}
+                      disabled={!canManageInvoices}
+                        onChange={e => {
+                          clearInvoiceError('comments');
+                          setInvoiceComments(e.target.value);
+                        }}
+                        rows={2}
+                        className={getFieldClassName(invoiceFieldErrors, 'comments')}
+                      />
+                      {renderFieldError(invoiceFieldErrors, 'comments')}
                     </div>
                   </div>
 
                   <Button
                     onClick={addInvoice}
-                    disabled={actionLoading}
+                    disabled={actionLoading || !canManageInvoices}
                     className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90"
                   >
                     <Receipt className="mr-2 h-4 w-4" /> Add Invoice
                   </Button>
+
+                  {!canManageInvoices ? (
+                    <p className="text-xs text-muted-foreground">
+                      Only the latest quote version can be invoiced.
+                    </p>
+                  ) : null}
 
                   <div className="space-y-2">
                     {quote.invoices?.length ? quote.invoices.map(invoice => (
@@ -581,16 +1093,29 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }:
                 </TabsContent>
 
                 <TabsContent value="attachments" className="space-y-4">
+                  {attachmentError ? (
+                    <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-100">
+                      {attachmentError}
+                    </div>
+                  ) : null}
+
                   <div className="flex items-center gap-3">
-                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-md bg-avs-yellow px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-avs-yellow/90">
+                    <label className={cn(
+                      'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold',
+                      canManageAttachments
+                        ? 'cursor-pointer bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90'
+                        : 'cursor-not-allowed bg-slate-700 text-slate-300'
+                    )}>
                       <Upload className="h-4 w-4" />
                       {uploadingAttachment ? 'Uploading...' : 'Upload Attachment'}
                       <input
                         type="file"
                         className="hidden"
+                        disabled={!canManageAttachments}
                         onChange={event => {
                           const file = event.target.files?.[0];
                           if (file) {
+                            setAttachmentError(null);
                             void handleAttachmentUpload(file);
                             event.target.value = '';
                           }
@@ -599,6 +1124,10 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }:
                     </label>
                     <p className="text-xs text-muted-foreground">Cost sheets, drawings, and supporting files can be attached here.</p>
                   </div>
+
+                  {!canManageAttachments ? (
+                    <p className="text-xs text-muted-foreground">Only the latest quote version can be changed.</p>
+                  ) : null}
 
                   <div className="space-y-2">
                     {quote.attachments?.length ? quote.attachments.map(attachment => (
@@ -609,7 +1138,13 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }:
                             {attachment.content_type || 'File'}{attachment.file_size ? ` • ${(attachment.file_size / 1024).toFixed(1)} KB` : ''}
                           </p>
                         </div>
-                        <Button variant="outline" size="sm" className="border-slate-600 text-muted-foreground" onClick={() => deleteAttachment(attachment.id)}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={!canManageAttachments}
+                          className="border-slate-600 text-muted-foreground"
+                          onClick={() => deleteAttachment(attachment.id)}
+                        >
                           Remove
                         </Button>
                       </div>
@@ -623,7 +1158,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }:
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Create Revision Type</Label>
-                      <Select value={revisionType} onValueChange={(value: QuoteRevisionType) => setRevisionType(value)}>
+                      <Select value={revisionType} onValueChange={(value: QuoteRevisionType) => setRevisionType(value)} disabled={!canCreateVersions}>
                         <SelectTrigger className="bg-slate-800 border-slate-600">
                           <SelectValue />
                         </SelectTrigger>
@@ -637,51 +1172,157 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }:
                     </div>
                     <div className="space-y-2">
                       <Label>Revision Notes</Label>
-                      <Textarea value={revisionNotes} onChange={e => setRevisionNotes(e.target.value)} rows={2} className="bg-slate-800 border-slate-600" />
+                      <Textarea
+                        value={revisionNotes}
+                        disabled={!canCreateVersions}
+                        onChange={e => setRevisionNotes(e.target.value)}
+                        rows={2}
+                        className="bg-slate-800 border-slate-600"
+                      />
                     </div>
                   </div>
 
                   <div className="flex flex-wrap gap-2">
                     <Button
-                      onClick={() => callAction('create_revision', { revision_type: revisionType, version_notes: revisionNotes })}
-                      disabled={actionLoading}
+                      onClick={() => callAction('create_revision', { revision_type: revisionType, version_notes: revisionNotes }, 'versions')}
+                      disabled={actionLoading || !canCreateVersions}
                       className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90"
                     >
                       <Files className="mr-2 h-4 w-4" /> Create New Version
                     </Button>
                     <Button
                       variant="outline"
-                      onClick={() => callAction('duplicate', { version_notes: revisionNotes })}
-                      disabled={actionLoading}
+                      onClick={() => callAction('duplicate', { version_notes: revisionNotes }, 'versions')}
+                      disabled={actionLoading || !canCreateVersions}
                       className="border-slate-600 text-muted-foreground"
                     >
                       <Copy className="mr-2 h-4 w-4" /> Duplicate As New Quote
                     </Button>
                   </div>
 
+                  {!canCreateVersions ? (
+                    <p className="text-xs text-muted-foreground">Open the latest version to create a new version or duplicate this quote.</p>
+                  ) : null}
+
                   <div className="space-y-2">
                     {quote.versions?.length ? quote.versions.map(version => (
-                      <div key={version.id} className="rounded-lg border border-slate-700 bg-slate-800/30 p-4">
+                        <button
+                          key={version.id}
+                          type="button"
+                          onClick={() => selectQuoteVersion(version.id)}
+                          className={cn(
+                            'w-full rounded-lg border p-4 text-left transition-colors',
+                            version.id === quote.id
+                              ? 'border-avs-yellow/60 bg-avs-yellow/10'
+                              : 'border-slate-700 bg-slate-800/30 hover:bg-slate-800/50'
+                          )}
+                        >
                         <div className="flex items-center justify-between gap-4">
                           <div>
-                            <p className="font-mono font-medium text-avs-yellow">{version.quote_reference}</p>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-mono font-medium text-avs-yellow">{version.quote_reference}</p>
+                              {version.id === quote.id ? (
+                                <Badge variant="outline" className="border-avs-yellow/40 text-avs-yellow">
+                                  Current
+                                </Badge>
+                              ) : null}
+                              {version.is_latest_version ? (
+                                <Badge variant="outline" className="border-emerald-500/30 text-emerald-300 bg-emerald-500/10">
+                                  Latest
+                                </Badge>
+                              ) : null}
+                            </div>
                             <p className="text-sm text-white">{version.version_label || 'Original'}</p>
                           </div>
-                          <Badge variant="outline" className={QUOTE_STATUS_CONFIG[version.status].color}>
-                            {QUOTE_STATUS_CONFIG[version.status].label}
+                          <Badge variant="outline" className={getQuoteStatusConfig(version.status).color}>
+                            {getQuoteStatusConfig(version.status).label}
                           </Badge>
                         </div>
                         {version.version_notes && <p className="mt-2 text-sm text-slate-300 whitespace-pre-wrap">{version.version_notes}</p>}
-                      </div>
+                      </button>
                     )) : (
                       <p className="text-sm text-muted-foreground">No version history yet.</p>
                     )}
                   </div>
                 </TabsContent>
+
+                <TabsContent value="timeline" className="space-y-4">
+                  {groupedTimeline.length ? (
+                    <div className="space-y-5">
+                      {groupedTimeline.map((group) => (
+                        <div key={group.key} className="space-y-2">
+                          <div className="sticky top-0 z-10">
+                            <span className="inline-flex rounded-full border border-slate-700 bg-slate-950/90 px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-slate-400 backdrop-blur">
+                              {group.label}
+                            </span>
+                          </div>
+
+                          <div className="space-y-1">
+                            {group.events.map((event) => {
+                              const toStatusConfig = event.to_status ? getQuoteStatusConfig(event.to_status) : null;
+                              const fromStatusConfig = event.from_status ? getQuoteStatusConfig(event.from_status) : null;
+                              const meta = getTimelineEventMeta(event.event_type);
+                              const Icon = meta.icon;
+
+                              return (
+                                <div key={event.id} className="grid grid-cols-[32px_1fr_auto] items-start gap-3 rounded-md px-1 py-2 hover:bg-slate-800/30">
+                                  <div className={cn('mt-0.5 flex h-8 w-8 items-center justify-center rounded-full border', meta.iconClassName)}>
+                                    <Icon className="h-4 w-4" />
+                                  </div>
+
+                                  <div className="min-w-0 space-y-1">
+                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                      <p className="text-sm font-medium text-white">{event.title}</p>
+                                      {fromStatusConfig ? (
+                                        <Badge variant="outline" className={cn('text-[10px]', fromStatusConfig.color)}>
+                                          {fromStatusConfig.label}
+                                        </Badge>
+                                      ) : null}
+                                      {fromStatusConfig && toStatusConfig ? (
+                                        <ArrowRight className="h-3.5 w-3.5 text-slate-500" />
+                                      ) : null}
+                                      {toStatusConfig ? (
+                                        <Badge variant="outline" className={cn('text-[10px]', toStatusConfig.color)}>
+                                          {toStatusConfig.label}
+                                        </Badge>
+                                      ) : null}
+                                    </div>
+
+                                    <p className="text-xs text-muted-foreground">
+                                      {event.actor?.full_name || 'Unknown user'}
+                                      {' • '}
+                                      {event.quote_reference}
+                                    </p>
+
+                                    {event.description ? (
+                                      <p className="text-xs text-slate-300 whitespace-pre-wrap">{event.description}</p>
+                                    ) : null}
+                                  </div>
+
+                                  <div className="pt-0.5 text-right text-[11px] text-slate-400">
+                                    {format(new Date(event.created_at), 'HH:mm')}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No timeline history yet.</p>
+                  )}
+                </TabsContent>
               </Tabs>
 
               <div className="flex flex-wrap gap-2">
-                {['draft', 'pending_internal_approval', 'changes_requested'].includes(quote.status) && (
+                {deleteError ? (
+                  <div className="w-full rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-100">
+                    {deleteError}
+                  </div>
+                ) : null}
+
+                {canEditQuote && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -702,6 +1343,18 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }:
                 >
                   <FileDown className="h-4 w-4 mr-1" /> Download PDF
                 </Button>
+
+                {canDeleteDraft ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void deleteQuote()}
+                    disabled={actionLoading}
+                    className="border-red-500/40 text-red-200 hover:bg-red-500/10 hover:text-red-100"
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" /> {hasMultipleVersions ? 'Delete Draft Version' : 'Delete Draft Quote'}
+                  </Button>
+                ) : null}
               </div>
             </div>
           </>

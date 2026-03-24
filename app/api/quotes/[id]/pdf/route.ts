@@ -15,7 +15,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'You must be signed in to use quotes.' }, { status: 401 });
     }
 
     // Fetch quote
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     if (quoteError) {
       if (quoteError.code === 'PGRST116') {
-        return NextResponse.json({ error: 'Quote not found' }, { status: 404 });
+        return NextResponse.json({ error: 'Quote not found.' }, { status: 404 });
       }
       throw quoteError;
     }
@@ -91,6 +91,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       additionalData: { endpoint: `GET /api/quotes/${id}/pdf` },
     });
 
-    return NextResponse.json({ error: 'Failed to generate PDF' }, { status: 500 });
+    return NextResponse.json({ error: 'Unable to generate the quote PDF right now.' }, { status: 500 });
   }
 }

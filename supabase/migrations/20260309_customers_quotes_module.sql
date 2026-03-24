@@ -93,8 +93,6 @@ CREATE TABLE IF NOT EXISTS quotes (
 
   -- Totals (denormalised for list view performance)
   subtotal NUMERIC(12,2) DEFAULT 0,
-  vat_rate NUMERIC(5,2) DEFAULT 20.00,
-  vat_amount NUMERIC(12,2) DEFAULT 0,
   total NUMERIC(12,2) DEFAULT 0,
 
   -- Workflow
