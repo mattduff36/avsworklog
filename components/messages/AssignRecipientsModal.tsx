@@ -22,7 +22,6 @@ interface Employee {
     name: string;
     display_name: string;
   } | null;
-  hasModuleAccess?: boolean;
 }
 
 interface Role {
@@ -57,7 +56,7 @@ export function AssignRecipientsModal({
       async function fetchEmployees() {
         setFetching(true);
         try {
-          const allEmployees = await fetchUserDirectory({ includeRole: true, module: 'toolbox-talks' });
+          const allEmployees = await fetchUserDirectory({ includeRole: true });
           const typedEmployees = allEmployees.map((employee) => ({
             id: employee.id,
             full_name: employee.full_name || 'Unknown User',
@@ -73,7 +72,6 @@ export function AssignRecipientsModal({
                   display_name: employee.role.display_name || employee.role.name,
                 }
               : null,
-            hasModuleAccess: employee.has_module_access !== false,
           }));
           const roleMap = new Map<string, Role>();
 
@@ -123,31 +121,21 @@ export function AssignRecipientsModal({
     employees.forEach((employee) => {
       if (!employee.team?.id) return;
 
-      const existing = teamMap.get(employee.team.id);
-      if (existing) {
-        existing.hasAccess = existing.hasAccess || employee.hasModuleAccess !== false;
+      if (teamMap.has(employee.team.id)) {
         return;
       }
 
       teamMap.set(employee.team.id, {
         id: employee.team.id,
         name: employee.team.name,
-        hasAccess: employee.hasModuleAccess !== false,
+        hasAccess: true,
       });
     });
 
     return Array.from(teamMap.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [employees]);
 
-  const accessibleTeamOptions = useMemo(
-    () => teamOptions.filter((team) => team.hasAccess),
-    [teamOptions]
-  );
-
   const handleToggleEmployee = (id: string) => {
-    const employee = employees.find((candidate) => candidate.id === id);
-    if (!employee || employee.hasModuleAccess === false) return;
-
     const newSelected = new Set(selectedIds);
     if (newSelected.has(id)) {
       newSelected.delete(id);
@@ -159,7 +147,7 @@ export function AssignRecipientsModal({
 
   const handleToggleTeam = (teamId: string) => {
     const teamEmployeeIds = employees
-      .filter((employee) => employee.team?.id === teamId && employee.hasModuleAccess !== false)
+      .filter((employee) => employee.team?.id === teamId)
       .map((employee) => employee.id);
 
     if (teamEmployeeIds.length === 0) {
@@ -179,34 +167,28 @@ export function AssignRecipientsModal({
   };
 
   const handleToggleAllTeams = () => {
-    if (accessibleTeamOptions.length === 0) {
+    if (teamOptions.length === 0) {
       return;
     }
 
     const nextSelected = new Set(selectedIds);
-    const allTeamsSelected = accessibleTeamOptions.every((team) =>
+    const allTeamsSelected = teamOptions.every((team) =>
       employees
-        .filter((employee) => employee.team?.id === team.id && employee.hasModuleAccess !== false)
+        .filter((employee) => employee.team?.id === team.id)
         .every((employee) => nextSelected.has(employee.id))
     );
 
     if (allTeamsSelected) {
-      employees
-        .filter((employee) => employee.hasModuleAccess !== false)
-        .forEach((employee) => nextSelected.delete(employee.id));
+      employees.forEach((employee) => nextSelected.delete(employee.id));
     } else {
-      employees
-        .filter((employee) => employee.hasModuleAccess !== false)
-        .forEach((employee) => nextSelected.add(employee.id));
+      employees.forEach((employee) => nextSelected.add(employee.id));
     }
 
     setSelectedIds(nextSelected);
   };
 
   const handleSelectRole = (role: string) => {
-    const employeesWithRole = employees.filter(
-      (emp) => emp.role?.name === role && emp.hasModuleAccess !== false
-    );
+    const employeesWithRole = employees.filter((emp) => emp.role?.name === role);
     // Check if all employees in this role are already selected
     const allRoleSelected = employeesWithRole.every(emp => selectedIds.has(emp.id));
     
@@ -259,12 +241,12 @@ export function AssignRecipientsModal({
     onClose();
   };
 
-  const selectedTeamCount = accessibleTeamOptions.filter((team) =>
+  const selectedTeamCount = teamOptions.filter((team) =>
     employees
-      .filter((employee) => employee.team?.id === team.id && employee.hasModuleAccess !== false)
+      .filter((employee) => employee.team?.id === team.id)
       .every((employee) => selectedIds.has(employee.id))
   ).length;
-  const allTeamsSelected = accessibleTeamOptions.length > 0 && selectedTeamCount === accessibleTeamOptions.length;
+  const allTeamsSelected = teamOptions.length > 0 && selectedTeamCount === teamOptions.length;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -289,9 +271,7 @@ export function AssignRecipientsModal({
               </label>
               <div className="grid grid-cols-2 gap-2">
                 {roles.map((role) => {
-                  const roleEmployees = employees.filter(
-                    (emp) => emp.role?.name === role.name && emp.hasModuleAccess !== false
-                  );
+                  const roleEmployees = employees.filter((emp) => emp.role?.name === role.name);
                   const roleCount = roleEmployees.length;
                   const allRoleSelected = roleEmployees.length > 0 && roleEmployees.every(emp => selectedIds.has(emp.id));
                   
@@ -333,9 +313,7 @@ export function AssignRecipientsModal({
                 teams={teamOptions.map((team) => ({
                   ...team,
                   selected: (() => {
-                    const teamEmployees = employees.filter(
-                      (employee) => employee.team?.id === team.id && employee.hasModuleAccess !== false
-                    );
+                    const teamEmployees = employees.filter((employee) => employee.team?.id === team.id);
                     return teamEmployees.length > 0 && teamEmployees.every((employee) => selectedIds.has(employee.id));
                   })(),
                 }))}
@@ -373,15 +351,13 @@ export function AssignRecipientsModal({
                     filteredEmployees.map((employee) => (
                       <div
                         key={employee.id}
-                        className={`flex items-center space-x-3 p-3 rounded-lg border ${
-                          employee.hasModuleAccess === false ? 'opacity-60' : 'hover:bg-accent/50'
-                        }`}
+                        className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-accent/50"
                       >
                         <Checkbox
                           id={employee.id}
                           checked={selectedIds.has(employee.id)}
                           onCheckedChange={() => handleToggleEmployee(employee.id)}
-                          disabled={loading || employee.hasModuleAccess === false}
+                          disabled={loading}
                         />
                         <label
                           htmlFor={employee.id}
@@ -390,9 +366,7 @@ export function AssignRecipientsModal({
                           {employee.full_name}
                         </label>
                         <span className="text-xs text-muted-foreground">
-                          {employee.hasModuleAccess === false
-                            ? `${employee.role?.display_name || 'No Role'} • No Toolbox access`
-                            : employee.role?.display_name || 'No Role'}
+                          {employee.role?.display_name || 'No Role'}
                         </span>
                       </div>
                     ))

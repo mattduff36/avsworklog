@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Save, Check, AlertCircle, XCircle, Home, User } from 'lucide-react';
+import { ArrowLeft, Save, Check, AlertCircle, XCircle, Home, User, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 // Removed: getWeekEnding, formatDateISO - no longer needed (week comes from props)
 import { calculateHours, formatHours } from '@/lib/utils/time-calculations';
@@ -60,6 +60,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [loadingExisting, setLoadingExisting] = useState(false);
+  const [existingTimesheetLoaded, setExistingTimesheetLoaded] = useState(!initialExistingId);
   const [managerComments, setManagerComments] = useState<string>(''); // For rejected timesheets
   
   // Manager-specific states
@@ -358,6 +359,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
     // Prevent duplicate loads
     if (loadingExisting) return;
     
+    setExistingTimesheetLoaded(false);
     setLoadingExisting(true);
     setError('');
     
@@ -478,6 +480,7 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
       setShowErrorDialog(true);
     } finally {
       setLoadingExisting(false);
+      setExistingTimesheetLoaded(true);
     }
   };
 
@@ -921,6 +924,17 @@ export function CivilsTimesheet({ weekEnding: initialWeekEnding, existingId: ini
       setSaving(false);
     }
   };
+
+  if (!existingTimesheetLoaded) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Loader2 className="h-10 w-10 animate-spin text-timesheet mx-auto mb-3" />
+          <p className="text-muted-foreground text-sm">Loading timesheet...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 pb-32 md:pb-6 max-w-5xl">
