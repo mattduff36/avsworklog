@@ -388,11 +388,11 @@ export default function ViewTimesheetPage() {
 
       if (error) throw error;
       
-      toast.success('Timesheet marked as processed');
+      toast.success('Timesheet marked as Manager Approved');
       await fetchTimesheet(timesheet.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to mark as processed');
-      toast.error(err instanceof Error ? err.message : 'Failed to mark as processed');
+      setError(err instanceof Error ? err.message : 'Failed to mark as Manager Approved');
+      toast.error(err instanceof Error ? err.message : 'Failed to mark as Manager Approved');
     } finally {
       setSaving(false);
     }
@@ -438,9 +438,9 @@ export default function ViewTimesheetPage() {
     const variants = {
       draft: { variant: 'secondary' as const, label: 'Draft' },
       submitted: { variant: 'warning' as const, label: 'Pending Approval' },
-      approved: { variant: 'success' as const, label: 'Approved' },
+      approved: { variant: 'success' as const, label: 'Payroll Received' },
       rejected: { variant: 'destructive' as const, label: 'Rejected' },
-      processed: { variant: 'default' as const, label: 'Processed' },
+      processed: { variant: 'default' as const, label: 'Manager Approved' },
       adjusted: { variant: 'default' as const, label: 'Adjusted' },
     };
     const config = variants[status as keyof typeof variants] || variants.draft;
@@ -817,17 +817,17 @@ export default function ViewTimesheetPage() {
             </p>
           </div>
 
-          {/* Warning for Approved Timesheet Editing */}
+          {/* Warning for payroll-received timesheet editing */}
           {editing && timesheet.status === 'approved' && dataChanged && (
             <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-md">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
                 <div>
                   <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
-                    Editing Approved Timesheet
+                    Editing Payroll Received Timesheet
                   </p>
                   <p className="text-sm text-amber-800 dark:text-amber-200 mt-1">
-                    You are editing an approved timesheet. When you finish, you must add a comment and mark it as &ldquo;Adjusted&rdquo; to notify the employee and selected managers.
+                    You are editing a payroll received timesheet. When you finish, you must add a comment and mark it as &ldquo;Adjusted&rdquo; to notify the employee and selected managers.
                   </p>
                 </div>
               </div>
@@ -896,7 +896,7 @@ export default function ViewTimesheetPage() {
               </>
             )}
 
-            {/* Mark as Processed button (only if NOT editing) */}
+            {/* Mark as Manager Approved button (only if NOT editing) */}
             {canMarkAsProcessed && !editing && (
               <Button
                 variant="outline"
@@ -905,23 +905,23 @@ export default function ViewTimesheetPage() {
                 className="border-timesheet/50 text-timesheet hover:bg-timesheet hover:text-white hover:border-timesheet active:bg-timesheet-dark active:scale-95 transition-all"
               >
                 <Package className="h-4 w-4 mr-2" />
-                Mark as Processed
+                Mark as Manager Approved
               </Button>
             )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Mark as Processed Confirmation Dialog */}
+      {/* Mark as Manager Approved confirmation dialog */}
       <AlertDialog open={showProcessedDialog} onOpenChange={setShowProcessedDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Mark Timesheet as Processed</AlertDialogTitle>
+            <AlertDialogTitle>Mark Timesheet as Manager Approved</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to mark this timesheet as processed?
+              Are you sure you want to mark this timesheet as Manager Approved?
               <br />
               <br />
-              <strong>Warning:</strong> Once marked as processed, this action cannot be undone. This indicates that the timesheet has been sent to payroll for payment.
+              <strong>Warning:</strong> Once marked as Manager Approved, this action cannot be undone. This indicates that the timesheet has been sent to payroll for payment.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -931,7 +931,7 @@ export default function ViewTimesheetPage() {
               disabled={saving}
               className="bg-timesheet hover:bg-timesheet-dark focus:ring-timesheet"
             >
-              {saving ? 'Processing...' : 'Mark as Processed'}
+              {saving ? 'Updating...' : 'Mark as Manager Approved'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

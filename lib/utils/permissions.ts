@@ -24,7 +24,8 @@ export type ProfileWithRole = {
   } | null;
 };
 
-type ProfileWithRoleRow = Omit<ProfileWithRole, 'role'> & {
+type ProfileWithRoleRow = Omit<ProfileWithRole, 'role' | 'is_super_admin' | 'email'> & {
+  super_admin: boolean | null;
   role:
     | {
         name: string;
@@ -50,20 +51,19 @@ type ProfileWithRoleRow = Omit<ProfileWithRole, 'role'> & {
  * Use this in API routes instead of direct profile fetch
  */
 export async function getProfileWithRole(userId: string): Promise<ProfileWithRole | null> {
-  const supabase = await createClient();
+  const admin = createAdminClient();
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await admin
       .from('profiles')
       .select(`
         id,
         full_name,
-        email,
         phone_number,
         employee_id,
         role_id,
         must_change_password,
-        is_super_admin,
+        super_admin,
         created_at,
         updated_at,
         role:roles(
@@ -92,6 +92,8 @@ export async function getProfileWithRole(userId: string): Promise<ProfileWithRol
     const role = Array.isArray(typedData.role) ? typedData.role[0] || null : typedData.role;
     return {
       ...typedData,
+      email: null,
+      is_super_admin: typedData.super_admin,
       role,
     };
   } catch (error) {

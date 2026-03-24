@@ -25,13 +25,6 @@ export async function POST(request: NextRequest) {
 
     // Check Org V2 module access
     const profile = await getProfileWithRole(user.id);
-    console.log('Profile fetched:', { 
-      id: profile?.id, 
-      full_name: profile?.full_name,
-      role_id: profile?.role_id,
-      role: profile?.role,
-      is_manager_admin: profile?.role?.is_manager_admin 
-    });
 
     if (!profile) {
       console.error('Profile not found for user:', user.id);

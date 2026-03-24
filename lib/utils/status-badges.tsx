@@ -28,7 +28,7 @@ const timesheetStatusConfig: Record<TimesheetStatus, StatusConfig> = {
     icon: <Clock className="h-3 w-3 mr-1" />,
   },
   approved: {
-    label: 'Approved',
+    label: 'Payroll Received',
     variant: 'default',
     icon: <CheckCircle2 className="h-3 w-3 mr-1" />,
   },
@@ -38,7 +38,7 @@ const timesheetStatusConfig: Record<TimesheetStatus, StatusConfig> = {
     icon: <XCircle className="h-3 w-3 mr-1" />,
   },
   processed: {
-    label: 'Processed',
+    label: 'Manager Approved',
     variant: 'default',
     icon: <Package className="h-3 w-3 mr-1" />,
   },

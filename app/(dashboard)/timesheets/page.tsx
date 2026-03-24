@@ -200,9 +200,9 @@ export default function TimesheetsPage() {
     const variants = {
       draft: { variant: 'secondary' as const, label: 'Draft' },
       submitted: { variant: 'warning' as const, label: 'Pending' },
-      approved: { variant: 'success' as const, label: 'Approved' },
+      approved: { variant: 'success' as const, label: 'Payroll Received' },
       rejected: { variant: 'destructive' as const, label: 'Rejected' },
-      processed: { variant: 'default' as const, label: 'Processed' },
+      processed: { variant: 'default' as const, label: 'Manager Approved' },
       adjusted: { variant: 'default' as const, label: 'Adjusted' },
     };
 
@@ -220,9 +220,9 @@ export default function TimesheetsPage() {
       case 'all': return 'All';
       case 'draft': return 'Draft';
       case 'pending': return 'Pending';
-      case 'approved': return 'Approved';
+      case 'approved': return 'Payroll Received';
       case 'rejected': return 'Rejected';
-      case 'processed': return 'Processed';
+      case 'processed': return 'Manager Approved';
       case 'adjusted': return 'Adjusted';
     }
   };

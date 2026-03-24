@@ -253,13 +253,13 @@ function ApprovalsContent() {
 
       if (error) throw error;
 
-      toast.success('Timesheet marked as processed');
+      toast.success('Timesheet marked as Manager Approved');
       setProcessModalOpen(false);
       setProcessingTimesheetId(null);
       await fetchApprovals(statusFilter);
     } catch (error) {
       console.error('Error processing timesheet:', error);
-      toast.error('Failed to mark timesheet as processed');
+      toast.error('Failed to mark timesheet as Manager Approved');
     } finally {
       setProcessingInProgress(false);
     }
@@ -278,9 +278,9 @@ function ApprovalsContent() {
   const getFilterLabel = (filter: StatusFilter): string => {
     switch (filter) {
       case 'pending': return 'Pending';
-      case 'approved': return 'Approved';
+      case 'approved': return 'Payroll Received';
       case 'rejected': return 'Rejected';
-      case 'processed': return 'Processed';
+      case 'processed': return 'Manager Approved';
       case 'adjusted': return 'Adjusted';
       case 'all': return 'All';
       default: return filter;
@@ -316,7 +316,7 @@ function ApprovalsContent() {
         return (
           <Badge variant="success" className="bg-green-500/10 text-green-600 border-green-500/20">
             <CheckCircle2 className="h-3 w-3 mr-1" />
-            Approved
+            Payroll Received
           </Badge>
         );
       case 'rejected':
@@ -329,7 +329,7 @@ function ApprovalsContent() {
       case 'processed':
         return (
           <Badge variant="default">
-            Processed
+            Manager Approved
           </Badge>
         );
       case 'adjusted':

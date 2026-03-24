@@ -28,13 +28,13 @@ export function ProcessTimesheetModal({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent className="bg-white dark:bg-slate-900 border-border">
         <AlertDialogHeader>
-          <AlertDialogTitle className="text-foreground">Mark Timesheet as Processed</AlertDialogTitle>
+          <AlertDialogTitle className="text-foreground">Mark Timesheet as Manager Approved</AlertDialogTitle>
           <AlertDialogDescription className="text-muted-foreground space-y-2">
             <span className="block">
-              Are you sure you want to mark this timesheet as processed?
+              Are you sure you want to mark this timesheet as Manager Approved?
             </span>
             <span className="block text-sm">
-              <strong>Warning:</strong> Once marked as processed, this action cannot be undone.
+              <strong>Warning:</strong> Once marked as Manager Approved, this action cannot be undone.
               This indicates that the timesheet has been sent to payroll for payment.
             </span>
           </AlertDialogDescription>
@@ -46,7 +46,7 @@ export function ProcessTimesheetModal({
             disabled={processing}
             className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900"
           >
-            {processing ? 'Processing...' : 'Mark as Processed'}
+            {processing ? 'Updating...' : 'Mark as Manager Approved'}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
