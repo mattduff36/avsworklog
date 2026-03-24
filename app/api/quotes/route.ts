@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
 
     const { data: managerProfile, error: managerProfileError } = await admin
       .from('profiles')
-      .select('id, full_name, email')
+      .select('id, full_name')
       .eq('id', managerProfileId)
       .single();
 
@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
       requester_id: managerProfileId,
       requester_initials: initials,
       manager_name: quoteData.manager_name || managerOption?.profile?.full_name || managerProfile.full_name,
-      manager_email: quoteData.manager_email || managerOption?.manager_email || managerProfile.email,
+      manager_email: quoteData.manager_email || managerOption?.manager_email || null,
       approver_profile_id: approver_profile_id || managerOption?.approver_profile_id || null,
       signoff_name: quoteData.signoff_name || managerOption?.signoff_name || managerProfile.full_name,
       signoff_title: quoteData.signoff_title || managerOption?.signoff_title || null,

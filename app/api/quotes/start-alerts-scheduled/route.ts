@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
       .select(`
         *,
         customer:customers(id, company_name),
-        manager:profiles!quotes_requester_id_fkey(id, full_name, email)
+        manager:profiles!quotes_requester_id_fkey(id, full_name)
       `)
       .not('start_date', 'is', null)
       .is('start_alert_sent_at', null)
@@ -35,7 +35,11 @@ export async function POST(request: NextRequest) {
     let processed = 0;
 
     for (const quote of quotes || []) {
-      if (!quote.start_date || !quote.start_alert_days || !quote.manager?.email) {
+      const managerEmail = quote.requester_id
+        ? (await admin.auth.admin.getUserById(quote.requester_id)).data.user?.email || null
+        : null;
+
+      if (!quote.start_date || !quote.start_alert_days || !managerEmail) {
         continue;
       }
 
@@ -46,7 +50,7 @@ export async function POST(request: NextRequest) {
       }
 
       const emailResult = await sendQuoteStartAlertEmail({
-        to: quote.manager.email,
+        to: managerEmail,
         managerName: quote.manager.full_name || 'Manager',
         quoteReference: quote.quote_reference,
         customerName: quote.customer?.company_name || 'Unknown customer',

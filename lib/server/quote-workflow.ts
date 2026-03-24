@@ -33,12 +33,12 @@ interface QuoteManagerOption {
   profile?: {
     id: string;
     full_name: string | null;
-    email: string | null;
+    email?: string | null;
   } | null;
   approver?: {
     id: string;
     full_name: string | null;
-    email: string | null;
+    email?: string | null;
   } | null;
 }
 
@@ -90,8 +90,8 @@ export async function listQuoteManagerOptions(): Promise<QuoteManagerOption[]> {
     .from('quote_manager_series')
     .select(`
       *,
-      profile:profiles!quote_manager_series_profile_id_fkey(id, full_name, email),
-      approver:profiles!quote_manager_series_approver_profile_id_fkey(id, full_name, email)
+      profile:profiles!quote_manager_series_profile_id_fkey(id, full_name),
+      approver:profiles!quote_manager_series_approver_profile_id_fkey(id, full_name)
     `)
     .order('initials');
 

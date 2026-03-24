@@ -19,7 +19,7 @@ export async function GET() {
       listQuoteManagerOptions(),
       createAdminClient()
         .from('profiles')
-        .select('id, full_name, email')
+        .select('id, full_name')
         .order('full_name'),
     ]);
 
@@ -29,7 +29,10 @@ export async function GET() {
 
     return NextResponse.json({
       managerOptions,
-      approvers: approversResult.data || [],
+      approvers: (approversResult.data || []).map(approver => ({
+        ...approver,
+        email: null,
+      })),
     });
   } catch (error) {
     console.error('Error fetching quote metadata:', error);

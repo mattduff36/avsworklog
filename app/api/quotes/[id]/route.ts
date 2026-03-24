@@ -85,9 +85,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       if (current.quote.approver_profile_id) {
         const { data: approver } = await admin
           .from('profiles')
-          .select('id, full_name, email')
+          .select('id, full_name')
           .eq('id', current.quote.approver_profile_id)
           .single();
+
+        const approverAuth = approver?.id
+          ? await admin.auth.admin.getUserById(approver.id)
+          : null;
+        const approverEmail = approverAuth?.data?.user?.email || null;
 
         if (approver?.id) {
           await createQuoteNotification({
@@ -98,9 +103,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           });
         }
 
-        if (approver?.email) {
+        if (approverEmail) {
           await sendQuoteApprovalRequestEmail({
-            approverEmail: approver.email,
+            approverEmail,
             managerName: current.quote.manager_name || 'A manager',
             quoteReference: current.quote.quote_reference,
             customerName: current.quote.customer?.company_name || 'Unknown customer',
