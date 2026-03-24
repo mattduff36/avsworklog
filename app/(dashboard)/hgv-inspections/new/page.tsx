@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
+import { Fragment, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { fetchUserDirectory, type DirectoryUser } from '@/lib/client/user-directory';
@@ -76,6 +76,7 @@ function NewHgvInspectionContent() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
+  const saveInspectionInFlightRef = useRef(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -266,7 +267,8 @@ function NewHgvInspectionContent() {
   };
 
   const saveInspection = async (signatureData: string) => {
-    if (!user) return;
+    if (!user || saveInspectionInFlightRef.current) return;
+    saveInspectionInFlightRef.current = true;
     setLoading(true);
     setError('');
 
@@ -377,6 +379,7 @@ function NewHgvInspectionContent() {
       setError(message);
       toast.error(message);
     } finally {
+      saveInspectionInFlightRef.current = false;
       setLoading(false);
     }
   };
@@ -760,6 +763,7 @@ function NewHgvInspectionContent() {
           </DialogHeader>
           <div className="py-4">
             <SignaturePad
+              disabled={loading}
               onSave={async (signatureData: string) => {
                 setShowSignatureDialog(false);
                 await saveInspection(signatureData);

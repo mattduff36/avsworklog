@@ -26,6 +26,12 @@ type Task = Database['public']['Tables']['actions']['Row'] & {
   workshop_task_categories?: {
     name: string;
   } | null;
+  workshop_task_subcategories?: {
+    name: string;
+    workshop_task_categories?: {
+      name: string;
+    } | null;
+  } | null;
   vans?: {
     reg_number: string;
     nickname: string | null;
@@ -73,6 +79,16 @@ export function WorkshopTaskModal({
   });
 
   if (!task) return null;
+
+  const categoryName =
+    task.workshop_task_subcategories?.workshop_task_categories?.name ||
+    task.workshop_task_categories?.name ||
+    null;
+  const subcategoryName = task.workshop_task_subcategories?.name || null;
+  const inspectionDetails = task.action_type === 'inspection_defect'
+    ? task.description?.trim() || null
+    : null;
+  const workshopNotes = task.workshop_comments?.trim() || null;
 
   const getVehicleDisplay = () => {
     const getAssetIdLabel = (asset?: { reg_number?: string | null; plant_id?: string | null }) => {
@@ -172,9 +188,14 @@ export function WorkshopTaskModal({
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-2">
                 {getTaskTypeBadge()}
-                {task.workshop_task_categories && (
+                {categoryName && (
                   <Badge variant="outline" className="bg-workshop/10 text-workshop border-workshop/30">
-                    {task.workshop_task_categories.name}
+                    {categoryName}
+                  </Badge>
+                )}
+                {subcategoryName && (
+                  <Badge variant="outline" className="bg-orange-500/10 text-orange-300 border-orange-500/30">
+                    {subcategoryName}
                   </Badge>
                 )}
               </div>
@@ -184,11 +205,24 @@ export function WorkshopTaskModal({
             </div>
 
             {/* Task Description */}
-            {task.workshop_comments && (
+            {inspectionDetails && (
               <Card className="bg-slate-800/50 border-border">
                 <CardContent className="pt-4">
+                  <p className="text-sm font-medium text-white mb-2">Reported Defect</p>
                   <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                    {task.workshop_comments}
+                    {inspectionDetails}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+            {workshopNotes && (
+              <Card className="bg-slate-800/50 border-border">
+                <CardContent className="pt-4">
+                  {inspectionDetails && (
+                    <p className="text-sm font-medium text-white mb-2">Workshop Notes</p>
+                  )}
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                    {workshopNotes}
                   </p>
                 </CardContent>
               </Card>
