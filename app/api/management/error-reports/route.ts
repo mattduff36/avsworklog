@@ -4,6 +4,23 @@ import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type { GetAllErrorReportsResponse, ErrorReportWithUser, ErrorReportStatus } from '@/types/error-reports';
 
+type ErrorReportWithUserRow = Omit<ErrorReportWithUser, 'user'> & {
+  user: Array<{ id: string; full_name: string | null }> | { id: string; full_name: string | null } | null;
+};
+
+function normalizeErrorReportUser(report: ErrorReportWithUserRow): ErrorReportWithUser {
+  const rawUser = Array.isArray(report.user) ? report.user[0] || null : report.user;
+  return {
+    ...report,
+    user: rawUser
+      ? {
+          id: rawUser.id,
+          full_name: rawUser.full_name || 'Unknown',
+        }
+      : null,
+  };
+}
+
 /**
  * GET /api/management/error-reports
  * Get all error reports (admin only)
@@ -27,48 +44,74 @@ export async function GET(request: NextRequest) {
     // Get filter from query params
     const { searchParams } = new URL(request.url);
     const statusFilter = searchParams.get('status') as ErrorReportStatus | null;
+    const limit = Math.min(Math.max(Number.parseInt(searchParams.get('limit') || '50', 10) || 50, 1), 200);
+    const offset = Math.max(Number.parseInt(searchParams.get('offset') || '0', 10) || 0, 0);
 
     // Build query
     let query = supabase
       .from('error_reports')
       .select(`
-        *,
+        id,
+        created_by,
+        title,
+        description,
+        error_code,
+        page_url,
+        user_agent,
+        additional_context,
+        status,
+        admin_notes,
+        resolved_at,
+        resolved_by,
+        notification_message_id,
+        created_at,
+        updated_at,
         user:created_by(
           id,
           full_name
         )
       `)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (statusFilter && ['new', 'investigating', 'resolved'].includes(statusFilter)) {
       query = query.eq('status', statusFilter);
     }
 
-    const { data: reports, error } = await query;
+    const [{ data: reports, error }, { data: allReports, error: countsError }] = await Promise.all([
+      query,
+      supabase.from('error_reports').select('status'),
+    ]);
 
     if (error) {
       throw error;
     }
 
-    // Calculate counts for all statuses
-    const { data: allReports } = await supabase
-      .from('error_reports')
-      .select('status');
+    if (countsError) {
+      throw countsError;
+    }
 
     const counts: Record<ErrorReportStatus | 'all', number> = {
       all: allReports?.length || 0,
-      new: allReports?.filter(r => r.status === 'new').length || 0,
-      investigating: allReports?.filter(r => r.status === 'investigating').length || 0,
-      resolved: allReports?.filter(r => r.status === 'resolved').length || 0,
+      new: allReports?.filter((report) => report.status === 'new').length || 0,
+      investigating: allReports?.filter((report) => report.status === 'investigating').length || 0,
+      resolved: allReports?.filter((report) => report.status === 'resolved').length || 0,
     };
 
     const response: GetAllErrorReportsResponse = {
       success: true,
-      reports: reports as ErrorReportWithUser[],
+      reports: ((reports || []) as ErrorReportWithUserRow[]).map(normalizeErrorReportUser),
       counts,
     };
 
-    return NextResponse.json(response);
+    return NextResponse.json({
+      ...response,
+      pagination: {
+        offset,
+        limit,
+        has_more: (reports || []).length === limit,
+      },
+    });
 
   } catch (error) {
     console.error('Error in GET /api/management/error-reports:', error);

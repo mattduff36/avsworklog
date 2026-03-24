@@ -30,13 +30,11 @@ import {
   Trash2,
   Loader2,
   AlertTriangle,
-  FileText,
   Search,
   Briefcase,
 } from 'lucide-react';
 import type { RoleMatrixRow } from '@/types/roles';
 import { toast } from 'sonner';
-import { TimesheetTypeOptions, getTimesheetTypeLabel } from '@/app/(dashboard)/timesheets/types/registry';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { getRoleSortPriority, isCoreRoleName } from '@/lib/config/roles-core';
 
@@ -63,7 +61,6 @@ export function JobRolesTab() {
     description: '',
     role_type: 'employee' as RoleType,
     hierarchy_rank: '',
-    timesheet_type: 'civils' as string,
   });
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState('');
@@ -119,7 +116,6 @@ export function JobRolesTab() {
       description: '',
       role_type: 'employee',
       hierarchy_rank: '',
-      timesheet_type: 'civils',
     });
     setFormError('');
   }
@@ -132,7 +128,6 @@ export function JobRolesTab() {
       description: role.description || '',
       role_type: role.role_class || (role.name === 'admin' ? 'admin' : (role.is_manager_admin ? 'manager' : 'employee')),
       hierarchy_rank: role.hierarchy_rank != null ? String(role.hierarchy_rank) : '',
-      timesheet_type: role.timesheet_type || 'civils',
     });
     setFormError('');
     setEditDialogOpen(true);
@@ -316,7 +311,6 @@ export function JobRolesTab() {
                     <TableRow className="border-slate-700 hover:bg-slate-800/50">
                       <TableHead className="text-muted-foreground">Role</TableHead>
                       <TableHead className="text-muted-foreground">Description</TableHead>
-                      <TableHead className="text-muted-foreground">Timesheet</TableHead>
                       <TableHead className="text-muted-foreground text-center">Tier</TableHead>
                       <TableHead className="text-muted-foreground text-center">Type</TableHead>
                       <TableHead className="text-muted-foreground text-center">Users</TableHead>
@@ -334,12 +328,6 @@ export function JobRolesTab() {
                         </TableCell>
                         <TableCell className="text-muted-foreground text-sm max-w-[250px] truncate">
                           {role.description || '—'}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          <div className="flex items-center gap-1.5 text-slate-300">
-                            <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                            {getTimesheetTypeLabel(role.timesheet_type || 'civils')}
-                          </div>
                         </TableCell>
                         <TableCell className="text-center text-slate-300">
                           {role.name === 'admin' ? 'Bypass' : role.hierarchy_rank ?? '—'}
@@ -458,23 +446,6 @@ export function JobRolesTab() {
                 className="bg-input border-border text-white placeholder:text-muted-foreground min-h-[80px]"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="jr-add-ts" className="flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Timesheet Type
-              </Label>
-              <Select value={formData.timesheet_type} onValueChange={v => setFormData({ ...formData, timesheet_type: v })}>
-                <SelectTrigger id="jr-add-ts" className="bg-input border-border text-white">
-                  <SelectValue placeholder="Select timesheet type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {TimesheetTypeOptions.map(opt => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">Which timesheet format should employees with this role use?</p>
-            </div>
             <div className="space-y-2 p-3 bg-slate-800 rounded">
               <Label htmlFor="jr-add-role-type">Role Type</Label>
               <Select
@@ -572,22 +543,6 @@ export function JobRolesTab() {
                 onChange={e => setFormData({ ...formData, description: e.target.value })}
                 className="bg-input border-border text-white placeholder:text-muted-foreground min-h-[80px]"
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="jr-edit-ts" className="flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Timesheet Type
-              </Label>
-              <Select value={formData.timesheet_type} onValueChange={v => setFormData({ ...formData, timesheet_type: v })}>
-                <SelectTrigger id="jr-edit-ts" className="bg-input border-border text-white">
-                  <SelectValue placeholder="Select timesheet type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {TimesheetTypeOptions.map(opt => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
             <div className="space-y-2 p-3 bg-slate-800 rounded">
               <Label htmlFor="jr-edit-role-type">Role Type</Label>

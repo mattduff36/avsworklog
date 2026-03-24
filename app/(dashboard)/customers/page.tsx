@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { Loader2, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
 import { CustomersTable } from './components/CustomersTable';
 import { CustomerFormDialog } from './components/CustomerFormDialog';
 import type { Customer, CustomerFormData } from './types';
@@ -20,10 +21,11 @@ export default function CustomersPage() {
 
   const fetchCustomers = useCallback(async () => {
     try {
-      const res = await fetch('/api/customers');
-      if (!res.ok) throw new Error('Failed to fetch');
-      const data = await res.json();
-      setCustomers(data.customers || []);
+      const { items } = await fetchAllPaginatedItems<Customer>('/api/customers', 'customers', {
+        limit: 500,
+        errorMessage: 'Failed to fetch customers',
+      });
+      setCustomers(items);
     } catch (error) {
       console.error('Error fetching customers:', error);
       toast.error('Failed to load customers');

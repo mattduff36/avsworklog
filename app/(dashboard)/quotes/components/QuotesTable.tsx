@@ -12,11 +12,12 @@ import {
   ChevronDown,
   Receipt,
 } from 'lucide-react';
-import type { Quote, QuoteStatus } from '../types';
+import type { Quote, QuoteListSummary, QuoteStatus } from '../types';
 import { QUOTE_STATUS_CONFIG } from '../types';
 
 interface QuotesTableProps {
   quotes: Quote[];
+  statusCounts?: QuoteListSummary['status_counts'];
   onAdd: () => void;
   onRowClick: (quote: Quote) => void;
   statusFilter: QuoteStatus | 'all';
@@ -26,7 +27,14 @@ interface QuotesTableProps {
 type SortField = 'quote_reference' | 'customer' | 'quote_date' | 'total' | 'status';
 type SortDir = 'asc' | 'desc';
 
-export function QuotesTable({ quotes, onAdd, onRowClick, statusFilter, onStatusFilterChange }: QuotesTableProps) {
+export function QuotesTable({
+  quotes,
+  statusCounts: providedStatusCounts,
+  onAdd,
+  onRowClick,
+  statusFilter,
+  onStatusFilterChange,
+}: QuotesTableProps) {
   const [search, setSearch] = useState('');
   const [poFilter, setPoFilter] = useState<'all' | 'with_po' | 'without_po'>('all');
   const [invoiceFilter, setInvoiceFilter] = useState<'all' | 'not_invoiced' | 'partially_invoiced' | 'invoiced'>('all');
@@ -111,10 +119,14 @@ export function QuotesTable({ quotes, onAdd, onRowClick, statusFilter, onStatusF
   }
 
   const statusCounts = useMemo(() => {
+    if (providedStatusCounts) {
+      return providedStatusCounts;
+    }
+
     const counts: Partial<Record<QuoteStatus | 'all', number>> = { all: quotes.length };
     quotes.forEach(q => { counts[q.status] = (counts[q.status] || 0) + 1; });
     return counts;
-  }, [quotes]);
+  }, [providedStatusCounts, quotes]);
 
   return (
     <div className="space-y-4">

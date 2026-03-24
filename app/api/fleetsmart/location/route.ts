@@ -59,6 +59,7 @@ const VEHICLES_TTL_MS = 30_000; // cache vehicle list for 30 s
 const LOCATION_TTL_MS = 30_000; // cache per-vehicle location for 30 s
 const MIN_INTERVAL_MS = 2_000;  // 2 s between FleetSmart requests (safety margin)
 const MAX_RETRIES = 2;
+const REQUEST_TIMEOUT_MS = 15_000;
 
 /* ---------- helpers ---------- */
 function fleetsmartHeaders(): HeadersInit {
@@ -112,7 +113,10 @@ async function fetchWithRetry(
 ): Promise<Response> {
   for (let attempt = 0; attempt <= retries; attempt++) {
     await throttle();
-    const res = await fetch(url, opts);
+    const res = await fetch(url, {
+      ...opts,
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
     if (res.status === 429 && attempt < retries) {
       // Wait extra before retrying on rate limit
       await new Promise((r) => setTimeout(r, 3_000));

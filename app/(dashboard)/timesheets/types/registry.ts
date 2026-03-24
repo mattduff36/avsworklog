@@ -30,7 +30,7 @@ export const TimesheetRegistry: Record<string, React.ComponentType<TimesheetProp
 
 /**
  * Timesheet Type Options
- * Used in admin UI for role configuration
+ * Used in admin UI for team configuration
  */
 export const TimesheetTypeOptions = [
   { 

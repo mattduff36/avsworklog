@@ -16,9 +16,8 @@ import {
   Check
 } from 'lucide-react';
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import type { ModuleName } from '@/types/roles';
-import { ALL_MODULES } from '@/types/roles';
+import { usePermissionSnapshot } from '@/lib/hooks/usePermissionSnapshot';
+import { usePendingAbsenceCount } from '@/lib/hooks/useNavMetrics';
 import { managerNavItems, adminNavItems, getFilteredNavByPermissions } from '@/lib/config/navigation';
 import {
   clearViewAsSelection,
@@ -49,19 +48,18 @@ interface SidebarNavProps {
 export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   const pathname = usePathname();
   const { isAdmin, isManager, effectiveRole, isViewingAs, isActualSuperAdmin } = useAuth();
-  const supabase = createClient();
   const [viewAsRoleId, setViewAsRoleIdState] = useState<string>('');
   const [viewAsTeamId, setViewAsTeamIdState] = useState<string>('');
   const [draftRoleId, setDraftRoleId] = useState<string>('');
   const [draftTeamId, setDraftTeamId] = useState<string>('');
   const [allRoles, setAllRoles] = useState<RoleOption[]>([]);
   const [allTeams, setAllTeams] = useState<TeamOption[]>([]);
-  const [userPermissions, setUserPermissions] = useState<Set<ModuleName>>(new Set());
-  const [pendingAbsenceCount, setPendingAbsenceCount] = useState(0);
   const [viewAsMenuOpen, setViewAsMenuOpen] = useState(false);
   const [viewAsMenuPosition, setViewAsMenuPosition] = useState({ left: 0, bottom: 12, maxHeight: 320 });
   const viewAsTriggerRef = useRef<HTMLButtonElement | null>(null);
   const viewAsMenuRef = useRef<HTMLDivElement | null>(null);
+  const { enabledModuleSet: userPermissions } = usePermissionSnapshot();
+  const { count: pendingAbsenceCount } = usePendingAbsenceCount(isManager || isAdmin);
 
   // Fetch user email, all roles, and current view-as selection
   useEffect(() => {
@@ -86,43 +84,6 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
     }
     fetchViewAsOptions();
 
-    async function fetchPermissions() {
-      try {
-        if (effectiveRole?.name === 'admin' || effectiveRole?.is_super_admin) {
-          queueMicrotask(() => setUserPermissions(new Set(ALL_MODULES)));
-          return;
-        }
-
-        const response = await fetch('/api/me/permissions', { cache: 'no-store' });
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to load permissions');
-        }
-
-        queueMicrotask(
-          () => setUserPermissions(new Set<ModuleName>((data.enabled_modules || []) as ModuleName[]))
-        );
-      } catch {
-        queueMicrotask(() => setUserPermissions(new Set()));
-      }
-    }
-    fetchPermissions();
-
-    async function fetchPendingAbsenceCount() {
-      if (!isManager && !isAdmin) {
-        setPendingAbsenceCount(0);
-        return;
-      }
-
-      const { count } = await supabase
-        .from('absences')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
-
-      setPendingAbsenceCount(count || 0);
-    }
-    fetchPendingAbsenceCount();
-
     // Read current selection from cookie (or legacy localStorage)
     const { roleId, teamId } = getViewAsSelection();
     queueMicrotask(() => {
@@ -139,7 +100,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
         localStorage.removeItem('viewAsRole');
       }
     }
-  }, [supabase, effectiveRole?.name, effectiveRole?.is_super_admin, isViewingAs, isManager, isAdmin]);
+  }, [effectiveRole?.name, effectiveRole?.is_super_admin, isViewingAs, isManager, isAdmin]);
 
   // Collapse sidebar on route change (don't close completely)
   const prevPathnameRef = useRef(pathname);

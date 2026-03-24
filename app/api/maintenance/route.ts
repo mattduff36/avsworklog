@@ -16,26 +16,16 @@ import {
   calculateAlertCounts
 } from '@/lib/utils/maintenanceCalculations';
 
-interface InspectionProfile {
-  full_name: string | null;
-}
-
-interface VanInspectionRow {
-  van_id: string | null;
+interface InspectionLookupRow {
   inspection_date: string | null;
-  profiles: InspectionProfile | null;
-}
-
-interface HgvInspectionRow {
-  hgv_id: string | null;
-  inspection_date: string | null;
-  profiles: InspectionProfile | null;
-}
-
-interface PlantInspectionRow {
-  plant_id: string | null;
-  inspection_date: string | null;
-  profiles: InspectionProfile | null;
+  profiles:
+    | {
+        full_name: string | null;
+      }
+    | Array<{
+        full_name: string | null;
+      }>
+    | null;
 }
 
 interface MaintenanceRow {
@@ -127,16 +117,60 @@ export async function GET() {
     const [vansResult, hgvsResult, plantResult] = await Promise.all([
       supabase
         .from('vans')
-        .select('id, reg_number, category_id, status, nickname, maintenance:vehicle_maintenance!van_id(*)')
-        .eq('status', 'active'),
+        .select(`
+          id,
+          reg_number,
+          category_id,
+          status,
+          nickname,
+          maintenance:vehicle_maintenance!van_id(*),
+          van_inspections!van_inspections_van_id_fkey(
+            inspection_date,
+            profiles!van_inspections_user_id_fkey(full_name)
+          )
+        `)
+        .eq('status', 'active')
+        .order('inspection_date', { foreignTable: 'van_inspections', ascending: false })
+        .limit(1, { foreignTable: 'van_inspections' }),
       supabase
         .from('hgvs')
-        .select('id, reg_number, category_id, status, nickname, maintenance:vehicle_maintenance!hgv_id(*)')
-        .eq('status', 'active'),
+        .select(`
+          id,
+          reg_number,
+          category_id,
+          status,
+          nickname,
+          maintenance:vehicle_maintenance!hgv_id(*),
+          hgv_inspections!hgv_inspections_hgv_id_fkey(
+            inspection_date,
+            profiles!hgv_inspections_user_id_fkey(full_name)
+          )
+        `)
+        .eq('status', 'active')
+        .order('inspection_date', { foreignTable: 'hgv_inspections', ascending: false })
+        .limit(1, { foreignTable: 'hgv_inspections' }),
       supabase
         .from('plant')
-        .select('id, plant_id, reg_number, nickname, serial_number, year, weight_class, category_id, status, loler_due_date, maintenance:vehicle_maintenance!plant_id(*)')
-        .eq('status', 'active'),
+        .select(`
+          id,
+          plant_id,
+          reg_number,
+          nickname,
+          serial_number,
+          year,
+          weight_class,
+          category_id,
+          status,
+          loler_due_date,
+          maintenance:vehicle_maintenance!plant_id(*),
+          plant_inspections!plant_inspections_plant_id_fkey(
+            inspection_date,
+            profiles!plant_inspections_user_id_fkey(full_name)
+          )
+        `)
+        .eq('status', 'active')
+        .order('inspection_date', { foreignTable: 'plant_inspections', ascending: false })
+        .limit(1, { foreignTable: 'plant_inspections' }),
     ]);
 
     if (vansResult.error) { logger.error('Failed to fetch vans', vansResult.error); throw vansResult.error; }
@@ -157,6 +191,9 @@ export async function GET() {
       weight_class?: string | null;
       loler_due_date?: string | null;
       maintenance?: Record<string, unknown>[] | Record<string, unknown> | null;
+      van_inspections?: InspectionLookupRow[] | null;
+      hgv_inspections?: InspectionLookupRow[] | null;
+      plant_inspections?: InspectionLookupRow[] | null;
     }
     const taggedAssets: TaggedAsset[] = [
       ...(vansResult.data || []).map(v => ({ ...v, _assetType: 'van' as const })),
@@ -164,74 +201,22 @@ export async function GET() {
       ...(plantResult.data || []).map(v => ({ ...v, _assetType: 'plant' as const })),
     ];
 
-    // Get last inspector for each asset (batched per inspection table)
-    const vanIds = taggedAssets.filter(a => a._assetType === 'van').map(a => a.id);
-    const hgvIds = taggedAssets.filter(a => a._assetType === 'hgv').map(a => a.id);
-    const plantIds = taggedAssets.filter(a => a._assetType === 'plant').map(a => a.id);
-
-    const lastInspectionMap = new Map<string, { inspector: string | null; date: string | null }>();
-
-    // Van inspections
-    if (vanIds.length > 0) {
-      const { data: vanInsp } = await supabase
-        .from('van_inspections')
-        .select('van_id, inspection_date, profiles!van_inspections_user_id_fkey(full_name)')
-        .in('van_id', vanIds)
-        .order('inspection_date', { ascending: false });
-
-      for (const row of ((vanInsp || []) as unknown as VanInspectionRow[])) {
-        if (row.van_id && !lastInspectionMap.has(row.van_id)) {
-          lastInspectionMap.set(row.van_id, {
-            inspector: row.profiles?.full_name || null,
-            date: row.inspection_date,
-          });
-        }
-      }
-    }
-
-    // HGV inspections
-    if (hgvIds.length > 0) {
-      const { data: hgvInsp } = await supabase
-        .from('hgv_inspections')
-        .select('hgv_id, inspection_date, profiles!hgv_inspections_user_id_fkey(full_name)')
-        .in('hgv_id', hgvIds)
-        .order('inspection_date', { ascending: false });
-
-      for (const row of ((hgvInsp || []) as unknown as HgvInspectionRow[])) {
-        if (row.hgv_id && !lastInspectionMap.has(row.hgv_id)) {
-          lastInspectionMap.set(row.hgv_id, {
-            inspector: row.profiles?.full_name || null,
-            date: row.inspection_date,
-          });
-        }
-      }
-    }
-
-    // Plant inspections
-    if (plantIds.length > 0) {
-      const { data: plantInsp } = await supabase
-        .from('plant_inspections')
-        .select('plant_id, inspection_date, profiles!plant_inspections_user_id_fkey(full_name)')
-        .in('plant_id', plantIds)
-        .order('inspection_date', { ascending: false });
-
-      for (const row of ((plantInsp || []) as unknown as PlantInspectionRow[])) {
-        if (row.plant_id && !lastInspectionMap.has(row.plant_id)) {
-          lastInspectionMap.set(row.plant_id, {
-            inspector: row.profiles?.full_name || null,
-            date: row.inspection_date,
-          });
-        }
-      }
-    }
-
     // Calculate status for each asset
     const vehiclesWithStatus = taggedAssets.map(asset => {
       const assetType = asset._assetType;
       const maintenance = (
         Array.isArray(asset.maintenance) ? asset.maintenance[0] : asset.maintenance
       ) as MaintenanceRow | null;
-      const inspInfo = lastInspectionMap.get(asset.id);
+      const latestInspection = (
+        assetType === 'van'
+          ? asset.van_inspections?.[0]
+          : assetType === 'hgv'
+            ? asset.hgv_inspections?.[0]
+            : asset.plant_inspections?.[0]
+      ) || null;
+      const latestInspectorProfile = Array.isArray(latestInspection?.profiles)
+        ? latestInspection?.profiles[0] || null
+        : latestInspection?.profiles || null;
 
       const vehicleObj = {
         id: asset.id,
@@ -264,8 +249,8 @@ export async function GET() {
           plant_id: assetType === 'plant' ? asset.id : null,
           is_plant: assetType === 'plant',
           vehicle: vehicleObj,
-          last_inspector: inspInfo?.inspector || null,
-          last_inspection_date: inspInfo?.date || null,
+          last_inspector: latestInspectorProfile?.full_name || null,
+          last_inspection_date: latestInspection?.inspection_date || null,
           current_mileage: null,
           current_hours: null,
           tax_due_date: null,
@@ -355,8 +340,8 @@ export async function GET() {
         ...maintenance,
         is_plant: assetType === 'plant',
         vehicle: vehicleObj,
-        last_inspector: inspInfo?.inspector || null,
-        last_inspection_date: inspInfo?.date || null,
+        last_inspector: latestInspectorProfile?.full_name || null,
+        last_inspection_date: latestInspection?.inspection_date || null,
         tax_status,
         mot_status,
         service_status,

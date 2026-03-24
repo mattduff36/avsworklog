@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -8,13 +9,14 @@ import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/ca
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Bug, Car, Clock, Database, History, Loader2, RefreshCw, Send, ShieldAlert, Users } from 'lucide-react';
 import { toast } from 'sonner';
-import { AuditLogDebugPanel } from './components/AuditLogDebugPanel';
-import { DVLASyncDebugPanel } from './components/DVLASyncDebugPanel';
-import { ErrorLogsDebugPanel } from './components/ErrorLogsDebugPanel';
-import { NotificationSettingsDebugPanel } from './components/NotificationSettingsDebugPanel';
-import { TestFleetDebugPanel } from './components/TestFleetDebugPanel';
-import { UIModalStylesDebugPanel } from './components/UIModalStylesDebugPanel';
 import { DebugInfo } from './types';
+
+const AuditLogDebugPanel = dynamic(() => import('./components/AuditLogDebugPanel').then((mod) => ({ default: mod.AuditLogDebugPanel })));
+const DVLASyncDebugPanel = dynamic(() => import('./components/DVLASyncDebugPanel').then((mod) => ({ default: mod.DVLASyncDebugPanel })));
+const ErrorLogsDebugPanel = dynamic(() => import('./components/ErrorLogsDebugPanel').then((mod) => ({ default: mod.ErrorLogsDebugPanel })));
+const NotificationSettingsDebugPanel = dynamic(() => import('./components/NotificationSettingsDebugPanel').then((mod) => ({ default: mod.NotificationSettingsDebugPanel })));
+const TestFleetDebugPanel = dynamic(() => import('./components/TestFleetDebugPanel').then((mod) => ({ default: mod.TestFleetDebugPanel })));
+const UIModalStylesDebugPanel = dynamic(() => import('./components/UIModalStylesDebugPanel').then((mod) => ({ default: mod.UIModalStylesDebugPanel })));
 
 type DebugTab = 'errors' | 'audit' | 'dvla' | 'test-fleet' | 'notifications' | 'modal-styles';
 

@@ -17,12 +17,33 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { searchParams } = new URL(request.url);
+    const limit = Math.min(Math.max(Number.parseInt(searchParams.get('limit') || '50', 10) || 50, 1), 200);
+    const offset = Math.max(Number.parseInt(searchParams.get('offset') || '0', 10) || 0, 0);
+
     // Fetch user's own error reports
     const { data: reports, error } = await supabase
       .from('error_reports')
-      .select('*')
+      .select(`
+        id,
+        created_by,
+        title,
+        description,
+        error_code,
+        page_url,
+        user_agent,
+        additional_context,
+        status,
+        admin_notes,
+        resolved_at,
+        resolved_by,
+        notification_message_id,
+        created_at,
+        updated_at
+      `)
       .eq('created_by', user.id)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) {
       throw error;
@@ -33,7 +54,14 @@ export async function GET(request: NextRequest) {
       reports: reports as ErrorReport[],
     };
 
-    return NextResponse.json(response);
+    return NextResponse.json({
+      ...response,
+      pagination: {
+        offset,
+        limit,
+        has_more: (reports || []).length === limit,
+      },
+    });
 
   } catch (error) {
     console.error('Error in GET /api/error-reports:', error);

@@ -5,10 +5,11 @@ import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, Receipt } from 'lucide-react';
 import { toast } from 'sonner';
+import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
 import { QuotesTable } from './components/QuotesTable';
 import { QuoteDetailsModal } from './components/QuoteDetailsModal';
 import { QuoteFormDialog } from './components/QuoteFormDialog';
-import type { Quote, QuoteFormData, QuoteManagerOption, QuoteStatus } from './types';
+import type { Quote, QuoteFormData, QuoteListSummary, QuoteManagerOption, QuoteStatus } from './types';
 
 interface CustomerOption {
   id: string;
@@ -36,6 +37,7 @@ export default function QuotesPage() {
   const searchParams = useSearchParams();
 
   const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [quoteSummary, setQuoteSummary] = useState<QuoteListSummary | null>(null);
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [managerOptions, setManagerOptions] = useState<QuoteManagerOption[]>([]);
   const [approvers, setApprovers] = useState<ApproverOption[]>([]);
@@ -53,20 +55,21 @@ export default function QuotesPage() {
   const fetchData = useCallback(async () => {
     try {
       const url = customerId ? `/api/quotes?customer_id=${customerId}` : '/api/quotes';
-      const [quotesRes, customersRes, metadataRes] = await Promise.all([
-        fetch(url),
-        fetch('/api/customers'),
+      const [quotesResult, customersResult, metadataRes] = await Promise.all([
+        fetchAllPaginatedItems<Quote>(url, 'quotes', {
+          limit: 250,
+          errorMessage: 'Failed to load quotes',
+        }),
+        fetchAllPaginatedItems<CustomerOption>('/api/customers', 'customers', {
+          limit: 500,
+          errorMessage: 'Failed to load customers',
+        }),
         fetch('/api/quotes/metadata'),
       ]);
 
-      if (quotesRes.ok) {
-        const data = await quotesRes.json();
-        setQuotes(data.quotes || []);
-      }
-      if (customersRes.ok) {
-        const data = await customersRes.json();
-        setCustomers(data.customers || []);
-      }
+      setQuotes(quotesResult.items);
+      setQuoteSummary((quotesResult.firstPagePayload?.summary as QuoteListSummary | undefined) || null);
+      setCustomers(customersResult.items);
       if (metadataRes.ok) {
         const data = await metadataRes.json();
         setManagerOptions(data.managerOptions || []);
@@ -168,6 +171,7 @@ export default function QuotesPage() {
 
       <QuotesTable
         quotes={quotes}
+        statusCounts={quoteSummary?.status_counts}
         onAdd={() => { setEditingQuote(null); setFormOpen(true); }}
         onRowClick={handleRowClick}
         statusFilter={statusFilter}

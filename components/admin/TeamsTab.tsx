@@ -21,15 +21,24 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Loader2, Plus, Edit, Trash2, Search } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, Search, FileText } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  fetchAdminTeamDirectory,
+  invalidateAdminTeamDirectoryCache,
+} from '@/lib/admin/team-directory-client';
 import { useAuth } from '@/lib/hooks/useAuth';
+import {
+  TimesheetTypeOptions,
+  getTimesheetTypeLabel,
+} from '@/app/(dashboard)/timesheets/types/registry';
 
 type TeamRow = {
   id: string;
   team_id?: string;
   name: string;
   code?: string | null;
+  timesheet_type?: string | null;
   active: boolean;
   member_count: number;
   manager_count: number;
@@ -66,20 +75,17 @@ export function TeamsTab() {
     id: '',
     name: '',
     code: '',
+    timesheet_type: 'civils',
     manager_1_id: '',
     manager_2_id: '',
   });
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState('');
 
-  const fetchTeams = useCallback(async () => {
+  const fetchTeams = useCallback(async (force = false) => {
     try {
       setLoading(true);
-      const response = await fetch('/api/admin/hierarchy/teams');
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to load teams');
-      }
+      const data = await fetchAdminTeamDirectory({ force });
       const rows = Array.isArray(data?.teams) ? data.teams : [];
       const mapped: TeamRow[] = rows.map((row: TeamRow & { team_id?: string }) => ({
         ...row,
@@ -119,7 +125,7 @@ export function TeamsTab() {
   );
 
   function resetForm() {
-    setFormData({ id: '', name: '', code: '', manager_1_id: '', manager_2_id: '' });
+    setFormData({ id: '', name: '', code: '', timesheet_type: 'civils', manager_1_id: '', manager_2_id: '' });
     setFormError('');
   }
 
@@ -129,6 +135,7 @@ export function TeamsTab() {
       id: team.id,
       name: team.name,
       code: team.code || '',
+      timesheet_type: team.timesheet_type || 'civils',
       manager_1_id: team.manager_1_id || '',
       manager_2_id: team.manager_2_id || '',
     });
@@ -151,6 +158,7 @@ export function TeamsTab() {
           id: formData.id || undefined,
           name: formData.name,
           code: formData.code || undefined,
+          timesheet_type: formData.timesheet_type,
           manager_1_id: formData.manager_1_id || null,
           manager_2_id: formData.manager_2_id || null,
         }),
@@ -160,7 +168,8 @@ export function TeamsTab() {
         throw new Error(data.error || 'Failed to create team');
       }
       toast.success('Team created');
-      await fetchTeams();
+      invalidateAdminTeamDirectoryCache();
+      await fetchTeams(true);
       setAddDialogOpen(false);
       resetForm();
     } catch (error) {
@@ -185,6 +194,7 @@ export function TeamsTab() {
         body: JSON.stringify({
           name: formData.name,
           code: formData.code || null,
+          timesheet_type: formData.timesheet_type,
           manager_1_id: formData.manager_1_id || null,
           manager_2_id: formData.manager_2_id || null,
         }),
@@ -194,7 +204,8 @@ export function TeamsTab() {
         throw new Error(data.error || 'Failed to update team');
       }
       toast.success('Team updated');
-      await fetchTeams();
+      invalidateAdminTeamDirectoryCache();
+      await fetchTeams(true);
       setEditDialogOpen(false);
       setSelectedTeam(null);
       resetForm();
@@ -216,7 +227,8 @@ export function TeamsTab() {
         throw new Error(data.error || 'Failed to delete team');
       }
       toast.success('Team deleted');
-      await fetchTeams();
+      invalidateAdminTeamDirectoryCache();
+      await fetchTeams(true);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to delete team');
     }
@@ -289,8 +301,9 @@ export function TeamsTab() {
                   <TableRow className="border-slate-700 hover:bg-slate-800/50">
                     <TableHead className="text-muted-foreground">Team</TableHead>
                     <TableHead className="text-muted-foreground">Code</TableHead>
-                      <TableHead className="text-muted-foreground">Manager 1</TableHead>
-                      <TableHead className="text-muted-foreground">Manager 2</TableHead>
+                    <TableHead className="text-muted-foreground">Timesheet</TableHead>
+                    <TableHead className="text-muted-foreground">Manager 1</TableHead>
+                    <TableHead className="text-muted-foreground">Manager 2</TableHead>
                     <TableHead className="text-muted-foreground text-center">Users</TableHead>
                     <TableHead className="text-right text-muted-foreground">Actions</TableHead>
                   </TableRow>
@@ -303,6 +316,12 @@ export function TeamsTab() {
                         <div className="text-xs text-muted-foreground font-mono">{team.id}</div>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{team.code || '—'}</TableCell>
+                      <TableCell className="text-slate-300">
+                        <div className="flex items-center gap-1.5">
+                          <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                          {getTimesheetTypeLabel(team.timesheet_type || 'civils')}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <span className={team.manager_1_name ? 'text-white' : 'text-slate-500'}>
                           {team.manager_1_name || 'No Manager 1'}
@@ -388,6 +407,30 @@ export function TeamsTab() {
                 className="bg-input border-border text-white"
                 placeholder="CVL"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="team-add-timesheet-type" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Timesheet Type
+              </Label>
+              <Select
+                value={formData.timesheet_type}
+                onValueChange={(value) => setFormData({ ...formData, timesheet_type: value })}
+              >
+                <SelectTrigger id="team-add-timesheet-type" className="bg-input border-border text-white">
+                  <SelectValue placeholder="Select timesheet type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TimesheetTypeOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Controls which timesheet format users on this team are sent to.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="team-add-manager-1">Manager 1</Label>
@@ -488,6 +531,27 @@ export function TeamsTab() {
                 onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                 className="bg-input border-border text-white"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="team-edit-timesheet-type" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Timesheet Type
+              </Label>
+              <Select
+                value={formData.timesheet_type}
+                onValueChange={(value) => setFormData({ ...formData, timesheet_type: value })}
+              >
+                <SelectTrigger id="team-edit-timesheet-type" className="bg-input border-border text-white">
+                  <SelectValue placeholder="Select timesheet type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TimesheetTypeOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="team-edit-manager-1">Manager 1</Label>

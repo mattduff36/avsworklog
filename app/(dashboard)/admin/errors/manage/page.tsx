@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
+import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
 import type { 
   ErrorReportWithUser, 
   ErrorReportStatus, 
@@ -76,16 +77,16 @@ export default function ErrorReportsManagePage() {
       if (filter !== 'all') {
         params.set('status', filter);
       }
-      
-      const response = await fetch(`/api/management/error-reports?${params}`);
-      const data = await response.json();
-      
-      if (data.success) {
-        setReports(data.reports);
-        setCounts(data.counts);
-      } else {
-        throw new Error(data.error || 'Failed to fetch error reports');
-      }
+      const endpoint = params.size > 0
+        ? `/api/management/error-reports?${params.toString()}`
+        : '/api/management/error-reports';
+      const result = await fetchAllPaginatedItems<ErrorReportWithUser>(endpoint, 'reports', {
+        limit: 200,
+        errorMessage: 'Failed to fetch error reports',
+      });
+
+      setReports(result.items);
+      setCounts((result.firstPagePayload?.counts as Record<string, number> | undefined) || {});
     } catch (error) {
       console.error('Error fetching error reports:', error);
       toast.error('Failed to load error reports');

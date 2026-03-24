@@ -190,13 +190,18 @@ export async function ensureTeamPermissionRows(
 export async function getPermissionModules(
   supabaseAdmin: SupabaseAdminClient = createAdminClient()
 ): Promise<PermissionModuleMatrixColumn[]> {
-  const [roles, modulesResult] = await Promise.all([
-    getPermissionTierRoles(supabaseAdmin),
-    supabaseAdmin
-      .from('permission_modules')
-      .select('module_name, minimum_role_id, sort_order')
-      .order('sort_order', { ascending: true }),
-  ]);
+  const roles = await getPermissionTierRoles(supabaseAdmin);
+  return getPermissionModulesForRoles(roles, supabaseAdmin);
+}
+
+async function getPermissionModulesForRoles(
+  roles: PermissionTierRole[],
+  supabaseAdmin: SupabaseAdminClient
+): Promise<PermissionModuleMatrixColumn[]> {
+  const modulesResult = await supabaseAdmin
+    .from('permission_modules')
+    .select('module_name, minimum_role_id, sort_order')
+    .order('sort_order', { ascending: true });
 
   if (modulesResult.error) {
     throw modulesResult.error;
@@ -233,9 +238,8 @@ export async function getTeamPermissionMatrix(
   modules: PermissionModuleMatrixColumn[];
   teams: TeamPermissionMatrixRow[];
 }> {
-  const [roles, modules, teamsResult, permissionsResult] = await Promise.all([
+  const [roles, teamsResult, permissionsResult] = await Promise.all([
     getPermissionTierRoles(supabaseAdmin),
-    getPermissionModules(supabaseAdmin),
     supabaseAdmin
       .from('org_teams')
       .select('id, name, code, active')
@@ -244,6 +248,7 @@ export async function getTeamPermissionMatrix(
       .from('team_module_permissions')
       .select('team_id, module_name, enabled'),
   ]);
+  const modules = await getPermissionModulesForRoles(roles, supabaseAdmin);
 
   if (teamsResult.error) {
     throw teamsResult.error;
@@ -309,10 +314,8 @@ export async function shiftPermissionModuleTier(
   moduleName: ModuleName,
   direction: 'left' | 'right'
 ): Promise<PermissionModuleMatrixColumn> {
-  const [roles, modules] = await Promise.all([
-    getPermissionTierRoles(supabaseAdmin),
-    getPermissionModules(supabaseAdmin),
-  ]);
+  const roles = await getPermissionTierRoles(supabaseAdmin);
+  const modules = await getPermissionModulesForRoles(roles, supabaseAdmin);
 
   const targetModule = modules.find((entry) => entry.module_name === moduleName);
   if (!targetModule) {
@@ -444,4 +447,102 @@ export async function getPermissionMapForUser(
   });
 
   return permissionMap;
+}
+
+export async function getUsersWithModuleAccess(
+  moduleName: ModuleName,
+  userIds?: string[],
+  supabaseAdmin: SupabaseAdminClient = createAdminClient()
+): Promise<Set<string>> {
+  if (userIds && userIds.length === 0) {
+    return new Set<string>();
+  }
+
+  const profilesQuery = supabaseAdmin.from('profiles').select('id, team_id, role_id');
+  const scopedProfilesQuery = userIds?.length ? profilesQuery.in('id', userIds) : profilesQuery;
+
+  const [{ data: profiles, error: profilesError }, { data: roles, error: rolesError }, modules] =
+    await Promise.all([
+      scopedProfilesQuery,
+      supabaseAdmin
+        .from('roles')
+        .select('id, name, display_name, role_class, hierarchy_rank, is_super_admin, is_manager_admin'),
+      getPermissionModules(supabaseAdmin),
+    ]);
+
+  if (profilesError) {
+    throw profilesError;
+  }
+  if (rolesError) {
+    throw rolesError;
+  }
+
+  const targetModule = modules.find((module) => module.module_name === moduleName);
+  if (!targetModule) {
+    return new Set<string>();
+  }
+
+  const typedProfiles = (profiles || []) as Array<{
+    id: string;
+    team_id: string | null;
+    role_id: string | null;
+  }>;
+
+  if (typedProfiles.length === 0) {
+    return new Set<string>();
+  }
+
+  const teamIds = Array.from(
+    new Set(typedProfiles.map((profile) => profile.team_id).filter((teamId): teamId is string => Boolean(teamId)))
+  );
+
+  const enabledByTeam = new Map<string, Map<ModuleName, boolean>>();
+
+  if (teamIds.length > 0) {
+    const { data: teamPermissions, error: teamPermissionsError } = await supabaseAdmin
+      .from('team_module_permissions')
+      .select('team_id, module_name, enabled')
+      .in('team_id', teamIds);
+
+    if (teamPermissionsError) {
+      throw teamPermissionsError;
+    }
+
+    ((teamPermissions || []) as TeamPermissionRow[]).forEach((row) => {
+      if (!enabledByTeam.has(row.team_id)) {
+        enabledByTeam.set(row.team_id, new Map<ModuleName, boolean>());
+      }
+
+      enabledByTeam.get(row.team_id)!.set(row.module_name, !!row.enabled);
+    });
+  }
+
+  const rolesById = new Map(((roles || []) as RoleRow[]).map((role) => [role.id, role]));
+  const allowedUsers = new Set<string>();
+
+  typedProfiles.forEach((profile) => {
+    if (!profile.role_id) {
+      return;
+    }
+
+    const role = rolesById.get(profile.role_id);
+    if (!role) {
+      return;
+    }
+
+    if (isFullAccessRole(role)) {
+      allowedUsers.add(profile.id);
+      return;
+    }
+
+    if (typeof role.hierarchy_rank !== 'number' || !profile.team_id) {
+      return;
+    }
+
+    if ((enabledByTeam.get(profile.team_id)?.get(moduleName) ?? false) && role.hierarchy_rank >= targetModule.minimum_hierarchy_rank) {
+      allowedUsers.add(profile.id);
+    }
+  });
+
+  return allowedUsers;
 }

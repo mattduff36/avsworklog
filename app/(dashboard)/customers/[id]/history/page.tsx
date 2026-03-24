@@ -21,8 +21,10 @@ import {
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import Link from 'next/link';
+import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
 import { CustomerFormDialog } from '../../components/CustomerFormDialog';
 import type { Customer, CustomerFormData } from '../../types';
+import type { QuoteListSummary } from '@/app/(dashboard)/quotes/types';
 
 interface QuoteSummary {
   id: string;
@@ -51,6 +53,7 @@ export default function CustomerHistoryPage({ params }: PageProps) {
 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [quotes, setQuotes] = useState<QuoteSummary[]>([]);
+  const [quoteSummary, setQuoteSummary] = useState<QuoteListSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
 
@@ -68,10 +71,12 @@ export default function CustomerHistoryPage({ params }: PageProps) {
 
   const fetchQuotes = useCallback(async () => {
     try {
-      const res = await fetch(`/api/quotes?customer_id=${id}`);
-      if (!res.ok) return;
-      const data = await res.json();
-      setQuotes(data.quotes || []);
+      const result = await fetchAllPaginatedItems<QuoteSummary>(`/api/quotes?customer_id=${id}`, 'quotes', {
+        limit: 250,
+        errorMessage: 'Failed to fetch quotes',
+      });
+      setQuotes(result.items);
+      setQuoteSummary((result.firstPagePayload?.summary as QuoteListSummary | undefined) || null);
     } catch {
       // quotes endpoint may not exist yet during incremental build
     }
@@ -111,7 +116,7 @@ export default function CustomerHistoryPage({ params }: PageProps) {
     ? 'border-green-500/30 text-green-400 bg-green-500/10'
     : 'border-slate-500/30 text-slate-400 bg-slate-500/10';
 
-  const wonStatuses = [
+  const wonStatuses = new Set([
     'won',
     'ready_to_invoice',
     'po_received',
@@ -120,9 +125,13 @@ export default function CustomerHistoryPage({ params }: PageProps) {
     'completed_full',
     'partially_invoiced',
     'invoiced',
-  ];
-  const wonQuotes = quotes.filter(q => wonStatuses.includes(q.status));
-  const totalQuoteValue = wonQuotes.reduce((sum, q) => sum + Number(q.total || 0), 0);
+  ]);
+  const totalQuotes = quoteSummary?.total_quotes ?? quotes.length;
+  const wonQuotesCount = quoteSummary?.won_quotes ?? quotes.filter((quote) => wonStatuses.has(quote.status)).length;
+  const totalQuoteValue = quoteSummary?.won_value
+    ?? quotes
+      .filter((quote) => wonStatuses.has(quote.status))
+      .reduce((sum, quote) => sum + Number(quote.total || 0), 0);
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -167,7 +176,7 @@ export default function CustomerHistoryPage({ params }: PageProps) {
               <FileText className="h-4 w-4 text-muted-foreground" />
               <p className="text-xs text-muted-foreground font-medium">Total Quotes</p>
             </div>
-            <p className="text-2xl font-bold text-white">{quotes.length}</p>
+            <p className="text-2xl font-bold text-white">{totalQuotes}</p>
           </CardContent>
         </Card>
         <Card className="bg-slate-800/50 border-slate-700">
@@ -176,7 +185,7 @@ export default function CustomerHistoryPage({ params }: PageProps) {
               <Receipt className="h-4 w-4 text-green-400" />
               <p className="text-xs text-muted-foreground font-medium">Won</p>
             </div>
-            <p className="text-2xl font-bold text-white">{wonQuotes.length}</p>
+            <p className="text-2xl font-bold text-white">{wonQuotesCount}</p>
           </CardContent>
         </Card>
         <Card className="bg-slate-800/50 border-slate-700">

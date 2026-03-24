@@ -103,8 +103,22 @@ export async function listQuoteManagerOptions(): Promise<QuoteManagerOption[]> {
 }
 
 export async function getQuoteManagerOption(profileId: string): Promise<QuoteManagerOption | null> {
-  const options = await listQuoteManagerOptions();
-  return options.find(option => option.profile_id === profileId) || null;
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from('quote_manager_series')
+    .select(`
+      *,
+      profile:profiles!quote_manager_series_profile_id_fkey(id, full_name),
+      approver:profiles!quote_manager_series_approver_profile_id_fkey(id, full_name)
+    `)
+    .eq('profile_id', profileId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return (data as QuoteManagerOption | null) || null;
 }
 
 export async function generateQuoteReferenceForManager(params: {
@@ -361,6 +375,11 @@ export async function renderQuotePdfAttachment(bundle: QuoteBundle): Promise<Ema
 
 export async function sendQuoteToCustomerEmail(bundle: QuoteBundle, cc: string[]) {
   const attachment = await renderQuotePdfAttachment(bundle);
+  const customerEmail = bundle.quote.attention_email?.trim() || bundle.quote.customer?.contact_email?.trim() || '';
+  if (!customerEmail) {
+    return { success: false, error: 'Quote cannot be sent because the customer does not have a contact email.' };
+  }
+
   const customerName = bundle.quote.attention_name || bundle.quote.customer?.contact_name || 'there';
   const subject = `Quotation ${bundle.quote.quote_reference} - ${bundle.quote.subject_line || bundle.quote.customer?.company_name || 'A&V Squires'}`;
   const html = `
@@ -378,7 +397,7 @@ export async function sendQuoteToCustomerEmail(bundle: QuoteBundle, cc: string[]
 
   return sendEmail({
     from: 'AVS Quotes <noreply@avsquires.co.uk>',
-    to: [bundle.quote.attention_email || bundle.quote.customer?.contact_email || ''],
+    to: [customerEmail],
     cc: cc.filter(Boolean),
     subject,
     html,

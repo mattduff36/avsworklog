@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
+import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
 import type { SuggestionWithUser, SuggestionStatus, SuggestionUpdateWithUser } from '@/types/faq';
 import { SUGGESTION_STATUS_LABELS, SUGGESTION_STATUS_COLORS } from '@/types/faq';
 
@@ -70,16 +71,16 @@ export default function SuggestionsManagePage() {
       if (filter !== 'all') {
         params.set('status', filter);
       }
-      
-      const response = await fetch(`/api/management/suggestions?${params}`);
-      const data = await response.json();
-      
-      if (data.success) {
-        setSuggestions(data.suggestions);
-        setCounts(data.counts);
-      } else {
-        throw new Error(data.error || 'Failed to fetch suggestions');
-      }
+      const endpoint = params.size > 0
+        ? `/api/management/suggestions?${params.toString()}`
+        : '/api/management/suggestions';
+      const result = await fetchAllPaginatedItems<SuggestionWithUser>(endpoint, 'suggestions', {
+        limit: 200,
+        errorMessage: 'Failed to fetch suggestions',
+      });
+
+      setSuggestions(result.items);
+      setCounts((result.firstPagePayload?.counts as Record<string, number> | undefined) || {});
     } catch (error) {
       console.error('Error fetching suggestions:', error);
       toast.error('Failed to load suggestions');

@@ -215,14 +215,14 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendRemin
     // Send emails if enabled
     if (category.reminder_email_enabled) {
       // Fetch recipient email addresses using admin client
-      const recipientEmails: string[] = [];
-
-      for (const userId of uniqueRecipientIds) {
-        const { data: authUser } = await supabaseServiceRole.auth.admin.getUserById(userId);
-        if (authUser?.user?.email) {
-          recipientEmails.push(authUser.user.email);
-        }
-      }
+      const recipientEmails = (
+        await Promise.all(
+          uniqueRecipientIds.map(async (userId) => {
+            const { data: authUser } = await supabaseServiceRole.auth.admin.getUserById(userId);
+            return authUser?.user?.email || null;
+          })
+        )
+      ).filter((email): email is string => Boolean(email));
 
       if (recipientEmails.length > 0) {
         const emailResult = await sendMaintenanceReminderEmail({

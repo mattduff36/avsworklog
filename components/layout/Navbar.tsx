@@ -17,8 +17,8 @@ import { NotificationPanel } from '@/components/messages/NotificationPanel';
 import { TabletModeToggleActions } from '@/components/layout/TabletModeToggleActions';
 import { SidebarNav } from './SidebarNav';
 import { createClient } from '@/lib/supabase/client';
-import type { ModuleName } from '@/types/roles';
-import { ALL_MODULES } from '@/types/roles';
+import { usePermissionSnapshot } from '@/lib/hooks/usePermissionSnapshot';
+import { usePendingAbsenceCount, useRamsAssignmentSummary } from '@/lib/hooks/useNavMetrics';
 import { 
   dashboardNavItem, 
   getFilteredEmployeeNav, 
@@ -98,31 +98,14 @@ function getNavItemIconColor(href: string): string {
   return 'text-avs-yellow';
 }
 
-function isExpectedNetworkError(error: unknown): boolean {
-  if (!navigator.onLine) return true;
-  if (!(error instanceof Error)) return false;
-
-  const message = error.message.toLowerCase();
-  return (
-    message.includes('failed to fetch') ||
-    message.includes('networkerror') ||
-    message.includes('network request failed') ||
-    message.includes('load failed')
-  );
-}
-
 export function Navbar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { user, profile, signOut, isAdmin, isManager, isActualSuperAdmin, isViewingAs, effectiveRole } = useAuth();
+  const { user, profile, signOut, isAdmin, isManager, isActualSuperAdmin, isViewingAs } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false); // Sidebar starts collapsed
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [userPermissions, setUserPermissions] = useState<Set<ModuleName>>(new Set());
-  const [, setPermissionsLoading] = useState(true);
-  const [hasRAMSAssignments, setHasRAMSAssignments] = useState(false);
-  const [pendingAbsenceCount, setPendingAbsenceCount] = useState(0);
   const [isMounted, setIsMounted] = useState(false); // Track client hydration
   const [isCompact, setIsCompact] = useState(false);
   const navRef = useRef<HTMLDivElement>(null);
@@ -133,6 +116,13 @@ export function Navbar() {
   // useAuth now provides effective role flags (respecting View As cookie)
   const effectiveIsManager = isManager;
   const effectiveIsAdmin = isAdmin;
+
+  const { enabledModuleSet: userPermissions } = usePermissionSnapshot();
+  const { data: ramsSummary } = useRamsAssignmentSummary(profile?.id);
+  const { count: pendingAbsenceCount } = usePendingAbsenceCount(
+    Boolean(profile?.id) && (effectiveIsManager || effectiveIsAdmin)
+  );
+  const hasRAMSAssignments = ramsSummary?.hasAssignments || false;
 
   // Set mounted state after hydration to prevent hydration mismatches
   useEffect(() => {
@@ -165,90 +155,6 @@ export function Navbar() {
 
     return () => observer.disconnect();
   }, []);
-
-  // Fetch user permissions (useAuth flags already respect View As mode)
-  useEffect(() => {
-    async function fetchPermissions() {
-      if (!profile?.id) {
-        setPermissionsLoading(false);
-        return;
-      }
-
-      // Admin keeps full access by definition.
-      if (isAdmin) {
-        setUserPermissions(new Set(ALL_MODULES));
-        setPermissionsLoading(false);
-        return;
-      }
-
-      try {
-        const response = await fetch('/api/me/permissions', { cache: 'no-store' });
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to load permissions');
-        }
-
-        const enabledModules = new Set<ModuleName>((data.enabled_modules || []) as ModuleName[]);
-        setUserPermissions(enabledModules);
-      } catch (error) {
-        console.error('Error fetching permissions:', error);
-        setUserPermissions(new Set());
-      } finally {
-        setPermissionsLoading(false);
-      }
-    }
-    fetchPermissions();
-  }, [profile?.id, isManager, isAdmin, isViewingAs, effectiveRole, supabase]);
-
-  // Fetch RAMS assignments to determine if RAMS should be visible
-  useEffect(() => {
-    async function fetchRAMSAssignments() {
-      if (!profile?.id) return;
-      
-      try {
-        if (!navigator.onLine) {
-          setHasRAMSAssignments(false);
-          return;
-        }
-
-        const { count } = await supabase
-          .from('rams_assignments')
-          .select('*', { count: 'exact', head: true })
-          .eq('employee_id', profile.id);
-        
-        setHasRAMSAssignments((count || 0) > 0);
-      } catch (error) {
-        if (!isExpectedNetworkError(error)) {
-          console.warn('Unexpected error fetching RAMS assignments:', error);
-        }
-        setHasRAMSAssignments(false);
-      }
-    }
-    
-    fetchRAMSAssignments();
-  }, [profile?.id, supabase]);
-
-  useEffect(() => {
-    async function fetchPendingAbsenceCount() {
-      if (!profile?.id || (!effectiveIsManager && !effectiveIsAdmin)) {
-        setPendingAbsenceCount(0);
-        return;
-      }
-
-      try {
-        const { count } = await supabase
-          .from('absences')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'pending');
-
-        setPendingAbsenceCount(count || 0);
-      } catch {
-        setPendingAbsenceCount(0);
-      }
-    }
-
-    fetchPendingAbsenceCount();
-  }, [profile?.id, effectiveIsManager, effectiveIsAdmin, supabase]);
 
   // Fetch notification count (only when user is authenticated)
   useEffect(() => {

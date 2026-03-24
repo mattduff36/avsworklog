@@ -22,8 +22,8 @@ const nextConfig: NextConfig = {
   webpack: (config) => {
     config.resolve.alias.canvas = false;
     
-    // Disable persistent cache to avoid noisy PackFile serialization warnings in CI.
-    config.cache = false;
+    // Keep local/dev builds fast while still avoiding noisy CI cache issues.
+    config.cache = process.env.CI ? false : config.cache;
     
     // Suppress non-critical warnings
     config.ignoreWarnings = [
@@ -36,6 +36,9 @@ const nextConfig: NextConfig = {
     ];
     
     return config;
+  },
+  experimental: {
+    optimizePackageImports: ['lucide-react'],
   },
   // Skip trailing slash redirect for root page
   skipTrailingSlashRedirect: true,

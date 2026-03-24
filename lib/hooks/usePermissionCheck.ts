@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from './useAuth';
+import { usePermissionSnapshot } from './usePermissionSnapshot';
 import type { ModuleName } from '@/types/roles';
 import { toast } from 'sonner';
 
@@ -15,7 +16,8 @@ import { toast } from 'sonner';
  * @returns Object with hasPermission and loading states
  */
 export function usePermissionCheck(moduleName: ModuleName, redirectOnFail = true) {
-  const { user, profile, isAdmin, isSuperAdmin, isViewingAs, effectiveRole, loading: authLoading } = useAuth();
+  const { user, profile, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
+  const { permissions, enabledModuleSet, isLoading: permissionsLoading, error } = usePermissionSnapshot();
   const router = useRouter();
   const [hasPermission, setHasPermission] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -40,23 +42,11 @@ export function usePermissionCheck(moduleName: ModuleName, redirectOnFail = true
         return;
       }
 
-      try {
-        const response = await fetch('/api/me/permissions', { cache: 'no-store' });
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to load permissions');
-        }
+      if (permissionsLoading) {
+        return;
+      }
 
-        const hasModulePermission = Boolean(data.permissions?.[moduleName]);
-
-        setHasPermission(hasModulePermission);
-
-        // Redirect if unauthorized
-        if (!hasModulePermission && redirectOnFail) {
-          toast.error(`You don't have access to ${moduleName.replace(/-/g, ' ')}`);
-          router.push('/dashboard');
-        }
-      } catch (error) {
+      if (error) {
         console.error('Error checking permission:', error);
         setHasPermission(false);
         
@@ -64,13 +54,24 @@ export function usePermissionCheck(moduleName: ModuleName, redirectOnFail = true
           toast.error('Failed to verify permissions');
           router.push('/dashboard');
         }
-      } finally {
         setLoading(false);
+        return;
       }
+
+      const hasModulePermission = Boolean(permissions?.[moduleName] || enabledModuleSet.has(moduleName));
+
+      setHasPermission(hasModulePermission);
+
+      if (!hasModulePermission && redirectOnFail) {
+        toast.error(`You don't have access to ${moduleName.replace(/-/g, ' ')}`);
+        router.push('/dashboard');
+      }
+
+      setLoading(false);
     }
 
     checkPermission();
-  }, [user, profile, isAdmin, isSuperAdmin, isViewingAs, effectiveRole, authLoading, moduleName, redirectOnFail, router]);
+  }, [user, profile, isAdmin, isSuperAdmin, authLoading, permissionsLoading, permissions, enabledModuleSet, error, moduleName, redirectOnFail, router]);
 
   return { hasPermission, loading };
 }

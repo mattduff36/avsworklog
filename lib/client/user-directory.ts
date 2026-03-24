@@ -1,4 +1,5 @@
 import type { ModuleName } from '@/types/roles';
+import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
 
 export interface DirectoryUserRole {
   id?: string | null;
@@ -28,6 +29,8 @@ export interface FetchUserDirectoryOptions {
   includeDeleted?: boolean;
   ids?: string[];
   module?: ModuleName;
+  limit?: number;
+  offset?: number;
 }
 
 export async function fetchUserDirectory(
@@ -55,19 +58,35 @@ export async function fetchUserDirectory(
     params.set('module', options.module);
   }
 
-  const query = params.toString();
-  const response = await fetch(
-    query ? `/api/users/directory?${query}` : '/api/users/directory',
-    { cache: 'no-store' }
-  );
-  const payload = (await response.json()) as {
-    error?: string;
-    users?: DirectoryUser[];
-  };
-
-  if (!response.ok) {
-    throw new Error(payload.error || 'Failed to load users');
+  if (typeof options.limit === 'number') {
+    params.set('limit', String(options.limit));
   }
 
-  return payload.users || [];
+  if (typeof options.offset === 'number') {
+    params.set('offset', String(options.offset));
+  }
+
+  const query = params.toString();
+  const endpoint = query ? `/api/users/directory?${query}` : '/api/users/directory';
+
+  if (typeof options.limit === 'number' || typeof options.offset === 'number') {
+    const response = await fetch(endpoint, { cache: 'no-store' });
+    const payload = (await response.json()) as {
+      error?: string;
+      users?: DirectoryUser[];
+    };
+
+    if (!response.ok) {
+      throw new Error(payload.error || 'Failed to load users');
+    }
+
+    return payload.users || [];
+  }
+
+  const { items } = await fetchAllPaginatedItems<DirectoryUser>(endpoint, 'users', {
+    limit: 500,
+    errorMessage: 'Failed to load users',
+  });
+
+  return items;
 }

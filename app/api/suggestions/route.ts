@@ -17,13 +17,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { searchParams } = new URL(request.url);
+    const limit = Math.min(Math.max(Number.parseInt(searchParams.get('limit') || '50', 10) || 50, 1), 200);
+    const offset = Math.max(Number.parseInt(searchParams.get('offset') || '0', 10) || 0, 0);
+
     // Fetch user's own suggestions
     // Note: suggestions table added by migration - types will update after migration runs
     const { data: suggestions, error } = await supabase
       .from('suggestions')
-      .select('*')
+      .select('id, created_by, title, body, page_hint, status, admin_notes, created_at, updated_at')
       .eq('created_by', user.id)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) {
       throw error;
@@ -32,6 +37,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       suggestions: suggestions as Suggestion[],
+      pagination: {
+        offset,
+        limit,
+        has_more: (suggestions || []).length === limit,
+      },
     });
 
   } catch (error) {

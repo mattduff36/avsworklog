@@ -10,7 +10,6 @@ import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { 
   CheckCircle2,
   ChevronRight,
@@ -25,6 +24,8 @@ import {
 import { getEnabledForms } from '@/lib/config/forms';
 import type { ModuleName } from '@/types/roles';
 import { managerNavItems, adminNavItems, getFilteredNavByPermissions } from '@/lib/config/navigation';
+import { usePermissionSnapshot } from '@/lib/hooks/usePermissionSnapshot';
+import { useRamsAssignmentSummary } from '@/lib/hooks/useNavMetrics';
 
 type PendingApprovalCount = {
   type: 'timesheets' | 'inspections' | 'absences' | 'pending' | 'logged' | 'completed' | 'workshop' | 'maintenance' | 'suggestions' | 'errors';
@@ -53,39 +54,27 @@ function applyAlphaToHSL(color: string): string {
   return 'hsl(215 16% 47% / 0.15)'; // slate-600 with 15% opacity
 }
 
-function isExpectedNetworkError(error: unknown): boolean {
-  if (!navigator.onLine) return true;
-  if (!(error instanceof Error)) return false;
-
-  const message = error.message.toLowerCase();
-  return (
-    message.includes('failed to fetch') ||
-    message.includes('networkerror') ||
-    message.includes('network request failed') ||
-    message.includes('load failed')
-  );
-}
-
 export default function DashboardPage() {
   const { profile, isManager, isAdmin, isActualSuperAdmin, isViewingAs, effectiveRole } = useAuth();
   const { tabletModeEnabled } = useTabletMode();
   const formTypes = getEnabledForms();
-  const supabase = createClient();
 
   const [pendingApprovals, setPendingApprovals] = useState<PendingApprovalCount[]>([]);
   const [actionsSummary, setActionsSummary] = useState<PendingApprovalCount[]>([]);
   const [loading, setLoading] = useState(true);
-  const [pendingRAMSCount, setPendingRAMSCount] = useState(0);
-  const [hasRAMSAssignments, setHasRAMSAssignments] = useState(false);
   const [newSuggestionsCount, setNewSuggestionsCount] = useState(0);
   const [newErrorReportsCount, setNewErrorReportsCount] = useState(0);
   const [pendingQuotesCount, setPendingQuotesCount] = useState(0);
   const [errorLogsCount, setErrorLogsCount] = useState(0);
-  const [userPermissions, setUserPermissions] = useState<Set<ModuleName>>(new Set());
-  const [permissionsLoading, setPermissionsLoading] = useState(true);
-  const [effectiveTeamName, setEffectiveTeamName] = useState<string | null>(effectiveRole?.team_name || null);
-  const [ramsLoading, setRamsLoading] = useState(true);
   const [badgesLoading, setBadgesLoading] = useState(true);
+  const {
+    enabledModuleSet: userPermissions,
+    effectiveTeamName,
+    isLoading: permissionsLoading,
+  } = usePermissionSnapshot();
+  const { data: ramsSummary, isLoading: ramsLoading } = useRamsAssignmentSummary(profile?.id);
+  const pendingRAMSCount = ramsSummary?.pendingCount || 0;
+  const hasRAMSAssignments = ramsSummary?.hasAssignments || false;
   
   // Intro animation state (all devices)
   const [showIntro, setShowIntro] = useState(true);
@@ -102,37 +91,6 @@ export default function DashboardPage() {
   const isSuperAdmin = isActualSuperAdmin;
   const effectiveIsManager = isManager;
   const effectiveIsAdmin = isAdmin;
-
-  // Fetch user permissions (useAuth flags already respect View As mode)
-  useEffect(() => {
-    async function fetchPermissions() {
-      if (!profile?.id) {
-        setPermissionsLoading(false);
-        setEffectiveTeamName(null);
-        return;
-      }
-      
-      setPermissionsLoading(true);
-      
-      try {
-        const response = await fetch('/api/me/permissions', { cache: 'no-store' });
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to load permissions');
-        }
-
-        setUserPermissions(new Set<ModuleName>((data.enabled_modules || []) as ModuleName[]));
-        setEffectiveTeamName(data.effective_team_name || effectiveRole?.team_name || null);
-      } catch (error) {
-        console.error('Error fetching permissions:', error);
-        setUserPermissions(new Set());
-        setEffectiveTeamName(effectiveRole?.team_name || null);
-      } finally {
-        setPermissionsLoading(false);
-      }
-    }
-    fetchPermissions();
-  }, [profile?.id, isManager, isAdmin, isViewingAs, effectiveRole, supabase]);
 
   const roleLabel = effectiveRole?.display_name || (isSuperAdmin ? 'SuperAdmin' : (profile?.role?.display_name || 'No Role Assigned'));
   const headerSubtitle = effectiveTeamName ? `${effectiveTeamName} · ${roleLabel}` : roleLabel;
@@ -220,110 +178,21 @@ export default function DashboardPage() {
         errorLogsCount: 0,
       };
     }
+    const response = await fetch('/api/dashboard/summary', { cache: 'no-store' });
+    const payload = await response.json();
 
-    const approvalsPromise = canViewApprovals
-      ? Promise.all([
-          supabase.from('timesheets').select('id', { count: 'exact', head: true }).eq('status', 'submitted'),
-          supabase.from('absences').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-        ])
-      : Promise.resolve(null);
-
-    const workshopPromise = canViewActions && canViewWorkshopTasks
-      ? Promise.all([
-          supabase
-            .from('actions')
-            .select('id', { count: 'exact', head: true })
-            .in('action_type', ['inspection_defect', 'workshop_vehicle_task'])
-            .eq('status', 'pending'),
-          supabase
-            .from('actions')
-            .select('id', { count: 'exact', head: true })
-            .in('action_type', ['inspection_defect', 'workshop_vehicle_task'])
-            .eq('status', 'logged'),
-        ])
-      : Promise.resolve(null);
-
-    const maintenancePromise = canViewActions && canViewMaintenance
-      ? fetch('/api/maintenance')
-      : Promise.resolve(null);
-
-    const suggestionsPromise = canViewSuggestions
-      ? Promise.all([
-          supabase.from('suggestions').select('id', { count: 'exact', head: true }).eq('status', 'new'),
-          supabase.from('suggestions').select('id', { count: 'exact', head: true }).in('status', ['under_review', 'planned']),
-        ])
-      : Promise.resolve(null);
-
-    const errorsPromise = canViewErrorReports
-      ? Promise.all([
-          supabase.from('error_reports').select('id', { count: 'exact', head: true }).eq('status', 'new'),
-          supabase.from('error_reports').select('id', { count: 'exact', head: true }).eq('status', 'investigating'),
-        ])
-      : Promise.resolve(null);
-
-    const [approvals, workshop, maintenanceResponse, suggestions, errors, quotes, errorLogs] = await Promise.all([
-      approvalsPromise,
-      workshopPromise,
-      maintenancePromise,
-      suggestionsPromise,
-      errorsPromise,
-      supabase.from('quotes').select('id', { count: 'exact', head: true }).eq('status', 'pending_internal_approval'),
-      supabase.from('error_logs').select('id', { count: 'exact', head: true }),
-    ]);
-
-    if (approvals) {
-      const [timesheetsResult, absencesResult] = approvals;
-      if (timesheetsResult.error) throw timesheetsResult.error;
-      if (absencesResult.error) throw absencesResult.error;
-    }
-    if (workshop) {
-      const [workshopPendingResult, workshopInProgressResult] = workshop;
-      if (workshopPendingResult.error) throw workshopPendingResult.error;
-      if (workshopInProgressResult.error) throw workshopInProgressResult.error;
-    }
-    if (suggestions) {
-      const [suggestionsNewResult, suggestionsReviewResult] = suggestions;
-      if (suggestionsNewResult.error) throw suggestionsNewResult.error;
-      if (suggestionsReviewResult.error) throw suggestionsReviewResult.error;
-    }
-    if (errors) {
-      const [errorsNewResult, errorsInvestigatingResult] = errors;
-      if (errorsNewResult.error) throw errorsNewResult.error;
-      if (errorsInvestigatingResult.error) throw errorsInvestigatingResult.error;
-    }
-    if (quotes.error) throw quotes.error;
-    if (errorLogs.error) throw errorLogs.error;
-
-    let maintenanceTotal = 0;
-    if (maintenanceResponse?.ok) {
-      const maintenanceData = await maintenanceResponse.json();
-      const vehicles = (maintenanceData.vehicles || []) as Array<{
-        tax_status?: { status: string };
-        mot_status?: { status: string };
-        service_status?: { status: string };
-        cambelt_status?: { status: string };
-        first_aid_status?: { status: string };
-      }>;
-
-      for (const vehicle of vehicles) {
-        const statuses = [
-          vehicle.tax_status?.status,
-          vehicle.mot_status?.status,
-          vehicle.service_status?.status,
-          vehicle.cambelt_status?.status,
-          vehicle.first_aid_status?.status,
-        ];
-        maintenanceTotal += statuses.filter((status) => status === 'overdue' || status === 'due_soon').length;
-      }
+    if (!response.ok) {
+      throw new Error(payload.error || 'Failed to load dashboard summary');
     }
 
-    const timesheetsCount = approvals?.[0].count || 0;
-    const absencesCount = approvals?.[1].count || 0;
-    const workshopTotal = (workshop?.[0].count || 0) + (workshop?.[1].count || 0);
-    const suggestionsNewCount = suggestions?.[0].count || 0;
-    const suggestionsReviewCount = suggestions?.[1].count || 0;
-    const errorsNewCount = errors?.[0].count || 0;
-    const errorsInvestigatingCount = errors?.[1].count || 0;
+    const timesheetsCount = payload.metrics?.approvals?.timesheets || 0;
+    const absencesCount = payload.metrics?.approvals?.absences || 0;
+    const workshopTotal = payload.metrics?.actions?.workshop || 0;
+    const maintenanceTotal = payload.metrics?.actions?.maintenance || 0;
+    const suggestionsTotal = payload.metrics?.actions?.suggestions || 0;
+    const errorsTotal = payload.metrics?.actions?.errors || 0;
+    const suggestionsNewCount = payload.metrics?.badges?.suggestions_new || 0;
+    const errorsNewCount = payload.metrics?.badges?.error_reports_new || 0;
 
     return {
       pendingApprovals: canViewApprovals ? buildPendingApprovalsSummary(timesheetsCount, absencesCount) : [],
@@ -331,14 +200,14 @@ export default function DashboardPage() {
         ? buildActionsSummary({
             workshopTotal,
             maintenanceTotal,
-            suggestionsTotal: suggestionsNewCount + suggestionsReviewCount,
-            errorsTotal: errorsNewCount + errorsInvestigatingCount,
+            suggestionsTotal,
+            errorsTotal,
           })
         : [],
       newSuggestionsCount: suggestionsNewCount,
       newErrorReportsCount: errorsNewCount,
-      pendingQuotesCount: quotes.count || 0,
-      errorLogsCount: errorLogs.count || 0,
+      pendingQuotesCount: payload.metrics?.badges?.quotes_pending_internal_approval || 0,
+      errorLogsCount: payload.metrics?.badges?.error_logs || 0,
     };
   }
 
@@ -383,57 +252,11 @@ export default function DashboardPage() {
     }
 
     void loadDashboardMetrics();
-    void fetchPendingRAMS();
-
     return () => {
       active = false;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [permissionsLoading, canViewApprovals, canViewActions, canViewWorkshopTasks, canViewMaintenance, canViewSuggestions, canViewErrorReports, profile?.id]);
-
-  const fetchPendingRAMS = async () => {
-    if (!profile?.id) {
-      // Don't set ramsLoading to false - keep it in loading state until profile loads
-      // The loading condition already handles !profile?.id case
-      return;
-    }
-    
-    try {
-      setRamsLoading(true);
-      if (!navigator.onLine) {
-        setHasRAMSAssignments(false);
-        setPendingRAMSCount(0);
-        return;
-      }
-
-      // Get total count of all assignments
-      const { count: totalCount, error: totalError } = await supabase
-        .from('rams_assignments')
-        .select('*', { count: 'exact', head: true })
-        .eq('employee_id', profile.id);
-
-      if (totalError) throw totalError;
-      setHasRAMSAssignments((totalCount || 0) > 0);
-
-      // Get count of pending assignments for badge
-      const { count: pendingCount, error: pendingError } = await supabase
-        .from('rams_assignments')
-        .select('*', { count: 'exact', head: true })
-        .eq('employee_id', profile.id)
-        .in('status', ['pending', 'read']);
-
-      if (pendingError) throw pendingError;
-      setPendingRAMSCount(pendingCount || 0);
-    } catch (error) {
-      if (!isExpectedNetworkError(error)) {
-        console.warn('Unexpected error fetching RAMS assignments:', error);
-      }
-      setHasRAMSAssignments(false);
-      setPendingRAMSCount(0);
-    } finally {
-      setRamsLoading(false);
-    }
-  };
 
   const visibleManagerTiles = getFilteredNavByPermissions(managerNavItems, userPermissions, effectiveIsAdmin);
   const visibleAdminTiles = getFilteredNavByPermissions(adminNavItems, userPermissions, effectiveIsAdmin);

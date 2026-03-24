@@ -2,7 +2,33 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
-import type { FAQArticleWithCategory, CreateFAQArticleRequest } from '@/types/faq';
+import type { FAQArticleWithCategory, CreateFAQArticleRequest, FAQCategory } from '@/types/faq';
+
+type FAQArticleRow = Omit<FAQArticleWithCategory, 'category'> & {
+  category: Partial<FAQCategory> | Array<Partial<FAQCategory>> | null;
+};
+
+function normalizeCategory(category: FAQArticleRow['category']): FAQCategory {
+  const raw = Array.isArray(category) ? category[0] || null : category;
+  return {
+    id: raw?.id || '',
+    name: raw?.name || '',
+    slug: raw?.slug || '',
+    description: raw?.description || null,
+    sort_order: raw?.sort_order || 0,
+    is_active: raw?.is_active ?? true,
+    module_name: raw?.module_name || null,
+    created_at: raw?.created_at || '',
+    updated_at: raw?.updated_at || '',
+  };
+}
+
+function normalizeArticle(article: FAQArticleRow): FAQArticleWithCategory {
+  return {
+    ...article,
+    category: normalizeCategory(article.category),
+  };
+}
 
 /**
  * GET /api/admin/faq/articles
@@ -33,8 +59,24 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('faq_articles')
       .select(`
-        *,
-        category:faq_categories(*)
+        id,
+        category_id,
+        title,
+        slug,
+        summary,
+        content_md,
+        is_published,
+        sort_order,
+        view_count,
+        created_at,
+        updated_at,
+        created_by,
+        updated_by,
+        category:faq_categories(
+          id,
+          name,
+          slug
+        )
       `)
       .order('sort_order', { ascending: true });
 
@@ -50,7 +92,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      articles: articles as FAQArticleWithCategory[],
+      articles: ((articles || []) as FAQArticleRow[]).map(normalizeArticle),
     });
 
   } catch (error) {
@@ -113,8 +155,24 @@ export async function POST(request: NextRequest) {
         updated_by: user.id,
       })
       .select(`
-        *,
-        category:faq_categories(*)
+        id,
+        category_id,
+        title,
+        slug,
+        summary,
+        content_md,
+        is_published,
+        sort_order,
+        view_count,
+        created_at,
+        updated_at,
+        created_by,
+        updated_by,
+        category:faq_categories(
+          id,
+          name,
+          slug
+        )
       `)
       .single();
 
@@ -127,7 +185,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      article,
+      article: normalizeArticle(article as FAQArticleRow),
     }, { status: 201 });
 
   } catch (error) {

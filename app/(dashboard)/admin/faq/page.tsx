@@ -156,9 +156,8 @@ export default function FAQEditorPage() {
   useEffect(() => {
     if (canEditFaq) {
       fetchCategories();
-      fetchArticles('all');
     }
-  }, [canEditFaq, fetchCategories, fetchArticles]);
+  }, [canEditFaq, fetchCategories]);
 
   // Refetch articles when filter changes
   useEffect(() => {

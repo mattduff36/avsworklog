@@ -66,6 +66,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }:
   const [revisionNotes, setRevisionNotes] = useState('');
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const activeQuoteId = quote?.id || quoteId;
+  const recipientEmail = quote?.attention_email || quote?.customer?.contact_email || '';
 
   const fetchQuote = useCallback(async () => {
     const idToLoad = quote?.id || quoteId;
@@ -110,7 +111,10 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }:
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const error = await res.json().catch(() => null) as { error?: string } | null;
+        throw new Error(error?.error || 'Failed to update quote');
+      }
       const data = await res.json();
       if (updates.action === 'create_revision' || updates.action === 'duplicate') {
         setQuote(data.quote);
@@ -120,8 +124,8 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }:
         await fetchQuote();
       }
       onRefresh();
-    } catch {
-      toast.error('Failed to update quote');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update quote');
     } finally {
       setActionLoading(false);
     }
@@ -414,7 +418,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }:
                       <>
                         <Button
                           onClick={() => callAction('approve_and_send')}
-                          disabled={actionLoading}
+                          disabled={actionLoading || !recipientEmail}
                           className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90"
                         >
                           <Send className="mr-2 h-4 w-4" /> Approve And Send
@@ -472,6 +476,12 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onEdit, onRefresh }:
                       {quote.commercial_status === 'closed' ? 'Reopen Quote' : 'Close Quote'}
                     </Button>
                   </div>
+
+                  {quote.status === 'pending_internal_approval' && !recipientEmail && (
+                    <p className="text-sm text-amber-300">
+                      Add a customer contact email before approving and sending this quote.
+                    </p>
+                  )}
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
                     <div><span className="text-muted-foreground">PO Received</span><p className="text-white">{quote.po_received_at ? format(new Date(quote.po_received_at), 'dd MMM yyyy') : '—'}</p></div>

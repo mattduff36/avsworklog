@@ -52,6 +52,16 @@ function normalizeStoredManagerId(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value : null;
 }
 
+const VALID_TIMESHEET_TYPES = new Set(['civils', 'plant']);
+
+function parseOptionalTimesheetType(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const normalized = value.trim().toLowerCase();
+  return normalized || undefined;
+}
+
 async function assertAdminUsersAccess() {
   const canAccessUserAdmin = await canEffectiveRoleAccessModule('admin-users');
   if (!canAccessUserAdmin) {
@@ -80,6 +90,7 @@ export async function PATCH(
 
   const name = typeof body?.name === 'string' ? body.name.trim() : undefined;
   const code = typeof body?.code === 'string' ? body.code.trim() : undefined;
+  const timesheetType = parseOptionalTimesheetType(body?.timesheet_type);
   const manager1Id = parseOptionalManagerId(body?.manager_1_id);
   const manager2Id = parseOptionalManagerId(body?.manager_2_id);
 
@@ -87,8 +98,17 @@ export async function PATCH(
     return NextResponse.json({ error: 'Team name cannot be empty' }, { status: 400 });
   }
 
-  if (name === undefined && code === undefined && manager1Id === undefined && manager2Id === undefined) {
+  if (
+    name === undefined &&
+    code === undefined &&
+    timesheetType === undefined &&
+    manager1Id === undefined &&
+    manager2Id === undefined
+  ) {
     return NextResponse.json({ error: 'No team fields provided' }, { status: 400 });
+  }
+  if (timesheetType !== undefined && !VALID_TIMESHEET_TYPES.has(timesheetType)) {
+    return NextResponse.json({ error: 'Invalid timesheet type' }, { status: 400 });
   }
 
   const supabaseAdmin = getSupabaseAdmin();
@@ -129,11 +149,13 @@ export async function PATCH(
   const updatePayload: {
     name?: string;
     code?: string | null;
+    timesheet_type?: string;
     manager_1_profile_id?: string | null;
     manager_2_profile_id?: string | null;
   } = {};
   if (name !== undefined) updatePayload.name = name;
   if (code !== undefined) updatePayload.code = code || null;
+  if (timesheetType !== undefined) updatePayload.timesheet_type = timesheetType;
   if (manager1Id !== undefined) updatePayload.manager_1_profile_id = manager1Id || null;
   if (manager2Id !== undefined) updatePayload.manager_2_profile_id = manager2Id || null;
 
@@ -141,7 +163,7 @@ export async function PATCH(
     .from('org_teams')
     .update(updatePayload)
     .eq('id', teamId)
-    .select('id, name, code, active, manager_1_profile_id, manager_2_profile_id')
+    .select('id, name, code, timesheet_type, active, manager_1_profile_id, manager_2_profile_id')
     .single();
 
   if (updateError) {

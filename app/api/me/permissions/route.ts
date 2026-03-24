@@ -5,6 +5,27 @@ import { getEffectiveRole } from '@/lib/utils/view-as';
 import { ALL_MODULES } from '@/types/roles';
 import { getPermissionMapForUser, isMissingTeamPermissionSchemaError } from '@/lib/server/team-permissions';
 
+function isTransientPermissionError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /fetch failed|ECONNRESET|ETIMEDOUT|ENOTFOUND|socket hang up|schema cache/i.test(message);
+}
+
+async function withRetry<T>(operation: () => Promise<T>, retries = 1): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (!isTransientPermissionError(error) || attempt === retries) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
+
 export async function GET() {
   const supabase = await createClient();
   const {
@@ -17,7 +38,7 @@ export async function GET() {
   }
 
   try {
-    const effectiveRole = await getEffectiveRole();
+    const effectiveRole = await withRetry(() => getEffectiveRole());
     if (effectiveRole.is_actual_super_admin || effectiveRole.is_super_admin) {
       const fullAccessPermissions = ALL_MODULES.reduce<Record<string, boolean>>((acc, moduleName) => {
         acc[moduleName] = true;
@@ -33,12 +54,12 @@ export async function GET() {
       });
     }
 
-    const permissions = await getPermissionMapForUser(
+    const permissions = await withRetry(() => getPermissionMapForUser(
       user.id,
       effectiveRole.role_id,
       createAdminClient(),
       effectiveRole.team_id
-    );
+    ));
 
     return NextResponse.json({
       success: true,

@@ -26,9 +26,14 @@ interface RecipientShape {
   messages?: MessageShape | MessageShape[] | null;
 }
 
+interface RecipientQueryResult {
+  data: RecipientShape[] | null;
+  error: { message?: string | null } | null;
+}
+
 function isTransientFetchError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return /fetch failed|ECONNRESET|ETIMEDOUT|ENOTFOUND|socket hang up/i.test(message);
+  return /fetch failed|ECONNRESET|ETIMEDOUT|ENOTFOUND|socket hang up|schema cache/i.test(message);
 }
 
 async function withRetry<T>(operation: () => Promise<T>, retries = 1): Promise<T> {
@@ -84,35 +89,37 @@ export async function GET() {
     sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
     // Fetch notifications (last 60 days, not cleared, not deleted messages)
-    const { data: recipients, error: fetchError } = await supabase
-      .from('message_recipients')
-      .select(`
-        id,
-        message_id,
-        status,
-        signed_at,
-        first_shown_at,
-        created_at,
-        messages!inner(
+    const { data: recipients, error: fetchError } = await withRetry<RecipientQueryResult>(async () =>
+      (await supabase
+        .from('message_recipients')
+        .select(`
           id,
-          type,
-          subject,
-          body,
-          priority,
-          sender_id,
+          message_id,
+          status,
+          signed_at,
+          first_shown_at,
           created_at,
-          deleted_at,
-          sender:sender_id(
+          messages!inner(
             id,
-            full_name
+            type,
+            subject,
+            body,
+            priority,
+            sender_id,
+            created_at,
+            deleted_at,
+            sender:sender_id(
+              id,
+              full_name
+            )
           )
-        )
-      `)
-      .eq('user_id', user.id)
-      .gte('messages.created_at', sixtyDaysAgo.toISOString())
-      .is('cleared_from_inbox_at', null)
-      .is('messages.deleted_at', null)
-      .order('messages(created_at)', { ascending: false });
+        `)
+        .eq('user_id', user.id)
+        .gte('messages.created_at', sixtyDaysAgo.toISOString())
+        .is('cleared_from_inbox_at', null)
+        .is('messages.deleted_at', null)
+        .order('messages(created_at)', { ascending: false })) as RecipientQueryResult
+    );
 
     if (fetchError) {
       console.error('Error fetching notifications:', fetchError);

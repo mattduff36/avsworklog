@@ -10,6 +10,35 @@ import {
   getQuoteManagerOption,
 } from '@/lib/server/quote-workflow';
 
+const QUOTE_STATUS_ORDER = [
+  'draft',
+  'pending_internal_approval',
+  'changes_requested',
+  'approved',
+  'sent',
+  'won',
+  'lost',
+  'ready_to_invoice',
+  'po_received',
+  'in_progress',
+  'completed_part',
+  'completed_full',
+  'partially_invoiced',
+  'invoiced',
+  'closed',
+] as const;
+
+const WON_QUOTE_STATUSES = new Set([
+  'won',
+  'ready_to_invoice',
+  'po_received',
+  'in_progress',
+  'completed_part',
+  'completed_full',
+  'partially_invoiced',
+  'invoiced',
+]);
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -25,6 +54,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const customerId = searchParams.get('customer_id');
     const includeVersions = searchParams.get('include_versions') === 'true';
+    const limit = Math.min(Math.max(Number.parseInt(searchParams.get('limit') || '100', 10) || 100, 1), 250);
+    const offset = Math.max(Number.parseInt(searchParams.get('offset') || '0', 10) || 0, 0);
 
     let query = supabase
       .from('quotes')
@@ -43,7 +74,8 @@ export async function GET(request: NextRequest) {
           postcode
         )
       `)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (customerId) {
       query = query.eq('customer_id', customerId);
@@ -53,8 +85,24 @@ export async function GET(request: NextRequest) {
       query = query.eq('is_latest_version', true);
     }
 
-    const { data, error } = await query;
+    let summaryQuery = supabase
+      .from('quotes')
+      .select('status, total');
+
+    if (customerId) {
+      summaryQuery = summaryQuery.eq('customer_id', customerId);
+    }
+
+    if (!includeVersions) {
+      summaryQuery = summaryQuery.eq('is_latest_version', true);
+    }
+
+    const [{ data, error }, { data: summaryRows, error: summaryError }] = await Promise.all([
+      query,
+      summaryQuery,
+    ]);
     if (error) throw error;
+    if (summaryError) throw summaryError;
 
     const quotes = data || [];
     const quoteIds = quotes.map(quote => quote.id);
@@ -70,22 +118,58 @@ export async function GET(request: NextRequest) {
         throw invoiceError;
       }
 
+      const invoicesByQuoteId = new Map<string, Array<{ quote_id: string; amount: number; invoice_date: string | null }>>();
+      (invoices || []).forEach((invoice) => {
+        if (!invoicesByQuoteId.has(invoice.quote_id)) {
+          invoicesByQuoteId.set(invoice.quote_id, []);
+        }
+        invoicesByQuoteId.get(invoice.quote_id)!.push(invoice);
+      });
+
       for (const quote of quotes) {
         summaries.set(
           quote.id,
           getInvoiceSummary({
             total: Number(quote.total || 0),
-            invoices: (invoices || []).filter(invoice => invoice.quote_id === quote.id),
+            invoices: invoicesByQuoteId.get(quote.id) || [],
           })
         );
       }
     }
+
+    const statusCounts = QUOTE_STATUS_ORDER.reduce<Record<string, number>>(
+      (acc, status) => ({ ...acc, [status]: 0 }),
+      { all: 0 }
+    );
+    let wonQuotes = 0;
+    let wonValue = 0;
+
+    (summaryRows || []).forEach((quote) => {
+      statusCounts.all += 1;
+      statusCounts[quote.status] = (statusCounts[quote.status] || 0) + 1;
+
+      if (WON_QUOTE_STATUSES.has(quote.status)) {
+        wonQuotes += 1;
+        wonValue += Number(quote.total || 0);
+      }
+    });
 
     return NextResponse.json({
       quotes: quotes.map(quote => ({
         ...quote,
         invoice_summary: summaries.get(quote.id) || getInvoiceSummary({ total: Number(quote.total || 0), invoices: [] }),
       })),
+      summary: {
+        total_quotes: statusCounts.all,
+        status_counts: statusCounts,
+        won_quotes: wonQuotes,
+        won_value: wonValue,
+      },
+      pagination: {
+        offset,
+        limit,
+        has_more: quotes.length === limit,
+      },
     });
   } catch (error) {
     console.error('Error fetching quotes:', error);

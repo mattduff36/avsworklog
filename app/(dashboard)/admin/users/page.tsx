@@ -43,6 +43,7 @@ import {
   Briefcase,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { fetchAdminTeamDirectory } from '@/lib/admin/team-directory-client';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import type { Database } from '@/types/database';
@@ -286,7 +287,16 @@ export default function UsersAdminPage() {
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
       .select(`
-        *,
+        id,
+        full_name,
+        phone_number,
+        employee_id,
+        created_at,
+        role_id,
+        line_manager_id,
+        secondary_manager_id,
+        team_id,
+        is_placeholder,
         role:roles(
           name,
           display_name,
@@ -301,6 +311,10 @@ export default function UsersAdminPage() {
 
     // Fetch auth users to get emails (via API route)
     const response = await fetch('/api/admin/users/list-with-emails');
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}));
+      throw new Error(result.error || 'Failed to load auth users');
+    }
     const { users: authUsers } = await response.json();
 
     // Create a map of user id to email
@@ -373,26 +387,23 @@ export default function UsersAdminPage() {
   useEffect(function () {
     async function fetchHierarchyMetadata() {
       try {
-        const teamsRes = await fetch('/api/admin/hierarchy/teams');
-        if (teamsRes.ok) {
-          const teamsData = await teamsRes.json();
-          if (Array.isArray(teamsData?.teams)) {
-            const mapped = teamsData.teams
-              .filter((team: { id?: string; team_id?: string }) => Boolean(team?.id || team?.team_id))
-              .map((team: { id?: string; team_id?: string; name?: string; active?: boolean }) => {
-                const teamId = team.id || team.team_id || '';
-                return {
-                  id: teamId,
-                  name: team.name || teamId,
-                  active: team.active !== false,
-                  manager_1_id: (team as { manager_1_id?: string | null }).manager_1_id || null,
-                  manager_2_id: (team as { manager_2_id?: string | null }).manager_2_id || null,
-                  manager_1_name: (team as { manager_1_name?: string | null }).manager_1_name || null,
-                  manager_2_name: (team as { manager_2_name?: string | null }).manager_2_name || null,
-                };
-              });
-            setTeamDirectory(mapped);
-          }
+        const teamsData = await fetchAdminTeamDirectory();
+        if (Array.isArray(teamsData?.teams)) {
+          const mapped = teamsData.teams
+            .filter((team: { id?: string; team_id?: string }) => Boolean(team?.id || team?.team_id))
+            .map((team: { id?: string; team_id?: string; name?: string; active?: boolean }) => {
+              const teamId = team.id || team.team_id || '';
+              return {
+                id: teamId,
+                name: team.name || teamId,
+                active: team.active !== false,
+                manager_1_id: (team as { manager_1_id?: string | null }).manager_1_id || null,
+                manager_2_id: (team as { manager_2_id?: string | null }).manager_2_id || null,
+                manager_1_name: (team as { manager_1_name?: string | null }).manager_1_name || null,
+                manager_2_name: (team as { manager_2_name?: string | null }).manager_2_name || null,
+              };
+            });
+          setTeamDirectory(mapped);
         }
       } catch (error) {
         console.error('Error fetching hierarchy metadata:', error);

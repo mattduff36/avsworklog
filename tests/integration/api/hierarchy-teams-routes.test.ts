@@ -6,6 +6,7 @@ const {
   mockGetTeamManagerOptions,
   mockGetEffectiveRole,
   mockInsertSingleResult,
+  mockTeamInsert,
   mockOrgTeamFetchSingleResult,
   mockProfilesCountResult,
   mockReconcileTeamManagerAssignments,
@@ -17,6 +18,7 @@ const {
   mockGetTeamManagerOptions: vi.fn(),
   mockGetEffectiveRole: vi.fn(),
   mockInsertSingleResult: vi.fn(),
+  mockTeamInsert: vi.fn(),
   mockOrgTeamFetchSingleResult: vi.fn(),
   mockProfilesCountResult: vi.fn(),
   mockReconcileTeamManagerAssignments: vi.fn(),
@@ -42,11 +44,14 @@ vi.mock('@supabase/supabase-js', () => ({
               single: mockOrgTeamFetchSingleResult,
             })),
           })),
-          insert: vi.fn(() => ({
-            select: vi.fn(() => ({
-              single: mockInsertSingleResult,
-            })),
-          })),
+          insert: vi.fn((payload: unknown) => {
+            mockTeamInsert(payload);
+            return {
+              select: vi.fn(() => ({
+                single: mockInsertSingleResult,
+              })),
+            };
+          }),
           update: vi.fn((payload: unknown) => {
             mockTeamUpdate(payload);
             return {
@@ -90,6 +95,7 @@ describe('Hierarchy teams routes', () => {
     mockCanAccess.mockResolvedValue(true);
     mockGetTeamManagerOptions.mockResolvedValue([]);
     mockInsertSingleResult.mockResolvedValue({ data: null, error: null });
+    mockTeamInsert.mockReset();
     mockOrgTeamFetchSingleResult.mockResolvedValue({
       data: {
         id: 'civils',
@@ -131,13 +137,13 @@ describe('Hierarchy teams routes', () => {
   it('allows team metadata update for admin user', async () => {
     const { PATCH } = await import('@/app/api/admin/hierarchy/teams/[id]/route');
     mockTeamSingleResult.mockResolvedValue({
-      data: { id: 'civils', name: 'Civils Team', code: 'CVL', active: true },
+      data: { id: 'civils', name: 'Civils Team', code: 'CVL', timesheet_type: 'plant', active: true },
       error: null,
     });
 
     const request = new NextRequest('http://localhost/api/admin/hierarchy/teams/civils', {
       method: 'PATCH',
-      body: JSON.stringify({ name: 'Civils Team', code: 'CVL' }),
+      body: JSON.stringify({ name: 'Civils Team', code: 'CVL', timesheet_type: 'plant' }),
     });
 
     const response = await PATCH(request, { params: Promise.resolve({ id: 'civils' }) });
@@ -146,6 +152,11 @@ describe('Hierarchy teams routes', () => {
     expect(response.status).toBe(200);
     expect(payload.success).toBe(true);
     expect(payload.team.name).toBe('Civils Team');
+    expect(mockTeamUpdate).toHaveBeenCalledWith({
+      name: 'Civils Team',
+      code: 'CVL',
+      timesheet_type: 'plant',
+    });
   });
 
   it('treats null manager ids as explicit clears', async () => {
@@ -227,6 +238,50 @@ describe('Hierarchy teams routes', () => {
 
     expect(response.status).toBe(500);
     expect(payload.error).toContain('null value in column');
+  });
+
+  it('persists team timesheet type on create', async () => {
+    const { POST } = await import('@/app/api/admin/hierarchy/teams/route');
+    mockInsertSingleResult.mockResolvedValue({
+      data: { id: 'plant', name: 'Plant', code: 'PLT', timesheet_type: 'plant', active: true },
+      error: null,
+    });
+
+    const request = new NextRequest('http://localhost/api/admin/hierarchy/teams', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Plant', code: 'PLT', timesheet_type: 'plant' }),
+    });
+
+    const response = await POST(request);
+    const payload = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(payload.success).toBe(true);
+    expect(mockTeamInsert).toHaveBeenCalledWith({
+      id: 'plant',
+      name: 'Plant',
+      code: 'PLT',
+      timesheet_type: 'plant',
+      active: true,
+      manager_1_profile_id: null,
+      manager_2_profile_id: null,
+    });
+  });
+
+  it('rejects invalid team timesheet types', async () => {
+    const { PATCH } = await import('@/app/api/admin/hierarchy/teams/[id]/route');
+
+    const request = new NextRequest('http://localhost/api/admin/hierarchy/teams/civils', {
+      method: 'PATCH',
+      body: JSON.stringify({ timesheet_type: 'invalid-type' }),
+    });
+
+    const response = await PATCH(request, { params: Promise.resolve({ id: 'civils' }) });
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload.error).toContain('Invalid timesheet type');
+    expect(mockTeamUpdate).not.toHaveBeenCalled();
   });
 
   it('returns duplicate conflict instead of schema missing for org_teams update errors', async () => {

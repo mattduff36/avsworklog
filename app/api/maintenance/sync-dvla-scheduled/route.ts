@@ -47,12 +47,13 @@ function getErrorMessage(error: unknown): string {
 }
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now();
   try {
     // Verify cron secret for security
     const authHeader = request.headers.get('authorization');
     const cronSecret = process.env.CRON_SECRET;
     
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 401 }
@@ -60,6 +61,10 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = await createClient();
+    const maxTargets = Math.min(
+      Math.max(Number.parseInt(request.nextUrl.searchParams.get('limit') || '40', 10) || 40, 1),
+      100
+    );
 
     // Check if DVLA API is configured
     const dvlaService = createDVLAApiService();
@@ -109,15 +114,25 @@ export async function POST(request: NextRequest) {
     // Filter assets that need syncing (not synced in the last 23 hours)
     const twentyThreeHoursAgo = new Date(Date.now() - 23 * 60 * 60 * 1000);
 
-    const targetsToSync = allTargets.filter((target) => {
+    const dueTargets = allTargets.filter((target) => {
       const lastSync = maintenanceMap.get(`${target.assetType}:${target.assetId}`);
       if (!lastSync) return true; // Never synced
       return new Date(lastSync) < twentyThreeHoursAgo; // Synced more than 23 hours ago
     });
+    const targetsToSync = dueTargets
+      .sort((a, b) => {
+        const aLastSync = maintenanceMap.get(`${a.assetType}:${a.assetId}`);
+        const bLastSync = maintenanceMap.get(`${b.assetType}:${b.assetId}`);
+        if (!aLastSync && !bLastSync) return 0;
+        if (!aLastSync) return -1;
+        if (!bLastSync) return 1;
+        return new Date(aLastSync).getTime() - new Date(bLastSync).getTime();
+      })
+      .slice(0, maxTargets);
 
-    console.log(`Scheduled sync: ${targetsToSync.length}/${allTargets.length} assets need syncing`);
+    console.log(`Scheduled sync: ${targetsToSync.length}/${allTargets.length} assets selected for syncing`);
 
-    if (targetsToSync.length === 0) {
+    if (dueTargets.length === 0) {
       return NextResponse.json({
         success: true,
         message: 'All road-eligible assets recently synced',
@@ -139,15 +154,25 @@ export async function POST(request: NextRequest) {
       delayMsBetweenRequests: 1000,
     });
 
-    console.log(`Scheduled sync complete: ${summary.successful} successful, ${summary.failed} failed`);
+    console.log('Scheduled sync complete', {
+      duration_ms: Date.now() - startedAt,
+      total_assets: allTargets.length,
+      due_assets: dueTargets.length,
+      processed_assets: targetsToSync.length,
+      successful: summary.successful,
+      failed: summary.failed,
+      deferred: Math.max(dueTargets.length - targetsToSync.length, 0),
+    });
 
     return NextResponse.json({
       success: true,
       total: allTargets.length,
+      due: dueTargets.length,
       synced: targetsToSync.length,
       successful: summary.successful,
       failed: summary.failed,
       skipped: allTargets.length - targetsToSync.length,
+      deferred: Math.max(dueTargets.length - targetsToSync.length, 0),
       results: summary.results,
     });
 

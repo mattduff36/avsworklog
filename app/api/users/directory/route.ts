@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isEffectiveRoleManagerOrHigher } from '@/lib/utils/rbac';
-import { getUsersWithPermission } from '@/lib/utils/permissions';
+import { getUsersWithModuleAccess } from '@/lib/server/team-permissions';
 import { ALL_MODULES, type ModuleName } from '@/types/roles';
 
 function isTruthy(value: string | null): boolean {
@@ -38,6 +38,8 @@ export async function GET(request: NextRequest) {
     ?.split(',')
     .map((value) => value.trim())
     .filter(Boolean) || [];
+  const limit = Math.min(Math.max(Number.parseInt(request.nextUrl.searchParams.get('limit') || '200', 10) || 200, 1), 500);
+  const offset = Math.max(Number.parseInt(request.nextUrl.searchParams.get('offset') || '0', 10) || 0, 0);
 
   if (moduleName && !ALL_MODULES.includes(moduleName as ModuleName)) {
     return NextResponse.json({ error: 'Valid module query parameter is required' }, { status: 400 });
@@ -64,14 +66,16 @@ export async function GET(request: NextRequest) {
     query = query.not('full_name', 'ilike', '%(Deleted User)%');
   }
 
-  const { data, error } = await query.order('full_name', { ascending: true });
+  const { data, error } = await query
+    .order('full_name', { ascending: true })
+    .range(offset, offset + limit - 1);
 
   if (error) {
     return NextResponse.json({ error: error.message || 'Failed to load users' }, { status: 500 });
   }
 
   const allowedUserIds = moduleName
-    ? new Set(await getUsersWithPermission(moduleName as ModuleName))
+    ? await getUsersWithModuleAccess(moduleName as ModuleName, ids.length > 0 ? ids : undefined, admin)
     : null;
 
   const userRows = ((data || []) as unknown) as Array<Record<string, unknown>>;
@@ -86,5 +90,10 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     success: true,
     users,
+    pagination: {
+      offset,
+      limit,
+      has_more: (data || []).length === limit,
+    },
   });
 }

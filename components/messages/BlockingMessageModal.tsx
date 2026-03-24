@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { SignaturePad } from '@/components/forms/SignaturePad';
 import { Loader2, AlertCircle, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import dynamic from 'next/dynamic';
@@ -22,6 +21,18 @@ const PDFViewer = dynamic(
         </span>
       </div>
     )
+  }
+);
+
+const SignaturePad = dynamic(
+  () => import('@/components/forms/SignaturePad').then((mod) => ({ default: mod.SignaturePad })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center rounded-md border border-border py-8">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    ),
   }
 );
 

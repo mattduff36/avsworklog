@@ -61,9 +61,17 @@ export class MotHistoryService {
   private config: MotHistoryConfig;
   private tokenCache: AccessToken | null = null;
   private baseUrl = process.env.MOT_API_BASE_URL || 'https://history.mot.api.gov.uk';
+  private readonly requestTimeoutMs = 15_000;
 
   constructor(config: MotHistoryConfig) {
     this.config = config;
+  }
+
+  private async fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+    return fetch(url, {
+      ...init,
+      signal: AbortSignal.timeout(this.requestTimeoutMs),
+    });
   }
 
   /**
@@ -80,7 +88,7 @@ export class MotHistoryService {
     try {
       logger.info('Requesting new MOT History API access token');
 
-      const response = await fetch(this.config.accessTokenUrl, {
+      const response = await this.fetchWithTimeout(this.config.accessTokenUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -126,7 +134,7 @@ export class MotHistoryService {
     try {
       logger.info(`Fetching MOT history for ${cleanReg}`);
 
-      const response = await fetch(
+      const response = await this.fetchWithTimeout(
         `${this.baseUrl}/v1/trade/vehicles/registration/${cleanReg}`,
         {
           method: 'GET',

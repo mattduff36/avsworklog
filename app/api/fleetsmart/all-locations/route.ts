@@ -69,6 +69,7 @@ const cache = g.__fleetsmartAllLocCache2;
 const VEHICLES_TTL_MS = 5 * 60_000;   // cache vehicle list for 5 min
 const ALL_LOC_TTL_MS = 5 * 60_000;    // cache combined result for 5 min
 const MIN_INTERVAL_MS = 2_500;         // 2.5 s between FleetSmart requests
+const REQUEST_TIMEOUT_MS = 15_000;
 
 /* ---------- helpers ---------- */
 function fleetsmartHeaders(): HeadersInit {
@@ -99,6 +100,7 @@ async function fetchVehicles(): Promise<FleetVehicle[]> {
   const res = await fetch(url, {
     headers: fleetsmartHeaders(),
     cache: 'no-store',
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
 
   if (!res.ok) throw new Error(`FleetSmart vehicles: ${res.status}`);
@@ -126,7 +128,7 @@ async function fetchSingleLocation(
   const res = await fetch(url, {
     headers: fleetsmartHeaders(),
     cache: 'no-store',
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
 
   if (!res.ok) {

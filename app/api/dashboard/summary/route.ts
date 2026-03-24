@@ -1,0 +1,343 @@
+import { NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { getEffectiveRole } from '@/lib/utils/view-as';
+import { ALL_MODULES, createEmptyModulePermissionRecord } from '@/types/roles';
+import { getPermissionMapForUser } from '@/lib/server/team-permissions';
+import {
+  calculateAlertCounts,
+  getDateBasedStatus,
+  getHoursBasedStatus,
+  getMileageBasedStatus,
+} from '@/lib/utils/maintenanceCalculations';
+
+type PermissionMap = Record<(typeof ALL_MODULES)[number], boolean>;
+
+type MaintenanceRow = {
+  current_mileage: number | null;
+  tax_due_date: string | null;
+  mot_due_date: string | null;
+  next_service_mileage: number | null;
+  cambelt_due_mileage: number | null;
+  first_aid_kit_expiry: string | null;
+  six_weekly_inspection_due_date: string | null;
+  fire_extinguisher_due_date: string | null;
+  taco_calibration_due_date: string | null;
+  current_hours: number | null;
+  next_service_hours: number | null;
+};
+
+function createFullAccessPermissionMap(): PermissionMap {
+  return ALL_MODULES.reduce<PermissionMap>((acc, moduleName) => {
+    acc[moduleName] = true;
+    return acc;
+  }, createEmptyModulePermissionRecord() as PermissionMap);
+}
+
+function getThresholds(categories: Array<Record<string, unknown>>) {
+  const categoryMap = new Map<string, Record<string, unknown>>();
+  categories.forEach((category) => {
+    const name = typeof category.name === 'string' ? category.name.toLowerCase() : '';
+    categoryMap.set(name, category);
+  });
+
+  const getDays = (name: string, fallback: number) =>
+    Number(categoryMap.get(name)?.alert_threshold_days ?? fallback);
+  const getMiles = (name: string, fallback: number) =>
+    Number(categoryMap.get(name)?.alert_threshold_miles ?? fallback);
+  const getHours = (name: string, fallback: number) =>
+    Number(categoryMap.get(name)?.alert_threshold_hours ?? fallback);
+
+  return {
+    taxThreshold: getDays('tax due date', 30),
+    motThreshold: getDays('mot due date', 30),
+    serviceThreshold: getMiles('service due', 1000),
+    cambeltThreshold: getMiles('cambelt replacement', 5000),
+    firstAidThreshold: getDays('first aid kit expiry', 30),
+    sixWeeklyThreshold: getDays('6 weekly inspection due', 7),
+    fireExtinguisherThreshold: getDays('fire extinguisher due', 30),
+    tacoCalibrationThreshold: getDays('taco calibration due', 60),
+    lolerThreshold: getDays('loler due', 30),
+    serviceHoursThreshold: getHours('service due (hours)', 50),
+  };
+}
+
+function sumMaintenanceAttentionCount(params: {
+  assetType: 'van' | 'hgv' | 'plant';
+  maintenance: MaintenanceRow | null;
+  lolerDueDate?: string | null;
+  thresholds: ReturnType<typeof getThresholds>;
+}): number {
+  const lolerStatus = params.assetType === 'plant'
+    ? getDateBasedStatus(params.lolerDueDate || null, params.thresholds.lolerThreshold)
+    : { status: 'not_set' as const };
+
+  if (!params.maintenance) {
+    const counts = params.assetType === 'plant'
+      ? calculateAlertCounts([lolerStatus])
+      : { overdue: 0, due_soon: 0 };
+    return counts.overdue + counts.due_soon;
+  }
+
+  const statuses = [
+    getDateBasedStatus(params.maintenance.tax_due_date, params.thresholds.taxThreshold),
+    getDateBasedStatus(params.maintenance.mot_due_date, params.thresholds.motThreshold),
+    getMileageBasedStatus(
+      params.maintenance.current_mileage,
+      params.maintenance.next_service_mileage,
+      params.thresholds.serviceThreshold
+    ),
+    getMileageBasedStatus(
+      params.maintenance.current_mileage,
+      params.maintenance.cambelt_due_mileage,
+      params.thresholds.cambeltThreshold
+    ),
+    getDateBasedStatus(params.maintenance.first_aid_kit_expiry, params.thresholds.firstAidThreshold),
+    getDateBasedStatus(
+      params.maintenance.six_weekly_inspection_due_date,
+      params.thresholds.sixWeeklyThreshold
+    ),
+    getDateBasedStatus(
+      params.maintenance.fire_extinguisher_due_date,
+      params.thresholds.fireExtinguisherThreshold
+    ),
+    getDateBasedStatus(
+      params.maintenance.taco_calibration_due_date,
+      params.thresholds.tacoCalibrationThreshold
+    ),
+    lolerStatus,
+    params.assetType === 'plant'
+      ? getHoursBasedStatus(
+          params.maintenance.current_hours,
+          params.maintenance.next_service_hours,
+          params.thresholds.serviceHoursThreshold
+        )
+      : { status: 'not_set' as const },
+  ];
+
+  const counts = calculateAlertCounts(statuses);
+  return counts.overdue + counts.due_soon;
+}
+
+async function getMaintenanceAttentionCount() {
+  const supabase = await createClient();
+  const [{ data: categories, error: categoriesError }, vansResult, hgvsResult, plantResult] = await Promise.all([
+    supabase
+      .from('maintenance_categories')
+      .select('name, alert_threshold_days, alert_threshold_miles, alert_threshold_hours')
+      .eq('is_active', true),
+    supabase
+      .from('vans')
+      .select(`
+        id,
+        maintenance:vehicle_maintenance!van_id(
+          current_mileage,
+          tax_due_date,
+          mot_due_date,
+          next_service_mileage,
+          cambelt_due_mileage,
+          first_aid_kit_expiry,
+          six_weekly_inspection_due_date,
+          fire_extinguisher_due_date,
+          taco_calibration_due_date,
+          current_hours,
+          next_service_hours
+        )
+      `)
+      .eq('status', 'active'),
+    supabase
+      .from('hgvs')
+      .select(`
+        id,
+        maintenance:vehicle_maintenance!hgv_id(
+          current_mileage,
+          tax_due_date,
+          mot_due_date,
+          next_service_mileage,
+          cambelt_due_mileage,
+          first_aid_kit_expiry,
+          six_weekly_inspection_due_date,
+          fire_extinguisher_due_date,
+          taco_calibration_due_date,
+          current_hours,
+          next_service_hours
+        )
+      `)
+      .eq('status', 'active'),
+    supabase
+      .from('plant')
+      .select(`
+        id,
+        loler_due_date,
+        maintenance:vehicle_maintenance!plant_id(
+          current_mileage,
+          tax_due_date,
+          mot_due_date,
+          next_service_mileage,
+          cambelt_due_mileage,
+          first_aid_kit_expiry,
+          six_weekly_inspection_due_date,
+          fire_extinguisher_due_date,
+          taco_calibration_due_date,
+          current_hours,
+          next_service_hours
+        )
+      `)
+      .eq('status', 'active'),
+  ]);
+
+  if (categoriesError) throw categoriesError;
+  if (vansResult.error) throw vansResult.error;
+  if (hgvsResult.error) throw hgvsResult.error;
+  if (plantResult.error) throw plantResult.error;
+
+  const thresholds = getThresholds((categories || []) as Array<Record<string, unknown>>);
+  let total = 0;
+
+  (vansResult.data || []).forEach((row) => {
+    total += sumMaintenanceAttentionCount({
+      assetType: 'van',
+      maintenance: (Array.isArray(row.maintenance) ? row.maintenance[0] : row.maintenance) as MaintenanceRow | null,
+      thresholds,
+    });
+  });
+
+  (hgvsResult.data || []).forEach((row) => {
+    total += sumMaintenanceAttentionCount({
+      assetType: 'hgv',
+      maintenance: (Array.isArray(row.maintenance) ? row.maintenance[0] : row.maintenance) as MaintenanceRow | null,
+      thresholds,
+    });
+  });
+
+  (plantResult.data || []).forEach((row) => {
+    total += sumMaintenanceAttentionCount({
+      assetType: 'plant',
+      maintenance: (Array.isArray(row.maintenance) ? row.maintenance[0] : row.maintenance) as MaintenanceRow | null,
+      lolerDueDate: row.loler_due_date,
+      thresholds,
+    });
+  });
+
+  return total;
+}
+
+export async function GET() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const admin = createAdminClient();
+  const effectiveRole = await getEffectiveRole();
+  const permissions =
+    effectiveRole.is_actual_super_admin || effectiveRole.role_name === 'admin' || effectiveRole.is_super_admin
+      ? createFullAccessPermissionMap()
+      : await getPermissionMapForUser(user.id, effectiveRole.role_id, admin, effectiveRole.team_id);
+
+  const canViewApprovals = permissions.approvals;
+  const canViewActions = permissions.actions;
+  const canViewWorkshopTasks = permissions['workshop-tasks'];
+  const canViewMaintenance = permissions.maintenance;
+  const canViewSuggestions = permissions.suggestions;
+  const canViewErrorReports = permissions['error-reports'];
+  const canViewQuotes = permissions.quotes;
+
+  const [
+    timesheetsResult,
+    absencesResult,
+    workshopPendingResult,
+    workshopInProgressResult,
+    suggestionsNewResult,
+    suggestionsReviewResult,
+    errorsNewResult,
+    errorsInvestigatingResult,
+    quotesResult,
+    errorLogsResult,
+    maintenanceTotal,
+  ] = await Promise.all([
+    canViewApprovals
+      ? supabase.from('timesheets').select('id', { count: 'exact', head: true }).eq('status', 'submitted')
+      : Promise.resolve({ count: 0, error: null }),
+    canViewApprovals
+      ? supabase.from('absences').select('id', { count: 'exact', head: true }).eq('status', 'pending')
+      : Promise.resolve({ count: 0, error: null }),
+    canViewActions && canViewWorkshopTasks
+      ? supabase
+          .from('actions')
+          .select('id', { count: 'exact', head: true })
+          .in('action_type', ['inspection_defect', 'workshop_vehicle_task'])
+          .eq('status', 'pending')
+      : Promise.resolve({ count: 0, error: null }),
+    canViewActions && canViewWorkshopTasks
+      ? supabase
+          .from('actions')
+          .select('id', { count: 'exact', head: true })
+          .in('action_type', ['inspection_defect', 'workshop_vehicle_task'])
+          .eq('status', 'logged')
+      : Promise.resolve({ count: 0, error: null }),
+    canViewSuggestions
+      ? supabase.from('suggestions').select('id', { count: 'exact', head: true }).eq('status', 'new')
+      : Promise.resolve({ count: 0, error: null }),
+    canViewSuggestions
+      ? supabase.from('suggestions').select('id', { count: 'exact', head: true }).in('status', ['under_review', 'planned'])
+      : Promise.resolve({ count: 0, error: null }),
+    canViewErrorReports
+      ? supabase.from('error_reports').select('id', { count: 'exact', head: true }).eq('status', 'new')
+      : Promise.resolve({ count: 0, error: null }),
+    canViewErrorReports
+      ? supabase.from('error_reports').select('id', { count: 'exact', head: true }).eq('status', 'investigating')
+      : Promise.resolve({ count: 0, error: null }),
+    canViewQuotes
+      ? supabase.from('quotes').select('id', { count: 'exact', head: true }).eq('status', 'pending_internal_approval')
+      : Promise.resolve({ count: 0, error: null }),
+    effectiveRole.is_actual_super_admin
+      ? supabase.from('error_logs').select('id', { count: 'exact', head: true })
+      : Promise.resolve({ count: 0, error: null }),
+    canViewActions && canViewMaintenance ? getMaintenanceAttentionCount() : Promise.resolve(0),
+  ]);
+
+  for (const result of [
+    timesheetsResult,
+    absencesResult,
+    workshopPendingResult,
+    workshopInProgressResult,
+    suggestionsNewResult,
+    suggestionsReviewResult,
+    errorsNewResult,
+    errorsInvestigatingResult,
+    quotesResult,
+    errorLogsResult,
+  ]) {
+    if (result.error) {
+      throw result.error;
+    }
+  }
+
+  return NextResponse.json({
+    success: true,
+    metrics: {
+      approvals: {
+        timesheets: timesheetsResult.count || 0,
+        absences: absencesResult.count || 0,
+      },
+      actions: {
+        workshop: (workshopPendingResult.count || 0) + (workshopInProgressResult.count || 0),
+        maintenance: maintenanceTotal,
+        suggestions: (suggestionsNewResult.count || 0) + (suggestionsReviewResult.count || 0),
+        errors: (errorsNewResult.count || 0) + (errorsInvestigatingResult.count || 0),
+      },
+      badges: {
+        suggestions_new: suggestionsNewResult.count || 0,
+        error_reports_new: errorsNewResult.count || 0,
+        quotes_pending_internal_approval: quotesResult.count || 0,
+        error_logs: errorLogsResult.count || 0,
+      },
+    },
+  });
+}

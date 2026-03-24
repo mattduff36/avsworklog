@@ -3,6 +3,7 @@ import {
   buildTeamPermissionRecord,
   getAdjacentTierRole,
   getPermissionSetForUser,
+  getUsersWithModuleAccess,
   isFullAccessRole,
   resolveModulesForRoleRank,
 } from '@/lib/server/team-permissions';
@@ -210,5 +211,110 @@ describe('team permission helpers', () => {
     expect(getAdjacentTierRole(roles, 'employee', 'right')?.name).toBe('supervisor');
     expect(getAdjacentTierRole(roles, 'contractor', 'left')).toBeNull();
     expect(getAdjacentTierRole(roles, 'manager', 'right')).toBeNull();
+  });
+
+  it('bulk resolves users with module access without per-user recalculation', async () => {
+    const profiles = [
+      { id: 'admin-1', team_id: null, role_id: 'admin-role' },
+      { id: 'employee-1', team_id: 'team-a', role_id: 'employee-role' },
+      { id: 'employee-2', team_id: 'team-b', role_id: 'employee-role' },
+      { id: 'contractor-1', team_id: 'team-a', role_id: 'contractor-role' },
+    ];
+    const rolesData = [
+      {
+        id: 'contractor-role',
+        name: 'contractor',
+        display_name: 'Contractor',
+        role_class: 'employee',
+        hierarchy_rank: 1,
+        is_super_admin: false,
+        is_manager_admin: false,
+      },
+      {
+        id: 'employee-role',
+        name: 'employee',
+        display_name: 'Employee',
+        role_class: 'employee',
+        hierarchy_rank: 2,
+        is_super_admin: false,
+        is_manager_admin: false,
+      },
+      {
+        id: 'admin-role',
+        name: 'admin',
+        display_name: 'Admin',
+        role_class: 'admin',
+        hierarchy_rank: 999,
+        is_super_admin: false,
+        is_manager_admin: true,
+      },
+    ];
+    const permissionModules = [
+      { module_name: 'timesheets', minimum_role_id: 'employee-role', sort_order: 10 },
+    ];
+    const teamPermissions = [
+      { team_id: 'team-a', module_name: 'timesheets', enabled: true },
+      { team_id: 'team-b', module_name: 'timesheets', enabled: false },
+    ];
+
+    const supabaseAdmin = {
+      from: (table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: () => ({
+              in: async () => ({ data: profiles, error: null }),
+            }),
+          };
+        }
+
+        if (table === 'roles') {
+          const directResult = Promise.resolve({ data: rolesData, error: null }) as Promise<{
+            data: typeof rolesData;
+            error: null;
+          }> & {
+            not: () => {
+              order: () => {
+                order: () => Promise<{ data: typeof rolesData; error: null }>;
+              };
+            };
+          };
+          directResult.not = () => ({
+            order: () => ({
+              order: async () => ({ data: rolesData, error: null }),
+            }),
+          });
+
+          return {
+            select: () => directResult,
+          };
+        }
+
+        if (table === 'permission_modules') {
+          return {
+            select: () => ({
+              order: async () => ({ data: permissionModules, error: null }),
+            }),
+          };
+        }
+
+        if (table === 'team_module_permissions') {
+          return {
+            select: () => ({
+              in: async () => ({ data: teamPermissions, error: null }),
+            }),
+          };
+        }
+
+        throw new Error(`Unexpected table lookup: ${table}`);
+      },
+    };
+
+    const allowedUsers = await getUsersWithModuleAccess(
+      'timesheets',
+      profiles.map((profile) => profile.id),
+      supabaseAdmin as never
+    );
+
+    expect(allowedUsers).toEqual(new Set(['admin-1', 'employee-1']));
   });
 });

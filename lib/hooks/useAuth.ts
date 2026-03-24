@@ -56,19 +56,31 @@ export function useAuth() {
   const supabase = useMemo(() => createClient(), []);
 
   const fetchProfile = useCallback(async (userId: string) => {
+    const profileSelect = `
+      id,
+      full_name,
+      email,
+      phone_number,
+      employee_id,
+      role_id,
+      super_admin,
+      team_id,
+      must_change_password,
+      created_at,
+      updated_at,
+      role:roles(
+        name,
+        display_name,
+        role_class,
+        is_manager_admin,
+        is_super_admin
+      )
+    `;
+
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select(`
-          *,
-          role:roles(
-            name,
-            display_name,
-            role_class,
-            is_manager_admin,
-            is_super_admin
-          )
-        `)
+        .select(profileSelect)
         .eq('id', userId)
         .single();
 
@@ -79,16 +91,7 @@ export function useAuth() {
           await new Promise(resolve => setTimeout(resolve, 1000));
           const { data: retryData, error: retryError } = await supabase
             .from('profiles')
-            .select(`
-              *,
-              role:roles(
-                name,
-                display_name,
-                role_class,
-                is_manager_admin,
-                is_super_admin
-              )
-            `)
+            .select(profileSelect)
             .eq('id', userId)
             .single();
           
@@ -213,7 +216,7 @@ export function useAuth() {
     };
   }, [user, fetchProfile, supabase]);
 
-  // Periodic check as backup (every 30 seconds)
+  // Periodic check as a low-frequency backup when realtime misses updates.
   useEffect(() => {
     if (!user) return;
 
@@ -261,7 +264,7 @@ export function useAuth() {
           console.warn('Role change check skipped (network issue)');
         }
       }
-    }, 30000); // Check every 30 seconds
+    }, 5 * 60 * 1000);
 
     return () => clearInterval(interval);
   }, [user, supabase]);

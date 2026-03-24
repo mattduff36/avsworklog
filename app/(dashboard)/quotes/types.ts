@@ -153,6 +153,13 @@ export interface Quote {
   };
 }
 
+export interface QuoteListSummary {
+  total_quotes: number;
+  status_counts: Record<QuoteStatus | 'all', number>;
+  won_quotes: number;
+  won_value: number;
+}
+
 export type QuoteRevisionType =
   | 'original'
   | 'revision'

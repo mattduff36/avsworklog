@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { ModuleName, UserPermissions } from '@/types/roles';
-import { getPermissionMapForUser, getPermissionSetForUser } from '@/lib/server/team-permissions';
+import { getPermissionMapForUser, getPermissionSetForUser, getUsersWithModuleAccess } from '@/lib/server/team-permissions';
 
 export type ProfileWithRole = {
   id: string;
@@ -24,6 +24,27 @@ export type ProfileWithRole = {
   } | null;
 };
 
+type ProfileWithRoleRow = Omit<ProfileWithRole, 'role'> & {
+  role:
+    | {
+        name: string;
+        display_name: string;
+        role_class: 'admin' | 'manager' | 'employee';
+        hierarchy_rank?: number | null;
+        is_manager_admin: boolean;
+        is_super_admin: boolean;
+      }
+    | Array<{
+        name: string;
+        display_name: string;
+        role_class: 'admin' | 'manager' | 'employee';
+        hierarchy_rank?: number | null;
+        is_manager_admin: boolean;
+        is_super_admin: boolean;
+      }>
+    | null;
+};
+
 /**
  * Fetch a profile with role information included
  * Use this in API routes instead of direct profile fetch
@@ -35,11 +56,21 @@ export async function getProfileWithRole(userId: string): Promise<ProfileWithRol
     const { data, error } = await supabase
       .from('profiles')
       .select(`
-        *,
+        id,
+        full_name,
+        email,
+        phone_number,
+        employee_id,
+        role_id,
+        must_change_password,
+        is_super_admin,
+        created_at,
+        updated_at,
         role:roles(
           name,
           display_name,
           role_class,
+          hierarchy_rank,
           is_manager_admin,
           is_super_admin
         )
@@ -53,19 +84,16 @@ export async function getProfileWithRole(userId: string): Promise<ProfileWithRol
       return null;
     }
 
-    const typedData = data as ProfileWithRole | null;
-    const role = typedData?.role;
-    console.log('getProfileWithRole result:', {
-      user_id: userId,
-      profile_id: typedData?.id,
-      role_id: typedData?.role_id,
-      role_name: role?.name,
-      role_class: role?.role_class,
-      role_display_name: role?.display_name,
-      is_manager_admin: role?.is_manager_admin
-    });
+    const typedData = data as ProfileWithRoleRow | null;
+    if (!typedData) {
+      return null;
+    }
 
-    return typedData;
+    const role = Array.isArray(typedData.role) ? typedData.role[0] || null : typedData.role;
+    return {
+      ...typedData,
+      role,
+    };
   } catch (error) {
     console.error('Error fetching profile with role:', error);
     return null;
@@ -155,32 +183,7 @@ export async function getUsersWithPermission(
   const admin = createAdminClient();
 
   try {
-    // Get all users who either:
-    // 1. Are admin/super-admin, OR
-    // 2. Have specific permission enabled for this module.
-    const { data: profiles, error: profilesError } = await admin
-      .from('profiles')
-      .select('id');
-
-    if (profilesError) {
-      throw profilesError;
-    }
-    const typedProfiles = profiles as Array<{ id: string }> | null;
-
-    if (!typedProfiles?.length) {
-      return [];
-    }
-
-    const allowedUsers: string[] = [];
-
-    for (const profileRow of typedProfiles) {
-      const permissionSet = await getPermissionSetForUser(profileRow.id, null, admin);
-      if (permissionSet.has(module)) {
-        allowedUsers.push(profileRow.id);
-      }
-    }
-
-    return allowedUsers;
+    return Array.from(await getUsersWithModuleAccess(module, undefined, admin));
   } catch (error) {
     console.error('Error getting users with permission:', error);
     return [];

@@ -135,6 +135,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         });
       }
     } else if (action === 'approve_and_send') {
+      const customerEmail = current.quote.attention_email?.trim() || current.quote.customer?.contact_email?.trim() || '';
+      if (!customerEmail) {
+        return NextResponse.json(
+          { error: 'Quote cannot be sent because the customer does not have a contact email.' },
+          { status: 400 }
+        );
+      }
+
       const emailResult = await sendQuoteToCustomerEmail(current, [
         current.quote.manager_email || '',
         'rob@avsquires.co.uk',
@@ -373,7 +381,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     });
   } catch (error) {
     console.error('Error updating quote:', error);
-    return NextResponse.json({ error: 'Failed to update quote' }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to update quote' },
+      { status: 500 }
+    );
   }
 }
 

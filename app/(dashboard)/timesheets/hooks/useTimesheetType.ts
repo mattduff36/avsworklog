@@ -1,8 +1,8 @@
 /**
  * useTimesheetType Hook
  * 
- * Fetches the appropriate timesheet type for a user based on their role.
- * Returns 'civils' (default) if role doesn't specify or if there's an error.
+ * Fetches the appropriate timesheet type for a user based on their team.
+ * Falls back to the legacy role-level setting, then the default type.
  * 
  * Phase 5: Dynamic Routing
  */
@@ -32,12 +32,15 @@ export function useTimesheetType(userId?: string): UseTimesheetTypeReturn {
       }
 
       try {
-        // Fetch user's profile with role information
+        // Prefer the team-level setting, but keep the role fallback while
+        // existing data is being migrated across.
         const { data, error: fetchError } = await supabase
           .from('profiles')
           .select(`
-            role_id,
-            roles (
+            team:org_teams!profiles_team_id_fkey (
+              timesheet_type
+            ),
+            role:roles (
               timesheet_type
             )
           `)
@@ -46,9 +49,13 @@ export function useTimesheetType(userId?: string): UseTimesheetTypeReturn {
 
         if (fetchError) throw fetchError;
 
-        // Extract timesheet type from nested role data
-        const roleData = data?.roles as { timesheet_type?: string } | null;
-        const type = (roleData?.timesheet_type || DEFAULT_TIMESHEET_TYPE) as TimesheetType;
+        const teamData = data?.team as { timesheet_type?: string | null } | null;
+        const roleData = data?.role as { timesheet_type?: string | null } | null;
+        const type = (
+          teamData?.timesheet_type ||
+          roleData?.timesheet_type ||
+          DEFAULT_TIMESHEET_TYPE
+        ) as TimesheetType;
 
         setTimesheetType(type);
         setError(null);

@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
+import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
 import type { FAQArticleWithCategory, FAQCategory, Suggestion } from '@/types/faq';
 import type { ErrorReport } from '@/types/error-reports';
 import type { ModuleName } from '@/types/roles';
@@ -109,12 +110,11 @@ export default function HelpPage() {
   const fetchMySuggestions = useCallback(async () => {
     try {
       setLoadingSuggestions(true);
-      const response = await fetch('/api/suggestions');
-      const data = await response.json();
-      
-      if (data.success) {
-        setMySuggestions(data.suggestions);
-      }
+      const { items } = await fetchAllPaginatedItems<Suggestion>('/api/suggestions', 'suggestions', {
+        limit: 200,
+        errorMessage: 'Failed to load suggestions',
+      });
+      setMySuggestions(items);
     } catch (error) {
       console.error('Error fetching suggestions:', error);
     } finally {
@@ -125,12 +125,11 @@ export default function HelpPage() {
   const fetchMyErrors = useCallback(async () => {
     try {
       setLoadingErrors(true);
-      const response = await fetch('/api/error-reports');
-      const data = await response.json();
-      
-      if (data.success) {
-        setMyErrors(data.reports);
-      }
+      const { items } = await fetchAllPaginatedItems<ErrorReport>('/api/error-reports', 'reports', {
+        limit: 200,
+        errorMessage: 'Failed to load error reports',
+      });
+      setMyErrors(items);
     } catch (error) {
       console.error('Error fetching error reports:', error);
     } finally {

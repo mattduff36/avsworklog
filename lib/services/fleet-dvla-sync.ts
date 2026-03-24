@@ -105,6 +105,17 @@ export async function runFleetDvlaSync(options: FleetSyncOptions): Promise<Fleet
   const results: FleetSyncResultRow[] = [];
   let successCount = 0;
   let failCount = 0;
+  let triggeredByProfileName: string | null = null;
+
+  if (triggeredBy) {
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', triggeredBy)
+      .single();
+    const typedProfile = userProfile as { full_name: string | null } | null;
+    triggeredByProfileName = typedProfile?.full_name || null;
+  }
 
   for (let i = 0; i < targets.length; i++) {
     const target = targets[i];
@@ -288,16 +299,8 @@ export async function runFleetDvlaSync(options: FleetSyncOptions): Promise<Fleet
       } as DvlaSyncLogInsert);
 
       let updaterName = triggerType === 'automatic' ? 'Scheduled DVLA Sync' : 'DVLA API Sync';
-      if (triggeredBy) {
-        const { data: userProfile } = await supabase
-          .from('profiles')
-          .select('full_name')
-          .eq('id', triggeredBy)
-          .single();
-        const typedProfile = userProfile as { full_name: string | null } | null;
-        if (typedProfile?.full_name) {
-          updaterName = `${typedProfile.full_name} (via DVLA Sync)`;
-        }
+      if (triggeredByProfileName) {
+        updaterName = `${triggeredByProfileName} (via DVLA Sync)`;
       }
 
       const historyEntries: Array<Record<string, unknown>> = [];

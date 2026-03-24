@@ -118,6 +118,19 @@ export function formatManagerOptionLabel(option: TeamManagerOption): string {
   return option.is_placeholder ? `${option.full_name} (Placeholder)` : option.full_name;
 }
 
+export function buildTeamManagerOptionsFromProfiles(rows: ManagerProfileRow[]): TeamManagerOption[] {
+  return rows
+    .map(toManagerCandidate)
+    .filter(isEligibleManager)
+    .map((row) => ({
+      id: row.id,
+      full_name: row.full_name,
+      employee_id: row.employee_id,
+      is_placeholder: row.is_placeholder,
+      role_class: row.role_class,
+    }));
+}
+
 async function loadManagerCandidates(
   supabaseAdmin: SupabaseAdminClient,
   managerIds: string[]
@@ -271,16 +284,7 @@ export async function getTeamManagerOptions(
   }
 
   const rows = (data || []) as ManagerProfileRow[];
-  return rows
-    .map(toManagerCandidate)
-    .filter(isEligibleManager)
-    .map((row) => ({
-      id: row.id,
-      full_name: row.full_name,
-      employee_id: row.employee_id,
-      is_placeholder: row.is_placeholder,
-      role_class: row.role_class,
-    }));
+  return buildTeamManagerOptionsFromProfiles(rows);
 }
 
 export async function reconcileTeamManagerAssignments(

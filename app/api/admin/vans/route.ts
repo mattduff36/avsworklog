@@ -14,6 +14,12 @@ interface ProfileNameShape {
   full_name?: string | null;
 }
 
+interface VanInspectionLookupRow {
+  van_id: string;
+  inspection_date?: string | null;
+  profiles?: ProfileNameShape | ProfileNameShape[] | null;
+}
+
 function pickProfileName(
   profile: ProfileNameShape | ProfileNameShape[] | null | undefined
 ): string | null {
@@ -54,33 +60,42 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    // For each van, get the last inspector
-    const vehiclesWithInspector = await Promise.all(
-      (vehicles || []).map(async (vehicle) => {
-        const { data: inspections } = await supabase
-          .from('van_inspections')
-          .select(`
-            user_id,
-            inspection_date,
-            profiles!van_inspections_user_id_fkey (
-              full_name
-            )
-          `)
-          .eq('van_id', vehicle.id)
-          .order('inspection_date', { ascending: false })
-          .limit(1);
+    const vehicleRows = vehicles || [];
+    const latestInspectionByVanId = new Map<string, VanInspectionLookupRow>();
 
-        const lastInspection = inspections?.[0] || null;
+    if (vehicleRows.length > 0) {
+      const { data: inspections, error: inspectionsError } = await supabase
+        .from('van_inspections')
+        .select(`
+          van_id,
+          inspection_date,
+          profiles!van_inspections_user_id_fkey (
+            full_name
+          )
+        `)
+        .in('van_id', vehicleRows.map((vehicle) => vehicle.id))
+        .order('inspection_date', { ascending: false });
 
-        return {
-          ...vehicle,
-          last_inspector: pickProfileName(
-            lastInspection?.profiles as ProfileNameShape | ProfileNameShape[] | null
-          ),
-          last_inspection_date: lastInspection?.inspection_date || null,
-        };
-      })
-    );
+      if (inspectionsError) throw inspectionsError;
+
+      for (const inspection of (inspections || []) as VanInspectionLookupRow[]) {
+        if (!latestInspectionByVanId.has(inspection.van_id)) {
+          latestInspectionByVanId.set(inspection.van_id, inspection);
+        }
+      }
+    }
+
+    const vehiclesWithInspector = vehicleRows.map((vehicle) => {
+      const lastInspection = latestInspectionByVanId.get(vehicle.id) || null;
+
+      return {
+        ...vehicle,
+        last_inspector: pickProfileName(
+          lastInspection?.profiles as ProfileNameShape | ProfileNameShape[] | null
+        ),
+        last_inspection_date: lastInspection?.inspection_date || null,
+      };
+    });
 
     return NextResponse.json({ vehicles: vehiclesWithInspector });
   } catch (error) {

@@ -11,6 +11,7 @@ export class DVLAApiService {
   private provider: DVLAProvider;
   private apiKey: string;
   private baseUrl: string;
+  private readonly requestTimeoutMs = 15_000;
 
   constructor(config: DVLAApiConfig) {
     this.provider = config.provider;
@@ -43,11 +44,18 @@ export class DVLAApiService {
     }
   }
 
+  private async fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+    return fetch(url, {
+      ...init,
+      signal: AbortSignal.timeout(this.requestTimeoutMs),
+    });
+  }
+
   /**
    * GOV.UK VES API Integration (Official DVLA API)
    */
   private async fetchFromVES(reg: string): Promise<VehicleDataResponse> {
-    const response = await fetch(`${this.baseUrl}/vehicles`, {
+    const response = await this.fetchWithTimeout(`${this.baseUrl}/vehicles`, {
       method: 'POST',
       headers: {
         'x-api-key': this.apiKey,
@@ -71,7 +79,7 @@ export class DVLAApiService {
    * Vehicle Smart API Integration
    */
   private async fetchFromVehicleSmart(reg: string): Promise<VehicleDataResponse> {
-    const response = await fetch(`${this.baseUrl}/vehicledata`, {
+    const response = await this.fetchWithTimeout(`${this.baseUrl}/vehicledata`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -94,7 +102,7 @@ export class DVLAApiService {
    * Check Car Details UK API Integration
    */
   private async fetchFromCheckCarDetails(reg: string): Promise<VehicleDataResponse> {
-    const response = await fetch(`${this.baseUrl}/vehicle/${reg}`, {
+    const response = await this.fetchWithTimeout(`${this.baseUrl}/vehicle/${reg}`, {
       method: 'GET',
       headers: {
         'x-api-key': this.apiKey,
@@ -113,7 +121,7 @@ export class DVLAApiService {
    * Vehicle Data Global API Integration
    */
   private async fetchFromVehicleDataGlobal(reg: string): Promise<VehicleDataResponse> {
-    const response = await fetch(`${this.baseUrl}/vehicle`, {
+    const response = await this.fetchWithTimeout(`${this.baseUrl}/vehicle`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -3,8 +3,8 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import {
+  buildTeamManagerOptionsFromProfiles,
   formatManagerOptionLabel,
-  getTeamManagerOptions,
   isMissingTeamManagerSchemaError,
   reconcileTeamManagerAssignments,
   validateTeamManagerSelection,
@@ -41,6 +41,15 @@ function isMissingHierarchySchemaError(error: unknown): boolean {
   );
 }
 
+const VALID_TIMESHEET_TYPES = new Set(['civils', 'plant']);
+
+function parseTimesheetType(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return undefined;
+  return normalized;
+}
+
 export async function GET() {
   const canAccessUserAdmin = await canEffectiveRoleAccessModule('admin-users');
   if (!canAccessUserAdmin) {
@@ -50,7 +59,7 @@ export async function GET() {
   const supabaseAdmin = getSupabaseAdmin();
   const { data: teamsData, error: teamsError } = await supabaseAdmin
     .from('org_teams')
-    .select('id, name, code, active, manager_1_profile_id, manager_2_profile_id')
+    .select('id, name, code, timesheet_type, active, manager_1_profile_id, manager_2_profile_id')
     .order('name', { ascending: true });
 
   if (teamsError) {
@@ -68,6 +77,9 @@ export async function GET() {
     .from('profiles')
     .select(`
       id,
+      full_name,
+      employee_id,
+      is_placeholder,
       team_id,
       line_manager_id,
       role:roles(role_class)
@@ -84,12 +96,23 @@ export async function GET() {
     return NextResponse.json({ error: 'Failed to load teams' }, { status: 500 });
   }
 
-  const rows = (data || []) as Array<{
+  const rows = ((data || []) as Array<{
     id: string;
+    full_name?: string | null;
+    employee_id?: string | null;
+    is_placeholder?: boolean | null;
     team_id?: string | null;
     line_manager_id?: string | null;
     role?: { role_class?: 'admin' | 'manager' | 'employee' } | null;
-  }>;
+  }>).map((row) => ({
+    id: row.id,
+    full_name: row.full_name ?? null,
+    employee_id: row.employee_id ?? null,
+    is_placeholder: row.is_placeholder ?? null,
+    team_id: row.team_id ?? null,
+    line_manager_id: row.line_manager_id ?? null,
+    role: row.role ?? null,
+  }));
 
   const teamStats = new Map<string, {
     team_id: string;
@@ -102,28 +125,16 @@ export async function GET() {
     id: string;
     name: string;
     code: string | null;
+    timesheet_type?: string | null;
     active: boolean;
     manager_1_profile_id?: string | null;
     manager_2_profile_id?: string | null;
   }>;
 
-  let managerOptions: Array<{
-    id: string;
-    full_name: string;
-    employee_id?: string | null;
-    is_placeholder: boolean;
-    role_class: 'admin' | 'manager' | 'employee';
-  }> = [];
-
-  try {
-    managerOptions = await getTeamManagerOptions(supabaseAdmin);
-  } catch (error) {
-    if (!isMissingTeamManagerSchemaError(error)) {
-      throw error;
-    }
-  }
+  const managerOptions = buildTeamManagerOptionsFromProfiles(rows);
 
   const managerById = new Map(managerOptions.map((manager) => [manager.id, manager]));
+  const knownTeamsById = new Map(knownTeams.map((team) => [team.id, team]));
 
   for (const team of knownTeams) {
     teamStats.set(team.id, {
@@ -152,25 +163,26 @@ export async function GET() {
 
   const teams = Array.from(teamStats.values())
     .sort((a, b) => a.team_id.localeCompare(b.team_id))
-    .map((team) => ({
-      ...team,
-      id: team.team_id,
-      name: knownTeams.find((t) => t.id === team.team_id)?.name || team.team_id,
-      code: knownTeams.find((t) => t.id === team.team_id)?.code || null,
-      active: knownTeams.find((t) => t.id === team.team_id)?.active ?? true,
-      manager_1_id: knownTeams.find((t) => t.id === team.team_id)?.manager_1_profile_id || null,
-      manager_2_id: knownTeams.find((t) => t.id === team.team_id)?.manager_2_profile_id || null,
-      manager_1_name: (() => {
-        const managerId = knownTeams.find((t) => t.id === team.team_id)?.manager_1_profile_id || null;
-        const manager = managerId ? managerById.get(managerId) : null;
-        return manager ? formatManagerOptionLabel(manager) : null;
-      })(),
-      manager_2_name: (() => {
-        const managerId = knownTeams.find((t) => t.id === team.team_id)?.manager_2_profile_id || null;
-        const manager = managerId ? managerById.get(managerId) : null;
-        return manager ? formatManagerOptionLabel(manager) : null;
-      })(),
-    }));
+    .map((team) => {
+      const teamRow = knownTeamsById.get(team.team_id);
+      const manager1Id = teamRow?.manager_1_profile_id || null;
+      const manager2Id = teamRow?.manager_2_profile_id || null;
+      const manager1 = manager1Id ? managerById.get(manager1Id) : null;
+      const manager2 = manager2Id ? managerById.get(manager2Id) : null;
+
+      return {
+        ...team,
+        id: team.team_id,
+        name: teamRow?.name || team.team_id,
+        code: teamRow?.code || null,
+        timesheet_type: teamRow?.timesheet_type || 'civils',
+        active: teamRow?.active ?? true,
+        manager_1_id: manager1Id,
+        manager_2_id: manager2Id,
+        manager_1_name: manager1 ? formatManagerOptionLabel(manager1) : null,
+        manager_2_name: manager2 ? formatManagerOptionLabel(manager2) : null,
+      };
+    });
 
   return NextResponse.json({
     configured: true,
@@ -207,6 +219,7 @@ export async function POST(request: Request) {
   const name = typeof body?.name === 'string' ? body.name.trim() : '';
   const requestedId = typeof body?.id === 'string' ? body.id : '';
   const code = typeof body?.code === 'string' ? body.code.trim() : null;
+  const timesheetType = parseTimesheetType(body?.timesheet_type) || 'civils';
   const manager1Id = typeof body?.manager_1_id === 'string' ? body.manager_1_id : null;
   const manager2Id = typeof body?.manager_2_id === 'string' ? body.manager_2_id : null;
   const teamId = normalizeTeamId(requestedId || name);
@@ -216,6 +229,9 @@ export async function POST(request: Request) {
   }
   if (!teamId) {
     return NextResponse.json({ error: 'Team id is invalid' }, { status: 400 });
+  }
+  if (!VALID_TIMESHEET_TYPES.has(timesheetType)) {
+    return NextResponse.json({ error: 'Invalid timesheet type' }, { status: 400 });
   }
 
   const supabaseAdmin = getSupabaseAdmin();
@@ -233,11 +249,12 @@ export async function POST(request: Request) {
       id: teamId,
       name,
       code: code || teamId,
+      timesheet_type: timesheetType,
       active: true,
       manager_1_profile_id: manager1Id || null,
       manager_2_profile_id: manager2Id || null,
     })
-    .select('id, name, code, active, manager_1_profile_id, manager_2_profile_id')
+    .select('id, name, code, timesheet_type, active, manager_1_profile_id, manager_2_profile_id')
     .single();
 
   if (createError) {

@@ -75,6 +75,7 @@ function InspectionsContent() {
   const [inspectionToDelete, setInspectionToDelete] = useState<{ id: string; vehicleReg: string; date: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [displayCount, setDisplayCount] = useState(pageSize);
+  const [hasMore, setHasMore] = useState(false);
   const supabase = createClient();
 
   // Fetch employees and vehicles
@@ -82,7 +83,7 @@ function InspectionsContent() {
     if (user && isElevatedUser) {
       const fetchEmployees = async () => {
         try {
-          const data = await fetchUserDirectory({ module: 'inspections' });
+          const data = await fetchUserDirectory({ module: 'inspections', limit: 200 });
           setEmployees(
             data.map((employee) => ({
               id: employee.id,
@@ -92,7 +93,14 @@ function InspectionsContent() {
             }))
           );
         } catch (err) {
-          console.error('Error fetching employees:', err);
+          const message = err instanceof Error ? err.message : String(err);
+          const isNetworkFailure =
+            message.includes('Failed to fetch') || message.includes('NetworkError') || message.toLowerCase().includes('network');
+          if (isNetworkFailure) {
+            console.warn('Unable to load employees (network):', err);
+          } else {
+            console.error('Error fetching employees:', err);
+          }
         }
       };
       fetchEmployees();
@@ -146,7 +154,8 @@ function InspectionsContent() {
           ),
           profile:profiles!van_inspections_user_id_fkey(full_name)
         `)
-        .order('inspection_date', { ascending: false });
+        .order('inspection_date', { ascending: false })
+        .range(0, displayCount);
 
       // Filter based on user role and selection
       if (!isElevatedUser) {
@@ -177,7 +186,9 @@ function InspectionsContent() {
       const { data, error } = await query;
 
       if (error) throw error;
-      setInspections(data || []);
+      const rows = data || [];
+      setHasMore(rows.length > displayCount);
+      setInspections(rows.slice(0, displayCount));
     } catch (error) {
       const message = (() => {
         if (error instanceof Error) return error.message;
@@ -211,7 +222,7 @@ function InspectionsContent() {
     } finally {
       setLoading(false);
     }
-  }, [user, authLoading, isElevatedUser, selectedEmployeeId, statusFilter, vehicleFilter, supabase]);
+  }, [user, authLoading, isElevatedUser, selectedEmployeeId, statusFilter, vehicleFilter, supabase, displayCount]);
 
   useEffect(() => {
     setDisplayCount(pageSize);
@@ -527,7 +538,7 @@ function InspectionsContent() {
       ) : (
         <>
           <div className="grid gap-4">
-            {inspections.slice(0, displayCount).map((inspection) => {
+            {inspections.map((inspection) => {
               const inspectionStatus = inspection.status as string;
               return (
             <Card 
@@ -614,14 +625,14 @@ function InspectionsContent() {
           </div>
 
           {/* Show More Button */}
-          {inspections.length > displayCount && (
+          {hasMore && (
             <div className="flex justify-center pt-4">
               <Button
                 onClick={() => setDisplayCount((prev) => prev + pageSize)}
                 variant="outline"
                 className={`w-full max-w-xs border-border text-white hover:bg-slate-800 ${tabletModeEnabled ? 'min-h-11 text-base' : ''}`}
               >
-                Show More ({inspections.length - displayCount} remaining)
+                Show More
               </Button>
             </div>
           )}

@@ -52,13 +52,14 @@ export default function TimesheetsPage() {
   const [deleting, setDeleting] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [displayCount, setDisplayCount] = useState(pageSize);
+  const [hasMore, setHasMore] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
     if (user && isElevatedUser) {
       const fetchEmployees = async () => {
         try {
-          const data = await fetchUserDirectory({ module: 'timesheets' });
+          const data = await fetchUserDirectory({ module: 'timesheets', limit: 200 });
           setEmployees(
             data.map((employee) => ({
               id: employee.id,
@@ -68,7 +69,14 @@ export default function TimesheetsPage() {
             }))
           );
         } catch (err) {
-          console.error('Error fetching employees:', err);
+          const message = err instanceof Error ? err.message : String(err);
+          const isNetworkFailure =
+            message.includes('Failed to fetch') || message.includes('NetworkError') || message.toLowerCase().includes('network');
+          if (isNetworkFailure) {
+            console.warn('Unable to load employees (network):', err);
+          } else {
+            console.error('Error fetching employees:', err);
+          }
         }
       };
 
@@ -88,7 +96,8 @@ export default function TimesheetsPage() {
           *,
           profile:profiles!timesheets_user_id_fkey(full_name)
         `)
-        .order('week_ending', { ascending: false });
+        .order('week_ending', { ascending: false })
+        .range(0, displayCount);
 
       // Filter based on user role and selection
       if (!isElevatedUser) {
@@ -111,7 +120,9 @@ export default function TimesheetsPage() {
       const { data, error } = await query;
 
       if (error) throw error;
-      setTimesheets(data || []);
+      const rows = data || [];
+      setHasMore(rows.length > displayCount);
+      setTimesheets(rows.slice(0, displayCount));
     } catch (error) {
       const message = (() => {
         if (error instanceof Error) return error.message;
@@ -147,7 +158,7 @@ export default function TimesheetsPage() {
     } finally {
       setLoading(false);
     }
-  }, [user, authLoading, isElevatedUser, selectedEmployeeId, statusFilter, supabase]);
+  }, [user, authLoading, isElevatedUser, selectedEmployeeId, statusFilter, supabase, displayCount]);
 
   useEffect(() => {
     setDisplayCount(pageSize);
@@ -470,7 +481,7 @@ export default function TimesheetsPage() {
       ) : (
         <>
           <div className="grid gap-4">
-            {timesheets.slice(0, displayCount).map((timesheet) => (
+            {timesheets.map((timesheet) => (
             <Card 
               key={timesheet.id} 
               className="border-border hover:shadow-lg hover:border-timesheet/50 transition-all duration-200 cursor-pointer"
@@ -550,14 +561,14 @@ export default function TimesheetsPage() {
           </div>
 
           {/* Show More Button */}
-          {timesheets.length > displayCount && (
+          {hasMore && (
             <div className="flex justify-center pt-4">
               <Button
                 onClick={() => setDisplayCount((prev) => prev + pageSize)}
                 variant="outline"
                 className="w-full max-w-xs border-border text-white hover:bg-slate-800"
               >
-                Show More ({timesheets.length - displayCount} remaining)
+                Show More
               </Button>
             </div>
           )}
