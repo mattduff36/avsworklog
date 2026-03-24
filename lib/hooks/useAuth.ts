@@ -7,6 +7,7 @@ import { Database } from '@/types/database';
 import { getViewAsSelection } from '@/lib/utils/view-as-cookie';
 
 type Profile = Database['public']['Tables']['profiles']['Row'] & {
+  email?: string | null;
   super_admin?: boolean | null;
   team_id?: string | null;
   role?: {
@@ -59,7 +60,6 @@ export function useAuth() {
     const profileSelect = `
       id,
       full_name,
-      email,
       phone_number,
       employee_id,
       role_id,

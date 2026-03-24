@@ -333,6 +333,10 @@ async function sendEmail(params: {
   return { success: true };
 }
 
+function getDefaultFromEmail(): string {
+  return process.env.RESEND_FROM_EMAIL || 'SquiresApp <no-reply@squiresapp.com>';
+}
+
 export async function renderQuotePdfAttachment(bundle: QuoteBundle): Promise<EmailAttachment> {
   const pdfDocument = QuotePDF({
     quoteReference: bundle.quote.quote_reference,
@@ -396,7 +400,7 @@ export async function sendQuoteToCustomerEmail(bundle: QuoteBundle, cc: string[]
   `;
 
   return sendEmail({
-    from: 'AVS Quotes <noreply@avsquires.co.uk>',
+    from: getDefaultFromEmail(),
     to: [customerEmail],
     cc: cc.filter(Boolean),
     subject,
