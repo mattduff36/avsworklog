@@ -17,7 +17,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 async function checkAttachmentHistory() {
   console.log('🔍 Checking attachment history for the last 18 days...\n');
-  console.log('Feature added: 2026-01-22 (4 days ago)\n');
+  console.log('Feature added: 22/01/2026\n');
 
   try {
     // 1. Check all completed tasks

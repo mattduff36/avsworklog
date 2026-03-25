@@ -17,7 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDate } from '@/lib/utils/date';
 import { formatFileSize } from '@/lib/utils/file-validation';
 import type { ManageDocumentRow } from '@/types/rams';
 import type { UploadingDoc } from '@/app/(dashboard)/projects/manage/page';
@@ -154,7 +154,7 @@ export function ProjectsDocumentsMobileCards({
                         </Badge>
                       )}
                       <span className="text-[11px] text-muted-foreground">
-                        {formatDistanceToNow(new Date(doc.created_at), { addSuffix: true })}
+                        {formatDate(doc.created_at)}
                       </span>
                     </div>
                   </div>
@@ -205,7 +205,7 @@ export function ProjectsDocumentsMobileCards({
                     <div>
                       <span className="text-muted-foreground">Uploaded</span>
                       <p className="text-foreground">
-                        {formatDistanceToNow(new Date(doc.created_at), { addSuffix: true })}
+                        {formatDate(doc.created_at)}
                       </p>
                     </div>
                   </div>

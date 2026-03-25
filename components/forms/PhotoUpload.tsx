@@ -98,6 +98,17 @@ export default function PhotoUpload({
     reader.readAsDataURL(file);
   };
 
+  const extractErrorMessage = (err: unknown): string => {
+    if (err instanceof Error) return err.message;
+    if (typeof err === 'object' && err !== null) {
+      const obj = err as Record<string, unknown>;
+      if (typeof obj.message === 'string') return obj.message;
+      if (typeof obj.error === 'string') return obj.error;
+      if (typeof obj.statusCode === 'number') return `Storage error (${obj.statusCode})`;
+    }
+    return String(err);
+  };
+
   const handleUpload = async () => {
     if (!selectedFile) return;
 
@@ -105,23 +116,24 @@ export default function PhotoUpload({
     setError('');
 
     try {
-      // Generate unique filename
       const fileExt = selectedFile.name.split('.').pop();
       const fileName = `${inspectionId}/${dayOfWeek ?? 'general'}/${itemNumber}/${Date.now()}.${fileExt}`;
 
-      // Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage
         .from('inspection-photos')
         .upload(fileName, selectedFile);
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Storage upload failed:', uploadError.message ?? uploadError);
+        setError(`Upload failed: ${extractErrorMessage(uploadError)}`);
+        setUploading(false);
+        return;
+      }
 
-      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('inspection-photos')
         .getPublicUrl(fileName);
 
-      // Save photo record to database
       const { error: dbError } = await supabase
         .from('inspection_photos')
         .insert({
@@ -132,20 +144,23 @@ export default function PhotoUpload({
           caption: caption || null,
         } as never);
 
-      if (dbError) throw dbError;
+      if (dbError) {
+        console.error('DB insert failed:', dbError.message ?? dbError);
+        setError(`Save failed: ${extractErrorMessage(dbError)}`);
+        setUploading(false);
+        return;
+      }
 
-      // Reset form
       setSelectedFile(null);
       setPreview(null);
       setCaption('');
       setSuccessMessage('Photo saved. You can review it below or add another one.');
       
-      // Refresh photos list
       await fetchExistingPhotos();
       onUploadComplete();
     } catch (err) {
-      console.error('Error uploading photo:', err);
-      setError(err instanceof Error ? err.message : 'Failed to upload photo');
+      console.error('Error uploading photo:', extractErrorMessage(err));
+      setError(extractErrorMessage(err) || 'Failed to upload photo');
     } finally {
       setUploading(false);
     }

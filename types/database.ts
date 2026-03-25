@@ -264,7 +264,7 @@ export interface Database {
           inspection_date: string
           inspection_end_date: string | null
           current_mileage: number | null
-          status: 'submitted'
+          status: 'draft' | 'submitted'
           submitted_at: string | null
           reviewed_by: string | null
           reviewed_at: string | null
@@ -282,7 +282,7 @@ export interface Database {
           inspection_date: string
           inspection_end_date?: string | null
           current_mileage?: number | null
-          status?: 'submitted'
+          status?: 'draft' | 'submitted'
           submitted_at?: string | null
           reviewed_by?: string | null
           reviewed_at?: string | null
@@ -300,7 +300,7 @@ export interface Database {
           inspection_date?: string
           inspection_end_date?: string | null
           current_mileage?: number | null
-          status?: 'submitted'
+          status?: 'draft' | 'submitted'
           submitted_at?: string | null
           reviewed_by?: string | null
           reviewed_at?: string | null

@@ -96,6 +96,7 @@ function HgvInspectionsContent() {
           hgv:hgvs!hgv_inspections_hgv_id_fkey(reg_number, nickname),
           profile:profiles!hgv_inspections_user_id_fkey(full_name)
         `)
+        .eq('status', 'submitted')
         .order('inspection_date', { ascending: false });
 
       if (!isElevatedUser) {

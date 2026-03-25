@@ -28,7 +28,7 @@ import {
   Clock
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDateTime } from '@/lib/utils/date';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
 import type { 
   ErrorReportWithUser, 
@@ -302,9 +302,7 @@ export default function ErrorReportsManagePage() {
                           <User className="h-3 w-3" />
                           {report.user?.full_name || 'Unknown'}
                         </span>
-                        <span>
-                          {formatDistanceToNow(new Date(report.created_at), { addSuffix: true })}
-                        </span>
+                        <span>{formatDateTime(report.created_at)}</span>
                         {report.error_code && (
                           <code className="text-muted-foreground bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded">
                             {report.error_code}

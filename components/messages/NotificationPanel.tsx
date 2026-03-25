@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Bell, Loader2, X } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDateTime } from '@/lib/utils/date';
 import { toast } from 'sonner';
 import type { NotificationItem } from '@/types/messages';
 
@@ -164,7 +164,7 @@ export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
                           {notification.subject}
                         </p>
                         <p className="text-xs text-slate-500 mt-0.5">
-                          {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
+                          {formatDateTime(notification.created_at)}
                         </p>
                       </div>
                     </button>

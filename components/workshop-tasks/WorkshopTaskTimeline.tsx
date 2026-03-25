@@ -7,7 +7,7 @@ import {
   Undo2,
   User,
 } from 'lucide-react';
-import { formatRelativeTime } from '@/lib/utils/date';
+import { formatDateTime } from '@/lib/utils/date';
 import { StatusHistoryEvent } from '@/lib/utils/workshopTaskStatusHistory';
 
 type WorkshopTaskComment = {
@@ -212,7 +212,7 @@ export function WorkshopTaskTimeline({
                     <span className="text-xs text-muted-foreground">created task</span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {formatRelativeTime(item.created_at)}
+                    {formatDateTime(item.created_at)}
                   </p>
                 </div>
               </div>
@@ -250,13 +250,13 @@ export function WorkshopTaskTimeline({
                       <img src={item.meta.signature_data} alt="Completion signature" className="border rounded p-1 bg-white max-w-xs" />
                       {item.meta.signed_at && (
                         <p className="text-xs text-muted-foreground">
-                          Signed: {formatRelativeTime(item.meta.signed_at)}
+                          Signed: {formatDateTime(item.meta.signed_at)}
                         </p>
                       )}
                     </div>
                   )}
                   <p className="text-xs text-muted-foreground">
-                    {formatRelativeTime(item.created_at)}
+                    {formatDateTime(item.created_at)}
                   </p>
                 </div>
               </div>
@@ -276,7 +276,7 @@ export function WorkshopTaskTimeline({
                 </div>
                 <p className="text-sm text-muted-foreground">{item.body}</p>
                 <p className="text-xs text-muted-foreground">
-                  {formatRelativeTime(item.created_at)}
+                  {formatDateTime(item.created_at)}
                   {item.updated_at && <span className="ml-1">(edited)</span>}
                 </p>
               </div>

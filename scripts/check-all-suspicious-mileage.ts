@@ -46,6 +46,21 @@ const supabase = createClient(
   }
 );
 
+function formatDateTime(value: string | Date): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Invalid date';
+  return date
+    .toLocaleString('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    })
+    .replace(',', '');
+}
+
 async function checkAllVehicles() {
   console.log('🔍 CHECKING ALL VEHICLES FOR SUSPICIOUS MILEAGE PATTERNS');
   console.log('========================================================\n');
@@ -139,7 +154,7 @@ async function checkAllVehicles() {
       console.log(`  Correct Mileage: UNKNOWN (no valid inspection history)`);
     }
     
-    console.log(`  Last Updated: ${v.lastUpdate} (${v.daysSinceUpdate} days ago)`);
+    console.log(`  Last Updated: ${formatDateTime(v.lastUpdate)}`);
     console.log('');
   }
 

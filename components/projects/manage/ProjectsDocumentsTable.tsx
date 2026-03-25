@@ -30,7 +30,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDate } from '@/lib/utils/date';
 import { formatFileSize } from '@/lib/utils/file-validation';
 import type { ManageDocumentRow, ManageDocumentsQuery } from '@/types/rams';
 import type { UploadingDoc } from '@/app/(dashboard)/projects/manage/page';
@@ -233,7 +233,7 @@ export function ProjectsDocumentsTable({
                 {doc.document_type_name || <span className="italic">None</span>}
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">
-                {formatDistanceToNow(new Date(doc.created_at), { addSuffix: true })}
+                {formatDate(doc.created_at)}
               </TableCell>
               <TableCell className="text-sm text-muted-foreground truncate max-w-[120px]">
                 {doc.uploader_name}

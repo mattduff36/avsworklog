@@ -15,7 +15,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Loader2, Search, Filter, CheckCircle2, Clock, AlertTriangle, Trash2, FileDown } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDateTime } from '@/lib/utils/date';
 import { toast } from 'sonner';
 import type { MessageReportData } from '@/types/messages';
 import {
@@ -216,7 +216,7 @@ export function MessagesReportView() {
                     </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    From: {selectedMessage.message.sender?.full_name || 'System'} • {formatDistanceToNow(new Date(selectedMessage.message.created_at), { addSuffix: true })}
+                    From: {selectedMessage.message.sender?.full_name || 'System'} • {formatDateTime(selectedMessage.message.created_at)}
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-2">
@@ -330,9 +330,7 @@ export function MessagesReportView() {
                           )}
                         </TableCell>
                         <TableCell>
-                          {recipient.signed_at
-                            ? formatDistanceToNow(new Date(recipient.signed_at), { addSuffix: true })
-                            : '-'}
+                          {recipient.signed_at ? formatDateTime(recipient.signed_at) : '-'}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -363,7 +361,7 @@ export function MessagesReportView() {
                     </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground mb-2">
-                    From: {msg.message.sender?.full_name || 'System'} • {formatDistanceToNow(new Date(msg.message.created_at), { addSuffix: true })}
+                    From: {msg.message.sender?.full_name || 'System'} • {formatDateTime(msg.message.created_at)}
                   </p>
                   <div className="flex items-center gap-4 text-sm">
                     <span className="text-muted-foreground">

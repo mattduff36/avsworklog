@@ -151,12 +151,19 @@ export function DVLASyncButton({
     
     if (lastSync) {
       const syncDate = new Date(lastSync);
-      const now = new Date();
-      const daysDiff = Math.floor((now.getTime() - syncDate.getTime()) / (1000 * 60 * 60 * 24));
-      
-      if (daysDiff === 0) return 'Sync tax & MOT due dates (synced today)';
-      if (daysDiff === 1) return 'Sync tax & MOT due dates (synced yesterday)';
-      return `Sync tax & MOT due dates (synced ${daysDiff} days ago)`;
+      if (!Number.isNaN(syncDate.getTime())) {
+        const formatted = syncDate
+          .toLocaleString('en-GB', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+          })
+          .replace(',', '');
+        return `Sync tax & MOT due dates (last synced ${formatted})`;
+      }
     }
     
     return 'Sync tax & MOT due dates';

@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { BackButton } from '@/components/ui/back-button';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDate } from '@/lib/utils/date';
 import { AssignEmployeesModal } from '@/components/rams/AssignEmployeesModal';
 import { formatFileSize } from '@/lib/utils/file-validation';
 
@@ -347,7 +347,7 @@ export default function RAMSDetailsPage() {
             <div>
               <h1 className="text-3xl font-bold text-foreground mb-2">{ramsDocument.title}</h1>
               <p className="text-muted-foreground">
-                Uploaded {formatDistanceToNow(new Date(ramsDocument.created_at), { addSuffix: true })} by{' '}
+                Uploaded {formatDate(ramsDocument.created_at)} by{' '}
                 {ramsDocument.uploader_name}
               </p>
             </div>
@@ -521,17 +521,15 @@ export default function RAMSDetailsPage() {
                           )}
                         </TableCell>
                         <TableCell>
-                          {formatDistanceToNow(new Date(assignment.assigned_at), {
-                            addSuffix: true,
-                          })}
+                          {formatDate(assignment.assigned_at)}
                         </TableCell>
                         <TableCell>
                           {requiredSignature
                             ? (assignment.signed_at
-                                ? formatDistanceToNow(new Date(assignment.signed_at), { addSuffix: true })
+                                ? formatDate(assignment.signed_at)
                                 : '-')
                             : (assignment.read_at
-                                ? formatDistanceToNow(new Date(assignment.read_at), { addSuffix: true })
+                                ? formatDate(assignment.read_at)
                                 : '-')}
                         </TableCell>
                       </TableRow>
@@ -578,9 +576,7 @@ export default function RAMSDetailsPage() {
                         <TableCell>{signature.visitor_company || '-'}</TableCell>
                         <TableCell>{signature.visitor_role || '-'}</TableCell>
                         <TableCell>
-                          {formatDistanceToNow(new Date(signature.signed_at), {
-                            addSuffix: true,
-                          })}
+                          {formatDate(signature.signed_at)}
                         </TableCell>
                         <TableCell>{signature.recorder.full_name}</TableCell>
                       </TableRow>

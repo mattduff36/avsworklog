@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useAttachmentTemplates } from '@/lib/hooks/useAttachmentTemplates';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Settings, Plus, CheckCircle2, Clock, AlertTriangle, Wrench, Pause } from 'lucide-react';
 import { ErrorDetailsResponse } from '@/types/error-details';
@@ -30,6 +31,8 @@ const CategoryManagementPanel = dynamic(() => import('@/components/workshop-task
 const AttachmentManagementPanel = dynamic(() => import('@/components/workshop-tasks/AttachmentManagementPanel').then(m => ({ default: m.AttachmentManagementPanel })), { ssr: false });
 const MarkTaskCompleteDialog = dynamic(() => import('@/components/workshop-tasks/MarkTaskCompleteDialog').then(m => ({ default: m.MarkTaskCompleteDialog })), { ssr: false });
 const ErrorDetailsModal = dynamic(() => import('@/components/ui/error-details-modal').then(m => ({ default: m.ErrorDetailsModal })), { ssr: false });
+
+const WORKSHOP_WIDESCREEN_STORAGE_KEY = 'workshop-tasks-widescreen-view';
 
 export default function WorkshopTasksPage() {
   const router = useRouter();
@@ -60,6 +63,7 @@ export default function WorkshopTasksPage() {
   const [showInProgress, setShowInProgress] = useState(true);
   const [showOnHold, setShowOnHold] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [widescreenView, setWidescreenView] = useState(false);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
@@ -133,6 +137,16 @@ export default function WorkshopTasksPage() {
 
   const validAssetTabs: ReadonlyArray<'all' | 'van' | 'plant' | 'hgv'> = ['all', 'van', 'plant', 'hgv'];
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      setWidescreenView(localStorage.getItem(WORKSHOP_WIDESCREEN_STORAGE_KEY) === 'true');
+    } catch {
+      // Ignore localStorage access failures
+    }
+  }, []);
+
   const { activeTab, assetTab } = useMemo(() => {
     const requestedTab = searchParams.get('tab') || 'all';
 
@@ -184,11 +198,24 @@ export default function WorkshopTasksPage() {
     }
   }
 
+  function handleWidescreenToggle(checked: boolean) {
+    setWidescreenView(checked);
+
+    try {
+      localStorage.setItem(WORKSHOP_WIDESCREEN_STORAGE_KEY, checked ? 'true' : 'false');
+      window.dispatchEvent(new Event('workshop-widescreen-changed'));
+    } catch {
+      // Ignore localStorage access failures
+    }
+  }
+
   if (permissionLoading) return <div className="flex items-center justify-center min-h-[400px]"><div className="text-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-workshop mx-auto mb-4" /><p className="text-muted-foreground">Checking permissions...</p></div></div>;
   if (!hasPermission) return null;
 
   return (
-    <div className="space-y-6 max-w-6xl">
+    <div
+      className={`space-y-6 ${widescreenView && !tabletModeEnabled ? 'w-full max-w-none' : 'mx-auto max-w-6xl'}`}
+    >
       <div className={`bg-white dark:bg-slate-900 rounded-lg border border-border ${tabletModeEnabled ? 'p-5 md:p-6' : 'p-6'}`}>
         <div className="flex items-center justify-between">
           <div>
@@ -200,9 +227,117 @@ export default function WorkshopTasksPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => handlePageTabChange(v as 'overview' | 'settings')}>
-        {showSettings && <TabsList className={tabletModeEnabled ? 'h-auto flex-wrap gap-2 p-1.5' : undefined}><TabsTrigger value="overview" className={tabletModeEnabled ? 'gap-2 min-h-11 text-base px-4' : 'gap-2'}><Wrench className="h-4 w-4" />Overview</TabsTrigger><TabsTrigger value="settings" className={tabletModeEnabled ? 'gap-2 min-h-11 text-base px-4' : 'gap-2'}><Settings className="h-4 w-4" />Settings</TabsTrigger></TabsList>}
-        <WorkshopTasksOverviewTab assetTab={assetTab} onAssetTabChange={(newTab) => handleAssetTabChange(newTab as 'all' | 'van' | 'plant' | 'hgv')} statusFilter={statusFilter} onStatusFilterChange={setStatusFilter} vehicleFilter={vehicleFilter} onVehicleFilterChange={setVehicleFilter} vehicles={vehicles} loading={loading} tabFilteredTasks={tabFilteredTasks} pendingTasks={pendingTasks} highPriorityPendingCount={highPriorityPendingTasks.length} inProgressTasks={inProgressTasks} onHoldTasks={onHoldTasks} completedTasks={completedTasks} showPending={showPending} onShowPendingChange={setShowPending} showInProgress={showInProgress} onShowInProgressChange={setShowInProgress} showOnHold={showOnHold} onShowOnHoldChange={setShowOnHold} showCompleted={showCompleted} onShowCompletedChange={setShowCompleted} updatingStatus={updatingStatus} taskAttachmentCounts={taskAttachmentCounts} taskInspectionPhotos={taskInspectionPhotos} getStatusIcon={getStatusIcon} getVehicleReg={getVehicleReg} getSourceLabel={getSourceLabel} getAssetDisplay={getAssetDisplay} onCreateTask={() => setShowAddModal(true)} onOpenTaskModal={(task) => { setModalTask(task); setShowTaskModal(true); }} onOpenComments={(task) => { setCommentsTask(task); setShowCommentsDrawer(true); }} onMarkInProgress={(task) => { setSelectedTask(task); setLoggedComment(''); setShowStatusModal(true); }} onMarkComplete={(task) => { setCompletingTask(task); setShowCompleteModal(true); }} onMarkOnHold={(task) => { setOnHoldingTask(task); setOnHoldComment(''); setShowOnHoldModal(true); }} onResumeTask={(task) => { setResumingTask(task); setResumeComment(''); setShowResumeModal(true); }} onUndoLogged={lifecycle.handleUndoLogged} onUndoComplete={lifecycle.handleUndoComplete} onEditTask={crud.handleEditTask} onDeleteTask={crud.handleDeleteTask} />
-        {showSettings && <TabsContent value="settings" className="space-y-6 mt-0"><Card className="border-border"><CardHeader><CardTitle className="text-white">Category Taxonomy</CardTitle><CardDescription className="text-muted-foreground">Manage categories for vans, HGVs, or plant machinery</CardDescription></CardHeader><CardContent><Tabs value={categoryTaxonomyMode} onValueChange={(v) => setCategoryTaxonomyMode(v as 'van' | 'plant' | 'hgv')}><TabsList className="grid w-full grid-cols-3"><TabsTrigger value="van">Van Categories</TabsTrigger><TabsTrigger value="plant">Plant Categories</TabsTrigger><TabsTrigger value="hgv">HGV Categories</TabsTrigger></TabsList></Tabs></CardContent></Card><CategoryManagementPanel categories={categoryTaxonomyMode === 'plant' ? plantCategories : categoryTaxonomyMode === 'hgv' ? hgvCategories : categories} subcategories={categoryTaxonomyMode === 'plant' ? plantSubcategories : categoryTaxonomyMode === 'hgv' ? hgvSubcategories : subcategories} onAddCategory={crud.openAddCategoryModal} onEditCategory={crud.openEditCategoryModal} onDeleteCategory={crud.handleDeleteCategory} onAddSubcategory={crud.openAddSubcategoryModal} onEditSubcategory={crud.openEditSubcategoryModal} onDeleteSubcategory={crud.handleDeleteSubcategory} /><AttachmentManagementPanel taxonomyMode={categoryTaxonomyMode} /></TabsContent>}
+        {showSettings && (
+          <TabsList className={tabletModeEnabled ? 'h-auto flex-wrap gap-2 p-1.5' : undefined}>
+            <TabsTrigger value="overview" className={tabletModeEnabled ? 'gap-2 min-h-11 text-base px-4' : 'gap-2'}>
+              <Wrench className="h-4 w-4" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="settings" className={tabletModeEnabled ? 'gap-2 min-h-11 text-base px-4' : 'gap-2'}>
+              <Settings className="h-4 w-4" />
+              Settings
+            </TabsTrigger>
+          </TabsList>
+        )}
+        <WorkshopTasksOverviewTab
+          assetTab={assetTab}
+          onAssetTabChange={(newTab) => handleAssetTabChange(newTab as 'all' | 'van' | 'plant' | 'hgv')}
+          statusFilter={statusFilter}
+          onStatusFilterChange={setStatusFilter}
+          vehicleFilter={vehicleFilter}
+          onVehicleFilterChange={setVehicleFilter}
+          vehicles={vehicles}
+          loading={loading}
+          tabFilteredTasks={tabFilteredTasks}
+          pendingTasks={pendingTasks}
+          highPriorityPendingCount={highPriorityPendingTasks.length}
+          inProgressTasks={inProgressTasks}
+          onHoldTasks={onHoldTasks}
+          completedTasks={completedTasks}
+          showPending={showPending}
+          onShowPendingChange={setShowPending}
+          showInProgress={showInProgress}
+          onShowInProgressChange={setShowInProgress}
+          showOnHold={showOnHold}
+          onShowOnHoldChange={setShowOnHold}
+          showCompleted={showCompleted}
+          onShowCompletedChange={setShowCompleted}
+          updatingStatus={updatingStatus}
+          taskAttachmentCounts={taskAttachmentCounts}
+          taskInspectionPhotos={taskInspectionPhotos}
+          getStatusIcon={getStatusIcon}
+          getVehicleReg={getVehicleReg}
+          getSourceLabel={getSourceLabel}
+          getAssetDisplay={getAssetDisplay}
+          onCreateTask={() => setShowAddModal(true)}
+          onOpenTaskModal={(task) => { setModalTask(task); setShowTaskModal(true); }}
+          onOpenComments={(task) => { setCommentsTask(task); setShowCommentsDrawer(true); }}
+          onMarkInProgress={(task) => { setSelectedTask(task); setLoggedComment(''); setShowStatusModal(true); }}
+          onMarkComplete={(task) => { setCompletingTask(task); setShowCompleteModal(true); }}
+          onMarkOnHold={(task) => { setOnHoldingTask(task); setOnHoldComment(''); setShowOnHoldModal(true); }}
+          onResumeTask={(task) => { setResumingTask(task); setResumeComment(''); setShowResumeModal(true); }}
+          onUndoLogged={lifecycle.handleUndoLogged}
+          onUndoComplete={lifecycle.handleUndoComplete}
+          onEditTask={crud.handleEditTask}
+          onDeleteTask={crud.handleDeleteTask}
+        />
+        {showSettings && (
+          <TabsContent value="settings" className="space-y-6 mt-0">
+            <Card className="border-border">
+              <CardHeader>
+                <CardTitle className="text-white">Layout Preferences</CardTitle>
+                <CardDescription className="text-muted-foreground">
+                  Control how wide the workshop tasks page appears on larger desktop screens.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col gap-4 rounded-lg border border-border bg-slate-900/40 p-4 md:flex-row md:items-center md:justify-between">
+                  <div className="space-y-1">
+                    <p className="font-medium text-foreground">Widescreen View</p>
+                    <p className="text-sm text-muted-foreground">
+                      Expand the workshop page close to the full viewport width. This is only applied when you enable it.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-muted-foreground">
+                      {widescreenView ? 'Enabled' : 'Default width'}
+                    </span>
+                    <Switch checked={widescreenView} onCheckedChange={handleWidescreenToggle} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border">
+              <CardHeader>
+                <CardTitle className="text-white">Category Taxonomy</CardTitle>
+                <CardDescription className="text-muted-foreground">
+                  Manage categories for vans, HGVs, or plant machinery
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Tabs value={categoryTaxonomyMode} onValueChange={(v) => setCategoryTaxonomyMode(v as 'van' | 'plant' | 'hgv')}>
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="van">Van Categories</TabsTrigger>
+                    <TabsTrigger value="plant">Plant Categories</TabsTrigger>
+                    <TabsTrigger value="hgv">HGV Categories</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </CardContent>
+            </Card>
+            <CategoryManagementPanel
+              categories={categoryTaxonomyMode === 'plant' ? plantCategories : categoryTaxonomyMode === 'hgv' ? hgvCategories : categories}
+              subcategories={categoryTaxonomyMode === 'plant' ? plantSubcategories : categoryTaxonomyMode === 'hgv' ? hgvSubcategories : subcategories}
+              onAddCategory={crud.openAddCategoryModal}
+              onEditCategory={crud.openEditCategoryModal}
+              onDeleteCategory={crud.handleDeleteCategory}
+              onAddSubcategory={crud.openAddSubcategoryModal}
+              onEditSubcategory={crud.openEditSubcategoryModal}
+              onDeleteSubcategory={crud.handleDeleteSubcategory}
+            />
+            <AttachmentManagementPanel taxonomyMode={categoryTaxonomyMode} />
+          </TabsContent>
+        )}
       </Tabs>
 
       <WorkshopTaskFormDialogs showAddModal={showAddModal} onShowAddModalChange={setShowAddModal} assetTab={assetTab} selectedVehicleId={selectedVehicleId} onSelectedVehicleIdChange={setSelectedVehicleId} vehicles={vehicles} getAssetDisplay={getAssetDisplay} selectedCategoryId={selectedCategoryId} onSelectedCategoryIdChange={crud.handleCategoryChange} activeCategories={activeCategories} categoryHasSubcategories={categoryHasSubcategories} selectedSubcategoryId={selectedSubcategoryId} onSelectedSubcategoryIdChange={setSelectedSubcategoryId} filteredSubcategories={filteredSubcategories} meterReadingType={meterReadingType} newMeterReading={newMeterReading} onNewMeterReadingChange={setNewMeterReading} currentMeterReading={currentMeterReading} workshopComments={workshopComments} onWorkshopCommentsChange={setWorkshopComments} attachmentTemplates={attachmentTemplates} selectedAttachmentTemplateIds={selectedAttachmentTemplateIds} onSelectedAttachmentTemplateIdsChange={setSelectedAttachmentTemplateIds} submitting={submitting} onResetAddForm={crud.resetAddForm} onFetchCurrentMeterReading={fetcher.fetchCurrentMeterReading} onCreateTask={crud.handleAddTask} showEditModal={showEditModal} onShowEditModalChange={setShowEditModal} editingTask={editingTask} editVehicleId={editVehicleId} onEditVehicleIdChange={crud.handleEditVehicleChange} recentVehicleIds={recentVehicleIds} editCategoryId={editCategoryId} onEditCategoryIdChange={(value) => { setEditCategoryId(value); setEditSubcategoryId(''); }} categories={categories} plantCategories={plantCategories} hgvCategories={hgvCategories} editSubcategoryId={editSubcategoryId} onEditSubcategoryIdChange={setEditSubcategoryId} subcategories={subcategories} plantSubcategories={plantSubcategories} hgvSubcategories={hgvSubcategories} initialEditCategoryId={initialEditCategoryId} initialEditHadSubcategory={initialEditHadSubcategory} editMileage={editMileage} onEditMileageChange={setEditMileage} editCurrentMileage={editCurrentMileage} editComments={editComments} onEditCommentsChange={setEditComments} isSaveEditDisabled={crud.isSaveEditDisabled} onSaveEdit={crud.handleSaveEdit} onResetEditForm={crud.resetEditForm} />

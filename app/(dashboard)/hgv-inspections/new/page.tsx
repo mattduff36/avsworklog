@@ -6,7 +6,16 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { fetchUserDirectory, type DirectoryUser } from '@/lib/client/user-directory';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { BackButton } from '@/components/ui/back-button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,7 +25,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertCircle, Camera, CheckCircle2, Info, MinusCircle, Send, Timer, User, XCircle } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Camera, CheckCircle2, Info, MinusCircle, Send, Timer, User, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { TRUCK_CHECKLIST_ITEMS } from '@/lib/checklists/vehicle-checklists';
 import { formatDate, formatDateISO, getDayOfWeek } from '@/lib/utils/date';
@@ -42,6 +51,8 @@ type HgvAsset = {
 
 type InspectionItemInsert = Database['public']['Tables']['inspection_items']['Insert'];
 type InspectionInsert = Database['public']['Tables']['hgv_inspections']['Insert'];
+type PendingNavigation = { type: 'href'; href: string } | { type: 'back' };
+type ExistingInspectionConflict = { id: string; status: 'draft' | 'submitted' };
 
 const MIN_HGV_INSPECTION_SECONDS = 10 * 60;
 const STICKY_NAV_OFFSET_PX = 96;
@@ -83,10 +94,19 @@ function NewHgvInspectionContent() {
   const [loading, setLoading] = useState(false);
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
   const saveInspectionInFlightRef = useRef(false);
+  const allowNavigationRef = useRef(false);
 
   const [existingInspectionId, setExistingInspectionId] = useState<string | null>(draftId);
   const [photoUploadItem, setPhotoUploadItem] = useState<{ itemNumber: number; dayOfWeek: number } | null>(null);
   const [savingDraftForPhoto, setSavingDraftForPhoto] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation | null>(null);
+  const [showDiscardDraftDialog, setShowDiscardDraftDialog] = useState(false);
+  const [discardingDraft, setDiscardingDraft] = useState(false);
+  const [conflictingDraftId, setConflictingDraftId] = useState<string | null>(null);
+  const [showDraftConflictDialog, setShowDraftConflictDialog] = useState(false);
+  const [resolvingDraftConflict, setResolvingDraftConflict] = useState(false);
+  const [submittedConflictInspectionId, setSubmittedConflictInspectionId] = useState<string | null>(null);
+  const [showSubmittedConflictDialog, setShowSubmittedConflictDialog] = useState(false);
   const { photoMap, refresh: refreshInspectionPhotos } = useInspectionPhotos(existingInspectionId, {
     enabled: Boolean(existingInspectionId),
   });
@@ -96,6 +116,104 @@ function NewHgvInspectionContent() {
       photoMap[getInspectionPhotoKey(itemNumber, dayOfWeek)] ?? [],
     [photoMap]
   );
+
+  const beginChecklist = useCallback(() => {
+    setChecklistStarted(true);
+    setInspectionStartMs(Date.now());
+  }, []);
+
+  const findExistingInspectionConflict = useCallback(async (): Promise<ExistingInspectionConflict | null> => {
+    if (!hgvId || !inspectionDate) {
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from('hgv_inspections')
+      .select('id, status')
+      .eq('hgv_id', hgvId)
+      .eq('inspection_date', inspectionDate)
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Failed to check for existing inspection:', error);
+      return null;
+    }
+
+    if (!data) {
+      return null;
+    }
+
+    if (data.id === existingInspectionId) {
+      return null;
+    }
+
+    return {
+      id: data.id,
+      status: data.status as 'draft' | 'submitted',
+    };
+  }, [existingInspectionId, hgvId, inspectionDate, supabase]);
+
+  const handleInspectionConflict = useCallback((conflict: ExistingInspectionConflict): void => {
+    if (conflict.status === 'draft') {
+      setConflictingDraftId(conflict.id);
+      setShowDraftConflictDialog(true);
+      toast.info('A draft already exists for this HGV and date.');
+      return;
+    }
+
+    setSubmittedConflictInspectionId(conflict.id);
+    setShowSubmittedConflictDialog(true);
+    toast.info('A daily check has already been submitted for this HGV and date.');
+  }, []);
+
+  const discardDraftById = useCallback(async (inspectionId: string, showToast = true): Promise<boolean> => {
+    try {
+      const response = await fetch(`/api/hgv-inspections/${inspectionId}/discard`, { method: 'DELETE' });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null) as { error?: string } | null;
+        throw new Error(body?.error || 'Failed to discard draft');
+      }
+
+      if (existingInspectionId === inspectionId) {
+        setExistingInspectionId(null);
+        setPhotoUploadItem(null);
+        window.history.replaceState(null, '', '/hgv-inspections/new');
+      }
+
+      if (showToast) {
+        toast.success('Draft discarded');
+      }
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to discard draft';
+      toast.error(message);
+      return false;
+    }
+  }, [existingInspectionId]);
+
+  const navigateWithoutPrompt = useCallback((navigation: PendingNavigation) => {
+    allowNavigationRef.current = true;
+    if (navigation.type === 'back') {
+      if (window.history.length > 1) {
+        router.back();
+      } else {
+        router.push('/hgv-inspections');
+      }
+      return;
+    }
+
+    router.push(navigation.href);
+  }, [router]);
+
+  const requestNavigation = useCallback((navigation: PendingNavigation) => {
+    if (!existingInspectionId || saveInspectionInFlightRef.current || allowNavigationRef.current) {
+      navigateWithoutPrompt(navigation);
+      return;
+    }
+    setPendingNavigation(navigation);
+    setShowDiscardDraftDialog(true);
+  }, [existingInspectionId, navigateWithoutPrompt]);
 
   const ensureDraftSaved = async (): Promise<string | null> => {
     if (existingInspectionId) return existingInspectionId;
@@ -107,6 +225,13 @@ function NewHgvInspectionContent() {
       toast.error('Select an inspection date before adding photos');
       return null;
     }
+
+    const inspectionConflict = await findExistingInspectionConflict();
+    if (inspectionConflict) {
+      handleInspectionConflict(inspectionConflict);
+      return null;
+    }
+
     setSavingDraftForPhoto(true);
     try {
       const mileageValue = parseInt(currentMileage, 10);
@@ -124,7 +249,16 @@ function NewHgvInspectionContent() {
         .select('id')
         .single();
 
-      if (draftError) throw draftError;
+      if (draftError) {
+        if (draftError.code === '23505') {
+          const inspectionConflict = await findExistingInspectionConflict();
+          if (inspectionConflict) {
+            handleInspectionConflict(inspectionConflict);
+            return null;
+          }
+        }
+        throw draftError;
+      }
 
       const dayOfWeek = getDayOfWeek(new Date(inspectionDate + 'T00:00:00'));
       const items: InspectionItemInsert[] = [];
@@ -178,6 +312,11 @@ function NewHgvInspectionContent() {
         return;
       }
 
+      setExistingInspectionId(id);
+      setConflictingDraftId(null);
+      setShowDraftConflictDialog(false);
+      setSubmittedConflictInspectionId(null);
+      setShowSubmittedConflictDialog(false);
       setHgvId(draft.hgv_id);
       setInspectionDate(draft.inspection_date);
       setCurrentMileage(draft.current_mileage != null ? String(draft.current_mileage) : '');
@@ -249,6 +388,55 @@ function NewHgvInspectionContent() {
   }, [draftId, user, loadDraftInspection]);
 
   useEffect(() => {
+    if (!existingInspectionId) return;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (saveInspectionInFlightRef.current || allowNavigationRef.current) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [existingInspectionId]);
+
+  useEffect(() => {
+    if (!existingInspectionId) return;
+
+    const handleDocumentClick = (event: MouseEvent) => {
+      if (saveInspectionInFlightRef.current || allowNavigationRef.current) return;
+      const target = event.target as HTMLElement | null;
+      const anchor = target?.closest('a[href]') as HTMLAnchorElement | null;
+      if (!anchor) return;
+      if (anchor.hasAttribute('download') || anchor.target === '_blank') return;
+
+      const rawHref = anchor.getAttribute('href');
+      if (!rawHref || rawHref.startsWith('#') || rawHref.startsWith('mailto:') || rawHref.startsWith('tel:')) {
+        return;
+      }
+
+      const nextUrl = new URL(rawHref, window.location.origin);
+      const currentUrl = new URL(window.location.href);
+      if (nextUrl.origin !== currentUrl.origin) return;
+
+      const nextPathWithSearch = `${nextUrl.pathname}${nextUrl.search}`;
+      const currentPathWithSearch = `${currentUrl.pathname}${currentUrl.search}`;
+      if (nextPathWithSearch === currentPathWithSearch) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      requestNavigation({ type: 'href', href: nextPathWithSearch });
+    };
+
+    document.addEventListener('click', handleDocumentClick, true);
+    return () => {
+      document.removeEventListener('click', handleDocumentClick, true);
+    };
+  }, [existingInspectionId, requestNavigation]);
+
+  useEffect(() => {
     if (!checklistStarted || !inspectionStartMs) return;
     const id = setInterval(() => setNowMs(Date.now()), 1000);
     return () => clearInterval(id);
@@ -293,7 +481,7 @@ function NewHgvInspectionContent() {
     }
   };
 
-  const startInspection = () => {
+  const startInspection = async () => {
     if (!hgvId) {
       setError('Please select an HGV first');
       return;
@@ -307,9 +495,17 @@ function NewHgvInspectionContent() {
       setError('Please enter a valid current KM');
       return;
     }
+
+    if (!existingInspectionId) {
+      const inspectionConflict = await findExistingInspectionConflict();
+      if (inspectionConflict) {
+        handleInspectionConflict(inspectionConflict);
+        return;
+      }
+    }
+
     setError('');
-    setChecklistStarted(true);
-    setInspectionStartMs(Date.now());
+    beginChecklist();
   };
 
   const handleStatusChange = (itemNumber: number, status: InspectionStatus) => {
@@ -408,115 +604,143 @@ function NewHgvInspectionContent() {
     }
   };
 
-  const saveInspection = async (signatureData: string) => {
+  const saveInspection = async (status: 'draft' | 'submitted', signatureData?: string) => {
     if (!user || saveInspectionInFlightRef.current) return;
     saveInspectionInFlightRef.current = true;
     setLoading(true);
     setError('');
 
     try {
-      const validationError = validate();
-      if (validationError) {
-        setError(validationError);
-        setLoading(false);
-        return;
+      if (status === 'submitted') {
+        const validationError = validate();
+        if (validationError) {
+          setError(validationError);
+          setLoading(false);
+          return;
+        }
+      }
+
+      if (!hgvId || !inspectionDate || !selectedEmployeeId) {
+        throw new Error('Select an HGV, employee and date before saving');
       }
 
       const mileageValue = parseInt(currentMileage, 10);
+      if (Number.isNaN(mileageValue) || mileageValue < 0) {
+        throw new Error('Please enter a valid current KM');
+      }
 
-      let inspection: { id: string };
+      const inspectionPayload: InspectionInsert = {
+        hgv_id: hgvId,
+        user_id: selectedEmployeeId,
+        inspection_date: inspectionDate,
+        inspection_end_date: inspectionDate,
+        current_mileage: mileageValue,
+        status,
+        submitted_at: status === 'submitted' ? new Date().toISOString() : null,
+        signature_data: status === 'submitted' ? signatureData || null : null,
+        signed_at: status === 'submitted' && signatureData ? new Date().toISOString() : null,
+        inspector_comments: inspectorComments.trim() || null,
+      };
+
+      let inspectionId = existingInspectionId;
 
       if (existingInspectionId) {
         const { data: updatedInspection, error: updateError } = await supabase
           .from('hgv_inspections')
-          .update({
-            hgv_id: hgvId,
-            user_id: selectedEmployeeId,
-            inspection_date: inspectionDate,
-            inspection_end_date: inspectionDate,
-            current_mileage: mileageValue,
-            status: 'submitted' as const,
-            submitted_at: new Date().toISOString(),
-            signature_data: signatureData,
-            signed_at: new Date().toISOString(),
-            inspector_comments: inspectorComments.trim() || null,
-          })
+          .update(inspectionPayload)
           .eq('id', existingInspectionId)
-          .select()
+          .select('id')
           .single();
 
         if (updateError || !updatedInspection) {
           throw updateError || new Error('Failed to update inspection');
         }
-        inspection = updatedInspection;
+        inspectionId = updatedInspection.id;
       } else {
-        const inspectionPayload: InspectionInsert = {
-          hgv_id: hgvId,
-          user_id: selectedEmployeeId,
-          inspection_date: inspectionDate,
-          inspection_end_date: inspectionDate,
-          current_mileage: mileageValue,
-          status: 'submitted',
-          submitted_at: new Date().toISOString(),
-          signature_data: signatureData,
-          signed_at: new Date().toISOString(),
-          inspector_comments: inspectorComments.trim() || null,
-        };
-
         const { data: newInspection, error: insertInspectionError } = await supabase
           .from('hgv_inspections')
           .insert(inspectionPayload)
-          .select()
+          .select('id')
           .single();
 
         if (insertInspectionError || !newInspection) {
           throw insertInspectionError || new Error('Failed to create inspection');
         }
-        inspection = newInspection;
+        inspectionId = newInspection.id;
+        setExistingInspectionId(newInspection.id);
+        window.history.replaceState(null, '', `/hgv-inspections/new?id=${newInspection.id}`);
       }
 
-      const { error: updateHgvMileageError } = await supabase
-        .from('hgvs')
-        .update({ current_mileage: mileageValue })
-        .eq('id', hgvId);
-
-      if (updateHgvMileageError) {
-        throw updateHgvMileageError;
+      if (!inspectionId) {
+        throw new Error('Failed to resolve inspection id');
       }
 
       if (existingInspectionId) {
-        await supabase
+        const { error: deleteItemsError } = await supabase
           .from('inspection_items')
           .delete()
           .eq('inspection_id', existingInspectionId);
+        if (deleteItemsError) {
+          throw deleteItemsError;
+        }
       }
 
       const dayOfWeek = getDayOfWeek(new Date(`${inspectionDate}T00:00:00`));
-      const itemsToInsert: InspectionItemInsert[] = TRUCK_CHECKLIST_ITEMS.map((itemDescription, idx) => {
+      const itemsToInsert: InspectionItemInsert[] = [];
+      TRUCK_CHECKLIST_ITEMS.forEach((itemDescription, idx) => {
         const itemNumber = idx + 1;
         const key = `${itemNumber}`;
-        return {
-          inspection_id: inspection.id,
+        const itemStatus = checkboxStates[key];
+
+        if (!itemStatus) {
+          return;
+        }
+
+        itemsToInsert.push({
+          inspection_id: inspectionId,
           item_number: itemNumber,
           item_description: itemDescription,
           day_of_week: dayOfWeek,
-          status: checkboxStates[key],
+          status: itemStatus,
           comments: comments[key] || null,
-        };
+        });
       });
 
-      const { data: insertedItems, error: insertItemsError } = await supabase
-        .from('inspection_items')
-        .insert(itemsToInsert)
-        .select();
+      type InsertedItem = {
+        id: string;
+        item_number: number;
+        item_description: string;
+        day_of_week: number | null;
+        status: InspectionStatus;
+        comments: string | null;
+      };
+      let insertedItems: InsertedItem[] = [];
 
-      if (insertItemsError) {
-        throw insertItemsError;
+      if (itemsToInsert.length > 0) {
+        const { data, error: insertItemsError } = await supabase
+          .from('inspection_items')
+          .insert(itemsToInsert)
+          .select('id, item_number, item_description, day_of_week, status, comments');
+
+        if (insertItemsError) {
+          throw insertItemsError;
+        }
+        insertedItems = (data || []) as InsertedItem[];
       }
 
-      type InsertedItem = { id: string; item_number: number; item_description: string; day_of_week: number | null; status: InspectionStatus; comments: string | null };
-      const failedItems = (insertedItems || []).filter((item: InsertedItem) => item.status === 'attention');
-      if (failedItems.length > 0) {
+      if (status === 'submitted') {
+        const { error: updateHgvMileageError } = await supabase
+          .from('hgvs')
+          .update({ current_mileage: mileageValue })
+          .eq('id', hgvId);
+
+        if (updateHgvMileageError) {
+          throw updateHgvMileageError;
+        }
+      }
+
+      const failedItems = insertedItems.filter((item) => item.status === 'attention');
+      if (status === 'submitted' && failedItems.length > 0) {
         const defects = failedItems.map((item: InsertedItem) => ({
           item_number: item.item_number,
           item_description: item.item_description,
@@ -529,7 +753,7 @@ function NewHgvInspectionContent() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            inspectionId: inspection.id,
+            inspectionId,
             hgvId,
             createdBy: user.id,
             defects,
@@ -537,12 +761,12 @@ function NewHgvInspectionContent() {
         });
       }
 
-      if (informWorkshop && inspectorComments.trim().length >= 10) {
+      if (status === 'submitted' && informWorkshop && inspectorComments.trim().length >= 10) {
         await fetch('/api/hgv-inspections/inform-workshop', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            inspectionId: inspection.id,
+            inspectionId,
             hgvId,
             createdBy: user.id,
             comments: inspectorComments.trim(),
@@ -550,8 +774,13 @@ function NewHgvInspectionContent() {
         });
       }
 
-      toast.success('HGV inspection submitted successfully');
-      router.push(`/hgv-inspections/${inspection.id}`);
+      if (status === 'submitted') {
+        toast.success('HGV inspection submitted successfully');
+        allowNavigationRef.current = true;
+        router.push(`/hgv-inspections/${inspectionId}`);
+      } else {
+        toast.success('Draft saved');
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to save inspection';
       setError(message);
@@ -570,6 +799,86 @@ function NewHgvInspectionContent() {
       return;
     }
     setShowSignatureDialog(true);
+  };
+
+  const handleBackButtonClick = () => {
+    requestNavigation({ type: 'back' });
+  };
+
+  const handleStayOnPage = () => {
+    setPendingNavigation(null);
+    setShowDiscardDraftDialog(false);
+  };
+
+  const handleDiscardAndContinueNavigation = async () => {
+    if (!pendingNavigation) {
+      setShowDiscardDraftDialog(false);
+      return;
+    }
+
+    if (!existingInspectionId) {
+      setShowDiscardDraftDialog(false);
+      const nextNavigation = pendingNavigation;
+      setPendingNavigation(null);
+      navigateWithoutPrompt(nextNavigation);
+      return;
+    }
+
+    setDiscardingDraft(true);
+    const discarded = await discardDraftById(existingInspectionId, false);
+    setDiscardingDraft(false);
+    if (!discarded) {
+      return;
+    }
+
+    setShowDiscardDraftDialog(false);
+    const nextNavigation = pendingNavigation;
+    setPendingNavigation(null);
+    navigateWithoutPrompt(nextNavigation);
+  };
+
+  const handleResumeConflictingDraft = async () => {
+    if (!conflictingDraftId) return;
+    setResolvingDraftConflict(true);
+    try {
+      window.history.replaceState(null, '', `/hgv-inspections/new?id=${conflictingDraftId}`);
+      await loadDraftInspection(conflictingDraftId);
+      setShowDraftConflictDialog(false);
+      setConflictingDraftId(null);
+    } finally {
+      setResolvingDraftConflict(false);
+    }
+  };
+
+  const handleDiscardConflictingDraftAndStart = async () => {
+    if (!conflictingDraftId) return;
+    setResolvingDraftConflict(true);
+    const discarded = await discardDraftById(conflictingDraftId, false);
+    setResolvingDraftConflict(false);
+    if (!discarded) return;
+
+    setConflictingDraftId(null);
+    setShowDraftConflictDialog(false);
+    setError('');
+    if (!checklistStarted) {
+      beginChecklist();
+    }
+  };
+
+  const handleViewSubmittedConflictInspection = () => {
+    if (!submittedConflictInspectionId) return;
+    allowNavigationRef.current = true;
+    setShowSubmittedConflictDialog(false);
+    const inspectionId = submittedConflictInspectionId;
+    setSubmittedConflictInspectionId(null);
+    router.push(`/hgv-inspections/${inspectionId}`);
+  };
+
+  const handleUseDifferentDateForSubmittedConflict = () => {
+    setShowSubmittedConflictDialog(false);
+    setSubmittedConflictInspectionId(null);
+    setError('A daily check is already submitted for this HGV and date. Choose a different date to continue.');
+    scrollAndHighlightValidationTarget(document.getElementById('inspectionDate'), STICKY_NAV_OFFSET_PX);
   };
 
   const getStatusIcon = (status: InspectionStatus, isSelected: boolean) => {
@@ -610,7 +919,16 @@ function NewHgvInspectionContent() {
       <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-border">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-3">
-            <BackButton fallbackHref="/hgv-inspections" />
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleBackButtonClick}
+              className="ui-component border-2 border-slate-600 text-slate-200 bg-slate-900/50 hover:bg-slate-800 hover:border-slate-500 hover:text-white focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
+              aria-label="Back"
+              title="Back"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
             <div>
               <h1 className="text-xl md:text-3xl font-bold text-foreground">New HGV Daily Check</h1>
               <p className="text-sm text-muted-foreground hidden md:block">Daily safety check</p>
@@ -978,6 +1296,109 @@ function NewHgvInspectionContent() {
         </div>
       )}
 
+      <AlertDialog
+        open={showDiscardDraftDialog}
+        onOpenChange={(open) => {
+          setShowDiscardDraftDialog(open);
+          if (!open) setPendingNavigation(null);
+        }}
+      >
+        <AlertDialogContent className="border-border text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard draft inspection?</AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              Leaving this page will discard your hidden HGV draft so it does not block another check for this HGV today.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleStayOnPage} disabled={discardingDraft}>
+              Stay on page
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async (event) => {
+                event.preventDefault();
+                await handleDiscardAndContinueNavigation();
+              }}
+              disabled={discardingDraft}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {discardingDraft ? 'Discarding...' : 'Discard and leave'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={showDraftConflictDialog}
+        onOpenChange={(open) => {
+          setShowDraftConflictDialog(open);
+          if (!open) setConflictingDraftId(null);
+        }}
+      >
+        <AlertDialogContent className="border-border text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Existing draft found</AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              A hidden draft already exists for this HGV and date. Resume it or discard it and start a new check.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={resolvingDraftConflict}
+              onClick={() => {
+                setShowDraftConflictDialog(false);
+                setConflictingDraftId(null);
+              }}
+            >
+              Keep current form
+            </AlertDialogCancel>
+            <Button
+              variant="outline"
+              onClick={handleResumeConflictingDraft}
+              disabled={resolvingDraftConflict || !conflictingDraftId}
+              className="border-border text-white hover:bg-slate-800"
+            >
+              {resolvingDraftConflict ? 'Working...' : 'Resume existing draft'}
+            </Button>
+            <AlertDialogAction
+              onClick={async (event) => {
+                event.preventDefault();
+                await handleDiscardConflictingDraftAndStart();
+              }}
+              disabled={resolvingDraftConflict || !conflictingDraftId}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {resolvingDraftConflict ? 'Working...' : 'Discard old draft and start new'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={showSubmittedConflictDialog}
+        onOpenChange={(open) => {
+          setShowSubmittedConflictDialog(open);
+          if (!open) setSubmittedConflictInspectionId(null);
+        }}
+      >
+        <AlertDialogContent className="border-border text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Daily check already submitted</AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              An HGV daily check already exists for this vehicle and date. You can view the submitted check or pick another date.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleUseDifferentDateForSubmittedConflict}>
+              Choose different date
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleViewSubmittedConflictInspection}>
+              View existing check
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <Dialog open={showSignatureDialog} onOpenChange={setShowSignatureDialog}>
         <DialogContent className="border-border text-white max-w-lg">
           <DialogHeader>
@@ -991,7 +1412,7 @@ function NewHgvInspectionContent() {
               disabled={loading}
               onSave={async (signatureData: string) => {
                 setShowSignatureDialog(false);
-                await saveInspection(signatureData);
+                await saveInspection('submitted', signatureData);
               }}
               onCancel={() => setShowSignatureDialog(false)}
             />

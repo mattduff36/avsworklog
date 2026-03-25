@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, History as HistoryIcon, User, Edit, ChevronDown, ChevronUp, Clock, FileText } from 'lucide-react';
 import { useMaintenanceHistory } from '@/lib/hooks/useMaintenance';
+import { formatDateTime } from '@/lib/utils/date';
 import { formatMaintenanceDate } from '@/lib/utils/maintenanceCalculations';
 import { MotHistoryDialog } from './MotHistoryDialog';
 
@@ -177,7 +178,7 @@ export function MaintenanceHistoryDialog({
             {showTimestamp && (
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Clock className="h-3 w-3" />
-                {getRelativeTime(item.created_at)}
+                {getDisplayTimestamp(item.created_at)}
               </div>
             )}
           </div>
@@ -204,12 +205,12 @@ export function MaintenanceHistoryDialog({
             
             {task.status === 'completed' && task.actioned_at && (
               <div className="text-xs text-green-400">
-                ✓ Completed: {getRelativeTime(task.actioned_at)}
+                ✓ Completed: {getDisplayTimestamp(task.actioned_at)}
               </div>
             )}
             {task.status === 'logged' && task.logged_at && (
               <div className="text-xs text-blue-400">
-                ⚙ Started: {getRelativeTime(task.logged_at)}
+                ⚙ Started: {getDisplayTimestamp(task.logged_at)}
               </div>
             )}
           </div>
@@ -261,7 +262,7 @@ export function MaintenanceHistoryDialog({
             {showTimestamp && (
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Clock className="h-3 w-3" />
-                {getRelativeTime(item.created_at)}
+                {getDisplayTimestamp(item.created_at)}
               </div>
             )}
           </div>
@@ -296,29 +297,9 @@ export function MaintenanceHistoryDialog({
     }
   };
   
-  // Format relative time
-  const getRelativeTime = (dateStr: string): string => {
+  const getDisplayTimestamp = (dateStr: string): string => {
     if (!dateStr) return 'Unknown date';
-    
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return 'Invalid date';
-    
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-    
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
-    if (diffDays < 7) return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
-    
-    return date.toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    });
+    return formatDateTime(dateStr) || 'Invalid date';
   };
   
   return (

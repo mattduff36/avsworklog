@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Loader2, Search, FileText, CheckCircle2, Clock, Settings, UserPlus } from 'lucide-react';
 import Link from 'next/link';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDate } from '@/lib/utils/date';
 import { formatFileSize } from '@/lib/utils/file-validation';
 import { RecordVisitorSignatureModal } from '@/components/rams/RecordVisitorSignatureModal';
 import { RAMSErrorBoundary } from '@/components/rams/RAMSErrorBoundary';
@@ -269,11 +269,11 @@ export default function RAMSPage() {
                       {doc.file_type.toUpperCase()} • {formatFileSize(doc.file_size)}
                     </span>
                     <span>
-                      Uploaded {formatDistanceToNow(new Date(doc.created_at), { addSuffix: true })}
+                      Uploaded {formatDate(doc.created_at)}
                     </span>
                     {doc.assigned_at && (
                       <span>
-                        Assigned {formatDistanceToNow(new Date(doc.assigned_at), { addSuffix: true })}
+                        Assigned {formatDate(doc.assigned_at)}
                       </span>
                     )}
                   </div>

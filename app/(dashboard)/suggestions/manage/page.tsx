@@ -30,7 +30,7 @@ import {
   User
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDateTime } from '@/lib/utils/date';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
 import type { SuggestionWithUser, SuggestionStatus, SuggestionUpdateWithUser } from '@/types/faq';
 import { SUGGESTION_STATUS_LABELS, SUGGESTION_STATUS_COLORS } from '@/types/faq';
@@ -299,9 +299,7 @@ export default function SuggestionsManagePage() {
                           <User className="h-3 w-3" />
                           {suggestion.user?.full_name || 'Unknown'}
                         </span>
-                        <span>
-                          {formatDistanceToNow(new Date(suggestion.created_at), { addSuffix: true })}
-                        </span>
+                        <span>{formatDateTime(suggestion.created_at)}</span>
                         {suggestion.page_hint && (
                           <span className="text-muted-foreground">
                             Related to: {suggestion.page_hint}

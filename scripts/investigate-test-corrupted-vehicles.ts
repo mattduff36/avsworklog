@@ -49,6 +49,21 @@ interface Inspection {
   created_at: string;
 }
 
+function formatDateTime(value: string | Date): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Invalid date';
+  return date
+    .toLocaleString('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    })
+    .replace(',', '');
+}
+
 async function investigateVehicles() {
   console.log('🔍 INVESTIGATING TEST-CORRUPTED VEHICLES');
   console.log('=========================================\n');
@@ -147,13 +162,11 @@ async function investigateVehicles() {
   console.log('═══════════════════════════════════════════════════════════\n');
 
   for (const corrupted of corruptedVehicles) {
-    const hoursAgo = (Date.now() - new Date(corrupted.lastUpdate).getTime()) / (1000 * 60 * 60);
-    
     console.log(`Vehicle: ${corrupted.vehicle.reg_number} (${corrupted.vehicle.nickname || 'No nickname'})`);
     console.log(`  Current Mileage: ${corrupted.currentMileage.toLocaleString()} miles ❌`);
     console.log(`  Correct Mileage: ${corrupted.correctMileage.toLocaleString()} miles ✅`);
     console.log(`  Difference: ${(corrupted.currentMileage - corrupted.correctMileage).toLocaleString()} miles`);
-    console.log(`  Last Updated: ${corrupted.lastUpdate} (${hoursAgo.toFixed(1)} hours ago)`);
+    console.log(`  Last Updated: ${formatDateTime(corrupted.lastUpdate)}`);
     console.log(`  Reason: ${corrupted.reason}`);
     console.log('');
   }

@@ -1,4 +1,4 @@
-import { format, startOfWeek, endOfWeek, addDays, parseISO, isValid, formatDistanceToNow } from 'date-fns';
+import { format, startOfWeek, endOfWeek, addDays, parseISO, isValid } from 'date-fns';
 import { calculateDurationDaysForShiftPattern, STANDARD_WORK_SHIFT_PATTERN } from '@/lib/utils/work-shifts';
 import type { WorkShiftPattern, WorkShiftSession } from '@/types/work-shifts';
 
@@ -34,6 +34,21 @@ export function formatDate(date: Date | string | null | undefined): string {
     const d = typeof date === 'string' ? parseISO(date) : date;
     if (!isValid(d)) return '';
     return format(d, 'dd/MM/yyyy');
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Format date and time for display (dd/MM/yyyy HH:mm)
+ */
+export function formatDateTime(date: Date | string | null | undefined): string {
+  if (!date) return '';
+  
+  try {
+    const d = typeof date === 'string' ? parseISO(date) : date;
+    if (!isValid(d)) return '';
+    return format(d, 'dd/MM/yyyy HH:mm');
   } catch {
     return '';
   }
@@ -190,16 +205,9 @@ export function getFinancialYearMonths(financialYear?: {
 }
 
 /**
- * Format a date as relative time (e.g., "2 hours ago", "3 days ago")
+ * Legacy alias retained for compatibility.
+ * Returns absolute date/time instead of relative text.
  */
 export function formatRelativeTime(date: Date | string | null | undefined): string {
-  if (!date) return '';
-  
-  try {
-    const d = typeof date === 'string' ? parseISO(date) : date;
-    if (!isValid(d)) return '';
-    return formatDistanceToNow(d, { addSuffix: true });
-  } catch {
-    return '';
-  }
+  return formatDateTime(date);
 }

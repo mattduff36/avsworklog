@@ -21,6 +21,21 @@ const supabase = createClient(
   }
 );
 
+function formatDateTime(value: Date | string | number): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Invalid date';
+  return date
+    .toLocaleString('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    })
+    .replace(',', '');
+}
+
 async function checkErrorLogs() {
   console.log('🔍 CHECKING ERROR LOGS');
   console.log('======================\n');
@@ -75,9 +90,8 @@ async function checkErrorLogs() {
       // Show first 3 of each type
       typeErrors.slice(0, 3).forEach((err, idx) => {
         const date = new Date(err.timestamp ?? Date.now());
-        const hoursAgo = Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60));
         
-        console.log(`\n  [${idx + 1}] ${hoursAgo}h ago - ${date.toLocaleString()}`);
+        console.log(`\n  [${idx + 1}] ${formatDateTime(date)}`);
         console.log(`      Message: ${(err.error_message || '').substring(0, 200)}${(err.error_message || '').length > 200 ? '...' : ''}`);
         console.log(`      Page: ${err.page_url || 'Unknown'}`);
         if (err.component_name) {

@@ -139,6 +139,7 @@
     "vitest": "^3.2.4"
   },
   "overrides": {
+    "signature_pad": "^5.1.3",
     "tmp": "^0.2.5"
   }
 }

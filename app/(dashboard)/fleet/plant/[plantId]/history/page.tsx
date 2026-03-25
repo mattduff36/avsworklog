@@ -21,7 +21,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { BackButton } from '@/components/ui/back-button';
-import { formatRelativeTime } from '@/lib/utils/date';
+import { formatDateTime } from '@/lib/utils/date';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { formatMaintenanceDate } from '@/lib/utils/maintenanceCalculations';
 import { usePlantMaintenanceHistory } from '@/lib/hooks/useMaintenance';
@@ -714,7 +714,7 @@ export default function PlantHistoryPage({
                               </div>
                             )}
                             <p className="text-xs text-muted-foreground">
-                              {formatRelativeTime(entry.created_at)}
+                              {formatDateTime(entry.created_at)}
                             </p>
                           </div>
                         </div>

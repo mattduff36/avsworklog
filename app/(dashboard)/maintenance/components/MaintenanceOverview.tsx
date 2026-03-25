@@ -11,7 +11,7 @@ import { AlertTriangle, Calendar, Wrench, ChevronDown, ChevronUp, Loader2, Clock
 import type { VehicleMaintenanceWithStatus, MaintenanceCategory, CategoryResponsibility } from '@/types/maintenance';
 import { formatDaysUntil, formatMilesUntil, formatHoursUntil, formatMileage, formatHours, formatMaintenanceDate } from '@/lib/utils/maintenanceCalculations';
 import type { CompletionUpdatesArray } from '@/types/workshop-completion';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDateTime } from '@/lib/utils/date';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { CreateWorkshopTaskDialog } from '@/components/workshop-tasks/CreateWorkshopTaskDialog';
@@ -1374,7 +1374,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                     </div>
                     
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      <span>Created {formatDistanceToNow(new Date(relatedTask.created_at), { addSuffix: true })}</span>
+                      <span>Created {formatDateTime(relatedTask.created_at)}</span>
                       {relatedTask.profiles?.full_name && (
                         <span>by {relatedTask.profiles.full_name}</span>
                       )}

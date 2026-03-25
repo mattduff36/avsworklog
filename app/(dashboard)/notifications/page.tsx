@@ -27,7 +27,7 @@ import {
   CheckSquare,
   ClipboardCheck
 } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDateTime } from '@/lib/utils/date';
 import { toast } from 'sonner';
 import type { NotificationItem } from '@/types/messages';
 import type { NotificationPreference, NotificationModuleKey } from '@/types/notifications';
@@ -429,12 +429,12 @@ export default function NotificationsPage() {
                             <div className="flex items-center gap-2 text-xs text-muted-foreground dark:text-muted-foreground">
                               <span>From: {notification.sender_name}</span>
                               <span>•</span>
-                              <span>{formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}</span>
+                              <span>{formatDateTime(notification.created_at)}</span>
                               {notification.signed_at && (
                                 <>
                                   <span>•</span>
                                   <span className="text-green-600">
-                                    Signed {formatDistanceToNow(new Date(notification.signed_at), { addSuffix: true })}
+                                    Signed {formatDateTime(notification.signed_at)}
                                   </span>
                                 </>
                               )}
@@ -606,7 +606,7 @@ export default function NotificationsPage() {
                               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                 <span>From: {notification.sender_name}</span>
                                 <span>•</span>
-                                <span>{formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}</span>
+                                <span>{formatDateTime(notification.created_at)}</span>
                               </div>
                             </div>
                           </div>

@@ -26,7 +26,7 @@ import {
   Edit
 } from 'lucide-react';
 import { BackButton } from '@/components/ui/back-button';
-import { formatRelativeTime } from '@/lib/utils/date';
+import { formatDateTime } from '@/lib/utils/date';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { formatMileage, formatMaintenanceDate } from '@/lib/utils/maintenanceCalculations';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
@@ -1180,7 +1180,7 @@ export default function VanHistoryPage({
                               <p className="text-sm text-muted-foreground italic">&quot;{entry.comment}&quot;</p>
                             )}
                             <p className="text-xs text-muted-foreground">
-                              {formatRelativeTime(entry.created_at)}
+                              {formatDateTime(entry.created_at)}
                             </p>
                           </div>
                         </div>

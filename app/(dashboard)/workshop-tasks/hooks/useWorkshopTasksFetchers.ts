@@ -106,8 +106,132 @@ export function useWorkshopTasksFetchers({
 
       if (error) throw error;
 
+      let normalizedTasks = (data || []) as Action[];
+      const inspectionIdsNeedingAsset = Array.from(
+        new Set(
+          normalizedTasks
+            .filter(
+              (task) =>
+                Boolean(task.inspection_id) &&
+                !task.van_id &&
+                !task.hgv_id &&
+                !task.plant_id
+            )
+            .map((task) => task.inspection_id as string)
+        )
+      );
+
+      if (inspectionIdsNeedingAsset.length > 0) {
+        const [
+          { data: vanInspectionRows, error: vanInspectionError },
+          { data: hgvInspectionRows, error: hgvInspectionError },
+          { data: plantInspectionRows, error: plantInspectionError },
+        ] = await Promise.all([
+          supabase
+            .from('van_inspections')
+            .select(`
+              id,
+              van_id,
+              vans (
+                reg_number,
+                nickname
+              )
+            `)
+            .in('id', inspectionIdsNeedingAsset),
+          supabase
+            .from('hgv_inspections')
+            .select(`
+              id,
+              hgv_id,
+              hgvs (
+                reg_number,
+                nickname
+              )
+            `)
+            .in('id', inspectionIdsNeedingAsset),
+          supabase
+            .from('plant_inspections')
+            .select(`
+              id,
+              plant_id,
+              plant (
+                plant_id,
+                nickname
+              )
+            `)
+            .in('id', inspectionIdsNeedingAsset),
+        ]);
+
+        if (vanInspectionError) {
+          console.warn('Unable to load van inspection fallback assets:', vanInspectionError.message);
+        }
+        if (hgvInspectionError) {
+          console.warn('Unable to load HGV inspection fallback assets:', hgvInspectionError.message);
+        }
+        if (plantInspectionError) {
+          console.warn('Unable to load plant inspection fallback assets:', plantInspectionError.message);
+        }
+
+        const vanByInspectionId = new Map(
+          ((vanInspectionRows || []) as Array<{
+            id: string;
+            van_id: string | null;
+            vans: { reg_number: string; nickname: string | null } | null;
+          }>).map((row) => [row.id, row])
+        );
+        const hgvByInspectionId = new Map(
+          ((hgvInspectionRows || []) as Array<{
+            id: string;
+            hgv_id: string | null;
+            hgvs: { reg_number: string; nickname: string | null } | null;
+          }>).map((row) => [row.id, row])
+        );
+        const plantByInspectionId = new Map(
+          ((plantInspectionRows || []) as Array<{
+            id: string;
+            plant_id: string | null;
+            plant: { plant_id: string; nickname: string | null } | null;
+          }>).map((row) => [row.id, row])
+        );
+
+        normalizedTasks = normalizedTasks.map((task) => {
+          if (task.van_id || task.hgv_id || task.plant_id || !task.inspection_id) {
+            return task;
+          }
+
+          const vanFallback = vanByInspectionId.get(task.inspection_id);
+          if (vanFallback?.van_id) {
+            return {
+              ...task,
+              van_id: vanFallback.van_id,
+              vans: task.vans || vanFallback.vans || null,
+            };
+          }
+
+          const hgvFallback = hgvByInspectionId.get(task.inspection_id);
+          if (hgvFallback?.hgv_id) {
+            return {
+              ...task,
+              hgv_id: hgvFallback.hgv_id,
+              hgvs: task.hgvs || hgvFallback.hgvs || null,
+            };
+          }
+
+          const plantFallback = plantByInspectionId.get(task.inspection_id);
+          if (plantFallback?.plant_id) {
+            return {
+              ...task,
+              plant_id: plantFallback.plant_id,
+              plant: task.plant || plantFallback.plant || null,
+            };
+          }
+
+          return task;
+        });
+      }
+
       const createdByIds = Array.from(
-        new Set((data || []).map((task: Action) => task.created_by).filter(Boolean))
+        new Set(normalizedTasks.map((task: Action) => task.created_by).filter(Boolean))
       );
       let profileMap = new Map<string, { full_name: string | null }>();
       if (createdByIds.length > 0) {
@@ -120,7 +244,7 @@ export function useWorkshopTasksFetchers({
         );
       }
 
-      const tasksWithProfiles = (data || []).map((task: Action) => ({
+      const tasksWithProfiles = normalizedTasks.map((task: Action) => ({
         ...task,
         profiles_created: task.created_by
           ? profileMap.get(task.created_by) || null

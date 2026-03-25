@@ -49,7 +49,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import type { Database } from '@/types/database';
 import { getRoleSortPriority } from '@/lib/config/roles-core';
-import { formatRelativeTime } from '@/lib/utils/date';
+import { formatDateTime } from '@/lib/utils/date';
 
 const RoleManagement = dynamic(() => import('@/components/admin/RoleManagement').then(m => ({ default: m.RoleManagement })), { 
   ssr: false,
@@ -103,21 +103,8 @@ function isExpectedUserAdminError(error: unknown): boolean {
 function formatAdminActivityTimestamp(value?: string | null): string {
   if (!value) return 'Never';
 
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return 'Unknown';
-  }
-
-  const relative = formatRelativeTime(date);
-  const absolute = date.toLocaleString('en-GB', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-
-  return relative ? `${absolute} (${relative})` : absolute;
+  const absolute = formatDateTime(value);
+  return absolute || 'Unknown';
 }
 
 export default function UsersAdminPage() {
