@@ -5,8 +5,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import type { ReactNode } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { InspectionPhotoGallery } from '@/components/inspections/InspectionPhotoGallery';
 import {
   AlertTriangle,
+  Camera,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
@@ -25,6 +27,7 @@ import {
 import { formatDate } from '@/lib/utils/date';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import type { Action, AssetTab, Vehicle } from '../types';
+import type { InspectionPhoto } from '@/types/inspection';
 
 interface WorkshopTasksOverviewTabProps {
   assetTab: AssetTab;
@@ -51,6 +54,7 @@ interface WorkshopTasksOverviewTabProps {
   onShowCompletedChange: (show: boolean) => void;
   updatingStatus: Set<string>;
   taskAttachmentCounts: Map<string, number>;
+  taskInspectionPhotos: Record<string, InspectionPhoto[]>;
   getStatusIcon: (status: string, task?: Action) => ReactNode;
   getVehicleReg: (task: Action) => string;
   getSourceLabel: (task: Action) => string;
@@ -93,6 +97,7 @@ export function WorkshopTasksOverviewTab({
   onShowCompletedChange,
   updatingStatus,
   taskAttachmentCounts,
+  taskInspectionPhotos,
   getStatusIcon,
   getVehicleReg,
   getSourceLabel,
@@ -116,6 +121,37 @@ export function WorkshopTasksOverviewTab({
   const taskActionGroupClass = tabletModeEnabled
     ? 'flex flex-wrap items-center gap-1.5 w-full lg:w-auto'
     : 'flex flex-wrap items-center gap-1.5 w-full md:w-auto';
+  const getTaskPhotos = (taskId: string) => taskInspectionPhotos[taskId] ?? [];
+  const renderInspectionPhotoBadge = (task: Action) => {
+    const count = getTaskPhotos(task.id).length;
+    if (task.action_type !== 'inspection_defect' || count === 0) {
+      return null;
+    }
+
+    return (
+      <Badge variant="outline" className="bg-emerald-500/10 text-emerald-300 border-emerald-500/30 text-xs">
+        <Camera className="h-3 w-3 mr-1" />
+        {count}
+      </Badge>
+    );
+  };
+  const renderInspectionPhotoPreview = (task: Action) => {
+    const photos = getTaskPhotos(task.id);
+    if (task.action_type !== 'inspection_defect' || photos.length === 0) {
+      return null;
+    }
+
+    return (
+      <InspectionPhotoGallery
+        photos={photos}
+        title="Defect Photos"
+        description="Uploaded photos linked to this defect."
+        maxPreview={1}
+        compact
+        className="mt-2"
+      />
+    );
+  };
 
   return (
     <TabsContent value="overview" className="space-y-6 mt-0">
@@ -281,6 +317,7 @@ export function WorkshopTasksOverviewTab({
                                     {taskAttachmentCounts.get(task.id)}
                                   </Badge>
                                 )}
+                                {renderInspectionPhotoBadge(task)}
                               </div>
                               <div className="flex flex-wrap gap-2 mb-2">
                                 {task.workshop_task_subcategories?.workshop_task_categories && (
@@ -297,6 +334,7 @@ export function WorkshopTasksOverviewTab({
                               {task.action_type === 'inspection_defect' && task.description && (
                                 <p className="text-sm text-muted-foreground mb-2">{task.description}</p>
                               )}
+                              {renderInspectionPhotoPreview(task)}
                               {task.workshop_comments && (
                                 <p className="text-sm text-muted-foreground mb-2">
                                   <strong>Notes:</strong> {task.workshop_comments}
@@ -423,6 +461,7 @@ export function WorkshopTasksOverviewTab({
                                     {taskAttachmentCounts.get(task.id)}
                                   </Badge>
                                 )}
+                                {renderInspectionPhotoBadge(task)}
                               </div>
                               <div className="flex flex-wrap gap-2 mb-2">
                                 {task.workshop_task_subcategories?.workshop_task_categories && (
@@ -439,6 +478,7 @@ export function WorkshopTasksOverviewTab({
                               {task.action_type === 'inspection_defect' && task.description && (
                                 <p className="text-sm text-muted-foreground mb-2">{task.description}</p>
                               )}
+                              {renderInspectionPhotoPreview(task)}
                               {task.logged_comment && (
                                 <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-2">
                                   <p className="text-sm text-blue-300">
@@ -543,6 +583,7 @@ export function WorkshopTasksOverviewTab({
                                     {taskAttachmentCounts.get(task.id)}
                                   </Badge>
                                 )}
+                                {renderInspectionPhotoBadge(task)}
                               </div>
                               <div className="flex flex-wrap gap-2 mb-2">
                                 {task.workshop_task_subcategories?.workshop_task_categories && (
@@ -559,6 +600,7 @@ export function WorkshopTasksOverviewTab({
                               {task.action_type === 'inspection_defect' && task.description && (
                                 <p className="text-sm text-muted-foreground mb-2">{task.description}</p>
                               )}
+                              {renderInspectionPhotoPreview(task)}
                               {task.logged_comment && (
                                 <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3 mb-2">
                                   <p className="text-sm text-purple-200 font-medium">Progress Note: {task.logged_comment}</p>
@@ -653,6 +695,7 @@ export function WorkshopTasksOverviewTab({
                                     {taskAttachmentCounts.get(task.id)}
                                   </Badge>
                                 )}
+                                {renderInspectionPhotoBadge(task)}
                               </div>
                               <div className="flex flex-wrap gap-2 mb-1">
                                 {task.workshop_task_subcategories?.workshop_task_categories && (
@@ -674,6 +717,7 @@ export function WorkshopTasksOverviewTab({
                               {task.action_type === 'inspection_defect' && task.description && (
                                 <p className="text-sm text-muted-foreground mb-2">{task.description}</p>
                               )}
+                              {renderInspectionPhotoPreview(task)}
                               <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                                 {task.actioned_at && (
                                   <span className="text-green-400">

@@ -12,6 +12,15 @@ import { AlertCircle, CheckCircle2, Download, MinusCircle, XCircle } from 'lucid
 import { formatDate } from '@/lib/utils/date';
 import type { InspectionItem, InspectionStatus } from '@/types/inspection';
 import { enrichDefectsWithWorkshopCompletion, type EnrichedDefectItem } from '@/lib/utils/hgvDefectWorkshopDetails';
+import PhotoUpload from '@/components/forms/PhotoUpload';
+import { InspectionPhotoGallery } from '@/components/inspections/InspectionPhotoGallery';
+import { InspectionPhotoTiles } from '@/components/inspections/InspectionPhotoTiles';
+import { useInspectionPhotos } from '@/lib/hooks/useInspectionPhotos';
+import { getInspectionPhotoKey } from '@/lib/inspection-photos';
+
+interface InspectionItemWithDay extends InspectionItem {
+  day_of_week: number | null;
+}
 
 interface HgvInspectionDetails {
   id: string;
@@ -36,10 +45,14 @@ export default function ViewHgvInspectionPage() {
   const { user, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
 
   const [inspection, setInspection] = useState<HgvInspectionDetails | null>(null);
-  const [items, setItems] = useState<InspectionItem[]>([]);
+  const [items, setItems] = useState<InspectionItemWithDay[]>([]);
   const [defectsWithWorkshop, setDefectsWithWorkshop] = useState<EnrichedDefectItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [photoUploadItem, setPhotoUploadItem] = useState<{ itemNumber: number; dayOfWeek: number | null } | null>(null);
+  const { photoMap, refresh: refreshInspectionPhotos } = useInspectionPhotos(inspection?.id, {
+    enabled: Boolean(inspection?.id),
+  });
 
   const fetchInspection = useCallback(async (id: string) => {
     setLoading(true);
@@ -76,7 +89,7 @@ export default function ViewHgvInspectionPage() {
       if (itemsError) throw itemsError;
 
       setInspection(inspectionData as HgvInspectionDetails);
-      const typedItems = (itemsData || []) as InspectionItem[];
+      const typedItems = (itemsData || []) as InspectionItemWithDay[];
       setItems(typedItems);
       const attentionItems = typedItems
         .filter((item) => item.status === 'attention')
@@ -135,8 +148,11 @@ export default function ViewHgvInspectionPage() {
 
   const defectCount = items.filter(item => item.status === 'attention').length;
   const okCount = items.filter(item => item.status === 'ok').length;
+  const canUploadPhotos = inspection.user_id === user?.id;
   const statusLabel = (status: string) =>
     status === 'logged' ? 'In Progress' : status === 'on_hold' ? 'On Hold' : status === 'resumed' ? 'Resumed' : status === 'completed' ? 'Completed' : status;
+  const getPhotosForItem = (itemNumber: number, dayOfWeek: number | null) =>
+    photoMap[getInspectionPhotoKey(itemNumber, dayOfWeek)] ?? [];
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -224,7 +240,29 @@ export default function ViewHgvInspectionPage() {
                         <span className="text-sm font-medium uppercase">{item.status}</span>
                       </div>
                     </td>
-                    <td className="p-2 text-sm">{item.comments || '-'}</td>
+                    <td className="p-2 text-sm">
+                      <div className="space-y-3">
+                        <div>{item.comments || '-'}</div>
+                        {item.status === 'attention' && (
+                          <>
+                            <InspectionPhotoTiles
+                              photos={getPhotosForItem(item.item_number, item.day_of_week)}
+                              onManage={
+                                canUploadPhotos
+                                  ? () => setPhotoUploadItem({ itemNumber: item.item_number, dayOfWeek: item.day_of_week })
+                                  : undefined
+                              }
+                              title={`Item #${item.item_number} photos`}
+                              description={`Uploaded photos for ${item.item_description}.`}
+                              emptyLabel="Add / View Photos"
+                              emptyHint="No photos saved yet"
+                              manageLabel="Add / View"
+                              className="max-w-[272px]"
+                            />
+                          </>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -240,6 +278,23 @@ export default function ViewHgvInspectionPage() {
                     <span className="text-sm uppercase">{item.status}</span>
                   </div>
                   <div className="text-sm text-muted-foreground">{item.comments || 'No comments'}</div>
+                  {item.status === 'attention' && (
+                    <>
+                      <InspectionPhotoTiles
+                        photos={getPhotosForItem(item.item_number, item.day_of_week)}
+                        onManage={
+                          canUploadPhotos
+                            ? () => setPhotoUploadItem({ itemNumber: item.item_number, dayOfWeek: item.day_of_week })
+                            : undefined
+                        }
+                        title={`Item #${item.item_number} photos`}
+                        description={`Uploaded photos for ${item.item_description}.`}
+                        emptyLabel="Add / View Photos"
+                        emptyHint="No photos saved yet"
+                        manageLabel="Add / View"
+                      />
+                    </>
+                  )}
                 </CardContent>
               </Card>
             ))}
@@ -297,12 +352,30 @@ export default function ViewHgvInspectionPage() {
                     ) : (
                       <p className="text-xs text-muted-foreground">No completed workshop task linked yet.</p>
                     )}
+                    <InspectionPhotoGallery
+                      photos={getPhotosForItem(defect.item_number, items.find((item) => item.id === defect.id)?.day_of_week ?? null)}
+                      title={`Item #${defect.item_number} photos`}
+                      description={`Uploaded photos for ${defect.item_description}.`}
+                      compact
+                    />
                   </div>
                 ))}
               </div>
             )}
           </CardContent>
         </Card>
+      )}
+
+      {photoUploadItem && (
+        <PhotoUpload
+          inspectionId={inspection.id}
+          itemNumber={photoUploadItem.itemNumber}
+          dayOfWeek={photoUploadItem.dayOfWeek}
+          onClose={() => setPhotoUploadItem(null)}
+          onUploadComplete={() => {
+            void refreshInspectionPhotos();
+          }}
+        />
       )}
     </div>
   );

@@ -31,6 +31,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { formatMileage, formatMaintenanceDate } from '@/lib/utils/maintenanceCalculations';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { useWorkshopTaskComments } from '@/lib/hooks/useWorkshopTaskComments';
+import { useTaskInspectionPhotos } from '@/lib/hooks/useTaskInspectionPhotos';
 
 // Dynamic imports for dialog components
 const EditMaintenanceDialog = dynamic(() => import('@/app/(dashboard)/maintenance/components/EditMaintenanceDialog').then(m => ({ default: m.EditMaintenanceDialog })), { ssr: false });
@@ -388,6 +389,10 @@ export default function VanHistoryPage({
     taskIds: workshopTasks.map(t => t.id),
     enabled: workshopTasks.length > 0
   });
+  const { photosByTask: taskInspectionPhotos } = useTaskInspectionPhotos(
+    workshopTasks.map((task) => task.id),
+    { enabled: workshopTasks.length > 0 }
+  );
 
   const fetchVehicleData = useCallback(async () => {
     try {
@@ -1136,6 +1141,7 @@ export default function VanHistoryPage({
                       key={task.id}
                       task={task}
                       comments={taskComments[task.id] || []}
+                      inspectionPhotos={taskInspectionPhotos[task.id] || []}
                       defaultExpanded={expandedTasks.has(task.id)}
                       onToggle={(taskId, isExpanded) => {
                         setExpandedTasks(prev => {

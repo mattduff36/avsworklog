@@ -3,13 +3,16 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { InspectionPhotoGallery } from '@/components/inspections/InspectionPhotoGallery';
 import { 
+  Camera,
   FileText, 
   Wrench, 
   ChevronDown,
   ChevronUp
 } from 'lucide-react';
 import { WorkshopTaskTimeline } from '@/components/workshop-tasks/WorkshopTaskTimeline';
+import type { InspectionPhoto } from '@/types/inspection';
 
 type WorkshopTaskComment = {
   id: string;
@@ -66,6 +69,7 @@ type WorkshopTaskData = {
 interface WorkshopTaskHistoryCardProps {
   task: WorkshopTaskData;
   comments?: WorkshopTaskComment[];
+  inspectionPhotos?: InspectionPhoto[];
   defaultExpanded?: boolean;
   onToggle?: (taskId: string, isExpanded: boolean) => void;
   actionButtons?: React.ReactNode;
@@ -86,6 +90,7 @@ const getStatusBadge = (status: string) => {
 export function WorkshopTaskHistoryCard({ 
   task, 
   comments = [], 
+  inspectionPhotos = [],
   defaultExpanded = false,
   onToggle,
   actionButtons 
@@ -124,6 +129,12 @@ export function WorkshopTaskHistoryCard({
                   {task.workshop_task_subcategories.name}
                 </Badge>
               )}
+              {inspectionPhotos.length > 0 && (
+                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-300 border-emerald-500/30">
+                  <Camera className="mr-1 h-3 w-3" />
+                  {inspectionPhotos.length}
+                </Badge>
+              )}
             </div>
             <p className="text-sm font-medium">{task.title}</p>
             {task.workshop_comments && (
@@ -147,6 +158,14 @@ export function WorkshopTaskHistoryCard({
             <div className="pb-4 border-b border-border">
               {actionButtons}
             </div>
+          )}
+
+          {task.action_type === 'inspection_defect' && inspectionPhotos.length > 0 && (
+            <InspectionPhotoGallery
+              photos={inspectionPhotos}
+              title="Defect Photos"
+              description="Uploaded photos linked to this inspection defect."
+            />
           )}
           
           {/* Timeline */}

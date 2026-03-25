@@ -8,6 +8,7 @@ export type AbsenceReasonUpdate = Database['public']['Tables']['absence_reasons'
 export type Absence = Database['public']['Tables']['absences']['Row'];
 export type AbsenceInsert = Database['public']['Tables']['absences']['Insert'];
 export type AbsenceUpdate = Database['public']['Tables']['absences']['Update'];
+export type AbsenceAllowanceCarryover = Database['public']['Tables']['absence_allowance_carryovers']['Row'];
 export type AbsenceArchive = Database['public']['Tables']['absences_archive']['Row'];
 export type AbsenceRecordSource = 'active' | 'archived';
 

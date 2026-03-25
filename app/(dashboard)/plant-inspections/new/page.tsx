@@ -26,6 +26,10 @@ import { toast } from 'sonner';
 import { showErrorWithReport } from '@/lib/utils/error-reporting';
 import { scrollAndHighlightValidationTarget } from '@/lib/utils/validation-scroll';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
+import { InspectionPhotoGallery } from '@/components/inspections/InspectionPhotoGallery';
+import { InspectionPhotoTiles } from '@/components/inspections/InspectionPhotoTiles';
+import { useInspectionPhotos } from '@/lib/hooks/useInspectionPhotos';
+import { getInspectionPhotoKey } from '@/lib/inspection-photos';
 
 // Dynamic imports for heavy components
 const PhotoUpload = dynamic(() => import('@/components/forms/PhotoUpload'), { ssr: false });
@@ -116,10 +120,19 @@ function NewPlantInspectionContent() {
   const [duplicateInspection, setDuplicateInspection] = useState<string | null>(null);
   
   const [photoUploadItem, setPhotoUploadItem] = useState<{ itemNumber: number; dayOfWeek: number } | null>(null);
+  const { photoMap, refresh: refreshInspectionPhotos } = useInspectionPhotos(existingInspectionId, {
+    enabled: Boolean(existingInspectionId),
+  });
   
   // End of inspection comment + inform workshop states
   const [inspectorComments, setInspectorComments] = useState('');
   const [informWorkshop, setInformWorkshop] = useState(false);
+
+  const getPhotosForItem = useCallback(
+    (itemNumber: number, dayOfWeek: number) =>
+      photoMap[getInspectionPhotoKey(itemNumber, dayOfWeek)] ?? [],
+    [photoMap]
+  );
   const [, setCreatingWorkshopTask] = useState(false);
 
   // Hired plant states
@@ -1115,6 +1128,8 @@ function NewPlantInspectionContent() {
               const itemNumber = index + 1;
               const key = `${itemNumber}`;
               const currentStatus = checkboxStates[key];
+              const dayOfWeek = getDayOfWeek(new Date(inspectionDate + 'T00:00:00'));
+              const itemPhotos = getPhotosForItem(itemNumber, dayOfWeek);
               
               const isLogged = loggedDefects.has(`${itemNumber}`);
         
@@ -1175,23 +1190,21 @@ function NewPlantInspectionContent() {
                   )}
 
                   {currentStatus === 'attention' && !isLogged && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
+                    <InspectionPhotoTiles
+                      photos={itemPhotos}
+                      onManage={() => {
                         if (existingInspectionId) {
                           setPhotoUploadItem({ itemNumber, dayOfWeek: getDayOfWeek(new Date(inspectionDate + 'T00:00:00')) });
                         } else {
                           toast.info('Photos can be added after submission');
                         }
                       }}
-                      disabled={!existingInspectionId}
-                      className="w-full border-border text-muted-foreground hover:bg-slate-800"
-                    >
-                      <Camera className="h-4 w-4 mr-2" />
-                      {existingInspectionId ? 'Add Photo' : 'Submit to upload photos'}
-                    </Button>
+                      title={`Item #${itemNumber} photos`}
+                      description={`Uploaded photos for ${item}.`}
+                      emptyLabel={existingInspectionId ? 'Add / View Photos' : 'Submit to upload photos'}
+                      emptyHint={existingInspectionId ? 'No photos saved yet' : 'Available after submission'}
+                      manageLabel="Add / View"
+                    />
                   )}
                 </div>
               );
@@ -1215,6 +1228,8 @@ function NewPlantInspectionContent() {
                   const itemNumber = index + 1;
                   const key = `${itemNumber}`;
                   const currentStatus = checkboxStates[key];
+                  const dayOfWeek = getDayOfWeek(new Date(inspectionDate + 'T00:00:00'));
+                  const itemPhotos = getPhotosForItem(itemNumber, dayOfWeek);
                   
                   const isLogged = loggedDefects.has(`${itemNumber}`);
                   
@@ -1266,22 +1281,38 @@ function NewPlantInspectionContent() {
                       </td>
                       <td className="p-3 text-center">
                         {currentStatus === 'attention' && !isLogged ? (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              if (existingInspectionId) {
-                                setPhotoUploadItem({ itemNumber, dayOfWeek: getDayOfWeek(new Date(inspectionDate + 'T00:00:00')) });
-                              } else {
-                                toast.info('Photos can be added after submission');
-                              }
-                            }}
-                            disabled={!existingInspectionId}
-                            className="text-muted-foreground hover:text-white"
-                          >
-                            <Camera className="h-4 w-4" />
-                          </Button>
+                          <div className="flex flex-col items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                if (existingInspectionId) {
+                                  setPhotoUploadItem({ itemNumber, dayOfWeek });
+                                } else {
+                                  toast.info('Photos can be added after submission');
+                                }
+                              }}
+                              disabled={!existingInspectionId}
+                              className="h-16 w-full min-w-28 flex-col gap-1 border-border text-muted-foreground hover:text-white"
+                            >
+                              <Camera className="h-4 w-4" />
+                              <span className="text-xs">
+                                {itemPhotos.length > 0 ? `${itemPhotos.length} saved` : 'Add photo'}
+                              </span>
+                            </Button>
+                            {itemPhotos[0] && (
+                              <div className="w-full">
+                                <InspectionPhotoGallery
+                                  photos={itemPhotos}
+                                  title={`Item #${itemNumber} photos`}
+                                  description={`Uploaded photos for ${item}.`}
+                                  maxPreview={1}
+                                  compact
+                                />
+                              </div>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-slate-600">-</span>
                         )}
@@ -1464,10 +1495,10 @@ function NewPlantInspectionContent() {
         <PhotoUpload
           inspectionId={existingInspectionId}
           itemNumber={photoUploadItem.itemNumber}
+          dayOfWeek={photoUploadItem.dayOfWeek}
           onClose={() => setPhotoUploadItem(null)}
           onUploadComplete={() => {
-            setPhotoUploadItem(null);
-            toast.success('Photo uploaded successfully');
+            void refreshInspectionPhotos();
           }}
         />
       )}

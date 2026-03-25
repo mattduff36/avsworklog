@@ -76,7 +76,8 @@ export interface InspectionItem {
 export interface InspectionPhoto {
   id: string;
   inspection_id: string;
-  item_number: number;
+  item_number: number | null;
+  day_of_week: number | null;
   photo_url: string;
   caption: string | null;
   created_at: string;

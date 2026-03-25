@@ -15,6 +15,10 @@ import { formatDate } from '@/lib/utils/date';
 import { InspectionStatus, VanInspection, InspectionItem } from '@/types/inspection';
 import PhotoUpload from '@/components/forms/PhotoUpload';
 import { Database } from '@/types/database';
+import { InspectionPhotoGallery } from '@/components/inspections/InspectionPhotoGallery';
+import { InspectionPhotoTiles } from '@/components/inspections/InspectionPhotoTiles';
+import { useInspectionPhotos } from '@/lib/hooks/useInspectionPhotos';
+import { getInspectionPhotoKey } from '@/lib/inspection-photos';
 
 interface InspectionWithDetails extends VanInspection {
   vans: {
@@ -40,7 +44,10 @@ export default function ViewInspectionPage() {
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState('');
-  const [photoUploadItem, setPhotoUploadItem] = useState<number | null>(null);
+  const [photoUploadItem, setPhotoUploadItem] = useState<{ itemNumber: number; dayOfWeek: number | null } | null>(null);
+  const { photoMap, refresh: refreshInspectionPhotos } = useInspectionPhotos(inspection?.id, {
+    enabled: Boolean(inspection?.id),
+  });
 
   const fetchInspection = useCallback(async (id: string) => {
     try {
@@ -603,6 +610,8 @@ export default function ViewInspectionPage() {
   const okCount = items.filter(item => item.status === 'ok').length;
   // Check if this is a weekly inspection (has day_of_week data)
   const isWeeklyInspection = items.length > 0 && items[0].day_of_week !== null;
+  const getPhotosForItem = (itemNumber: number, dayOfWeek: number | null) =>
+    photoMap[getInspectionPhotoKey(itemNumber, dayOfWeek)] ?? [];
 
   // For weekly inspections, group items by item_number to show in table format
   const uniqueItems: Array<{ number: number; description: string }> = [];
@@ -823,14 +832,22 @@ export default function ViewInspectionPage() {
                       <td className="p-2 text-center">
                         {/* Only show photo upload for defective items */}
                         {item.status === 'attention' ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setPhotoUploadItem(item.item_number)}
-                            disabled={!canEdit}
-                          >
-                            <Camera className="h-4 w-4" />
-                          </Button>
+                          <div className="flex flex-col items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setPhotoUploadItem({ itemNumber: item.item_number, dayOfWeek: item.day_of_week })}
+                              disabled={!canEdit}
+                              className="h-16 w-full min-w-28 flex-col gap-1"
+                            >
+                              <Camera className="h-4 w-4" />
+                              <span className="text-xs">
+                                {getPhotosForItem(item.item_number, item.day_of_week).length > 0
+                                  ? `${getPhotosForItem(item.item_number, item.day_of_week).length} saved`
+                                  : 'Add photo'}
+                              </span>
+                            </Button>
+                          </div>
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
@@ -927,16 +944,19 @@ export default function ViewInspectionPage() {
                     )}
                     {/* Only show photo upload for defective items */}
                     {item.status === 'attention' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full"
-                        onClick={() => setPhotoUploadItem(item.item_number)}
-                        disabled={!canEdit}
-                      >
-                        <Camera className="h-4 w-4 mr-2" />
-                        Add Photo
-                      </Button>
+                      <InspectionPhotoTiles
+                        photos={getPhotosForItem(item.item_number, item.day_of_week)}
+                        onManage={
+                          canEdit
+                            ? () => setPhotoUploadItem({ itemNumber: item.item_number, dayOfWeek: item.day_of_week })
+                            : undefined
+                        }
+                        title={`Item #${item.item_number} photos`}
+                        description={`Uploaded photos for ${item.item_description}.`}
+                        emptyLabel="Add / View Photos"
+                        emptyHint="No photos saved yet"
+                        manageLabel="Add / View"
+                      />
                     )}
                   </CardContent>
                 </Card>
@@ -1017,6 +1037,13 @@ export default function ViewInspectionPage() {
                           {item.comments}
                         </div>
                       )}
+                      <InspectionPhotoGallery
+                        photos={getPhotosForItem(item.item_number, item.day_of_week)}
+                        title={`Item #${item.item_number} photos`}
+                        description={`Uploaded photos for ${item.item_description}.`}
+                        compact
+                        className="mt-3 pl-7"
+                      />
                     </div>
                   );
                 })}
@@ -1029,11 +1056,11 @@ export default function ViewInspectionPage() {
       {photoUploadItem && (
         <PhotoUpload
           inspectionId={inspection.id}
-          itemNumber={photoUploadItem}
+          itemNumber={photoUploadItem.itemNumber}
+          dayOfWeek={photoUploadItem.dayOfWeek}
           onClose={() => setPhotoUploadItem(null)}
           onUploadComplete={() => {
-            setPhotoUploadItem(null);
-            // Optionally refresh data
+            void refreshInspectionPhotos();
           }}
         />
       )}

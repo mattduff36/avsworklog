@@ -2040,6 +2040,47 @@ export interface Database {
           updated_at?: string
         }
       }
+      absence_allowance_carryovers: {
+        Row: {
+          id: string
+          profile_id: string
+          financial_year_start_year: number
+          source_financial_year_start_year: number
+          carried_days: number
+          auto_generated: boolean
+          generation_source: string
+          generated_at: string
+          generated_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          profile_id: string
+          financial_year_start_year: number
+          source_financial_year_start_year: number
+          carried_days?: number
+          auto_generated?: boolean
+          generation_source?: string
+          generated_at?: string
+          generated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          profile_id?: string
+          financial_year_start_year?: number
+          source_financial_year_start_year?: number
+          carried_days?: number
+          auto_generated?: boolean
+          generation_source?: string
+          generated_at?: string
+          generated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
       absence_financial_year_archives: {
         Row: {
           id: string

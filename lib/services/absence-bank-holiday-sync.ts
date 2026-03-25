@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { loadEmployeeWorkShiftPatternMap } from '@/lib/server/work-shifts';
+import { fetchCarryoverMapForFinancialYear, getEffectiveAllowance } from '@/lib/utils/absence-carryover';
 import { getBankHolidaysForYear } from '@/lib/utils/bank-holidays';
 import { calculateDurationDays } from '@/lib/utils/date';
 import type { WorkShiftPattern } from '@/types/work-shifts';
@@ -21,6 +22,7 @@ export interface BankHolidaySeedResult {
   employeeCount: number;
   created: number;
   skippedExisting: number;
+  carryoverGenerated: number;
 }
 
 export interface AbsenceGenerationStatus {
@@ -37,6 +39,7 @@ export interface AbsenceGenerationRemoveResult {
   removedFinancialYearLabel: string;
   removedGeneratedAbsences: number;
   removedExistingAbsences: number;
+  removedCarryovers: number;
 }
 
 interface BankHolidayEvent {
@@ -117,6 +120,8 @@ export interface UndoBulkAbsenceBatchResult {
   batchId: string;
   removedAbsences: number;
 }
+
+const ABSENCE_CARRYOVER_GENERATION_SOURCE = 'absence-year-end-carryover';
 
 export function getFinancialYearStartYear(date: Date): number {
   const year = date.getFullYear();
@@ -280,6 +285,91 @@ async function getEligibleEmployees(supabase: AnySupabase): Promise<Array<{ id: 
   return (data || []).map((row: { id: string }) => ({ id: row.id }));
 }
 
+export async function generateFinancialYearCarryovers(
+  supabase: AnySupabase,
+  sourceFinancialYearStartYear: number,
+  targetFinancialYearStartYear: number,
+  actorProfileId: string
+): Promise<number> {
+  const annualLeaveReasonId = await getAnnualLeaveReasonId(supabase);
+  const sourceFinancialYear = buildFinancialYearBounds(sourceFinancialYearStartYear);
+  const sourceStartIso = formatIsoDate(sourceFinancialYear.start);
+  const sourceEndIso = formatIsoDate(sourceFinancialYear.end);
+
+  const [{ data: profiles, error: profilesError }, { data: annualAbsences, error: annualAbsencesError }] =
+    await Promise.all([
+      supabase
+        .from('profiles')
+        .select('id, annual_holiday_allowance_days')
+        .order('id'),
+      supabase
+        .from('absences')
+        .select('profile_id, duration_days')
+        .eq('reason_id', annualLeaveReasonId)
+        .in('status', ['approved', 'pending'])
+        .gte('date', sourceStartIso)
+        .lte('date', sourceEndIso),
+    ]);
+
+  if (profilesError) {
+    throw profilesError;
+  }
+
+  if (annualAbsencesError) {
+    throw annualAbsencesError;
+  }
+
+  const usedByProfile = new Map<string, number>();
+  for (const row of (annualAbsences || []) as Array<{ profile_id: string; duration_days: number | null }>) {
+    usedByProfile.set(row.profile_id, (usedByProfile.get(row.profile_id) || 0) + (row.duration_days || 0));
+  }
+
+  const rowsToInsert = ((profiles || []) as Array<{ id: string; annual_holiday_allowance_days: number | null }>)
+    .map((profile) => {
+      const baseAllowance = profile.annual_holiday_allowance_days ?? 28;
+      const usedDays = usedByProfile.get(profile.id) || 0;
+      const carriedDays = Math.max(0, baseAllowance - usedDays);
+
+      return {
+        profile_id: profile.id,
+        financial_year_start_year: targetFinancialYearStartYear,
+        source_financial_year_start_year: sourceFinancialYearStartYear,
+        carried_days: carriedDays,
+        auto_generated: true,
+        generation_source: ABSENCE_CARRYOVER_GENERATION_SOURCE,
+        generated_by: actorProfileId,
+        generated_at: new Date().toISOString(),
+      };
+    })
+    .filter((row) => row.carried_days > 0);
+
+  const { error: deleteError } = await supabase
+    .from('absence_allowance_carryovers')
+    .delete()
+    .eq('financial_year_start_year', targetFinancialYearStartYear)
+    .eq('auto_generated', true)
+    .eq('generation_source', ABSENCE_CARRYOVER_GENERATION_SOURCE);
+
+  if (deleteError) {
+    throw deleteError;
+  }
+
+  if (rowsToInsert.length === 0) {
+    return 0;
+  }
+
+  const batchSize = 500;
+  for (let i = 0; i < rowsToInsert.length; i += batchSize) {
+    const chunk = rowsToInsert.slice(i, i + batchSize);
+    const { error } = await supabase.from('absence_allowance_carryovers').insert(chunk);
+    if (error) {
+      throw error;
+    }
+  }
+
+  return rowsToInsert.length;
+}
+
 async function getFinancialYearBankHolidays(startYear: number): Promise<BankHolidayEvent[]> {
   const bounds = buildFinancialYearBounds(startYear);
   const startIso = formatIsoDate(bounds.start);
@@ -336,6 +426,7 @@ export async function seedFinancialYearBankHolidays(
       employeeCount: employees.length,
       created: 0,
       skippedExisting: 0,
+      carryoverGenerated: 0,
     };
   }
 
@@ -376,6 +467,7 @@ export async function seedFinancialYearBankHolidays(
     employeeCount: employees.length,
     created: rowsToInsert.length,
     skippedExisting: allRows.length - rowsToInsert.length,
+    carryoverGenerated: 0,
   };
 }
 
@@ -428,6 +520,12 @@ export async function generateNextFinancialYearAllowances(
   options: GenerateNextFinancialYearOptions
 ): Promise<BankHolidaySeedResult> {
   const status = await getAbsenceGenerationStatus(options.supabase);
+  const carryoverGenerated = await generateFinancialYearCarryovers(
+    options.supabase,
+    status.latestGeneratedFinancialYearStartYear,
+    status.nextFinancialYearStartYear,
+    options.actorProfileId
+  );
   const result = await seedFinancialYearBankHolidays({
     supabase: options.supabase,
     financialYearStartYear: status.nextFinancialYearStartYear,
@@ -448,7 +546,10 @@ export async function generateNextFinancialYearAllowances(
     throw error;
   }
 
-  return result;
+  return {
+    ...result,
+    carryoverGenerated,
+  };
 }
 
 interface RemoveGeneratedFinancialYearOptions {
@@ -538,11 +639,23 @@ export async function removeLatestGeneratedFinancialYear(
     throw deleteGenerationError;
   }
 
+  const { count: removedCarryovers, error: deleteCarryoversError } = await options.supabase
+    .from('absence_allowance_carryovers')
+    .delete({ count: 'exact' })
+    .eq('financial_year_start_year', latestGeneration.financial_year_start_year)
+    .eq('auto_generated', true)
+    .eq('generation_source', ABSENCE_CARRYOVER_GENERATION_SOURCE);
+
+  if (deleteCarryoversError) {
+    throw deleteCarryoversError;
+  }
+
   return {
     removedFinancialYearStartYear: latestGeneration.financial_year_start_year,
     removedFinancialYearLabel: financialYear.label,
     removedGeneratedAbsences: removedCount ?? 0,
     removedExistingAbsences,
+    removedCarryovers: removedCarryovers ?? 0,
   };
 }
 
@@ -737,6 +850,11 @@ export async function bookBulkAbsence(
   const financialYear = buildFinancialYearBounds(getFinancialYearStartYear(start));
   const fyStartIso = formatIsoDate(financialYear.start);
   const fyEndIso = formatIsoDate(financialYear.end);
+  const carryoverByProfile = await fetchCarryoverMapForFinancialYear(
+    options.supabase,
+    financialYear.start.getFullYear(),
+    profileIds
+  );
   const reasonIsAnnualLeave = reason.name.trim().toLowerCase() === 'annual leave';
   const annualLeaveReason = reasonIsAnnualLeave ? reason : await getAnnualLeaveReason(options.supabase);
 
@@ -871,7 +989,10 @@ export async function bookBulkAbsence(
     }
 
     if (reasonIsAnnualLeave && createdDaysForEmployee > 0) {
-      const allowance = employee.annual_holiday_allowance_days ?? 28;
+      const allowance = getEffectiveAllowance(
+        employee.annual_holiday_allowance_days,
+        carryoverByProfile.get(employee.id) || 0
+      );
       const alreadyBooked = usedByProfile.get(employee.id) || 0;
       const projectedRemaining = allowance - alreadyBooked - createdDaysForEmployee;
       if (projectedRemaining < 0) {

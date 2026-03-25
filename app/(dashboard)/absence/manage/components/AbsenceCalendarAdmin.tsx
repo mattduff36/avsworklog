@@ -20,6 +20,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { createClient } from '@/lib/supabase/client';
 import {
   Dialog,
   DialogContent,
@@ -29,6 +30,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useAllAbsenceReasons, useAllAbsences, useDeleteAbsence } from '@/lib/hooks/useAbsence';
+import { fetchCarryoverMapForFinancialYear, getEffectiveAllowance } from '@/lib/utils/absence-carryover';
+import { filterEmployeesBySelectedTeam } from '@/lib/utils/absence-admin';
 import { getCurrentFinancialYear, getFinancialYearMonths } from '@/lib/utils/date';
 import {
   eachDayOfInterval,
@@ -39,8 +42,10 @@ import {
   startOfMonth,
   startOfWeek,
 } from 'date-fns';
-import { AlertTriangle, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Filter, Settings2, Trash2 } from 'lucide-react';
+import { AlertTriangle, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Filter, Settings2, Trash2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
+import type { AbsenceWithRelations } from '@/types/absence';
+import { AbsenceEditDialog } from '@/app/(dashboard)/absence/manage/components/AbsenceEditDialog';
 
 type Employee = {
   id: string;
@@ -167,6 +172,7 @@ function parseIsoDateAsLocalMidnight(isoDate: string): Date {
 export function AbsenceCalendarAdmin() {
   const [generationStatus, setGenerationStatus] = useState<GenerationStatus | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [carryoverByProfile, setCarryoverByProfile] = useState<Map<string, number>>(new Map());
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('all');
   const [selectedTeamId, setSelectedTeamId] = useState('all');
   const [selectedReasonId, setSelectedReasonId] = useState('all');
@@ -226,6 +232,7 @@ export function AbsenceCalendarAdmin() {
   const deleteAbsence = useDeleteAbsence();
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+  const [editTarget, setEditTarget] = useState<AbsenceWithRelations | null>(null);
 
   useEffect(() => {
     void loadGenerationStatus();
@@ -362,6 +369,56 @@ export function AbsenceCalendarAdmin() {
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [employees]);
 
+  const filteredEmployeeOptions = useMemo(() => {
+    return filterEmployeesBySelectedTeam(employees, selectedTeamId);
+  }, [employees, selectedTeamId]);
+
+  useEffect(() => {
+    if (selectedEmployeeId === 'all') {
+      return;
+    }
+
+    const employeeStillVisible = filteredEmployeeOptions.some((employee) => employee.id === selectedEmployeeId);
+    if (!employeeStillVisible) {
+      setSelectedEmployeeId('all');
+    }
+  }, [filteredEmployeeOptions, selectedEmployeeId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCarryovers() {
+      try {
+        const nextCarryovers = await fetchCarryoverMapForFinancialYear(
+          createClient(),
+          selectedFinancialYearStartYear,
+          employees.map((employee) => employee.id)
+        );
+        if (!cancelled) {
+          setCarryoverByProfile(nextCarryovers);
+        }
+      } catch (error) {
+        console.error('Error loading absence carryovers:', error);
+        if (!cancelled) {
+          setCarryoverByProfile(new Map());
+          toast.error('Failed to load carryover allowances');
+        }
+      }
+    }
+
+    if (employees.length === 0) {
+      setCarryoverByProfile(new Map());
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void loadCarryovers();
+    return () => {
+      cancelled = true;
+    };
+  }, [employees, selectedFinancialYearStartYear]);
+
   const annualLeaveReasonIds = useMemo(() => {
     return new Set(
       (reasons || [])
@@ -376,7 +433,10 @@ export function AbsenceCalendarAdmin() {
     const fyEnd = displayFinancialYear.end;
 
     for (const employee of employees) {
-      const allowance = employee.annual_holiday_allowance_days ?? 28;
+      const allowance = getEffectiveAllowance(
+        employee.annual_holiday_allowance_days,
+        carryoverByProfile.get(employee.id) || 0
+      );
       map.set(employee.id, allowance);
     }
 
@@ -394,7 +454,7 @@ export function AbsenceCalendarAdmin() {
     }
 
     return map;
-  }, [employees, annualLeaveReasonIds, displayFinancialYear, absences]);
+  }, [employees, annualLeaveReasonIds, displayFinancialYear, absences, carryoverByProfile]);
 
   const reasonLegend = useMemo(() => {
     const map = new Map<string, { name: string; color: string }>();
@@ -453,6 +513,10 @@ export function AbsenceCalendarAdmin() {
     setShowDayModal(true);
   }
 
+  function canEditAbsence(absence: AbsenceWithRelations): boolean {
+    return absence.record_source !== 'archived' && !absence.is_bank_holiday && !absence.auto_generated;
+  }
+
   if (isLoading) {
     return (
       <Card>
@@ -497,7 +561,7 @@ export function AbsenceCalendarAdmin() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All employees</SelectItem>
-                  {employees.map((employee) => (
+                  {filteredEmployeeOptions.map((employee) => (
                     <SelectItem key={employee.id} value={employee.id}>
                       {employee.full_name} {employee.employee_id ? `(${employee.employee_id})` : ''}
                     </SelectItem>
@@ -846,6 +910,28 @@ export function AbsenceCalendarAdmin() {
                           >
                             {event.status}
                           </Badge>
+                          {(() => {
+                            const target = (absences || []).find((absence) => absence.id === event.id) || null;
+                            const canEditTarget = Boolean(target && canEditAbsence(target));
+
+                            return (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (target && canEditTarget) {
+                                    setEditTarget(target);
+                                  }
+                                }}
+                                disabled={!canEditTarget}
+                                className="border-absence/30 text-absence hover:bg-absence/10 hover:text-absence h-7 px-2 text-xs"
+                              >
+                                <Pencil className="h-3 w-3 mr-1" />
+                                Edit
+                              </Button>
+                            );
+                          })()}
                           <Button
                             variant="outline"
                             size="sm"
@@ -878,6 +964,17 @@ export function AbsenceCalendarAdmin() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AbsenceEditDialog
+        absence={editTarget}
+        reasons={reasons || []}
+        open={!!editTarget}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditTarget(null);
+          }
+        }}
+      />
 
       <Dialog open={!!deleteTargetId} onOpenChange={(open) => { if (!open) setDeleteTargetId(null); }}>
         <DialogContent className="border-border max-w-md">

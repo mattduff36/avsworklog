@@ -31,6 +31,7 @@ interface BuildMockSupabaseOptions {
   profiles: MockProfile[];
   annualAbsences: Array<{ profile_id: string; duration_days: number | null; status: string }>;
   existingRows: MockAbsenceRow[];
+  carryovers?: Array<{ profile_id: string; carried_days: number }>;
 }
 
 function buildMockSupabase(options: BuildMockSupabaseOptions) {
@@ -76,6 +77,25 @@ function buildMockSupabase(options: BuildMockSupabaseOptions) {
                 return { data: options.profiles, error: null };
               },
             };
+          },
+        };
+      }
+
+      if (table === 'absence_allowance_carryovers') {
+        return {
+          select() {
+            const chain = {
+              eq() {
+                return chain;
+              },
+              in() {
+                return chain;
+              },
+              async then(resolve: (value: { data: Array<{ profile_id: string; carried_days: number }>; error: null }) => void) {
+                resolve({ data: options.carryovers || [], error: null });
+              },
+            };
+            return chain;
           },
         };
       }
@@ -310,5 +330,36 @@ describe('bookBulkAbsence partial conflict handling', () => {
     expect(result.requestedDaysMin).toBe(1);
     expect(result.requestedDaysMax).toBe(2);
     expect(result.wouldCreate).toBe(3);
+  });
+
+  it('uses carryover allowance when calculating annual leave warnings', async () => {
+    const { supabase } = buildMockSupabase({
+      profiles: [
+        {
+          id: 'emp-a',
+          full_name: 'A Worker',
+          employee_id: 'A1',
+          annual_holiday_allowance_days: 2,
+          roles: null,
+        },
+      ],
+      annualAbsences: [],
+      existingRows: [],
+      carryovers: [{ profile_id: 'emp-a', carried_days: 3 }],
+    });
+
+    const result = await bookBulkAbsence({
+      supabase: supabase as never,
+      actorProfileId: 'manager-1',
+      reasonId: 'reason-annual',
+      startDate: '2026-12-14',
+      endDate: '2026-12-18',
+      applyToAll: true,
+      confirm: false,
+    });
+
+    expect(result.requestedDays).toBe(5);
+    expect(result.warningCount).toBe(0);
+    expect(result.warnings).toEqual([]);
   });
 });

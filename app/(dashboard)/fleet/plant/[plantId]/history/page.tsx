@@ -26,6 +26,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { formatMaintenanceDate } from '@/lib/utils/maintenanceCalculations';
 import { usePlantMaintenanceHistory } from '@/lib/hooks/useMaintenance';
 import { useWorkshopTaskComments } from '@/lib/hooks/useWorkshopTaskComments';
+import { useTaskInspectionPhotos } from '@/lib/hooks/useTaskInspectionPhotos';
 import { AttachmentHistoryViewer } from '@/components/workshop-tasks/AttachmentHistoryViewer';
 
 // Dynamic imports for dialog components
@@ -344,6 +345,10 @@ export default function PlantHistoryPage({
     taskIds: workshopTasks.map((t: WorkshopTask) => t.id),
     enabled: workshopTasks.length > 0
   });
+  const { photosByTask: taskInspectionPhotos } = useTaskInspectionPhotos(
+    workshopTasks.map((task: WorkshopTask) => task.id),
+    { enabled: workshopTasks.length > 0 }
+  );
 
   const fetchPlantData = useCallback(async () => {
     try {
@@ -664,6 +669,7 @@ export default function PlantHistoryPage({
                       key={task.id}
                       task={task}
                       comments={taskComments[task.id] || []}
+                      inspectionPhotos={taskInspectionPhotos[task.id] || []}
                       defaultExpanded={expandedTasks.has(task.id)}
                       onToggle={(taskId, isExpanded) => {
                         setExpandedTasks(prev => {

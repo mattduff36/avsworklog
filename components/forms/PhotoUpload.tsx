@@ -7,11 +7,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Camera, Upload, X, Trash2 } from 'lucide-react';
+import { Camera, Expand, Trash2, Upload, X } from 'lucide-react';
 
 interface PhotoUploadProps {
   inspectionId: string;
   itemNumber: number;
+  dayOfWeek?: number | null;
   onClose: () => void;
   onUploadComplete: () => void;
 }
@@ -22,7 +23,15 @@ interface ExistingPhoto {
   caption: string | null;
 }
 
-export default function PhotoUpload({ inspectionId, itemNumber, onClose, onUploadComplete }: PhotoUploadProps) {
+const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+export default function PhotoUpload({
+  inspectionId,
+  itemNumber,
+  dayOfWeek = null,
+  onClose,
+  onUploadComplete,
+}: PhotoUploadProps) {
   const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -32,21 +41,30 @@ export default function PhotoUpload({ inspectionId, itemNumber, onClose, onUploa
   const [caption, setCaption] = useState('');
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [selectedExistingPhoto, setSelectedExistingPhoto] = useState<ExistingPhoto | null>(null);
+  const hasPendingPhoto = Boolean(preview);
 
   const fetchExistingPhotos = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('inspection_photos')
         .select('*')
         .eq('inspection_id', inspectionId)
         .eq('item_number', itemNumber);
+
+      if (dayOfWeek !== null) {
+        query = query.eq('day_of_week', dayOfWeek);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
       setExistingPhotos(data || []);
     } catch (err) {
       console.error('Error fetching photos:', err);
     }
-  }, [supabase, inspectionId, itemNumber]);
+  }, [supabase, inspectionId, itemNumber, dayOfWeek]);
 
   useEffect(() => {
     fetchExistingPhotos();
@@ -70,6 +88,7 @@ export default function PhotoUpload({ inspectionId, itemNumber, onClose, onUploa
 
     setSelectedFile(file);
     setError('');
+    setSuccessMessage('');
 
     // Create preview
     const reader = new FileReader();
@@ -88,7 +107,7 @@ export default function PhotoUpload({ inspectionId, itemNumber, onClose, onUploa
     try {
       // Generate unique filename
       const fileExt = selectedFile.name.split('.').pop();
-      const fileName = `${inspectionId}/${itemNumber}/${Date.now()}.${fileExt}`;
+      const fileName = `${inspectionId}/${dayOfWeek ?? 'general'}/${itemNumber}/${Date.now()}.${fileExt}`;
 
       // Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage
@@ -108,6 +127,7 @@ export default function PhotoUpload({ inspectionId, itemNumber, onClose, onUploa
         .insert({
           inspection_id: inspectionId,
           item_number: itemNumber,
+          day_of_week: dayOfWeek,
           photo_url: publicUrl,
           caption: caption || null,
         } as never);
@@ -118,6 +138,7 @@ export default function PhotoUpload({ inspectionId, itemNumber, onClose, onUploa
       setSelectedFile(null);
       setPreview(null);
       setCaption('');
+      setSuccessMessage('Photo saved. You can review it below or add another one.');
       
       // Refresh photos list
       await fetchExistingPhotos();
@@ -163,11 +184,14 @@ export default function PhotoUpload({ inspectionId, itemNumber, onClose, onUploa
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] border-border">
+      <DialogContent className="sm:max-w-[680px] border-border">
         <DialogHeader>
-          <DialogTitle>Photo Upload - Item #{itemNumber}</DialogTitle>
+          <DialogTitle>
+            Photos for Item #{itemNumber}
+            {dayOfWeek ? ` - ${dayNames[dayOfWeek - 1]}` : ''}
+          </DialogTitle>
           <DialogDescription>
-            Upload photos of defects or issues
+            Upload and review photos for this defect.
           </DialogDescription>
         </DialogHeader>
 
@@ -178,35 +202,69 @@ export default function PhotoUpload({ inspectionId, itemNumber, onClose, onUploa
             </div>
           )}
 
+          {successMessage && (
+            <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-200">
+              {successMessage}
+            </div>
+          )}
+
           {/* Existing Photos */}
           {existingPhotos.length > 0 && (
             <div className="space-y-2">
-              <Label>Existing Photos</Label>
+              <div className="flex items-center justify-between gap-3">
+                <Label>Saved Photos</Label>
+                <span className="text-xs text-muted-foreground">
+                  {existingPhotos.length} saved
+                </span>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 {existingPhotos.map((photo) => (
-                  <div key={photo.id} className="relative group">
-                    <Image
-                      src={photo.photo_url}
-                      alt={photo.caption || 'Inspection photo'}
-                      width={400}
-                      height={128}
-                      unoptimized
-                      loader={({ src }) => src}
-                      className="w-full h-32 object-cover rounded border"
-                    />
+                  <div key={photo.id} className="space-y-2 rounded-lg border border-border p-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedExistingPhoto(photo)}
+                      className="group relative block w-full overflow-hidden rounded border"
+                    >
+                      <Image
+                        src={photo.photo_url}
+                        alt={photo.caption || 'Inspection photo'}
+                        width={400}
+                        height={128}
+                        unoptimized
+                        loader={({ src }) => src}
+                        className="h-36 w-full object-cover"
+                      />
+                      <div className="absolute inset-x-0 bottom-0 flex items-center justify-end bg-gradient-to-t from-black/75 to-transparent p-2">
+                        <Expand className="h-3.5 w-3.5 text-white/80" />
+                      </div>
+                    </button>
                     {photo.caption && (
-                      <p className="text-xs text-muted-foreground mt-1 truncate">
+                      <p className="truncate text-xs text-muted-foreground">
                         {photo.caption}
                       </p>
                     )}
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => handleDelete(photo.id, photo.photo_url)}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => setSelectedExistingPhoto(photo)}
+                      >
+                        <Expand className="mr-2 h-3.5 w-3.5" />
+                        View
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => handleDelete(photo.id, photo.photo_url)}
+                      >
+                        <Trash2 className="mr-2 h-3 w-3" />
+                        Delete
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -215,7 +273,7 @@ export default function PhotoUpload({ inspectionId, itemNumber, onClose, onUploa
 
           {/* File Upload */}
           <div className="space-y-3">
-            <Label>Add New Photo</Label>
+            <Label>{hasPendingPhoto ? 'Ready to Save' : 'Add New Photo'}</Label>
             
             <input
               ref={fileInputRef}
@@ -252,16 +310,19 @@ export default function PhotoUpload({ inspectionId, itemNumber, onClose, onUploa
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full h-48 border-2 border-dashed rounded-md flex flex-col items-center justify-center gap-2 hover:bg-secondary/50 transition-colors"
+                className="flex h-56 w-full flex-col items-center justify-center gap-3 rounded-md border-2 border-dashed border-border bg-slate-900/30 hover:bg-secondary/50 transition-colors"
               >
                 <Camera className="h-12 w-12 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">
+                <span className="text-sm font-medium text-muted-foreground">
                   Click to select a photo
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  Saved photos appear above straight away after you press save.
                 </span>
               </button>
             )}
 
-            {selectedFile && (
+            {hasPendingPhoto && (
               <div className="space-y-2">
                 <Label htmlFor="caption">Caption (Optional)</Label>
                 <Input
@@ -276,17 +337,62 @@ export default function PhotoUpload({ inspectionId, itemNumber, onClose, onUploa
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={uploading}>
-            Close
-          </Button>
-          {selectedFile && (
-            <Button onClick={handleUpload} disabled={uploading}>
-              <Upload className="h-4 w-4 mr-2" />
-              {uploading ? 'Uploading...' : 'Upload Photo'}
+          {hasPendingPhoto ? (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setSelectedFile(null);
+                  setPreview(null);
+                  setCaption('');
+                  setError('');
+                }}
+                disabled={uploading}
+              >
+                Cancel
+              </Button>
+              <Button type="button" onClick={handleUpload} disabled={uploading || !selectedFile}>
+                <Upload className="h-4 w-4 mr-2" />
+                {uploading ? 'Saving...' : 'Save Photo'}
+              </Button>
+            </>
+          ) : (
+            <Button type="button" variant="outline" onClick={onClose} disabled={uploading}>
+              Done
             </Button>
           )}
         </DialogFooter>
       </DialogContent>
+
+      <Dialog open={Boolean(selectedExistingPhoto)} onOpenChange={(open) => !open && setSelectedExistingPhoto(null)}>
+        <DialogContent className="max-w-4xl border-border">
+          {selectedExistingPhoto && (
+            <>
+              <DialogHeader>
+                <DialogTitle>
+                  Photo for Item #{itemNumber}
+                  {dayOfWeek ? ` - ${dayNames[dayOfWeek - 1]}` : ''}
+                </DialogTitle>
+                <DialogDescription>
+                  {selectedExistingPhoto.caption || 'Inspection photo'}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="overflow-hidden rounded-lg border border-border bg-slate-950">
+                <Image
+                  src={selectedExistingPhoto.photo_url}
+                  alt={selectedExistingPhoto.caption || 'Inspection photo'}
+                  width={1600}
+                  height={1200}
+                  unoptimized
+                  loader={({ src }) => src}
+                  className="max-h-[75vh] w-full object-contain"
+                />
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

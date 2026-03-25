@@ -27,7 +27,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ArrowUpDown, Calendar, ChevronLeft, ChevronRight, Plus, Filter, Trash2, Search, ExternalLink, Wrench, Briefcase, Clock } from 'lucide-react';
+import { ArrowUpDown, Calendar, ChevronLeft, ChevronRight, Plus, Filter, Trash2, Search, ExternalLink, Wrench, Briefcase, Clock, Pencil } from 'lucide-react';
 import { 
   useAllAbsences, 
   useAllAbsenceReasons,
@@ -43,9 +43,11 @@ import Link from 'next/link';
 import { AbsenceReasonsContent } from '@/app/(dashboard)/absence/manage/components/AbsenceReasonsContent';
 import { AllowancesContent } from '@/app/(dashboard)/absence/manage/components/AllowancesContent';
 import { AbsenceCalendarAdmin } from '@/app/(dashboard)/absence/manage/components/AbsenceCalendarAdmin';
+import { AbsenceEditDialog } from '@/app/(dashboard)/absence/manage/components/AbsenceEditDialog';
 import { AbsenceAboutHelper } from '@/app/(dashboard)/absence/components/AbsenceAboutHelper';
 import { ManageOverviewAdminActions } from '@/app/(dashboard)/absence/manage/components/ManageOverviewAdminActions';
 import { WorkShiftsContent } from '@/app/(dashboard)/absence/manage/components/WorkShiftsContent';
+import type { AbsenceWithRelations } from '@/types/absence';
 import type { WorkShiftPattern } from '@/types/work-shifts';
 
 type ManageSortField = 'employee' | 'reason' | 'status' | 'date' | 'duration' | 'approved_at';
@@ -163,6 +165,7 @@ export default function AdminAbsencePage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+  const [editTarget, setEditTarget] = useState<AbsenceWithRelations | null>(null);
   const [selectedProfileId, setSelectedProfileId] = useState('');
   const [selectedReasonId, setSelectedReasonId] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -361,6 +364,10 @@ export default function AdminAbsencePage() {
 
   function formatDuration(days: number): string {
     return `${days} ${days === 1 ? 'day' : 'days'}`;
+  }
+
+  function canEditAbsence(absence: AbsenceWithRelations): boolean {
+    return absence.record_source !== 'archived' && !absence.is_bank_holiday && !absence.auto_generated;
   }
 
   // Handle create
@@ -790,6 +797,16 @@ export default function AdminAbsencePage() {
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
+                                {canEditAbsence(absence) && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setEditTarget(absence)}
+                                    className="px-2 text-absence hover:text-absence hover:bg-absence/10"
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                )}
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -864,6 +881,16 @@ export default function AdminAbsencePage() {
                             </div>
                           </div>
                           <div className="flex gap-2">
+                            {canEditAbsence(absence) && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setEditTarget(absence)}
+                                className="px-2 text-absence hover:text-absence hover:bg-absence/10"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="sm"
@@ -1102,6 +1129,17 @@ export default function AdminAbsencePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AbsenceEditDialog
+        absence={editTarget}
+        reasons={reasons || []}
+        open={!!editTarget}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditTarget(null);
+          }
+        }}
+      />
 
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent className="border-border max-w-3xl">

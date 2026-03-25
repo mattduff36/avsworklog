@@ -624,6 +624,7 @@ export function ManageOverviewAdminActions() {
                   <TeamToggleMenu
                     teams={bulkTeamOptions.map((team) => ({
                       ...team,
+                      hasAccess: true,
                       selected: (() => {
                         const teamEmployees = bulkEmployeeOptions.filter(
                           (employee) => employee.team_id === team.id

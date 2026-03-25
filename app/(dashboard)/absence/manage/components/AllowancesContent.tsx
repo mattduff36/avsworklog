@@ -36,6 +36,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { AlertTriangle, ArrowUpDown, ChevronLeft, ChevronRight, Loader2, Search, Settings2, Sparkles, Trash2, Users } from 'lucide-react';
 import { useUpdateEmployeeAllowance } from '@/lib/hooks/useAbsence';
 import { useAbsenceRealtime } from '@/lib/hooks/useRealtime';
+import { fetchCarryoverMapForFinancialYear, getEffectiveAllowance } from '@/lib/utils/absence-carryover';
 import { getCurrentFinancialYear } from '@/lib/utils/date';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
@@ -437,6 +438,7 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
         team: profile.team || null,
         role: profile.role || null,
       })) as ProfileData[];
+      const carryoverByProfile = await fetchCarryoverMapForFinancialYear(supabase, selectedFinancialYearStartYear);
       const computedRows: ProfileRow[] = typedProfiles.map((profile) => {
         const totals = summaryByProfile.get(profile.id) || {
           annualTaken: 0,
@@ -444,7 +446,10 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
           annualPending: 0,
           byReason: {},
         };
-        const allowance = profile.annual_holiday_allowance_days ?? 28;
+        const allowance = getEffectiveAllowance(
+          profile.annual_holiday_allowance_days,
+          carryoverByProfile.get(profile.id) || 0
+        );
         const totalApproved = totals.annualTaken + totals.annualUpcoming;
         return {
           id: profile.id,
@@ -634,6 +639,7 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
         success?: boolean;
         created?: number;
         skippedExisting?: number;
+        carryoverGenerated?: number;
         financialYearLabel?: string;
         error?: string;
       };
@@ -641,7 +647,7 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
         throw new Error(payload.error || 'Failed to generate allowances');
       }
       toast.success(
-        `Allowances generated for ${payload.financialYearLabel}: ${payload.created ?? 0} created, ${payload.skippedExisting ?? 0} already existed`
+        `Allowances generated for ${payload.financialYearLabel}: ${payload.created ?? 0} bank holidays created, ${payload.skippedExisting ?? 0} already existed, ${payload.carryoverGenerated ?? 0} carryovers added`
       );
       setShowGenerateDialog(false);
       await Promise.all([loadRows(), loadGenerationStatus()]);
@@ -666,13 +672,14 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
         success?: boolean;
         removedFinancialYearLabel?: string;
         removedGeneratedAbsences?: number;
+        removedCarryovers?: number;
         error?: string;
       };
       if (!response.ok || !payload.success) {
         throw new Error(payload.error || 'Failed to remove generated year');
       }
       toast.success(
-        `Removed generated year ${payload.removedFinancialYearLabel}. ${payload.removedGeneratedAbsences ?? 0} auto-generated bank holiday entries were deleted.`
+        `Removed generated year ${payload.removedFinancialYearLabel}. ${payload.removedGeneratedAbsences ?? 0} auto-generated bank holidays and ${payload.removedCarryovers ?? 0} carryovers were deleted.`
       );
       setShowRemoveDialog(false);
       await Promise.all([loadRows(), loadGenerationStatus()]);

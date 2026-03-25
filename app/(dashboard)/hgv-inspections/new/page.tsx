@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertCircle, CheckCircle2, Info, MinusCircle, Send, Timer, User, XCircle } from 'lucide-react';
+import { AlertCircle, Camera, CheckCircle2, Info, MinusCircle, Send, Timer, User, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { TRUCK_CHECKLIST_ITEMS } from '@/lib/checklists/vehicle-checklists';
 import { formatDate, formatDateISO, getDayOfWeek } from '@/lib/utils/date';
@@ -373,7 +373,7 @@ function NewHgvInspectionContent() {
       }
 
       toast.success('HGV inspection submitted successfully');
-      router.push('/hgv-inspections');
+      router.push(`/hgv-inspections/${inspection.id}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to save inspection';
       setError(message);
@@ -647,6 +647,18 @@ function NewHgvInspectionContent() {
                               className={`bg-slate-900/50 border-slate-600 text-white ${currentStatus === 'attention' && !comments[key] ? 'border-red-500' : ''}`}
                               readOnly={isLocked}
                             />
+                            {currentStatus === 'attention' && !isLocked && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled
+                                className="mt-3 h-16 w-full flex-col gap-1 border-border text-muted-foreground opacity-100"
+                              >
+                                <Camera className="h-4 w-4" />
+                                <span className="text-xs">Submit to upload photos</span>
+                              </Button>
+                            )}
                           </td>
                         </tr>
                       </Fragment>
@@ -694,6 +706,21 @@ function NewHgvInspectionContent() {
                         className="min-h-[80px] bg-slate-900/50 border-slate-600 text-white"
                         readOnly={isLocked}
                       />
+                      {currentStatus === 'attention' && !isLocked && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled
+                          className="min-h-[88px] w-full flex-col gap-2 border-border text-muted-foreground opacity-100"
+                        >
+                          <Camera className="h-5 w-5" />
+                          <span>Submit to upload photos</span>
+                          <span className="text-xs text-muted-foreground/80">
+                            Photos can be added on the submitted check.
+                          </span>
+                        </Button>
+                      )}
                     </div>
                   </Fragment>
                 );

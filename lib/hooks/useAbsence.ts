@@ -11,12 +11,25 @@ import {
   AbsenceSummary,
   FinancialYear
 } from '@/types/absence';
+import { fetchCarryoverMapForFinancialYear, getEffectiveAllowance } from '@/lib/utils/absence-carryover';
 import { getCurrentFinancialYear, getFinancialYear } from '@/lib/utils/date';
 import { calculateDurationDays } from '@/lib/utils/date';
 import { isClosedFinancialYearDate } from '@/lib/services/absence-archive';
 import { ANNUAL_LEAVE_MIN_REMAINING_DAYS } from '@/lib/utils/annual-leave';
 
 const ANNUAL_LEAVE_REASON_NAME = 'annual leave';
+
+interface AbsenceValidationShape {
+  profile_id: string;
+  date: string;
+  end_date: string | null;
+  reason_id: string;
+  duration_days: number;
+  is_half_day: boolean;
+  half_day_session: 'AM' | 'PM' | null;
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  notes: string | null;
+}
 
 function hasFilterValue(value?: string): value is string {
   return !!value && value.trim().length > 0;
@@ -54,15 +67,48 @@ async function assertAbsenceFinancialYearOpen(
   }
 }
 
-async function assertNoAbsenceConflictBeforeInsert(
+async function resolveAbsenceDuration(
+  absence: AbsenceValidationShape,
+  currentUserId?: string
+): Promise<AbsenceValidationShape> {
+  const resolvedAbsence = { ...absence };
+
+  if (!resolvedAbsence.profile_id || !resolvedAbsence.date) {
+    return resolvedAbsence;
+  }
+
+  try {
+    const workShift =
+      currentUserId && currentUserId === resolvedAbsence.profile_id
+        ? await fetchCurrentWorkShift()
+        : await fetchEmployeeWorkShift(resolvedAbsence.profile_id);
+
+    resolvedAbsence.duration_days = calculateDurationDays(
+      new Date(`${resolvedAbsence.date}T00:00:00`),
+      resolvedAbsence.end_date ? new Date(`${resolvedAbsence.end_date}T00:00:00`) : null,
+      resolvedAbsence.is_half_day === true,
+      {
+        pattern: workShift.pattern,
+        halfDaySession: resolvedAbsence.half_day_session || null,
+      }
+    );
+  } catch (error) {
+    console.error('Error resolving work shift duration, falling back to provided duration:', error);
+  }
+
+  return resolvedAbsence;
+}
+
+async function assertNoAbsenceConflictBeforeSave(
   supabase: ReturnType<typeof createClient>,
-  absence: AbsenceInsert
+  absence: AbsenceValidationShape,
+  excludeAbsenceId?: string
 ): Promise<void> {
   const profileId = absence.profile_id;
   const startDate = absence.date;
   const endDate = absence.end_date || absence.date;
-  const nextStatus = absence.status || 'pending';
-  const isHalfDay = absence.is_half_day === true;
+  const nextStatus = absence.status;
+  const isHalfDay = absence.is_half_day;
   const halfDaySession = absence.half_day_session || null;
 
   if (!profileId || !startDate) {
@@ -80,12 +126,18 @@ async function assertNoAbsenceConflictBeforeInsert(
     throw new Error('Half-day absences must be a single day');
   }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('absences')
     .select('date, end_date, is_half_day, half_day_session')
     .eq('profile_id', profileId)
     .in('status', ['approved', 'pending'])
     .lte('date', endDate);
+
+  if (excludeAbsenceId) {
+    query = query.neq('id', excludeAbsenceId);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw error;
 
@@ -121,6 +173,101 @@ async function assertNoAbsenceConflictBeforeInsert(
     if (row.half_day_session === halfDaySession) {
       throw new Error(`This ${halfDaySession} half-day is already booked`);
     }
+  }
+}
+
+async function buildValidatedAbsence(
+  supabase: ReturnType<typeof createClient>,
+  absence: AbsenceValidationShape,
+  options?: { excludeAbsenceId?: string; currentUserId?: string }
+): Promise<AbsenceValidationShape> {
+  const resolvedAbsence = await resolveAbsenceDuration(absence, options?.currentUserId);
+  await assertNoAbsenceConflictBeforeSave(supabase, resolvedAbsence, options?.excludeAbsenceId);
+  return resolvedAbsence;
+}
+
+async function getAnnualLeaveReasonIdByReason(
+  supabase: ReturnType<typeof createClient>,
+  reasonId: string
+): Promise<string | null> {
+  const { data: reason, error: reasonError } = await supabase
+    .from('absence_reasons')
+    .select('id, name')
+    .eq('id', reasonId)
+    .single();
+
+  if (reasonError) {
+    throw reasonError;
+  }
+
+  return reason?.name?.trim().toLowerCase() === ANNUAL_LEAVE_REASON_NAME ? reason.id : null;
+}
+
+async function assertAnnualLeaveAllowanceAvailable(
+  supabase: ReturnType<typeof createClient>,
+  absence: AbsenceValidationShape,
+  excludeAbsenceId?: string
+): Promise<void> {
+  if (!['pending', 'approved'].includes(absence.status)) {
+    return;
+  }
+
+  if (!absence.reason_id || !absence.profile_id || (absence.duration_days || 0) <= 0) {
+    return;
+  }
+
+  const annualLeaveReasonId = await getAnnualLeaveReasonIdByReason(supabase, absence.reason_id);
+  if (!annualLeaveReasonId) {
+    return;
+  }
+
+  const requestDate = new Date(`${absence.date}T00:00:00`);
+  const financialYear = getFinancialYear(requestDate);
+  const financialYearStartYear = financialYear.start.getFullYear();
+
+  const [{ data: profile, error: profileError }, carryoverByProfile] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('annual_holiday_allowance_days')
+      .eq('id', absence.profile_id)
+      .single(),
+    fetchCarryoverMapForFinancialYear(supabase, financialYearStartYear, [absence.profile_id]),
+  ]);
+
+  if (profileError) {
+    throw profileError;
+  }
+
+  const allowance = getEffectiveAllowance(
+    profile?.annual_holiday_allowance_days,
+    carryoverByProfile.get(absence.profile_id) || 0
+  );
+
+  let query = supabase
+    .from('absences')
+    .select('duration_days')
+    .eq('profile_id', absence.profile_id)
+    .eq('reason_id', annualLeaveReasonId)
+    .in('status', ['approved', 'pending'])
+    .gte('date', financialYear.start.toISOString().split('T')[0])
+    .lte('date', financialYear.end.toISOString().split('T')[0]);
+
+  if (excludeAbsenceId) {
+    query = query.neq('id', excludeAbsenceId);
+  }
+
+  const { data: annualAbsences, error: annualAbsencesError } = await query;
+  if (annualAbsencesError) {
+    throw annualAbsencesError;
+  }
+
+  const usedOrPending = (annualAbsences || []).reduce(
+    (sum: number, entry: { duration_days: number | null }) => sum + (entry.duration_days || 0),
+    0
+  );
+
+  if (allowance - usedOrPending - absence.duration_days < ANNUAL_LEAVE_MIN_REMAINING_DAYS) {
+    throw new Error('Annual leave request exceeds available allowance');
   }
 }
 
@@ -244,18 +391,25 @@ export function useAbsenceSummaryForUserFinancialYear(financialYear?: Pick<Finan
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
-      
-      // Get user's allowance
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('annual_holiday_allowance_days')
-        .eq('id', user.id)
-        .single();
-      
+
+      const financialYearStartYear = start.getFullYear();
+
+      const [{ data: profile, error: profileError }, carryoverByProfile] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('annual_holiday_allowance_days')
+          .eq('id', user.id)
+          .single(),
+        fetchCarryoverMapForFinancialYear(supabase, financialYearStartYear, [user.id]),
+      ]);
+
       if (profileError) throw profileError;
-      
-      const allowance = profile?.annual_holiday_allowance_days || 28;
-      
+
+      const allowance = getEffectiveAllowance(
+        profile?.annual_holiday_allowance_days,
+        carryoverByProfile.get(user.id) || 0
+      );
+
       // Get Annual Leave reason ID
       const { data: annualLeaveReason, error: reasonError } = await supabase
         .from('absence_reasons')
@@ -318,87 +472,37 @@ export function useCreateAbsence() {
   return useMutation({
     mutationFn: async (absence: AbsenceInsert) => {
       const { data: { user } } = await supabase.auth.getUser();
+      const validatedAbsence = await buildValidatedAbsence(
+        supabase,
+        {
+          profile_id: absence.profile_id,
+          date: absence.date,
+          end_date: absence.end_date ?? null,
+          reason_id: absence.reason_id,
+          duration_days: absence.duration_days,
+          is_half_day: absence.is_half_day ?? false,
+          half_day_session: absence.half_day_session ?? null,
+          status: absence.status ?? 'pending',
+          notes: absence.notes ?? null,
+        },
+        { currentUserId: user?.id }
+      );
 
-      const resolvedAbsence = { ...absence };
-      if (resolvedAbsence.profile_id && resolvedAbsence.date) {
-        try {
-          const workShift =
-            user?.id === resolvedAbsence.profile_id
-              ? await fetchCurrentWorkShift()
-              : await fetchEmployeeWorkShift(resolvedAbsence.profile_id);
-
-          resolvedAbsence.duration_days = calculateDurationDays(
-            new Date(`${resolvedAbsence.date}T00:00:00`),
-            resolvedAbsence.end_date ? new Date(`${resolvedAbsence.end_date}T00:00:00`) : null,
-            resolvedAbsence.is_half_day === true,
-            {
-              pattern: workShift.pattern,
-              halfDaySession: resolvedAbsence.half_day_session || null,
-            }
-          );
-        } catch (error) {
-          console.error('Error resolving work shift duration, falling back to provided duration:', error);
-        }
-      }
-
-      await assertNoAbsenceConflictBeforeInsert(supabase, resolvedAbsence);
-
-      // Enforce annual leave allowance at mutation time to prevent stale UI bypasses.
-      if (
-        resolvedAbsence.status === 'pending' &&
-        resolvedAbsence.reason_id &&
-        resolvedAbsence.profile_id &&
-        (resolvedAbsence.duration_days || 0) > 0
-      ) {
-        const { data: reason, error: reasonError } = await supabase
-          .from('absence_reasons')
-          .select('id, name')
-          .eq('id', resolvedAbsence.reason_id)
-          .single();
-
-        if (reasonError) throw reasonError;
-
-        const isAnnualLeave = reason?.name?.trim().toLowerCase() === ANNUAL_LEAVE_REASON_NAME;
-        if (isAnnualLeave) {
-          const requestDate = resolvedAbsence.date ? new Date(`${resolvedAbsence.date}T00:00:00`) : new Date();
-          const { start, end } = getFinancialYear(requestDate);
-
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('annual_holiday_allowance_days')
-            .eq('id', resolvedAbsence.profile_id)
-            .single();
-
-          if (profileError) throw profileError;
-
-          const allowance = profile?.annual_holiday_allowance_days || 28;
-
-          const { data: annualAbsences, error: annualAbsencesError } = await supabase
-            .from('absences')
-            .select('duration_days')
-            .eq('profile_id', resolvedAbsence.profile_id)
-            .eq('reason_id', reason.id)
-            .in('status', ['approved', 'pending'])
-            .gte('date', start.toISOString().split('T')[0])
-            .lte('date', end.toISOString().split('T')[0]);
-
-          if (annualAbsencesError) throw annualAbsencesError;
-
-          const usedOrPending = (annualAbsences || []).reduce(
-            (sum: number, entry: { duration_days: number | null }) => sum + (entry.duration_days || 0),
-            0
-          );
-          const requested = resolvedAbsence.duration_days || 0;
-
-          if (allowance - usedOrPending - requested < ANNUAL_LEAVE_MIN_REMAINING_DAYS) {
-            throw new Error('Annual leave request exceeds available allowance');
-          }
-        }
-      }
+      await assertAnnualLeaveAllowanceAvailable(supabase, validatedAbsence);
 
       const { data, error } = await supabase
         .from('absences')
-        .insert(resolvedAbsence)
+        .insert({
+          ...absence,
+          date: validatedAbsence.date,
+          end_date: validatedAbsence.end_date,
+          reason_id: validatedAbsence.reason_id,
+          duration_days: validatedAbsence.duration_days,
+          is_half_day: validatedAbsence.is_half_day,
+          half_day_session: validatedAbsence.half_day_session,
+          status: validatedAbsence.status,
+          notes: validatedAbsence.notes,
+        })
         .select()
         .single();
       
@@ -422,9 +526,60 @@ export function useUpdateAbsence() {
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: AbsenceUpdate }) => {
       await assertAbsenceFinancialYearOpen(supabase, id);
+      const { data: existingAbsence, error: existingAbsenceError } = await supabase
+        .from('absences')
+        .select('profile_id, date, end_date, reason_id, duration_days, is_half_day, half_day_session, status, notes')
+        .eq('id', id)
+        .single();
+
+      if (existingAbsenceError) throw existingAbsenceError;
+
+      const { data: { user } } = await supabase.auth.getUser();
+      const hasUpdateField = <K extends keyof AbsenceUpdate>(key: K) =>
+        Object.prototype.hasOwnProperty.call(updates, key);
+      const resolveUpdatedField = <
+        K extends keyof AbsenceUpdate,
+        TExisting
+      >(
+        key: K,
+        fallback: TExisting
+      ) => (hasUpdateField(key) ? (updates[key] as TExisting) : fallback);
+
+      const validatedAbsence = await buildValidatedAbsence(
+        supabase,
+        {
+          profile_id: resolveUpdatedField('profile_id', existingAbsence.profile_id),
+          date: resolveUpdatedField('date', existingAbsence.date),
+          end_date: resolveUpdatedField('end_date', existingAbsence.end_date),
+          reason_id: resolveUpdatedField('reason_id', existingAbsence.reason_id),
+          duration_days: resolveUpdatedField('duration_days', existingAbsence.duration_days),
+          is_half_day: resolveUpdatedField('is_half_day', existingAbsence.is_half_day),
+          half_day_session: resolveUpdatedField('half_day_session', existingAbsence.half_day_session),
+          status: resolveUpdatedField('status', existingAbsence.status),
+          notes: resolveUpdatedField('notes', existingAbsence.notes),
+        },
+        {
+          excludeAbsenceId: id,
+          currentUserId: user?.id,
+        }
+      );
+
+      await assertAnnualLeaveAllowanceAvailable(supabase, validatedAbsence, id);
+
       const { data, error } = await supabase
         .from('absences')
-        .update(updates)
+        .update({
+          ...updates,
+          profile_id: validatedAbsence.profile_id,
+          date: validatedAbsence.date,
+          end_date: validatedAbsence.end_date,
+          reason_id: validatedAbsence.reason_id,
+          duration_days: validatedAbsence.duration_days,
+          is_half_day: validatedAbsence.is_half_day,
+          half_day_session: validatedAbsence.half_day_session,
+          status: validatedAbsence.status,
+          notes: validatedAbsence.notes,
+        })
         .eq('id', id)
         .select()
         .single();
@@ -706,17 +861,24 @@ export function useAbsenceSummaryForEmployee(profileId: string) {
   return useQuery({
     queryKey: ['absence-summary', profileId, start.toISOString(), end.toISOString()],
     queryFn: async () => {
-      // Get user's allowance
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('annual_holiday_allowance_days')
-        .eq('id', profileId)
-        .single();
-      
+      const financialYearStartYear = start.getFullYear();
+
+      const [{ data: profile, error: profileError }, carryoverByProfile] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('annual_holiday_allowance_days')
+          .eq('id', profileId)
+          .single(),
+        fetchCarryoverMapForFinancialYear(supabase, financialYearStartYear, [profileId]),
+      ]);
+
       if (profileError) throw profileError;
-      
-      const allowance = profile?.annual_holiday_allowance_days || 28;
-      
+
+      const allowance = getEffectiveAllowance(
+        profile?.annual_holiday_allowance_days,
+        carryoverByProfile.get(profileId) || 0
+      );
+
       // Get Annual Leave reason ID
       const { data: annualLeaveReason, error: reasonError } = await supabase
         .from('absence_reasons')

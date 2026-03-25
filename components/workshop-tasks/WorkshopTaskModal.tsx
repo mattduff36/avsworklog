@@ -19,6 +19,8 @@ import { WorkshopTaskTimeline } from '@/components/workshop-tasks/WorkshopTaskTi
 import { TaskAttachmentsSection } from '@/components/workshop-tasks/TaskAttachmentsSection';
 import { useWorkshopTaskComments } from '@/lib/hooks/useWorkshopTaskComments';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
+import { InspectionPhotoGallery } from '@/components/inspections/InspectionPhotoGallery';
+import type { InspectionPhoto } from '@/types/inspection';
 import type { Database } from '@/types/database';
 
 type Task = Database['public']['Tables']['actions']['Row'] & {
@@ -57,6 +59,7 @@ interface WorkshopTaskModalProps {
   onMarkOnHold: (task: Task) => void;
   onResume: (task: Task) => void;
   isUpdating: boolean;
+  inspectionPhotos?: InspectionPhoto[];
 }
 
 export function WorkshopTaskModal({
@@ -70,6 +73,7 @@ export function WorkshopTaskModal({
   onMarkOnHold,
   onResume,
   isUpdating,
+  inspectionPhotos = [],
 }: WorkshopTaskModalProps) {
   const { tabletModeEnabled } = useTabletMode();
   const taskActionButtonClass = tabletModeEnabled ? 'min-h-11 text-base px-4' : '';
@@ -224,6 +228,17 @@ export function WorkshopTaskModal({
                   <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                     {workshopNotes}
                   </p>
+                </CardContent>
+              </Card>
+            )}
+            {task.action_type === 'inspection_defect' && inspectionPhotos.length > 0 && (
+              <Card className="bg-slate-800/50 border-border">
+                <CardContent className="pt-4">
+                  <InspectionPhotoGallery
+                    photos={inspectionPhotos}
+                    title="Defect Photos"
+                    description="Uploaded photos linked to this inspection defect."
+                  />
                 </CardContent>
               </Card>
             )}

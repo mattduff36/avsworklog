@@ -15,6 +15,9 @@ import { formatDate } from '@/lib/utils/date';
 import { InspectionStatus, InspectionItem } from '@/types/inspection';
 import PhotoUpload from '@/components/forms/PhotoUpload';
 import { Database } from '@/types/database';
+import { InspectionPhotoGallery } from '@/components/inspections/InspectionPhotoGallery';
+import { useInspectionPhotos } from '@/lib/hooks/useInspectionPhotos';
+import { getInspectionPhotoKey } from '@/lib/inspection-photos';
 
 interface PlantInspectionWithDetails {
   id: string;
@@ -65,7 +68,10 @@ export default function ViewPlantInspectionPage() {
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState('');
-  const [photoUploadItem, setPhotoUploadItem] = useState<number | null>(null);
+  const [photoUploadItem, setPhotoUploadItem] = useState<{ itemNumber: number; dayOfWeek: number | null } | null>(null);
+  const { photoMap, refresh: refreshInspectionPhotos } = useInspectionPhotos(inspection?.id, {
+    enabled: Boolean(inspection?.id),
+  });
   
   // Editable daily hours state (for draft inspections)
   const [editableDailyHours, setEditableDailyHours] = useState<Record<number, number | null>>({
@@ -441,6 +447,8 @@ export default function ViewPlantInspectionPage() {
 
   const isWeeklyInspection = inspection.inspection_end_date && 
     inspection.inspection_end_date !== inspection.inspection_date;
+  const getPhotosForItem = (itemNumber: number, dayOfWeek: number | null) =>
+    photoMap[getInspectionPhotoKey(itemNumber, dayOfWeek)] ?? [];
 
   const uniqueItems: Array<{ number: number; description: string }> = [];
   if (isWeeklyInspection) {
@@ -829,6 +837,13 @@ export default function ViewPlantInspectionPage() {
                           {item.comments}
                         </div>
                       )}
+                      <InspectionPhotoGallery
+                        photos={getPhotosForItem(item.item_number, item.day_of_week)}
+                        title={`Item #${item.item_number} photos`}
+                        description={`Uploaded photos for ${item.item_description}.`}
+                        compact
+                        className="mt-3 pl-7"
+                      />
                     </div>
                   );
                 })}
@@ -853,10 +868,11 @@ export default function ViewPlantInspectionPage() {
       {photoUploadItem && (
         <PhotoUpload
           inspectionId={inspection.id}
-          itemNumber={photoUploadItem}
+          itemNumber={photoUploadItem.itemNumber}
+          dayOfWeek={photoUploadItem.dayOfWeek}
           onClose={() => setPhotoUploadItem(null)}
           onUploadComplete={() => {
-            setPhotoUploadItem(null);
+            void refreshInspectionPhotos();
           }}
         />
       )}
