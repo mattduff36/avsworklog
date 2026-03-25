@@ -316,6 +316,18 @@ export default function AbsencePage() {
 
   const selectedReason = availableRequestReasons.find((reason) => reason.id === selectedReasonId);
   const deductsAllowance = selectedReason ? isAnnualLeaveReason(selectedReason.name) : false;
+  const displayAllowance = useMemo(() => {
+    if (!summary) {
+      return 28;
+    }
+
+    return summary.allowance > 0 ? summary.allowance : 28;
+  }, [summary]);
+  const displayApprovedTaken = summary?.approved_taken ?? 0;
+  const displayPendingTotal = summary?.pending_total ?? 0;
+  const calculatedRemaining = useMemo(() => {
+    return displayAllowance - displayApprovedTaken - displayPendingTotal;
+  }, [displayAllowance, displayApprovedTaken, displayPendingTotal]);
   
   // Calculate requested days
   const requestedDays = useMemo(() => {
@@ -330,8 +342,8 @@ export default function AbsencePage() {
   
   // Projected remaining after this request (annual leave only)
   const projectedRemaining = deductsAllowance
-    ? (summary?.remaining || 0) - requestedDays
-    : (summary?.remaining || 0);
+    ? calculatedRemaining - requestedDays
+    : calculatedRemaining;
   
   // Handle form submission
   async function handleSubmit(e: React.FormEvent) {
@@ -687,22 +699,22 @@ export default function AbsencePage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
               <p className="text-sm text-purple-100 mb-1">Total Allowance</p>
-              <p className="text-3xl font-bold">{summary?.allowance || 28}</p>
+              <p className="text-3xl font-bold">{displayAllowance}</p>
               <p className="text-xs text-purple-100">days</p>
             </div>
             <div>
               <p className="text-sm text-purple-100 mb-1">Approved Taken</p>
-              <p className="text-3xl font-bold">{summary?.approved_taken || 0}</p>
+              <p className="text-3xl font-bold">{displayApprovedTaken}</p>
               <p className="text-xs text-purple-100">days</p>
             </div>
             <div>
               <p className="text-sm text-purple-100 mb-1">Pending</p>
-              <p className="text-3xl font-bold">{summary?.pending_total || 0}</p>
+              <p className="text-3xl font-bold">{displayPendingTotal}</p>
               <p className="text-xs text-purple-100">days</p>
             </div>
             <div>
               <p className="text-sm text-purple-100 mb-1">Remaining</p>
-              <p className="text-3xl font-bold">{summary?.remaining || 0}</p>
+              <p className="text-3xl font-bold">{calculatedRemaining}</p>
               <p className="text-xs text-purple-100">days</p>
             </div>
           </div>
@@ -850,11 +862,11 @@ export default function AbsencePage() {
                   </div>
                   <div>
                     <span className="text-muted-foreground">Approved Taken:</span>
-                    <span className="ml-2 text-foreground font-medium">{summary?.approved_taken || 0}</span>
+                    <span className="ml-2 text-foreground font-medium">{displayApprovedTaken}</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Pending:</span>
-                    <span className="ml-2 text-foreground font-medium">{summary?.pending_total || 0}</span>
+                    <span className="ml-2 text-foreground font-medium">{displayPendingTotal}</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Projected Remaining:</span>

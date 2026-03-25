@@ -26,7 +26,6 @@ import { toast } from 'sonner';
 import { showErrorWithReport } from '@/lib/utils/error-reporting';
 import { scrollAndHighlightValidationTarget } from '@/lib/utils/validation-scroll';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
-import { InspectionPhotoGallery } from '@/components/inspections/InspectionPhotoGallery';
 import { InspectionPhotoTiles } from '@/components/inspections/InspectionPhotoTiles';
 import { useInspectionPhotos } from '@/lib/hooks/useInspectionPhotos';
 import { getInspectionPhotoKey } from '@/lib/inspection-photos';
@@ -120,6 +119,7 @@ function NewPlantInspectionContent() {
   const [duplicateInspection, setDuplicateInspection] = useState<string | null>(null);
   
   const [photoUploadItem, setPhotoUploadItem] = useState<{ itemNumber: number; dayOfWeek: number } | null>(null);
+  const [savingDraftForPhoto, setSavingDraftForPhoto] = useState(false);
   const { photoMap, refresh: refreshInspectionPhotos } = useInspectionPhotos(existingInspectionId, {
     enabled: Boolean(existingInspectionId),
   });
@@ -133,6 +133,7 @@ function NewPlantInspectionContent() {
       photoMap[getInspectionPhotoKey(itemNumber, dayOfWeek)] ?? [],
     [photoMap]
   );
+
   const [, setCreatingWorkshopTask] = useState(false);
 
   // Hired plant states
@@ -141,6 +142,77 @@ function NewPlantInspectionContent() {
   const [hiredPlantIdSerial, setHiredPlantIdSerial] = useState('');
   const [hiredPlantDescription, setHiredPlantDescription] = useState('');
   const [hiredPlantHiringCompany, setHiredPlantHiringCompany] = useState('');
+
+  const ensureDraftSaved = async (): Promise<string | null> => {
+    if (existingInspectionId) return existingInspectionId;
+    if (!user || !selectedEmployeeId) {
+      toast.error('Select an employee before adding photos');
+      return null;
+    }
+    if (!isHiredPlant && !selectedPlantId) {
+      toast.error('Select a plant before adding photos');
+      return null;
+    }
+    if (!inspectionDate || inspectionDate.trim() === '') {
+      toast.error('Select an inspection date before adding photos');
+      return null;
+    }
+    setSavingDraftForPhoto(true);
+    try {
+      const { data: draft, error: draftError } = await supabase
+        .from('plant_inspections')
+        .insert({
+          plant_id: isHiredPlant ? null : selectedPlantId,
+          user_id: selectedEmployeeId,
+          inspection_date: inspectionDate,
+          inspection_end_date: inspectionDate,
+          current_mileage: getParsedHours(),
+          status: 'draft' as const,
+          inspector_comments: inspectorComments.trim() || null,
+          is_hired_plant: isHiredPlant,
+          hired_plant_id_serial: isHiredPlant ? hiredPlantIdSerial.trim() : null,
+          hired_plant_description: isHiredPlant ? hiredPlantDescription.trim() : null,
+          hired_plant_hiring_company: isHiredPlant ? hiredPlantHiringCompany.trim() : null,
+        })
+        .select('id')
+        .single();
+
+      if (draftError) throw draftError;
+
+      const dayOfWeek = getDayOfWeek(new Date(inspectionDate + 'T00:00:00'));
+      const items: Database['public']['Tables']['inspection_items']['Insert'][] = [];
+      currentChecklist.forEach((item, index) => {
+        const itemNumber = index + 1;
+        const key = `${itemNumber}`;
+        if (checkboxStates[key]) {
+          items.push({
+            inspection_id: draft.id,
+            item_number: itemNumber,
+            item_description: item,
+            day_of_week: dayOfWeek,
+            status: checkboxStates[key],
+            comments: comments[key] || null,
+          });
+        }
+      });
+      if (items.length > 0) {
+        const { error: itemsError } = await supabase
+          .from('inspection_items')
+          .insert(items);
+        if (itemsError) throw itemsError;
+      }
+
+      setExistingInspectionId(draft.id);
+      window.history.replaceState(null, '', `/plant-inspections/new?id=${draft.id}`);
+      return draft.id;
+    } catch (err) {
+      console.error('Silent draft save failed:', err);
+      toast.error('Could not auto-save draft. Please try again.');
+      return null;
+    } finally {
+      setSavingDraftForPhoto(false);
+    }
+  };
 
   useEffect(() => {
     const fetchPlants = async () => {
@@ -1192,17 +1264,14 @@ function NewPlantInspectionContent() {
                   {currentStatus === 'attention' && !isLogged && (
                     <InspectionPhotoTiles
                       photos={itemPhotos}
-                      onManage={() => {
-                        if (existingInspectionId) {
-                          setPhotoUploadItem({ itemNumber, dayOfWeek: getDayOfWeek(new Date(inspectionDate + 'T00:00:00')) });
-                        } else {
-                          toast.info('Photos can be added after submission');
-                        }
+                      onManage={async () => {
+                        const id = await ensureDraftSaved();
+                        if (id) setPhotoUploadItem({ itemNumber, dayOfWeek: getDayOfWeek(new Date(inspectionDate + 'T00:00:00')) });
                       }}
                       title={`Item #${itemNumber} photos`}
                       description={`Uploaded photos for ${item}.`}
-                      emptyLabel={existingInspectionId ? 'Add / View Photos' : 'Submit to upload photos'}
-                      emptyHint={existingInspectionId ? 'No photos saved yet' : 'Available after submission'}
+                      emptyLabel={savingDraftForPhoto ? 'Saving draft...' : 'Add / View Photos'}
+                      emptyHint="No photos saved yet"
                       manageLabel="Add / View"
                     />
                   )}
@@ -1279,40 +1348,27 @@ function NewPlantInspectionContent() {
                           readOnly={isLogged}
                         />
                       </td>
-                      <td className="p-3 text-center">
+                      <td className="p-3 text-center align-middle">
                         {currentStatus === 'attention' && !isLogged ? (
-                          <div className="flex flex-col items-center gap-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                if (existingInspectionId) {
-                                  setPhotoUploadItem({ itemNumber, dayOfWeek });
-                                } else {
-                                  toast.info('Photos can be added after submission');
-                                }
-                              }}
-                              disabled={!existingInspectionId}
-                              className="h-16 w-full min-w-28 flex-col gap-1 border-border text-muted-foreground hover:text-white"
-                            >
-                              <Camera className="h-4 w-4" />
-                              <span className="text-xs">
-                                {itemPhotos.length > 0 ? `${itemPhotos.length} saved` : 'Add photo'}
-                              </span>
-                            </Button>
-                            {itemPhotos[0] && (
-                              <div className="w-full">
-                                <InspectionPhotoGallery
-                                  photos={itemPhotos}
-                                  title={`Item #${itemNumber} photos`}
-                                  description={`Uploaded photos for ${item}.`}
-                                  maxPreview={1}
-                                  compact
-                                />
-                              </div>
-                            )}
-                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                              const id = await ensureDraftSaved();
+                              if (id) setPhotoUploadItem({ itemNumber, dayOfWeek });
+                            }}
+                            disabled={savingDraftForPhoto}
+                            title={itemPhotos.length > 0 ? `${itemPhotos.length} photo(s) saved` : 'Add photo'}
+                            className={`h-10 min-w-24 gap-1.5 text-xs ${
+                              itemPhotos.length > 0
+                                ? 'border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10'
+                                : 'border-border text-muted-foreground hover:text-white'
+                            }`}
+                          >
+                            <Camera className="h-3.5 w-3.5" />
+                            {savingDraftForPhoto ? 'Saving...' : itemPhotos.length > 0 ? `${itemPhotos.length} saved` : 'Add photo'}
+                          </Button>
                         ) : (
                           <span className="text-slate-600">-</span>
                         )}

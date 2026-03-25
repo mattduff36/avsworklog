@@ -352,7 +352,12 @@ export default function PhotoUpload({
               >
                 Cancel
               </Button>
-              <Button type="button" onClick={handleUpload} disabled={uploading || !selectedFile}>
+              <Button
+                type="button"
+                onClick={handleUpload}
+                disabled={uploading || !selectedFile}
+                className="bg-emerald-600 text-white hover:bg-emerald-700"
+              >
                 <Upload className="h-4 w-4 mr-2" />
                 {uploading ? 'Saving...' : 'Save Photo'}
               </Button>

@@ -829,26 +829,27 @@ export default function ViewInspectionPage() {
                           <span className="text-sm">{item.comments || '-'}</span>
                         )}
                       </td>
-                      <td className="p-2 text-center">
-                        {/* Only show photo upload for defective items */}
-                        {item.status === 'attention' ? (
-                          <div className="flex flex-col items-center gap-2">
+                      <td className="p-2 text-center align-middle">
+                        {item.status === 'attention' ? (() => {
+                          const photos = getPhotosForItem(item.item_number, item.day_of_week);
+                          return (
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => setPhotoUploadItem({ itemNumber: item.item_number, dayOfWeek: item.day_of_week })}
                               disabled={!canEdit}
-                              className="h-16 w-full min-w-28 flex-col gap-1"
+                              title={photos.length > 0 ? `${photos.length} photo(s) saved` : 'Add photo'}
+                              className={`h-10 min-w-24 gap-1.5 text-xs ${
+                                photos.length > 0
+                                  ? 'border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10'
+                                  : 'border-border text-muted-foreground hover:text-white'
+                              }`}
                             >
-                              <Camera className="h-4 w-4" />
-                              <span className="text-xs">
-                                {getPhotosForItem(item.item_number, item.day_of_week).length > 0
-                                  ? `${getPhotosForItem(item.item_number, item.day_of_week).length} saved`
-                                  : 'Add photo'}
-                              </span>
+                              <Camera className="h-3.5 w-3.5" />
+                              {photos.length > 0 ? `${photos.length} saved` : 'Add photo'}
                             </Button>
-                          </div>
-                        ) : (
+                          );
+                        })() : (
                           <span className="text-muted-foreground">-</span>
                         )}
                       </td>

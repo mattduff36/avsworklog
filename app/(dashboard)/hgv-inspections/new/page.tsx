@@ -1,8 +1,8 @@
 'use client';
 
-import { Fragment, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { fetchUserDirectory, type DirectoryUser } from '@/lib/client/user-directory';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -25,7 +25,11 @@ import type { Database } from '@/types/database';
 import type { Employee } from '@/types/common';
 import type { InspectionStatus } from '@/types/inspection';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
+import { InspectionPhotoTiles } from '@/components/inspections/InspectionPhotoTiles';
+import { useInspectionPhotos } from '@/lib/hooks/useInspectionPhotos';
+import { getInspectionPhotoKey } from '@/lib/inspection-photos';
 
+const PhotoUpload = dynamic(() => import('@/components/forms/PhotoUpload'), { ssr: false });
 const SignaturePad = dynamic(() => import('@/components/forms/SignaturePad'), { ssr: false });
 
 type HgvAsset = {
@@ -50,6 +54,8 @@ function isArticOnlyItem(itemNumber: number): boolean {
 
 function NewHgvInspectionContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const draftId = searchParams.get('id');
   const supabase = createClient();
   const { user, isManager, isAdmin, isSuperAdmin } = useAuth();
   const isElevatedUser = isManager || isAdmin || isSuperAdmin;
@@ -78,6 +84,136 @@ function NewHgvInspectionContent() {
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
   const saveInspectionInFlightRef = useRef(false);
 
+  const [existingInspectionId, setExistingInspectionId] = useState<string | null>(draftId);
+  const [photoUploadItem, setPhotoUploadItem] = useState<{ itemNumber: number; dayOfWeek: number } | null>(null);
+  const [savingDraftForPhoto, setSavingDraftForPhoto] = useState(false);
+  const { photoMap, refresh: refreshInspectionPhotos } = useInspectionPhotos(existingInspectionId, {
+    enabled: Boolean(existingInspectionId),
+  });
+
+  const getPhotosForItem = useCallback(
+    (itemNumber: number, dayOfWeek: number) =>
+      photoMap[getInspectionPhotoKey(itemNumber, dayOfWeek)] ?? [],
+    [photoMap]
+  );
+
+  const ensureDraftSaved = async (): Promise<string | null> => {
+    if (existingInspectionId) return existingInspectionId;
+    if (!user || !selectedEmployeeId || !hgvId) {
+      toast.error('Select an HGV, employee and date before adding photos');
+      return null;
+    }
+    if (!inspectionDate) {
+      toast.error('Select an inspection date before adding photos');
+      return null;
+    }
+    setSavingDraftForPhoto(true);
+    try {
+      const mileageValue = parseInt(currentMileage, 10);
+      const { data: draft, error: draftError } = await supabase
+        .from('hgv_inspections')
+        .insert({
+          hgv_id: hgvId,
+          user_id: selectedEmployeeId,
+          inspection_date: inspectionDate,
+          inspection_end_date: inspectionDate,
+          current_mileage: Number.isNaN(mileageValue) ? null : mileageValue,
+          status: 'draft' as const,
+          inspector_comments: inspectorComments.trim() || null,
+        })
+        .select('id')
+        .single();
+
+      if (draftError) throw draftError;
+
+      const dayOfWeek = getDayOfWeek(new Date(inspectionDate + 'T00:00:00'));
+      const items: InspectionItemInsert[] = [];
+      TRUCK_CHECKLIST_ITEMS.forEach((itemDescription, idx) => {
+        const itemNumber = idx + 1;
+        const key = `${itemNumber}`;
+        if (checkboxStates[key]) {
+          items.push({
+            inspection_id: draft.id,
+            item_number: itemNumber,
+            item_description: itemDescription,
+            day_of_week: dayOfWeek,
+            status: checkboxStates[key],
+            comments: comments[key] || null,
+          });
+        }
+      });
+
+      if (items.length > 0) {
+        const { error: itemsError } = await supabase
+          .from('inspection_items')
+          .insert(items);
+        if (itemsError) throw itemsError;
+      }
+
+      setExistingInspectionId(draft.id);
+      window.history.replaceState(null, '', `/hgv-inspections/new?id=${draft.id}`);
+      return draft.id;
+    } catch (err) {
+      console.error('Silent draft save failed:', err);
+      toast.error('Could not auto-save draft. Please try again.');
+      return null;
+    } finally {
+      setSavingDraftForPhoto(false);
+    }
+  };
+
+  const loadDraftInspection = useCallback(async (id: string) => {
+    try {
+      setLoading(true);
+      const { data: draft, error: draftError } = await supabase
+        .from('hgv_inspections')
+        .select('id, hgv_id, user_id, inspection_date, current_mileage, inspector_comments, created_at')
+        .eq('id', id)
+        .eq('status', 'draft')
+        .single();
+
+      if (draftError || !draft) {
+        setExistingInspectionId(null);
+        window.history.replaceState(null, '', '/hgv-inspections/new');
+        return;
+      }
+
+      setHgvId(draft.hgv_id);
+      setInspectionDate(draft.inspection_date);
+      setCurrentMileage(draft.current_mileage != null ? String(draft.current_mileage) : '');
+      setSelectedEmployeeId(draft.user_id);
+      setInspectorComments(draft.inspector_comments || '');
+
+      const { data: items } = await supabase
+        .from('inspection_items')
+        .select('item_number, status, comments')
+        .eq('inspection_id', id);
+
+      const restoredStates: Record<string, InspectionStatus> = {};
+      const restoredComments: Record<string, string> = {};
+      for (const item of (items || []) as Array<{ item_number: number; status: InspectionStatus; comments: string | null }>) {
+        const key = `${item.item_number}`;
+        restoredStates[key] = item.status;
+        if (item.comments) restoredComments[key] = item.comments;
+      }
+      setCheckboxStates(restoredStates);
+      setComments(restoredComments);
+
+      setChecklistStarted(true);
+      const createdAt = draft.created_at ? new Date(draft.created_at).getTime() : Date.now();
+      setInspectionStartMs(createdAt);
+
+      if (draft.hgv_id) {
+        await loadLockedDefects(draft.hgv_id);
+      }
+    } catch (err) {
+      console.error('Error loading HGV draft:', err);
+      toast.error('Failed to load draft inspection');
+    } finally {
+      setLoading(false);
+    }
+  }, [supabase]);
+
   useEffect(() => {
     const loadData = async () => {
       const [{ data: hgvData }, employeeData] = await Promise.all([
@@ -105,6 +241,12 @@ function NewHgvInspectionContent() {
 
     loadData();
   }, [isElevatedUser, supabase, user]);
+
+  useEffect(() => {
+    if (draftId && user) {
+      loadDraftInspection(draftId);
+    }
+  }, [draftId, user, loadDraftInspection]);
 
   useEffect(() => {
     if (!checklistStarted || !inspectionStartMs) return;
@@ -281,27 +423,56 @@ function NewHgvInspectionContent() {
       }
 
       const mileageValue = parseInt(currentMileage, 10);
-      const inspectionPayload: InspectionInsert = {
-        hgv_id: hgvId,
-        user_id: selectedEmployeeId,
-        inspection_date: inspectionDate,
-        inspection_end_date: inspectionDate,
-        current_mileage: mileageValue,
-        status: 'submitted',
-        submitted_at: new Date().toISOString(),
-        signature_data: signatureData,
-        signed_at: new Date().toISOString(),
-        inspector_comments: inspectorComments.trim() || null,
-      };
 
-      const { data: inspection, error: insertInspectionError } = await supabase
-        .from('hgv_inspections')
-        .insert(inspectionPayload)
-        .select()
-        .single();
+      let inspection: { id: string };
 
-      if (insertInspectionError || !inspection) {
-        throw insertInspectionError || new Error('Failed to create inspection');
+      if (existingInspectionId) {
+        const { data: updatedInspection, error: updateError } = await supabase
+          .from('hgv_inspections')
+          .update({
+            hgv_id: hgvId,
+            user_id: selectedEmployeeId,
+            inspection_date: inspectionDate,
+            inspection_end_date: inspectionDate,
+            current_mileage: mileageValue,
+            status: 'submitted' as const,
+            submitted_at: new Date().toISOString(),
+            signature_data: signatureData,
+            signed_at: new Date().toISOString(),
+            inspector_comments: inspectorComments.trim() || null,
+          })
+          .eq('id', existingInspectionId)
+          .select()
+          .single();
+
+        if (updateError || !updatedInspection) {
+          throw updateError || new Error('Failed to update inspection');
+        }
+        inspection = updatedInspection;
+      } else {
+        const inspectionPayload: InspectionInsert = {
+          hgv_id: hgvId,
+          user_id: selectedEmployeeId,
+          inspection_date: inspectionDate,
+          inspection_end_date: inspectionDate,
+          current_mileage: mileageValue,
+          status: 'submitted',
+          submitted_at: new Date().toISOString(),
+          signature_data: signatureData,
+          signed_at: new Date().toISOString(),
+          inspector_comments: inspectorComments.trim() || null,
+        };
+
+        const { data: newInspection, error: insertInspectionError } = await supabase
+          .from('hgv_inspections')
+          .insert(inspectionPayload)
+          .select()
+          .single();
+
+        if (insertInspectionError || !newInspection) {
+          throw insertInspectionError || new Error('Failed to create inspection');
+        }
+        inspection = newInspection;
       }
 
       const { error: updateHgvMileageError } = await supabase
@@ -311,6 +482,13 @@ function NewHgvInspectionContent() {
 
       if (updateHgvMileageError) {
         throw updateHgvMileageError;
+      }
+
+      if (existingInspectionId) {
+        await supabase
+          .from('inspection_items')
+          .delete()
+          .eq('inspection_id', existingInspectionId);
       }
 
       const dayOfWeek = getDayOfWeek(new Date(`${inspectionDate}T00:00:00`));
@@ -647,18 +825,33 @@ function NewHgvInspectionContent() {
                               className={`bg-slate-900/50 border-slate-600 text-white ${currentStatus === 'attention' && !comments[key] ? 'border-red-500' : ''}`}
                               readOnly={isLocked}
                             />
-                            {currentStatus === 'attention' && !isLocked && (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                disabled
-                                className="mt-3 h-16 w-full flex-col gap-1 border-border text-muted-foreground opacity-100"
-                              >
-                                <Camera className="h-4 w-4" />
-                                <span className="text-xs">Submit to upload photos</span>
-                              </Button>
-                            )}
+                            {currentStatus === 'attention' && !isLocked && (() => {
+                              const dayOfWeek = inspectionDate ? getDayOfWeek(new Date(inspectionDate + 'T00:00:00')) : 1;
+                              const itemPhotos = getPhotosForItem(itemNumber, dayOfWeek);
+                              return (
+                                <div className="mt-3">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={async () => {
+                                      const id = await ensureDraftSaved();
+                                      if (id) setPhotoUploadItem({ itemNumber, dayOfWeek });
+                                    }}
+                                    disabled={savingDraftForPhoto}
+                                    title={itemPhotos.length > 0 ? `${itemPhotos.length} photo(s) saved` : 'Add photo'}
+                                    className={`h-10 min-w-24 gap-1.5 text-xs ${
+                                      itemPhotos.length > 0
+                                        ? 'border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10'
+                                        : 'border-border text-muted-foreground hover:text-white'
+                                    }`}
+                                  >
+                                    <Camera className="h-3.5 w-3.5" />
+                                    {savingDraftForPhoto ? 'Saving...' : itemPhotos.length > 0 ? `${itemPhotos.length} saved` : 'Add photo'}
+                                  </Button>
+                                </div>
+                              );
+                            })()}
                           </td>
                         </tr>
                       </Fragment>
@@ -706,21 +899,24 @@ function NewHgvInspectionContent() {
                         className="min-h-[80px] bg-slate-900/50 border-slate-600 text-white"
                         readOnly={isLocked}
                       />
-                      {currentStatus === 'attention' && !isLocked && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled
-                          className="min-h-[88px] w-full flex-col gap-2 border-border text-muted-foreground opacity-100"
-                        >
-                          <Camera className="h-5 w-5" />
-                          <span>Submit to upload photos</span>
-                          <span className="text-xs text-muted-foreground/80">
-                            Photos can be added on the submitted check.
-                          </span>
-                        </Button>
-                      )}
+                      {currentStatus === 'attention' && !isLocked && (() => {
+                        const dayOfWeek = inspectionDate ? getDayOfWeek(new Date(inspectionDate + 'T00:00:00')) : 1;
+                        const itemPhotos = getPhotosForItem(itemNumber, dayOfWeek);
+                        return (
+                          <InspectionPhotoTiles
+                            photos={itemPhotos}
+                            onManage={async () => {
+                              const id = await ensureDraftSaved();
+                              if (id) setPhotoUploadItem({ itemNumber, dayOfWeek });
+                            }}
+                            title={`Item #${itemNumber} photos`}
+                            description={`Uploaded photos for ${item}.`}
+                            emptyLabel={savingDraftForPhoto ? 'Saving draft...' : 'Add / View Photos'}
+                            emptyHint="No photos saved yet"
+                            manageLabel="Add / View"
+                          />
+                        );
+                      })()}
                     </div>
                   </Fragment>
                 );
@@ -802,6 +998,18 @@ function NewHgvInspectionContent() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {photoUploadItem && existingInspectionId && (
+        <PhotoUpload
+          inspectionId={existingInspectionId}
+          itemNumber={photoUploadItem.itemNumber}
+          dayOfWeek={photoUploadItem.dayOfWeek}
+          onClose={() => setPhotoUploadItem(null)}
+          onUploadComplete={() => {
+            void refreshInspectionPhotos();
+          }}
+        />
+      )}
     </div>
   );
 }

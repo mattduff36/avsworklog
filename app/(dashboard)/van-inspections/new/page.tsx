@@ -29,7 +29,6 @@ import { showErrorWithReport } from '@/lib/utils/error-reporting';
 import { scrollAndHighlightValidationTarget } from '@/lib/utils/validation-scroll';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { triggerShakeAnimation } from '@/lib/utils/animations';
-import { InspectionPhotoGallery } from '@/components/inspections/InspectionPhotoGallery';
 import { InspectionPhotoTiles } from '@/components/inspections/InspectionPhotoTiles';
 import { useInspectionPhotos } from '@/lib/hooks/useInspectionPhotos';
 import { getInspectionPhotoKey } from '@/lib/inspection-photos';
@@ -167,6 +166,7 @@ function NewInspectionContent() {
   
   // Photo upload state
   const [photoUploadItem, setPhotoUploadItem] = useState<{ itemNumber: number; dayOfWeek: number } | null>(null);
+  const [savingDraftForPhoto, setSavingDraftForPhoto] = useState(false);
   const { photoMap, refresh: refreshInspectionPhotos } = useInspectionPhotos(existingInspectionId, {
     enabled: Boolean(existingInspectionId),
   });
@@ -181,6 +181,74 @@ function NewInspectionContent() {
       photoMap[getInspectionPhotoKey(itemNumber, dayOfWeek)] ?? [],
     [photoMap]
   );
+
+  const ensureDraftSaved = async (): Promise<string | null> => {
+    if (existingInspectionId) return existingInspectionId;
+    if (!user || !selectedEmployeeId || !vehicleId) {
+      toast.error('Select a vehicle, employee and week before adding photos');
+      return null;
+    }
+    if (!weekEnding || weekEnding.trim() === '') {
+      toast.error('Select a week ending date before adding photos');
+      return null;
+    }
+    setSavingDraftForPhoto(true);
+    try {
+      const weekEndDate = new Date(weekEnding + 'T00:00:00');
+      const startDate = new Date(weekEndDate);
+      startDate.setDate(weekEndDate.getDate() - 6);
+
+      const { data: draft, error: draftError } = await supabase
+        .from('van_inspections')
+        .insert({
+          van_id: vehicleId,
+          user_id: selectedEmployeeId,
+          inspection_date: formatDateISO(startDate),
+          inspection_end_date: weekEnding,
+          current_mileage: getParsedMileage(),
+          status: 'draft' as const,
+          inspector_comments: inspectorComments.trim() || null,
+        })
+        .select('id')
+        .single();
+
+      if (draftError) throw draftError;
+
+      const items: Database['public']['Tables']['inspection_items']['Insert'][] = [];
+      for (let dayOfWeek = 1; dayOfWeek <= 7; dayOfWeek++) {
+        currentChecklist.forEach((item, index) => {
+          const itemNumber = index + 1;
+          const key = `${dayOfWeek}-${itemNumber}`;
+          if (checkboxStates[key]) {
+            items.push({
+              inspection_id: draft.id,
+              item_number: itemNumber,
+              item_description: item,
+              day_of_week: dayOfWeek,
+              status: checkboxStates[key],
+              comments: comments[key] || null,
+            });
+          }
+        });
+      }
+      if (items.length > 0) {
+        const { error: itemsError } = await supabase
+          .from('inspection_items')
+          .insert(items);
+        if (itemsError) throw itemsError;
+      }
+
+      setExistingInspectionId(draft.id);
+      window.history.replaceState(null, '', `/van-inspections/new?id=${draft.id}`);
+      return draft.id;
+    } catch (err) {
+      console.error('Silent draft save failed:', err);
+      toast.error('Could not auto-save draft. Please try again.');
+      return null;
+    } finally {
+      setSavingDraftForPhoto(false);
+    }
+  };
 
   const isAddVehicleFormDirty = Boolean(newVehicleReg.trim() || newVehicleCategoryId);
 
@@ -1736,17 +1804,14 @@ function NewInspectionContent() {
                   {currentStatus === 'attention' && !isLogged && (
                     <InspectionPhotoTiles
                       photos={itemPhotos}
-                      onManage={() => {
-                        if (existingInspectionId) {
-                          setPhotoUploadItem({ itemNumber, dayOfWeek });
-                        } else {
-                          toast.info('Save as draft first to upload photos');
-                        }
+                      onManage={async () => {
+                        const id = await ensureDraftSaved();
+                        if (id) setPhotoUploadItem({ itemNumber, dayOfWeek });
                       }}
                       title={`Item #${itemNumber} photos`}
                       description={`Uploaded photos for ${item}.`}
-                      emptyLabel={existingInspectionId ? 'Add / View Photos' : 'Save draft to upload photos'}
-                      emptyHint={existingInspectionId ? 'No photos saved yet' : 'Save as draft first'}
+                      emptyLabel={savingDraftForPhoto ? 'Saving draft...' : 'Add / View Photos'}
+                      emptyHint="No photos saved yet"
                       manageLabel="Add / View"
                     />
                   )}
@@ -1835,41 +1900,27 @@ function NewInspectionContent() {
                           readOnly={isLogged}
                         />
                       </td>
-                      <td className="p-3 text-center">
+                      <td className="p-3 text-center align-middle">
                         {currentStatus === 'attention' && !isLogged ? (
-                          <div className="flex flex-col items-center gap-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                if (existingInspectionId) {
-                                  setPhotoUploadItem({ itemNumber, dayOfWeek });
-                                } else {
-                                  toast.info('Save as draft first to upload photos');
-                                }
-                              }}
-                              disabled={!existingInspectionId}
-                              title={existingInspectionId ? 'Add photo' : 'Save draft to upload photos'}
-                              className="h-16 w-full min-w-28 flex-col gap-1 border-border text-muted-foreground hover:text-white"
-                            >
-                              <Camera className="h-4 w-4" />
-                              <span className="text-xs">
-                                {itemPhotos.length > 0 ? `${itemPhotos.length} saved` : 'Add photo'}
-                              </span>
-                            </Button>
-                            {itemPhotos[0] && (
-                              <div className="w-full">
-                                <InspectionPhotoGallery
-                                  photos={itemPhotos}
-                                  title={`Item #${itemNumber} photos`}
-                                  description={`Uploaded photos for ${item}.`}
-                                  maxPreview={1}
-                                  compact
-                                />
-                              </div>
-                            )}
-                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                              const id = await ensureDraftSaved();
+                              if (id) setPhotoUploadItem({ itemNumber, dayOfWeek });
+                            }}
+                            disabled={savingDraftForPhoto}
+                            title={itemPhotos.length > 0 ? `${itemPhotos.length} photo(s) saved` : 'Add photo'}
+                            className={`h-10 min-w-24 gap-1.5 text-xs ${
+                              itemPhotos.length > 0
+                                ? 'border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10'
+                                : 'border-border text-muted-foreground hover:text-white'
+                            }`}
+                          >
+                            <Camera className="h-3.5 w-3.5" />
+                            {savingDraftForPhoto ? 'Saving...' : itemPhotos.length > 0 ? `${itemPhotos.length} saved` : 'Add photo'}
+                          </Button>
                         ) : (
                           <span className="text-slate-600">-</span>
                         )}
