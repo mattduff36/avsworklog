@@ -36,7 +36,6 @@ interface BulkEmployeeOption {
   role_id: string | null;
   role_name: string | null;
   role_display_name: string | null;
-  has_module_access?: boolean;
 }
 
 interface GenerationStatus {
@@ -159,7 +158,7 @@ export function ManageOverviewAdminActions() {
   const loadBulkOptions = useCallback(async () => {
     try {
       const [profiles, { data: reasons, error: reasonsError }] = await Promise.all([
-        fetchUserDirectory({ includeRole: true, module: 'absence' }),
+        fetchUserDirectory({ includeRole: true }),
         supabase
           .from('absence_reasons')
           .select('id, name, is_active')
@@ -185,7 +184,6 @@ export function ManageOverviewAdminActions() {
         role_id: profile.role?.id || null,
         role_name: profile.role?.name || null,
         role_display_name: profile.role?.display_name || null,
-        has_module_access: (profile as { has_module_access?: boolean }).has_module_access,
       }));
       setBulkEmployeeOptions(nextEmployees);
 
@@ -220,48 +218,42 @@ export function ManageOverviewAdminActions() {
   }, [loadGenerationStatus, loadBulkOptions]);
 
   const bulkTeamOptions = useMemo(() => {
-    const teamMap = new Map<string, { id: string; name: string; hasAccess: boolean }>();
+    const teamMap = new Map<string, { id: string; name: string }>();
 
     bulkEmployeeOptions.forEach((employee) => {
       if (!employee.team_id) return;
 
       const existing = teamMap.get(employee.team_id);
       if (existing) {
-        existing.hasAccess = existing.hasAccess || employee.has_module_access !== false;
         return;
       }
 
       teamMap.set(employee.team_id, {
         id: employee.team_id,
         name: employee.team_name || employee.team_id,
-        hasAccess: employee.has_module_access !== false,
       });
     });
 
     return Array.from(teamMap.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [bulkEmployeeOptions]);
-  const accessibleBulkTeams = useMemo(
-    () => bulkTeamOptions.filter((team) => team.hasAccess),
-    [bulkTeamOptions]
-  );
   const selectedBulkTeamCount = useMemo(
     () =>
-      accessibleBulkTeams.filter((team) =>
+      bulkTeamOptions.filter((team) =>
         bulkEmployeeOptions
-          .filter((employee) => employee.team_id === team.id && employee.has_module_access !== false)
+          .filter((employee) => employee.team_id === team.id)
           .every((employee) => shutdownEmployeeFilters.includes(employee.id))
       ).length,
-    [accessibleBulkTeams, bulkEmployeeOptions, shutdownEmployeeFilters]
+    [bulkTeamOptions, bulkEmployeeOptions, shutdownEmployeeFilters]
   );
   const selectableBulkTeamEmployeeIds = useMemo(
     () =>
       bulkEmployeeOptions
-        .filter((employee) => employee.team_id && employee.has_module_access !== false)
+        .filter((employee) => employee.team_id)
         .map((employee) => employee.id),
     [bulkEmployeeOptions]
   );
   const allBulkTeamsSelected =
-    accessibleBulkTeams.length > 0 && selectedBulkTeamCount === accessibleBulkTeams.length;
+    bulkTeamOptions.length > 0 && selectedBulkTeamCount === bulkTeamOptions.length;
 
   function toggleShutdownRole(roleId: string) {
     setShutdownRoleFilters((prev) => (prev.includes(roleId) ? prev.filter((role) => role !== roleId) : [...prev, roleId]));
@@ -275,7 +267,7 @@ export function ManageOverviewAdminActions() {
 
   function toggleShutdownTeam(teamId: string) {
     const teamEmployeeIds = bulkEmployeeOptions
-      .filter((employee) => employee.team_id === teamId && employee.has_module_access !== false)
+      .filter((employee) => employee.team_id === teamId)
       .map((employee) => employee.id);
 
     if (teamEmployeeIds.length === 0) return;
@@ -634,7 +626,7 @@ export function ManageOverviewAdminActions() {
                       ...team,
                       selected: (() => {
                         const teamEmployees = bulkEmployeeOptions.filter(
-                          (employee) => employee.team_id === team.id && employee.has_module_access !== false
+                          (employee) => employee.team_id === team.id
                         );
                         return teamEmployees.length > 0 && teamEmployees.every((employee) => shutdownEmployeeFilters.includes(employee.id));
                       })(),
@@ -666,12 +658,10 @@ export function ManageOverviewAdminActions() {
                           key={employee.id}
                           checked={shutdownEmployeeFilters.includes(employee.id)}
                           onCheckedChange={() => toggleShutdownEmployee(employee.id)}
-                          disabled={employee.has_module_access === false}
                           className="text-foreground focus:bg-slate-800/70 focus:text-foreground"
                         >
                           {employee.full_name}
                           {employee.employee_id ? ` (${employee.employee_id})` : ''}
-                          {employee.has_module_access === false ? ' - No Absence access' : ''}
                         </DropdownMenuCheckboxItem>
                       ))}
                     </DropdownMenuContent>
