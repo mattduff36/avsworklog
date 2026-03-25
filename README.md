@@ -27,6 +27,8 @@ A Progressive Web App (PWA) for managing employee timesheets and vehicle inspect
 - **PWA**: next-pwa with service workers
 - **Deployment**: Vercel
 
+Production deployments are triggered automatically from pushes to `main`.
+
 ## Prerequisites
 
 - Node.js 18+ and npm
