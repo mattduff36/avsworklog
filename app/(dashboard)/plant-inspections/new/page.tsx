@@ -1335,7 +1335,7 @@ function NewPlantInspectionContent() {
                       </Badge>
                     </Label>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Creates a workshop task from your notes.
+                      Do not tick this for defects already reported above. Marking a defect already creates a workshop task. Only use this if your comments describe an additional task that is not linked to a reported defect.
                     </p>
                   </div>
                 </div>

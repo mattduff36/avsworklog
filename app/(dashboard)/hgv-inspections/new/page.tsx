@@ -721,7 +721,9 @@ function NewHgvInspectionContent() {
                 />
                 <div className="flex-1">
                   <Label htmlFor="inform-workshop" className="text-white cursor-pointer">Inform Workshop</Label>
-                  <p className="text-xs text-muted-foreground mt-1">Creates a workshop task from your notes.</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Do not tick this for defects already reported above. Marking a defect already creates a workshop task. Only use this if your comments describe an additional task that is not linked to a reported defect.
+                  </p>
                 </div>
               </div>
             </div>
