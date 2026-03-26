@@ -83,6 +83,7 @@ function NewHgvInspectionContent() {
   const [checklistStarted, setChecklistStarted] = useState(false);
   const [inspectionStartMs, setInspectionStartMs] = useState<number | null>(null);
   const [nowMs, setNowMs] = useState<number>(Date.now());
+  const lockedDefectsRequestIdRef = useRef(0);
 
   const [checkboxStates, setCheckboxStates] = useState<Record<string, InspectionStatus>>({});
   const [comments, setComments] = useState<Record<string, string>>({});
@@ -109,6 +110,7 @@ function NewHgvInspectionContent() {
   const { photoMap, refresh: refreshInspectionPhotos } = useInspectionPhotos(existingInspectionId, {
     enabled: Boolean(existingInspectionId),
   });
+  const isDraftHydratedRef = useRef(!draftId);
 
   useEffect(() => {
     if (!hasOptionalInspectorComment && informWorkshop) {
@@ -190,7 +192,11 @@ function NewHgvInspectionContent() {
     return items;
   }, [checkboxStates, comments, inspectionDate]);
 
-  const mergeIntoExistingDraft = useCallback(async (inspectionId: string): Promise<boolean> => {
+  const mergeIntoExistingDraft = useCallback(async (
+    inspectionId: string,
+    options: { showToast?: boolean } = {}
+  ): Promise<boolean> => {
+    const { showToast = true } = options;
     if (!hgvId || !inspectionDate || !selectedEmployeeId) {
       toast.error('Select an HGV, employee and date before continuing');
       return false;
@@ -240,12 +246,16 @@ function NewHgvInspectionContent() {
 
       setExistingInspectionId(inspectionId);
       window.history.replaceState(null, '', `/hgv-inspections/new?id=${inspectionId}`);
-      toast.info('Merged with existing draft for this HGV and date.');
+      if (showToast) {
+        toast.info('Merged with existing draft for this HGV and date.');
+      }
       return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not merge with existing draft';
       console.error('Failed to merge into existing HGV draft:', err);
-      toast.error(message);
+      if (showToast) {
+        toast.error(message);
+      }
       return false;
     }
   }, [
@@ -310,21 +320,34 @@ function NewHgvInspectionContent() {
     setShowDiscardDraftDialog(true);
   }, [existingInspectionId, navigateWithoutPrompt]);
 
-  const ensureDraftSaved = async (): Promise<string | null> => {
-    if (existingInspectionId) return existingInspectionId;
+  const ensureDraftSaved = async (
+    options: { silent?: boolean; source?: 'auto' | 'user' } = {}
+  ): Promise<string | null> => {
+    const { silent = false, source = 'user' } = options;
+
+    if (existingInspectionId) {
+      if (source === 'auto' && !isDraftHydratedRef.current) {
+        return existingInspectionId;
+      }
+      const merged = await mergeIntoExistingDraft(existingInspectionId, { showToast: false });
+      if (!merged && !silent) {
+        toast.error('Could not auto-save draft. Please try again.');
+      }
+      return merged ? existingInspectionId : null;
+    }
     if (!user || !selectedEmployeeId || !hgvId) {
-      toast.error('Select an HGV, employee and date before adding photos');
+      if (!silent) toast.error('Select an HGV, employee and date before adding photos');
       return null;
     }
     if (!inspectionDate) {
-      toast.error('Select an inspection date before adding photos');
+      if (!silent) toast.error('Select an inspection date before adding photos');
       return null;
     }
 
     const inspectionConflict = await findExistingInspectionConflict();
     if (inspectionConflict) {
       if (inspectionConflict.status === 'draft') {
-        const merged = await mergeIntoExistingDraft(inspectionConflict.id);
+        const merged = await mergeIntoExistingDraft(inspectionConflict.id, { showToast: !silent });
         return merged ? inspectionConflict.id : null;
       }
       handleInspectionConflict(inspectionConflict);
@@ -353,7 +376,7 @@ function NewHgvInspectionContent() {
           const inspectionConflict = await findExistingInspectionConflict();
           if (inspectionConflict) {
             if (inspectionConflict.status === 'draft') {
-              const merged = await mergeIntoExistingDraft(inspectionConflict.id);
+              const merged = await mergeIntoExistingDraft(inspectionConflict.id, { showToast: !silent });
               return merged ? inspectionConflict.id : null;
             }
             handleInspectionConflict(inspectionConflict);
@@ -392,15 +415,21 @@ function NewHgvInspectionContent() {
       return draft.id;
     } catch (err) {
       console.error('Silent draft save failed:', err);
-      toast.error('Could not auto-save draft. Please try again.');
+      if (!silent) {
+        toast.error('Could not auto-save draft. Please try again.');
+      }
       return null;
     } finally {
       setSavingDraftForPhoto(false);
     }
   };
 
+  const autoSaveDraftRef = useRef<(() => Promise<string | null>) | null>(null);
+  autoSaveDraftRef.current = () => ensureDraftSaved({ silent: true, source: 'auto' });
+
   const loadDraftInspection = useCallback(async (id: string) => {
     try {
+      isDraftHydratedRef.current = false;
       setLoading(true);
       const { data: draft, error: draftError } = await supabase
         .from('hgv_inspections')
@@ -412,6 +441,7 @@ function NewHgvInspectionContent() {
       if (draftError || !draft) {
         setExistingInspectionId(null);
         window.history.replaceState(null, '', '/hgv-inspections/new');
+        isDraftHydratedRef.current = true;
         return;
       }
 
@@ -456,12 +486,13 @@ function NewHgvInspectionContent() {
       setNowMs(inspectionTimerStartMs);
 
       if (draft.hgv_id) {
-        await loadLockedDefects(draft.hgv_id);
+        await loadLockedDefects(draft.hgv_id, 'merge');
       }
     } catch (err) {
       console.error('Error loading HGV draft:', err);
       toast.error('Failed to load draft inspection');
     } finally {
+      isDraftHydratedRef.current = true;
       setLoading(false);
     }
   }, [supabase]);
@@ -496,9 +527,34 @@ function NewHgvInspectionContent() {
 
   useEffect(() => {
     if (draftId && user) {
+      isDraftHydratedRef.current = false;
       loadDraftInspection(draftId);
+    } else {
+      isDraftHydratedRef.current = true;
     }
   }, [draftId, user, loadDraftInspection]);
+
+  useEffect(() => {
+    const persistDraft = () => {
+      if (existingInspectionId && !isDraftHydratedRef.current) return;
+      if (saveInspectionInFlightRef.current || allowNavigationRef.current) return;
+      void autoSaveDraftRef.current?.();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        persistDraft();
+      }
+    };
+
+    const handlePageHide = () => persistDraft();
+    window.addEventListener('pagehide', handlePageHide);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('pagehide', handlePageHide);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [existingInspectionId]);
 
   useEffect(() => {
     if (!existingInspectionId) return;
@@ -579,11 +635,18 @@ function NewHgvInspectionContent() {
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   }, [remainingSeconds]);
 
-  const loadLockedDefects = async (selectedHgvId: string) => {
+  const loadLockedDefects = async (
+    selectedHgvId: string,
+    mode: 'replace' | 'merge' = 'replace'
+  ) => {
+    const requestId = ++lockedDefectsRequestIdRef.current;
     try {
       const response = await fetch(`/api/hgv-inspections/locked-defects?hgvId=${selectedHgvId}`);
       if (!response.ok) return;
       const { lockedItems } = await response.json();
+
+      // Ignore stale responses from previous HGV selections.
+      if (requestId !== lockedDefectsRequestIdRef.current) return;
 
       const map = new Map<string, { comment: string; actionId: string }>();
       const initialStates: Record<string, InspectionStatus> = {};
@@ -597,8 +660,13 @@ function NewHgvInspectionContent() {
       }
 
       setLoggedDefects(map);
-      setCheckboxStates(initialStates);
-      setComments(initialComments);
+      if (mode === 'merge') {
+        setCheckboxStates((prev) => ({ ...prev, ...initialStates }));
+        setComments((prev) => ({ ...prev, ...initialComments }));
+      } else {
+        setCheckboxStates(initialStates);
+        setComments(initialComments);
+      }
     } catch {
       // Non-blocking.
     }
@@ -1102,7 +1170,7 @@ function NewHgvInspectionContent() {
                   setComments({});
                   setLoggedDefects(new Map());
                   if (value) {
-                    loadLockedDefects(value);
+                    void loadLockedDefects(value, 'replace');
                   }
                 }}
               >

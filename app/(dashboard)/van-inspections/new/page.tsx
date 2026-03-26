@@ -189,14 +189,14 @@ function NewInspectionContent() {
     [photoMap]
   );
 
-  const ensureDraftSaved = async (): Promise<string | null> => {
-    if (existingInspectionId) return existingInspectionId;
+  const ensureDraftSaved = async (options: { silent?: boolean } = {}): Promise<string | null> => {
+    const { silent = false } = options;
     if (!user || !selectedEmployeeId || !vehicleId) {
-      toast.error('Select a vehicle, employee and week before adding photos');
+      if (!silent) toast.error('Select a vehicle, employee and week before adding photos');
       return null;
     }
     if (!weekEnding || weekEnding.trim() === '') {
-      toast.error('Select a week ending date before adding photos');
+      if (!silent) toast.error('Select a week ending date before adding photos');
       return null;
     }
     setSavingDraftForPhoto(true);
@@ -204,6 +204,71 @@ function NewInspectionContent() {
       const weekEndDate = new Date(weekEnding + 'T00:00:00');
       const startDate = new Date(weekEndDate);
       startDate.setDate(weekEndDate.getDate() - 6);
+
+      const buildItemsPayload = (inspectionId: string): Database['public']['Tables']['inspection_items']['Insert'][] => {
+        const items: Database['public']['Tables']['inspection_items']['Insert'][] = [];
+        for (let dayOfWeek = 1; dayOfWeek <= 7; dayOfWeek++) {
+          currentChecklist.forEach((item, index) => {
+            const itemNumber = index + 1;
+            const key = `${dayOfWeek}-${itemNumber}`;
+            if (checkboxStates[key]) {
+              items.push({
+                inspection_id: inspectionId,
+                item_number: itemNumber,
+                item_description: item,
+                day_of_week: dayOfWeek,
+                status: checkboxStates[key],
+                comments: comments[key] || null,
+              });
+            }
+          });
+        }
+        return items;
+      };
+
+      if (existingInspectionId) {
+        const draftPayload: Database['public']['Tables']['van_inspections']['Update'] = {
+          van_id: vehicleId,
+          user_id: selectedEmployeeId,
+          inspection_date: formatDateISO(startDate),
+          inspection_end_date: weekEnding,
+          current_mileage: getParsedMileage(),
+          status: 'draft',
+          submitted_at: null,
+          signature_data: null,
+          signed_at: null,
+          inspector_comments: inspectorComments.trim() || null,
+          updated_at: new Date().toISOString(),
+        };
+
+        const { data: updatedDraft, error: updateError } = await supabase
+          .from('van_inspections')
+          .update(draftPayload)
+          .eq('id', existingInspectionId)
+          .eq('status', 'draft')
+          .select('id')
+          .maybeSingle();
+
+        if (updateError || !updatedDraft) {
+          throw updateError ?? new Error('Draft not found');
+        }
+
+        const { error: deleteItemsError } = await supabase
+          .from('inspection_items')
+          .delete()
+          .eq('inspection_id', existingInspectionId);
+        if (deleteItemsError) throw deleteItemsError;
+
+        const updatedItems = buildItemsPayload(existingInspectionId);
+        if (updatedItems.length > 0) {
+          const { error: itemsError } = await supabase
+            .from('inspection_items')
+            .insert(updatedItems);
+          if (itemsError) throw itemsError;
+        }
+
+        return existingInspectionId;
+      }
 
       const { data: draft, error: draftError } = await supabase
         .from('van_inspections')
@@ -221,23 +286,7 @@ function NewInspectionContent() {
 
       if (draftError) throw draftError;
 
-      const items: Database['public']['Tables']['inspection_items']['Insert'][] = [];
-      for (let dayOfWeek = 1; dayOfWeek <= 7; dayOfWeek++) {
-        currentChecklist.forEach((item, index) => {
-          const itemNumber = index + 1;
-          const key = `${dayOfWeek}-${itemNumber}`;
-          if (checkboxStates[key]) {
-            items.push({
-              inspection_id: draft.id,
-              item_number: itemNumber,
-              item_description: item,
-              day_of_week: dayOfWeek,
-              status: checkboxStates[key],
-              comments: comments[key] || null,
-            });
-          }
-        });
-      }
+      const items = buildItemsPayload(draft.id);
       if (items.length > 0) {
         const { error: itemsError } = await supabase
           .from('inspection_items')
@@ -250,12 +299,17 @@ function NewInspectionContent() {
       return draft.id;
     } catch (err) {
       console.error('Silent draft save failed:', err);
-      toast.error('Could not auto-save draft. Please try again.');
+      if (!silent) {
+        toast.error('Could not auto-save draft. Please try again.');
+      }
       return null;
     } finally {
       setSavingDraftForPhoto(false);
     }
   };
+
+  const autoSaveDraftRef = useRef<(() => Promise<string | null>) | null>(null);
+  autoSaveDraftRef.current = () => ensureDraftSaved({ silent: true });
 
   const isAddVehicleFormDirty = Boolean(newVehicleReg.trim() || newVehicleCategoryId);
 
@@ -401,6 +455,26 @@ function NewInspectionContent() {
       return () => clearTimeout(timer);
     }
   }, [draftId, user, loadDraftInspection]);
+
+  useEffect(() => {
+    const persistDraft = () => {
+      if (loadingRef.current || savingDraftForPhoto) return;
+      void autoSaveDraftRef.current?.();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        persistDraft();
+      }
+    };
+
+    window.addEventListener('pagehide', persistDraft);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('pagehide', persistDraft);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [savingDraftForPhoto]);
 
   // Fetch employees if manager, and set initial selected employee
   useEffect(() => {
