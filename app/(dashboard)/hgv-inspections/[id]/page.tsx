@@ -8,7 +8,7 @@ import { BackButton } from '@/components/ui/back-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertCircle, CheckCircle2, Download, MinusCircle, XCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Download, XCircle } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import type { InspectionItem, InspectionStatus } from '@/types/inspection';
 import { enrichDefectsWithWorkshopCompletion, type EnrichedDefectItem } from '@/lib/utils/hgvDefectWorkshopDetails';
@@ -118,9 +118,9 @@ export default function ViewHgvInspectionPage() {
   }, [authLoading, fetchInspection, params.id]);
 
   const getStatusIcon = (status: InspectionStatus) => {
-    if (status === 'ok') return <CheckCircle2 className="h-5 w-5 text-green-600" />;
-    if (status === 'attention') return <XCircle className="h-5 w-5 text-red-600" />;
-    return <MinusCircle className="h-5 w-5 text-slate-400" />;
+    if (status === 'ok') return <CheckCircle2 className="h-5 w-5 text-green-400" />;
+    if (status === 'attention') return <XCircle className="h-5 w-5 text-red-400" />;
+    return <span className="text-xs font-extrabold tracking-wide text-slate-300">N/A</span>;
   };
 
   if (authLoading || loading) {
@@ -135,9 +135,9 @@ export default function ViewHgvInspectionPage() {
     return (
       <div className="space-y-6">
         <BackButton fallbackHref="/hgv-inspections" />
-        <Card>
+        <Card className="border-red-500/30 bg-red-500/10">
           <CardContent className="pt-6">
-            <p className="text-red-600">{error}</p>
+            <p className="text-red-300">{error}</p>
           </CardContent>
         </Card>
       </div>
@@ -176,23 +176,25 @@ export default function ViewHgvInspectionPage() {
               variant="outline"
               size="sm"
               onClick={() => window.open(`/api/hgv-inspections/${inspection.id}/pdf`, '_blank')}
+              className="border-border text-white hover:bg-slate-800"
             >
               <Download className="h-4 w-4 mr-2" />
-              Download PDF
+              <span className="hidden sm:inline">Download PDF</span>
+              <span className="sm:hidden">PDF</span>
             </Button>
-            <Badge>Submitted</Badge>
+            <Badge className="border-inspection/40 bg-inspection/10 text-inspection">Submitted</Badge>
           </div>
         </div>
       </div>
 
       {error && (
-        <div className="p-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md flex items-start gap-2">
-          <AlertCircle className="h-4 w-4 mt-0.5" />
+        <div className="p-4 text-sm text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg backdrop-blur-xl flex items-start gap-2">
+          <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
           {error}
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-6 text-center">
             <div className="text-3xl font-bold text-green-600">{okCount}</div>
@@ -213,7 +215,7 @@ export default function ViewHgvInspectionPage() {
         </Card>
       </div>
 
-      <Card>
+      <Card className="">
         <CardHeader>
           <CardTitle>Checklist Items</CardTitle>
           <CardDescription>25-point HGV checklist results</CardDescription>
@@ -222,27 +224,26 @@ export default function ViewHgvInspectionPage() {
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
-                <tr className="border-b">
-                  <th className="text-left p-2 w-12 font-medium">#</th>
-                  <th className="text-left p-2 font-medium">Item</th>
-                  <th className="text-center p-2 w-40 font-medium">Status</th>
-                  <th className="text-left p-2 font-medium">Comments</th>
+                <tr className="border-b border-border">
+                  <th className="text-left p-3 w-12 font-medium text-white">#</th>
+                  <th className="text-left p-3 font-medium text-white">Item</th>
+                  <th className="text-center p-3 w-40 font-medium text-white">Status</th>
+                  <th className="text-left p-3 font-medium text-white">Comments</th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((item) => (
-                  <tr key={item.id} className="border-b hover:bg-secondary/20">
-                    <td className="p-2 text-sm text-muted-foreground">{item.item_number}</td>
-                    <td className="p-2 text-sm">{item.item_description}</td>
-                    <td className="p-2">
+                  <tr key={item.id} className="border-b border-border/50 hover:bg-slate-800/30">
+                    <td className="p-3 text-sm text-muted-foreground">{item.item_number}</td>
+                    <td className="p-3 text-sm text-white">{item.item_description}</td>
+                    <td className="p-3">
                       <div className="flex items-center justify-center gap-2">
                         {getStatusIcon(item.status)}
-                        <span className="text-sm font-medium uppercase">{item.status}</span>
                       </div>
                     </td>
-                    <td className="p-2 text-sm">
+                    <td className="p-3 text-sm">
                       <div className="space-y-3">
-                        <div>{item.comments || '-'}</div>
+                        <div className="text-muted-foreground">{item.comments || '-'}</div>
                         {item.status === 'attention' && (
                           <>
                             <InspectionPhotoTiles
@@ -257,7 +258,7 @@ export default function ViewHgvInspectionPage() {
                               emptyLabel="Add / View Photos"
                               emptyHint="No photos saved yet"
                               manageLabel="Add / View"
-                              className="max-w-[272px]"
+                              className="max-w-[272px] border-border/50"
                             />
                           </>
                         )}
@@ -270,33 +271,37 @@ export default function ViewHgvInspectionPage() {
           </div>
           <div className="md:hidden space-y-3">
             {items.map((item) => (
-              <Card key={item.id}>
-                <CardContent className="pt-4 space-y-2">
-                  <div className="font-medium text-sm">{item.item_number}. {item.item_description}</div>
-                  <div className="flex items-center gap-2">
-                    {getStatusIcon(item.status)}
-                    <span className="text-sm uppercase">{item.status}</span>
+              <div key={item.id} className="bg-slate-900/30 border border-border/50 rounded-lg p-4 space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-800 border border-slate-600 flex items-center justify-center">
+                    <span className="text-sm font-bold text-muted-foreground">{item.item_number}</span>
                   </div>
-                  <div className="text-sm text-muted-foreground">{item.comments || 'No comments'}</div>
-                  {item.status === 'attention' && (
-                    <>
-                      <InspectionPhotoTiles
-                        photos={getPhotosForItem(item.item_number, item.day_of_week)}
-                        onManage={
-                          canUploadPhotos
-                            ? () => setPhotoUploadItem({ itemNumber: item.item_number, dayOfWeek: item.day_of_week })
-                            : undefined
-                        }
-                        title={`Item #${item.item_number} photos`}
-                        description={`Uploaded photos for ${item.item_description}.`}
-                        emptyLabel="Add / View Photos"
-                        emptyHint="No photos saved yet"
-                        manageLabel="Add / View"
-                      />
-                    </>
-                  )}
-                </CardContent>
-              </Card>
+                  <div className="flex-1">
+                    <h4 className="text-base font-medium text-white leading-tight">{item.item_description}</h4>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="rounded-lg border border-border/60 bg-slate-900/40 px-3 py-2 flex items-center gap-2">
+                    {getStatusIcon(item.status)}
+                  </div>
+                </div>
+                <div className="text-sm text-muted-foreground">{item.comments || 'No comments'}</div>
+                {item.status === 'attention' && (
+                  <InspectionPhotoTiles
+                    photos={getPhotosForItem(item.item_number, item.day_of_week)}
+                    onManage={
+                      canUploadPhotos
+                        ? () => setPhotoUploadItem({ itemNumber: item.item_number, dayOfWeek: item.day_of_week })
+                        : undefined
+                    }
+                    title={`Item #${item.item_number} photos`}
+                    description={`Uploaded photos for ${item.item_description}.`}
+                    emptyLabel="Add / View Photos"
+                    emptyHint="No photos saved yet"
+                    manageLabel="Add / View"
+                  />
+                )}
+              </div>
             ))}
           </div>
         </CardContent>

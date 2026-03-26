@@ -410,7 +410,7 @@ export default function ViewPlantInspectionPage() {
       case 'attention':
         return <XCircle className="h-5 w-5 text-red-600" />;
       case 'na':
-        return <AlertCircle className="h-5 w-5 text-gray-400" />;
+        return <span className="text-xs font-extrabold tracking-wide text-gray-400">N/A</span>;
       default:
         return null;
     }
@@ -523,6 +523,7 @@ export default function ViewPlantInspectionPage() {
                     window.open(pdfUrl, '_blank');
                   }
                 }}
+                className="border-border text-white hover:bg-slate-800"
               >
                 <Download className="h-4 w-4 mr-2" />
                 <span className="hidden sm:inline">Download PDF</span>
@@ -535,8 +536,9 @@ export default function ViewPlantInspectionPage() {
       </div>
 
       {error && (
-        <div className="p-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
-          {error}
+        <div className="p-4 text-sm text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg backdrop-blur-xl flex items-start gap-2">
+          <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+          <div>{error}</div>
         </div>
       )}
 
@@ -691,9 +693,6 @@ export default function ViewPlantInspectionPage() {
                       <td className="p-2">
                         <div className="flex items-center justify-center">
                           {getStatusIcon(item.status)}
-                          <span className="ml-2 text-sm font-medium">
-                            {item.status.toUpperCase()}
-                          </span>
                         </div>
                       </td>
                       <td className="p-2">
@@ -751,9 +750,6 @@ export default function ViewPlantInspectionPage() {
                   <CardContent className="space-y-3">
                     <div className="flex items-center justify-center py-4">
                       {getStatusIcon(item.status)}
-                      <span className="ml-2 font-medium">
-                        {item.status.toUpperCase()}
-                      </span>
                     </div>
                     {item.comments && (
                       <p className="text-sm text-muted-foreground">{item.comments}</p>

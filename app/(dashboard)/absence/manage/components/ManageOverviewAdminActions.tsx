@@ -24,6 +24,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { TeamToggleMenu } from '@/components/ui/team-toggle-menu';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { createClient } from '@/lib/supabase/client';
+import { getErrorMessage, shouldLogAbsenceManageError } from '@/lib/utils/absence-error-handling';
 import { Loader2, Sparkles, Trash2, Users } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -208,8 +209,13 @@ export function ManageOverviewAdminActions() {
       setBulkReasonOptions(nextReasons);
       setShutdownReasonId((current) => current || nextReasons[0]?.id || '');
     } catch (error) {
-      console.error('Error loading bulk absence options:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to load bulk absence options');
+      const message = getErrorMessage(error, 'Failed to load bulk absence options');
+      if (shouldLogAbsenceManageError(error)) {
+        console.error('Error loading bulk absence options:', error);
+      } else {
+        console.warn('Bulk absence options load blocked:', message);
+      }
+      toast.error(message);
     }
   }, [supabase]);
 

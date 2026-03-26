@@ -78,7 +78,6 @@ interface WorkshopTasksOverviewTabProps {
 
 type CompletedSortField =
   | 'completedAt'
-  | 'createdAt'
   | 'asset'
   | 'source'
   | 'category'
@@ -309,7 +308,7 @@ export function WorkshopTasksOverviewTab({
     rows.sort((a, b) => {
       const compareMultiplier = completedSortDirection === 'asc' ? 1 : -1;
 
-      if (completedSortField === 'completedAt' || completedSortField === 'createdAt') {
+      if (completedSortField === 'completedAt') {
         const aTime = a[completedSortField] ? new Date(a[completedSortField] as string).getTime() : 0;
         const bTime = b[completedSortField] ? new Date(b[completedSortField] as string).getTime() : 0;
         return (aTime - bTime) * compareMultiplier;
@@ -343,7 +342,7 @@ export function WorkshopTasksOverviewTab({
     }
 
     setCompletedSortField(field);
-    setCompletedSortDirection(field === 'completedAt' || field === 'createdAt' ? 'desc' : 'asc');
+    setCompletedSortDirection(field === 'completedAt' ? 'desc' : 'asc');
   };
 
   const resetCompletedFilters = () => {
@@ -983,19 +982,10 @@ export function WorkshopTasksOverviewTab({
                               onSort={handleCompletedSort}
                             />
                           </TableHead>
-                          <TableHead className="w-[10rem]">
-                            <SortableHeader
-                              label="Created"
-                              field="createdAt"
-                              currentField={completedSortField}
-                              direction={completedSortDirection}
-                              onSort={handleCompletedSort}
-                            />
-                          </TableHead>
-                          <TableHead className="w-[11rem] text-right">Actions</TableHead>
+                          <TableHead className="w-[7rem] pr-3 text-right">Actions</TableHead>
                         </TableRow>
                         <TableRow className="bg-slate-50/60 dark:bg-slate-900/60 hover:bg-slate-50/60 dark:hover:bg-slate-900/60">
-                          <TableHead />
+                          <TableHead className="w-[7rem]" />
                           <TableHead>
                             <Input
                               value={completedAssetFilter}
@@ -1043,7 +1033,6 @@ export function WorkshopTasksOverviewTab({
                             />
                           </TableHead>
                           <TableHead />
-                          <TableHead />
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1055,7 +1044,20 @@ export function WorkshopTasksOverviewTab({
                               onClick={() => onOpenTaskModal(row.task)}
                             >
                               <TableCell className="text-sm text-green-400">
-                                {row.completedAt ? formatDate(row.completedAt) : '-'}
+                                {row.completedAt ? (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="inline-flex cursor-help underline decoration-dotted underline-offset-4">
+                                        {formatDate(row.completedAt)}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Created: {row.createdAt ? formatDate(row.createdAt) : '-'}</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                ) : (
+                                  '-'
+                                )}
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-2">
@@ -1098,16 +1100,13 @@ export function WorkshopTasksOverviewTab({
                                   )}
                                 </div>
                               </TableCell>
-                              <TableCell className="text-sm text-muted-foreground">
-                                {row.createdAt ? formatDate(row.createdAt) : '-'}
-                              </TableCell>
-                              <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                                <div className="flex justify-end gap-1">
+                              <TableCell className="w-[7rem] px-2 text-right" onClick={(e) => e.stopPropagation()}>
+                                <div className="ml-auto flex w-fit justify-end gap-1">
                                   <Button
                                     onClick={() => onOpenComments(row.task)}
                                     size="sm"
                                     variant="outline"
-                                    className="h-8 w-8 border-slate-600 p-0 text-muted-foreground hover:bg-slate-800 hover:text-white"
+                                    className="h-7 w-7 border-slate-600 p-0 text-muted-foreground hover:bg-slate-800 hover:text-white"
                                     title="Comments"
                                     aria-label="Comments"
                                   >
@@ -1117,7 +1116,7 @@ export function WorkshopTasksOverviewTab({
                                     onClick={() => onUndoComplete(row.task.id)}
                                     size="sm"
                                     variant="outline"
-                                    className="h-8 w-8 border-slate-600 p-0 text-muted-foreground hover:bg-slate-800 hover:text-white"
+                                    className="h-7 w-7 border-slate-600 p-0 text-muted-foreground hover:bg-slate-800 hover:text-white"
                                     title="Undo"
                                     aria-label="Undo"
                                   >
@@ -1129,7 +1128,7 @@ export function WorkshopTasksOverviewTab({
                           ))
                         ) : (
                           <TableRow>
-                            <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                            <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                               No completed tasks match the current filters.
                             </TableCell>
                           </TableRow>

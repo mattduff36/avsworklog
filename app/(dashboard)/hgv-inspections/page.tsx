@@ -29,12 +29,23 @@ interface HgvInspectionWithRelations {
   submitted_at: string | null;
   hgv: { reg_number: string; nickname: string | null } | null;
   profile: { full_name: string } | null;
+  has_reported_defect?: boolean;
+  has_inform_workshop_task?: boolean;
 }
 
 interface HgvSummary {
   id: string;
   reg_number: string;
   nickname: string | null;
+}
+
+interface InspectionItemSummaryRow {
+  inspection_id: string | null;
+  status: string | null;
+}
+
+interface WorkshopTaskSummaryRow {
+  inspection_id: string | null;
 }
 
 function HgvInspectionsContent() {
@@ -111,7 +122,52 @@ function HgvInspectionsContent() {
 
       const { data, error } = await query;
       if (error) throw error;
-      setInspections((data || []) as HgvInspectionWithRelations[]);
+      const rows = (data || []) as HgvInspectionWithRelations[];
+      const inspectionIds = rows.map((row) => row.id).filter((id): id is string => Boolean(id));
+      let defectInspectionIds = new Set<string>();
+      let workshopTaskInspectionIds = new Set<string>();
+
+      if (inspectionIds.length > 0) {
+        const { data: defectData, error: defectError } = await supabase
+          .from('inspection_items')
+          .select('inspection_id, status')
+          .in('inspection_id', inspectionIds)
+          .in('status', ['attention', 'defect']);
+
+        if (defectError) {
+          console.warn('Unable to determine defect status for HGV inspection icons:', defectError);
+        } else {
+          defectInspectionIds = new Set(
+            ((defectData || []) as InspectionItemSummaryRow[])
+              .map((row) => row.inspection_id)
+              .filter((id): id is string => Boolean(id))
+          );
+        }
+
+        const { data: workshopTaskData, error: workshopTaskError } = await supabase
+          .from('actions')
+          .select('inspection_id')
+          .in('inspection_id', inspectionIds)
+          .eq('action_type', 'workshop_vehicle_task');
+
+        if (workshopTaskError) {
+          console.warn('Unable to determine workshop-task status for HGV inspection icons:', workshopTaskError);
+        } else {
+          workshopTaskInspectionIds = new Set(
+            ((workshopTaskData || []) as WorkshopTaskSummaryRow[])
+              .map((row) => row.inspection_id)
+              .filter((id): id is string => Boolean(id))
+          );
+        }
+      }
+
+      setInspections(
+        rows.map((row) => ({
+          ...row,
+          has_reported_defect: defectInspectionIds.has(row.id),
+          has_inform_workshop_task: workshopTaskInspectionIds.has(row.id),
+        }))
+      );
     } catch (error) {
       console.error('Error fetching HGV inspections:', error);
       toast.error('Failed to load HGV inspections');
@@ -177,16 +233,25 @@ function HgvInspectionsContent() {
     }
   };
 
+  const getInspectionIcon = (inspection: HgvInspectionWithRelations) => {
+    const iconColorClass = inspection.has_inform_workshop_task
+      ? 'text-inspection'
+      : inspection.has_reported_defect
+        ? 'text-red-500'
+        : 'text-green-500';
+    return <Clock className={`h-5 w-5 ${iconColorClass}`} />;
+  };
+
   return (
     <div className="space-y-6 max-w-6xl">
       <div className={`bg-slate-900 rounded-lg border border-border ${tabletModeEnabled ? 'p-5 md:p-6' : 'p-6'}`}>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
           <div>
             <h1 className="text-3xl font-bold text-white mb-2">HGV Daily Checks</h1>
             <p className="text-muted-foreground">Daily 25-point HGV safety checks</p>
           </div>
           <Link href="/hgv-inspections/new">
-            <Button className={`bg-inspection hover:bg-inspection/90 text-white ${tabletModeEnabled ? 'min-h-11 text-base px-4 [&_svg]:size-5' : ''}`}>
+            <Button className={`bg-inspection hover:bg-inspection/90 text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg ${tabletModeEnabled ? 'min-h-11 text-base px-4 [&_svg]:size-5' : ''}`}>
               <Plus className="h-4 w-4 mr-2" />
               New Daily Check
             </Button>
@@ -194,13 +259,14 @@ function HgvInspectionsContent() {
         </div>
 
         {isElevatedUser && employees.length > 0 && (
-          <div className={`pt-4 border-t border-border flex items-center gap-3 ${tabletModeEnabled ? 'max-w-none flex-wrap' : 'max-w-md'}`}>
+          <div className="pt-4 border-t border-border">
+            <div className={`flex items-center gap-3 ${tabletModeEnabled ? 'max-w-none flex-wrap' : 'max-w-md'}`}>
             <Label className="text-white text-sm flex items-center gap-2 whitespace-nowrap">
               <User className="h-4 w-4" />
               View daily checks for:
             </Label>
             <Select value={selectedEmployeeId || 'all'} onValueChange={setSelectedEmployeeId}>
-              <SelectTrigger className={`${tabletModeEnabled ? 'min-h-11 text-base' : 'h-10'} border-border text-white`}>
+              <SelectTrigger className={`${tabletModeEnabled ? 'min-h-11 text-base' : 'h-10'} border-border text-white bg-slate-900/50`}>
                 <SelectValue placeholder="All employees" />
               </SelectTrigger>
               <SelectContent>
@@ -214,18 +280,19 @@ function HgvInspectionsContent() {
                 ))}
               </SelectContent>
             </Select>
+            </div>
           </div>
         )}
       </div>
 
       {isElevatedUser && (
-        <Card>
+        <Card className="border-border">
           <CardContent className="pt-6">
             <div className={`flex items-center gap-3 ${tabletModeEnabled ? 'flex-wrap' : ''}`}>
               <Filter className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm text-slate-400">Filter by HGV:</span>
               <Select value={hgvFilter || 'all'} onValueChange={setHgvFilter}>
-                <SelectTrigger className={`${tabletModeEnabled ? 'min-h-11 text-base w-full md:w-[360px]' : 'w-[320px] h-9'}`}>
+                <SelectTrigger className={`${tabletModeEnabled ? 'min-h-11 text-base w-full md:w-[360px]' : 'w-[320px] h-9'} border-border text-white bg-slate-900/50`}>
                   <SelectValue placeholder="All HGVs" />
                 </SelectTrigger>
                 <SelectContent>
@@ -251,13 +318,13 @@ function HgvInspectionsContent() {
           </div>
         </div>
       ) : inspections.length === 0 ? (
-        <Card>
+        <Card className="border-border">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Clipboard className="h-16 w-16 text-slate-400 mb-4" />
             <h3 className="text-lg font-semibold text-white mb-2">No HGV daily checks yet</h3>
             <p className="text-slate-400 mb-4">Create your first HGV daily check</p>
             <Link href="/hgv-inspections/new">
-              <Button className={`bg-inspection hover:bg-inspection/90 text-white ${tabletModeEnabled ? 'min-h-11 text-base px-4 [&_svg]:size-5' : ''}`}>
+              <Button className={`bg-inspection hover:bg-inspection/90 text-white transition-all duration-200 active:scale-95 ${tabletModeEnabled ? 'min-h-11 text-base px-4 [&_svg]:size-5' : ''}`}>
                 <Plus className="h-4 w-4 mr-2" />
                 Create Daily Check
               </Button>
@@ -276,7 +343,7 @@ function HgvInspectionsContent() {
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex items-center space-x-3">
-                    <Clock className="h-5 w-5 text-amber-500" />
+                    {getInspectionIcon(inspection)}
                     <div>
                       <CardTitle className="text-lg text-white">
                         {inspection.hgv?.reg_number || 'Unknown HGV'}
@@ -289,7 +356,7 @@ function HgvInspectionsContent() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge>Submitted</Badge>
+                    <Badge className="border-inspection/40 bg-inspection/10 text-inspection">Submitted</Badge>
                     {isElevatedUser && (
                       <Button
                         variant="ghost"
@@ -315,7 +382,7 @@ function HgvInspectionsContent() {
                     disabled={downloading === inspection.id}
                     variant="outline"
                     size="sm"
-                    className={`bg-slate-900 border-inspection text-inspection hover:bg-inspection hover:text-white ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
+                    className={`bg-slate-900 border-inspection text-inspection hover:bg-inspection hover:text-white transition-all duration-200 ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
                   >
                     <Download className="h-4 w-4 mr-2" />
                     {downloading === inspection.id ? 'Downloading...' : 'Download PDF'}

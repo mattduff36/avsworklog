@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { fetchEmployeeWorkShift } from '@/lib/client/work-shifts';
 import { useUpdateAbsence } from '@/lib/hooks/useAbsence';
+import { getErrorMessage, shouldLogAbsenceManageError } from '@/lib/utils/absence-error-handling';
 import { calculateDurationDays } from '@/lib/utils/date';
 import type { AbsenceReason, AbsenceWithRelations } from '@/types/absence';
 import type { WorkShiftPattern } from '@/types/work-shifts';
@@ -144,8 +145,13 @@ export function AbsenceEditDialog({
       toast.success('Absence updated');
       onOpenChange(false);
     } catch (error) {
-      console.error('Error updating absence:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to update absence');
+      const message = getErrorMessage(error, 'Failed to update absence');
+      if (shouldLogAbsenceManageError(error)) {
+        console.error('Error updating absence:', error);
+      } else {
+        console.warn('Update absence request rejected:', message);
+      }
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }

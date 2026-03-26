@@ -23,12 +23,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertCircle, ArrowLeft, Camera, CheckCircle2, Info, MinusCircle, Send, Timer, User, XCircle } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Camera, CheckCircle2, Info, Send, Timer, User, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { TRUCK_CHECKLIST_ITEMS } from '@/lib/checklists/vehicle-checklists';
 import { formatDate, formatDateISO, getDayOfWeek } from '@/lib/utils/date';
+import { getRecentVehicleIds, recordRecentVehicleId, splitVehiclesByRecent } from '@/lib/utils/recentVehicles';
 import { scrollAndHighlightValidationTarget } from '@/lib/utils/validation-scroll';
 import type { Database } from '@/types/database';
 import type { Employee } from '@/types/common';
@@ -74,6 +75,7 @@ function NewHgvInspectionContent() {
   const { tabletModeEnabled } = useTabletMode();
 
   const [hgvs, setHgvs] = useState<HgvAsset[]>([]);
+  const [recentHgvIds, setRecentHgvIds] = useState<string[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const [hgvId, setHgvId] = useState('');
@@ -533,6 +535,12 @@ function NewHgvInspectionContent() {
       isDraftHydratedRef.current = true;
     }
   }, [draftId, user, loadDraftInspection]);
+
+  useEffect(() => {
+    if (user?.id) {
+      setRecentHgvIds(getRecentVehicleIds(user.id, 'hgvs'));
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     const persistDraft = () => {
@@ -1061,7 +1069,7 @@ function NewHgvInspectionContent() {
       case 'attention':
         return <XCircle className={`h-10 w-10 md:h-6 md:w-6 ${isSelected ? 'text-red-400' : 'text-muted-foreground'}`} />;
       case 'na':
-        return <MinusCircle className={`h-10 w-10 md:h-6 md:w-6 ${isSelected ? 'text-blue-300' : 'text-muted-foreground'}`} />;
+        return <span className={`text-sm md:text-xs font-extrabold tracking-wide ${isSelected ? 'text-blue-200' : 'text-muted-foreground'}`}>N/A</span>;
       default:
         return null;
     }
@@ -1078,14 +1086,9 @@ function NewHgvInspectionContent() {
   const getStatusOptions = (itemNumber: number): InspectionStatus[] =>
     isArticOnlyItem(itemNumber) ? ['ok', 'attention', 'na'] : ['ok', 'attention'];
 
-  const getStatusLabel = (status: InspectionStatus): string => {
-    if (status === 'ok') return 'Pass';
-    if (status === 'attention') return 'Fail';
-    return 'N/A';
-  };
-
   const completedItems = Object.keys(checkboxStates).length;
   const totalItems = TRUCK_CHECKLIST_ITEMS.length;
+  const progressPercent = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
 
   return (
     <div className={`space-y-4 max-w-6xl ${tabletModeEnabled ? 'pb-36' : 'pb-32 md:pb-6'}`}>
@@ -1096,7 +1099,7 @@ function NewHgvInspectionContent() {
               variant="outline"
               size="icon"
               onClick={handleBackButtonClick}
-              className="ui-component border-2 border-slate-600 text-slate-200 bg-slate-900/50 hover:bg-slate-800 hover:border-slate-500 hover:text-white focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
+              className="border-slate-600 text-white bg-slate-900/50 hover:bg-slate-800"
               aria-label="Back"
               title="Back"
             >
@@ -1107,17 +1110,25 @@ function NewHgvInspectionContent() {
               <p className="text-sm text-muted-foreground hidden md:block">Daily safety check</p>
             </div>
           </div>
-          {checklistStarted && (
+          {hgvId && (
             <div className="bg-inspection/10 dark:bg-inspection/20 border border-inspection/30 rounded-lg px-3 py-2">
               <div className="text-xs text-muted-foreground">Progress</div>
               <div className="text-lg font-bold text-foreground">{completedItems}/{totalItems}</div>
             </div>
           )}
         </div>
+        {hgvId && (
+          <div className="h-2 bg-slate-200 dark:bg-slate-800/50 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-inspection transition-all duration-300"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+        )}
       </div>
 
       {error && (
-        <div className="p-4 text-sm text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-3">
+        <div className="p-4 text-sm text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg backdrop-blur-xl flex items-start gap-3">
           <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
           <div>{error}</div>
         </div>
@@ -1166,6 +1177,10 @@ function NewHgvInspectionContent() {
                 disabled={checklistStarted}
                 onValueChange={(value) => {
                   setHgvId(value);
+                  if (user?.id) {
+                    const updatedRecent = recordRecentVehicleId(user.id, value, 3, 'hgvs');
+                    setRecentHgvIds(updatedRecent);
+                  }
                   setCheckboxStates({});
                   setComments({});
                   setLoggedDefects(new Map());
@@ -1178,11 +1193,38 @@ function NewHgvInspectionContent() {
                   <SelectValue placeholder="Select an HGV" />
                 </SelectTrigger>
                 <SelectContent>
-                  {hgvs.map((hgv) => (
-                    <SelectItem key={hgv.id} value={hgv.id}>
-                      {hgv.reg_number} {hgv.nickname ? `- ${hgv.nickname}` : ''} ({hgv.hgv_categories?.name || 'Uncategorised'})
-                    </SelectItem>
-                  ))}
+                  {(() => {
+                    const { recentVehicles, otherVehicles } = splitVehiclesByRecent(hgvs, recentHgvIds);
+                    return (
+                      <>
+                        {recentVehicles.length > 0 && (
+                          <SelectGroup>
+                            <SelectLabel className="text-muted-foreground text-xs px-2 py-1.5">Recent</SelectLabel>
+                            {recentVehicles.map((hgv) => (
+                              <SelectItem key={hgv.id} value={hgv.id}>
+                                {hgv.reg_number} {hgv.nickname ? `- ${hgv.nickname}` : ''} ({hgv.hgv_categories?.name || 'Uncategorised'})
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        )}
+                        {recentVehicles.length > 0 && otherVehicles.length > 0 && (
+                          <SelectSeparator className="bg-slate-700" />
+                        )}
+                        {otherVehicles.length > 0 && (
+                          <SelectGroup>
+                            {recentVehicles.length > 0 && (
+                              <SelectLabel className="text-muted-foreground text-xs px-2 py-1.5">All HGVs</SelectLabel>
+                            )}
+                            {otherVehicles.map((hgv) => (
+                              <SelectItem key={hgv.id} value={hgv.id}>
+                                {hgv.reg_number} {hgv.nickname ? `- ${hgv.nickname}` : ''} ({hgv.hgv_categories?.name || 'Uncategorised'})
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        )}
+                      </>
+                    );
+                  })()}
                 </SelectContent>
               </Select>
             </div>
@@ -1207,8 +1249,8 @@ function NewHgvInspectionContent() {
             </div>
           </div>
 
-          <div className="flex items-end gap-4">
-            <div className="flex-1 space-y-2">
+          <div className="space-y-3">
+            <div className="space-y-2">
               <Label htmlFor="currentMileage" className="text-foreground text-base flex items-center gap-2">
                 Current KM
                 <span className="text-red-400">*</span>
@@ -1233,13 +1275,13 @@ function NewHgvInspectionContent() {
               <Button
                 onClick={startInspection}
                 disabled={!hgvId || !inspectionDate || !currentMileage}
-                className="h-12 bg-inspection hover:bg-inspection/90 text-white font-semibold whitespace-nowrap"
+                className="w-full md:w-auto h-12 bg-inspection hover:bg-inspection/90 text-slate-900 font-semibold whitespace-nowrap"
               >
                 <Timer className="h-4 w-4 mr-2" />
                 Start Daily Check
               </Button>
             ) : (
-              <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg shrink-0">
+              <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                 <p className="text-sm text-blue-400">
                   <Info className="h-4 w-4 inline mr-2" />
                   Daily check started. The submit button unlocks after 10 minutes.
@@ -1366,8 +1408,20 @@ function NewHgvInspectionContent() {
                         Artics only
                       </div>
                     )}
-                    <div data-checklist-item={key} className={`bg-slate-900/30 border rounded-lg p-4 space-y-3 ${isLocked ? 'border-red-500/50' : 'border-border/50'}`}>
-                      <div className="text-sm font-medium text-white">{itemNumber}. {item}</div>
+                    <div data-checklist-item={key} className={`bg-slate-900/30 border rounded-lg p-4 space-y-3 ${isLocked ? 'border-red-500/50 bg-red-500/5' : 'border-border/50'}`}>
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-800 border border-slate-600 flex items-center justify-center">
+                          <span className="text-sm font-bold text-muted-foreground">{itemNumber}</span>
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="text-base font-medium text-white leading-tight">{item}</h4>
+                          {isLocked && (
+                            <Badge className="mt-2 bg-red-500/20 text-red-400 border-red-500/30">
+                              LOGGED DEFECT
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
                       <div className={`grid ${statusOptions.length === 3 ? 'grid-cols-3' : 'grid-cols-2'} gap-2`}>
                         {statusOptions.map((status) => (
                           <button
@@ -1375,21 +1429,30 @@ function NewHgvInspectionContent() {
                             type="button"
                             onClick={() => handleStatusChange(itemNumber, status)}
                             disabled={isLocked}
-                            className={`h-12 rounded-xl border-2 ${getStatusColor(status, currentStatus === status)} ${isLocked ? 'opacity-60 cursor-not-allowed' : ''}`}
+                            className={`flex flex-col items-center justify-center h-14 rounded-xl border-3 transition-all ${getStatusColor(status, currentStatus === status)} ${isLocked ? 'opacity-60 cursor-not-allowed' : ''}`}
                           >
-                            {getStatusLabel(status)}
+                            {getStatusIcon(status, currentStatus === status)}
                           </button>
                         ))}
                       </div>
-                      <Textarea
-                        id={`hgv-comment-${itemNumber}`}
-                        data-comment-input={key}
-                        value={comments[key] || ''}
-                        onChange={(e) => handleCommentChange(itemNumber, e.target.value)}
-                        placeholder={currentStatus === 'attention' ? 'Required for failed items' : 'Optional notes'}
-                        className="min-h-[80px] bg-slate-900/50 border-slate-600 text-white"
-                        readOnly={isLocked}
-                      />
+                      {(currentStatus === 'attention' || comments[key]) && (
+                        <div className="space-y-2">
+                          <Label className="text-foreground text-sm">
+                            {currentStatus === 'attention' ? (isLocked ? 'Manager Comment' : 'Comments (Required)') : 'Notes'}
+                          </Label>
+                          <Textarea
+                            id={`hgv-comment-${itemNumber}`}
+                            data-comment-input={key}
+                            value={comments[key] || ''}
+                            onChange={(e) => handleCommentChange(itemNumber, e.target.value)}
+                            placeholder={isLocked ? '' : 'Add details...'}
+                            className={`min-h-[80px] bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground ${
+                              currentStatus === 'attention' && !comments[key] && !isLocked ? 'border-red-500' : ''
+                            } ${isLocked ? 'cursor-not-allowed opacity-70' : ''}`}
+                            readOnly={isLocked}
+                          />
+                        </div>
+                      )}
                       {currentStatus === 'attention' && !isLocked && (() => {
                         const dayOfWeek = inspectionDate ? getDayOfWeek(new Date(inspectionDate + 'T00:00:00')) : 1;
                         const itemPhotos = getPhotosForItem(itemNumber, dayOfWeek);
@@ -1453,7 +1516,7 @@ function NewHgvInspectionContent() {
               <Button
                 onClick={onSubmitClicked}
                 disabled={loading || !canSubmitNow}
-                className="bg-inspection hover:bg-inspection/90 text-white font-semibold disabled:opacity-70"
+                className="bg-inspection hover:bg-inspection/90 text-slate-900 font-semibold disabled:opacity-70"
               >
                 <Send className="h-4 w-4 mr-2" />
                 {canSubmitNow ? 'Submit Daily Check' : `Submit available in ${countdownLabel}`}
@@ -1468,7 +1531,7 @@ function NewHgvInspectionContent() {
           <Button
             onClick={onSubmitClicked}
             disabled={loading || !canSubmitNow}
-            className={`${tabletModeEnabled ? 'w-full min-h-11 text-base bg-inspection hover:bg-inspection/90 text-white font-semibold disabled:opacity-70' : 'w-full h-14 bg-inspection hover:bg-inspection/90 text-white font-semibold text-base disabled:opacity-70'}`}
+            className="w-full h-14 bg-inspection hover:bg-inspection/90 text-slate-900 font-semibold text-base disabled:opacity-70"
           >
             <Send className="h-5 w-5 mr-2" />
             {canSubmitNow ? 'Submit Daily Check' : `Submit in ${countdownLabel}`}

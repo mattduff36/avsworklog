@@ -20,12 +20,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Send, CheckCircle2, XCircle, AlertCircle, Info, User, Camera, MinusCircle, ArrowLeft } from 'lucide-react';
+import { Send, CheckCircle2, XCircle, AlertCircle, Info, User, Camera, ArrowLeft } from 'lucide-react';
 import { formatDateISO, formatDate, getDayOfWeek } from '@/lib/utils/date';
 import { InspectionStatus } from '@/types/inspection';
 import { PLANT_INSPECTION_ITEMS } from '@/lib/checklists/plant-checklists';
@@ -38,6 +38,7 @@ import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { InspectionPhotoTiles } from '@/components/inspections/InspectionPhotoTiles';
 import { useInspectionPhotos } from '@/lib/hooks/useInspectionPhotos';
 import { getInspectionPhotoKey } from '@/lib/inspection-photos';
+import { getRecentVehicleIds, recordRecentVehicleId, splitVehiclesByRecent } from '@/lib/utils/recentVehicles';
 
 // Dynamic imports for heavy components
 const PhotoUpload = dynamic(() => import('@/components/forms/PhotoUpload'), { ssr: false });
@@ -99,6 +100,7 @@ function NewPlantInspectionContent() {
     current_hours?: number | null;
     van_categories?: { name: string } | null;
   }>>([]);
+  const [recentPlantIds, setRecentPlantIds] = useState<string[]>([]);
   const [selectedPlantId, setSelectedPlantId] = useState('');
   const [inspectionDate, setInspectionDate] = useState('');
   
@@ -621,6 +623,12 @@ function NewPlantInspectionContent() {
       isDraftHydratedRef.current = true;
     }
   }, [draftId, user, loadDraftInspection]);
+
+  useEffect(() => {
+    if (user?.id) {
+      setRecentPlantIds(getRecentVehicleIds(user.id, 'plant'));
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     const persistDraft = () => {
@@ -1267,7 +1275,7 @@ function NewPlantInspectionContent() {
       case 'attention':
         return <XCircle className={`h-10 w-10 md:h-6 md:w-6 ${isSelected ? 'text-red-400' : 'text-muted-foreground'}`} />;
       case 'na':
-        return <MinusCircle className={`h-10 w-10 md:h-6 md:w-6 ${isSelected ? 'text-slate-300' : 'text-muted-foreground'}`} />;
+        return <span className={`text-sm md:text-xs font-extrabold tracking-wide ${isSelected ? 'text-slate-200' : 'text-muted-foreground'}`}>N/A</span>;
       default:
         return null;
     }
@@ -1303,7 +1311,7 @@ function NewPlantInspectionContent() {
               variant="outline"
               size="icon"
               onClick={handleBackButtonClick}
-              className="ui-component border-2 border-slate-600 text-slate-200 bg-slate-900/50 hover:bg-slate-800 hover:border-slate-500 hover:text-white focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
+              className="border-slate-600 text-white bg-slate-900/50 hover:bg-slate-800"
               aria-label="Back"
               title="Back"
             >
@@ -1318,14 +1326,14 @@ function NewPlantInspectionContent() {
               </p>
             </div>
           </div>
-          {selectedPlantId && (
+          {(selectedPlantId || isHiredPlant) && (
             <div className="bg-plant-inspection/10 dark:bg-plant-inspection/20 border border-plant-inspection/30 rounded-lg px-3 py-2">
               <div className="text-xs text-muted-foreground">Progress</div>
               <div className="text-lg font-bold text-foreground">{completedItems}/{totalItems}</div>
             </div>
           )}
         </div>
-        {selectedPlantId && (
+        {(selectedPlantId || isHiredPlant) && (
           <div className="h-2 bg-slate-200 dark:bg-slate-800/50 rounded-full overflow-hidden">
             <div 
               className="h-full bg-plant-inspection transition-all duration-300"
@@ -1398,6 +1406,10 @@ function NewPlantInspectionContent() {
                     setHiredPlantDescription('');
                     setHiredPlantHiringCompany('');
                     setSelectedPlantId(value);
+                    if (user?.id) {
+                      const updatedRecent = recordRecentVehicleId(user.id, value, 3, 'plant');
+                      setRecentPlantIds(updatedRecent);
+                    }
                     loadLockedDefects(value);
                   }
                 }}
@@ -1406,16 +1418,42 @@ function NewPlantInspectionContent() {
                   <SelectValue placeholder="Select a plant" />
                 </SelectTrigger>
                 <SelectContent className="border-border max-h-[300px] md:max-h-[400px]">
-                  <SelectGroup>
-                    <SelectItem value={HIRED_PLANT_SENTINEL} className="font-semibold !text-amber-400 focus:!text-amber-400">
-                      Hired Plant
-                    </SelectItem>
-                    {plants.map((plant) => (
-                      <SelectItem key={plant.id} value={plant.id}>
-                        {plant.plant_id} {plant.nickname ? `- ${plant.nickname}` : ''} ({plant.van_categories?.name || 'Uncategorized'})
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
+                  <SelectItem value={HIRED_PLANT_SENTINEL} className="font-semibold !text-amber-400 focus:!text-amber-400">
+                    Hired Plant
+                  </SelectItem>
+                  {plants.length > 0 && <SelectSeparator className="bg-slate-700" />}
+                  {(() => {
+                    const { recentVehicles: recentPlants, otherVehicles: otherPlants } = splitVehiclesByRecent(plants, recentPlantIds);
+                    return (
+                      <>
+                        {recentPlants.length > 0 && (
+                          <SelectGroup>
+                            <SelectLabel className="text-muted-foreground text-xs px-2 py-1.5">Recent</SelectLabel>
+                            {recentPlants.map((plant) => (
+                              <SelectItem key={plant.id} value={plant.id}>
+                                {plant.plant_id} {plant.nickname ? `- ${plant.nickname}` : ''} ({plant.van_categories?.name || 'Uncategorized'})
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        )}
+                        {recentPlants.length > 0 && otherPlants.length > 0 && (
+                          <SelectSeparator className="bg-slate-700" />
+                        )}
+                        {otherPlants.length > 0 && (
+                          <SelectGroup>
+                            {recentPlants.length > 0 && (
+                              <SelectLabel className="text-muted-foreground text-xs px-2 py-1.5">All Plants</SelectLabel>
+                            )}
+                            {otherPlants.map((plant) => (
+                              <SelectItem key={plant.id} value={plant.id}>
+                                {plant.plant_id} {plant.nickname ? `- ${plant.nickname}` : ''} ({plant.van_categories?.name || 'Uncategorized'})
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        )}
+                      </>
+                    );
+                  })()}
                 </SelectContent>
               </Select>
             </div>
@@ -1584,9 +1622,6 @@ function NewPlantInspectionContent() {
                         } ${isLogged ? 'opacity-60 cursor-not-allowed' : ''}`}
                       >
                         {getStatusIcon(status, currentStatus === status)}
-                        <span className="text-[10px] mt-1 text-muted-foreground">
-                          {status === 'ok' ? 'Pass' : status === 'attention' ? 'Fail' : 'N/A'}
-                        </span>
                       </button>
                     ))}
                   </div>
@@ -1678,9 +1713,6 @@ function NewPlantInspectionContent() {
                               title={status === 'ok' ? 'Pass' : status === 'attention' ? 'Fail' : 'N/A'}
                             >
                               {getStatusIcon(status, currentStatus === status)}
-                              <span className="text-[10px] mt-0.5 text-muted-foreground">
-                                {status === 'ok' ? 'Pass' : status === 'attention' ? 'Fail' : 'N/A'}
-                              </span>
                             </button>
                           ))}
                         </div>

@@ -7,11 +7,16 @@
 
 const STORAGE_KEY_PREFIX = 'recent_vehicles_';
 const DEFAULT_MAX_RECENT = 3;
+const DEFAULT_SCOPE = 'vehicles';
 
 /**
  * Get the localStorage key for a specific user
  */
-function getStorageKey(userId: string): string {
+function getStorageKey(userId: string, scope: string = DEFAULT_SCOPE): string {
+  return `${STORAGE_KEY_PREFIX}${scope}_${userId}`;
+}
+
+function getLegacyStorageKey(userId: string): string {
   return `${STORAGE_KEY_PREFIX}${userId}`;
 }
 
@@ -50,10 +55,11 @@ function safeLocalStorageSet(key: string, value: string): boolean {
  * @param userId - The user's ID
  * @returns Array of vehicle IDs, newest first (max 3)
  */
-export function getRecentVehicleIds(userId: string): string[] {
+export function getRecentVehicleIds(userId: string, scope: string = DEFAULT_SCOPE): string[] {
   if (!userId) return [];
   
-  const raw = safeLocalStorageGet(getStorageKey(userId));
+  const scopedRaw = safeLocalStorageGet(getStorageKey(userId, scope));
+  const raw = scopedRaw ?? (scope === DEFAULT_SCOPE ? safeLocalStorageGet(getLegacyStorageKey(userId)) : null);
   if (!raw) return [];
   
   try {
@@ -82,12 +88,13 @@ export function getRecentVehicleIds(userId: string): string[] {
 export function recordRecentVehicleId(
   userId: string, 
   vehicleId: string, 
-  max: number = DEFAULT_MAX_RECENT
+  max: number = DEFAULT_MAX_RECENT,
+  scope: string = DEFAULT_SCOPE
 ): string[] {
-  if (!userId || !vehicleId) return getRecentVehicleIds(userId);
+  if (!userId || !vehicleId) return getRecentVehicleIds(userId, scope);
   
   // Get current list
-  const current = getRecentVehicleIds(userId);
+  const current = getRecentVehicleIds(userId, scope);
   
   // Remove the vehicle if it already exists (to move it to front)
   const filtered = current.filter(id => id !== vehicleId);
@@ -96,7 +103,7 @@ export function recordRecentVehicleId(
   const updated = [vehicleId, ...filtered].slice(0, max);
   
   // Save to localStorage
-  safeLocalStorageSet(getStorageKey(userId), JSON.stringify(updated));
+  safeLocalStorageSet(getStorageKey(userId, scope), JSON.stringify(updated));
   
   return updated;
 }
@@ -106,24 +113,23 @@ export function recordRecentVehicleId(
  * 
  * @param userId - The user's ID
  */
-export function clearRecentVehicles(userId: string): void {
+export function clearRecentVehicles(userId: string, scope: string = DEFAULT_SCOPE): void {
   if (!userId) return;
   
   if (typeof window === 'undefined') return;
   
   try {
-    localStorage.removeItem(getStorageKey(userId));
+    localStorage.removeItem(getStorageKey(userId, scope));
   } catch {
     // Ignore errors
   }
 }
 
 /**
- * Helper type for vehicle with recent status
+ * Helper type for selectable assets with recent status
  */
-export interface VehicleWithRecent {
+export interface SelectableWithRecent {
   id: string;
-  reg_number: string;
   [key: string]: unknown;
 }
 
@@ -134,7 +140,7 @@ export interface VehicleWithRecent {
  * @param recentIds - List of recent vehicle IDs
  * @returns Object with recentVehicles and otherVehicles arrays
  */
-export function splitVehiclesByRecent<T extends VehicleWithRecent>(
+export function splitVehiclesByRecent<T extends SelectableWithRecent>(
   vehicles: T[],
   recentIds: string[]
 ): { recentVehicles: T[]; otherVehicles: T[] } {

@@ -47,6 +47,7 @@ import { AbsenceEditDialog } from '@/app/(dashboard)/absence/manage/components/A
 import { AbsenceAboutHelper } from '@/app/(dashboard)/absence/components/AbsenceAboutHelper';
 import { ManageOverviewAdminActions } from '@/app/(dashboard)/absence/manage/components/ManageOverviewAdminActions';
 import { WorkShiftsContent } from '@/app/(dashboard)/absence/manage/components/WorkShiftsContent';
+import { getErrorMessage, shouldLogAbsenceManageError } from '@/lib/utils/absence-error-handling';
 import type { AbsenceWithRelations } from '@/types/absence';
 import type { WorkShiftPattern } from '@/types/work-shifts';
 
@@ -410,8 +411,13 @@ export default function AdminAbsencePage() {
       setNotes('');
       setShowCreateDialog(false);
     } catch (error) {
-      console.error('Error creating absence:', error);
-      toast.error('Failed to create absence');
+      const message = getErrorMessage(error, 'Failed to create absence');
+      if (shouldLogAbsenceManageError(error)) {
+        console.error('Error creating absence:', error);
+      } else {
+        console.warn('Create absence request rejected:', message);
+      }
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }

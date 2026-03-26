@@ -37,12 +37,23 @@ interface InspectionWithVehicle extends VanInspection {
     reg_number: string;
     van_categories: { name: string } | null;
   };
+  has_reported_defect?: boolean;
+  has_inform_workshop_task?: boolean;
 }
 
 interface Vehicle {
   id: string;
   reg_number: string;
   van_categories: { name: string } | null;
+}
+
+interface InspectionItemSummaryRow {
+  inspection_id: string | null;
+  status: string | null;
+}
+
+interface WorkshopTaskSummaryRow {
+  inspection_id: string | null;
 }
 
 function InspectionsContent() {
@@ -186,9 +197,52 @@ function InspectionsContent() {
       const { data, error } = await query;
 
       if (error) throw error;
-      const rows = data || [];
+      const rows = (data || []) as InspectionWithVehicle[];
+      const inspectionIds = rows.map((row) => row.id).filter((id): id is string => Boolean(id));
+      let defectInspectionIds = new Set<string>();
+      let workshopTaskInspectionIds = new Set<string>();
+
+      if (inspectionIds.length > 0) {
+        const { data: defectData, error: defectError } = await supabase
+          .from('inspection_items')
+          .select('inspection_id, status')
+          .in('inspection_id', inspectionIds)
+          .in('status', ['attention', 'defect']);
+
+        if (defectError) {
+          console.warn('Unable to determine defect status for inspection icons:', defectError);
+        } else {
+          defectInspectionIds = new Set(
+            ((defectData || []) as InspectionItemSummaryRow[])
+              .map((row) => row.inspection_id)
+              .filter((id): id is string => Boolean(id))
+          );
+        }
+
+        const { data: workshopTaskData, error: workshopTaskError } = await supabase
+          .from('actions')
+          .select('inspection_id')
+          .in('inspection_id', inspectionIds)
+          .eq('action_type', 'workshop_vehicle_task');
+
+        if (workshopTaskError) {
+          console.warn('Unable to determine workshop-task status for inspection icons:', workshopTaskError);
+        } else {
+          workshopTaskInspectionIds = new Set(
+            ((workshopTaskData || []) as WorkshopTaskSummaryRow[])
+              .map((row) => row.inspection_id)
+              .filter((id): id is string => Boolean(id))
+          );
+        }
+      }
+
+      const enrichedRows = rows.map((row) => ({
+        ...row,
+        has_reported_defect: defectInspectionIds.has(row.id),
+        has_inform_workshop_task: workshopTaskInspectionIds.has(row.id),
+      }));
       setHasMore(rows.length > displayCount);
-      setInspections(rows.slice(0, displayCount));
+      setInspections(enrichedRows.slice(0, displayCount));
     } catch (error) {
       const message = (() => {
         if (error instanceof Error) return error.message;
@@ -272,13 +326,18 @@ function InspectionsContent() {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'submitted':
-        return <Clock className="h-5 w-5 text-amber-600" />;
-      default:
-        return <Clipboard className="h-5 w-5 text-muted-foreground" />;
+  const getStatusIcon = (inspection: InspectionWithVehicle) => {
+    const iconColorClass = inspection.has_inform_workshop_task
+      ? 'text-inspection'
+      : inspection.has_reported_defect
+        ? 'text-red-500'
+        : 'text-green-500';
+
+    if (inspection.status === 'submitted') {
+      return <Clock className={`h-5 w-5 ${iconColorClass}`} />;
     }
+
+    return <Clipboard className={`h-5 w-5 ${iconColorClass}`} />;
   };
 
   const handleDownloadPDF = async (e: React.MouseEvent, inspectionId: string) => {
@@ -388,7 +447,7 @@ function InspectionsContent() {
       
       {/* Header */}
       <div className={`bg-slate-900 rounded-lg border border-border ${tabletModeEnabled ? 'p-5 md:p-6' : 'p-6'}`}>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
           <div>
             <h1 className="text-3xl font-bold text-white mb-2">Van Daily Checks</h1>
             <p className="text-muted-foreground">
@@ -412,7 +471,7 @@ function InspectionsContent() {
                 View daily checks for:
               </Label>
               <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-                <SelectTrigger id="employee-filter" className={`${tabletModeEnabled ? 'min-h-11 text-base' : 'h-10'} border-border text-white`}>
+              <SelectTrigger id="employee-filter" className={`${tabletModeEnabled ? 'min-h-11 text-base' : 'h-10'} border-border text-white bg-slate-900/50`}>
                   <SelectValue placeholder="Select employee" />
                 </SelectTrigger>
                 <SelectContent>
@@ -462,7 +521,7 @@ function InspectionsContent() {
                 <Truck className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-slate-400 mr-2 whitespace-nowrap">Filter by van:</span>
                 <Select value={vehicleFilter} onValueChange={setVehicleFilter}>
-                <SelectTrigger className={`${tabletModeEnabled ? 'min-h-11 text-base' : 'h-9'} border-border text-white`}>
+                <SelectTrigger className={`${tabletModeEnabled ? 'min-h-11 text-base' : 'h-9'} border-border text-white bg-slate-900/50`}>
                     <SelectValue placeholder="All vans" />
                   </SelectTrigger>
                   <SelectContent>
@@ -556,7 +615,7 @@ function InspectionsContent() {
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex items-center space-x-3">
-                    {getStatusIcon(inspection.status)}
+                    {getStatusIcon(inspection)}
                     <div>
                       <CardTitle className="text-lg text-white">
                         {inspection.vans?.reg_number || 'Unknown Van'}
