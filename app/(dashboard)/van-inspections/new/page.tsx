@@ -175,6 +175,13 @@ function NewInspectionContent() {
   const [inspectorComments, setInspectorComments] = useState('');
   const [informWorkshop, setInformWorkshop] = useState(false);
   const [, setCreatingWorkshopTask] = useState(false);
+  const hasOptionalInspectorComment = inspectorComments.trim().length > 0;
+
+  useEffect(() => {
+    if (!hasOptionalInspectorComment && informWorkshop) {
+      setInformWorkshop(false);
+    }
+  }, [hasOptionalInspectorComment, informWorkshop]);
 
   const getPhotosForItem = useCallback(
     (itemNumber: number, dayOfWeek: number) =>
@@ -1414,7 +1421,7 @@ function NewInspectionContent() {
   const progressPercent = Math.round((completedItems / totalItems) * 100);
 
   return (
-    <div className={`space-y-4 max-w-5xl ${tabletModeEnabled ? 'pb-36' : 'pb-32 md:pb-6'}`}>
+    <div className={`space-y-4 max-w-6xl ${tabletModeEnabled ? 'pb-36' : 'pb-32 md:pb-6'}`}>
       
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-border">
@@ -1932,26 +1939,6 @@ function NewInspectionContent() {
             </table>
           </div>
 
-          {/* Information Box - Desktop Only */}
-          <div className="hidden md:block p-4 bg-slate-800/40 border border-border/50 rounded-lg backdrop-blur-xl">
-            <div className="flex items-start gap-3">
-              <Info className="h-5 w-5 text-inspection flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-semibold text-white mb-2">Daily Check Guidelines:</p>
-                <ul className="space-y-2 text-sm text-muted-foreground">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-green-400" />
-                    <span><strong>Pass:</strong> Item is in good working condition</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <XCircle className="h-5 w-5 text-red-400" />
-                    <span><strong>Fail:</strong> Item needs attention - comment required</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </div>
-
               </TabsContent>
             ))}
           </Tabs>
@@ -1967,7 +1954,7 @@ function NewInspectionContent() {
                   id="inspector-comments"
                   value={inspectorComments}
                   onChange={(e) => setInspectorComments(e.target.value)}
-                  placeholder="Add any additional notes or observations about this inspection..."
+                  placeholder="Do not add any notes regarding a reported defect. Only add additional notes NOT linked to a defect..."
                   className="min-h-[100px] bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground"
                   maxLength={500}
                 />
@@ -1976,45 +1963,50 @@ function NewInspectionContent() {
                 </p>
               </div>
 
-              {/* Inform Workshop Toggle */}
-              <div className="flex items-start space-x-3 p-3 bg-slate-900/30 rounded-lg border border-border/30">
-                <Checkbox
-                  id="inform-workshop"
-                  checked={informWorkshop}
-                  onCheckedChange={(checked) => setInformWorkshop(checked === true)}
-                  className="mt-0.5 border-slate-500 data-[state=checked]:bg-workshop data-[state=checked]:border-workshop"
-                />
-                <div className="flex-1">
-                  <Label 
-                    htmlFor="inform-workshop" 
-                    className="text-white cursor-pointer flex items-center gap-2"
-                  >
-                    Inform Workshop
-                    <Badge variant="outline" className="text-xs border-workshop/50 text-workshop">
-                      Creates Task
-                    </Badge>
-                  </Label>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Do not tick this for defects already reported above. Marking a defect already creates a workshop task. Only use this if your comments describe an additional task that is not linked to a reported defect.
-                  </p>
-                  
-                  {/* Validation warning */}
-                  {informWorkshop && inspectorComments.trim().length < 10 && (
-                    <p className="text-xs text-amber-400 mt-2 flex items-center gap-1">
-                      <AlertTriangle className="h-3 w-3" />
-                      Comment must be at least 10 characters to create a workshop task
-                    </p>
-                  )}
-                  
-                  {/* Ready indicator */}
-                  {informWorkshop && inspectorComments.trim().length >= 10 && (
-                    <p className="text-xs text-green-400 mt-2 flex items-center gap-1">
-                      <CheckCircle2 className="h-3 w-3" />
-                      Workshop task will be created on submit
-                    </p>
-                  )}
+              {/* Inform Workshop Toggle (shown only when optional notes exist) */}
+              {hasOptionalInspectorComment && (
+                <div className="flex items-start space-x-3 p-3 bg-slate-900/30 rounded-lg border border-border/30">
+                  <Checkbox
+                    id="inform-workshop"
+                    checked={informWorkshop}
+                    onCheckedChange={(checked) => setInformWorkshop(checked === true)}
+                    className="mt-0.5 border-slate-500 data-[state=checked]:bg-workshop data-[state=checked]:border-workshop"
+                  />
+                  <div className="flex-1">
+                    <Label 
+                      htmlFor="inform-workshop" 
+                      className="text-white cursor-pointer flex items-center gap-2"
+                    >
+                      Inform Workshop
+                      <Badge variant="outline" className="text-xs border-workshop/50 text-workshop">
+                        Creates Task
+                      </Badge>
+                    </Label>
+                    <div className="mt-1.5 flex items-start gap-1.5 rounded-md border border-workshop/35 bg-workshop/10 px-2.5 py-1.5 text-xs text-workshop/90">
+                      <Info className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-workshop" />
+                      <span className="leading-5">
+                        Do not tick &quot;Inform Workshop&quot; for defects already reported above. A failed item already creates a workshop task.
+                      </span>
+                    </div>
+                    
+                    {/* Validation warning */}
+                    {informWorkshop && inspectorComments.trim().length < 10 && (
+                      <p className="text-xs text-amber-400 mt-2 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" />
+                        Comment must be at least 10 characters to create a workshop task
+                      </p>
+                    )}
+                    
+                    {/* Ready indicator */}
+                    {informWorkshop && inspectorComments.trim().length >= 10 && (
+                      <p className="text-xs text-green-400 mt-2 flex items-center gap-1">
+                        <CheckCircle2 className="h-3 w-3" />
+                        Workshop task will be created on submit
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
 

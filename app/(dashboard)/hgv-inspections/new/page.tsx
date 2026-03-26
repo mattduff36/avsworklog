@@ -89,6 +89,7 @@ function NewHgvInspectionContent() {
 
   const [inspectorComments, setInspectorComments] = useState('');
   const [informWorkshop, setInformWorkshop] = useState(false);
+  const hasOptionalInspectorComment = inspectorComments.trim().length > 0;
 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -102,14 +103,17 @@ function NewHgvInspectionContent() {
   const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation | null>(null);
   const [showDiscardDraftDialog, setShowDiscardDraftDialog] = useState(false);
   const [discardingDraft, setDiscardingDraft] = useState(false);
-  const [conflictingDraftId, setConflictingDraftId] = useState<string | null>(null);
-  const [showDraftConflictDialog, setShowDraftConflictDialog] = useState(false);
-  const [resolvingDraftConflict, setResolvingDraftConflict] = useState(false);
   const [submittedConflictInspectionId, setSubmittedConflictInspectionId] = useState<string | null>(null);
   const [showSubmittedConflictDialog, setShowSubmittedConflictDialog] = useState(false);
   const { photoMap, refresh: refreshInspectionPhotos } = useInspectionPhotos(existingInspectionId, {
     enabled: Boolean(existingInspectionId),
   });
+
+  useEffect(() => {
+    if (!hasOptionalInspectorComment && informWorkshop) {
+      setInformWorkshop(false);
+    }
+  }, [hasOptionalInspectorComment, informWorkshop]);
 
   const getPhotosForItem = useCallback(
     (itemNumber: number, dayOfWeek: number) =>
@@ -155,17 +159,101 @@ function NewHgvInspectionContent() {
   }, [existingInspectionId, hgvId, inspectionDate, supabase]);
 
   const handleInspectionConflict = useCallback((conflict: ExistingInspectionConflict): void => {
-    if (conflict.status === 'draft') {
-      setConflictingDraftId(conflict.id);
-      setShowDraftConflictDialog(true);
-      toast.info('A draft already exists for this HGV and date.');
-      return;
-    }
-
+    if (conflict.status !== 'submitted') return;
     setSubmittedConflictInspectionId(conflict.id);
     setShowSubmittedConflictDialog(true);
     toast.info('A daily check has already been submitted for this HGV and date.');
   }, []);
+
+  const buildCurrentInspectionItemsPayload = useCallback((inspectionId: string): InspectionItemInsert[] => {
+    if (!inspectionDate) return [];
+
+    const dayOfWeek = getDayOfWeek(new Date(inspectionDate + 'T00:00:00'));
+    const items: InspectionItemInsert[] = [];
+    TRUCK_CHECKLIST_ITEMS.forEach((itemDescription, idx) => {
+      const itemNumber = idx + 1;
+      const key = `${itemNumber}`;
+      if (checkboxStates[key]) {
+        items.push({
+          inspection_id: inspectionId,
+          item_number: itemNumber,
+          item_description: itemDescription,
+          day_of_week: dayOfWeek,
+          status: checkboxStates[key],
+          comments: comments[key] || null,
+        });
+      }
+    });
+    return items;
+  }, [checkboxStates, comments, inspectionDate]);
+
+  const mergeIntoExistingDraft = useCallback(async (inspectionId: string): Promise<boolean> => {
+    if (!hgvId || !inspectionDate || !selectedEmployeeId) {
+      toast.error('Select an HGV, employee and date before continuing');
+      return false;
+    }
+
+    const mileageValue = parseInt(currentMileage, 10);
+    const draftPayload: Database['public']['Tables']['hgv_inspections']['Update'] = {
+      hgv_id: hgvId,
+      user_id: selectedEmployeeId,
+      inspection_date: inspectionDate,
+      inspection_end_date: inspectionDate,
+      current_mileage: Number.isNaN(mileageValue) ? null : mileageValue,
+      status: 'draft',
+      submitted_at: null,
+      signature_data: null,
+      signed_at: null,
+      inspector_comments: inspectorComments.trim() || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    try {
+      const { data: updatedDraft, error: updateError } = await supabase
+        .from('hgv_inspections')
+        .update(draftPayload)
+        .eq('id', inspectionId)
+        .eq('status', 'draft')
+        .select('id')
+        .maybeSingle();
+
+      if (updateError || !updatedDraft) {
+        throw updateError ?? new Error('Draft not found');
+      }
+
+      const { error: deleteItemsError } = await supabase
+        .from('inspection_items')
+        .delete()
+        .eq('inspection_id', inspectionId);
+      if (deleteItemsError) throw deleteItemsError;
+
+      const items = buildCurrentInspectionItemsPayload(inspectionId);
+      if (items.length > 0) {
+        const { error: itemsError } = await supabase
+          .from('inspection_items')
+          .insert(items);
+        if (itemsError) throw itemsError;
+      }
+
+      setExistingInspectionId(inspectionId);
+      window.history.replaceState(null, '', `/hgv-inspections/new?id=${inspectionId}`);
+      toast.info('Merged with existing draft for this HGV and date.');
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not merge with existing draft';
+      console.error('Failed to merge into existing HGV draft:', err);
+      toast.error(message);
+      return false;
+    }
+  }, [
+    buildCurrentInspectionItemsPayload,
+    currentMileage,
+    hgvId,
+    inspectionDate,
+    inspectorComments,
+    selectedEmployeeId,
+    supabase,
+  ]);
 
   const discardDraftById = useCallback(async (inspectionId: string, showToast = true): Promise<boolean> => {
     try {
@@ -228,6 +316,10 @@ function NewHgvInspectionContent() {
 
     const inspectionConflict = await findExistingInspectionConflict();
     if (inspectionConflict) {
+      if (inspectionConflict.status === 'draft') {
+        const merged = await mergeIntoExistingDraft(inspectionConflict.id);
+        return merged ? inspectionConflict.id : null;
+      }
       handleInspectionConflict(inspectionConflict);
       return null;
     }
@@ -253,6 +345,10 @@ function NewHgvInspectionContent() {
         if (draftError.code === '23505') {
           const inspectionConflict = await findExistingInspectionConflict();
           if (inspectionConflict) {
+            if (inspectionConflict.status === 'draft') {
+              const merged = await mergeIntoExistingDraft(inspectionConflict.id);
+              return merged ? inspectionConflict.id : null;
+            }
             handleInspectionConflict(inspectionConflict);
             return null;
           }
@@ -313,8 +409,6 @@ function NewHgvInspectionContent() {
       }
 
       setExistingInspectionId(id);
-      setConflictingDraftId(null);
-      setShowDraftConflictDialog(false);
       setSubmittedConflictInspectionId(null);
       setShowSubmittedConflictDialog(false);
       setHgvId(draft.hgv_id);
@@ -499,8 +593,15 @@ function NewHgvInspectionContent() {
     if (!existingInspectionId) {
       const inspectionConflict = await findExistingInspectionConflict();
       if (inspectionConflict) {
-        handleInspectionConflict(inspectionConflict);
-        return;
+        if (inspectionConflict.status === 'draft') {
+          const merged = await mergeIntoExistingDraft(inspectionConflict.id);
+          if (!merged) {
+            return;
+          }
+        } else {
+          handleInspectionConflict(inspectionConflict);
+          return;
+        }
       }
     }
 
@@ -837,34 +938,6 @@ function NewHgvInspectionContent() {
     navigateWithoutPrompt(nextNavigation);
   };
 
-  const handleResumeConflictingDraft = async () => {
-    if (!conflictingDraftId) return;
-    setResolvingDraftConflict(true);
-    try {
-      window.history.replaceState(null, '', `/hgv-inspections/new?id=${conflictingDraftId}`);
-      await loadDraftInspection(conflictingDraftId);
-      setShowDraftConflictDialog(false);
-      setConflictingDraftId(null);
-    } finally {
-      setResolvingDraftConflict(false);
-    }
-  };
-
-  const handleDiscardConflictingDraftAndStart = async () => {
-    if (!conflictingDraftId) return;
-    setResolvingDraftConflict(true);
-    const discarded = await discardDraftById(conflictingDraftId, false);
-    setResolvingDraftConflict(false);
-    if (!discarded) return;
-
-    setConflictingDraftId(null);
-    setShowDraftConflictDialog(false);
-    setError('');
-    if (!checklistStarted) {
-      beginChecklist();
-    }
-  };
-
   const handleViewSubmittedConflictInspection = () => {
     if (!submittedConflictInspectionId) return;
     allowNavigationRef.current = true;
@@ -915,7 +988,7 @@ function NewHgvInspectionContent() {
   const totalItems = TRUCK_CHECKLIST_ITEMS.length;
 
   return (
-    <div className={`space-y-4 max-w-5xl ${tabletModeEnabled ? 'pb-36' : 'pb-32 md:pb-6'}`}>
+    <div className={`space-y-4 max-w-6xl ${tabletModeEnabled ? 'pb-36' : 'pb-32 md:pb-6'}`}>
       <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-border">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-3">
@@ -1243,30 +1316,37 @@ function NewHgvInspectionContent() {
 
             <div className="mt-6 p-4 bg-slate-800/40 border border-border/50 rounded-lg space-y-4">
               <div className="space-y-2">
-                <Label className="text-white text-base">End of Daily Check Notes</Label>
+                <Label className="text-white text-base">
+                  End of Daily Check Notes <span className="text-muted-foreground text-sm">(Optional)</span>
+                </Label>
                 <Textarea
                   id="inspectorComments"
                   value={inspectorComments}
                   onChange={(e) => setInspectorComments(e.target.value)}
-                  placeholder="Add any additional notes..."
+                  placeholder="Do not add any notes regarding a reported defect. Only add additional notes NOT linked to a defect..."
                   className="min-h-[100px] bg-slate-900/50 border-slate-600 text-white"
                   maxLength={500}
                 />
               </div>
-              <div className="flex items-start space-x-3 p-3 bg-slate-900/30 rounded-lg border border-border/30">
-                <Checkbox
-                  id="inform-workshop"
-                  checked={informWorkshop}
-                  onCheckedChange={(checked) => setInformWorkshop(checked === true)}
-                  className="mt-0.5 border-slate-500 data-[state=checked]:bg-workshop data-[state=checked]:border-workshop"
-                />
-                <div className="flex-1">
-                  <Label htmlFor="inform-workshop" className="text-white cursor-pointer">Inform Workshop</Label>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Do not tick this for defects already reported above. Marking a defect already creates a workshop task. Only use this if your comments describe an additional task that is not linked to a reported defect.
-                  </p>
+              {hasOptionalInspectorComment && (
+                <div className="flex items-start space-x-3 p-3 bg-slate-900/30 rounded-lg border border-border/30">
+                  <Checkbox
+                    id="inform-workshop"
+                    checked={informWorkshop}
+                    onCheckedChange={(checked) => setInformWorkshop(checked === true)}
+                    className="mt-0.5 border-slate-500 data-[state=checked]:bg-workshop data-[state=checked]:border-workshop"
+                  />
+                  <div className="flex-1">
+                    <Label htmlFor="inform-workshop" className="text-white cursor-pointer">Inform Workshop</Label>
+                    <div className="mt-1.5 flex items-start gap-1.5 rounded-md border border-workshop/35 bg-workshop/10 px-2.5 py-1.5 text-xs text-workshop/90">
+                      <Info className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-workshop" />
+                      <span className="leading-5">
+                        Do not tick &quot;Inform Workshop&quot; for defects already reported above. A failed item already creates a workshop task.
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <div className={tabletModeEnabled ? 'hidden' : 'hidden md:flex flex-row gap-3 justify-end pt-4'}>
@@ -1323,52 +1403,6 @@ function NewHgvInspectionContent() {
               className="bg-red-600 hover:bg-red-700"
             >
               {discardingDraft ? 'Discarding...' : 'Discard and leave'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog
-        open={showDraftConflictDialog}
-        onOpenChange={(open) => {
-          setShowDraftConflictDialog(open);
-          if (!open) setConflictingDraftId(null);
-        }}
-      >
-        <AlertDialogContent className="border-border text-white">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Existing draft found</AlertDialogTitle>
-            <AlertDialogDescription className="text-muted-foreground">
-              A hidden draft already exists for this HGV and date. Resume it or discard it and start a new check.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel
-              disabled={resolvingDraftConflict}
-              onClick={() => {
-                setShowDraftConflictDialog(false);
-                setConflictingDraftId(null);
-              }}
-            >
-              Keep current form
-            </AlertDialogCancel>
-            <Button
-              variant="outline"
-              onClick={handleResumeConflictingDraft}
-              disabled={resolvingDraftConflict || !conflictingDraftId}
-              className="border-border text-white hover:bg-slate-800"
-            >
-              {resolvingDraftConflict ? 'Working...' : 'Resume existing draft'}
-            </Button>
-            <AlertDialogAction
-              onClick={async (event) => {
-                event.preventDefault();
-                await handleDiscardConflictingDraftAndStart();
-              }}
-              disabled={resolvingDraftConflict || !conflictingDraftId}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              {resolvingDraftConflict ? 'Working...' : 'Discard old draft and start new'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

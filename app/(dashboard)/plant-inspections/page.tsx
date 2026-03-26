@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Clipboard, Clock, User, Download, Trash2, Filter, FileText, Wrench, Loader2 } from 'lucide-react';
+import { Plus, Clipboard, Clock, User, Download, Trash2, Filter, Wrench, Loader2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { toast } from 'sonner';
 import { PlantInspection } from '@/types/inspection';
@@ -143,6 +143,7 @@ function PlantInspectionsContent() {
           ),
           profile:profiles!plant_inspections_user_id_fkey(full_name)
         `)
+        .eq('status', 'submitted')
         .order('inspection_date', { ascending: false });
 
       // Filter based on user role and selection
@@ -153,12 +154,6 @@ function PlantInspectionsContent() {
         if (employeeFilter !== 'all') {
           query = query.eq('user_id', employeeFilter);
         }
-      }
-
-      // Apply status filter
-      const currentStatusFilter = statusFilter || 'all';
-      if (currentStatusFilter !== 'all') {
-        query = query.eq('status', currentStatusFilter);
       }
 
       // Apply plant filter
@@ -387,7 +382,7 @@ function PlantInspectionsContent() {
                 <Filter className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-slate-400 mr-2">Filter by status:</span>
                 <div className="flex gap-2 flex-wrap">
-                  {(['all', 'draft', 'submitted'] as InspectionStatusFilter[]).map((filter) => (
+                  {(['all', 'submitted'] as InspectionStatusFilter[]).map((filter) => (
                     <Button
                       key={filter}
                       variant="outline"
@@ -396,7 +391,6 @@ function PlantInspectionsContent() {
                       className={`${tabletModeEnabled ? 'min-h-11 text-base px-4 [&_svg]:size-5' : ''} ${statusFilter === filter ? 'bg-white text-slate-900 border-white/80 hover:bg-slate-200' : 'border-slate-600 text-muted-foreground hover:bg-slate-700/50'}`}
                     >
                       {filter === 'submitted' && <Clock className="h-3 w-3 mr-1" />}
-                      {filter === 'draft' && <FileText className="h-3 w-3 mr-1" />}
                       {getFilterLabel(filter)}
                     </Button>
                   ))}

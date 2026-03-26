@@ -338,7 +338,14 @@ export default function PlantHistoryPage({
   const { data: historyData, refetch: refetchHistory } = usePlantMaintenanceHistory(unwrappedParams.plantId);
 
   const workshopTasks = historyData?.workshopTasks || [];
-  const maintenanceHistory = historyData?.history || [];
+  const maintenanceHistory = (historyData?.history || []).filter((entry: MaintenanceHistoryEntry) => {
+    const oldValue = entry.old_value?.toLowerCase();
+    const newValue = entry.new_value?.toLowerCase();
+    if (entry.field_name === 'status' && (oldValue === 'draft' || newValue === 'draft')) {
+      return false;
+    }
+    return true;
+  });
 
   // Fetch comments for all workshop tasks
   const { comments: taskComments } = useWorkshopTaskComments({

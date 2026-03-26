@@ -6,6 +6,16 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { createClient } from '@/lib/supabase/client';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,8 +25,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Send, CheckCircle2, XCircle, AlertCircle, Info, User, Camera, MinusCircle } from 'lucide-react';
-import { BackButton } from '@/components/ui/back-button';
+import { Send, CheckCircle2, XCircle, AlertCircle, Info, User, Camera, MinusCircle, ArrowLeft } from 'lucide-react';
 import { formatDateISO, formatDate, getDayOfWeek } from '@/lib/utils/date';
 import { InspectionStatus } from '@/types/inspection';
 import { PLANT_INSPECTION_ITEMS } from '@/lib/checklists/plant-checklists';
@@ -69,6 +78,9 @@ type ProfileWithRole = {
   } | null;
 };
 
+type PendingNavigation = { type: 'href'; href: string } | { type: 'back' };
+type ExistingInspectionConflict = { id: string; status: 'draft' | 'submitted' };
+
 const STICKY_NAV_OFFSET_PX = 96;
 
 function NewPlantInspectionContent() {
@@ -101,11 +113,18 @@ function NewPlantInspectionContent() {
   const [loading, setLoading] = useState(false);
   const loadingRef = useRef(false);
   loadingRef.current = loading;
+  const saveInspectionInFlightRef = useRef(false);
+  const allowNavigationRef = useRef(false);
   const [error, setError] = useState('');
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
   const [, setSignature] = useState<string | null>(null);
   const [showConfirmSubmitDialog, setShowConfirmSubmitDialog] = useState(false);
-  const [existingInspectionId, setExistingInspectionId] = useState<string | null>(null);
+  const [existingInspectionId, setExistingInspectionId] = useState<string | null>(draftId);
+  const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation | null>(null);
+  const [showDiscardDraftDialog, setShowDiscardDraftDialog] = useState(false);
+  const [discardingDraft, setDiscardingDraft] = useState(false);
+  const [submittedConflictInspectionId, setSubmittedConflictInspectionId] = useState<string | null>(null);
+  const [showSubmittedConflictDialog, setShowSubmittedConflictDialog] = useState(false);
   
   // Manager-specific states
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -115,8 +134,6 @@ function NewPlantInspectionContent() {
   const [loggedDefects, setLoggedDefects] = useState<Map<string, { comment: string; actionId: string }>>(new Map());
   
   const [checklistStarted, setChecklistStarted] = useState(false);
-  const [duplicateCheckLoading, setDuplicateCheckLoading] = useState(false);
-  const [duplicateInspection, setDuplicateInspection] = useState<string | null>(null);
   
   const [photoUploadItem, setPhotoUploadItem] = useState<{ itemNumber: number; dayOfWeek: number } | null>(null);
   const [savingDraftForPhoto, setSavingDraftForPhoto] = useState(false);
@@ -127,6 +144,7 @@ function NewPlantInspectionContent() {
   // End of inspection comment + inform workshop states
   const [inspectorComments, setInspectorComments] = useState('');
   const [informWorkshop, setInformWorkshop] = useState(false);
+  const hasOptionalInspectorComment = inspectorComments.trim().length > 0;
 
   const getPhotosForItem = useCallback(
     (itemNumber: number, dayOfWeek: number) =>
@@ -143,6 +161,214 @@ function NewPlantInspectionContent() {
   const [hiredPlantDescription, setHiredPlantDescription] = useState('');
   const [hiredPlantHiringCompany, setHiredPlantHiringCompany] = useState('');
 
+  useEffect(() => {
+    if (!hasOptionalInspectorComment && informWorkshop) {
+      setInformWorkshop(false);
+    }
+  }, [hasOptionalInspectorComment, informWorkshop]);
+
+  const findExistingInspectionConflict = useCallback(async (): Promise<ExistingInspectionConflict | null> => {
+    if (!inspectionDate || inspectionDate.trim() === '') return null;
+
+    const hiredSerial = hiredPlantIdSerial.trim();
+    if (isHiredPlant) {
+      if (!hiredSerial) return null;
+    } else if (!selectedPlantId) {
+      return null;
+    }
+
+    let query = supabase
+      .from('plant_inspections')
+      .select('id, status')
+      .eq('inspection_date', inspectionDate)
+      .limit(1);
+
+    if (isHiredPlant) {
+      query = query
+        .eq('is_hired_plant', true)
+        .eq('hired_plant_id_serial', hiredSerial);
+    } else {
+      query = query.eq('plant_id', selectedPlantId);
+    }
+
+    const { data, error } = await query.maybeSingle();
+
+    if (error) {
+      console.error('Failed to check for existing plant inspection:', error);
+      return null;
+    }
+
+    if (!data || data.id === existingInspectionId) {
+      return null;
+    }
+
+    return {
+      id: data.id,
+      status: data.status as 'draft' | 'submitted',
+    };
+  }, [existingInspectionId, hiredPlantIdSerial, inspectionDate, isHiredPlant, selectedPlantId, supabase]);
+
+  const handleSubmittedInspectionConflict = useCallback((inspectionId: string) => {
+    setSubmittedConflictInspectionId(inspectionId);
+    setShowSubmittedConflictDialog(true);
+    toast.info('A daily check has already been submitted for this plant and date.');
+  }, []);
+
+  const buildCurrentInspectionItemsPayload = useCallback((inspectionId: string) => {
+    if (!inspectionDate) return [] as Database['public']['Tables']['inspection_items']['Insert'][];
+
+    const dayOfWeek = getDayOfWeek(new Date(inspectionDate + 'T00:00:00'));
+    const items: Database['public']['Tables']['inspection_items']['Insert'][] = [];
+
+    currentChecklist.forEach((item, index) => {
+      const itemNumber = index + 1;
+      const key = `${itemNumber}`;
+      if (checkboxStates[key]) {
+        items.push({
+          inspection_id: inspectionId,
+          item_number: itemNumber,
+          item_description: item,
+          day_of_week: dayOfWeek,
+          status: checkboxStates[key],
+          comments: comments[key] || null,
+        });
+      }
+    });
+
+    return items;
+  }, [checkboxStates, comments, currentChecklist, inspectionDate]);
+
+  const mergeIntoExistingDraft = useCallback(async (inspectionId: string): Promise<boolean> => {
+    if (!selectedEmployeeId || !inspectionDate) {
+      toast.error('Select an employee and inspection date before continuing');
+      return false;
+    }
+    if (!isHiredPlant && !selectedPlantId) {
+      toast.error('Select a plant before continuing');
+      return false;
+    }
+    if (isHiredPlant && !hiredPlantIdSerial.trim()) {
+      toast.error('Enter the hired plant ID / serial before continuing');
+      return false;
+    }
+
+    const payload: Database['public']['Tables']['plant_inspections']['Update'] = {
+      plant_id: isHiredPlant ? null : selectedPlantId,
+      user_id: selectedEmployeeId,
+      inspection_date: inspectionDate,
+      inspection_end_date: inspectionDate,
+      current_mileage: getParsedHours(),
+      status: 'draft',
+      submitted_at: null,
+      signature_data: null,
+      signed_at: null,
+      inspector_comments: inspectorComments.trim() || null,
+      is_hired_plant: isHiredPlant,
+      hired_plant_id_serial: isHiredPlant ? hiredPlantIdSerial.trim() : null,
+      hired_plant_description: isHiredPlant ? hiredPlantDescription.trim() : null,
+      hired_plant_hiring_company: isHiredPlant ? hiredPlantHiringCompany.trim() : null,
+      updated_at: new Date().toISOString(),
+    };
+
+    try {
+      const { data: updatedDraft, error: updateError } = await supabase
+        .from('plant_inspections')
+        .update(payload)
+        .eq('id', inspectionId)
+        .eq('status', 'draft')
+        .select('id')
+        .maybeSingle();
+
+      if (updateError || !updatedDraft) {
+        throw updateError ?? new Error('Draft not found');
+      }
+
+      const { error: deleteItemsError } = await supabase
+        .from('inspection_items')
+        .delete()
+        .eq('inspection_id', inspectionId);
+      if (deleteItemsError) throw deleteItemsError;
+
+      const items = buildCurrentInspectionItemsPayload(inspectionId);
+      if (items.length > 0) {
+        const { error: itemsError } = await supabase
+          .from('inspection_items')
+          .insert(items);
+        if (itemsError) throw itemsError;
+      }
+
+      setExistingInspectionId(inspectionId);
+      setSubmittedConflictInspectionId(null);
+      setShowSubmittedConflictDialog(false);
+      window.history.replaceState(null, '', `/plant-inspections/new?id=${inspectionId}`);
+      toast.info('Merged with existing draft for this plant and date.');
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not merge with existing draft';
+      console.error('Failed to merge into existing plant draft:', err);
+      toast.error(message);
+      return false;
+    }
+  }, [
+    buildCurrentInspectionItemsPayload,
+    hiredPlantDescription,
+    hiredPlantHiringCompany,
+    hiredPlantIdSerial,
+    inspectionDate,
+    inspectorComments,
+    isHiredPlant,
+    selectedEmployeeId,
+    selectedPlantId,
+    supabase,
+  ]);
+
+  const discardDraftById = useCallback(async (inspectionId: string, showToast = true): Promise<boolean> => {
+    try {
+      const response = await fetch(`/api/plant-inspections/${inspectionId}/discard`, { method: 'DELETE' });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null) as { error?: string } | null;
+        throw new Error(body?.error || 'Failed to discard draft');
+      }
+
+      if (existingInspectionId === inspectionId) {
+        setExistingInspectionId(null);
+        setPhotoUploadItem(null);
+        window.history.replaceState(null, '', '/plant-inspections/new');
+      }
+
+      if (showToast) {
+        toast.success('Draft discarded');
+      }
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to discard draft';
+      toast.error(message);
+      return false;
+    }
+  }, [existingInspectionId]);
+
+  const navigateWithoutPrompt = useCallback((navigation: PendingNavigation) => {
+    allowNavigationRef.current = true;
+    if (navigation.type === 'back') {
+      if (window.history.length > 1) {
+        router.back();
+      } else {
+        router.push('/plant-inspections');
+      }
+      return;
+    }
+    router.push(navigation.href);
+  }, [router]);
+
+  const requestNavigation = useCallback((navigation: PendingNavigation) => {
+    if (!existingInspectionId || saveInspectionInFlightRef.current || allowNavigationRef.current) {
+      navigateWithoutPrompt(navigation);
+      return;
+    }
+    setPendingNavigation(navigation);
+    setShowDiscardDraftDialog(true);
+  }, [existingInspectionId, navigateWithoutPrompt]);
+
   const ensureDraftSaved = async (): Promise<string | null> => {
     if (existingInspectionId) return existingInspectionId;
     if (!user || !selectedEmployeeId) {
@@ -157,8 +383,19 @@ function NewPlantInspectionContent() {
       toast.error('Select an inspection date before adding photos');
       return null;
     }
+
     setSavingDraftForPhoto(true);
     try {
+      const conflict = await findExistingInspectionConflict();
+      if (conflict) {
+        if (conflict.status === 'draft') {
+          const merged = await mergeIntoExistingDraft(conflict.id);
+          return merged ? conflict.id : null;
+        }
+        handleSubmittedInspectionConflict(conflict.id);
+        return null;
+      }
+
       const { data: draft, error: draftError } = await supabase
         .from('plant_inspections')
         .insert({
@@ -177,24 +414,22 @@ function NewPlantInspectionContent() {
         .select('id')
         .single();
 
-      if (draftError) throw draftError;
-
-      const dayOfWeek = getDayOfWeek(new Date(inspectionDate + 'T00:00:00'));
-      const items: Database['public']['Tables']['inspection_items']['Insert'][] = [];
-      currentChecklist.forEach((item, index) => {
-        const itemNumber = index + 1;
-        const key = `${itemNumber}`;
-        if (checkboxStates[key]) {
-          items.push({
-            inspection_id: draft.id,
-            item_number: itemNumber,
-            item_description: item,
-            day_of_week: dayOfWeek,
-            status: checkboxStates[key],
-            comments: comments[key] || null,
-          });
+      if (draftError) {
+        if (draftError.code === '23505') {
+          const retryConflict = await findExistingInspectionConflict();
+          if (retryConflict) {
+            if (retryConflict.status === 'draft') {
+              const merged = await mergeIntoExistingDraft(retryConflict.id);
+              return merged ? retryConflict.id : null;
+            }
+            handleSubmittedInspectionConflict(retryConflict.id);
+            return null;
+          }
         }
-      });
+        throw draftError;
+      }
+
+      const items = buildCurrentInspectionItemsPayload(draft.id);
       if (items.length > 0) {
         const { error: itemsError } = await supabase
           .from('inspection_items')
@@ -203,6 +438,8 @@ function NewPlantInspectionContent() {
       }
 
       setExistingInspectionId(draft.id);
+      setSubmittedConflictInspectionId(null);
+      setShowSubmittedConflictDialog(false);
       window.history.replaceState(null, '', `/plant-inspections/new?id=${draft.id}`);
       return draft.id;
     } catch (err) {
@@ -293,6 +530,8 @@ function NewPlantInspectionContent() {
       if (itemsError) throw itemsError;
 
       setExistingInspectionId(id);
+      setSubmittedConflictInspectionId(null);
+      setShowSubmittedConflictDialog(false);
       const inspectionData = inspection as InspectionWithRelations;
       
       if (inspection.is_hired_plant) {
@@ -351,6 +590,56 @@ function NewPlantInspectionContent() {
   }, [draftId, user, loadDraftInspection]);
 
   useEffect(() => {
+    if (!existingInspectionId) return;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (saveInspectionInFlightRef.current || allowNavigationRef.current) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [existingInspectionId]);
+
+  useEffect(() => {
+    if (!existingInspectionId) return;
+
+    const handleDocumentClick = (event: MouseEvent) => {
+      if (saveInspectionInFlightRef.current || allowNavigationRef.current) return;
+
+      const target = event.target as HTMLElement | null;
+      const anchor = target?.closest('a[href]') as HTMLAnchorElement | null;
+      if (!anchor) return;
+      if (anchor.hasAttribute('download') || anchor.target === '_blank') return;
+
+      const rawHref = anchor.getAttribute('href');
+      if (!rawHref || rawHref.startsWith('#') || rawHref.startsWith('mailto:') || rawHref.startsWith('tel:')) {
+        return;
+      }
+
+      const nextUrl = new URL(rawHref, window.location.origin);
+      const currentUrl = new URL(window.location.href);
+      if (nextUrl.origin !== currentUrl.origin) return;
+
+      const nextPathWithSearch = `${nextUrl.pathname}${nextUrl.search}`;
+      const currentPathWithSearch = `${currentUrl.pathname}${currentUrl.search}`;
+      if (nextPathWithSearch === currentPathWithSearch) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      requestNavigation({ type: 'href', href: nextPathWithSearch });
+    };
+
+    document.addEventListener('click', handleDocumentClick, true);
+    return () => {
+      document.removeEventListener('click', handleDocumentClick, true);
+    };
+  }, [existingInspectionId, requestNavigation]);
+
+  useEffect(() => {
     if (user && isElevatedUser) {
       const fetchEmployees = async () => {
         try {
@@ -379,82 +668,6 @@ function NewPlantInspectionContent() {
       setSelectedEmployeeId(user.id);
     }
   }, [user, isElevatedUser, supabase]);
-
-  const checkForDuplicate = useCallback(async (
-    plantIdToCheck: string, 
-    dateToCheck: string,
-    clearOtherErrors: boolean = false
-  ): Promise<boolean> => {
-    if (!dateToCheck || existingInspectionId) {
-      setDuplicateInspection(null);
-      return false;
-    }
-
-    if (!plantIdToCheck && !isHiredPlant) {
-      setDuplicateInspection(null);
-      return false;
-    }
-
-    setDuplicateCheckLoading(true);
-    
-    try {
-      let query;
-      if (isHiredPlant) {
-        if (!hiredPlantIdSerial.trim()) {
-          setDuplicateInspection(null);
-          return false;
-        }
-        query = supabase
-          .from('plant_inspections')
-          .select('id, status')
-          .eq('is_hired_plant', true)
-          .eq('hired_plant_id_serial', hiredPlantIdSerial.trim())
-          .eq('inspection_date', dateToCheck)
-          .limit(1);
-      } else {
-        query = supabase
-          .from('plant_inspections')
-          .select('id, status')
-          .eq('plant_id', plantIdToCheck)
-          .eq('inspection_date', dateToCheck)
-          .limit(1);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      if (data && data.length > 0) {
-        const existing = data[0];
-        setDuplicateInspection(existing.id);
-        setError(`An inspection for this plant and date already exists (${existing.status}). Please select a different plant or date.`);
-        return true;
-      } else {
-        setDuplicateInspection(null);
-        setError(prev => {
-          if (prev.includes('already exists')) {
-            return '';
-          }
-          return clearOtherErrors ? '' : prev;
-        });
-        return false;
-      }
-    } catch (err) {
-      console.error('Error checking for duplicate:', err);
-      setDuplicateInspection(null);
-      return false;
-    } finally {
-      setDuplicateCheckLoading(false);
-    }
-  }, [existingInspectionId, isHiredPlant, hiredPlantIdSerial, supabase]);
-
-  useEffect(() => {
-    if (isHiredPlant && hiredPlantIdSerial.trim() && inspectionDate && !existingInspectionId) {
-      checkForDuplicate('', inspectionDate);
-    } else if (selectedPlantId && inspectionDate && !existingInspectionId) {
-      checkForDuplicate(selectedPlantId, inspectionDate);
-    }
-  }, [selectedPlantId, isHiredPlant, hiredPlantIdSerial, inspectionDate, existingInspectionId, checkForDuplicate]);
 
   const loadLockedDefects = async (plantId: string) => {
     try {
@@ -639,6 +852,58 @@ function NewPlantInspectionContent() {
     await saveInspection('submitted', sig);
   };
 
+  const handleBackButtonClick = () => {
+    requestNavigation({ type: 'back' });
+  };
+
+  const handleStayOnPage = () => {
+    setPendingNavigation(null);
+    setShowDiscardDraftDialog(false);
+  };
+
+  const handleDiscardAndContinueNavigation = async () => {
+    if (!pendingNavigation) {
+      setShowDiscardDraftDialog(false);
+      return;
+    }
+
+    if (!existingInspectionId) {
+      setShowDiscardDraftDialog(false);
+      const nextNavigation = pendingNavigation;
+      setPendingNavigation(null);
+      navigateWithoutPrompt(nextNavigation);
+      return;
+    }
+
+    setDiscardingDraft(true);
+    const discarded = await discardDraftById(existingInspectionId, false);
+    setDiscardingDraft(false);
+    if (!discarded) {
+      return;
+    }
+
+    setShowDiscardDraftDialog(false);
+    const nextNavigation = pendingNavigation;
+    setPendingNavigation(null);
+    navigateWithoutPrompt(nextNavigation);
+  };
+
+  const handleViewSubmittedConflictInspection = () => {
+    if (!submittedConflictInspectionId) return;
+    allowNavigationRef.current = true;
+    setShowSubmittedConflictDialog(false);
+    const inspectionId = submittedConflictInspectionId;
+    setSubmittedConflictInspectionId(null);
+    router.push(`/plant-inspections/${inspectionId}`);
+  };
+
+  const handleUseDifferentDateForSubmittedConflict = () => {
+    setShowSubmittedConflictDialog(false);
+    setSubmittedConflictInspectionId(null);
+    setError('A daily check is already submitted for this plant and date. Choose a different date to continue.');
+    scrollToTarget(document.getElementById('inspectionDate'));
+  };
+
   const saveInspection = async (status: 'submitted', signatureData?: string) => {
     if (!user || !selectedEmployeeId) return;
     if (!isHiredPlant && !selectedPlantId) return;
@@ -647,26 +912,33 @@ function NewPlantInspectionContent() {
       setError('Please select an inspection date');
       return;
     }
-    
-    if (duplicateInspection) {
-      setError('An inspection for this plant and date already exists.');
-      return;
-    }
-    
-    const isDuplicate = await checkForDuplicate(isHiredPlant ? '' : selectedPlantId, inspectionDate, true);
-    if (isDuplicate) {
-      setError('An inspection for this plant and date already exists.');
-      return;
-    }
-    
-    if (loading) {
+
+    if (loading || saveInspectionInFlightRef.current) {
       return;
     }
 
+    saveInspectionInFlightRef.current = true;
     setError('');
     setLoading(true);
 
     try {
+      let workingInspectionId = existingInspectionId;
+      if (!workingInspectionId) {
+        const inspectionConflict = await findExistingInspectionConflict();
+        if (inspectionConflict) {
+          if (inspectionConflict.status === 'draft') {
+            const merged = await mergeIntoExistingDraft(inspectionConflict.id);
+            if (!merged) {
+              return;
+            }
+            workingInspectionId = inspectionConflict.id;
+          } else {
+            handleSubmittedInspectionConflict(inspectionConflict.id);
+            return;
+          }
+        }
+      }
+
       type InspectionInsert = Database['public']['Tables']['plant_inspections']['Insert'];
       const inspectionData: InspectionInsert = {
         plant_id: isHiredPlant ? null : selectedPlantId,
@@ -687,11 +959,11 @@ function NewPlantInspectionContent() {
 
       let inspection: { id: string };
 
-      if (existingInspectionId) {
+      if (workingInspectionId) {
         const { data: existingItems, error: fetchError } = await supabase
           .from('inspection_items')
           .select('id')
-          .eq('inspection_id', existingInspectionId);
+          .eq('inspection_id', workingInspectionId);
 
         if (fetchError) throw new Error(`Failed to fetch existing items: ${fetchError.message}`);
 
@@ -699,12 +971,12 @@ function NewPlantInspectionContent() {
           const { error: deleteError } = await supabase
             .from('inspection_items')
             .delete()
-            .eq('inspection_id', existingInspectionId);
+            .eq('inspection_id', workingInspectionId);
 
           if (deleteError) throw new Error(`Failed to delete existing items: ${deleteError.message}`);
         }
 
-        inspection = { id: existingInspectionId };
+        inspection = { id: workingInspectionId };
       } else {
         const { data: newInspection, error: insertError } = await supabase
           .from('plant_inspections')
@@ -750,7 +1022,7 @@ function NewPlantInspectionContent() {
         insertedItems = (data || []) as InspectionItem[];
       }
 
-      if (existingInspectionId) {
+      if (workingInspectionId) {
         type InspectionUpdate = Database['public']['Tables']['plant_inspections']['Update'];
         const inspectionUpdate: InspectionUpdate = {
           plant_id: isHiredPlant ? null : selectedPlantId,
@@ -772,7 +1044,7 @@ function NewPlantInspectionContent() {
         const { data: updatedInspection, error: updateError } = await supabase
           .from('plant_inspections')
           .update(inspectionUpdate)
-          .eq('id', existingInspectionId)
+          .eq('id', workingInspectionId)
           .select();
 
         if (updateError) throw updateError;
@@ -887,7 +1159,7 @@ function NewPlantInspectionContent() {
       }
 
       toast.success('Daily check submitted successfully');
-
+      allowNavigationRef.current = true;
       router.push('/plant-inspections');
     } catch (err) {
       const errMessage = err instanceof Error ? err.message : String(err);
@@ -901,10 +1173,22 @@ function NewPlantInspectionContent() {
         errCode === '23505';
 
       if (isDuplicateKey) {
-        setError('An inspection for this plant and date already exists. Please select a different plant or date.');
-        toast.error('Duplicate inspection', {
-          description: 'An inspection already exists for this plant on this date.',
-        });
+        const inspectionConflict = await findExistingInspectionConflict();
+        if (inspectionConflict) {
+          if (inspectionConflict.status === 'draft') {
+            const merged = await mergeIntoExistingDraft(inspectionConflict.id);
+            if (merged) {
+              toast.info('Draft merged. Submit again to finish this daily check.');
+            }
+          } else {
+            handleSubmittedInspectionConflict(inspectionConflict.id);
+          }
+        } else {
+          setError('An inspection for this plant and date already exists. Please select a different plant or date.');
+          toast.error('Duplicate inspection', {
+            description: 'An inspection already exists for this plant on this date.',
+          });
+        }
         return;
       }
 
@@ -916,6 +1200,7 @@ function NewPlantInspectionContent() {
         { plantId: selectedPlantId, inspectionDate, existingInspectionId }
       );
     } finally {
+      saveInspectionInFlightRef.current = false;
       setLoading(false);
     }
   };
@@ -953,13 +1238,22 @@ function NewPlantInspectionContent() {
   const progressPercent = Math.round((completedItems / totalItems) * 100);
 
   return (
-    <div className={`space-y-4 max-w-5xl ${tabletModeEnabled ? 'pb-36' : 'pb-32 md:pb-6'}`}>
+    <div className={`space-y-4 max-w-6xl ${tabletModeEnabled ? 'pb-36' : 'pb-32 md:pb-6'}`}>
       
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-border">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-3">
-            <BackButton fallbackHref="/plant-inspections" />
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleBackButtonClick}
+              className="ui-component border-2 border-slate-600 text-slate-200 bg-slate-900/50 hover:bg-slate-800 hover:border-slate-500 hover:text-white focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
+              aria-label="Back"
+              title="Back"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
             <div>
               <h1 className="text-xl md:text-3xl font-bold text-foreground">
                 {existingInspectionId ? 'Edit Plant Daily Check' : 'New Plant Daily Check'}
@@ -1184,7 +1478,7 @@ function NewPlantInspectionContent() {
       </Card>
 
       {/* Safety Check */}
-      {(selectedPlantId || isHiredPlant) && inspectionDate && !duplicateInspection && !duplicateCheckLoading && (
+      {(selectedPlantId || isHiredPlant) && inspectionDate && (
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-foreground">{currentChecklist.length}-Point Plant Safety Check</CardTitle>
@@ -1391,7 +1685,7 @@ function NewPlantInspectionContent() {
                   id="inspector-comments"
                   value={inspectorComments}
                   onChange={(e) => setInspectorComments(e.target.value)}
-                  placeholder="Add any additional notes..."
+                  placeholder="Do not add any notes regarding a reported defect. Only add additional notes NOT linked to a defect..."
                   className="min-h-[100px] bg-slate-900/50 border-slate-600 text-white"
                   maxLength={500}
                 />
@@ -1403,7 +1697,7 @@ function NewPlantInspectionContent() {
                     Workshop tasks are not created for hired plant inspections.
                   </p>
                 </div>
-              ) : (
+              ) : hasOptionalInspectorComment ? (
                 <div className="flex items-start space-x-3 p-3 bg-slate-900/30 rounded-lg border border-border/30">
                   <Checkbox
                     id="inform-workshop"
@@ -1421,12 +1715,15 @@ function NewPlantInspectionContent() {
                         Creates Task
                       </Badge>
                     </Label>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Do not tick this for defects already reported above. Marking a defect already creates a workshop task. Only use this if your comments describe an additional task that is not linked to a reported defect.
-                    </p>
+                    <div className="mt-1.5 flex items-start gap-1.5 rounded-md border border-workshop/35 bg-workshop/10 px-2.5 py-1.5 text-xs text-workshop/90">
+                      <Info className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-workshop" />
+                      <span className="leading-5">
+                        Do not tick &quot;Inform Workshop&quot; for defects already reported above. A failed item already creates a workshop task.
+                      </span>
+                    </div>
                   </div>
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
 
@@ -1456,6 +1753,63 @@ function NewPlantInspectionContent() {
           {loading ? 'Submitting...' : 'Submit Daily Check'}
         </Button>
       </div>
+
+      <AlertDialog
+        open={showDiscardDraftDialog}
+        onOpenChange={(open) => {
+          setShowDiscardDraftDialog(open);
+          if (!open) setPendingNavigation(null);
+        }}
+      >
+        <AlertDialogContent className="border-border text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard draft inspection?</AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              Leaving this page will discard your hidden Plant draft so it does not block another check for this asset today.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleStayOnPage} disabled={discardingDraft}>
+              Stay on page
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async (event) => {
+                event.preventDefault();
+                await handleDiscardAndContinueNavigation();
+              }}
+              disabled={discardingDraft}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {discardingDraft ? 'Discarding...' : 'Discard and leave'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={showSubmittedConflictDialog}
+        onOpenChange={(open) => {
+          setShowSubmittedConflictDialog(open);
+          if (!open) setSubmittedConflictInspectionId(null);
+        }}
+      >
+        <AlertDialogContent className="border-border text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Daily check already submitted</AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              A Plant daily check already exists for this asset and date. You can view the submitted check or pick another date.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleUseDifferentDateForSubmittedConflict}>
+              Choose different date
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleViewSubmittedConflictInspection}>
+              View existing check
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Confirmation Dialog */}
       <Dialog 
