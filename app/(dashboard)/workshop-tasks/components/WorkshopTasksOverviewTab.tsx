@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -187,7 +187,7 @@ export function WorkshopTasksOverviewTab({
     ? 'flex flex-wrap items-center gap-1.5 w-full lg:w-auto'
     : 'flex flex-wrap items-center gap-1.5 w-full md:w-auto';
   const getTaskPhotos = (taskId: string) => taskInspectionPhotos[taskId] ?? [];
-  const [completedVisibleCount, setCompletedVisibleCount] = useState(20);
+  const [completedLoadState, setCompletedLoadState] = useState({ key: '', count: 20 });
   const [completedSearch, setCompletedSearch] = useState('');
   const [completedDateFrom, setCompletedDateFrom] = useState('');
   const [completedDateTo, setCompletedDateTo] = useState('');
@@ -197,6 +197,9 @@ export function WorkshopTasksOverviewTab({
   const [completedSummaryFilter, setCompletedSummaryFilter] = useState('');
   const [completedSortField, setCompletedSortField] = useState<CompletedSortField>('completedAt');
   const [completedSortDirection, setCompletedSortDirection] = useState<CompletedSortDirection>('desc');
+
+  const completedFilterKey = `${completedAssetFilter}|${completedCategoryFilter}|${completedDateFrom}|${completedDateTo}|${completedSearch}|${completedSortDirection}|${completedSortField}|${completedSourceFilter}|${completedSummaryFilter}`;
+  const completedVisibleCount = completedLoadState.key === completedFilterKey ? completedLoadState.count : 20;
 
   const renderInspectionPhotoBadge = (task: Action) => {
     const count = getTaskPhotos(task.id).length;
@@ -332,19 +335,6 @@ export function WorkshopTasksOverviewTab({
   const hasMoreCompletedRows = sortedCompletedRows.length > visibleCompletedRows.length;
   const hasMoreCompletedRowsMobile = completedTasks.length > mobileVisibleCompletedRows.length;
 
-  useEffect(() => {
-    setCompletedVisibleCount(20);
-  }, [
-    completedAssetFilter,
-    completedCategoryFilter,
-    completedDateFrom,
-    completedDateTo,
-    completedSearch,
-    completedSortDirection,
-    completedSortField,
-    completedSourceFilter,
-    completedSummaryFilter,
-  ]);
 
   const handleCompletedSort = (field: CompletedSortField) => {
     if (completedSortField === field) {
@@ -1236,7 +1226,7 @@ export function WorkshopTasksOverviewTab({
                       <Button
                         type="button"
                         variant="outline"
-                        onClick={() => setCompletedVisibleCount((current) => current + 10)}
+                        onClick={() => setCompletedLoadState(prev => ({ key: completedFilterKey, count: (prev.key === completedFilterKey ? prev.count : 20) + 10 }))}
                       >
                         Show More
                       </Button>
@@ -1248,7 +1238,7 @@ export function WorkshopTasksOverviewTab({
                       <Button
                         type="button"
                         variant="outline"
-                        onClick={() => setCompletedVisibleCount((current) => current + 10)}
+                        onClick={() => setCompletedLoadState(prev => ({ key: completedFilterKey, count: (prev.key === completedFilterKey ? prev.count : 20) + 10 }))}
                       >
                         Show More
                       </Button>

@@ -18,7 +18,17 @@ interface SignaturePadProps {
 export function SignaturePad({ onSave, onCancel, initialValue, disabled = false, variant = 'default' }: SignaturePadProps) {
   const sigCanvas = useRef<SignatureCanvas>(null);
 
+  const fillCanvasWhite = () => {
+    const canvas = sigCanvas.current?.getCanvas();
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  };
+
   useEffect(() => {
+    fillCanvasWhite();
     if (initialValue && sigCanvas.current) {
       sigCanvas.current.fromDataURL(initialValue);
     }
@@ -26,6 +36,7 @@ export function SignaturePad({ onSave, onCancel, initialValue, disabled = false,
 
   const handleClear = () => {
     sigCanvas.current?.clear();
+    fillCanvasWhite();
   };
 
   const handleSave = () => {
@@ -50,9 +61,8 @@ export function SignaturePad({ onSave, onCancel, initialValue, disabled = false,
             ref={sigCanvas}
             canvasProps={{
               className: 'w-full h-48 md:h-64',
-              style: { touchAction: 'none' }
+              style: { touchAction: 'none', backgroundColor: 'white' }
             }}
-            backgroundColor="white"
           />
         </div>
         <p className="text-xs text-muted-foreground">

@@ -173,28 +173,28 @@ export function useWorkshopTasksFetchers({
         }
 
         const vanByInspectionId = new Map(
-          ((vanInspectionRows || []) as Array<{
+          ((vanInspectionRows || []) as unknown as Array<{
             id: string;
             van_id: string | null;
             vans: { reg_number: string; nickname: string | null } | null;
           }>).map((row) => [row.id, row])
         );
         const hgvByInspectionId = new Map(
-          ((hgvInspectionRows || []) as Array<{
+          ((hgvInspectionRows || []) as unknown as Array<{
             id: string;
             hgv_id: string | null;
             hgvs: { reg_number: string; nickname: string | null } | null;
           }>).map((row) => [row.id, row])
         );
         const plantByInspectionId = new Map(
-          ((plantInspectionRows || []) as Array<{
+          ((plantInspectionRows || []) as unknown as Array<{
             id: string;
             plant_id: string | null;
             plant: { plant_id: string; nickname: string | null } | null;
           }>).map((row) => [row.id, row])
         );
 
-        normalizedTasks = normalizedTasks.map((task) => {
+        normalizedTasks = normalizedTasks.map((task): Action => {
           if (task.van_id || task.hgv_id || task.plant_id || !task.inspection_id) {
             return task;
           }
@@ -204,7 +204,7 @@ export function useWorkshopTasksFetchers({
             return {
               ...task,
               van_id: vanFallback.van_id,
-              vans: task.vans || vanFallback.vans || null,
+              vans: task.vans || vanFallback.vans || undefined,
             };
           }
 
@@ -213,7 +213,7 @@ export function useWorkshopTasksFetchers({
             return {
               ...task,
               hgv_id: hgvFallback.hgv_id,
-              hgvs: task.hgvs || hgvFallback.hgvs || null,
+              hgvs: task.hgvs || hgvFallback.hgvs || undefined,
             };
           }
 
@@ -222,7 +222,7 @@ export function useWorkshopTasksFetchers({
             return {
               ...task,
               plant_id: plantFallback.plant_id,
-              plant: task.plant || plantFallback.plant || null,
+              plant: task.plant || plantFallback.plant || undefined,
             };
           }
 
