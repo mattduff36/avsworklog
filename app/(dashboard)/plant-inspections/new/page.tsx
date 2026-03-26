@@ -1034,6 +1034,7 @@ function NewPlantInspectionContent() {
           submitted_at: status === 'submitted' ? new Date().toISOString() : null,
           signature_data: signatureData || null,
           signed_at: signatureData ? new Date().toISOString() : null,
+          inspector_comments: inspectorComments.trim() || null,
           updated_at: new Date().toISOString(),
           is_hired_plant: isHiredPlant,
           hired_plant_id_serial: isHiredPlant ? hiredPlantIdSerial.trim() : null,

@@ -58,6 +58,7 @@ const MIN_HGV_INSPECTION_SECONDS = 10 * 60;
 const STICKY_NAV_OFFSET_PX = 96;
 const ARTIC_ONLY_START_ITEM = 22;
 const ARTIC_ONLY_END_ITEM = 25;
+const getInspectionTimerStorageKey = (inspectionId: string): string => `hgv-inspection-timer-start:${inspectionId}`;
 
 function isArticOnlyItem(itemNumber: number): boolean {
   return itemNumber >= ARTIC_ONLY_START_ITEM && itemNumber <= ARTIC_ONLY_END_ITEM;
@@ -122,8 +123,10 @@ function NewHgvInspectionContent() {
   );
 
   const beginChecklist = useCallback(() => {
+    const startedAt = Date.now();
     setChecklistStarted(true);
-    setInspectionStartMs(Date.now());
+    setInspectionStartMs(startedAt);
+    setNowMs(startedAt);
   }, []);
 
   const findExistingInspectionConflict = useCallback(async (): Promise<ExistingInspectionConflict | null> => {
@@ -263,6 +266,10 @@ function NewHgvInspectionContent() {
         throw new Error(body?.error || 'Failed to discard draft');
       }
 
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.removeItem(getInspectionTimerStorageKey(inspectionId));
+      }
+
       if (existingInspectionId === inspectionId) {
         setExistingInspectionId(null);
         setPhotoUploadItem(null);
@@ -397,7 +404,7 @@ function NewHgvInspectionContent() {
       setLoading(true);
       const { data: draft, error: draftError } = await supabase
         .from('hgv_inspections')
-        .select('id, hgv_id, user_id, inspection_date, current_mileage, inspector_comments, created_at')
+        .select('id, hgv_id, user_id, inspection_date, current_mileage, inspector_comments')
         .eq('id', id)
         .eq('status', 'draft')
         .single();
@@ -433,8 +440,20 @@ function NewHgvInspectionContent() {
       setComments(restoredComments);
 
       setChecklistStarted(true);
-      const createdAt = draft.created_at ? new Date(draft.created_at).getTime() : Date.now();
-      setInspectionStartMs(createdAt);
+      const startedAt = Date.now();
+      let inspectionTimerStartMs = startedAt;
+      if (typeof window !== 'undefined') {
+        const timerKey = getInspectionTimerStorageKey(id);
+        const storedTimerValue = window.sessionStorage.getItem(timerKey);
+        const parsedStoredTimer = storedTimerValue ? Number.parseInt(storedTimerValue, 10) : NaN;
+        if (!Number.isNaN(parsedStoredTimer) && parsedStoredTimer > 0) {
+          inspectionTimerStartMs = parsedStoredTimer;
+        } else {
+          window.sessionStorage.setItem(timerKey, String(startedAt));
+        }
+      }
+      setInspectionStartMs(inspectionTimerStartMs);
+      setNowMs(inspectionTimerStartMs);
 
       if (draft.hgv_id) {
         await loadLockedDefects(draft.hgv_id);
@@ -536,13 +555,23 @@ function NewHgvInspectionContent() {
     return () => clearInterval(id);
   }, [checklistStarted, inspectionStartMs]);
 
+  useEffect(() => {
+    if (!existingInspectionId || !inspectionStartMs) return;
+    if (typeof window === 'undefined') return;
+    const timerKey = getInspectionTimerStorageKey(existingInspectionId);
+    const hasStoredTimer = window.sessionStorage.getItem(timerKey);
+    if (!hasStoredTimer) {
+      window.sessionStorage.setItem(timerKey, String(inspectionStartMs));
+    }
+  }, [existingInspectionId, inspectionStartMs]);
+
   const elapsedSeconds = useMemo(() => {
     if (!inspectionStartMs) return 0;
     return Math.max(0, Math.floor((nowMs - inspectionStartMs) / 1000));
   }, [inspectionStartMs, nowMs]);
 
   const remainingSeconds = Math.max(0, MIN_HGV_INSPECTION_SECONDS - elapsedSeconds);
-  const canSubmitNow = remainingSeconds === 0;
+  const canSubmitNow = checklistStarted && inspectionStartMs !== null && remainingSeconds === 0;
 
   const countdownLabel = useMemo(() => {
     const mins = Math.floor(remainingSeconds / 60);
@@ -877,6 +906,9 @@ function NewHgvInspectionContent() {
 
       if (status === 'submitted') {
         toast.success('HGV inspection submitted successfully');
+        if (typeof window !== 'undefined') {
+          window.sessionStorage.removeItem(getInspectionTimerStorageKey(inspectionId));
+        }
         allowNavigationRef.current = true;
         router.push(`/hgv-inspections/${inspectionId}`);
       } else {

@@ -1145,6 +1145,7 @@ function NewInspectionContent() {
           submitted_at: status === 'submitted' ? new Date().toISOString() : null,
           signature_data: signatureData || null,
           signed_at: signatureData ? new Date().toISOString() : null,
+          inspector_comments: inspectorComments.trim() || null,
           updated_at: new Date().toISOString(),
         };
 
