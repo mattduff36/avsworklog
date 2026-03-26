@@ -19,7 +19,12 @@ if (!connectionString) {
 async function runMigration() {
   console.log('Running plant draft status migration...\n');
 
-  const url = new URL(connectionString);
+  const resolvedConnectionString = connectionString;
+  if (!resolvedConnectionString) {
+    throw new Error('Missing database connection string');
+  }
+
+  const url = new URL(resolvedConnectionString);
   const client = new Client({
     host: url.hostname,
     port: parseInt(url.port, 10) || 5432,
