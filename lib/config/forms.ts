@@ -76,7 +76,7 @@ export const FORM_TYPES: FormType[] = [
     icon: ClipboardCheck,
     href: '/hgv-inspections',
     listHref: '/hgv-inspections',
-    color: 'inspection',
+    color: 'hgv-inspection',
     enabled: true,
   },
   {

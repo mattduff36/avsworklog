@@ -44,13 +44,17 @@
     --timesheet-light: 210 100% 96%;
     --timesheet-dark: 210 90% 35%;
     
-    --inspection-primary: 30 95% 55%;
-    --inspection-light: 30 100% 96%;
-    --inspection-dark: 30 95% 40%;
+    --inspection-primary: 33 95% 55%;
+    --inspection-light: 33 100% 96%;
+    --inspection-dark: 33 95% 40%;
     
-    --plant-inspection-primary: 30 95% 45%;
-    --plant-inspection-light: 30 100% 94%;
-    --plant-inspection-dark: 30 95% 32%;
+    --plant-inspection-primary: 25 90% 45%;
+    --plant-inspection-light: 25 100% 94%;
+    --plant-inspection-dark: 25 90% 32%;
+
+    --hgv-inspection-primary: 18 95% 38%;
+    --hgv-inspection-light: 18 100% 94%;
+    --hgv-inspection-dark: 18 95% 28%;
     
     --rams-primary: 142 76% 36%;
     --rams-light: 142 76% 95%;
@@ -135,6 +139,12 @@
     --primary: var(--plant-inspection-primary);
     --primary-foreground: 210 40% 98%;
     --ring: var(--plant-inspection-primary);
+  }
+
+  [data-accent="hgv-inspections"] {
+    --primary: var(--hgv-inspection-primary);
+    --primary-foreground: 210 40% 98%;
+    --ring: var(--hgv-inspection-primary);
   }
 
   [data-accent="rams"] {
@@ -249,6 +259,13 @@
   .bg-plant-inspection-dark { background-color: hsl(var(--plant-inspection-dark)); }
   .text-plant-inspection { color: hsl(var(--plant-inspection-primary)); }
   .border-plant-inspection { border-color: hsl(var(--plant-inspection-primary)); }
+
+  /* HGV Inspection */
+  .bg-hgv-inspection { background-color: hsl(var(--hgv-inspection-primary)); }
+  .bg-hgv-inspection-light { background-color: hsl(var(--hgv-inspection-light)); }
+  .bg-hgv-inspection-dark { background-color: hsl(var(--hgv-inspection-dark)); }
+  .text-hgv-inspection { color: hsl(var(--hgv-inspection-primary)); }
+  .border-hgv-inspection { border-color: hsl(var(--hgv-inspection-primary)); }
   
   /* Report */
   .bg-report { background-color: hsl(var(--report-primary)); }
