@@ -187,7 +187,7 @@ describe('Tablet mode Phase 0/1', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Try Tablet Mode' })).toBeInTheDocument();
+      expect(screen.getByTitle('Enable Tablet Mode')).toBeInTheDocument();
     });
 
     const shellRoot = container.firstElementChild as HTMLElement;
@@ -196,18 +196,18 @@ describe('Tablet mode Phase 0/1', () => {
       expect(localStorage.getItem('tablet_mode:user-default')).toBe('off');
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Try Tablet Mode' }));
+    fireEvent.click(screen.getByTitle('Enable Tablet Mode'));
     await waitFor(() => {
       expect(shellRoot.getAttribute('data-tablet-mode')).toBe('on');
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Exit Tablet Mode' }));
+    fireEvent.click(screen.getByTitle('Disable Tablet Mode'));
     await waitFor(() => {
       expect(shellRoot.getAttribute('data-tablet-mode')).toBeNull();
     });
   });
 
-  it('supports dashboard toggle flow with active indicator', async () => {
+  it('supports dashboard toggle flow', async () => {
     render(
       <TabletModeProvider>
         <TabletModeToggleActions />
@@ -215,18 +215,17 @@ describe('Tablet mode Phase 0/1', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Try Tablet Mode' })).toBeInTheDocument();
+      expect(screen.getByTitle('Enable Tablet Mode')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Try Tablet Mode' }));
+    fireEvent.click(screen.getByTitle('Enable Tablet Mode'));
     await waitFor(() => {
-      expect(screen.getByText('Tablet Mode Active')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Exit Tablet Mode' })).toBeInTheDocument();
+      expect(screen.getByTitle('Disable Tablet Mode')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Exit Tablet Mode' }));
+    fireEvent.click(screen.getByTitle('Disable Tablet Mode'));
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Try Tablet Mode' })).toBeInTheDocument();
+      expect(screen.getByTitle('Enable Tablet Mode')).toBeInTheDocument();
     });
   });
 

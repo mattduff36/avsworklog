@@ -7,6 +7,7 @@ const EXPECTED_ABSENCE_VALIDATION_MESSAGES = [
   'Half-day absences require AM or PM session',
   'Half-day absences must be a single day',
   'This absence is in a closed financial year and is read-only',
+  'This financial year is closed for employee bookings. Please contact your manager.',
 ];
 
 function extractErrorMessage(error: unknown): string {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -23,8 +24,10 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { TeamToggleMenu } from '@/components/ui/team-toggle-menu';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
+import { useAuth } from '@/lib/hooks/useAuth';
 import { createClient } from '@/lib/supabase/client';
 import { getErrorMessage, shouldLogAbsenceManageError } from '@/lib/utils/absence-error-handling';
+import { getCurrentFinancialYear } from '@/lib/utils/date';
 import { Loader2, Sparkles, Trash2, Users } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -40,8 +43,16 @@ interface BulkEmployeeOption {
 }
 
 interface GenerationStatus {
+  currentFinancialYearLabel: string;
   latestGeneratedFinancialYearLabel: string;
   nextFinancialYearLabel: string;
+  latestClosedFinancialYearLabel: string | null;
+  latestClosedFinancialYearClosedAt: string | null;
+  latestClosedFinancialYearClosedByName: string | null;
+  latestUndoableClosedFinancialYearStartYear: number | null;
+  latestUndoableClosedFinancialYearLabel: string | null;
+  canUndoLatestClosedFinancialYear: boolean;
+  undoCloseBlockedReason: string | null;
 }
 
 interface ShutdownWarningRow {
@@ -102,14 +113,31 @@ interface BulkAbsenceBatchSummary {
   duplicateCount: number;
 }
 
+function formatFinancialYearLabel(startYear: number): string {
+  return `${startYear}/${(startYear + 1).toString().slice(-2)}`;
+}
+
+function formatAuditTimestamp(value: string | null): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString();
+}
+
 export function ManageOverviewAdminActions() {
   const supabase = createClient();
+  const router = useRouter();
+  const { isAdmin } = useAuth();
   const [generationStatus, setGenerationStatus] = useState<GenerationStatus | null>(null);
   const [showGenerateDialog, setShowGenerateDialog] = useState(false);
+  const [showCloseYearDialog, setShowCloseYearDialog] = useState(false);
+  const [showUndoCloseYearDialog, setShowUndoCloseYearDialog] = useState(false);
   const [showShutdownDialog, setShowShutdownDialog] = useState(false);
   const [showBulkUndoDialog, setShowBulkUndoDialog] = useState(false);
   const [generatingAllowances, setGeneratingAllowances] = useState(false);
   const [removingGeneratedYear, setRemovingGeneratedYear] = useState(false);
+  const [closingCurrentYear, setClosingCurrentYear] = useState(false);
+  const [undoingClosedYear, setUndoingClosedYear] = useState(false);
   const [deleteExistingBookings, setDeleteExistingBookings] = useState(false);
 
   const [shutdownStartDate, setShutdownStartDate] = useState('');
@@ -139,16 +167,34 @@ export function ManageOverviewAdminActions() {
       const response = await fetch('/api/absence/generation/status', { method: 'GET' });
       const payload = (await response.json()) as {
         success?: boolean;
+        currentFinancialYearStartYear?: number;
         latestGeneratedFinancialYearLabel?: string;
         nextFinancialYearLabel?: string;
+        latestClosedFinancialYearLabel?: string | null;
+        latestClosedFinancialYearClosedAt?: string | null;
+        latestClosedFinancialYearClosedByName?: string | null;
+        latestUndoableClosedFinancialYearStartYear?: number | null;
+        latestUndoableClosedFinancialYearLabel?: string | null;
+        canUndoLatestClosedFinancialYear?: boolean;
+        undoCloseBlockedReason?: string | null;
         error?: string;
       };
       if (!response.ok || !payload.success) {
         throw new Error(payload.error || 'Failed to load generation status');
       }
+      const currentFinancialYearStartYear =
+        payload.currentFinancialYearStartYear ?? getCurrentFinancialYear().start.getFullYear();
       setGenerationStatus({
+        currentFinancialYearLabel: formatFinancialYearLabel(currentFinancialYearStartYear),
         latestGeneratedFinancialYearLabel: payload.latestGeneratedFinancialYearLabel || 'current year',
         nextFinancialYearLabel: payload.nextFinancialYearLabel || 'next year',
+        latestClosedFinancialYearLabel: payload.latestClosedFinancialYearLabel || null,
+        latestClosedFinancialYearClosedAt: payload.latestClosedFinancialYearClosedAt || null,
+        latestClosedFinancialYearClosedByName: payload.latestClosedFinancialYearClosedByName || null,
+        latestUndoableClosedFinancialYearStartYear: payload.latestUndoableClosedFinancialYearStartYear ?? null,
+        latestUndoableClosedFinancialYearLabel: payload.latestUndoableClosedFinancialYearLabel || null,
+        canUndoLatestClosedFinancialYear: payload.canUndoLatestClosedFinancialYear === true,
+        undoCloseBlockedReason: payload.undoCloseBlockedReason || null,
       });
     } catch (error) {
       console.error('Error loading generation status:', error);
@@ -501,6 +547,70 @@ export function ManageOverviewAdminActions() {
     }
   }
 
+  async function handleCloseCurrentYearBookings() {
+    setClosingCurrentYear(true);
+    try {
+      const response = await fetch('/api/absence/generation/close-current-year', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      const payload = (await response.json()) as {
+        success?: boolean;
+        closedFinancialYearLabel?: string;
+        pendingCount?: number;
+        carryoversWritten?: number;
+        error?: string;
+      };
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error || 'Failed to close current financial year');
+      }
+      toast.success(
+        `Closed ${payload.closedFinancialYearLabel}: ${payload.carryoversWritten ?? 0} carryover balance(s) written.`
+      );
+      setShowCloseYearDialog(false);
+      await loadGenerationStatus();
+      router.push('/absence/manage?tab=allowances');
+    } catch (error) {
+      console.error('Error closing current financial year bookings:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to close current financial year');
+    } finally {
+      setClosingCurrentYear(false);
+    }
+  }
+
+  async function handleUndoCloseCurrentYearBookings() {
+    setUndoingClosedYear(true);
+    try {
+      const response = await fetch('/api/absence/generation/undo-close-current-year', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      const payload = (await response.json()) as {
+        success?: boolean;
+        undoneFinancialYearLabel?: string;
+        restoredCarryovers?: number;
+        error?: string;
+      };
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error || 'Failed to undo closed financial year');
+      }
+      toast.success(
+        `Reopened ${payload.undoneFinancialYearLabel}: restored ${payload.restoredCarryovers ?? 0} carryover balance(s).`
+      );
+      setShowUndoCloseYearDialog(false);
+      await loadGenerationStatus();
+    } catch (error) {
+      console.error('Error undoing close financial year bookings:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to undo close year');
+    } finally {
+      setUndoingClosedYear(false);
+    }
+  }
+
   return (
     <>
       <CardHeader className="flex flex-row items-start justify-between gap-4">
@@ -515,11 +625,44 @@ export function ManageOverviewAdminActions() {
               {generationStatus.nextFinancialYearLabel}.
             </p>
           ) : null}
+          {generationStatus?.latestClosedFinancialYearLabel ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Latest closed financial year: {generationStatus.latestClosedFinancialYearLabel}.
+            </p>
+          ) : null}
+          {generationStatus?.latestClosedFinancialYearClosedAt ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Closed by {generationStatus.latestClosedFinancialYearClosedByName || 'Unknown'} on{' '}
+              {formatAuditTimestamp(generationStatus.latestClosedFinancialYearClosedAt) || 'Unknown date'}.
+            </p>
+          ) : null}
+          {isAdmin && generationStatus?.latestClosedFinancialYearLabel && !generationStatus.canUndoLatestClosedFinancialYear ? (
+            <p className="mt-1 text-xs text-amber-300">
+              Undo Close unavailable: {generationStatus.undoCloseBlockedReason || 'This closed year cannot be reopened right now.'}
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button onClick={() => setShowShutdownDialog(true)} variant="outline" className="border-border text-muted-foreground">
             <Users className="h-4 w-4 mr-2" />
             Bulk Absence
+          </Button>
+          {isAdmin ? (
+            <Button
+              onClick={() => setShowUndoCloseYearDialog(true)}
+              variant="outline"
+              disabled={!generationStatus?.latestClosedFinancialYearLabel}
+              className="border-violet-500/40 text-violet-200 hover:bg-violet-500/10 disabled:opacity-60"
+            >
+              Undo Close
+            </Button>
+          ) : null}
+          <Button
+            onClick={() => setShowCloseYearDialog(true)}
+            variant="outline"
+            className="border-amber-500/40 text-amber-200 hover:bg-amber-500/10"
+          >
+            Close {generationStatus?.currentFinancialYearLabel || 'Current Year'}
           </Button>
           <Button
             onClick={() => setShowGenerateDialog(true)}
@@ -930,6 +1073,7 @@ export function ManageOverviewAdminActions() {
               <p className="font-medium text-foreground">What Set up does</p>
               <p>Creates auto-generated bank holiday leave records for every employee in the selected next financial year.</p>
               <p>Does not remove or overwrite existing manual bookings.</p>
+              <p>Does not move any carryover balance at this stage.</p>
             </div>
             <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200 space-y-2">
               <p className="font-medium">What Undo setup does</p>
@@ -966,6 +1110,83 @@ export function ManageOverviewAdminActions() {
             >
               {generatingAllowances ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
               {generatingAllowances ? 'Preparing...' : 'Set up Next Year'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showCloseYearDialog}
+        onOpenChange={setShowCloseYearDialog}
+      >
+        <DialogContent className="border-border max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">
+              Close {generationStatus?.currentFinancialYearLabel || 'Current Year'} Bookings
+            </DialogTitle>
+            <DialogDescription className="text-slate-400/90">
+              This locks employee self-service bookings for the selected year and generates carryover balances into the
+              following year using approved annual leave only.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 space-y-3 text-sm text-amber-100">
+            <p>Managers and admins can still create or edit bookings in the closed year.</p>
+            <p>If any pending bookings exist in that year, close will be blocked until they are accepted or declined.</p>
+            <p>Every close action is logged with the user and timestamp.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCloseYearDialog(false)} className="border-border text-muted-foreground">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCloseCurrentYearBookings}
+              disabled={closingCurrentYear}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              {closingCurrentYear ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              {closingCurrentYear ? 'Closing...' : 'Close Year & Generate Carryover'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showUndoCloseYearDialog}
+        onOpenChange={setShowUndoCloseYearDialog}
+      >
+        <DialogContent className="border-border max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">
+              Undo Close {generationStatus?.latestClosedFinancialYearLabel || 'Latest Closed Year'}
+            </DialogTitle>
+            <DialogDescription className="text-slate-400/90">
+              This reopens the latest closed financial year and restores carryover balances to their exact pre-close snapshot.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border border-violet-500/30 bg-violet-500/10 p-4 space-y-3 text-sm text-violet-100">
+            <p>Only admins can run this action.</p>
+            <p>Undo is only available for the latest closed year and before that financial year has ended.</p>
+            {generationStatus?.canUndoLatestClosedFinancialYear ? (
+              <p>
+                Ready to undo close for {generationStatus.latestUndoableClosedFinancialYearLabel || generationStatus.latestClosedFinancialYearLabel}.
+              </p>
+            ) : (
+              <p className="text-amber-200">
+                Cannot undo close: {generationStatus?.undoCloseBlockedReason || 'This close cannot be undone right now.'}
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowUndoCloseYearDialog(false)} className="border-border text-muted-foreground">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUndoCloseCurrentYearBookings}
+              disabled={undoingClosedYear || !generationStatus?.canUndoLatestClosedFinancialYear}
+              className="bg-violet-600 hover:bg-violet-700 text-white"
+            >
+              {undoingClosedYear ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              {undoingClosedYear ? 'Undoing...' : 'Undo Close & Reopen Year'}
             </Button>
           </DialogFooter>
         </DialogContent>

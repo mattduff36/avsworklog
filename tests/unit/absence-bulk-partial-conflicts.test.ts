@@ -73,8 +73,15 @@ function buildMockSupabase(options: BuildMockSupabaseOptions) {
         return {
           select() {
             return {
-              async order() {
-                return { data: options.profiles, error: null };
+              gt(_field: string, value: number) {
+                const filteredProfiles = options.profiles.filter(
+                  (profile) => (profile.annual_holiday_allowance_days ?? 0) > value
+                );
+                return {
+                  async order() {
+                    return { data: filteredProfiles, error: null };
+                  },
+                };
               },
             };
           },
@@ -361,5 +368,44 @@ describe('bookBulkAbsence partial conflict handling', () => {
     expect(result.requestedDays).toBe(5);
     expect(result.warningCount).toBe(0);
     expect(result.warnings).toEqual([]);
+  });
+
+  it('excludes zero-allowance users from apply-to-all bulk booking', async () => {
+    const { supabase, insertedAbsenceRows } = buildMockSupabase({
+      profiles: [
+        {
+          id: 'emp-a',
+          full_name: 'A Worker',
+          employee_id: 'A1',
+          annual_holiday_allowance_days: 28,
+          roles: null,
+        },
+        {
+          id: 'emp-zero',
+          full_name: 'Zero Allowance User',
+          employee_id: 'Z0',
+          annual_holiday_allowance_days: 0,
+          roles: null,
+        },
+      ],
+      annualAbsences: [],
+      existingRows: [],
+    });
+
+    const result = await bookBulkAbsence({
+      supabase: supabase as never,
+      actorProfileId: 'manager-1',
+      reasonId: 'reason-annual',
+      startDate: '2026-12-14',
+      endDate: '2026-12-18',
+      applyToAll: true,
+      confirm: true,
+    });
+
+    expect(result.totalEmployees).toBe(1);
+    expect(result.targetedEmployees).toBe(1);
+    expect(result.createdCount).toBe(1);
+    expect(insertedAbsenceRows).toHaveLength(1);
+    expect(insertedAbsenceRows[0]?.profile_id).toBe('emp-a');
   });
 });

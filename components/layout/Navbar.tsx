@@ -15,6 +15,7 @@ import {
 import { useState, useEffect, useRef } from 'react';
 import { NotificationPanel } from '@/components/messages/NotificationPanel';
 import { TabletModeToggleActions } from '@/components/layout/TabletModeToggleActions';
+import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { SidebarNav } from './SidebarNav';
 import { createClient } from '@/lib/supabase/client';
 import { usePermissionSnapshot } from '@/lib/hooks/usePermissionSnapshot';
@@ -102,6 +103,7 @@ export function Navbar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { user, profile, signOut, isAdmin, isManager, isActualSuperAdmin, isViewingAs } = useAuth();
+  const { tabletModeEnabled } = useTabletMode();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false); // Sidebar starts collapsed
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
@@ -128,6 +130,13 @@ export function Navbar() {
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!tabletModeEnabled) return;
+    setMobileMenuOpen(false);
+    setSidebarOpen(false);
+    setNotificationPanelOpen(false);
+  }, [tabletModeEnabled]);
 
   // Auto-compact: switch to icon-only when labels would overflow the nav container
   useEffect(() => {
@@ -312,7 +321,7 @@ export function Navbar() {
   return (
     <>
       {/* Sidebar for Manager/Admin (desktop) */}
-      <SidebarNav open={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+      {!tabletModeEnabled && <SidebarNav open={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />}
 
       <nav 
         className="bg-slate-900/50 backdrop-blur-xl border-b border-border/50 sticky top-0 z-50"
@@ -321,6 +330,21 @@ export function Navbar() {
         {/* AVS Yellow accent strip */}
         <div className="h-1 bg-gradient-to-r from-avs-yellow via-avs-yellow to-avs-yellow-hover"></div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {tabletModeEnabled ? (
+            <div className="flex items-center h-16">
+              <Link
+                href="/dashboard"
+                className="flex items-center group"
+              >
+                <div className="text-xl font-bold text-white group-hover:text-avs-yellow transition-colors">
+                  SQUIRES
+                </div>
+              </Link>
+              <div className="ml-auto hidden md:flex items-center">
+                <TabletModeToggleActions />
+              </div>
+            </div>
+          ) : (
           <div className="flex items-center h-16">
             {/* Mobile-only text logo */}
             <Link 
@@ -372,8 +396,8 @@ export function Navbar() {
 
             {/* Right side */}
             <div className="flex items-center space-x-2 ml-auto">
-              {/* Tablet Mode toggle (desktop only) */}
-              <div className="hidden md:block">
+              {/* Tablet Mode toggle */}
+              <div className="hidden md:flex items-center">
                 <TabletModeToggleActions />
               </div>
 
@@ -434,10 +458,11 @@ export function Navbar() {
               </button>
             </div>
           </div>
+          )}
         </div>
 
         {/* Mobile menu */}
-        {mobileMenuOpen && (
+        {!tabletModeEnabled && mobileMenuOpen && (
           <div className="md:hidden border-t border-border/50 bg-slate-900/95 backdrop-blur-xl">
             <div className="px-2 pt-2 pb-3 space-y-1">
               {/* Dashboard + Employee Navigation */}
@@ -569,21 +594,23 @@ export function Navbar() {
         )}
 
         {/* Notification Panel */}
-        <NotificationPanel
-          open={notificationPanelOpen}
-          onClose={() => {
-            setNotificationPanelOpen(false);
-            // Refresh unread count after closing
-            fetch('/api/messages/notifications')
-              .then(res => res.json())
-              .then(data => {
-                if (data.success) {
-                  setUnreadCount(data.unread_count || 0);
-                }
-              })
-              .catch(console.error);
-          }}
-        />
+        {!tabletModeEnabled && (
+          <NotificationPanel
+            open={notificationPanelOpen}
+            onClose={() => {
+              setNotificationPanelOpen(false);
+              // Refresh unread count after closing
+              fetch('/api/messages/notifications')
+                .then(res => res.json())
+                .then(data => {
+                  if (data.success) {
+                    setUnreadCount(data.unread_count || 0);
+                  }
+                })
+                .catch(console.error);
+            }}
+          />
+        )}
       </nav>
     </>
   );

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -45,9 +46,12 @@ interface ProfileRow {
   id: string;
   full_name: string;
   employee_id: string | null;
-  allowance: number;
+  baseAllowance: number;
+  carryoverDays: number;
+  totalAllowance: number;
   taken: number;
   upcoming: number;
+  pending: number;
   remaining: number;
   reason_totals: Record<string, number>;
 }
@@ -76,6 +80,7 @@ interface GenerationStatus {
   latestGeneratedFinancialYearEndDate: string;
   nextFinancialYearStartYear: number;
   nextFinancialYearLabel: string;
+  closedFinancialYearStartYears: number[];
 }
 
 interface ShutdownWarningRow {
@@ -163,8 +168,6 @@ const DEFAULT_BASE_COLUMN_VISIBILITY: BaseColumnVisibility = {
   remaining: true,
 };
 
-const DEFAULT_VISIBLE_REASON_NAMES = new Set(['sickness', 'training', 'unpaid leave']);
-
 function FmtDays({ value }: { value: number }) {
   const absValue = Math.abs(value);
   const hasHalf = absValue % 1 !== 0;
@@ -206,6 +209,10 @@ function formatLocalDate(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+function formatDaysForField(value: number): string {
+  return Number.isInteger(value) ? String(Math.trunc(value)) : String(value);
+}
+
 function buildFinancialYearFromStartYear(startYear: number) {
   const start = new Date(startYear, 3, 1);
   const end = new Date(startYear + 1, 2, 31);
@@ -218,8 +225,23 @@ function buildFinancialYearFromStartYear(startYear: number) {
   };
 }
 
+function getOldestOpenFinancialYearStartYear(
+  currentFinancialYearStartYear: number,
+  latestGeneratedFinancialYearStartYear: number,
+  closedFinancialYearStartYears: number[]
+): number {
+  const closedYears = new Set(closedFinancialYearStartYears);
+  for (let year = currentFinancialYearStartYear; year <= latestGeneratedFinancialYearStartYear; year += 1) {
+    if (!closedYears.has(year)) {
+      return year;
+    }
+  }
+  return latestGeneratedFinancialYearStartYear;
+}
+
 export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
   const supabase = createClient();
+  const searchParams = useSearchParams();
   const currentFinancialYear = getCurrentFinancialYear();
 
   const [rows, setRows] = useState<ProfileRow[]>([]);
@@ -228,15 +250,11 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
   const [sortField, setSortField] = useState<SortField>('full_name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [baseColumnVisibility, setBaseColumnVisibility] = useState<BaseColumnVisibility>(DEFAULT_BASE_COLUMN_VISIBILITY);
-  const [reasonColumnVisibility, setReasonColumnVisibility] = useState<Record<string, boolean>>({});
   const baseColumnVisibilityRef = useRef<BaseColumnVisibility>(DEFAULT_BASE_COLUMN_VISIBILITY);
-  const reasonColumnVisibilityRef = useRef<Record<string, boolean>>({});
   const [reasonColumns, setReasonColumns] = useState<ReasonColumn[]>([]);
-  const [annualLeaveColor, setAnnualLeaveColor] = useState('#8b5cf6');
   const [generationStatus, setGenerationStatus] = useState<GenerationStatus | null>(null);
-  const [selectedFinancialYearStartYear, setSelectedFinancialYearStartYear] = useState<number>(
-    currentFinancialYear.start.getFullYear()
-  );
+  const [selectedFinancialYearStartYear, setSelectedFinancialYearStartYear] = useState<number | null>(null);
+  const [financialYearResolved, setFinancialYearResolved] = useState(false);
   const [generatingAllowances, setGeneratingAllowances] = useState(false);
   const [removingGeneratedYear, setRemovingGeneratedYear] = useState(false);
   const [showGenerateDialog, setShowGenerateDialog] = useState(false);
@@ -268,11 +286,43 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
   const [editingProfile, setEditingProfile] = useState<ProfileRow | null>(null);
   const [newAllowance, setNewAllowance] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const fallbackFinancialYearStartYear = currentFinancialYear.start.getFullYear();
 
   const selectedFinancialYear = useMemo(
-    () => buildFinancialYearFromStartYear(selectedFinancialYearStartYear),
-    [selectedFinancialYearStartYear]
+    () => buildFinancialYearFromStartYear(selectedFinancialYearStartYear ?? fallbackFinancialYearStartYear),
+    [selectedFinancialYearStartYear, fallbackFinancialYearStartYear]
   );
+  const activeTab = searchParams.get('tab') || 'overview';
+  const closedFinancialYearStartYears = useMemo(
+    () => new Set(generationStatus?.closedFinancialYearStartYears || []),
+    [generationStatus?.closedFinancialYearStartYears]
+  );
+  const isSelectedFinancialYearClosed =
+    selectedFinancialYearStartYear !== null && closedFinancialYearStartYears.has(selectedFinancialYearStartYear);
+  const isSelectedYearReadOnly = isSelectedFinancialYearClosed;
+  const selectedYearCarryoverTargetLabel = useMemo(
+    () => buildFinancialYearFromStartYear((selectedFinancialYearStartYear ?? fallbackFinancialYearStartYear) + 1).label,
+    [selectedFinancialYearStartYear, fallbackFinancialYearStartYear]
+  );
+  const carryoverSourceFinancialYearLabel = useMemo(
+    () => buildFinancialYearFromStartYear((selectedFinancialYearStartYear ?? fallbackFinancialYearStartYear) - 1).label,
+    [selectedFinancialYearStartYear, fallbackFinancialYearStartYear]
+  );
+  const totalAllowancePreview = useMemo(() => {
+    if (!editingProfile) return 0;
+    const parsedBaseAllowance = Number(newAllowance);
+    const baseAllowance = Number.isFinite(parsedBaseAllowance) ? parsedBaseAllowance : editingProfile.baseAllowance;
+    return baseAllowance + editingProfile.carryoverDays;
+  }, [editingProfile, newAllowance]);
+  const modalReasonStats = useMemo(() => {
+    if (!editingProfile) return [] as Array<{ id: string; name: string; color: string; days: number }>;
+    return reasonColumns.map((reason) => ({
+      id: reason.id,
+      name: reason.name,
+      color: reason.color,
+      days: editingProfile.reason_totals[reason.id] || 0,
+    }));
+  }, [editingProfile, reasonColumns]);
 
   const yearOptions = useMemo(() => {
     const currentStartYear = currentFinancialYear.start.getFullYear();
@@ -288,28 +338,21 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
     try {
       const stored = localStorage.getItem(COLUMN_VISIBILITY_STORAGE_KEY);
       if (!stored) return;
-      const parsed = JSON.parse(stored) as {
-        base?: Partial<BaseColumnVisibility>;
-        reasons?: Record<string, boolean>;
-      };
+      const parsed = JSON.parse(stored) as { base?: Partial<BaseColumnVisibility> };
       if (parsed.base) {
         const nextBaseVisibility = { ...DEFAULT_BASE_COLUMN_VISIBILITY, ...parsed.base };
         baseColumnVisibilityRef.current = nextBaseVisibility;
         setBaseColumnVisibility(nextBaseVisibility);
-      }
-      if (parsed.reasons) {
-        reasonColumnVisibilityRef.current = parsed.reasons;
-        setReasonColumnVisibility(parsed.reasons);
       }
     } catch {
       // Ignore parse errors
     }
   }, []);
 
-  function persistColumnVisibility(nextBase: BaseColumnVisibility, nextReasons: Record<string, boolean>) {
+  function persistColumnVisibility(nextBase: BaseColumnVisibility) {
     localStorage.setItem(
       COLUMN_VISIBILITY_STORAGE_KEY,
-      JSON.stringify({ base: nextBase, reasons: nextReasons })
+      JSON.stringify({ base: nextBase })
     );
   }
 
@@ -318,21 +361,39 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
   }, [baseColumnVisibility]);
 
   useEffect(() => {
-    reasonColumnVisibilityRef.current = reasonColumnVisibility;
-  }, [reasonColumnVisibility]);
-
-  useEffect(() => {
-    void loadRows();
     void loadGenerationStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedFinancialYearStartYear]);
+  }, []);
 
   useEffect(() => {
-    if (refreshKey !== undefined && refreshKey > 0) {
+    if (activeTab !== 'allowances') {
+      return;
+    }
+    if (!generationStatus) return;
+
+    const oldestOpenYear = getOldestOpenFinancialYearStartYear(
+      generationStatus.currentFinancialYearStartYear,
+      generationStatus.latestGeneratedFinancialYearStartYear,
+      generationStatus.closedFinancialYearStartYears
+    );
+    setSelectedFinancialYearStartYear(oldestOpenYear);
+    setFinancialYearResolved(true);
+  }, [activeTab, generationStatus]);
+
+  useEffect(() => {
+    if (activeTab !== 'allowances') return;
+    if (!financialYearResolved) return;
+    if (selectedFinancialYearStartYear === null) return;
+    void loadRows();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, financialYearResolved, selectedFinancialYearStartYear]);
+
+  useEffect(() => {
+    if (activeTab === 'allowances' && financialYearResolved && selectedFinancialYearStartYear !== null && refreshKey !== undefined && refreshKey > 0) {
       void loadRows();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refreshKey]);
+  }, [refreshKey, activeTab, financialYearResolved, selectedFinancialYearStartYear]);
 
   async function loadRows() {
     setLoading(true);
@@ -355,8 +416,6 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
 
       const annualReason = typedReasons.find((reason) => reason.name.trim().toLowerCase() === 'annual leave');
       if (!annualReason) throw new Error('Annual leave reason not found');
-      setAnnualLeaveColor(annualReason.color || '#8b5cf6');
-
       const visibleReasonColumns = typedReasons
         .filter((reason) => reason.is_active && reason.id !== annualReason.id)
         .map((reason) => ({ id: reason.id, name: reason.name, color: reason.color || '#6366f1' }));
@@ -366,16 +425,6 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
       if (!shutdownReasonId) {
         setShutdownReasonId(annualReason.id || activeReasons[0]?.id || '');
       }
-
-      const mergedReasonVisibility = { ...reasonColumnVisibilityRef.current };
-      for (const reason of visibleReasonColumns) {
-        if (mergedReasonVisibility[reason.id] === undefined) {
-          mergedReasonVisibility[reason.id] = DEFAULT_VISIBLE_REASON_NAMES.has(reason.name.trim().toLowerCase());
-        }
-      }
-      reasonColumnVisibilityRef.current = mergedReasonVisibility;
-      setReasonColumnVisibility(mergedReasonVisibility);
-      persistColumnVisibility(baseColumnVisibilityRef.current, mergedReasonVisibility);
 
       const { data: absences, error: absencesError } = await supabase
         .from('absences')
@@ -438,6 +487,7 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
         team: profile.team || null,
         role: profile.role || null,
       })) as ProfileData[];
+      if (selectedFinancialYearStartYear === null) return;
       const carryoverByProfile = await fetchCarryoverMapForFinancialYear(supabase, selectedFinancialYearStartYear);
       const computedRows: ProfileRow[] = typedProfiles.map((profile) => {
         const totals = summaryByProfile.get(profile.id) || {
@@ -446,19 +496,24 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
           annualPending: 0,
           byReason: {},
         };
-        const allowance = getEffectiveAllowance(
+        const baseAllowance = profile.annual_holiday_allowance_days ?? 28;
+        const carryoverDays = carryoverByProfile.get(profile.id) || 0;
+        const totalAllowance = getEffectiveAllowance(
           profile.annual_holiday_allowance_days,
-          carryoverByProfile.get(profile.id) || 0
+          carryoverDays
         );
         const totalApproved = totals.annualTaken + totals.annualUpcoming;
         return {
           id: profile.id,
           full_name: profile.full_name,
           employee_id: profile.employee_id,
-          allowance,
+          baseAllowance,
+          carryoverDays,
+          totalAllowance,
           taken: totals.annualTaken,
           upcoming: totals.annualUpcoming,
-          remaining: allowance - totalApproved - totals.annualPending,
+          pending: totals.annualPending,
+          remaining: totalAllowance - totalApproved - totals.annualPending,
           reason_totals: totals.byReason,
         };
       });
@@ -498,10 +553,6 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
     }
   }
 
-  const featuredReasonColumns = useMemo(
-    () => reasonColumns.filter((r) => DEFAULT_VISIBLE_REASON_NAMES.has(r.name.trim().toLowerCase())),
-    [reasonColumns]
-  );
   const bulkTeamOptions = useMemo(() => {
     const teamMap = new Map<string, { id: string; name: string }>();
 
@@ -537,11 +588,6 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
   const allBulkTeamsSelected =
     bulkTeamOptions.length > 0 && selectedBulkTeamCount === bulkTeamOptions.length;
 
-  const otherReasonColumns = useMemo(
-    () => reasonColumns.filter((r) => !DEFAULT_VISIBLE_REASON_NAMES.has(r.name.trim().toLowerCase())),
-    [reasonColumns]
-  );
-
   const filteredRows = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     const base = rows.filter((row) => {
@@ -552,7 +598,10 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
     const direction = sortDirection === 'asc' ? 1 : -1;
     return [...base].sort((a, b) => {
       if (sortField === 'full_name') return direction * a.full_name.localeCompare(b.full_name);
-      return direction * (a[sortField] - b[sortField]);
+      if (sortField === 'allowance') return direction * (a.totalAllowance - b.totalAllowance);
+      if (sortField === 'taken') return direction * (a.taken - b.taken);
+      if (sortField === 'upcoming') return direction * ((a.upcoming + a.pending) - (b.upcoming + b.pending));
+      return direction * (a.remaining - b.remaining);
     });
   }, [rows, searchTerm, sortDirection, sortField]);
 
@@ -570,16 +619,7 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
     setBaseColumnVisibility((prev) => {
       const next = { ...prev, [column]: !prev[column] };
       baseColumnVisibilityRef.current = next;
-      persistColumnVisibility(next, reasonColumnVisibilityRef.current);
-      return next;
-    });
-  }
-
-  function toggleReasonColumn(reasonId: string) {
-    setReasonColumnVisibility((prev) => {
-      const next = { ...prev, [reasonId]: !prev[reasonId] };
-      reasonColumnVisibilityRef.current = next;
-      persistColumnVisibility(baseColumnVisibilityRef.current, next);
+      persistColumnVisibility(next);
       return next;
     });
   }
@@ -594,13 +634,13 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
   }
 
   async function loadGenerationStatus() {
+    const currentStartYear = currentFinancialYear.start.getFullYear();
     try {
       const response = await fetch('/api/absence/generation/status', { method: 'GET' });
       const payload = (await response.json()) as Partial<GenerationStatus> & { error?: string };
       if (!response.ok) {
         throw new Error(payload.error || 'Failed to load generation status');
       }
-      const currentStartYear = currentFinancialYear.start.getFullYear();
       const latestStartYear = payload.latestGeneratedFinancialYearStartYear ?? currentStartYear;
       setGenerationStatus({
         currentFinancialYearStartYear: payload.currentFinancialYearStartYear ?? currentStartYear,
@@ -613,16 +653,20 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
         nextFinancialYearStartYear: payload.nextFinancialYearStartYear ?? latestStartYear + 1,
         nextFinancialYearLabel:
           payload.nextFinancialYearLabel || buildFinancialYearFromStartYear(latestStartYear + 1).label,
-      });
-      setSelectedFinancialYearStartYear((prev) => {
-        if (prev < currentStartYear || prev > latestStartYear) {
-          return latestStartYear;
-        }
-        return prev;
+        closedFinancialYearStartYears: payload.closedFinancialYearStartYears || [],
       });
     } catch (error) {
       console.error('Error loading generation status:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to load generation status');
+      setGenerationStatus({
+        currentFinancialYearStartYear: currentStartYear,
+        latestGeneratedFinancialYearStartYear: currentStartYear,
+        latestGeneratedFinancialYearLabel: buildFinancialYearFromStartYear(currentStartYear).label,
+        latestGeneratedFinancialYearEndDate: buildFinancialYearFromStartYear(currentStartYear).endIso,
+        nextFinancialYearStartYear: currentStartYear + 1,
+        nextFinancialYearLabel: buildFinancialYearFromStartYear(currentStartYear + 1).label,
+        closedFinancialYearStartYears: [],
+      });
     }
   }
 
@@ -647,7 +691,7 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
         throw new Error(payload.error || 'Failed to generate allowances');
       }
       toast.success(
-        `Allowances generated for ${payload.financialYearLabel}: ${payload.created ?? 0} bank holidays created, ${payload.skippedExisting ?? 0} already existed, ${payload.carryoverGenerated ?? 0} carryovers added`
+        `Allowances generated for ${payload.financialYearLabel}: ${payload.created ?? 0} bank holidays created, ${payload.skippedExisting ?? 0} already existed`
       );
       setShowGenerateDialog(false);
       await Promise.all([loadRows(), loadGenerationStatus()]);
@@ -880,8 +924,9 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
   }
 
   function openEdit(profile: ProfileRow) {
+    if (isSelectedYearReadOnly) return;
     setEditingProfile(profile);
-    setNewAllowance(String(profile.allowance));
+    setNewAllowance(String(profile.baseAllowance));
     setShowEditDialog(true);
   }
 
@@ -934,6 +979,12 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
             <CardDescription className="text-muted-foreground">
               Manage annual leave allowances for all employees ({selectedFinancialYear.label})
             </CardDescription>
+            {isSelectedFinancialYearClosed ? (
+              <p className="mt-2 text-xs text-amber-300">
+                This financial year is now closed. The remaining values shown below are the final carryover record moved
+                into {selectedYearCarryoverTargetLabel}. Negative remaining values reduced that following year&apos;s allowance.
+              </p>
+            ) : null}
           </div>
         </CardHeader>
       </Card>
@@ -951,18 +1002,36 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
               />
             </div>
             <Select
-              value={String(selectedFinancialYearStartYear)}
+              value={selectedFinancialYearStartYear === null ? undefined : String(selectedFinancialYearStartYear)}
               onValueChange={(value) => setSelectedFinancialYearStartYear(Number(value))}
             >
               <SelectTrigger className="w-full md:w-[190px] border-slate-600">
-                <SelectValue placeholder="Financial Year" />
+                <div className="flex items-center gap-2">
+                  <span>{selectedFinancialYear.label}</span>
+                  {isSelectedFinancialYearClosed ? (
+                    <Badge variant="outline" className="border-amber-500/50 bg-amber-500/10 text-amber-300 text-[10px] uppercase">
+                      Closed
+                    </Badge>
+                  ) : null}
+                </div>
               </SelectTrigger>
               <SelectContent className="bg-slate-950 border-border text-foreground">
                 {yearOptions.map((startYear) => {
                   const year = buildFinancialYearFromStartYear(startYear);
+                  const isClosedYearOption = closedFinancialYearStartYears.has(startYear);
                   return (
                     <SelectItem key={startYear} value={String(startYear)}>
-                      {year.label}
+                      <div className="flex items-center gap-2">
+                        <span>{year.label}</span>
+                        {isClosedYearOption ? (
+                          <Badge
+                            variant="outline"
+                            className="border-amber-500/50 bg-amber-500/10 text-amber-300 text-[10px] uppercase"
+                          >
+                            Closed
+                          </Badge>
+                        ) : null}
+                      </div>
                     </SelectItem>
                   );
                 })}
@@ -979,7 +1048,7 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
                 <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuCheckboxItem checked={baseColumnVisibility.allowance} onCheckedChange={() => toggleBaseColumn('allowance')}>
-                  Allowance
+                  Total Allowance
                 </DropdownMenuCheckboxItem>
                 <DropdownMenuCheckboxItem checked={baseColumnVisibility.taken} onCheckedChange={() => toggleBaseColumn('taken')}>
                   Taken
@@ -990,31 +1059,6 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
                 <DropdownMenuCheckboxItem checked={baseColumnVisibility.remaining} onCheckedChange={() => toggleBaseColumn('remaining')}>
                   Remaining
                 </DropdownMenuCheckboxItem>
-                {featuredReasonColumns.map((reason) => (
-                  <DropdownMenuCheckboxItem
-                    key={reason.id}
-                    checked={Boolean(reasonColumnVisibility[reason.id])}
-                    onCheckedChange={() => toggleReasonColumn(reason.id)}
-                  >
-                    <span className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: reason.color }} />
-                      {reason.name}
-                    </span>
-                  </DropdownMenuCheckboxItem>
-                ))}
-                {otherReasonColumns.length > 0 && <DropdownMenuSeparator />}
-                {otherReasonColumns.map((reason) => (
-                  <DropdownMenuCheckboxItem
-                    key={reason.id}
-                    checked={Boolean(reasonColumnVisibility[reason.id])}
-                    onCheckedChange={() => toggleReasonColumn(reason.id)}
-                  >
-                    <span className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: reason.color }} />
-                      {reason.name}
-                    </span>
-                  </DropdownMenuCheckboxItem>
-                ))}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -1040,153 +1084,149 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
             </div>
           ) : (
             <>
-              <div className="hidden md:block border border-slate-700 rounded-lg overflow-hidden">
-                <Table className="min-w-full">
-                  <TableHeader>
-                    <TableRow className="border-border">
-                      <TableHead className="bg-slate-900 text-muted-foreground cursor-pointer" onClick={() => handleSort('full_name')}>
-                        <div className="flex items-center gap-2">Employee <ArrowUpDown className="h-3 w-3" /></div>
-                      </TableHead>
-                      {baseColumnVisibility.allowance && (
-                        <TableHead className="bg-slate-900 text-muted-foreground cursor-pointer" onClick={() => handleSort('allowance')}>
-                          <div className="flex items-center gap-2">
-                            <span className="h-2.5 w-2.5 rounded-full flex-shrink-0 ring-1 ring-white/10" style={{ backgroundColor: annualLeaveColor }} />
-                            Allowance <ArrowUpDown className="h-3 w-3" />
-                          </div>
-                        </TableHead>
-                      )}
-                      {baseColumnVisibility.taken && (
-                        <TableHead className="bg-slate-900 text-muted-foreground cursor-pointer" onClick={() => handleSort('taken')}>
-                          <div className="flex items-center gap-2">
-                            <span className="h-2.5 w-2.5 rounded-full flex-shrink-0 ring-1 ring-white/10" style={{ backgroundColor: annualLeaveColor }} />
-                            Taken <ArrowUpDown className="h-3 w-3" />
-                          </div>
-                        </TableHead>
-                      )}
-                      {baseColumnVisibility.upcoming && (
-                        <TableHead className="bg-slate-900 text-muted-foreground cursor-pointer" onClick={() => handleSort('upcoming')}>
-                          <div className="flex items-center gap-2">
-                            <span className="h-2.5 w-2.5 rounded-full flex-shrink-0 ring-1 ring-white/10" style={{ backgroundColor: annualLeaveColor }} />
-                            Upcoming <ArrowUpDown className="h-3 w-3" />
-                          </div>
-                        </TableHead>
-                      )}
-                      {baseColumnVisibility.remaining && (
-                        <TableHead className="bg-slate-900 text-muted-foreground cursor-pointer" onClick={() => handleSort('remaining')}>
-                          <div className="flex items-center gap-2">
-                            <span className="h-2.5 w-2.5 rounded-full flex-shrink-0 ring-1 ring-white/10" style={{ backgroundColor: annualLeaveColor }} />
-                            Remaining <ArrowUpDown className="h-3 w-3" />
-                          </div>
-                        </TableHead>
-                      )}
-                      {reasonColumns
-                        .filter((reason) => reasonColumnVisibility[reason.id])
-                        .map((reason) => (
-                          <TableHead key={reason.id} className="bg-slate-900 text-muted-foreground">
-                            <div className="flex items-center gap-2">
-                              <span className="h-2.5 w-2.5 rounded-full flex-shrink-0 ring-1 ring-white/10" style={{ backgroundColor: reason.color }} />
-                              {reason.name}
-                            </div>
+              <div className="relative">
+                <div className={isSelectedYearReadOnly ? 'pointer-events-none select-none opacity-55' : undefined}>
+                  <div className="hidden md:block border border-slate-700 rounded-lg overflow-hidden">
+                    <Table className="min-w-full">
+                      <TableHeader>
+                        <TableRow className="border-border">
+                          <TableHead className="bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border" onClick={() => handleSort('full_name')}>
+                            <div className="flex items-center gap-2">Employee <ArrowUpDown className="h-3 w-3" /></div>
                           </TableHead>
+                          {baseColumnVisibility.allowance && (
+                            <TableHead className="bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border" onClick={() => handleSort('allowance')}>
+                              <div className="flex items-center gap-2">
+                                Total Allowance <ArrowUpDown className="h-3 w-3" />
+                              </div>
+                            </TableHead>
+                          )}
+                          {baseColumnVisibility.taken && (
+                            <TableHead className="bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border" onClick={() => handleSort('taken')}>
+                              <div className="flex items-center gap-2">
+                                Taken <ArrowUpDown className="h-3 w-3" />
+                              </div>
+                            </TableHead>
+                          )}
+                          {baseColumnVisibility.upcoming && (
+                            <TableHead className="bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border" onClick={() => handleSort('upcoming')}>
+                              <div className="flex items-center gap-2">
+                                Upcoming <ArrowUpDown className="h-3 w-3" />
+                              </div>
+                            </TableHead>
+                          )}
+                          {baseColumnVisibility.remaining && (
+                            <TableHead className="bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border" onClick={() => handleSort('remaining')}>
+                              <div className="flex items-center gap-2">
+                                Remaining <ArrowUpDown className="h-3 w-3" />
+                              </div>
+                            </TableHead>
+                          )}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {paginatedRows.map((profile) => (
+                          <TableRow
+                            key={profile.id}
+                            className="border-slate-700 hover:bg-slate-800/50 cursor-pointer"
+                            onClick={() => openEdit(profile)}
+                          >
+                            <TableCell className="font-medium text-white">
+                              <div className="flex items-center gap-2">
+                                {profile.full_name}
+                                {profile.employee_id && (
+                                  <Badge variant="outline" className="border-slate-600 text-muted-foreground text-xs">
+                                    {profile.employee_id}
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            {baseColumnVisibility.allowance && (
+                              <TableCell className="text-white tabular-nums">
+                                <FmtDays value={profile.totalAllowance} />
+                              </TableCell>
+                            )}
+                            {baseColumnVisibility.taken && (
+                              <TableCell className="text-muted-foreground tabular-nums">
+                                <FmtDays value={profile.taken} />
+                              </TableCell>
+                            )}
+                            {baseColumnVisibility.upcoming && (
+                              <TableCell className="text-muted-foreground tabular-nums">
+                                <span className="inline-flex items-center gap-1">
+                                  <FmtDays value={profile.upcoming} />
+                                  {profile.pending > 0 ? (
+                                    <span className="text-amber-300">
+                                      + <FmtDays value={profile.pending} />
+                                    </span>
+                                  ) : null}
+                                </span>
+                              </TableCell>
+                            )}
+                            {baseColumnVisibility.remaining && (
+                              <TableCell
+                                className="tabular-nums"
+                                style={{ backgroundColor: remainingTint(profile.remaining) }}
+                              >
+                                <RemainingAllowanceValue value={profile.remaining} />
+                              </TableCell>
+                            )}
+                          </TableRow>
                         ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  <div className="md:hidden space-y-3">
                     {paginatedRows.map((profile) => (
-                      <TableRow
-                        key={profile.id}
-                        className="border-slate-700 hover:bg-slate-800/30 cursor-pointer"
-                        onClick={() => openEdit(profile)}
-                      >
-                        <TableCell className="font-medium text-white">
-                          <div className="flex items-center gap-2">
-                            {profile.full_name}
+                      <Card key={profile.id} className="bg-slate-800 border-slate-700 cursor-pointer hover:bg-slate-800/80 transition-colors" onClick={() => openEdit(profile)}>
+                        <CardContent className="p-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <h3 className="font-semibold text-white">{profile.full_name}</h3>
                             {profile.employee_id && (
-                              <Badge variant="outline" className="border-slate-600 text-muted-foreground text-xs">
+                              <Badge variant="outline" className="border-slate-600 text-muted-foreground">
                                 {profile.employee_id}
                               </Badge>
                             )}
                           </div>
-                        </TableCell>
-                        {baseColumnVisibility.allowance && (
-                          <TableCell className="text-white" style={{ borderLeft: `3px solid ${annualLeaveColor}22` }}>
-                            <FmtDays value={profile.allowance} />
-                          </TableCell>
-                        )}
-                        {baseColumnVisibility.taken && (
-                          <TableCell className="text-white" style={{ borderLeft: `3px solid ${annualLeaveColor}22` }}>
-                            <FmtDays value={profile.taken} />
-                          </TableCell>
-                        )}
-                        {baseColumnVisibility.upcoming && (
-                          <TableCell className="text-white" style={{ borderLeft: `3px solid ${annualLeaveColor}22` }}>
-                            <FmtDays value={profile.upcoming} />
-                          </TableCell>
-                        )}
-                        {baseColumnVisibility.remaining && (
-                          <TableCell
-                            style={{
-                              borderLeft: `3px solid ${annualLeaveColor}22`,
-                              backgroundColor: remainingTint(profile.remaining),
-                            }}
-                          >
-                            <RemainingAllowanceValue value={profile.remaining} />
-                          </TableCell>
-                        )}
-                        {reasonColumns
-                          .filter((reason) => reasonColumnVisibility[reason.id])
-                          .map((reason) => {
-                            const days = profile.reason_totals[reason.id] || 0;
-                            return (
-                              <TableCell key={reason.id} className="text-white" style={{ borderLeft: `3px solid ${reason.color}22` }}>
-                                <FmtDays value={days} />
-                              </TableCell>
-                            );
-                          })}
-                      </TableRow>
+                          <div className="grid grid-cols-2 gap-3 text-sm tabular-nums">
+                            <div>
+                              <p className="text-muted-foreground text-xs">Total Allowance</p>
+                              <p className="text-white font-medium"><FmtDays value={profile.totalAllowance} /></p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground text-xs">Taken</p>
+                              <p className="text-muted-foreground"><FmtDays value={profile.taken} /></p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground text-xs">Upcoming</p>
+                              <p className="text-muted-foreground inline-flex items-center gap-1">
+                                <FmtDays value={profile.upcoming} />
+                                {profile.pending > 0 ? (
+                                  <span className="text-amber-300">
+                                    + <FmtDays value={profile.pending} />
+                                  </span>
+                                ) : null}
+                              </p>
+                            </div>
+                            <div
+                              className={profile.remaining < 0 ? 'rounded-md px-2 py-1' : undefined}
+                              style={{ backgroundColor: remainingTint(profile.remaining) }}
+                            >
+                              <p className="text-muted-foreground text-xs">Remaining</p>
+                              <p className="font-medium">
+                                <RemainingAllowanceValue value={profile.remaining} />
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
                     ))}
-                  </TableBody>
-                </Table>
-              </div>
+                  </div>
+                </div>
 
-              <div className="md:hidden space-y-3">
-                {paginatedRows.map((profile) => (
-                  <Card key={profile.id} className="bg-slate-800 border-slate-700 cursor-pointer" onClick={() => openEdit(profile)}>
-                    <CardContent className="p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-semibold text-white">{profile.full_name}</h3>
-                        {profile.employee_id && (
-                          <Badge variant="outline" className="border-slate-600 text-muted-foreground">
-                            {profile.employee_id}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-2 gap-3 text-sm">
-                        <div>
-                          <p className="text-muted-foreground">Allowance</p>
-                          <p className="text-white"><FmtDays value={profile.allowance} /></p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Taken</p>
-                          <p className="text-white"><FmtDays value={profile.taken} /></p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Upcoming</p>
-                          <p className="text-white"><FmtDays value={profile.upcoming} /></p>
-                        </div>
-                        <div
-                          className={profile.remaining < 0 ? 'rounded-md px-2 py-1' : undefined}
-                          style={{ backgroundColor: remainingTint(profile.remaining) }}
-                        >
-                          <p className="text-muted-foreground">Remaining</p>
-                          <p>
-                            <RemainingAllowanceValue value={profile.remaining} />
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                {isSelectedYearReadOnly ? (
+                  <div className="pointer-events-none absolute inset-0 z-10 rounded-lg border border-amber-500/20 bg-slate-950/15" />
+                ) : null}
               </div>
 
               {totalPages > 1 && (
@@ -1620,7 +1660,8 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
             <DialogDescription className="text-slate-400/90">
               This will create bank holiday leave entries for every employee in{' '}
               <span className="font-medium text-foreground">{generationStatus?.nextFinancialYearLabel || 'the next financial year'}</span>{' '}
-              and make that year available for booking. Please confirm before proceeding.
+              and make that year available for booking. Carryover balances are only generated when the current year is closed.
+              Please confirm before proceeding.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -1675,28 +1716,78 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent className="border-border max-w-3xl">
           <DialogHeader>
-            <DialogTitle className="text-foreground">Edit Allowance</DialogTitle>
+            <DialogTitle className="text-foreground">
+              {editingProfile?.full_name || 'Employee'} Absence & Leave Record
+            </DialogTitle>
             <DialogDescription className="text-slate-400/90">
-              Update annual leave allowance for {editingProfile?.full_name}
+              Financial year {selectedFinancialYear.label}. Annual leave allowance and approved absence totals.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="rounded-lg border border-[hsl(var(--absence-primary)/0.25)] bg-[hsl(var(--absence-primary)/0.06)] p-4 space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="allowance" className="text-foreground font-medium">Annual Leave Allowance (days) *</Label>
-              <Input
-                id="allowance"
-                type="number"
-                step="0.5"
-                min="0"
-                value={newAllowance}
-                onChange={(e) => setNewAllowance(e.target.value)}
-                placeholder="28"
-                className="bg-slate-950 border-border text-foreground"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Standard UK allowance is 28 days (including bank holidays)
-              </p>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div className="rounded-lg border border-[hsl(var(--absence-primary)/0.25)] bg-[hsl(var(--absence-primary)/0.06)] p-4 space-y-3">
+              <h3 className="text-sm font-semibold text-foreground">Annual Leave Allowance</h3>
+              <div className="space-y-1.5">
+                <Label htmlFor="allowance" className="text-foreground font-medium">Annual Leave Allowance (days) *</Label>
+                <Input
+                  id="allowance"
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  value={newAllowance}
+                  onChange={(e) => setNewAllowance(e.target.value)}
+                  placeholder="28"
+                  className="bg-slate-950 border-border text-foreground"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="carryover-days" className="text-foreground font-medium">
+                  Carryover from {carryoverSourceFinancialYearLabel}
+                </Label>
+                <Input
+                  id="carryover-days"
+                  type="text"
+                  value={editingProfile ? formatDaysForField(editingProfile.carryoverDays) : ''}
+                  readOnly
+                  disabled
+                  className="bg-slate-900 border-border text-muted-foreground"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="total-allowance-days" className="text-foreground font-medium">Total Allowance (days)</Label>
+                <Input
+                  id="total-allowance-days"
+                  type="text"
+                  value={editingProfile ? formatDaysForField(totalAllowancePreview) : ''}
+                  readOnly
+                  disabled
+                  className="bg-slate-900 border-border text-muted-foreground"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-[hsl(var(--absence-primary)/0.25)] bg-[hsl(var(--absence-primary)/0.06)] p-4 space-y-3">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Other Absence Totals</h3>
+                <p className="text-xs text-muted-foreground">{selectedFinancialYear.label}</p>
+              </div>
+              {modalReasonStats.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No active non-annual leave reasons configured.</p>
+              ) : (
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {modalReasonStats.map((reasonStat) => (
+                    <div key={reasonStat.id} className="rounded-md border border-border bg-slate-950/60 p-2.5">
+                      <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: reasonStat.color }} />
+                        {reasonStat.name}
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-foreground">
+                        <FmtDays value={reasonStat.days} />
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

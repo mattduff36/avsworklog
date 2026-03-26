@@ -32,6 +32,15 @@ export interface AbsenceGenerationStatus {
   latestGeneratedFinancialYearEndDate: string;
   nextFinancialYearStartYear: number;
   nextFinancialYearLabel: string;
+  latestClosedFinancialYearStartYear: number | null;
+  latestClosedFinancialYearLabel: string | null;
+  latestClosedFinancialYearClosedAt: string | null;
+  latestClosedFinancialYearClosedByName: string | null;
+  latestUndoableClosedFinancialYearStartYear: number | null;
+  latestUndoableClosedFinancialYearLabel: string | null;
+  canUndoLatestClosedFinancialYear: boolean;
+  undoCloseBlockedReason: string | null;
+  closedFinancialYearStartYears: number[];
 }
 
 export interface AbsenceGenerationRemoveResult {
@@ -40,6 +49,19 @@ export interface AbsenceGenerationRemoveResult {
   removedGeneratedAbsences: number;
   removedExistingAbsences: number;
   removedCarryovers: number;
+}
+
+export interface AbsenceGenerationCloseResult {
+  closedFinancialYearStartYear: number;
+  closedFinancialYearLabel: string;
+  pendingCount: number;
+  carryoversWritten: number;
+}
+
+export interface AbsenceGenerationUndoResult {
+  undoneFinancialYearStartYear: number;
+  undoneFinancialYearLabel: string;
+  restoredCarryovers: number;
 }
 
 interface BankHolidayEvent {
@@ -296,7 +318,11 @@ export async function generateFinancialYearCarryovers(
   const sourceStartIso = formatIsoDate(sourceFinancialYear.start);
   const sourceEndIso = formatIsoDate(sourceFinancialYear.end);
 
-  const [{ data: profiles, error: profilesError }, { data: annualAbsences, error: annualAbsencesError }] =
+  const [
+    { data: profiles, error: profilesError },
+    { data: annualAbsences, error: annualAbsencesError },
+    { data: sourceCarryovers, error: sourceCarryoversError },
+  ] =
     await Promise.all([
       supabase
         .from('profiles')
@@ -306,9 +332,13 @@ export async function generateFinancialYearCarryovers(
         .from('absences')
         .select('profile_id, duration_days')
         .eq('reason_id', annualLeaveReasonId)
-        .in('status', ['approved', 'pending'])
+        .eq('status', 'approved')
         .gte('date', sourceStartIso)
         .lte('date', sourceEndIso),
+      supabase
+        .from('absence_allowance_carryovers')
+        .select('profile_id, carried_days')
+        .eq('financial_year_start_year', sourceFinancialYearStartYear),
     ]);
 
   if (profilesError) {
@@ -318,17 +348,25 @@ export async function generateFinancialYearCarryovers(
   if (annualAbsencesError) {
     throw annualAbsencesError;
   }
+  if (sourceCarryoversError) {
+    throw sourceCarryoversError;
+  }
 
   const usedByProfile = new Map<string, number>();
   for (const row of (annualAbsences || []) as Array<{ profile_id: string; duration_days: number | null }>) {
     usedByProfile.set(row.profile_id, (usedByProfile.get(row.profile_id) || 0) + (row.duration_days || 0));
   }
+  const carryInByProfile = new Map<string, number>();
+  for (const row of (sourceCarryovers || []) as Array<{ profile_id: string; carried_days: number | null }>) {
+    carryInByProfile.set(row.profile_id, row.carried_days || 0);
+  }
 
   const rowsToInsert = ((profiles || []) as Array<{ id: string; annual_holiday_allowance_days: number | null }>)
     .map((profile) => {
       const baseAllowance = profile.annual_holiday_allowance_days ?? 28;
+      const carryIn = carryInByProfile.get(profile.id) || 0;
       const usedDays = usedByProfile.get(profile.id) || 0;
-      const carriedDays = Math.max(0, baseAllowance - usedDays);
+      const carriedDays = baseAllowance + carryIn - usedDays;
 
       return {
         profile_id: profile.id,
@@ -341,7 +379,7 @@ export async function generateFinancialYearCarryovers(
         generated_at: new Date().toISOString(),
       };
     })
-    .filter((row) => row.carried_days > 0);
+    .filter((row) => row.carried_days !== 0);
 
   const { error: deleteError } = await supabase
     .from('absence_allowance_carryovers')
@@ -488,11 +526,98 @@ async function getLatestTrackedGenerationStartYear(
   return data?.financial_year_start_year ?? null;
 }
 
+async function getClosedFinancialYearStatus(
+  supabase: AnySupabase
+): Promise<{
+  years: number[];
+  latest: {
+    financialYearStartYear: number;
+    closedAt: string;
+    closedByName: string | null;
+  } | null;
+}> {
+  const { data, error } = await supabase
+    .from('absence_financial_year_closures')
+    .select(
+      'financial_year_start_year, closed_at, closed_by_profile:profiles!absence_financial_year_closures_closed_by_fkey(full_name)'
+    )
+    .order('financial_year_start_year', { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  const rows = (data || []) as Array<{
+    financial_year_start_year: number;
+    closed_at: string;
+    closed_by_profile?: { full_name?: string | null } | null;
+  }>;
+
+  const years = rows.map((row) => row.financial_year_start_year);
+  const latestRow = rows[0];
+
+  return {
+    years,
+    latest: latestRow
+      ? {
+          financialYearStartYear: latestRow.financial_year_start_year,
+          closedAt: latestRow.closed_at,
+          closedByName: latestRow.closed_by_profile?.full_name || null,
+        }
+      : null,
+  };
+}
+
+async function getLatestCloseUndoStatus(
+  supabase: AnySupabase
+): Promise<{
+  latestClosedFinancialYearStartYear: number | null;
+  latestClosedFinancialYearLabel: string | null;
+  canUndo: boolean;
+  blockedReason: string | null;
+}> {
+  const { data, error } = await supabase.rpc('get_latest_absence_close_undo_status');
+
+  if (error) {
+    throw new Error(error.message || 'Failed to load undo-close status');
+  }
+
+  const row = ((data || [])[0] || null) as
+    | {
+        latest_closed_financial_year_start_year: number | null;
+        latest_closed_financial_year_label: string | null;
+        can_undo: boolean | null;
+        blocked_reason: string | null;
+      }
+    | null;
+
+  if (!row) {
+    return {
+      latestClosedFinancialYearStartYear: null,
+      latestClosedFinancialYearLabel: null,
+      canUndo: false,
+      blockedReason: 'No closed financial year found to undo.',
+    };
+  }
+
+  return {
+    latestClosedFinancialYearStartYear: row.latest_closed_financial_year_start_year,
+    latestClosedFinancialYearLabel: row.latest_closed_financial_year_label,
+    canUndo: row.can_undo === true,
+    blockedReason: row.blocked_reason || null,
+  };
+}
+
 export async function getAbsenceGenerationStatus(
   supabase: AnySupabase
 ): Promise<AbsenceGenerationStatus> {
   const currentFinancialYearStartYear = getFinancialYearStartYear(new Date());
-  const latestTracked = await getLatestTrackedGenerationStartYear(supabase);
+  const [latestTracked, closedYearStatus, latestCloseUndoStatus] = await Promise.all([
+    getLatestTrackedGenerationStartYear(supabase),
+    getClosedFinancialYearStatus(supabase),
+    getLatestCloseUndoStatus(supabase),
+  ]);
+  const closedFinancialYearStartYears = closedYearStatus.years;
   const latestGeneratedFinancialYearStartYear =
     latestTracked === null
       ? currentFinancialYearStartYear
@@ -500,6 +625,13 @@ export async function getAbsenceGenerationStatus(
   const latestGenerated = buildFinancialYearBounds(latestGeneratedFinancialYearStartYear);
   const nextFinancialYearStartYear = latestGeneratedFinancialYearStartYear + 1;
   const nextFinancialYear = buildFinancialYearBounds(nextFinancialYearStartYear);
+  const latestClosedFinancialYearStartYear = closedFinancialYearStartYears[0] ?? null;
+  const latestClosedFinancialYearLabel =
+    latestClosedFinancialYearStartYear === null
+      ? null
+      : buildFinancialYearBounds(latestClosedFinancialYearStartYear).label;
+  const latestClosedFinancialYearClosedAt = closedYearStatus.latest?.closedAt || null;
+  const latestClosedFinancialYearClosedByName = closedYearStatus.latest?.closedByName || null;
 
   return {
     currentFinancialYearStartYear,
@@ -508,6 +640,15 @@ export async function getAbsenceGenerationStatus(
     latestGeneratedFinancialYearEndDate: formatIsoDate(latestGenerated.end),
     nextFinancialYearStartYear,
     nextFinancialYearLabel: nextFinancialYear.label,
+    latestClosedFinancialYearStartYear,
+    latestClosedFinancialYearLabel,
+    latestClosedFinancialYearClosedAt,
+    latestClosedFinancialYearClosedByName,
+    latestUndoableClosedFinancialYearStartYear: latestCloseUndoStatus.latestClosedFinancialYearStartYear,
+    latestUndoableClosedFinancialYearLabel: latestCloseUndoStatus.latestClosedFinancialYearLabel,
+    canUndoLatestClosedFinancialYear: latestCloseUndoStatus.canUndo,
+    undoCloseBlockedReason: latestCloseUndoStatus.blockedReason,
+    closedFinancialYearStartYears,
   };
 }
 
@@ -520,12 +661,6 @@ export async function generateNextFinancialYearAllowances(
   options: GenerateNextFinancialYearOptions
 ): Promise<BankHolidaySeedResult> {
   const status = await getAbsenceGenerationStatus(options.supabase);
-  const carryoverGenerated = await generateFinancialYearCarryovers(
-    options.supabase,
-    status.latestGeneratedFinancialYearStartYear,
-    status.nextFinancialYearStartYear,
-    options.actorProfileId
-  );
   const result = await seedFinancialYearBankHolidays({
     supabase: options.supabase,
     financialYearStartYear: status.nextFinancialYearStartYear,
@@ -548,7 +683,83 @@ export async function generateNextFinancialYearAllowances(
 
   return {
     ...result,
-    carryoverGenerated,
+    carryoverGenerated: 0,
+  };
+}
+
+interface CloseCurrentFinancialYearOptions {
+  supabase: AnySupabase;
+  actorProfileId: string;
+  notes?: string;
+}
+
+export async function closeCurrentFinancialYearBookings(
+  options: CloseCurrentFinancialYearOptions
+): Promise<AbsenceGenerationCloseResult> {
+  const currentFinancialYearStartYear = getFinancialYearStartYear(new Date());
+  const { data, error } = await options.supabase.rpc('close_absence_financial_year_bookings', {
+    p_financial_year_start_year: currentFinancialYearStartYear,
+    p_actor_profile_id: options.actorProfileId,
+    p_notes: options.notes || null,
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Failed to close current year');
+  }
+
+  const row = ((data || [])[0] || null) as
+    | {
+        financial_year_start_year: number;
+        pending_count: number;
+        carryovers_written: number;
+      }
+    | null;
+
+  if (!row) {
+    throw new Error('No close-year result was returned');
+  }
+
+  const bounds = buildFinancialYearBounds(row.financial_year_start_year);
+  return {
+    closedFinancialYearStartYear: row.financial_year_start_year,
+    closedFinancialYearLabel: bounds.label,
+    pendingCount: row.pending_count || 0,
+    carryoversWritten: row.carryovers_written || 0,
+  };
+}
+
+interface UndoLatestClosedFinancialYearOptions {
+  supabase: AnySupabase;
+  actorProfileId: string;
+}
+
+export async function undoLatestClosedFinancialYearBookings(
+  options: UndoLatestClosedFinancialYearOptions
+): Promise<AbsenceGenerationUndoResult> {
+  const { data, error } = await options.supabase.rpc('undo_close_absence_financial_year_bookings', {
+    p_actor_profile_id: options.actorProfileId,
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Failed to undo close year');
+  }
+
+  const row = ((data || [])[0] || null) as
+    | {
+        financial_year_start_year: number;
+        restored_carryovers: number;
+      }
+    | null;
+
+  if (!row) {
+    throw new Error('No undo-close result was returned');
+  }
+
+  const bounds = buildFinancialYearBounds(row.financial_year_start_year);
+  return {
+    undoneFinancialYearStartYear: row.financial_year_start_year,
+    undoneFinancialYearLabel: bounds.label,
+    restoredCarryovers: row.restored_carryovers || 0,
   };
 }
 
@@ -639,23 +850,12 @@ export async function removeLatestGeneratedFinancialYear(
     throw deleteGenerationError;
   }
 
-  const { count: removedCarryovers, error: deleteCarryoversError } = await options.supabase
-    .from('absence_allowance_carryovers')
-    .delete({ count: 'exact' })
-    .eq('financial_year_start_year', latestGeneration.financial_year_start_year)
-    .eq('auto_generated', true)
-    .eq('generation_source', ABSENCE_CARRYOVER_GENERATION_SOURCE);
-
-  if (deleteCarryoversError) {
-    throw deleteCarryoversError;
-  }
-
   return {
     removedFinancialYearStartYear: latestGeneration.financial_year_start_year,
     removedFinancialYearLabel: financialYear.label,
     removedGeneratedAbsences: removedCount ?? 0,
     removedExistingAbsences,
-    removedCarryovers: removedCarryovers ?? 0,
+    removedCarryovers: 0,
   };
 }
 
@@ -700,6 +900,7 @@ async function getBulkAbsenceEmployees(supabase: AnySupabase): Promise<BulkAbsen
   const { data, error } = await supabase
     .from('profiles')
     .select('id, full_name, employee_id, annual_holiday_allowance_days, roles(id, name, display_name)')
+    .gt('annual_holiday_allowance_days', 0)
     .order('full_name');
 
   if (error) {

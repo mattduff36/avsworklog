@@ -2081,6 +2081,117 @@ export interface Database {
           updated_at?: string
         }
       }
+      absence_financial_year_closures: {
+        Row: {
+          id: string
+          financial_year_start_year: number
+          closed_at: string
+          closed_by: string | null
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          financial_year_start_year: number
+          closed_at?: string
+          closed_by?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          financial_year_start_year?: number
+          closed_at?: string
+          closed_by?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      absence_financial_year_close_snapshots: {
+        Row: {
+          id: string
+          financial_year_start_year: number
+          target_financial_year_start_year: number
+          snapshot_taken_at: string
+          snapshot_taken_by: string | null
+          restored_at: string | null
+          restored_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          financial_year_start_year: number
+          target_financial_year_start_year: number
+          snapshot_taken_at?: string
+          snapshot_taken_by?: string | null
+          restored_at?: string | null
+          restored_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          financial_year_start_year?: number
+          target_financial_year_start_year?: number
+          snapshot_taken_at?: string
+          snapshot_taken_by?: string | null
+          restored_at?: string | null
+          restored_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      absence_financial_year_close_snapshot_rows: {
+        Row: {
+          id: string
+          snapshot_id: string
+          carryover_id: string
+          profile_id: string
+          financial_year_start_year: number
+          source_financial_year_start_year: number
+          carried_days: number
+          auto_generated: boolean
+          generation_source: string
+          generated_at: string
+          generated_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          snapshot_id: string
+          carryover_id: string
+          profile_id: string
+          financial_year_start_year: number
+          source_financial_year_start_year: number
+          carried_days: number
+          auto_generated: boolean
+          generation_source: string
+          generated_at: string
+          generated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          snapshot_id?: string
+          carryover_id?: string
+          profile_id?: string
+          financial_year_start_year?: number
+          source_financial_year_start_year?: number
+          carried_days?: number
+          auto_generated?: boolean
+          generation_source?: string
+          generated_at?: string
+          generated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
       absence_financial_year_archives: {
         Row: {
           id: string

@@ -19,6 +19,7 @@ import { useCallback, useEffect, useState, useRef } from 'react';
 import { usePermissionSnapshot } from '@/lib/hooks/usePermissionSnapshot';
 import { usePendingAbsenceCount } from '@/lib/hooks/useNavMetrics';
 import { managerNavItems, adminNavItems, getFilteredNavByPermissions } from '@/lib/config/navigation';
+import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import {
   clearViewAsSelection,
   getViewAsSelection,
@@ -48,6 +49,7 @@ interface SidebarNavProps {
 export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   const pathname = usePathname();
   const { isAdmin, isManager, effectiveRole, isViewingAs, isActualSuperAdmin } = useAuth();
+  const { tabletModeEnabled } = useTabletMode();
   const [viewAsRoleId, setViewAsRoleIdState] = useState<string>('');
   const [viewAsTeamId, setViewAsTeamIdState] = useState<string>('');
   const [draftRoleId, setDraftRoleId] = useState<string>('');
@@ -63,6 +65,8 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
 
   // Fetch user email, all roles, and current view-as selection
   useEffect(() => {
+    if (tabletModeEnabled) return;
+
     async function fetchViewAsOptions() {
       try {
         const response = await fetch('/api/superadmin/view-as/options', { cache: 'no-store' });
@@ -100,7 +104,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
         localStorage.removeItem('viewAsRole');
       }
     }
-  }, [effectiveRole?.name, effectiveRole?.is_super_admin, isViewingAs, isManager, isAdmin]);
+  }, [effectiveRole?.name, effectiveRole?.is_super_admin, isViewingAs, isManager, isAdmin, tabletModeEnabled]);
 
   // Collapse sidebar on route change (don't close completely)
   const prevPathnameRef = useRef(pathname);
@@ -174,6 +178,8 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   const isSuperAdmin = isActualSuperAdmin;
   const isViewingAsOverride = isSuperAdmin && (viewAsRoleId !== '' || viewAsTeamId !== '');
   const showDeveloperTools = isSuperAdmin && !isViewingAsOverride;
+
+  if (tabletModeEnabled) return null;
 
   // Find the currently-selected role object for display
   const selectedRole = allRoles.find((r) => r.id === viewAsRoleId) ?? null;

@@ -6,15 +6,25 @@ const authState = {
   isManager: false,
   isActualSuperAdmin: false,
 };
+const tabletState = {
+  tabletModeEnabled: false,
+};
 
 vi.mock('@/lib/hooks/useAuth', () => ({
   useAuth: () => authState,
+}));
+
+vi.mock('@/components/layout/tablet-mode-context', () => ({
+  useTabletMode: () => ({
+    tabletModeEnabled: tabletState.tabletModeEnabled,
+  }),
 }));
 
 describe('DashboardContent sidebar offset', () => {
   beforeEach(() => {
     authState.isManager = false;
     authState.isActualSuperAdmin = false;
+    tabletState.tabletModeEnabled = false;
   });
 
   it('does not add sidebar offset for standard users', () => {
@@ -52,5 +62,19 @@ describe('DashboardContent sidebar offset', () => {
 
     const wrapper = container.firstElementChild as HTMLElement;
     expect(wrapper.className).toContain('md:pl-16');
+  });
+
+  it('does not add sidebar offset in tablet mode', () => {
+    authState.isManager = true;
+    tabletState.tabletModeEnabled = true;
+
+    const { container } = render(
+      <DashboardContent>
+        <div>content</div>
+      </DashboardContent>
+    );
+
+    const wrapper = container.firstElementChild as HTMLElement;
+    expect(wrapper.className).not.toContain('md:pl-16');
   });
 });

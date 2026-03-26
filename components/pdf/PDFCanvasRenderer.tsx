@@ -11,6 +11,36 @@ type PdfjsLib = {
 
 let pdfjsCache: PdfjsLib | null = null;
 
+function ensurePromiseWithResolvers(): void {
+  const promiseWithResolvers = (Promise as PromiseConstructor & {
+    withResolvers?: <T>() => {
+      promise: Promise<T>;
+      resolve: (value: T | PromiseLike<T>) => void;
+      reject: (reason?: unknown) => void;
+    };
+  }).withResolvers;
+
+  if (typeof promiseWithResolvers === 'function') {
+    return;
+  }
+
+  (Promise as PromiseConstructor & {
+    withResolvers?: <T>() => {
+      promise: Promise<T>;
+      resolve: (value: T | PromiseLike<T>) => void;
+      reject: (reason?: unknown) => void;
+    };
+  }).withResolvers = function withResolvers<T>() {
+    let resolve!: (value: T | PromiseLike<T>) => void;
+    let reject!: (reason?: unknown) => void;
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  };
+}
+
 function isExpectedPdfLoadError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
 
@@ -42,6 +72,7 @@ function getPdfLoadMessage(error: unknown): string {
 
 async function getPdfjs(): Promise<PdfjsLib> {
   if (pdfjsCache) return pdfjsCache;
+  ensurePromiseWithResolvers();
   // webpackIgnore makes the browser's native ESM loader handle this import
   // instead of Webpack, which avoids the "Object.defineProperty on non-object" bug.
   // @ts-expect-error – absolute-URL import handled by browser ESM, not TypeScript/Webpack

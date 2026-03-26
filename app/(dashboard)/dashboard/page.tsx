@@ -286,43 +286,44 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8 max-w-6xl">
       
-      {/* Welcome Section */}
-      <div className="bg-slate-900 rounded-lg p-4 md:p-5 border border-slate-700 relative overflow-hidden">
-        {/* Intro Animation Overlay (All Devices) */}
-        <div 
-          className={`flex absolute inset-0 bg-slate-900 items-center justify-center z-10 transition-opacity duration-700 ${
-            showIntro ? 'opacity-100' : 'opacity-0 pointer-events-none'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <Image
-              src="/icon-192x192.png"
-              alt=""
-              width={36}
-              height={36}
-              className="h-8 w-8 md:h-9 md:w-9"
-            />
-            <span className="text-2xl md:text-3xl font-bold text-avs-yellow tracking-wide">
-              SquiresApp
-            </span>
+      {!tabletModeEnabled && (
+        <div className="bg-slate-900 rounded-lg p-4 md:p-5 border border-slate-700 relative overflow-hidden">
+          {/* Intro Animation Overlay (All Devices) */}
+          <div
+            className={`flex absolute inset-0 bg-slate-900 items-center justify-center z-10 transition-opacity duration-700 ${
+              showIntro ? 'opacity-100' : 'opacity-0 pointer-events-none'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Image
+                src="/icon-192x192.png"
+                alt=""
+                width={36}
+                height={36}
+                className="h-8 w-8 md:h-9 md:w-9"
+              />
+              <span className="text-2xl md:text-3xl font-bold text-avs-yellow tracking-wide">
+                SquiresApp
+              </span>
+            </div>
+          </div>
+
+          {/* Actual Content */}
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-white">
+                Welcome back, {profile?.full_name}
+              </h1>
+              <p className="text-slate-400 mt-1">
+                {headerSubtitle}
+              </p>
+            </div>
+            <div className="hidden md:flex items-center justify-end">
+              <TabletModeToggleActions size="dashboard" />
+            </div>
           </div>
         </div>
-        
-        {/* Actual Content */}
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-white">
-              Welcome back, {profile?.full_name}
-            </h1>
-            <p className="text-slate-400 mt-1">
-              {headerSubtitle}
-            </p>
-          </div>
-          <div className="flex items-center justify-end">
-            <TabletModeToggleActions size="dashboard" />
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* Quick Actions - Square Button Grid */}
       <div>
@@ -508,7 +509,7 @@ export default function DashboardPage() {
       )}
 
       {/* Pending Approvals Summary - Manager/Admin Only */}
-      {canViewApprovals && (
+      {!tabletModeEnabled && canViewApprovals && (
         <Card className="border-border animate-card-fade" style={{ animationDelay: '300ms' }}>
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-white">
@@ -591,7 +592,7 @@ export default function DashboardPage() {
       )}
 
       {/* Manager Actions Section */}
-      {canViewActions && (
+      {!tabletModeEnabled && canViewActions && (
         <Card className="border-border animate-card-fade" style={{ animationDelay: '400ms' }}>
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-white">

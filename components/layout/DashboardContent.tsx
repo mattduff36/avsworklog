@@ -1,6 +1,7 @@
 'use client';
 
 import { useAuth } from '@/lib/hooks/useAuth';
+import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -12,6 +13,7 @@ interface DashboardContentProps {
 
 export function DashboardContent({ children }: DashboardContentProps) {
   const { isManager, isActualSuperAdmin } = useAuth();
+  const { tabletModeEnabled } = useTabletMode();
   const pathname = usePathname();
   const [isPWA] = useState(() => {
     if (typeof window === 'undefined') {
@@ -52,9 +54,10 @@ export function DashboardContent({ children }: DashboardContentProps) {
   const isWorkshopWidescreen =
     pathname?.startsWith('/workshop-tasks') &&
     workshopWidescreenEnabled;
+  const shouldApplySidebarOffset = !tabletModeEnabled && (isManager || isActualSuperAdmin);
 
   return (
-    <div className={`transition-all duration-300 ${(isManager || isActualSuperAdmin) ? 'md:pl-16' : ''}`}>
+    <div className={`transition-all duration-300 ${shouldApplySidebarOffset ? 'md:pl-16' : ''}`}>
       <main
         className={`relative z-10 py-8 md:pb-8 ${
           isWorkshopWidescreen
@@ -64,7 +67,7 @@ export function DashboardContent({ children }: DashboardContentProps) {
         style={
           isWorkshopWidescreen
             ? {
-                paddingLeft: (isManager || isActualSuperAdmin) ? '64px' : '65px',
+                paddingLeft: shouldApplySidebarOffset ? '64px' : '65px',
                 paddingRight: '65px',
               }
             : undefined

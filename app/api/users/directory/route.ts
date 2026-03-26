@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { isEffectiveRoleManagerOrHigher } from '@/lib/utils/rbac';
+import { getEffectiveRole } from '@/lib/utils/view-as';
 import { getUsersWithModuleAccess } from '@/lib/server/team-permissions';
 import { ALL_MODULES, type ModuleName } from '@/types/roles';
 
@@ -24,10 +24,24 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const canViewDirectory = await isEffectiveRoleManagerOrHigher();
+  const effectiveRole = await getEffectiveRole();
+  const canViewDirectory = Boolean(
+    effectiveRole.user_id &&
+      (
+        effectiveRole.is_actual_super_admin ||
+        effectiveRole.is_super_admin ||
+        effectiveRole.role_name === 'admin' ||
+        effectiveRole.is_manager_admin
+      )
+  );
   if (!canViewDirectory) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
+  const isAdminOrSuper =
+    effectiveRole.is_actual_super_admin ||
+    effectiveRole.is_super_admin ||
+    effectiveRole.role_name === 'admin';
+  const shouldScopeToTeam = effectiveRole.is_manager_admin && !isAdminOrSuper;
 
   const includeRole = isTruthy(request.nextUrl.searchParams.get('includeRole'));
   const includeAllowance = isTruthy(request.nextUrl.searchParams.get('includeAllowance'));
@@ -57,6 +71,14 @@ export async function GET(request: NextRequest) {
 
   const admin = createAdminClient();
   let query = admin.from('profiles').select(fields.join(', '));
+
+  if (shouldScopeToTeam) {
+    if (effectiveRole.team_id) {
+      query = query.eq('team_id', effectiveRole.team_id);
+    } else {
+      query = query.eq('id', user.id);
+    }
+  }
 
   if (ids.length > 0) {
     query = query.in('id', ids);

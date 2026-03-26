@@ -36,6 +36,7 @@ function buildMockSupabase() {
                   data: [
                     { id: 'emp-a', annual_holiday_allowance_days: 28 },
                     { id: 'emp-b', annual_holiday_allowance_days: 20 },
+                    { id: 'emp-c', annual_holiday_allowance_days: 28 },
                   ],
                   error: null,
                 };
@@ -48,23 +49,28 @@ function buildMockSupabase() {
       if (table === 'absences') {
         return {
           select() {
+            let statusFilter: string | null = null;
             const chain = {
-              eq() {
-                return chain;
-              },
-              in() {
+              eq(field: string, value: string) {
+                if (field === 'status') {
+                  statusFilter = value;
+                }
                 return chain;
               },
               gte() {
                 return chain;
               },
               async lte() {
+                const approvedRows = [
+                  { profile_id: 'emp-a', duration_days: 6 },
+                  { profile_id: 'emp-a', duration_days: 4 },
+                  { profile_id: 'emp-b', duration_days: 23 },
+                ];
+                const pendingRows = [
+                  { profile_id: 'emp-a', duration_days: 3 },
+                ];
                 return {
-                  data: [
-                    { profile_id: 'emp-a', duration_days: 6 },
-                    { profile_id: 'emp-a', duration_days: 4 },
-                    { profile_id: 'emp-b', duration_days: 20 },
-                  ],
+                  data: statusFilter === 'approved' ? approvedRows : approvedRows.concat(pendingRows),
                   error: null,
                 };
               },
@@ -76,6 +82,16 @@ function buildMockSupabase() {
 
       if (table === 'absence_allowance_carryovers') {
         return {
+          select() {
+            return {
+              async eq() {
+                return {
+                  data: [{ profile_id: 'emp-a', carried_days: 2 }],
+                  error: null,
+                };
+              },
+            };
+          },
           delete() {
             return {
               eq(_field: string, value: number | boolean | string) {
@@ -101,7 +117,7 @@ function buildMockSupabase() {
 }
 
 describe('generateFinancialYearCarryovers', () => {
-  it('creates next-year carryover rows from unused allowance', async () => {
+  it('creates next-year carryover rows using approved-only usage and supports negatives', async () => {
     const { supabase, insertedCarryovers, deletedYears } = buildMockSupabase();
 
     const created = await generateFinancialYearCarryovers(
@@ -111,14 +127,30 @@ describe('generateFinancialYearCarryovers', () => {
       'admin-1'
     );
 
-    expect(created).toBe(1);
+    expect(created).toBe(3);
     expect(deletedYears).toContain(2026);
-    expect(insertedCarryovers).toHaveLength(1);
+    expect(insertedCarryovers).toHaveLength(3);
     expect(insertedCarryovers[0]).toMatchObject({
       profile_id: 'emp-a',
       financial_year_start_year: 2026,
       source_financial_year_start_year: 2025,
-      carried_days: 18,
+      carried_days: 20,
+      auto_generated: true,
+      generated_by: 'admin-1',
+    });
+    expect(insertedCarryovers[1]).toMatchObject({
+      profile_id: 'emp-b',
+      financial_year_start_year: 2026,
+      source_financial_year_start_year: 2025,
+      carried_days: -3,
+      auto_generated: true,
+      generated_by: 'admin-1',
+    });
+    expect(insertedCarryovers[2]).toMatchObject({
+      profile_id: 'emp-c',
+      financial_year_start_year: 2026,
+      source_financial_year_start_year: 2025,
+      carried_days: 28,
       auto_generated: true,
       generated_by: 'admin-1',
     });

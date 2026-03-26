@@ -62,7 +62,44 @@ async function assertAbsenceFinancialYearOpen(
 
   if (error) throw error;
   if (!data?.date) throw new Error('Absence record not found');
-  if (isClosedFinancialYearDate(data.date)) {
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError) throw authError;
+  if (!authData.user) throw new Error('Not authenticated');
+
+  const { data: actorProfile, error: actorProfileError } = await supabase
+    .from('profiles')
+    .select('super_admin, role:roles(name, is_manager_admin, is_super_admin)')
+    .eq('id', authData.user.id)
+    .single();
+
+  if (actorProfileError) throw actorProfileError;
+
+  const typedActorProfile = actorProfile as {
+    super_admin?: boolean | null;
+    role?: { name?: string | null; is_manager_admin?: boolean | null; is_super_admin?: boolean | null } | null;
+  } | null;
+  const actorRole = typedActorProfile?.role || null;
+  const actorIsManagerOrHigher = Boolean(
+    typedActorProfile?.super_admin ||
+      actorRole?.is_super_admin ||
+      actorRole?.name === 'admin' ||
+      actorRole?.is_manager_admin
+  );
+  const targetFinancialYearStartYear = getFinancialYear(new Date(`${data.date}T00:00:00`)).start.getFullYear();
+
+  const { data: closureState, error: closureError } = await supabase
+    .from('absence_financial_year_closures')
+    .select('id')
+    .eq('financial_year_start_year', targetFinancialYearStartYear)
+    .maybeSingle();
+
+  if (closureError) throw closureError;
+
+  if (closureState?.id && !actorIsManagerOrHigher) {
+    throw new Error('This financial year is closed for employee bookings. Please contact your manager.');
+  }
+
+  if (isClosedFinancialYearDate(data.date) && !actorIsManagerOrHigher) {
     throw new Error('This absence is in a closed financial year and is read-only');
   }
 }
@@ -472,6 +509,40 @@ export function useCreateAbsence() {
   return useMutation({
     mutationFn: async (absence: AbsenceInsert) => {
       const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { data: actorProfile, error: actorProfileError } = await supabase
+        .from('profiles')
+        .select('super_admin, role:roles(name, is_manager_admin, is_super_admin)')
+        .eq('id', user.id)
+        .single();
+      if (actorProfileError) throw actorProfileError;
+
+      const typedActorProfile = actorProfile as {
+        super_admin?: boolean | null;
+        role?: { name?: string | null; is_manager_admin?: boolean | null; is_super_admin?: boolean | null } | null;
+      } | null;
+      const actorRole = typedActorProfile?.role || null;
+      const actorIsManagerOrHigher = Boolean(
+        typedActorProfile?.super_admin ||
+          actorRole?.is_super_admin ||
+          actorRole?.name === 'admin' ||
+          actorRole?.is_manager_admin
+      );
+      const requestFinancialYearStartYear = getFinancialYear(new Date(`${absence.date}T00:00:00`)).start.getFullYear();
+      const { data: closureState, error: closureError } = await supabase
+        .from('absence_financial_year_closures')
+        .select('id')
+        .eq('financial_year_start_year', requestFinancialYearStartYear)
+        .maybeSingle();
+      if (closureError) throw closureError;
+      if (closureState?.id && !actorIsManagerOrHigher) {
+        throw new Error('This financial year is closed for employee bookings. Please contact your manager.');
+      }
+      if (isClosedFinancialYearDate(absence.date) && !actorIsManagerOrHigher) {
+        throw new Error('This absence is in a closed financial year and is read-only');
+      }
+
       const validatedAbsence = await buildValidatedAbsence(
         supabase,
         {
@@ -485,7 +556,7 @@ export function useCreateAbsence() {
           status: absence.status ?? 'pending',
           notes: absence.notes ?? null,
         },
-        { currentUserId: user?.id }
+        { currentUserId: user.id }
       );
 
       await assertAnnualLeaveAllowanceAvailable(supabase, validatedAbsence);

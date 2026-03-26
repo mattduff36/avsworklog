@@ -73,11 +73,13 @@ interface ErrorLogsDebugPanelProps {
 export function ErrorLogsDebugPanel({ supabase }: ErrorLogsDebugPanelProps) {
   const [errorLogs, setErrorLogs] = useState<ErrorLogEntry[]>([]);
   const [clearingErrors, setClearingErrors] = useState(false);
+  const [confirmClearAll, setConfirmClearAll] = useState(false);
   const [expandedErrors, setExpandedErrors] = useState<string[]>([]);
   const [viewedErrors, setViewedErrors] = useState<Set<string>>(new Set());
   const [lastCheckedErrorId, setLastCheckedErrorId] = useState<string | null>(null);
   const notifyingNewErrorsRef = useRef(false);
   const lastNotifiedErrorIdRef = useRef<string | null>(null);
+  const clearAllConfirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [filterLocalhost, setFilterLocalhost] = useState(true);
   const [filterAdminAccount, setFilterAdminAccount] = useState(true);
@@ -101,6 +103,14 @@ export function ErrorLogsDebugPanel({ supabase }: ErrorLogsDebugPanelProps) {
   useEffect(() => {
     void fetchErrorLogs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (clearAllConfirmTimerRef.current) {
+        clearTimeout(clearAllConfirmTimerRef.current);
+      }
+    };
   }, []);
 
   const fetchErrorLogs = async () => {
@@ -183,18 +193,23 @@ export function ErrorLogsDebugPanel({ supabase }: ErrorLogsDebugPanelProps) {
   };
 
   const clearAllErrorLogs = async () => {
-    const confirmed = await import('@/lib/services/notification.service').then((m) =>
-      m.notify.confirm({
-        title: 'Clear All Error Logs',
-        description: 'Are you sure you want to clear ALL error logs? This cannot be undone.',
-        confirmText: 'Clear All',
-        destructive: true,
-      }),
-    );
-    if (!confirmed) {
+    if (!confirmClearAll) {
+      setConfirmClearAll(true);
+      if (clearAllConfirmTimerRef.current) {
+        clearTimeout(clearAllConfirmTimerRef.current);
+      }
+      clearAllConfirmTimerRef.current = setTimeout(() => {
+        setConfirmClearAll(false);
+        clearAllConfirmTimerRef.current = null;
+      }, 3000);
       return;
     }
 
+    if (clearAllConfirmTimerRef.current) {
+      clearTimeout(clearAllConfirmTimerRef.current);
+      clearAllConfirmTimerRef.current = null;
+    }
+    setConfirmClearAll(false);
     setClearingErrors(true);
     try {
       const { error } = await supabase.from('error_logs').delete().gte('timestamp', '1970-01-01');
@@ -325,13 +340,17 @@ ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional
             </Button>
             <Button
               onClick={clearAllErrorLogs}
-              variant="destructive"
+              variant={confirmClearAll ? 'outline' : 'destructive'}
               size="sm"
               disabled={clearingErrors || errorLogs.length === 0}
-              className="bg-red-600 hover:bg-red-700 text-white border-red-600"
+              className={
+                confirmClearAll
+                  ? 'border-red-500 text-red-300 bg-red-500/10 hover:bg-red-500/20'
+                  : 'bg-red-600 hover:bg-red-700 text-white border-red-600'
+              }
             >
               {clearingErrors ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash className="h-4 w-4 mr-2" />}
-              Clear All
+              {clearingErrors ? 'Clearing...' : confirmClearAll ? 'Confirm?' : 'Clear All'}
             </Button>
           </div>
         </div>

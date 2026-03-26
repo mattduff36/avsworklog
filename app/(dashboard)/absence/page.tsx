@@ -46,7 +46,7 @@ import {
   useAllAbsences,
   useAbsenceRealtimeQueryInvalidation
 } from '@/lib/hooks/useAbsence';
-import { formatDate, formatDateISO, calculateDurationDays, getFinancialYearMonths, getCurrentFinancialYear } from '@/lib/utils/date';
+import { formatDate, formatDateISO, calculateDurationDays, getFinancialYearMonths, getCurrentFinancialYear, getFinancialYear } from '@/lib/utils/date';
 import { ANNUAL_LEAVE_MIN_REMAINING_DAYS } from '@/lib/utils/annual-leave';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isThisMonth } from 'date-fns';
 import { toast } from 'sonner';
@@ -58,6 +58,7 @@ type GenerationStatus = {
   latestGeneratedFinancialYearEndDate: string;
   nextFinancialYearStartYear: number;
   nextFinancialYearLabel: string;
+  closedFinancialYearStartYears?: number[];
 };
 
 function isAnnualLeaveReason(name: string): boolean {
@@ -114,7 +115,8 @@ function isExpectedAbsenceSubmissionError(message: string): boolean {
     normalized.includes('annual leave request exceeds available allowance') ||
     normalized.includes('conflicts with an existing approved/pending booking') ||
     normalized.includes('half-day conflicts') ||
-    normalized.includes('half-day is already booked')
+    normalized.includes('half-day is already booked') ||
+    normalized.includes('financial year is closed for employee bookings')
   );
 }
 
@@ -166,6 +168,10 @@ export default function AbsencePage() {
     };
   }, [selectedFinancialYearStartYear, generationStatus]);
   const bookingMaxDate = generationStatus?.latestGeneratedFinancialYearEndDate || formatDateISO(displayFinancialYear.end);
+  const closedFinancialYearStartYears = useMemo(
+    () => new Set(generationStatus?.closedFinancialYearStartYears || []),
+    [generationStatus?.closedFinancialYearStartYears]
+  );
   const months = useMemo(() => getFinancialYearMonths(displayFinancialYear), [displayFinancialYear]);
   
   // Find current month index in financial year
@@ -344,6 +350,11 @@ export default function AbsencePage() {
   const projectedRemaining = deductsAllowance
     ? calculatedRemaining - requestedDays
     : calculatedRemaining;
+
+  function isClosedFinancialYearRequest(isoDate: string): boolean {
+    const year = getFinancialYear(new Date(`${isoDate}T00:00:00`)).start.getFullYear();
+    return closedFinancialYearStartYears.has(year);
+  }
   
   // Handle form submission
   async function handleSubmit(e: React.FormEvent) {
@@ -361,6 +372,11 @@ export default function AbsencePage() {
 
     if (startDate > bookingMaxDate || (endDate && endDate > bookingMaxDate)) {
       toast.error(`Leave can only be booked up to ${formatDate(bookingMaxDate)}.`);
+      return;
+    }
+
+    if (!(isManager || isAdmin) && (isClosedFinancialYearRequest(startDate) || (endDate && isClosedFinancialYearRequest(endDate)))) {
+      toast.error('This financial year is closed for employee bookings. Please speak to your manager.');
       return;
     }
     
@@ -422,6 +438,10 @@ export default function AbsencePage() {
     if (selectedDate) {
       if (formatDateISO(selectedDate) > bookingMaxDate) {
         toast.error(`Leave can only be booked up to ${formatDate(bookingMaxDate)}.`);
+        return;
+      }
+      if (!(isManager || isAdmin) && isClosedFinancialYearRequest(formatDateISO(selectedDate))) {
+        toast.error('This financial year is closed for employee bookings. Please speak to your manager.');
         return;
       }
       setStartDate(formatDateISO(selectedDate));
@@ -1223,9 +1243,20 @@ export default function AbsencePage() {
                         This date is outside the current booking window ({formatDate(bookingMaxDate)}).
                       </p>
                     )}
+                    {selectedDate && !(isManager || isAdmin) && isClosedFinancialYearRequest(formatDateISO(selectedDate)) && (
+                      <p className="text-xs text-amber-400 mb-3">
+                        This financial year is closed for employee bookings.
+                      </p>
+                    )}
                     <Button
                       onClick={handleRequestFromDay}
-                      disabled={Boolean(selectedDate && formatDateISO(selectedDate) > bookingMaxDate)}
+                      disabled={Boolean(
+                        selectedDate &&
+                        (
+                          formatDateISO(selectedDate) > bookingMaxDate ||
+                          (!(isManager || isAdmin) && isClosedFinancialYearRequest(formatDateISO(selectedDate)))
+                        )
+                      )}
                       className="bg-absence hover:bg-absence-dark text-white"
                     >
                       Request Leave
