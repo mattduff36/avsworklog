@@ -4,12 +4,13 @@ import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type { GetAllErrorReportsResponse, ErrorReportWithUser, ErrorReportStatus } from '@/types/error-reports';
 
-type ErrorReportWithUserRow = Omit<ErrorReportWithUser, 'user'> & {
-  user: Array<{ id: string; full_name: string | null }> | { id: string; full_name: string | null } | null;
-};
+type ErrorReportRow = Omit<ErrorReportWithUser, 'user'>;
 
-function normalizeErrorReportUser(report: ErrorReportWithUserRow): ErrorReportWithUser {
-  const rawUser = Array.isArray(report.user) ? report.user[0] || null : report.user;
+function normalizeErrorReportUser(
+  report: ErrorReportRow,
+  profileMap: Map<string, { id: string; full_name: string | null }>
+): ErrorReportWithUser {
+  const rawUser = profileMap.get(report.created_by) || null;
   return {
     ...report,
     user: rawUser
@@ -65,11 +66,7 @@ export async function GET(request: NextRequest) {
         resolved_by,
         notification_message_id,
         created_at,
-        updated_at,
-        user:created_by(
-          id,
-          full_name
-        )
+        updated_at
       `)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
@@ -91,6 +88,23 @@ export async function GET(request: NextRequest) {
       throw countsError;
     }
 
+    const reportRows = (reports || []) as ErrorReportRow[];
+    const creatorIds = [...new Set(reportRows.map((report) => report.created_by).filter(Boolean))];
+    let profileMap = new Map<string, { id: string; full_name: string | null }>();
+
+    if (creatorIds.length > 0) {
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', creatorIds);
+      if (profilesError) throw profilesError;
+      if (profiles) {
+        profileMap = new Map(
+          profiles.map((profile: { id: string; full_name: string | null }) => [profile.id, profile])
+        );
+      }
+    }
+
     const counts: Record<ErrorReportStatus | 'all', number> = {
       all: allReports?.length || 0,
       new: allReports?.filter((report) => report.status === 'new').length || 0,
@@ -100,7 +114,7 @@ export async function GET(request: NextRequest) {
 
     const response: GetAllErrorReportsResponse = {
       success: true,
-      reports: ((reports || []) as ErrorReportWithUserRow[]).map(normalizeErrorReportUser),
+      reports: reportRows.map((report) => normalizeErrorReportUser(report, profileMap)),
       counts,
     };
 

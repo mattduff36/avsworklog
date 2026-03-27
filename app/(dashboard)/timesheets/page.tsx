@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { PageLoader } from '@/components/ui/page-loader';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Plus, FileText, Clock, CheckCircle2, XCircle, User, Download, Trash2, Filter, Package, AlertTriangle, Loader2 } from 'lucide-react';
@@ -44,6 +45,7 @@ export default function TimesheetsPage() {
   const [timesheets, setTimesheets] = useState<TimesheetWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [employeesLoading, setEmployeesLoading] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<TimesheetStatusFilter>('all');
   const [downloading, setDownloading] = useState<string | null>(null);
@@ -58,6 +60,7 @@ export default function TimesheetsPage() {
   useEffect(() => {
     if (user && isElevatedUser) {
       const fetchEmployees = async () => {
+        setEmployeesLoading(true);
         try {
           const data = await fetchUserDirectory({ module: 'timesheets', limit: 200 });
           setEmployees(
@@ -77,6 +80,8 @@ export default function TimesheetsPage() {
           } else {
             console.error('Error fetching employees:', err);
           }
+        } finally {
+          setEmployeesLoading(false);
         }
       };
 
@@ -344,14 +349,7 @@ export default function TimesheetsPage() {
   };
 
   if (permissionLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <Loader2 className="h-10 w-10 animate-spin text-timesheet mx-auto mb-3" />
-          <p className="text-muted-foreground text-sm">Loading timesheets...</p>
-        </div>
-      </div>
-    );
+    return <PageLoader message="Loading timesheets..." />;
   }
 
   // Don't render if no permission (hook will redirect)
@@ -380,29 +378,38 @@ export default function TimesheetsPage() {
         </div>
         
         {/* Manager: Employee Filter */}
-        {isElevatedUser && employees.length > 0 && (
-          <div className="pt-4 border-t border-border">
-            <div className="flex items-center gap-3 max-w-md">
-              <Label htmlFor="employee-filter" className="text-white text-sm flex items-center gap-2 whitespace-nowrap">
-                <User className="h-4 w-4" />
-                View timesheets for:
-              </Label>
-              <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-                <SelectTrigger id="employee-filter" className="h-10 border-border text-white">
-                  <SelectValue placeholder="Select employee" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Employees</SelectItem>
-                  {employees.map((employee) => (
-                    <SelectItem key={employee.id} value={employee.id} disabled={employee.has_module_access === false}>
-                      {employee.full_name}
-                      {employee.employee_id && ` (${employee.employee_id})`}
-                      {employee.has_module_access === false && ' - No Timesheets access'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        {isElevatedUser && (
+          <div className="pt-4 border-t border-border min-h-[72px]">
+            {employeesLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading employee filter...
+              </div>
+            ) : employees.length > 0 ? (
+              <div className="flex items-center gap-3 max-w-md">
+                <Label htmlFor="employee-filter" className="text-white text-sm flex items-center gap-2 whitespace-nowrap">
+                  <User className="h-4 w-4" />
+                  View timesheets for:
+                </Label>
+                <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+                  <SelectTrigger id="employee-filter" className="h-10 border-border text-white">
+                    <SelectValue placeholder="Select employee" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Employees</SelectItem>
+                    {employees.map((employee) => (
+                      <SelectItem key={employee.id} value={employee.id} disabled={employee.has_module_access === false}>
+                        {employee.full_name}
+                        {employee.employee_id && ` (${employee.employee_id})`}
+                        {employee.has_module_access === false && ' - No Timesheets access'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No employees available for filtering.</p>
+            )}
           </div>
         )}
       </div>

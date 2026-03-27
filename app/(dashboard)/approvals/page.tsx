@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileText, Clock, CheckCircle2, XCircle, User, Filter, Calendar, Package, LayoutGrid, Table2, Settings2 } from 'lucide-react';
+import { FileText, Clock, CheckCircle2, XCircle, User, Filter, Calendar, Package, LayoutGrid, Table2, Settings2, Loader2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -37,6 +37,7 @@ import type { ColumnVisibility } from './components/TimesheetsApprovalTable';
 import { AbsencesApprovalTable, ABSENCE_COLUMN_VISIBILITY_STORAGE_KEY, DEFAULT_ABSENCE_COLUMN_VISIBILITY } from './components/AbsencesApprovalTable';
 import type { AbsenceColumnVisibility } from './components/AbsencesApprovalTable';
 import { ProcessTimesheetModal } from './components/ProcessTimesheetModal';
+import { PageLoader } from '@/components/ui/page-loader';
 
 function isAnnualLeaveReason(name: string): boolean {
   return name.trim().toLowerCase() === 'annual leave';
@@ -65,6 +66,7 @@ function ApprovalsContent() {
   
   const [timesheets, setTimesheets] = useState<TimesheetWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasLoadedTimesheets, setHasLoadedTimesheets] = useState(false);
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'timesheets');
   const [timesheetFilter, setTimesheetFilter] = useState<TimesheetStatusFilter>('pending');
   const statusFilter: StatusFilter = timesheetFilter;
@@ -131,7 +133,7 @@ function ApprovalsContent() {
   const [processingInProgress, setProcessingInProgress] = useState(false);
   
   // Absence hooks
-  const { data: absences } = usePendingAbsences();
+  const { data: absences, isLoading: absencesLoading } = usePendingAbsences();
   const approveAbsence = useApproveAbsence();
   const rejectAbsence = useRejectAbsence();
   useAbsenceRealtimeQueryInvalidation();
@@ -145,7 +147,7 @@ function ApprovalsContent() {
         .from('timesheets')
         .select(`
           *,
-          user:profiles!user_id (
+          user:profiles!timesheets_user_id_fkey (
             full_name,
             employee_id
           ),
@@ -180,6 +182,7 @@ function ApprovalsContent() {
       console.error('Error fetching approvals:', error);
     } finally {
       setLoading(false);
+      setHasLoadedTimesheets(true);
     }
   }, [supabase]);
 
@@ -191,7 +194,7 @@ function ApprovalsContent() {
       }
       fetchApprovals(statusFilter);
     }
-  }, [canViewApprovals, permissionLoading, router, fetchApprovals, statusFilter, activeTab]);
+  }, [canViewApprovals, permissionLoading, router, fetchApprovals, statusFilter]);
 
   const handleQuickApprove = async (_type: 'timesheet', id: string) => {
     try {
@@ -265,12 +268,8 @@ function ApprovalsContent() {
     }
   };
 
-  if (permissionLoading || loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <p className="text-muted-foreground">Loading approvals...</p>
-      </div>
-    );
+  if (permissionLoading || (!hasLoadedTimesheets && loading)) {
+    return <PageLoader message="Loading approvals..." />;
   }
 
   const totalCount = timesheets.length;
@@ -461,7 +460,13 @@ function ApprovalsContent() {
           </Card>
 
           <TabsContent value="timesheets" className="mt-6 space-y-4">
-            {timesheets.length === 0 ? (
+            {loading ? (
+              <Card className="border-border">
+                <CardContent className="flex items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </CardContent>
+              </Card>
+            ) : timesheets.length === 0 ? (
               <Card className="border-border">
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   {statusFilter === 'pending' ? (
@@ -619,7 +624,13 @@ function ApprovalsContent() {
           {/* Inspections tab removed - inspections no longer require approvals */}
 
           <TabsContent value="absences" className="mt-6 space-y-4">
-            {!absences || absences.length === 0 ? (
+            {absencesLoading ? (
+              <Card className="border-border">
+                <CardContent className="flex items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </CardContent>
+              </Card>
+            ) : !absences || absences.length === 0 ? (
               <Card className="border-border">
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <CheckCircle2 className="h-12 w-12 text-green-400 mb-3" />
@@ -953,7 +964,7 @@ function AbsenceApprovalCard({
 
 export default function ApprovalsPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><p className="text-muted-foreground">Loading...</p></div>}>
+    <Suspense fallback={<PageLoader message="Loading approvals..." />}>
       <ApprovalsContent />
     </Suspense>
   );

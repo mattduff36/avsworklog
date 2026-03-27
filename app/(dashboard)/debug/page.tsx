@@ -6,8 +6,9 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageLoader } from '@/components/ui/page-loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Bug, Car, Clock, Database, History, Loader2, RefreshCw, Send, ShieldAlert, Users } from 'lucide-react';
+import { Bug, Car, Clock, Database, History, RefreshCw, Send, ShieldAlert, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { DebugInfo } from './types';
 
@@ -113,11 +114,7 @@ export default function DebugPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-      </div>
-    );
+    return <PageLoader message="Loading debug tools..." />;
   }
 
   if (!authorized) {

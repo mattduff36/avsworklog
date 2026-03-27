@@ -3,9 +3,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Loader2, Plus, Receipt, Settings } from 'lucide-react';
+import { Plus, Receipt, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
+import { PageLoader } from '@/components/ui/page-loader';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { QuotesTable } from './components/QuotesTable';
@@ -177,11 +178,7 @@ export default function QuotesPage() {
   }
 
   if (permissionLoading || loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-avs-yellow" />
-      </div>
-    );
+    return <PageLoader message="Loading quotes..." />;
   }
 
   return (

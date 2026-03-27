@@ -536,15 +536,6 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     };
   });
 
-  // Check if a specific alert has a matching workshop task
-  const hasMatchingTask = (vehicle: VehicleWithAlerts, alert: Alert, tasks: WorkshopTask[]): boolean => {
-    if (!tasks || tasks.length === 0) return false;
-    const regNumber = vehicle.vehicle?.reg_number || vehicle.vehicle?.plant_id || 'Unknown';
-    const activeTasks = tasks.filter(t => t.status !== 'completed');
-    const { title } = getTaskContent(alert.type as AlertType, regNumber, '');
-    return activeTasks.some(task => task.title === title || task.description?.includes(title));
-  };
-
   const handleCreateTask = (vehicleId: string, alert: Alert) => {
     setCreateTaskVehicleId(vehicleId);
     setCreateTaskCategoryId(maintenanceCategoryId);
@@ -1083,8 +1074,16 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     const { vehicle, alert: cardAlert, entryKey, vehicleId, isPlant } = entry;
     const isExpanded = expandedVehicles.has(entryKey);
     const historyData = vehicleHistory[vehicleId];
-    
-    const hasExistingTask = historyData && !historyData.loading && hasMatchingTask(vehicle, cardAlert, historyData.workshopTasks);
+    const historyResolved = Boolean(historyData) && !historyData.loading;
+    const regNumber = vehicle.vehicle?.reg_number || vehicle.vehicle?.plant_id || 'Unknown';
+    const { title: expectedTitle } = getTaskContent(cardAlert.type as AlertType, regNumber, '');
+    const relatedTask = historyResolved
+      ? historyData?.workshopTasks.find(task => {
+          if (task.status === 'completed') return false;
+          return task.title === expectedTitle || task.description?.includes(expectedTitle);
+        }) || null
+      : null;
+    const hasExistingTask = Boolean(relatedTask);
     
     return (
       <Card 
@@ -1122,16 +1121,11 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                 </div>
               </div>
               
-              {/* Status Badge - Top Right Corner (only show if task exists) */}
-              {hasExistingTask && (() => {
-                const regNumber = vehicle.vehicle?.reg_number || vehicle.vehicle?.plant_id || 'Unknown';
-                const { title: expectedTitle } = getTaskContent(cardAlert.type as AlertType, regNumber, '');
-                const relatedTask = historyData?.workshopTasks.find(task => {
-                  if (task.status === 'completed') return false;
-                  return task.title === expectedTitle || task.description?.includes(expectedTitle);
-                });
-                if (!relatedTask) return null;
-                return (
+              {/* Status area: reserve space to avoid action jump while task state resolves */}
+              <div className="min-h-[32px] min-w-[120px] flex items-start justify-end">
+                {!historyResolved ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mt-1" />
+                ) : relatedTask ? (
                   <Badge 
                     variant="outline" 
                     className={`text-sm px-3 py-1 font-semibold ${
@@ -1144,8 +1138,8 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                   >
                     {relatedTask.status === 'logged' || relatedTask.status === 'in_progress' ? 'In Progress' : relatedTask.status === 'pending' ? 'Pending' : 'On Hold'}
                   </Badge>
-                );
-              })()}
+                ) : null}
+              </div>
             </div>
             
             {/* Service Information - Horizontal Row with Status Badge and Chevron */}
@@ -1267,102 +1261,96 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
               </div>
               
               {/* Action Button - Bottom Right (mutually exclusive: Office Action OR Create Task OR Expand OR Loading) */}
-              {historyData?.loading ? (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="flex-shrink-0 text-muted-foreground"
-                  disabled
-                >
-                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  Loading...
-                </Button>
-              ) : !hasExistingTask ? (
-                (() => {
-                  const responsibility = getCategoryResponsibility(cardAlert.type);
-                  
-                  if (responsibility === 'office') {
+              <div className="flex-shrink-0 min-w-[132px] flex justify-end">
+                {!historyResolved ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-muted-foreground"
+                    disabled
+                  >
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    Loading...
+                  </Button>
+                ) : !hasExistingTask ? (
+                  (() => {
+                    const responsibility = getCategoryResponsibility(cardAlert.type);
+                    
+                    if (responsibility === 'office') {
+                      return (
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOfficeAction(vehicleId, vehicle, cardAlert);
+                          }}
+                        >
+                          <Briefcase className="h-4 w-4 mr-1" />
+                          Office Action
+                        </Button>
+                      );
+                    }
+                    
                     return (
                       <Button
                         size="sm"
                         variant="default"
-                        className="flex-shrink-0 bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900"
+                        className="bg-workshop hover:bg-workshop-dark text-white"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleOfficeAction(vehicleId, vehicle, cardAlert);
+                          handleCreateTask(vehicleId, cardAlert);
                         }}
                       >
-                        <Briefcase className="h-4 w-4 mr-1" />
-                        Office Action
+                        <Wrench className="h-4 w-4 mr-1" />
+                        Create Task
                       </Button>
                     );
-                  }
-                  
-                  return (
-                    <Button
-                      size="sm"
-                      variant="default"
-                      className="flex-shrink-0 bg-workshop hover:bg-workshop-dark text-white"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleCreateTask(vehicleId, cardAlert);
-                      }}
-                    >
-                      <Wrench className="h-4 w-4 mr-1" />
-                      Create Task
-                    </Button>
-                  );
-                })()
-              ) : (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="flex-shrink-0 text-muted-foreground hover:text-white hover:bg-slate-800"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleEntry(entryKey, vehicleId, isPlant);
-                  }}
-                >
-                  {isExpanded ? (
-                    <>
-                      <ChevronUp className="h-4 w-4 mr-1" />
-                      Collapse
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDown className="h-4 w-4 mr-1" />
-                      Expand
-                    </>
-                  )}
-                </Button>
-              )}
+                  })()
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-muted-foreground hover:text-white hover:bg-slate-800"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleEntry(entryKey, vehicleId, isPlant);
+                    }}
+                  >
+                    {isExpanded ? (
+                      <>
+                        <ChevronUp className="h-4 w-4 mr-1" />
+                        Collapse
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="h-4 w-4 mr-1" />
+                        Expand
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Expanded View - Workshop Tasks */}
           {isExpanded && (
             <div className="mt-4 pt-4 border-t border-border" onClick={(e) => e.stopPropagation()}>
-              {historyData?.loading ? (
+              {!historyResolved ? (
                 <div className="flex items-center justify-center py-6">
                   <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
                 </div>
-              ) : (() => {
-                const regNumber = vehicle.vehicle?.reg_number || vehicle.vehicle?.plant_id || 'Unknown';
-                const { title: expectedTitle } = getTaskContent(cardAlert.type as AlertType, regNumber, '');
-                const relatedTask = historyData?.workshopTasks.find(task => {
-                  if (task.status === 'completed') return false;
-                  return task.title === expectedTitle || task.description?.includes(expectedTitle);
-                });
-                
-                if (!relatedTask) {
-                  return <p className="text-sm text-muted-foreground py-4 text-center">No active workshop task found</p>;
-                }
-                
-                // Ensure task has van_id for handlers (TaskForCompletion requires van_id: string | null)
-                const taskWithVehicleId = { ...relatedTask, van_id: vehicleId ?? null };
-                
-                // Display task details directly
-                return (
+              ) : !relatedTask ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">No active workshop task found</p>
+              ) : (
+                (() => {
+                  // Ensure task has van_id for handlers (TaskForCompletion requires van_id: string | null)
+                  const taskWithVehicleId = { ...relatedTask, van_id: vehicleId ?? null };
+
+                  // Display task details directly
+                  return (
                   <div className="bg-slate-800/50 rounded-lg p-4 space-y-3">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 space-y-2">
@@ -1515,8 +1503,9 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                       )}
                     </div>
                   </div>
-                );
-              })()}
+                  );
+                })()
+              )}
             </div>
           )}
         </CardContent>

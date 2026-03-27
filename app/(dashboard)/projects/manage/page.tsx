@@ -24,6 +24,7 @@ import type { ManageDocumentRow, ManageDocumentsQuery } from '@/types/rams';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { PageLoader } from '@/components/ui/page-loader';
 import { FileText, Upload, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Monitor } from 'lucide-react';
@@ -298,11 +299,7 @@ export default function ProjectsManagePage() {
 
   // Auth guard loading
   if (authLoading || (!isManager && !isAdmin)) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <PageLoader message="Loading project management..." />;
   }
 
   return (

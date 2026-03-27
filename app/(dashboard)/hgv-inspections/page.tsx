@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { PageLoader } from '@/components/ui/page-loader';
 import { Clipboard, Clock, Download, Filter, Loader2, Plus, Trash2, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
@@ -233,6 +234,8 @@ function HgvInspectionsContent() {
     }
   };
 
+  const showInitialLoading = loading && inspections.length === 0;
+
   const getInspectionIcon = (inspection: HgvInspectionWithRelations) => {
     const iconColorClass = inspection.has_inform_workshop_task
       ? 'text-inspection'
@@ -310,7 +313,7 @@ function HgvInspectionsContent() {
         </Card>
       )}
 
-      {loading ? (
+      {showInitialLoading ? (
         <div className="flex items-center justify-center py-20">
           <div className="text-center">
             <Loader2 className="h-10 w-10 animate-spin text-inspection mx-auto mb-3" />
@@ -333,6 +336,12 @@ function HgvInspectionsContent() {
         </Card>
       ) : (
         <>
+          {loading && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Refreshing HGV checks...
+            </div>
+          )}
           <div className="grid gap-4">
             {inspections.slice(0, displayCount).map((inspection) => (
             <Card
@@ -411,7 +420,7 @@ function HgvInspectionsContent() {
 
 export default function HgvInspectionsPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><p className="text-muted-foreground">Loading...</p></div>}>
+    <Suspense fallback={<PageLoader message="Loading HGV inspections..." />}>
       <HgvInspectionsContent />
     </Suspense>
   );

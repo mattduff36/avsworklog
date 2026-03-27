@@ -57,8 +57,10 @@ type Employee = {
 };
 
 type GenerationStatus = {
+  currentFinancialYearStartYear: number;
   latestGeneratedFinancialYearStartYear: number;
   latestGeneratedFinancialYearLabel: string;
+  closedFinancialYearStartYears: number[];
 };
 
 type DetailVisibility = {
@@ -169,6 +171,20 @@ function parseIsoDateAsLocalMidnight(isoDate: string): Date {
   return new Date(year, month - 1, day);
 }
 
+function getOldestOpenFinancialYearStartYear(
+  currentFinancialYearStartYear: number,
+  latestGeneratedFinancialYearStartYear: number,
+  closedFinancialYearStartYears: number[]
+): number {
+  const closedYears = new Set(closedFinancialYearStartYears);
+  for (let year = currentFinancialYearStartYear; year <= latestGeneratedFinancialYearStartYear; year += 1) {
+    if (!closedYears.has(year)) {
+      return year;
+    }
+  }
+  return latestGeneratedFinancialYearStartYear;
+}
+
 export function AbsenceCalendarAdmin() {
   const [generationStatus, setGenerationStatus] = useState<GenerationStatus | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -183,24 +199,45 @@ export function AbsenceCalendarAdmin() {
 
   const currentFinancialYear = getCurrentFinancialYear();
   const currentFinancialYearStartYear = currentFinancialYear.start.getFullYear();
+  const generationCurrentFinancialYearStartYear =
+    generationStatus?.currentFinancialYearStartYear ?? currentFinancialYearStartYear;
   const latestGeneratedFinancialYearStartYear =
     generationStatus?.latestGeneratedFinancialYearStartYear || currentFinancialYearStartYear;
   const availableFinancialYearStartYears = useMemo(() => {
-    const fromYear = Math.min(currentFinancialYearStartYear, latestGeneratedFinancialYearStartYear);
-    const toYear = Math.max(currentFinancialYearStartYear, latestGeneratedFinancialYearStartYear);
+    const fromYear = Math.min(generationCurrentFinancialYearStartYear, latestGeneratedFinancialYearStartYear);
+    const toYear = Math.max(generationCurrentFinancialYearStartYear, latestGeneratedFinancialYearStartYear);
     const years: number[] = [];
     for (let year = fromYear; year <= toYear; year += 1) {
       years.push(year);
     }
     return years.reverse();
-  }, [currentFinancialYearStartYear, latestGeneratedFinancialYearStartYear]);
+  }, [generationCurrentFinancialYearStartYear, latestGeneratedFinancialYearStartYear]);
+  const oldestOpenFinancialYearStartYear = useMemo(
+    () =>
+      getOldestOpenFinancialYearStartYear(
+        generationCurrentFinancialYearStartYear,
+        latestGeneratedFinancialYearStartYear,
+        generationStatus?.closedFinancialYearStartYears || []
+      ),
+    [generationCurrentFinancialYearStartYear, latestGeneratedFinancialYearStartYear, generationStatus?.closedFinancialYearStartYears]
+  );
   const [selectedFinancialYearStartYear, setSelectedFinancialYearStartYear] = useState(currentFinancialYearStartYear);
 
   useEffect(() => {
+    if (!generationStatus) return;
+    setSelectedFinancialYearStartYear(oldestOpenFinancialYearStartYear);
+  }, [generationStatus, oldestOpenFinancialYearStartYear]);
+
+  useEffect(() => {
     if (!availableFinancialYearStartYears.includes(selectedFinancialYearStartYear)) {
-      setSelectedFinancialYearStartYear(currentFinancialYearStartYear);
+      setSelectedFinancialYearStartYear(oldestOpenFinancialYearStartYear);
     }
-  }, [availableFinancialYearStartYears, selectedFinancialYearStartYear, currentFinancialYearStartYear]);
+  }, [availableFinancialYearStartYears, selectedFinancialYearStartYear, oldestOpenFinancialYearStartYear]);
+  const closedFinancialYearStartYears = useMemo(
+    () => new Set(generationStatus?.closedFinancialYearStartYears || []),
+    [generationStatus?.closedFinancialYearStartYears]
+  );
+  const isSelectedFinancialYearClosed = closedFinancialYearStartYears.has(selectedFinancialYearStartYear);
 
   const displayFinancialYear = useMemo(() => {
     const startYear = selectedFinancialYearStartYear;
@@ -658,21 +695,47 @@ export function AbsenceCalendarAdmin() {
               <CardDescription className="text-muted-foreground">
                 Detailed team calendar ({displayFinancialYear.label})
               </CardDescription>
+              {isSelectedFinancialYearClosed ? (
+                <p className="mt-2 text-xs text-amber-300">
+                  This financial year is closed and read-only.
+                </p>
+              ) : null}
             </div>
             <div className="flex gap-2">
               <Select
                 value={String(selectedFinancialYearStartYear)}
                 onValueChange={(value) => setSelectedFinancialYearStartYear(Number(value))}
               >
-                <SelectTrigger className="w-[160px] border-border text-muted-foreground">
-                  <SelectValue placeholder="Financial Year" />
+                <SelectTrigger className="w-[190px] border-border text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <span>{displayFinancialYear.label}</span>
+                    {isSelectedFinancialYearClosed ? (
+                      <Badge variant="outline" className="border-amber-500/50 bg-amber-500/10 text-amber-300 text-[10px] uppercase">
+                        Closed
+                      </Badge>
+                    ) : null}
+                  </div>
                 </SelectTrigger>
                 <SelectContent>
-                  {availableFinancialYearStartYears.map((startYear) => (
-                    <SelectItem key={startYear} value={String(startYear)}>
-                      {startYear}/{(startYear + 1).toString().slice(-2)}
-                    </SelectItem>
-                  ))}
+                  {availableFinancialYearStartYears.map((startYear) => {
+                    const label = `${startYear}/${(startYear + 1).toString().slice(-2)}`;
+                    const isClosedYearOption = closedFinancialYearStartYears.has(startYear);
+                    return (
+                      <SelectItem key={startYear} value={String(startYear)}>
+                        <div className="flex items-center gap-2">
+                          <span>{label}</span>
+                          {isClosedYearOption ? (
+                            <Badge
+                              variant="outline"
+                              className="border-amber-500/50 bg-amber-500/10 text-amber-300 text-[10px] uppercase"
+                            >
+                              Closed
+                            </Badge>
+                          ) : null}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
               <Button
@@ -760,6 +823,10 @@ export function AbsenceCalendarAdmin() {
                       {segments
                         .filter((segment) => segment.lane === laneIndex)
                         .map((segment) => {
+                          const isSingleDayHalfBooking =
+                            segment.event.isHalfDay && segment.startCol === segment.endCol;
+                          const isAmHalfDay = isSingleDayHalfBooking && segment.event.halfDaySession === 'AM';
+                          const isPmHalfDay = isSingleDayHalfBooking && segment.event.halfDaySession === 'PM';
                           const statusClass =
                             segment.event.status === 'pending'
                               ? 'border-amber-500/50 text-amber-300'
@@ -790,11 +857,14 @@ export function AbsenceCalendarAdmin() {
                               key={`${segment.event.id}-${segment.startCol}-${segment.endCol}`}
                               type="button"
                               onClick={() => handleDayClick(segment.event.start)}
-                              className={`h-10 rounded-sm border px-2 py-1 text-left ${statusClass}`}
+                              className={`h-10 rounded-sm border px-2 py-1 text-left ${statusClass} ${
+                                isAmHalfDay ? 'justify-self-start' : isPmHalfDay ? 'justify-self-end' : ''
+                              }`}
                               style={{
                                 gridColumn: `${segment.startCol + 1} / ${segment.endCol + 2}`,
                                 backgroundColor: `${segment.event.reasonColor}33`,
                                 borderLeft: `3px solid ${leftIndicatorColor}`,
+                                width: isSingleDayHalfBooking ? 'calc(50% - 2px)' : undefined,
                               }}
                               title={`${segment.event.employeeName} - ${segment.event.reasonName}${extraDetails.length ? ` (${extraDetails.join(' • ')})` : ''}`}
                             >
@@ -853,8 +923,8 @@ export function AbsenceCalendarAdmin() {
                       className="p-3 rounded bg-slate-800/50 border border-border"
                       style={{ borderLeftWidth: '3px', borderLeftColor: event.reasonColor }}
                     >
-                      <div className="flex items-start justify-between">
-                        <div>
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0 flex-1">
                           <p className="font-medium text-foreground flex items-center gap-2">
                             <span className="h-2.5 w-2.5 rounded-full flex-shrink-0 ring-1 ring-white/10" style={{ backgroundColor: event.reasonColor }} />
                             {event.reasonName}
@@ -895,7 +965,7 @@ export function AbsenceCalendarAdmin() {
 
                           {event.notes && <p className="text-xs text-muted-foreground mt-1">{event.notes}</p>}
                         </div>
-                        <div className="flex flex-col items-end gap-2">
+                        <div className="flex min-h-[132px] w-24 flex-col items-end justify-between">
                           <Badge
                             variant="outline"
                             className={
@@ -910,40 +980,43 @@ export function AbsenceCalendarAdmin() {
                           >
                             {event.status}
                           </Badge>
-                          {(() => {
-                            const target = (absences || []).find((absence) => absence.id === event.id) || null;
-                            const canEditTarget = Boolean(target && canEditAbsence(target));
+                          <div className="flex w-full flex-col items-stretch gap-2">
+                            {(() => {
+                              const target = (absences || []).find((absence) => absence.id === event.id) || null;
+                            const canEditTarget = Boolean(target && canEditAbsence(target) && !isSelectedFinancialYearClosed);
 
-                            return (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (target && canEditTarget) {
-                                    setEditTarget(target);
-                                  }
-                                }}
-                                disabled={!canEditTarget}
-                                className="border-absence/30 text-absence hover:bg-absence/10 hover:text-absence h-7 px-2 text-xs"
-                              >
-                                <Pencil className="h-3 w-3 mr-1" />
-                                Edit
-                              </Button>
-                            );
-                          })()}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeleteTargetId(event.id);
-                            }}
-                            className="border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300 h-7 px-2 text-xs"
-                          >
-                            <Trash2 className="h-3 w-3 mr-1" />
-                            Delete
-                          </Button>
+                              return (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (target && canEditTarget) {
+                                      setEditTarget(target);
+                                    }
+                                  }}
+                                  disabled={!canEditTarget}
+                                  className="w-full border-absence/30 text-absence hover:bg-absence/10 hover:text-absence h-7 px-2 text-xs"
+                                >
+                                  <Pencil className="h-3 w-3 mr-1" />
+                                  Edit
+                                </Button>
+                              );
+                            })()}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteTargetId(event.id);
+                              }}
+                            disabled={isSelectedFinancialYearClosed}
+                              className="w-full border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300 h-7 px-2 text-xs"
+                            >
+                              <Trash2 className="h-3 w-3 mr-1" />
+                              Delete
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </div>

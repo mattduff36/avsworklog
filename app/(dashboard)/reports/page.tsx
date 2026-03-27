@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
+import { PageLoader } from '@/components/ui/page-loader';
 import { toast } from 'sonner';
 import { 
   FileText, 
@@ -327,6 +328,12 @@ export default function ReportsPage() {
       });
     }
   };
+
+  const isInitialLoading = !dateFrom || !dateTo;
+
+  if (isInitialLoading) {
+    return <PageLoader message="Preparing reports..." />;
+  }
 
   return (
     <div className="space-y-6 max-w-6xl">

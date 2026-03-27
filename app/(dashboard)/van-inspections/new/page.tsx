@@ -17,6 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { PageLoader } from '@/components/ui/page-loader';
 import { Save, Send, CheckCircle2, XCircle, AlertCircle, Info, User, Plus, Check, Camera, AlertTriangle } from 'lucide-react';
 import { BackButton } from '@/components/ui/back-button';
 import { formatDateISO, formatDate, getWeekEnding } from '@/lib/utils/date';
@@ -2502,7 +2503,7 @@ function NewInspectionContent() {
 
 export default function NewInspectionPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><p className="text-muted-foreground">Loading...</p></div>}>
+    <Suspense fallback={<PageLoader message="Loading van inspection form..." />}>
       <NewInspectionContent />
     </Suspense>
   );

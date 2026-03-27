@@ -27,11 +27,14 @@ export async function POST(request: Request) {
 
     const body = (await request.json().catch(() => ({}))) as {
       notes?: string;
+      financialYearStartYear?: number;
     };
 
     const result = await closeCurrentFinancialYearBookings({
       supabase,
       actorProfileId: profile.id,
+      financialYearStartYear:
+        typeof body.financialYearStartYear === 'number' ? body.financialYearStartYear : undefined,
       notes: body.notes,
     });
 

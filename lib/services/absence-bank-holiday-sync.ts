@@ -690,15 +690,17 @@ export async function generateNextFinancialYearAllowances(
 interface CloseCurrentFinancialYearOptions {
   supabase: AnySupabase;
   actorProfileId: string;
+  financialYearStartYear?: number;
   notes?: string;
 }
 
 export async function closeCurrentFinancialYearBookings(
   options: CloseCurrentFinancialYearOptions
 ): Promise<AbsenceGenerationCloseResult> {
-  const currentFinancialYearStartYear = getFinancialYearStartYear(new Date());
+  const targetFinancialYearStartYear =
+    options.financialYearStartYear ?? getFinancialYearStartYear(new Date());
   const { data, error } = await options.supabase.rpc('close_absence_financial_year_bookings', {
-    p_financial_year_start_year: currentFinancialYearStartYear,
+    p_financial_year_start_year: targetFinancialYearStartYear,
     p_actor_profile_id: options.actorProfileId,
     p_notes: options.notes || null,
   });

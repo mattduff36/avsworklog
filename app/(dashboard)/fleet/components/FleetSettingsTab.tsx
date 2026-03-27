@@ -10,10 +10,13 @@ interface FleetSettingsTabProps {
   categories: Category[];
   categoriesLoading: boolean;
   vehicles: Vehicle[];
+  vehiclesLoading: boolean;
   plantAssets: PlantAsset[];
+  plantAssetsLoading: boolean;
   hgvCategories: HgvCategory[];
   hgvCategoriesLoading: boolean;
   hgvAssets: HgvAsset[];
+  hgvAssetsLoading: boolean;
   plantCategoriesExpanded: boolean;
   vanCategoriesExpanded: boolean;
   hgvCategoriesExpanded: boolean;
@@ -34,10 +37,13 @@ export function FleetSettingsTab({
   categories,
   categoriesLoading,
   vehicles,
+  vehiclesLoading,
   plantAssets,
+  plantAssetsLoading,
   hgvCategories,
   hgvCategoriesLoading,
   hgvAssets,
+  hgvAssetsLoading,
   plantCategoriesExpanded,
   vanCategoriesExpanded,
   hgvCategoriesExpanded,
@@ -134,9 +140,13 @@ export function FleetSettingsTab({
                                 </div>
                                 <div className="flex items-center gap-4">
                                   <div className="text-right">
-                                    <div className="text-2xl font-bold text-orange-400">
-                                      {plantCount}
-                                    </div>
+                                    {plantAssetsLoading ? (
+                                      <Loader2 className="h-5 w-5 animate-spin text-orange-400 ml-auto" />
+                                    ) : (
+                                      <div className="text-2xl font-bold text-orange-400">
+                                        {plantCount}
+                                      </div>
+                                    )}
                                     <p className="text-xs text-muted-foreground">plant assets</p>
                                   </div>
                                   <div className="flex gap-1">
@@ -247,9 +257,13 @@ export function FleetSettingsTab({
                               </div>
                               <div className="flex items-center gap-4">
                                 <div className="text-right">
-                                  <div className="text-2xl font-bold text-blue-400">
-                                    {vehicles.filter(v => v.category_id === category.id).length}
-                                  </div>
+                                  {vehiclesLoading ? (
+                                    <Loader2 className="h-5 w-5 animate-spin text-blue-400 ml-auto" />
+                                  ) : (
+                                    <div className="text-2xl font-bold text-blue-400">
+                                      {vehicles.filter(v => v.category_id === category.id).length}
+                                    </div>
+                                  )}
                                   <p className="text-xs text-muted-foreground">vans</p>
                                 </div>
                                 <div className="flex gap-1">
@@ -351,7 +365,11 @@ export function FleetSettingsTab({
                               </div>
                               <div className="flex items-center gap-4">
                                 <div className="text-right">
-                                  <div className="text-2xl font-bold text-emerald-400">{hgvCount}</div>
+                                  {hgvAssetsLoading ? (
+                                    <Loader2 className="h-5 w-5 animate-spin text-emerald-400 ml-auto" />
+                                  ) : (
+                                    <div className="text-2xl font-bold text-emerald-400">{hgvCount}</div>
+                                  )}
                                   <p className="text-xs text-muted-foreground">HGVs</p>
                                 </div>
                                 <div className="flex gap-1">

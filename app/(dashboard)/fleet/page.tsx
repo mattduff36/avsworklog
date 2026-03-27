@@ -31,6 +31,7 @@ import { FleetSettingsTab } from './components/FleetSettingsTab';
 import { FleetCategoryDialogs } from './components/FleetCategoryDialogs';
 import { AddAssetFlowDialog } from '@/app/(dashboard)/maintenance/components/add-asset/AddAssetFlowDialog';
 import { Button } from '@/components/ui/button';
+import { PageLoader } from '@/components/ui/page-loader';
 import type { Category, HgvAsset, HgvCategory, PlantAsset, Vehicle } from './types';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 
@@ -103,7 +104,9 @@ function FleetContent() {
   
   // State for vehicles and categories
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [vehiclesLoading, setVehiclesLoading] = useState(false);
   const [plantAssets, setPlantAssets] = useState<PlantAsset[]>([]); // Separate state for plant assets
+  const [plantAssetsLoading, setPlantAssetsLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   
@@ -116,11 +119,13 @@ function FleetContent() {
   const [hgvCategories, setHgvCategories] = useState<HgvCategory[]>([]);
   const [hgvCategoriesLoading, setHgvCategoriesLoading] = useState(false);
   const [hgvAssets, setHgvAssets] = useState<HgvAsset[]>([]);
+  const [hgvAssetsLoading, setHgvAssetsLoading] = useState(false);
   
   const [searchQuery, setSearchQuery] = useState('');
   
   // Fetch vehicles
   const fetchVehicles = async () => {
+    setVehiclesLoading(true);
     try {
       const response = await fetch('/api/admin/vans');
       const data = await response.json();
@@ -129,11 +134,14 @@ function FleetContent() {
       }
     } catch (error) {
       logger.error('Failed to fetch vehicles', error, 'FleetPage');
+    } finally {
+      setVehiclesLoading(false);
     }
   };
 
   // Fetch plant assets
   const fetchPlantAssets = async () => {
+    setPlantAssetsLoading(true);
     try {
       const { data, error } = await supabase
         .from('plant')
@@ -144,6 +152,8 @@ function FleetContent() {
       setPlantAssets(data || []);
     } catch (error) {
       logger.error('Failed to fetch plant assets', error, 'FleetPage');
+    } finally {
+      setPlantAssetsLoading(false);
     }
   };
 
@@ -165,6 +175,7 @@ function FleetContent() {
 
   // Fetch HGV assets
   const fetchHgvAssets = async () => {
+    setHgvAssetsLoading(true);
     try {
       const { data, error } = await supabase
         .from('hgvs')
@@ -176,6 +187,8 @@ function FleetContent() {
       setHgvAssets(data || []);
     } catch (error) {
       logger.error('Failed to fetch HGV assets', error, 'FleetPage');
+    } finally {
+      setHgvAssetsLoading(false);
     }
   };
 
@@ -363,11 +376,7 @@ function FleetContent() {
   
   // Show loading while auth or permissions are being checked
   if (authLoading || hasModulePermission === null) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-      </div>
-    );
+    return <PageLoader message="Loading fleet..." />;
   }
   
   // Show access denied if no permission
@@ -445,7 +454,7 @@ function FleetContent() {
           {/* Plant content */}
           {assetTab === 'plant' && (
             <div className="space-y-6">
-          {maintenanceLoading ? (
+          {maintenanceLoading || (plantAssetsLoading && plantAssets.length === 0) ? (
             <div className="flex items-center justify-center min-h-[400px]">
               <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
             </div>
@@ -472,7 +481,7 @@ function FleetContent() {
           {/* Vans content */}
           {assetTab === 'vans' && (
             <div className="space-y-6">
-              {maintenanceLoading ? (
+              {maintenanceLoading || (vehiclesLoading && vehicles.length === 0) ? (
                 <div className="flex items-center justify-center min-h-[400px]">
                   <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
                 </div>
@@ -500,7 +509,7 @@ function FleetContent() {
           {/* HGVs content */}
           {assetTab === 'hgvs' && (
             <div className="space-y-6">
-              {maintenanceLoading ? (
+              {maintenanceLoading || (hgvAssetsLoading && hgvAssets.length === 0) ? (
                 <div className="flex items-center justify-center min-h-[400px]">
                   <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
                 </div>
@@ -533,10 +542,13 @@ function FleetContent() {
           categories={categories}
           categoriesLoading={categoriesLoading}
           vehicles={vehicles}
+          vehiclesLoading={vehiclesLoading}
           plantAssets={plantAssets}
+          plantAssetsLoading={plantAssetsLoading}
           hgvCategories={hgvCategories}
           hgvCategoriesLoading={hgvCategoriesLoading}
           hgvAssets={hgvAssets}
+          hgvAssetsLoading={hgvAssetsLoading}
           plantCategoriesExpanded={plantCategoriesExpanded}
           vanCategoriesExpanded={vanCategoriesExpanded}
           hgvCategoriesExpanded={hgvCategoriesExpanded}
@@ -591,11 +603,7 @@ function FleetContent() {
 
 export default function FleetPage() {
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-      </div>
-    }>
+    <Suspense fallback={<PageLoader message="Loading fleet..." />}>
       <FleetContent />
     </Suspense>
   );

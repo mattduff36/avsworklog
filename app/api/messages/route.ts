@@ -239,14 +239,14 @@ export async function POST(request: NextRequest) {
 
     // Send email notifications for Toolbox Talks only
     if (type === 'TOOLBOX_TALK') {
-      // Fetch recipient email addresses
+      // Fetch recipient profile names
       const { data: recipientProfiles, error: emailError } = await supabase
         .from('profiles')
-        .select('id, full_name, email:auth.users(email)')
+        .select('id, full_name')
         .in('id', recipientUserIds);
 
       if (!emailError && recipientProfiles) {
-        // Extract email addresses (handle the auth.users join)
+        // Extract email addresses
         const recipientEmails: string[] = [];
         
         // Use admin client to fetch emails from auth.users

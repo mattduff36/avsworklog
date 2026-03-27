@@ -57,8 +57,40 @@ describe('GET /api/management/error-reports', () => {
 
   it('returns accurate global counts in the default all view', async () => {
     const paginatedReports = [
-      { id: 'report-1', status: 'new', user: { id: 'user-1', full_name: 'Alex Able' } },
-      { id: 'report-2', status: 'new', user: { id: 'user-2', full_name: 'Blake Baker' } },
+      {
+        id: 'report-1',
+        created_by: 'user-1',
+        title: 'First',
+        description: 'First',
+        error_code: null,
+        page_url: null,
+        user_agent: null,
+        additional_context: null,
+        status: 'new',
+        admin_notes: null,
+        resolved_at: null,
+        resolved_by: null,
+        notification_message_id: null,
+        created_at: '2026-03-25T00:00:00Z',
+        updated_at: '2026-03-25T00:00:00Z',
+      },
+      {
+        id: 'report-2',
+        created_by: 'user-2',
+        title: 'Second',
+        description: 'Second',
+        error_code: null,
+        page_url: null,
+        user_agent: null,
+        additional_context: null,
+        status: 'new',
+        admin_notes: null,
+        resolved_at: null,
+        resolved_by: null,
+        notification_message_id: null,
+        created_at: '2026-03-24T00:00:00Z',
+        updated_at: '2026-03-24T00:00:00Z',
+      },
     ];
     const allStatuses = [
       { status: 'new' },
@@ -67,8 +99,15 @@ describe('GET /api/management/error-reports', () => {
       { status: 'resolved' },
     ];
     const { order, range, query } = createReportsQuery(paginatedReports);
+    const profilesIn = vi.fn().mockResolvedValue({
+      data: [
+        { id: 'user-1', full_name: 'Alex Able' },
+        { id: 'user-2', full_name: 'Blake Baker' },
+      ],
+      error: null,
+    });
     const select = vi.fn((columns: string) => {
-      if (columns.includes('user:created_by')) {
+      if (columns.includes('created_by') && columns.includes('notification_message_id')) {
         return { order };
       }
 
@@ -78,6 +117,9 @@ describe('GET /api/management/error-reports', () => {
 
       throw new Error(`Unexpected select columns: ${columns}`);
     });
+    const selectProfiles = vi.fn(() => ({
+      in: profilesIn,
+    }));
 
     mockCreateClient.mockResolvedValue({
       auth: {
@@ -87,11 +129,9 @@ describe('GET /api/management/error-reports', () => {
         }),
       },
       from: vi.fn((table: string) => {
-        if (table !== 'error_reports') {
-          throw new Error(`Unexpected table: ${table}`);
-        }
-
-        return { select };
+        if (table === 'error_reports') return { select };
+        if (table === 'profiles') return { select: selectProfiles };
+        throw new Error(`Unexpected table: ${table}`);
       }),
     } as unknown as SupabaseClient);
 
@@ -103,6 +143,9 @@ describe('GET /api/management/error-reports', () => {
     expect(response.status).toBe(200);
     expect(range).toHaveBeenCalledWith(0, 1);
     expect(query.eq).not.toHaveBeenCalled();
+    expect(profilesIn).toHaveBeenCalledWith('id', ['user-1', 'user-2']);
+    expect(payload.reports[0].user).toEqual({ id: 'user-1', full_name: 'Alex Able' });
+    expect(payload.reports[1].user).toEqual({ id: 'user-2', full_name: 'Blake Baker' });
     expect(payload.counts).toEqual({
       all: 4,
       new: 2,
@@ -118,7 +161,23 @@ describe('GET /api/management/error-reports', () => {
 
   it('keeps counts global when a status filter is applied', async () => {
     const paginatedReports = [
-      { id: 'report-3', status: 'investigating', user: { id: 'user-3', full_name: 'Casey Cole' } },
+      {
+        id: 'report-3',
+        created_by: 'user-3',
+        title: 'Third',
+        description: 'Third',
+        error_code: null,
+        page_url: null,
+        user_agent: null,
+        additional_context: null,
+        status: 'investigating',
+        admin_notes: null,
+        resolved_at: null,
+        resolved_by: null,
+        notification_message_id: null,
+        created_at: '2026-03-23T00:00:00Z',
+        updated_at: '2026-03-23T00:00:00Z',
+      },
     ];
     const allStatuses = [
       { status: 'new' },
@@ -127,8 +186,12 @@ describe('GET /api/management/error-reports', () => {
       { status: 'resolved' },
     ];
     const { order, query } = createReportsQuery(paginatedReports);
+    const profilesIn = vi.fn().mockResolvedValue({
+      data: [{ id: 'user-3', full_name: 'Casey Cole' }],
+      error: null,
+    });
     const select = vi.fn((columns: string) => {
-      if (columns.includes('user:created_by')) {
+      if (columns.includes('created_by') && columns.includes('notification_message_id')) {
         return { order };
       }
 
@@ -138,6 +201,9 @@ describe('GET /api/management/error-reports', () => {
 
       throw new Error(`Unexpected select columns: ${columns}`);
     });
+    const selectProfiles = vi.fn(() => ({
+      in: profilesIn,
+    }));
 
     mockCreateClient.mockResolvedValue({
       auth: {
@@ -147,11 +213,9 @@ describe('GET /api/management/error-reports', () => {
         }),
       },
       from: vi.fn((table: string) => {
-        if (table !== 'error_reports') {
-          throw new Error(`Unexpected table: ${table}`);
-        }
-
-        return { select };
+        if (table === 'error_reports') return { select };
+        if (table === 'profiles') return { select: selectProfiles };
+        throw new Error(`Unexpected table: ${table}`);
       }),
     } as unknown as SupabaseClient);
 
@@ -163,6 +227,8 @@ describe('GET /api/management/error-reports', () => {
     expect(response.status).toBe(200);
     expect(query.eq).toHaveBeenCalledWith('status', 'investigating');
     expect(payload.reports).toHaveLength(1);
+    expect(profilesIn).toHaveBeenCalledWith('id', ['user-3']);
+    expect(payload.reports[0].user).toEqual({ id: 'user-3', full_name: 'Casey Cole' });
     expect(payload.counts).toEqual({
       all: 4,
       new: 1,

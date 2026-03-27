@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Button } from '@/components/ui/button';
+import { PageLoader } from '@/components/ui/page-loader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -17,7 +18,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  Loader2,
   FileText,
   Users,
   CheckCircle2,
@@ -306,11 +306,7 @@ export default function RAMSDetailsPage() {
 
   // Show loading while checking auth or redirecting
   if (authLoading || (!isManager && !isAdmin) || loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <PageLoader message="Loading project details..." />;
   }
 
   if (!ramsDocument) {

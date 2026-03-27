@@ -65,6 +65,8 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [filteredNotifications, setFilteredNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshingNotifications, setIsRefreshingNotifications] = useState(false);
+  const [hasLoadedNotifications, setHasLoadedNotifications] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedNotification, setSelectedNotification] = useState<NotificationItem | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -99,8 +101,12 @@ export default function NotificationsPage() {
     return false;
   });
 
-  const fetchNotifications = useCallback(async () => {
-    setLoading(true);
+  const fetchNotifications = useCallback(async (keepCurrentListVisible = false) => {
+    if (keepCurrentListVisible && hasLoadedNotifications) {
+      setIsRefreshingNotifications(true);
+    } else {
+      setLoading(true);
+    }
     try {
       const response = await fetch('/api/messages/notifications');
       const data = await response.json();
@@ -113,8 +119,10 @@ export default function NotificationsPage() {
       toast.error('Failed to load notifications');
     } finally {
       setLoading(false);
+      setIsRefreshingNotifications(false);
+      setHasLoadedNotifications(true);
     }
-  }, []);
+  }, [hasLoadedNotifications]);
 
   useEffect(() => {
     fetchNotifications();
@@ -270,7 +278,7 @@ export default function NotificationsPage() {
     setShowModal(false);
     setSelectedNotification(null);
     // Refresh notifications after modal closes
-    fetchNotifications();
+    fetchNotifications(true);
   }
 
   function getStatusBadge(status: string) {
@@ -370,11 +378,17 @@ export default function NotificationsPage() {
                       className="pl-11 bg-white dark:bg-slate-900 border-border dark:text-slate-100 text-slate-900"
                     />
                   </div>
+                  {isRefreshingNotifications && (
+                    <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Refreshing notifications...
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
               {/* Notifications List */}
-              {loading ? (
+              {loading && !hasLoadedNotifications ? (
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>

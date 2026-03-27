@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageLoader } from '@/components/ui/page-loader';
 import { AlertCircle, ArrowLeft, Camera, CheckCircle2, Info, Send, Timer, User, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { TRUCK_CHECKLIST_ITEMS } from '@/lib/checklists/vehicle-checklists';
@@ -1634,7 +1635,7 @@ function NewHgvInspectionContent() {
 
 export default function NewHgvInspectionPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><p className="text-muted-foreground">Loading...</p></div>}>
+    <Suspense fallback={<PageLoader message="Loading HGV inspection form..." />}>
       <NewHgvInspectionContent />
     </Suspense>
   );

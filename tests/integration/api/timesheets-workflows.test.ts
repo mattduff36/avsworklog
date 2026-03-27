@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createMockTimesheet, createMockTimesheetEntry } from '../../utils/factories';
 import { resetAllMocks } from '../../utils/test-helpers';
+import {
+  normalizeTimesheetEntriesForOffDays,
+  resolveTimesheetOffDayStates,
+} from '@/lib/utils/timesheet-off-days';
+import { STANDARD_WORK_SHIFT_PATTERN } from '@/lib/utils/work-shifts';
 
 describe('Timesheets Complete Workflows', () => {
   beforeEach(() => {
@@ -276,6 +281,112 @@ describe('Timesheets Complete Workflows', () => {
       });
 
       expect(vehicleWork.reg_number).toBeDefined();
+    });
+  });
+
+  describe('Absence + Timesheet integration', () => {
+    it('hard-overwrites approved leave days to did-not-work', () => {
+      const entries = Array.from({ length: 7 }, (_, index) => ({
+        ...createMockTimesheetEntry({
+          day_of_week: index + 1,
+          did_not_work: false,
+          time_started: null,
+          time_finished: null,
+          job_number: null,
+          remarks: null,
+          daily_total: null,
+          working_in_yard: false,
+        }),
+        time_started: '',
+        time_finished: '',
+        job_number: '',
+        remarks: '',
+        didNotWorkReason: null as 'Holiday' | 'Sickness' | 'Off Shift' | 'Other' | null,
+      }));
+
+      entries[0] = {
+        ...entries[0],
+        time_started: '08:00',
+        time_finished: '17:00',
+        job_number: '1234-AB',
+        daily_total: 8.5,
+      };
+
+      const offDays = resolveTimesheetOffDayStates(
+        '2026-03-29',
+        [
+          {
+            date: '2026-03-23',
+            end_date: null,
+            is_half_day: false,
+            absence_reasons: { name: 'Annual Leave', is_paid: true },
+          },
+        ],
+        STANDARD_WORK_SHIFT_PATTERN
+      );
+
+      const normalized = normalizeTimesheetEntriesForOffDays(entries, offDays, {
+        enforceLeaveOverwrite: true,
+        applyNonShiftDefaults: true,
+      });
+
+      expect(normalized[0].did_not_work).toBe(true);
+      expect(normalized[0].didNotWorkReason).toBe('Holiday');
+      expect(normalized[0].remarks).toBe('Annual Leave');
+      expect(normalized[0].time_started).toBe('');
+      expect(normalized[0].time_finished).toBe('');
+      expect(normalized[0].job_number).toBe('');
+      expect(normalized[0].daily_total).toBe(9);
+    });
+
+    it('adds paid half-day credit while preserving allowed worked session', () => {
+      const entries = Array.from({ length: 7 }, (_, index) => ({
+        ...createMockTimesheetEntry({
+          day_of_week: index + 1,
+          did_not_work: false,
+          time_started: null,
+          time_finished: null,
+          job_number: null,
+          remarks: null,
+          daily_total: null,
+          working_in_yard: false,
+        }),
+        time_started: '',
+        time_finished: '',
+        job_number: '',
+        remarks: '',
+        didNotWorkReason: null as 'Holiday' | 'Sickness' | 'Off Shift' | 'Other' | null,
+      }));
+
+      entries[0] = {
+        ...entries[0],
+        time_started: '12:00',
+        time_finished: '17:00',
+        job_number: '1234-AB',
+      };
+
+      const offDays = resolveTimesheetOffDayStates(
+        '2026-03-29',
+        [
+          {
+            date: '2026-03-23',
+            end_date: null,
+            is_half_day: true,
+            half_day_session: 'AM',
+            absence_reasons: { name: 'Training', is_paid: true },
+          },
+        ],
+        STANDARD_WORK_SHIFT_PATTERN
+      );
+
+      const normalized = normalizeTimesheetEntriesForOffDays(entries, offDays, {
+        enforceLeaveOverwrite: true,
+        applyNonShiftDefaults: true,
+      });
+
+      expect(normalized[0].did_not_work).toBe(false);
+      expect(normalized[0].daily_total).toBe(9.5);
+      expect(normalized[0].remarks).toBe('Training (AM)');
     });
   });
 });

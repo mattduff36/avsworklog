@@ -3,9 +3,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
-import { Loader2, Building2, Plus, Settings } from 'lucide-react';
+import { Building2, Plus, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
+import { PageLoader } from '@/components/ui/page-loader';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CustomersTable } from './components/CustomersTable';
@@ -82,11 +83,7 @@ export default function CustomersPage() {
   }
 
   if (permissionLoading || loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-avs-yellow" />
-      </div>
-    );
+    return <PageLoader message="Loading customers..." />;
   }
 
   return (

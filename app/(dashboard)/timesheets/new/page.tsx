@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { TimesheetRouter } from '../components/TimesheetRouter';
 import { WeekSelector } from '../components/WeekSelector';
 import { createClient } from '@/lib/supabase/client';
+import { PageLoader } from '@/components/ui/page-loader';
 
 /**
  * New Timesheet Page
@@ -79,14 +80,7 @@ function NewTimesheetContent() {
     
     // Don't render until we have a week (prevents blank form bug for existing timesheets)
     if (!weekToUse) {
-      return (
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center space-y-3">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-timesheet mx-auto"></div>
-            <p className="text-slate-600 dark:text-muted-foreground">Loading timesheet...</p>
-          </div>
-        </div>
-      );
+      return <PageLoader message="Loading timesheet..." />;
     }
     
     return (
@@ -99,16 +93,12 @@ function NewTimesheetContent() {
   }
 
   // Loading state
-  return (
-    <div className="flex items-center justify-center min-h-[400px]">
-      <p className="text-muted-foreground">Loading...</p>
-    </div>
-  );
+  return <PageLoader message="Loading timesheet form..." />;
 }
 
 export default function NewTimesheetPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><p className="text-muted-foreground">Loading...</p></div>}>
+    <Suspense fallback={<PageLoader message="Loading timesheet form..." />}>
       <NewTimesheetContent />
     </Suspense>
   );

@@ -8,10 +8,11 @@ import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { PageLoader } from '@/components/ui/page-loader';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertTriangle, CheckCircle2, Clock, Trash2, FileText, Undo2, Wrench, ArrowRight, Settings, Lightbulb, Bug, Truck } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, Trash2, FileText, Undo2, Wrench, ArrowRight, Settings, Lightbulb, Bug, Truck, Loader2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { Database } from '@/types/database';
 import { toast } from 'sonner';
@@ -53,6 +54,7 @@ export default function ActionsPage() {
   const [vehicleMaintenanceDueSoon, setVehicleMaintenanceDueSoon] = useState(0);
   const [plantMaintenanceOverdue, setPlantMaintenanceOverdue] = useState(0);
   const [plantMaintenanceDueSoon, setPlantMaintenanceDueSoon] = useState(0);
+  const [maintenanceCountsLoading, setMaintenanceCountsLoading] = useState(false);
 
   const [suggestionsNew, setSuggestionsNew] = useState(0);
   const [suggestionsUnderReview, setSuggestionsUnderReview] = useState(0);
@@ -61,6 +63,7 @@ export default function ActionsPage() {
   const [errorsNew, setErrorsNew] = useState(0);
   const [errorsInvestigating, setErrorsInvestigating] = useState(0);
   const [errorsResolved, setErrorsResolved] = useState(0);
+  const [feedbackCountsLoading, setFeedbackCountsLoading] = useState(false);
   
   // Logged modal states
   const [showLoggedDialog, setShowLoggedDialog] = useState(false);
@@ -108,6 +111,7 @@ export default function ActionsPage() {
 
   const fetchMaintenanceCounts = useCallback(async () => {
     try {
+      setMaintenanceCountsLoading(true);
       // Fetch vehicle maintenance data from API
       const response = await fetch('/api/maintenance');
       if (!response.ok) {
@@ -170,11 +174,14 @@ export default function ActionsPage() {
       setMaintenanceDueSoon(vehicleDueSoon + plantDueSoon);
     } catch (err) {
       console.error('Error fetching maintenance counts:', err);
+    } finally {
+      setMaintenanceCountsLoading(false);
     }
   }, [supabase]);
 
   const fetchSuggestionErrorCounts = useCallback(async () => {
     try {
+      setFeedbackCountsLoading(true);
       let sNew = 0;
       let sReview = 0;
       let sResolved = 0;
@@ -220,8 +227,17 @@ export default function ActionsPage() {
       setErrorsResolved(eResolved);
     } catch (err) {
       console.error('Error fetching suggestion/error counts:', err);
+    } finally {
+      setFeedbackCountsLoading(false);
     }
   }, [supabase, canViewSuggestions, canViewErrorReports]);
+
+  const renderCountValue = (value: number, className: string, isLoading: boolean) => {
+    if (isLoading) {
+      return <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />;
+    }
+    return <p className={className}>{value}</p>;
+  };
 
   useEffect(() => {
     if (!actionsPermissionLoading) {
@@ -473,11 +489,7 @@ export default function ActionsPage() {
   };
 
   if (actionsPermissionLoading || loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <p className="text-muted-foreground">Loading actions...</p>
-      </div>
-    );
+    return <PageLoader message="Loading actions..." />;
   }
 
   // Filter out workshop tasks (they're managed in Workshop Tasks module now)
@@ -639,17 +651,15 @@ export default function ActionsPage() {
                   <p className="text-sm text-muted-foreground">Overdue Tasks</p>
                   <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 opacity-50" />
                 </div>
-                <p className="text-2xl font-bold text-red-600 dark:text-red-400 mb-3">
-                  {maintenanceOverdue}
-                </p>
+                {renderCountValue(maintenanceOverdue, 'text-2xl font-bold text-red-600 dark:text-red-400 mb-3', maintenanceCountsLoading)}
                 <div className="space-y-1 border-t border-red-500/20 pt-3">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground flex items-center gap-1.5"><Wrench className="h-3 w-3" />Van</span>
-                    <span className="font-medium text-foreground">{vehicleMaintenanceOverdue}</span>
+                    <span className="font-medium text-foreground">{maintenanceCountsLoading ? '...' : vehicleMaintenanceOverdue}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground flex items-center gap-1.5"><Settings className="h-3 w-3" />Plant</span>
-                    <span className="font-medium text-foreground">{plantMaintenanceOverdue}</span>
+                    <span className="font-medium text-foreground">{maintenanceCountsLoading ? '...' : plantMaintenanceOverdue}</span>
                   </div>
                 </div>
               </div>
@@ -658,17 +668,15 @@ export default function ActionsPage() {
                   <p className="text-sm text-muted-foreground">Due Soon (30 days)</p>
                   <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400 opacity-50" />
                 </div>
-                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400 mb-3">
-                  {maintenanceDueSoon}
-                </p>
+                {renderCountValue(maintenanceDueSoon, 'text-2xl font-bold text-amber-600 dark:text-amber-400 mb-3', maintenanceCountsLoading)}
                 <div className="space-y-1 border-t border-amber-500/20 pt-3">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground flex items-center gap-1.5"><Wrench className="h-3 w-3" />Van</span>
-                    <span className="font-medium text-foreground">{vehicleMaintenanceDueSoon}</span>
+                    <span className="font-medium text-foreground">{maintenanceCountsLoading ? '...' : vehicleMaintenanceDueSoon}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground flex items-center gap-1.5"><Settings className="h-3 w-3" />Plant</span>
-                    <span className="font-medium text-foreground">{plantMaintenanceDueSoon}</span>
+                    <span className="font-medium text-foreground">{maintenanceCountsLoading ? '...' : plantMaintenanceDueSoon}</span>
                   </div>
                 </div>
               </div>
@@ -710,27 +718,21 @@ export default function ActionsPage() {
                   <p className="text-sm text-muted-foreground">New</p>
                   <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 opacity-50" />
                 </div>
-                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-                  {suggestionsNew}
-                </p>
+                {renderCountValue(suggestionsNew, 'text-2xl font-bold text-amber-600 dark:text-amber-400', feedbackCountsLoading)}
               </div>
               <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/30">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-sm text-muted-foreground">Under Review</p>
                   <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400 opacity-50" />
                 </div>
-                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                  {suggestionsUnderReview}
-                </p>
+                {renderCountValue(suggestionsUnderReview, 'text-2xl font-bold text-blue-600 dark:text-blue-400', feedbackCountsLoading)}
               </div>
               <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/30">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-sm text-muted-foreground">Resolved</p>
                   <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 opacity-50" />
                 </div>
-                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                  {suggestionsResolved}
-                </p>
+                {renderCountValue(suggestionsResolved, 'text-2xl font-bold text-green-600 dark:text-green-400', feedbackCountsLoading)}
               </div>
             </div>
           </CardContent>
@@ -770,27 +772,21 @@ export default function ActionsPage() {
                   <p className="text-sm text-muted-foreground">New</p>
                   <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 opacity-50" />
                 </div>
-                <p className="text-2xl font-bold text-red-600 dark:text-red-400">
-                  {errorsNew}
-                </p>
+                {renderCountValue(errorsNew, 'text-2xl font-bold text-red-600 dark:text-red-400', feedbackCountsLoading)}
               </div>
               <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/30">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-sm text-muted-foreground">Investigating</p>
                   <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400 opacity-50" />
                 </div>
-                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                  {errorsInvestigating}
-                </p>
+                {renderCountValue(errorsInvestigating, 'text-2xl font-bold text-blue-600 dark:text-blue-400', feedbackCountsLoading)}
               </div>
               <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/30">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-sm text-muted-foreground">Resolved</p>
                   <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 opacity-50" />
                 </div>
-                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                  {errorsResolved}
-                </p>
+                {renderCountValue(errorsResolved, 'text-2xl font-bold text-green-600 dark:text-green-400', feedbackCountsLoading)}
               </div>
             </div>
           </CardContent>

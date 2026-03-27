@@ -67,7 +67,7 @@ export async function GET() {
           created_at,
           deleted_at,
           pdf_file_path,
-          sender:sender_id(
+          sender:profiles!messages_sender_id_fkey(
             id,
             full_name
           )
@@ -100,7 +100,7 @@ export async function GET() {
           sender_id,
           created_at,
           deleted_at,
-          sender:sender_id(
+          sender:profiles!messages_sender_id_fkey(
             id,
             full_name
           )

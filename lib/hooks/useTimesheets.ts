@@ -28,7 +28,7 @@ export function useTimesheets({ userId, isManager, selectedEmployeeId, statusFil
         .from('timesheets')
         .select(`
           *,
-          profile:profiles!user_id (full_name)
+          profile:profiles!timesheets_user_id_fkey (full_name)
         `)
         .order('week_ending', { ascending: false });
 

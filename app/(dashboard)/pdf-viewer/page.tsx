@@ -2,7 +2,8 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import { PageLoader } from '@/components/ui/page-loader';
 import { PDFCanvasRenderer } from '@/components/pdf/PDFCanvasRenderer';
 
 function PDFViewerContent() {
@@ -130,11 +131,7 @@ function PDFViewerContent() {
 
 export default function PDFViewerPage() {
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center min-h-screen bg-slate-900">
-        <Loader2 className="h-12 w-12 animate-spin text-rams" />
-      </div>
-    }>
+    <Suspense fallback={<PageLoader message="Loading PDF viewer..." />}>
       <PDFViewerContent />
     </Suspense>
   );

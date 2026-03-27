@@ -15,15 +15,15 @@ function normalizeRemark(remarks: string | null | undefined): string {
 function inferCategoryFromRemarks(remarks: string): DidNotWorkCategory {
   const normalized = remarks.toLowerCase();
 
-  if (normalized === 'annual leave' || normalized === 'holiday') {
+  if (normalized.startsWith('annual leave') || normalized === 'holiday') {
     return 'Holiday';
   }
 
   if (
-    normalized === 'sickness leave' ||
-    normalized === 'sick leave' ||
-    normalized === 'sickness' ||
-    normalized === 'sick'
+    normalized.startsWith('sickness leave') ||
+    normalized.startsWith('sick leave') ||
+    normalized.startsWith('sickness') ||
+    normalized.startsWith('sick')
   ) {
     return 'Sick';
   }

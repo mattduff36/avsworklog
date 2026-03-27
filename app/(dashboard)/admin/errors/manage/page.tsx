@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { PageLoader } from '@/components/ui/page-loader';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -49,6 +50,7 @@ export default function ErrorReportsManagePage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [countsLoaded, setCountsLoaded] = useState(false);
   
   // Detail dialog
   const [selectedReport, setSelectedReport] = useState<ErrorReportWithUser | null>(null);
@@ -87,9 +89,11 @@ export default function ErrorReportsManagePage() {
 
       setReports(result.items);
       setCounts((result.firstPagePayload?.counts as Record<string, number> | undefined) || {});
+      setCountsLoaded(true);
     } catch (error) {
       console.error('Error fetching error reports:', error);
       toast.error('Failed to load error reports');
+      setCountsLoaded(true);
     } finally {
       setLoading(false);
     }
@@ -180,16 +184,14 @@ export default function ErrorReportsManagePage() {
   };
 
   if (permissionLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-red-500" />
-      </div>
-    );
+    return <PageLoader message="Loading error reports..." />;
   }
 
   if (!canManageErrors) {
     return null;
   }
+
+  const showCountsLoading = loading && !countsLoaded;
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -229,9 +231,13 @@ export default function ErrorReportsManagePage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground">{label}</p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {counts[key] || 0}
-                  </p>
+                  {showCountsLoading ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground mt-1" />
+                  ) : (
+                    <p className="text-2xl font-bold text-foreground">
+                      {counts[key] || 0}
+                    </p>
+                  )}
                 </div>
                 <div className={`h-3 w-3 rounded-full ${color}`} />
               </div>

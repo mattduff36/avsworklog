@@ -33,7 +33,7 @@ interface RecipientQueryResult {
 
 function isTransientFetchError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return /fetch failed|ECONNRESET|ETIMEDOUT|ENOTFOUND|socket hang up|schema cache/i.test(message);
+  return /fetch failed|ECONNRESET|ETIMEDOUT|ENOTFOUND|socket hang up|schema cache|bad gateway|502/i.test(message);
 }
 
 async function withRetry<T>(operation: () => Promise<T>, retries = 1): Promise<T> {
@@ -89,8 +89,8 @@ export async function GET() {
     sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
     // Fetch notifications (last 60 days, not cleared, not deleted messages)
-    const { data: recipients, error: fetchError } = await withRetry<RecipientQueryResult>(async () =>
-      (await supabase
+    const { data: recipients, error: fetchError } = await withRetry<RecipientQueryResult>(async () => {
+      const result = (await supabase
         .from('message_recipients')
         .select(`
           id,
@@ -108,7 +108,7 @@ export async function GET() {
             sender_id,
             created_at,
             deleted_at,
-            sender:sender_id(
+            sender:profiles!messages_sender_id_fkey(
               id,
               full_name
             )
@@ -118,8 +118,14 @@ export async function GET() {
         .gte('messages.created_at', sixtyDaysAgo.toISOString())
         .is('cleared_from_inbox_at', null)
         .is('messages.deleted_at', null)
-        .order('messages(created_at)', { ascending: false })) as RecipientQueryResult
-    );
+        .order('messages(created_at)', { ascending: false })) as RecipientQueryResult;
+
+      if (result.error && isTransientFetchError(result.error.message || '')) {
+        throw new Error(result.error.message || 'Transient notifications query failure');
+      }
+
+      return result;
+    });
 
     if (fetchError) {
       console.error('Error fetching notifications:', fetchError);

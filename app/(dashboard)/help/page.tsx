@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -44,6 +44,10 @@ export default function HelpPage() {
   const [articles, setArticles] = useState<FAQArticleWithCategory[]>([]);
   const [categories, setCategories] = useState<FAQCategory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [faqLoadedOnce, setFaqLoadedOnce] = useState(false);
+  const [isFaqRefreshing, setIsFaqRefreshing] = useState(false);
+  const hasSkippedInitialDebounceRef = useRef(false);
+  const hasStartedInitialFaqFetchRef = useRef(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   
@@ -85,9 +89,13 @@ export default function HelpPage() {
   // User permissions
   const [userPermissions, setUserPermissions] = useState<Set<ModuleName>>(new Set());
 
-  const fetchFAQ = useCallback(async (query: string, category: string | null) => {
+  const fetchFAQ = useCallback(async (query: string, category: string | null, isInitialLoad = false) => {
     try {
-      setLoading(true);
+      if (isInitialLoad) {
+        setLoading(true);
+      } else {
+        setIsFaqRefreshing(true);
+      }
       const params = new URLSearchParams();
       if (query) params.set('query', query);
       if (category) params.set('category', category);
@@ -103,7 +111,12 @@ export default function HelpPage() {
       console.error('Error fetching FAQ:', error);
       toast.error('Failed to load FAQ content');
     } finally {
-      setLoading(false);
+      if (isInitialLoad) {
+        setLoading(false);
+        setFaqLoadedOnce(true);
+      } else {
+        setIsFaqRefreshing(false);
+      }
     }
   }, []);
 
@@ -166,7 +179,12 @@ export default function HelpPage() {
 
   // Fetch FAQ data on mount
   useEffect(() => {
-    fetchFAQ('', null);
+    // Guard initial FAQ bootstrap from React StrictMode double-invocation in dev.
+    if (hasStartedInitialFaqFetchRef.current) {
+      return;
+    }
+    hasStartedInitialFaqFetchRef.current = true;
+    fetchFAQ('', null, true);
   }, [fetchFAQ]);
 
   // Fetch user's suggestions when tab changes
@@ -185,11 +203,18 @@ export default function HelpPage() {
 
   // Debounced search
   useEffect(() => {
+    if (!faqLoadedOnce) {
+      return;
+    }
+    if (!hasSkippedInitialDebounceRef.current) {
+      hasSkippedInitialDebounceRef.current = true;
+      return;
+    }
     const timer = setTimeout(() => {
-      fetchFAQ(searchQuery, selectedCategory);
+      fetchFAQ(searchQuery, selectedCategory, false);
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchQuery, selectedCategory, fetchFAQ]);
+  }, [searchQuery, selectedCategory, fetchFAQ, faqLoadedOnce]);
 
   // Filter categories based on user permissions
   const filteredCategories = useMemo(() => {
@@ -436,6 +461,12 @@ export default function HelpPage() {
                   className="pl-10"
                 />
               </div>
+              {isFaqRefreshing && (
+                <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Updating FAQ results...
+                </div>
+              )}
               
               {/* Category Filter */}
               <div className="mt-4 flex flex-wrap gap-2">

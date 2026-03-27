@@ -5,7 +5,8 @@ import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, MessageSquare, Bell, BarChart3 } from 'lucide-react';
+import { PageLoader } from '@/components/ui/page-loader';
+import { MessageSquare, Bell, BarChart3 } from 'lucide-react';
 import { CreateToolboxTalkForm } from '@/components/messages/CreateToolboxTalkForm';
 import { CreateReminderForm } from '@/components/messages/CreateReminderForm';
 import { MessagesReportView } from '@/components/messages/MessagesReportView';
@@ -31,11 +32,7 @@ export default function ToolboxTalksPage() {
   }
 
   if (permissionLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <PageLoader message="Loading toolbox talks..." />;
   }
 
   return (

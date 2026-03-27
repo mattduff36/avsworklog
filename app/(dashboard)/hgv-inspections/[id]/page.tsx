@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { BackButton } from '@/components/ui/back-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { PageLoader } from '@/components/ui/page-loader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertCircle, CheckCircle2, Download, XCircle } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
@@ -124,11 +125,7 @@ export default function ViewHgvInspectionPage() {
   };
 
   if (authLoading || loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <p className="text-muted-foreground">Loading inspection...</p>
-      </div>
-    );
+    return <PageLoader message="Loading inspection..." />;
   }
 
   if (error && !inspection) {

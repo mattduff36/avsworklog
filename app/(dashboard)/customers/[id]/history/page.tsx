@@ -6,8 +6,8 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageLoader } from '@/components/ui/page-loader';
 import {
-  Loader2,
   ArrowLeft,
   Building2,
   Mail,
@@ -103,11 +103,7 @@ export default function CustomerHistoryPage({ params }: PageProps) {
   }
 
   if (permissionLoading || loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-avs-yellow" />
-      </div>
-    );
+    return <PageLoader message="Loading customer history..." />;
   }
 
   if (!customer) return null;

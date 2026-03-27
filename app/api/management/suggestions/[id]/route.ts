@@ -28,14 +28,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Forbidden - suggestions access required' }, { status: 403 });
     }
 
-    // Fetch suggestion
-    // Note: suggestions table added by migration - types will update after migration runs
+    // Fetch suggestion first, then resolve creator profile separately.
+    // suggestions.created_by does not have a direct PostgREST relationship to profiles.
     const { data: suggestion, error: suggestionError } = await supabase
       .from('suggestions')
-      .select(`
-        *,
-        user:profiles!created_by(full_name)
-      `)
+      .select('id, created_by, title, body, page_hint, status, admin_notes, created_at, updated_at')
       .eq('id', id)
       .single();
 
@@ -49,10 +46,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // Fetch update history
     const { data: updates, error: updatesError } = await supabase
       .from('suggestion_updates')
-      .select(`
-        *,
-        user:profiles!created_by(full_name)
-      `)
+      .select('id, suggestion_id, created_by, old_status, new_status, note, created_at')
       .eq('suggestion_id', id)
       .order('created_at', { ascending: false });
 
@@ -60,10 +54,40 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       throw updatesError;
     }
 
+    const rawSuggestion = suggestion as Suggestion;
+    const rawUpdates = (updates || []) as SuggestionUpdateWithUser[];
+    const creatorIds = [...new Set([
+      rawSuggestion.created_by,
+      ...rawUpdates.map((update) => update.created_by),
+    ].filter(Boolean))];
+
+    let profileMap = new Map<string, { full_name: string | null }>();
+    if (creatorIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', creatorIds);
+
+      if (profiles) {
+        profileMap = new Map(
+          profiles.map((profile: { id: string; full_name: string | null }) => [
+            profile.id,
+            { full_name: profile.full_name },
+          ])
+        );
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      suggestion: suggestion as Suggestion & { user?: { full_name: string | null } },
-      updates: updates as SuggestionUpdateWithUser[],
+      suggestion: {
+        ...rawSuggestion,
+        user: profileMap.get(rawSuggestion.created_by) || null,
+      } as Suggestion & { user?: { full_name: string | null } },
+      updates: rawUpdates.map((update) => ({
+        ...update,
+        user: profileMap.get(update.created_by) || null,
+      })) as SuggestionUpdateWithUser[],
     });
 
   } catch (error) {

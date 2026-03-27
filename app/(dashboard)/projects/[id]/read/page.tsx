@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
+import { PageLoader } from '@/components/ui/page-loader';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, FileText, Download, CheckCircle2, Mail, ExternalLink, AlertCircle } from 'lucide-react';
@@ -363,11 +364,7 @@ function ReadRAMSContent() {
 
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <PageLoader message="Loading RAMS document..." />;
   }
 
   if (!ramsDocument) {
@@ -634,11 +631,7 @@ function ReadRAMSContent() {
 
 export default function ReadRAMSPage() {
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-rams" />
-      </div>
-    }>
+    <Suspense fallback={<PageLoader message="Loading RAMS document..." />}>
       <ReadRAMSContent />
     </Suspense>
   );

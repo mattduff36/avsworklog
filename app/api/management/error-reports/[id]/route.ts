@@ -12,6 +12,9 @@ import type {
   ErrorReportUpdateWithUser
 } from '@/types/error-reports';
 
+type ErrorReportRow = Omit<ErrorReportWithUser, 'user'>;
+type ErrorReportUpdateRow = Omit<ErrorReportUpdateWithUser, 'user'>;
+
 /**
  * GET /api/management/error-reports/[id]
  * Get error report details with update history (admin only)
@@ -38,13 +41,7 @@ export async function GET(
     // Fetch error report
     const { data: report, error: reportError } = await supabase
       .from('error_reports')
-      .select(`
-        *,
-        user:created_by(
-          id,
-          full_name
-        )
-      `)
+      .select('*')
       .eq('id', id)
       .single();
 
@@ -55,13 +52,7 @@ export async function GET(
     // Fetch update history
     const { data: updates, error: updatesError } = await supabase
       .from('error_report_updates')
-      .select(`
-        *,
-        user:created_by(
-          id,
-          full_name
-        )
-      `)
+      .select('*')
       .eq('error_report_id', id)
       .order('created_at', { ascending: false });
 
@@ -69,10 +60,53 @@ export async function GET(
       console.error('Error fetching updates:', updatesError);
     }
 
+    const reportRow = report as ErrorReportRow;
+    const updateRows = (updates || []) as ErrorReportUpdateRow[];
+    const creatorIds = [...new Set([
+      reportRow.created_by,
+      ...updateRows.map((update) => update.created_by),
+    ].filter(Boolean))];
+    let profileMap = new Map<string, { id: string; full_name: string | null }>();
+
+    if (creatorIds.length > 0) {
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', creatorIds);
+      if (profilesError) throw profilesError;
+      if (profiles) {
+        profileMap = new Map(
+          profiles.map((profile: { id: string; full_name: string | null }) => [profile.id, profile])
+        );
+      }
+    }
+
     const response: GetErrorReportDetailResponse = {
       success: true,
-      report: report as ErrorReportWithUser,
-      updates: (updates || []) as ErrorReportUpdateWithUser[],
+      report: (() => {
+        const creator = profileMap.get(reportRow.created_by);
+        return {
+          ...reportRow,
+          user: creator
+            ? {
+              id: creator.id,
+              full_name: creator.full_name || 'Unknown',
+            }
+            : null,
+        } as ErrorReportWithUser;
+      })(),
+      updates: updateRows.map((update) => ({
+        ...update,
+        user: (() => {
+          const creator = profileMap.get(update.created_by);
+          return creator
+            ? {
+              id: creator.id,
+              full_name: creator.full_name || 'Unknown',
+            }
+            : null;
+        })(),
+      })) as ErrorReportUpdateWithUser[],
     };
 
     return NextResponse.json(response);

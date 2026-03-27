@@ -9,6 +9,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { PageLoader } from '@/components/ui/page-loader';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -53,12 +54,13 @@ import { toast } from 'sonner';
 import type { WorkShiftPattern } from '@/types/work-shifts';
 
 type GenerationStatus = {
+  currentFinancialYearStartYear: number;
   latestGeneratedFinancialYearStartYear: number;
   latestGeneratedFinancialYearLabel: string;
   latestGeneratedFinancialYearEndDate: string;
   nextFinancialYearStartYear: number;
   nextFinancialYearLabel: string;
-  closedFinancialYearStartYears?: number[];
+  closedFinancialYearStartYears: number[];
 };
 
 function isAnnualLeaveReason(name: string): boolean {
@@ -67,6 +69,20 @@ function isAnnualLeaveReason(name: string): boolean {
 
 function isUnpaidLeaveReason(name: string): boolean {
   return name.trim().toLowerCase() === 'unpaid leave';
+}
+
+function getOldestOpenFinancialYearStartYear(
+  currentFinancialYearStartYear: number,
+  latestGeneratedFinancialYearStartYear: number,
+  closedFinancialYearStartYears: number[]
+): number {
+  const closedYears = new Set(closedFinancialYearStartYears);
+  for (let year = currentFinancialYearStartYear; year <= latestGeneratedFinancialYearStartYear; year += 1) {
+    if (!closedYears.has(year)) {
+      return year;
+    }
+  }
+  return latestGeneratedFinancialYearStartYear;
 }
 
 function getReasonColor(name: string, color?: string | null): string {
@@ -106,7 +122,14 @@ function parseIsoDateAsLocalMidnight(isoDate: string): Date {
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message.trim().length > 0 ? error.message : fallback;
+  const rawMessage = error instanceof Error && error.message.trim().length > 0 ? error.message : fallback;
+  const normalized = rawMessage.trim().toLowerCase();
+
+  if (normalized.includes('new row violates row-level security policy for table "absences"')) {
+    return 'This request could not be submitted with your current permissions. Please choose Annual Leave or Unpaid Leave, or contact your manager.';
+  }
+
+  return rawMessage;
 }
 
 function isExpectedAbsenceSubmissionError(message: string): boolean {
@@ -116,7 +139,8 @@ function isExpectedAbsenceSubmissionError(message: string): boolean {
     normalized.includes('conflicts with an existing approved/pending booking') ||
     normalized.includes('half-day conflicts') ||
     normalized.includes('half-day is already booked') ||
-    normalized.includes('financial year is closed for employee bookings')
+    normalized.includes('financial year is closed for employee bookings') ||
+    normalized.includes('could not be submitted with your current permissions')
   );
 }
 
@@ -128,32 +152,50 @@ export default function AbsencePage() {
   const [activeTab, setActiveTab] = useState<'calendar' | 'bookings'>('calendar');
   const [showRequestDialog, setShowRequestDialog] = useState(false);
   const [generationStatus, setGenerationStatus] = useState<GenerationStatus | null>(null);
+  const [generationStatusLoading, setGenerationStatusLoading] = useState(true);
   const [currentWorkShiftPattern, setCurrentWorkShiftPattern] = useState<WorkShiftPattern | null>(null);
   const [absenceAnnouncement, setAbsenceAnnouncement] = useState<string | null>(null);
   
   // Financial year months
   const currentFinancialYear = getCurrentFinancialYear();
   const currentFinancialYearStartYear = currentFinancialYear.start.getFullYear();
+  const generationCurrentFinancialYearStartYear =
+    generationStatus?.currentFinancialYearStartYear ?? currentFinancialYearStartYear;
   const latestGeneratedFinancialYearStartYear =
     generationStatus?.latestGeneratedFinancialYearStartYear || currentFinancialYearStartYear;
 
   const availableFinancialYearStartYears = useMemo(() => {
-    const fromYear = Math.min(currentFinancialYearStartYear, latestGeneratedFinancialYearStartYear);
-    const toYear = Math.max(currentFinancialYearStartYear, latestGeneratedFinancialYearStartYear);
+    const fromYear = Math.min(generationCurrentFinancialYearStartYear, latestGeneratedFinancialYearStartYear);
+    const toYear = Math.max(generationCurrentFinancialYearStartYear, latestGeneratedFinancialYearStartYear);
     const years: number[] = [];
     for (let year = fromYear; year <= toYear; year += 1) {
       years.push(year);
     }
     return years.reverse();
-  }, [currentFinancialYearStartYear, latestGeneratedFinancialYearStartYear]);
+  }, [generationCurrentFinancialYearStartYear, latestGeneratedFinancialYearStartYear]);
+
+  const oldestOpenFinancialYearStartYear = useMemo(
+    () =>
+      getOldestOpenFinancialYearStartYear(
+        generationCurrentFinancialYearStartYear,
+        latestGeneratedFinancialYearStartYear,
+        generationStatus?.closedFinancialYearStartYears || []
+      ),
+    [generationCurrentFinancialYearStartYear, latestGeneratedFinancialYearStartYear, generationStatus?.closedFinancialYearStartYears]
+  );
 
   const [selectedFinancialYearStartYear, setSelectedFinancialYearStartYear] = useState(currentFinancialYearStartYear);
 
   useEffect(() => {
+    if (!generationStatus) return;
+    setSelectedFinancialYearStartYear(oldestOpenFinancialYearStartYear);
+  }, [generationStatus, oldestOpenFinancialYearStartYear]);
+
+  useEffect(() => {
     if (!availableFinancialYearStartYears.includes(selectedFinancialYearStartYear)) {
-      setSelectedFinancialYearStartYear(currentFinancialYearStartYear);
+      setSelectedFinancialYearStartYear(oldestOpenFinancialYearStartYear);
     }
-  }, [availableFinancialYearStartYears, selectedFinancialYearStartYear, currentFinancialYearStartYear]);
+  }, [availableFinancialYearStartYears, selectedFinancialYearStartYear, oldestOpenFinancialYearStartYear]);
 
   const displayFinancialYear = useMemo(() => {
     const startYear = selectedFinancialYearStartYear;
@@ -172,6 +214,7 @@ export default function AbsencePage() {
     () => new Set(generationStatus?.closedFinancialYearStartYears || []),
     [generationStatus?.closedFinancialYearStartYears]
   );
+  const isSelectedFinancialYearClosed = closedFinancialYearStartYears.has(selectedFinancialYearStartYear);
   const months = useMemo(() => getFinancialYearMonths(displayFinancialYear), [displayFinancialYear]);
   
   // Find current month index in financial year
@@ -238,6 +281,7 @@ export default function AbsencePage() {
   }, [permissionLoading, hasPermission]);
 
   async function loadGenerationStatus() {
+    setGenerationStatusLoading(true);
     try {
       const response = await fetch('/api/absence/generation/status');
       const payload = (await response.json()) as GenerationStatus & { error?: string };
@@ -248,6 +292,8 @@ export default function AbsencePage() {
     } catch (error) {
       console.error('Error loading absence generation status:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to load booking window');
+    } finally {
+      setGenerationStatusLoading(false);
     }
   }
 
@@ -323,11 +369,7 @@ export default function AbsencePage() {
   const selectedReason = availableRequestReasons.find((reason) => reason.id === selectedReasonId);
   const deductsAllowance = selectedReason ? isAnnualLeaveReason(selectedReason.name) : false;
   const displayAllowance = useMemo(() => {
-    if (!summary) {
-      return 28;
-    }
-
-    return summary.allowance > 0 ? summary.allowance : 28;
+    return summary?.allowance ?? 0;
   }, [summary]);
   const displayApprovedTaken = summary?.approved_taken ?? 0;
   const displayPendingTotal = summary?.pending_total ?? 0;
@@ -375,8 +417,8 @@ export default function AbsencePage() {
       return;
     }
 
-    if (!(isManager || isAdmin) && (isClosedFinancialYearRequest(startDate) || (endDate && isClosedFinancialYearRequest(endDate)))) {
-      toast.error('This financial year is closed for employee bookings. Please speak to your manager.');
+    if (isClosedFinancialYearRequest(startDate) || (endDate && isClosedFinancialYearRequest(endDate))) {
+      toast.error('This financial year is closed for bookings.');
       return;
     }
     
@@ -440,8 +482,8 @@ export default function AbsencePage() {
         toast.error(`Leave can only be booked up to ${formatDate(bookingMaxDate)}.`);
         return;
       }
-      if (!(isManager || isAdmin) && isClosedFinancialYearRequest(formatDateISO(selectedDate))) {
-        toast.error('This financial year is closed for employee bookings. Please speak to your manager.');
+      if (isClosedFinancialYearRequest(formatDateISO(selectedDate))) {
+        toast.error('This financial year is closed for bookings.');
         return;
       }
       setStartDate(formatDateISO(selectedDate));
@@ -558,14 +600,25 @@ export default function AbsencePage() {
                 <div className="space-y-0.5 text-[10px]">
                   {dayAbsences.map(absence => (
                     <div key={absence.id} className="flex items-start gap-1">
-                      <div
-                        className="h-1.5 w-1.5 rounded-full mt-1 flex-shrink-0 border"
-                        style={{
-                          backgroundColor: getReasonColor(absence.absence_reasons.name, absence.absence_reasons.color),
-                          borderColor: 'transparent',
-                        }}
-                        title={absence.absence_reasons.name}
-                      />
+                      {(() => {
+                        const reasonColor = getReasonColor(absence.absence_reasons.name, absence.absence_reasons.color);
+                        const isHalfDay = Boolean(absence.is_half_day && absence.half_day_session);
+                        const splitFill =
+                          absence.half_day_session === 'AM'
+                            ? `linear-gradient(to right, ${reasonColor} 0 50%, transparent 50% 100%)`
+                            : `linear-gradient(to right, transparent 0 50%, ${reasonColor} 50% 100%)`;
+
+                        return (
+                          <div
+                            className="h-2 w-2 rounded-full mt-1 flex-shrink-0 border"
+                            style={{
+                              background: isHalfDay ? splitFill : reasonColor,
+                              borderColor: reasonColor,
+                            }}
+                            title={`${absence.absence_reasons.name}${isHalfDay ? ` (${absence.half_day_session})` : ''}`}
+                          />
+                        );
+                      })()}
                       <span
                         className={`leading-tight truncate ${
                           absence.status === 'pending'
@@ -648,17 +701,13 @@ export default function AbsencePage() {
   }
   
   // Show loading while checking permissions
-  if (permissionLoading || loadingAbsences || loadingSummary) {
+  const isBookingWindowLoading = generationStatusLoading && !generationStatus;
+
+  if (permissionLoading || loadingAbsences || loadingSummary || isBookingWindowLoading) {
     return (
-      <div className="space-y-6 max-w-6xl">
-        <Card className="">
-          <CardContent className="flex items-center justify-center py-12">
-            <p className="text-muted-foreground">
-              {permissionLoading ? 'Checking access...' : 'Loading absences...'}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <PageLoader
+        message={permissionLoading ? 'Checking access...' : isBookingWindowLoading ? 'Loading booking window...' : 'Loading absences...'}
+      />
     );
   }
 
@@ -696,6 +745,7 @@ export default function AbsencePage() {
             <Button
               className="bg-absence hover:bg-absence-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
               onClick={() => setShowRequestDialog(true)}
+              disabled={isSelectedFinancialYearClosed}
             >
               <Plus className="h-4 w-4 mr-2" />
               Request Leave
@@ -956,15 +1006,36 @@ export default function AbsencePage() {
                     value={String(selectedFinancialYearStartYear)}
                     onValueChange={(value) => setSelectedFinancialYearStartYear(Number(value))}
                   >
-                    <SelectTrigger className="w-[160px] border-border text-muted-foreground">
-                      <SelectValue placeholder="Financial Year" />
+                    <SelectTrigger className="w-[190px] border-border text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <span>{displayFinancialYear.label}</span>
+                        {isSelectedFinancialYearClosed ? (
+                          <Badge variant="outline" className="border-amber-500/50 bg-amber-500/10 text-amber-300 text-[10px] uppercase">
+                            Closed
+                          </Badge>
+                        ) : null}
+                      </div>
                     </SelectTrigger>
                     <SelectContent>
-                      {availableFinancialYearStartYears.map((startYear) => (
-                        <SelectItem key={startYear} value={String(startYear)}>
-                          {startYear}/{(startYear + 1).toString().slice(-2)}
-                        </SelectItem>
-                      ))}
+                      {availableFinancialYearStartYears.map((startYear) => {
+                        const label = `${startYear}/${(startYear + 1).toString().slice(-2)}`;
+                        const isClosedYearOption = closedFinancialYearStartYears.has(startYear);
+                        return (
+                          <SelectItem key={startYear} value={String(startYear)}>
+                            <div className="flex items-center gap-2">
+                              <span>{label}</span>
+                              {isClosedYearOption ? (
+                                <Badge
+                                  variant="outline"
+                                  className="border-amber-500/50 bg-amber-500/10 text-amber-300 text-[10px] uppercase"
+                                >
+                                  Closed
+                                </Badge>
+                              ) : null}
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                   <Button
@@ -1024,15 +1095,36 @@ export default function AbsencePage() {
                   value={String(selectedFinancialYearStartYear)}
                   onValueChange={(value) => setSelectedFinancialYearStartYear(Number(value))}
                 >
-                  <SelectTrigger className="w-full sm:w-[180px] border-border text-muted-foreground">
-                    <SelectValue placeholder="Financial Year" />
+                  <SelectTrigger className="w-full sm:w-[190px] border-border text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <span>{displayFinancialYear.label}</span>
+                      {isSelectedFinancialYearClosed ? (
+                        <Badge variant="outline" className="border-amber-500/50 bg-amber-500/10 text-amber-300 text-[10px] uppercase">
+                          Closed
+                        </Badge>
+                      ) : null}
+                    </div>
                   </SelectTrigger>
                   <SelectContent>
-                    {availableFinancialYearStartYears.map((startYear) => (
-                      <SelectItem key={startYear} value={String(startYear)}>
-                        {startYear}/{(startYear + 1).toString().slice(-2)}
-                      </SelectItem>
-                    ))}
+                    {availableFinancialYearStartYears.map((startYear) => {
+                      const label = `${startYear}/${(startYear + 1).toString().slice(-2)}`;
+                      const isClosedYearOption = closedFinancialYearStartYears.has(startYear);
+                      return (
+                        <SelectItem key={startYear} value={String(startYear)}>
+                          <div className="flex items-center gap-2">
+                            <span>{label}</span>
+                            {isClosedYearOption ? (
+                              <Badge
+                                variant="outline"
+                                className="border-amber-500/50 bg-amber-500/10 text-amber-300 text-[10px] uppercase"
+                              >
+                                Closed
+                              </Badge>
+                            ) : null}
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
@@ -1243,9 +1335,9 @@ export default function AbsencePage() {
                         This date is outside the current booking window ({formatDate(bookingMaxDate)}).
                       </p>
                     )}
-                    {selectedDate && !(isManager || isAdmin) && isClosedFinancialYearRequest(formatDateISO(selectedDate)) && (
+                    {selectedDate && isClosedFinancialYearRequest(formatDateISO(selectedDate)) && (
                       <p className="text-xs text-amber-400 mb-3">
-                        This financial year is closed for employee bookings.
+                        This financial year is closed for bookings.
                       </p>
                     )}
                     <Button
@@ -1254,7 +1346,7 @@ export default function AbsencePage() {
                         selectedDate &&
                         (
                           formatDateISO(selectedDate) > bookingMaxDate ||
-                          (!(isManager || isAdmin) && isClosedFinancialYearRequest(formatDateISO(selectedDate)))
+                          isClosedFinancialYearRequest(formatDateISO(selectedDate))
                         )
                       )}
                       className="bg-absence hover:bg-absence-dark text-white"

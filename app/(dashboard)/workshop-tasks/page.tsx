@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PageLoader } from '@/components/ui/page-loader';
 import { Settings, Plus, CheckCircle2, Clock, AlertTriangle, Wrench, Pause } from 'lucide-react';
 import { ErrorDetailsResponse } from '@/types/error-details';
 import { WorkshopTasksOverviewTab } from './components/WorkshopTasksOverviewTab';
@@ -209,7 +210,7 @@ export default function WorkshopTasksPage() {
     }
   }
 
-  if (permissionLoading) return <div className="flex items-center justify-center min-h-[400px]"><div className="text-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-workshop mx-auto mb-4" /><p className="text-muted-foreground">Checking permissions...</p></div></div>;
+  if (permissionLoading) return <PageLoader message="Checking permissions..." />;
   if (!hasPermission) return null;
 
   return (

@@ -22,6 +22,7 @@ import {
   Paperclip,
   Pause,
   Plus,
+  Loader2,
   Search,
   Trash2,
   Truck,
@@ -178,6 +179,7 @@ export function WorkshopTasksOverviewTab({
   onEditTask,
   onDeleteTask,
 }: WorkshopTasksOverviewTabProps) {
+  const showInitialLoading = loading && tabFilteredTasks.length === 0;
   const { tabletModeEnabled } = useTabletMode();
   const hasHighPriorityPending = highPriorityPendingCount > 0;
   const pendingHeaderIconClass = hasHighPriorityPending ? 'text-red-500' : 'text-amber-400';
@@ -469,9 +471,12 @@ export function WorkshopTasksOverviewTab({
         </Card>
       </div>
 
-      {loading ? (
+      {showInitialLoading ? (
         <div className="flex items-center justify-center min-h-[400px]">
-          <p className="text-muted-foreground">Loading tasks...</p>
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <p>Loading tasks...</p>
+          </div>
         </div>
       ) : tabFilteredTasks.length === 0 ? (
         <Card>
@@ -492,6 +497,12 @@ export function WorkshopTasksOverviewTab({
         </Card>
       ) : (
         <div className="space-y-6">
+          {loading && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Refreshing tasks...
+            </div>
+          )}
           {pendingTasks.length > 0 && (
             <div className="border-2 border-amber-500/30 rounded-lg overflow-hidden bg-amber-500/5">
               <button

@@ -25,6 +25,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { PageLoader } from '@/components/ui/page-loader';
 import { Send, CheckCircle2, XCircle, AlertCircle, Info, User, Camera, ArrowLeft } from 'lucide-react';
 import { formatDateISO, formatDate, getDayOfWeek } from '@/lib/utils/date';
 import { InspectionStatus } from '@/types/inspection';
@@ -241,6 +242,13 @@ function NewPlantInspectionContent() {
     return items;
   }, [checkboxStates, comments, currentChecklist, inspectionDate]);
 
+  const getParsedHours = useCallback((): number | null => {
+    if (!currentHours || currentHours.trim() === '') return null;
+    const hoursValue = parseInt(currentHours, 10);
+    if (Number.isNaN(hoursValue) || hoursValue < 0) return null;
+    return hoursValue;
+  }, [currentHours]);
+
   const mergeIntoExistingDraft = useCallback(async (
     inspectionId: string,
     options: { showToast?: boolean } = {}
@@ -322,6 +330,7 @@ function NewPlantInspectionContent() {
     }
   }, [
     buildCurrentInspectionItemsPayload,
+    getParsedHours,
     hiredPlantDescription,
     hiredPlantHiringCompany,
     hiredPlantIdSerial,
@@ -787,13 +796,6 @@ function NewPlantInspectionContent() {
   const handleCommentChange = (itemNumber: number, comment: string) => {
     const key = `${itemNumber}`;
     setComments(prev => ({ ...prev, [key]: comment }));
-  };
-
-  const getParsedHours = (): number | null => {
-    if (!currentHours || currentHours.trim() === '') return null;
-    const hoursValue = parseInt(currentHours, 10);
-    if (Number.isNaN(hoursValue) || hoursValue < 0) return null;
-    return hoursValue;
   };
 
   const handleSubmit = () => {
@@ -2005,7 +2007,7 @@ function NewPlantInspectionContent() {
 
 export default function NewPlantInspectionPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><p className="text-muted-foreground">Loading...</p></div>}>
+    <Suspense fallback={<PageLoader message="Loading plant inspection form..." />}>
       <NewPlantInspectionContent />
     </Suspense>
   );

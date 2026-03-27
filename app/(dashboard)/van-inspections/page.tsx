@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
+import { PageLoader } from '@/components/ui/page-loader';
 import { getRecentVehicleIds, splitVehiclesByRecent } from '@/lib/utils/recentVehicles';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
@@ -442,6 +443,8 @@ function InspectionsContent() {
     }
   };
 
+  const showInitialLoading = loading && inspections.length === 0;
+
   return (
     <div className="space-y-6 max-w-6xl">
       
@@ -571,7 +574,7 @@ function InspectionsContent() {
         </Card>
       )}
 
-      {loading ? (
+      {showInitialLoading ? (
         <div className="flex items-center justify-center py-20">
           <div className="text-center">
             <Loader2 className="h-10 w-10 animate-spin text-inspection mx-auto mb-3" />
@@ -596,6 +599,12 @@ function InspectionsContent() {
         </Card>
       ) : (
         <>
+          {loading && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Refreshing daily checks...
+            </div>
+          )}
           <div className="grid gap-4">
             {inspections.map((inspection) => {
               const inspectionStatus = inspection.status as string;
@@ -730,7 +739,7 @@ function InspectionsContent() {
 
 export default function InspectionsPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><p className="text-muted-foreground">Loading...</p></div>}>
+    <Suspense fallback={<PageLoader message="Loading van inspections..." />}>
       <InspectionsContent />
     </Suspense>
   );

@@ -28,7 +28,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { createClient } from '@/lib/supabase/client';
 import { getErrorMessage, shouldLogAbsenceManageError } from '@/lib/utils/absence-error-handling';
 import { getCurrentFinancialYear } from '@/lib/utils/date';
-import { Loader2, Sparkles, Trash2, Users } from 'lucide-react';
+import { Loader2, Lock, RotateCcw, Sparkles, Trash2, Users } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface BulkEmployeeOption {
@@ -43,9 +43,12 @@ interface BulkEmployeeOption {
 }
 
 interface GenerationStatus {
+  currentFinancialYearStartYear: number;
   currentFinancialYearLabel: string;
+  latestGeneratedFinancialYearStartYear: number;
   latestGeneratedFinancialYearLabel: string;
   nextFinancialYearLabel: string;
+  closedFinancialYearStartYears: number[];
   latestClosedFinancialYearLabel: string | null;
   latestClosedFinancialYearClosedAt: string | null;
   latestClosedFinancialYearClosedByName: string | null;
@@ -124,11 +127,26 @@ function formatAuditTimestamp(value: string | null): string | null {
   return date.toLocaleString();
 }
 
+function getOldestOpenFinancialYearStartYear(
+  currentFinancialYearStartYear: number,
+  latestGeneratedFinancialYearStartYear: number,
+  closedFinancialYearStartYears: number[]
+): number | null {
+  const closedYears = new Set(closedFinancialYearStartYears);
+  for (let year = currentFinancialYearStartYear; year <= latestGeneratedFinancialYearStartYear; year += 1) {
+    if (!closedYears.has(year)) {
+      return year;
+    }
+  }
+  return null;
+}
+
 export function ManageOverviewAdminActions() {
   const supabase = createClient();
   const router = useRouter();
   const { isAdmin } = useAuth();
   const [generationStatus, setGenerationStatus] = useState<GenerationStatus | null>(null);
+  const [generationStatusHydrating, setGenerationStatusHydrating] = useState(true);
   const [showGenerateDialog, setShowGenerateDialog] = useState(false);
   const [showCloseYearDialog, setShowCloseYearDialog] = useState(false);
   const [showUndoCloseYearDialog, setShowUndoCloseYearDialog] = useState(false);
@@ -168,8 +186,10 @@ export function ManageOverviewAdminActions() {
       const payload = (await response.json()) as {
         success?: boolean;
         currentFinancialYearStartYear?: number;
+        latestGeneratedFinancialYearStartYear?: number;
         latestGeneratedFinancialYearLabel?: string;
         nextFinancialYearLabel?: string;
+        closedFinancialYearStartYears?: number[];
         latestClosedFinancialYearLabel?: string | null;
         latestClosedFinancialYearClosedAt?: string | null;
         latestClosedFinancialYearClosedByName?: string | null;
@@ -184,10 +204,15 @@ export function ManageOverviewAdminActions() {
       }
       const currentFinancialYearStartYear =
         payload.currentFinancialYearStartYear ?? getCurrentFinancialYear().start.getFullYear();
+      const latestGeneratedFinancialYearStartYear =
+        payload.latestGeneratedFinancialYearStartYear ?? currentFinancialYearStartYear;
       setGenerationStatus({
+        currentFinancialYearStartYear,
         currentFinancialYearLabel: formatFinancialYearLabel(currentFinancialYearStartYear),
+        latestGeneratedFinancialYearStartYear,
         latestGeneratedFinancialYearLabel: payload.latestGeneratedFinancialYearLabel || 'current year',
         nextFinancialYearLabel: payload.nextFinancialYearLabel || 'next year',
+        closedFinancialYearStartYears: payload.closedFinancialYearStartYears || [],
         latestClosedFinancialYearLabel: payload.latestClosedFinancialYearLabel || null,
         latestClosedFinancialYearClosedAt: payload.latestClosedFinancialYearClosedAt || null,
         latestClosedFinancialYearClosedByName: payload.latestClosedFinancialYearClosedByName || null,
@@ -199,6 +224,8 @@ export function ManageOverviewAdminActions() {
     } catch (error) {
       console.error('Error loading generation status:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to load generation status');
+    } finally {
+      setGenerationStatusHydrating(false);
     }
   }, []);
 
@@ -306,6 +333,27 @@ export function ManageOverviewAdminActions() {
   );
   const allBulkTeamsSelected =
     bulkTeamOptions.length > 0 && selectedBulkTeamCount === bulkTeamOptions.length;
+
+  const bulkAbsenceLabel = 'Bulk Absence';
+  const undoCloseLabel = 'Undo Close';
+  const closeTargetFinancialYearStartYear = useMemo(() => {
+    if (!generationStatus) return null;
+    return getOldestOpenFinancialYearStartYear(
+      generationStatus.currentFinancialYearStartYear,
+      generationStatus.latestGeneratedFinancialYearStartYear,
+      generationStatus.closedFinancialYearStartYears
+    );
+  }, [generationStatus]);
+  const closeTargetFinancialYearLabel = useMemo(() => {
+    if (closeTargetFinancialYearStartYear === null) return null;
+    return formatFinancialYearLabel(closeTargetFinancialYearStartYear);
+  }, [closeTargetFinancialYearStartYear]);
+  const closeYearLabel = `Close ${closeTargetFinancialYearLabel || 'No Open Year'}`;
+  const setupYearLabel = `Set up ${generationStatus?.nextFinancialYearLabel || 'next year'}`;
+  // Keep tile width stable so labels don't cause a visible resize.
+  const actionTileWidthCh = 22;
+  const actionTileClass =
+    'h-[54px] justify-center rounded-lg border-4 border-slate-600 bg-slate-800 dark:bg-slate-900 px-3 text-white shadow-md transition-all duration-200 hover:scale-105 hover:border-slate-500 hover:bg-slate-800 active:scale-95 animate-tile-pop disabled:opacity-60';
 
   function toggleShutdownRole(roleId: string) {
     setShutdownRoleFilters((prev) => (prev.includes(roleId) ? prev.filter((role) => role !== roleId) : [...prev, roleId]));
@@ -548,6 +596,11 @@ export function ManageOverviewAdminActions() {
   }
 
   async function handleCloseCurrentYearBookings() {
+    if (closeTargetFinancialYearStartYear === null) {
+      toast.error('No open financial year is available to close.');
+      return;
+    }
+
     setClosingCurrentYear(true);
     try {
       const response = await fetch('/api/absence/generation/close-current-year', {
@@ -555,6 +608,9 @@ export function ManageOverviewAdminActions() {
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          financialYearStartYear: closeTargetFinancialYearStartYear,
+        }),
       });
       const payload = (await response.json()) as {
         success?: boolean;
@@ -613,64 +669,100 @@ export function ManageOverviewAdminActions() {
 
   return (
     <>
-      <CardHeader className="flex flex-row items-start justify-between gap-4">
+      <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <CardTitle className="text-foreground">Admin Actions</CardTitle>
           <CardDescription className="text-muted-foreground">
             Run bulk absence booking and prepare next-year setup actions.
           </CardDescription>
-          {generationStatus ? (
-            <p className="mt-1 text-xs text-muted-foreground">
-              Current booking horizon: {generationStatus.latestGeneratedFinancialYearLabel}. Next available generation:{' '}
-              {generationStatus.nextFinancialYearLabel}.
-            </p>
-          ) : null}
-          {generationStatus?.latestClosedFinancialYearLabel ? (
-            <p className="mt-1 text-xs text-muted-foreground">
-              Latest closed financial year: {generationStatus.latestClosedFinancialYearLabel}.
-            </p>
-          ) : null}
-          {generationStatus?.latestClosedFinancialYearClosedAt ? (
-            <p className="mt-1 text-xs text-muted-foreground">
-              Closed by {generationStatus.latestClosedFinancialYearClosedByName || 'Unknown'} on{' '}
-              {formatAuditTimestamp(generationStatus.latestClosedFinancialYearClosedAt) || 'Unknown date'}.
-            </p>
-          ) : null}
-          {isAdmin && generationStatus?.latestClosedFinancialYearLabel && !generationStatus.canUndoLatestClosedFinancialYear ? (
-            <p className="mt-1 text-xs text-amber-300">
-              Undo Close unavailable: {generationStatus.undoCloseBlockedReason || 'This closed year cannot be reopened right now.'}
-            </p>
-          ) : null}
+          <div className="mt-1 min-h-[72px]">
+            {generationStatusHydrating ? (
+              <p className="text-xs text-muted-foreground">Loading admin status...</p>
+            ) : null}
+            {generationStatus ? (
+              <p className="text-xs text-muted-foreground">
+                Current booking horizon: {generationStatus.latestGeneratedFinancialYearLabel}. Next available generation:{' '}
+                {generationStatus.nextFinancialYearLabel}.
+              </p>
+            ) : null}
+            {generationStatus?.latestClosedFinancialYearLabel ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Latest closed financial year: {generationStatus.latestClosedFinancialYearLabel}.
+              </p>
+            ) : null}
+            {generationStatus?.latestClosedFinancialYearClosedAt ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Closed by {generationStatus.latestClosedFinancialYearClosedByName || 'Unknown'} on{' '}
+                {formatAuditTimestamp(generationStatus.latestClosedFinancialYearClosedAt) || 'Unknown date'}.
+              </p>
+            ) : null}
+            {isAdmin && generationStatus?.latestClosedFinancialYearLabel && !generationStatus.canUndoLatestClosedFinancialYear ? (
+              <p className="mt-1 text-xs text-amber-300">
+                Undo Close unavailable: {generationStatus.undoCloseBlockedReason || 'This closed year cannot be reopened right now.'}
+              </p>
+            ) : null}
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={() => setShowShutdownDialog(true)} variant="outline" className="border-border text-muted-foreground">
-            <Users className="h-4 w-4 mr-2" />
-            Bulk Absence
-          </Button>
-          {isAdmin ? (
-            <Button
-              onClick={() => setShowUndoCloseYearDialog(true)}
-              variant="outline"
-              disabled={!generationStatus?.latestClosedFinancialYearLabel}
-              className="border-violet-500/40 text-violet-200 hover:bg-violet-500/10 disabled:opacity-60"
+        <div className="inline-grid grid-cols-2 gap-2 self-start">
+          {generationStatusHydrating ? (
+            <div
+              className={`${actionTileClass} col-span-2 flex items-center justify-center`}
+              style={{ width: `${actionTileWidthCh}ch` }}
             >
-              Undo Close
-            </Button>
-          ) : null}
-          <Button
-            onClick={() => setShowCloseYearDialog(true)}
-            variant="outline"
-            className="border-amber-500/40 text-amber-200 hover:bg-amber-500/10"
-          >
-            Close {generationStatus?.currentFinancialYearLabel || 'Current Year'}
-          </Button>
-          <Button
-            onClick={() => setShowGenerateDialog(true)}
-            className="bg-absence hover:bg-absence-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
-          >
-            <Sparkles className="h-4 w-4 mr-2" />
-            Set up {generationStatus?.nextFinancialYearLabel || 'next year'}
-          </Button>
+              <Loader2 className="h-4 w-4 animate-spin text-absence" />
+            </div>
+          ) : (
+            <>
+              <Button
+                onClick={() => setShowShutdownDialog(true)}
+                variant="outline"
+                className={actionTileClass}
+                style={{ width: `${actionTileWidthCh}ch` }}
+              >
+                <span className="flex w-full items-center justify-center gap-2 text-center text-sm font-semibold text-foreground">
+                  <Users className="h-4 w-4 text-absence" />
+                  {bulkAbsenceLabel}
+                </span>
+              </Button>
+              <Button
+                onClick={() => setShowGenerateDialog(true)}
+                variant="outline"
+                className={actionTileClass}
+                style={{ width: `${actionTileWidthCh}ch` }}
+              >
+                <span className="flex w-full items-center justify-center gap-2 text-center text-sm font-semibold">
+                  <Sparkles className="h-4 w-4 text-absence" />
+                  {setupYearLabel}
+                </span>
+              </Button>
+              {isAdmin ? (
+                <Button
+                  onClick={() => setShowUndoCloseYearDialog(true)}
+                  variant="outline"
+                  disabled={!generationStatus?.latestClosedFinancialYearLabel}
+                  className={actionTileClass}
+                  style={{ width: `${actionTileWidthCh}ch` }}
+                >
+                  <span className="flex w-full items-center justify-center gap-2 text-center text-sm font-semibold">
+                    <RotateCcw className="h-4 w-4 text-absence" />
+                    {undoCloseLabel}
+                  </span>
+                </Button>
+              ) : null}
+              <Button
+                onClick={() => setShowCloseYearDialog(true)}
+                variant="outline"
+                className={actionTileClass}
+                style={{ width: `${actionTileWidthCh}ch` }}
+                disabled={closeTargetFinancialYearStartYear === null}
+              >
+                <span className="flex w-full items-center justify-center gap-2 text-center text-sm font-semibold">
+                  <Lock className="h-4 w-4 text-absence" />
+                  {closeYearLabel}
+                </span>
+              </Button>
+            </>
+          )}
         </div>
       </CardHeader>
 
@@ -1122,7 +1214,7 @@ export function ManageOverviewAdminActions() {
         <DialogContent className="border-border max-w-3xl">
           <DialogHeader>
             <DialogTitle className="text-foreground">
-              Close {generationStatus?.currentFinancialYearLabel || 'Current Year'} Bookings
+              Close {closeTargetFinancialYearLabel || 'Open Year'} Bookings
             </DialogTitle>
             <DialogDescription className="text-slate-400/90">
               This locks employee self-service bookings for the selected year and generates carryover balances into the
@@ -1140,7 +1232,7 @@ export function ManageOverviewAdminActions() {
             </Button>
             <Button
               onClick={handleCloseCurrentYearBookings}
-              disabled={closingCurrentYear}
+              disabled={closingCurrentYear || closeTargetFinancialYearStartYear === null}
               className="bg-amber-600 hover:bg-amber-700 text-white"
             >
               {closingCurrentYear ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}

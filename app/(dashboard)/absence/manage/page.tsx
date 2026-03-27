@@ -53,6 +53,8 @@ import type { WorkShiftPattern } from '@/types/work-shifts';
 
 type ManageSortField = 'employee' | 'reason' | 'status' | 'date' | 'duration' | 'approved_at';
 type ManageSortDirection = 'asc' | 'desc';
+type ManageTab = 'overview' | 'calendar' | 'reasons' | 'allowances' | 'work-shifts';
+type ProtectedManageTab = 'overview' | 'allowances' | 'reasons';
 
 export default function AdminAbsencePage() {
   const { isAdmin, isManager, loading: authLoading } = useAuth();
@@ -75,7 +77,7 @@ export default function AdminAbsencePage() {
   const [sortDirection, setSortDirection] = useState<ManageSortDirection>('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 25;
-  const [activeTab, setActiveTab] = useState<'overview' | 'calendar' | 'reasons' | 'allowances' | 'work-shifts'>('overview');
+  const [activeTab, setActiveTab] = useState<ManageTab>('overview');
   
   // Data
   const { data: absences, isLoading } = useAllAbsences({ 
@@ -160,7 +162,8 @@ export default function AdminAbsencePage() {
   const deleteAbsence = useDeleteAbsence();
   useAbsenceRealtimeQueryInvalidation();
   const [allowancesRefreshKey, setAllowancesRefreshKey] = useState(0);
-  const [allowancesUnlocked, setAllowancesUnlocked] = useState(false);
+  const [protectedTabsUnlocked, setProtectedTabsUnlocked] = useState(false);
+  const [pendingProtectedTab, setPendingProtectedTab] = useState<ProtectedManageTab>('overview');
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState('');
@@ -181,6 +184,17 @@ export default function AdminAbsencePage() {
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   
+  const isProtectedTab = useCallback((tab: ManageTab): tab is ProtectedManageTab => {
+    return tab === 'overview' || tab === 'allowances' || tab === 'reasons';
+  }, []);
+
+  const openPasswordGate = useCallback((tab: ProtectedManageTab) => {
+    setPendingProtectedTab(tab);
+    setPasswordInput('');
+    setPasswordError('');
+    setShowPasswordDialog(true);
+  }, []);
+
   // Check admin/manager access
   useEffect(() => {
     if (!authLoading && !isAdmin && !isManager) {
@@ -190,26 +204,37 @@ export default function AdminAbsencePage() {
 
   useEffect(() => {
     if (authLoading) return;
-    const tabParam = searchParams.get('tab') || 'overview';
-    const requestedTab = tabParam === 'records' ? 'overview' : tabParam;
-    const allowedTabs: Array<'overview' | 'calendar' | 'reasons' | 'allowances' | 'work-shifts'> = ['overview', 'calendar'];
+    const tabParam = searchParams.get('tab');
+    const resolvedTabParam = tabParam || 'calendar';
+    if (!tabParam) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('tab', 'calendar');
+      if (includeArchived) {
+        params.set('archived', '1');
+      } else {
+        params.delete('archived');
+      }
+      router.replace(`/absence/manage?${params.toString()}`, { scroll: false });
+    }
+    const requestedTab = resolvedTabParam === 'records' ? 'overview' : resolvedTabParam;
+    const allowedTabs: ManageTab[] = ['calendar', 'overview'];
     if (isAdmin) allowedTabs.push('reasons', 'allowances', 'work-shifts');
     else if (isManager) allowedTabs.push('allowances');
 
     if (allowedTabs.includes(requestedTab as typeof allowedTabs[number])) {
-      if (requestedTab === 'allowances' && !allowancesUnlocked) {
+      if (isProtectedTab(requestedTab as ManageTab) && !protectedTabsUnlocked) {
         const params = new URLSearchParams(searchParams.toString());
-        params.set('tab', 'overview');
+        params.set('tab', 'calendar');
         if (includeArchived) {
           params.set('archived', '1');
         } else {
           params.delete('archived');
         }
-        setActiveTab('overview');
+        setActiveTab('calendar');
         router.replace(`/absence/manage?${params.toString()}`, { scroll: false });
-        setShowPasswordDialog(true);
+        openPasswordGate(requestedTab as ProtectedManageTab);
       } else {
-        setActiveTab(requestedTab as 'overview' | 'calendar' | 'reasons' | 'allowances' | 'work-shifts');
+        setActiveTab(requestedTab as ManageTab);
       }
     } else {
       const fallback = allowedTabs[0];
@@ -222,7 +247,7 @@ export default function AdminAbsencePage() {
       }
       router.replace(`/absence/manage?${params.toString()}`, { scroll: false });
     }
-  }, [searchParams, authLoading, isAdmin, isManager, router, includeArchived, allowancesUnlocked]);
+  }, [searchParams, authLoading, isAdmin, isManager, router, includeArchived, protectedTabsUnlocked, isProtectedTab, openPasswordGate]);
 
   useEffect(() => {
     const archivedParam = searchParams.get('archived');
@@ -231,10 +256,10 @@ export default function AdminAbsencePage() {
 
   useEffect(() => {
     if (!isAdmin && activeTab === 'reasons') {
-      setActiveTab('overview');
+      setActiveTab('calendar');
     }
     if (!isAdmin && activeTab === 'work-shifts') {
-      setActiveTab('overview');
+      setActiveTab('calendar');
     }
   }, [isAdmin, activeTab]);
 
@@ -261,14 +286,12 @@ export default function AdminAbsencePage() {
 
   const hasUnsavedAbsenceAnnouncement = absenceAnnouncementInput.trim() !== savedAbsenceAnnouncement.trim();
 
-  function handleTabChange(nextTab: 'overview' | 'calendar' | 'reasons' | 'allowances' | 'work-shifts') {
+  function handleTabChange(nextTab: ManageTab) {
     if (!isAdmin && nextTab === 'reasons') return;
     if (!isAdmin && nextTab === 'work-shifts') return;
     if (!canManage && nextTab === 'allowances') return;
-    if (nextTab === 'allowances' && !allowancesUnlocked) {
-      setPasswordInput('');
-      setPasswordError('');
-      setShowPasswordDialog(true);
+    if (isProtectedTab(nextTab) && !protectedTabsUnlocked) {
+      openPasswordGate(nextTab);
       return;
     }
     setActiveTab(nextTab);
@@ -284,13 +307,13 @@ export default function AdminAbsencePage() {
 
   const handlePasswordSubmit = useCallback(() => {
     if (passwordInput === 'AVS-Access1') {
-      setAllowancesUnlocked(true);
+      setProtectedTabsUnlocked(true);
       setShowPasswordDialog(false);
       setPasswordInput('');
       setPasswordError('');
-      setActiveTab('allowances');
+      setActiveTab(pendingProtectedTab);
       const params = new URLSearchParams(searchParams.toString());
-      params.set('tab', 'allowances');
+      params.set('tab', pendingProtectedTab);
       if (includeArchived) {
         params.set('archived', '1');
       } else {
@@ -302,7 +325,7 @@ export default function AdminAbsencePage() {
       setPasswordInput('');
       setTimeout(() => passwordInputRef.current?.focus(), 0);
     }
-  }, [passwordInput, searchParams, includeArchived, router]);
+  }, [passwordInput, pendingProtectedTab, searchParams, includeArchived, router]);
 
   function handlePasswordDialogClose() {
     setShowPasswordDialog(false);
@@ -597,34 +620,34 @@ export default function AdminAbsencePage() {
         </div>
       )}
 
-      <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as 'overview' | 'calendar' | 'reasons' | 'allowances' | 'work-shifts')} className="space-y-6">
+      <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as ManageTab)} className="space-y-6">
         <TabsList>
-          <TabsTrigger value="overview" className="gap-2">
-            <Wrench className="h-4 w-4" />
-            Overview
-          </TabsTrigger>
           <TabsTrigger value="calendar" className="gap-2">
             <Calendar className="h-4 w-4" />
             Calendar
           </TabsTrigger>
-          {isAdmin && (
-            <TabsTrigger value="reasons" className="gap-2">
-              <Filter className="h-4 w-4" />
-              Reasons
-            </TabsTrigger>
-          )}
-          {canManage && (
-            <TabsTrigger value="allowances" className="gap-2">
-              <Briefcase className="h-4 w-4" />
-              Allowances
-            </TabsTrigger>
-          )}
           {isAdmin && (
             <TabsTrigger value="work-shifts" className="gap-2">
               <Clock className="h-4 w-4" />
               Work Shifts
             </TabsTrigger>
           )}
+          {canManage && (
+            <TabsTrigger value="allowances" className="group gap-2">
+              <Briefcase className="h-4 w-4 text-absence transition-colors group-data-[state=active]:text-white" />
+              Allowances
+            </TabsTrigger>
+          )}
+          {isAdmin && (
+            <TabsTrigger value="reasons" className="group gap-2">
+              <Filter className="h-4 w-4 text-absence transition-colors group-data-[state=active]:text-white" />
+              Reasons
+            </TabsTrigger>
+          )}
+          <TabsTrigger value="overview" className="group gap-2">
+            <Wrench className="h-4 w-4 text-absence transition-colors group-data-[state=active]:text-white" />
+            Records & Admin
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6 mt-0">
@@ -1226,10 +1249,20 @@ export default function AdminAbsencePage() {
           <DialogHeader>
             <DialogTitle className="text-foreground flex items-center gap-2">
               <Lock className="h-5 w-5 text-absence" />
-              Allowances — Protected
+              {pendingProtectedTab === 'overview'
+                ? 'Records & Admin — Protected'
+                : pendingProtectedTab === 'reasons'
+                ? 'Reasons — Protected'
+                : 'Allowances — Protected'}
             </DialogTitle>
             <DialogDescription className="text-slate-400/90">
-              Enter the password to access the Allowances tab.
+              Enter the password to access the{' '}
+              {pendingProtectedTab === 'overview'
+                ? 'Records & Admin'
+                : pendingProtectedTab === 'reasons'
+                ? 'Reasons'
+                : 'Allowances'}{' '}
+              tab.
             </DialogDescription>
           </DialogHeader>
           <form
@@ -1237,10 +1270,10 @@ export default function AdminAbsencePage() {
             className="space-y-4"
           >
             <div className="space-y-2">
-              <Label htmlFor="allowances-password" className="text-foreground font-medium">Password</Label>
+              <Label htmlFor="protected-tab-password" className="text-foreground font-medium">Password</Label>
               <Input
                 ref={passwordInputRef}
-                id="allowances-password"
+                id="protected-tab-password"
                 type="password"
                 value={passwordInput}
                 onChange={(e) => { setPasswordInput(e.target.value); if (passwordError) setPasswordError(''); }}

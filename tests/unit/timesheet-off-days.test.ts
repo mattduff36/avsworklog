@@ -1,0 +1,265 @@
+import { describe, expect, it } from 'vitest';
+import {
+  getTimesheetEntryDateFromWeekEnding,
+  normalizeTimesheetEntriesForOffDays,
+  PAID_LEAVE_DAILY_HOURS,
+  resolveTimesheetOffDayStates,
+  type TimesheetEntryLike,
+} from '@/lib/utils/timesheet-off-days';
+import { STANDARD_WORK_SHIFT_PATTERN } from '@/lib/utils/work-shifts';
+
+function buildEntries(): TimesheetEntryLike[] {
+  return Array.from({ length: 7 }, (_, i) => ({
+    day_of_week: i + 1,
+    time_started: '',
+    time_finished: '',
+    job_number: '',
+    working_in_yard: false,
+    did_not_work: false,
+    didNotWorkReason: null,
+    daily_total: null,
+    remarks: '',
+  }));
+}
+
+describe('timesheet off-day resolver', () => {
+  it('maps day_of_week to expected calendar dates', () => {
+    const monday = getTimesheetEntryDateFromWeekEnding('2026-03-29', 1);
+    const sunday = getTimesheetEntryDateFromWeekEnding('2026-03-29', 7);
+
+    expect(monday.toISOString().slice(0, 10)).toBe('2026-03-23');
+    expect(sunday.toISOString().slice(0, 10)).toBe('2026-03-29');
+  });
+
+  it('marks approved annual leave as locked off-day', () => {
+    const states = resolveTimesheetOffDayStates(
+      '2026-03-29',
+      [
+        {
+          date: '2026-03-24',
+          end_date: null,
+          is_half_day: false,
+          absence_reasons: { name: 'Annual Leave', color: '#7c3aed', is_paid: true },
+        },
+      ],
+      STANDARD_WORK_SHIFT_PATTERN
+    );
+
+    const tuesday = states.find((row) => row.day_of_week === 2);
+    expect(tuesday?.isOnApprovedLeave).toBe(true);
+    expect(tuesday?.isAnnualLeave).toBe(true);
+    expect(tuesday?.isLeaveLocked).toBe(true);
+    expect(tuesday?.leaveReasonColor).toBe('#7c3aed');
+    expect(tuesday?.paidLeaveHours).toBe(PAID_LEAVE_DAILY_HOURS);
+  });
+
+  it('still marks approved leave when work-shift pattern is unavailable', () => {
+    const states = resolveTimesheetOffDayStates(
+      '2026-03-29',
+      [
+        {
+          date: '2026-03-27',
+          end_date: null,
+          is_half_day: false,
+          absence_reasons: { name: 'Annual Leave' },
+        },
+      ],
+      null
+    );
+
+    const friday = states.find((row) => row.day_of_week === 5);
+    expect(friday?.isOnApprovedLeave).toBe(true);
+    expect(friday?.isLeaveLocked).toBe(true);
+    // Pattern fallback still resolves expected shift days without disabling leave lock.
+    expect(friday?.isExpectedShiftDay).toBe(true);
+  });
+
+  it('does not treat half-day leave as full off-day lock', () => {
+    const states = resolveTimesheetOffDayStates(
+      '2026-03-29',
+      [
+        {
+          date: '2026-03-25',
+          end_date: null,
+          is_half_day: true,
+          half_day_session: 'AM',
+          absence_reasons: { name: 'Annual Leave', is_paid: true },
+        },
+      ],
+      STANDARD_WORK_SHIFT_PATTERN
+    );
+
+    const wednesday = states.find((row) => row.day_of_week === 3);
+    expect(wednesday?.isOnApprovedLeave).toBe(true);
+    expect(wednesday?.isLeaveLocked).toBe(false);
+    expect(wednesday?.isPartialLeave).toBe(true);
+    expect(wednesday?.workWindow?.start).toBe('12:00');
+    expect(wednesday?.workWindow?.end).toBe('23:59');
+    expect(wednesday?.paidLeaveHours).toBe(4.5);
+    expect(wednesday?.leaveLabels[0]?.label).toBe('Annual Leave (AM)');
+  });
+
+  it('supports two separate half-day leave reasons in one day', () => {
+    const states = resolveTimesheetOffDayStates(
+      '2026-03-29',
+      [
+        {
+          date: '2026-03-24',
+          end_date: null,
+          is_half_day: true,
+          half_day_session: 'AM',
+          absence_reasons: { name: 'Annual Leave', is_paid: true },
+        },
+        {
+          date: '2026-03-24',
+          end_date: null,
+          is_half_day: true,
+          half_day_session: 'PM',
+          absence_reasons: { name: 'Training', is_paid: true },
+        },
+      ],
+      STANDARD_WORK_SHIFT_PATTERN
+    );
+
+    const tuesday = states.find((row) => row.day_of_week === 2);
+    expect(tuesday?.isLeaveLocked).toBe(true);
+    expect(tuesday?.leaveLabels.map((row) => row.label)).toEqual(['Annual Leave (AM)', 'Training (PM)']);
+    expect(tuesday?.paidLeaveHours).toBe(9);
+  });
+});
+
+describe('timesheet off-day normalization', () => {
+  it('hard-overwrites paid full-day leave to did-not-work with 9.00 hours', () => {
+    const entries = buildEntries();
+    entries[1] = {
+      ...entries[1],
+      time_started: '08:00',
+      time_finished: '17:00',
+      job_number: '1234-AB',
+      daily_total: 8.5,
+      remarks: 'Worked anyway',
+    };
+
+    const states = resolveTimesheetOffDayStates(
+      '2026-03-29',
+      [
+        {
+          date: '2026-03-24',
+          end_date: null,
+          is_half_day: false,
+          absence_reasons: { name: 'Sickness', is_paid: true },
+        },
+      ],
+      STANDARD_WORK_SHIFT_PATTERN
+    );
+
+    const normalized = normalizeTimesheetEntriesForOffDays(entries, states, {
+      enforceLeaveOverwrite: true,
+      applyNonShiftDefaults: false,
+    });
+
+    expect(normalized[1].did_not_work).toBe(true);
+    expect(normalized[1].didNotWorkReason).toBe('Sickness');
+    expect(normalized[1].time_started).toBe('');
+    expect(normalized[1].time_finished).toBe('');
+    expect(normalized[1].job_number).toBe('');
+    expect(normalized[1].daily_total).toBe(9);
+    expect(normalized[1].remarks).toBe('Sickness');
+  });
+
+  it('uses 0.00 hours for unpaid full-day leave', () => {
+    const entries = buildEntries();
+    const states = resolveTimesheetOffDayStates(
+      '2026-03-29',
+      [
+        {
+          date: '2026-03-24',
+          end_date: null,
+          is_half_day: false,
+          absence_reasons: { name: 'Unpaid leave', is_paid: false },
+        },
+      ],
+      STANDARD_WORK_SHIFT_PATTERN
+    );
+
+    const normalized = normalizeTimesheetEntriesForOffDays(entries, states, {
+      enforceLeaveOverwrite: true,
+      applyNonShiftDefaults: true,
+    });
+
+    expect(normalized[1].did_not_work).toBe(true);
+    expect(normalized[1].daily_total).toBe(0);
+    expect(normalized[1].remarks).toBe('Unpaid leave');
+  });
+
+  it('adds paid half-day credit to worked hours for partial leave', () => {
+    const entries = buildEntries();
+    entries[1] = {
+      ...entries[1],
+      time_started: '12:00',
+      time_finished: '17:00',
+      job_number: '1234-AB',
+    };
+
+    const states = resolveTimesheetOffDayStates(
+      '2026-03-29',
+      [
+        {
+          date: '2026-03-24',
+          end_date: null,
+          is_half_day: true,
+          half_day_session: 'AM',
+          absence_reasons: { name: 'Annual Leave', is_paid: true },
+        },
+      ],
+      STANDARD_WORK_SHIFT_PATTERN
+    );
+
+    const normalized = normalizeTimesheetEntriesForOffDays(entries, states, {
+      enforceLeaveOverwrite: true,
+      applyNonShiftDefaults: true,
+    });
+
+    // 12:00-17:00 = 5.00 worked hours + 4.50 paid leave = 9.50
+    expect(normalized[1].did_not_work).toBe(false);
+    expect(normalized[1].daily_total).toBe(9.5);
+    expect(normalized[1].remarks).toBe('Annual Leave (AM)');
+  });
+
+  it('defaults non-shift days to Off Shift when no work was entered', () => {
+    const entries = buildEntries();
+    const states = resolveTimesheetOffDayStates('2026-03-29', [], STANDARD_WORK_SHIFT_PATTERN);
+
+    const normalized = normalizeTimesheetEntriesForOffDays(entries, states, {
+      enforceLeaveOverwrite: false,
+      applyNonShiftDefaults: true,
+    });
+
+    expect(normalized[5].did_not_work).toBe(true);
+    expect(normalized[5].didNotWorkReason).toBe('Off Shift');
+    expect(normalized[5].remarks).toBe('Not on Shift');
+  });
+
+  it('keeps non-shift day editable data when hours were entered', () => {
+    const entries = buildEntries();
+    entries[5] = {
+      ...entries[5],
+      time_started: '09:00',
+      time_finished: '13:00',
+      daily_total: 4,
+      did_not_work: false,
+      remarks: 'Overtime Saturday',
+    };
+
+    const states = resolveTimesheetOffDayStates('2026-03-29', [], STANDARD_WORK_SHIFT_PATTERN);
+    const normalized = normalizeTimesheetEntriesForOffDays(entries, states, {
+      enforceLeaveOverwrite: false,
+      applyNonShiftDefaults: true,
+    });
+
+    expect(normalized[5].did_not_work).toBe(false);
+    expect(normalized[5].time_started).toBe('09:00');
+    expect(normalized[5].time_finished).toBe('13:00');
+    expect(normalized[5].remarks).toBe('Overtime Saturday');
+  });
+});

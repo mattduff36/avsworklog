@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Loader2, Wrench, Truck, HardHat, Settings } from 'lucide-react';
+import { PageLoader } from '@/components/ui/page-loader';
 import { logger } from '@/lib/utils/logger';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { useMaintenance } from '@/lib/hooks/useMaintenance';
@@ -38,6 +39,7 @@ function MaintenanceContent() {
   const lastAssetFilterRef = useRef<'both' | 'van' | 'hgv' | 'plant'>('both');
 
   const { data: maintenanceData, isLoading: maintenanceLoading, error: maintenanceError } = useMaintenance();
+  const showInitialMaintenanceLoading = maintenanceLoading && !maintenanceData;
 
   useEffect(() => {
     async function checkPermission() {
@@ -129,11 +131,7 @@ function MaintenanceContent() {
   };
 
   if (authLoading || hasModulePermission === null) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-maintenance" />
-      </div>
-    );
+    return <PageLoader message="Loading maintenance..." />;
   }
 
   if (!hasModulePermission) {
@@ -182,7 +180,7 @@ function MaintenanceContent() {
         )}
 
         <TabsContent value="overview" className="space-y-6 mt-0">
-          {maintenanceLoading ? (
+          {showInitialMaintenanceLoading ? (
             <div className="flex items-center justify-center min-h-[400px]">
               <Loader2 className="h-8 w-8 animate-spin text-maintenance" />
             </div>
@@ -198,6 +196,12 @@ function MaintenanceContent() {
             </Card>
           ) : (
             <>
+              {maintenanceLoading && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Refreshing maintenance status...
+                </div>
+              )}
               {/* Asset type filter */}
               <div className={`flex ${tabletModeEnabled ? 'justify-start' : 'justify-end'}`}>
                 <Tabs value={maintenanceFilter} onValueChange={(v) => handleMaintenanceFilterChange(v as 'both' | 'van' | 'hgv' | 'plant')}>
@@ -258,11 +262,7 @@ function MaintenanceContent() {
 
 export default function MaintenancePage() {
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-maintenance" />
-      </div>
-    }>
+    <Suspense fallback={<PageLoader message="Loading maintenance..." />}>
       <MaintenanceContent />
     </Suspense>
   );

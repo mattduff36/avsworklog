@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
           sender_id,
           created_at,
           deleted_at,
-          sender:sender_id(
+          sender:profiles!messages_sender_id_fkey(
             id,
             full_name
           )
