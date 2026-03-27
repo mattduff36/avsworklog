@@ -160,6 +160,7 @@ export default function AdminAbsencePage() {
   const deleteAbsence = useDeleteAbsence();
   useAbsenceRealtimeQueryInvalidation();
   const [allowancesRefreshKey, setAllowancesRefreshKey] = useState(0);
+  const [allowancesUnlocked, setAllowancesUnlocked] = useState(false);
   
   // Dialog state
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -192,7 +193,28 @@ export default function AdminAbsencePage() {
     else if (isManager) allowedTabs.push('allowances');
 
     if (allowedTabs.includes(requestedTab as typeof allowedTabs[number])) {
-      setActiveTab(requestedTab as 'overview' | 'calendar' | 'reasons' | 'allowances' | 'work-shifts');
+      if (requestedTab === 'allowances' && !allowancesUnlocked) {
+        const entered = window.prompt('Enter the password to access Allowances:');
+        if (entered === 'AVS-Access1') {
+          setAllowancesUnlocked(true);
+          setActiveTab('allowances');
+        } else {
+          if (entered !== null) {
+            toast.error('Incorrect password');
+          }
+          const params = new URLSearchParams(searchParams.toString());
+          params.set('tab', 'overview');
+          if (includeArchived) {
+            params.set('archived', '1');
+          } else {
+            params.delete('archived');
+          }
+          setActiveTab('overview');
+          router.replace(`/absence/manage?${params.toString()}`, { scroll: false });
+        }
+      } else {
+        setActiveTab(requestedTab as 'overview' | 'calendar' | 'reasons' | 'allowances' | 'work-shifts');
+      }
     } else {
       const fallback = allowedTabs[0];
       const params = new URLSearchParams(searchParams.toString());
@@ -204,7 +226,7 @@ export default function AdminAbsencePage() {
       }
       router.replace(`/absence/manage?${params.toString()}`, { scroll: false });
     }
-  }, [searchParams, authLoading, isAdmin, isManager, router, includeArchived]);
+  }, [searchParams, authLoading, isAdmin, isManager, router, includeArchived, allowancesUnlocked]);
 
   useEffect(() => {
     const archivedParam = searchParams.get('archived');
@@ -247,6 +269,17 @@ export default function AdminAbsencePage() {
     if (!isAdmin && nextTab === 'reasons') return;
     if (!isAdmin && nextTab === 'work-shifts') return;
     if (!canManage && nextTab === 'allowances') return;
+    if (nextTab === 'allowances' && !allowancesUnlocked) {
+      const entered = window.prompt('Enter the password to access Allowances:');
+      if (entered === 'AVS-Access1') {
+        setAllowancesUnlocked(true);
+      } else {
+        if (entered !== null) {
+          toast.error('Incorrect password');
+        }
+        return;
+      }
+    }
     setActiveTab(nextTab);
     const params = new URLSearchParams(searchParams.toString());
     params.set('tab', nextTab);
