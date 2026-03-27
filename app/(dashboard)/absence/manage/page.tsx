@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { fetchAbsenceMessage, updateAbsenceMessage } from '@/lib/client/absence-message';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
@@ -27,7 +27,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ArrowUpDown, Calendar, ChevronLeft, ChevronRight, Plus, Filter, Trash2, Search, ExternalLink, Wrench, Briefcase, Clock, Pencil } from 'lucide-react';
+import { ArrowUpDown, Calendar, ChevronLeft, ChevronRight, Plus, Filter, Trash2, Search, ExternalLink, Wrench, Briefcase, Clock, Pencil, Lock } from 'lucide-react';
 import { 
   useAllAbsences, 
   useAllAbsenceReasons,
@@ -161,6 +161,10 @@ export default function AdminAbsencePage() {
   useAbsenceRealtimeQueryInvalidation();
   const [allowancesRefreshKey, setAllowancesRefreshKey] = useState(0);
   const [allowancesUnlocked, setAllowancesUnlocked] = useState(false);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const passwordInputRef = useRef<HTMLInputElement>(null);
   
   // Dialog state
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -194,24 +198,16 @@ export default function AdminAbsencePage() {
 
     if (allowedTabs.includes(requestedTab as typeof allowedTabs[number])) {
       if (requestedTab === 'allowances' && !allowancesUnlocked) {
-        const entered = window.prompt('Enter the password to access Allowances:');
-        if (entered === 'AVS-Access1') {
-          setAllowancesUnlocked(true);
-          setActiveTab('allowances');
+        const params = new URLSearchParams(searchParams.toString());
+        params.set('tab', 'overview');
+        if (includeArchived) {
+          params.set('archived', '1');
         } else {
-          if (entered !== null) {
-            toast.error('Incorrect password');
-          }
-          const params = new URLSearchParams(searchParams.toString());
-          params.set('tab', 'overview');
-          if (includeArchived) {
-            params.set('archived', '1');
-          } else {
-            params.delete('archived');
-          }
-          setActiveTab('overview');
-          router.replace(`/absence/manage?${params.toString()}`, { scroll: false });
+          params.delete('archived');
         }
+        setActiveTab('overview');
+        router.replace(`/absence/manage?${params.toString()}`, { scroll: false });
+        setShowPasswordDialog(true);
       } else {
         setActiveTab(requestedTab as 'overview' | 'calendar' | 'reasons' | 'allowances' | 'work-shifts');
       }
@@ -270,15 +266,10 @@ export default function AdminAbsencePage() {
     if (!isAdmin && nextTab === 'work-shifts') return;
     if (!canManage && nextTab === 'allowances') return;
     if (nextTab === 'allowances' && !allowancesUnlocked) {
-      const entered = window.prompt('Enter the password to access Allowances:');
-      if (entered === 'AVS-Access1') {
-        setAllowancesUnlocked(true);
-      } else {
-        if (entered !== null) {
-          toast.error('Incorrect password');
-        }
-        return;
-      }
+      setPasswordInput('');
+      setPasswordError('');
+      setShowPasswordDialog(true);
+      return;
     }
     setActiveTab(nextTab);
     const params = new URLSearchParams(searchParams.toString());
@@ -289,6 +280,34 @@ export default function AdminAbsencePage() {
       params.delete('archived');
     }
     router.replace(`/absence/manage?${params.toString()}`, { scroll: false });
+  }
+
+  const handlePasswordSubmit = useCallback(() => {
+    if (passwordInput === 'AVS-Access1') {
+      setAllowancesUnlocked(true);
+      setShowPasswordDialog(false);
+      setPasswordInput('');
+      setPasswordError('');
+      setActiveTab('allowances');
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('tab', 'allowances');
+      if (includeArchived) {
+        params.set('archived', '1');
+      } else {
+        params.delete('archived');
+      }
+      router.replace(`/absence/manage?${params.toString()}`, { scroll: false });
+    } else {
+      setPasswordError('Incorrect password. Please try again.');
+      setPasswordInput('');
+      setTimeout(() => passwordInputRef.current?.focus(), 0);
+    }
+  }, [passwordInput, searchParams, includeArchived, router]);
+
+  function handlePasswordDialogClose() {
+    setShowPasswordDialog(false);
+    setPasswordInput('');
+    setPasswordError('');
   }
 
   async function handleSaveAbsenceAnnouncement(nextMessage: string | null = absenceAnnouncementInput) {
@@ -1199,6 +1218,49 @@ export default function AdminAbsencePage() {
               {deleteSubmitting ? 'Deleting...' : 'Delete'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showPasswordDialog} onOpenChange={(open) => { if (!open) handlePasswordDialogClose(); }}>
+        <DialogContent className="border-border max-w-sm" onOpenAutoFocus={(e) => { e.preventDefault(); setTimeout(() => passwordInputRef.current?.focus(), 0); }}>
+          <DialogHeader>
+            <DialogTitle className="text-foreground flex items-center gap-2">
+              <Lock className="h-5 w-5 text-absence" />
+              Allowances — Protected
+            </DialogTitle>
+            <DialogDescription className="text-slate-400/90">
+              Enter the password to access the Allowances tab.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => { e.preventDefault(); handlePasswordSubmit(); }}
+            className="space-y-4"
+          >
+            <div className="space-y-2">
+              <Label htmlFor="allowances-password" className="text-foreground font-medium">Password</Label>
+              <Input
+                ref={passwordInputRef}
+                id="allowances-password"
+                type="password"
+                value={passwordInput}
+                onChange={(e) => { setPasswordInput(e.target.value); if (passwordError) setPasswordError(''); }}
+                placeholder="Enter password..."
+                className="bg-slate-950 border-border text-foreground"
+                autoComplete="off"
+              />
+              {passwordError && (
+                <p className="text-sm text-red-400">{passwordError}</p>
+              )}
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={handlePasswordDialogClose} className="border-border text-muted-foreground">
+                Cancel
+              </Button>
+              <Button type="submit" disabled={!passwordInput} className="bg-absence hover:bg-absence-dark text-white">
+                Unlock
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
