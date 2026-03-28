@@ -17,6 +17,10 @@ import type {
   TeamPermissionMatrixRow,
 } from '@/types/roles';
 import { MODULE_CSS_VAR } from '@/types/roles';
+import { cn } from '@/lib/utils';
+
+/** Visible vertical rule between job-role tier columns (header + full matrix height). */
+const TIER_DIVIDER_CLASS = 'border-l-2 border-slate-400';
 
 function getModuleColor(mod: ModuleName): string {
   return `hsl(var(${MODULE_CSS_VAR[mod]}))`;
@@ -209,7 +213,7 @@ export function RoleManagement() {
     [fetchMatrix]
   );
 
-  function renderModuleHeader(module: PermissionModuleMatrixColumn) {
+  function renderModuleHeader(module: PermissionModuleMatrixColumn, isFirstInTierGroup: boolean) {
     const currentIndex = roles.findIndex((role) => role.id === module.minimum_role_id);
     const canMoveLeft = currentIndex > 0;
     const canMoveRight = currentIndex >= 0 && currentIndex < roles.length - 1;
@@ -218,7 +222,7 @@ export function RoleManagement() {
     return (
       <th
         key={module.module_name}
-        className="p-0 align-bottom group relative"
+        className={cn('p-0 align-bottom group relative', isFirstInTierGroup && TIER_DIVIDER_CLASS)}
         style={{ width: 34, minWidth: 34, maxWidth: 34, height: 110 }}
       >
         <div className="flex items-end justify-center h-full pb-2 relative">
@@ -268,14 +272,21 @@ export function RoleManagement() {
     );
   }
 
-  function renderPermissionCell(team: TeamPermissionMatrixRow, moduleName: ModuleName) {
+  function renderPermissionCell(
+    team: TeamPermissionMatrixRow,
+    moduleName: ModuleName,
+    isFirstInTierGroup: boolean
+  ) {
     const cellKey = `${team.id}:${moduleName}`;
     const isSaving = savingCells.has(cellKey);
     const isEnabled = team.permissions[moduleName];
     const color = getModuleColor(moduleName);
 
     return (
-      <td key={moduleName} className="px-0 py-0.5 text-center">
+      <td
+        key={moduleName}
+        className={cn('px-0 py-0.5 text-center', isFirstInTierGroup && TIER_DIVIDER_CLASS)}
+      >
         <TooltipProvider delayDuration={300}>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -356,14 +367,19 @@ export function RoleManagement() {
                       <th
                         key={group.role.id}
                         colSpan={group.modules.length}
-                        className="px-1 py-1 text-center text-[10px] font-semibold text-slate-400 uppercase tracking-widest border-l border-slate-700/50"
+                        className={cn(
+                          'px-1 py-1 text-center text-[10px] font-semibold text-slate-400 uppercase tracking-widest',
+                          TIER_DIVIDER_CLASS
+                        )}
                       >
                         {group.role.display_name}
                       </th>
                     ))}
                   </tr>
                   <tr className="border-b border-slate-700">
-                    {groupedModules.flatMap((group) => group.modules.map((module) => renderModuleHeader(module)))}
+                    {groupedModules.flatMap((group) =>
+                      group.modules.map((module, idx) => renderModuleHeader(module, idx === 0))
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -377,7 +393,9 @@ export function RoleManagement() {
                         <div className="text-[11px] text-muted-foreground font-mono mt-0.5">{team.id}</div>
                       </td>
                       {groupedModules.flatMap((group) =>
-                        group.modules.map((module) => renderPermissionCell(team, module.module_name))
+                        group.modules.map((module, idx) =>
+                          renderPermissionCell(team, module.module_name, idx === 0)
+                        )
                       )}
                     </tr>
                   ))}
