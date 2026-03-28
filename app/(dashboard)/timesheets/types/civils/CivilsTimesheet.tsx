@@ -1057,10 +1057,16 @@ export function CivilsTimesheet({
       type TimesheetEntryInsert = Database['public']['Tables']['timesheet_entries']['Insert'];
       const entriesToInsert: TimesheetEntryInsert[] = entriesForPersistence.map((entry) => {
           const entryDate = getTimesheetEntryDateFromWeekEnding(weekEnding, entry.day_of_week);
+          const offDay = offDayByDay.get(entry.day_of_week);
           
           // Automatically detect night shift and bank holiday
           const isNight = !entry.did_not_work && isNightShift(entry.time_started, entry.daily_total);
           const isBankHol = !entry.did_not_work && isUKBankHoliday(entryDate);
+          const normalizedRemarks =
+            entry.remarks?.trim() ||
+            (entry.did_not_work
+              ? (offDay && !offDay.isExpectedShiftDay ? 'Not on Shift' : 'Did Not Work')
+              : '');
           
           return {
             timesheet_id: timesheetId,
@@ -1073,7 +1079,7 @@ export function CivilsTimesheet({
             night_shift: isNight,
             bank_holiday: isBankHol,
             daily_total: entry.daily_total,
-            remarks: entry.remarks || null,
+            remarks: normalizedRemarks || null,
           };
         });
 

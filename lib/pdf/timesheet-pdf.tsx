@@ -319,7 +319,10 @@ export function TimesheetPDF({ timesheet, employeeName }: TimesheetPDFProps) {
               <View style={styles.colRemarks}>
                 <Text style={[styles.cellText, { textAlign: 'left' }]}>
                   {entry.did_not_work
-                    ? getDidNotWorkReasonInfo(entry.did_not_work, entry.remarks).combinedDisplay
+                    ? getDidNotWorkReasonInfo(
+                        entry.did_not_work,
+                        entry.remarks?.trim() ? entry.remarks : 'Not on Shift'
+                      ).combinedDisplay
                     : formatRemarks(entry)}
                 </Text>
               </View>

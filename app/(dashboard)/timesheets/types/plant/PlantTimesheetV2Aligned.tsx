@@ -867,6 +867,11 @@ export function PlantTimesheetV2({
         const machineStanding = parseHoursInput(recalculated.machine_standing_hours);
         const machineOperator = parseHoursInput(recalculated.machine_operator_hours);
         const maintenanceBreakdown = parseHoursInput(recalculated.maintenance_breakdown_hours);
+        const normalizedRemarks =
+          recalculated.remarks?.trim() ||
+          (recalculated.did_not_work
+            ? (offDayState && !offDayState.isExpectedShiftDay ? 'Not on Shift' : 'Did Not Work')
+            : '');
 
         return {
           timesheet_id: timesheetId,
@@ -889,7 +894,7 @@ export function PlantTimesheetV2({
           did_not_work: recalculated.did_not_work,
           night_shift: false,
           bank_holiday: false,
-          remarks: recalculated.remarks || null,
+          remarks: normalizedRemarks || null,
         };
       });
 

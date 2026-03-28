@@ -226,19 +226,37 @@ export default function ViewTimesheetPage() {
         .delete()
         .eq('timesheet_id', timesheet.id);
 
-      // Insert updated entries (only those with data)
+      // Insert updated entries, including did-not-work/yard rows
       type TimesheetEntryInsert = Database['public']['Tables']['timesheet_entries']['Insert'];
       const entriesToInsert: TimesheetEntryInsert[] = entries
-        .filter(entry => entry.time_started || entry.time_finished || entry.remarks)
-        .map(entry => ({
+        .filter((entry) =>
+          Boolean(
+            entry.time_started ||
+            entry.time_finished ||
+            entry.remarks ||
+            entry.did_not_work ||
+            entry.working_in_yard ||
+            entry.job_number ||
+            ((entry.daily_total || 0) > 0)
+          )
+        )
+        .map((entry) => {
+          const normalizedRemarks =
+            entry.remarks?.trim() ||
+            (entry.did_not_work ? 'Did Not Work' : '');
+
+          return {
           timesheet_id: timesheet.id,
           day_of_week: entry.day_of_week,
           time_started: entry.time_started || null,
           time_finished: entry.time_finished || null,
+          job_number: entry.job_number || null,
+          did_not_work: entry.did_not_work,
           working_in_yard: entry.working_in_yard,
           daily_total: entry.daily_total,
-          remarks: entry.remarks || null,
-        }));
+          remarks: normalizedRemarks || null,
+          };
+        });
 
       if (entriesToInsert.length > 0) {
         const { error: entriesError } = await supabase
@@ -651,7 +669,7 @@ export default function ViewTimesheetPage() {
                           placeholder="Notes"
                         />
                       ) : (
-                        <span className="text-sm">{entry.remarks || '-'}</span>
+                        <span className="text-sm">{entry.remarks || (entry.did_not_work ? 'Did Not Work' : '-')}</span>
                       )}
                     </td>
                   </tr>
@@ -734,7 +752,7 @@ export default function ViewTimesheetPage() {
                         placeholder="Any notes..."
                       />
                     ) : (
-                      <p className="text-sm">{entry.remarks || '-'}</p>
+                      <p className="text-sm">{entry.remarks || (entry.did_not_work ? 'Did Not Work' : '-')}</p>
                     )}
                   </div>
                   <div className="pt-2 border-t">

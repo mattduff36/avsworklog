@@ -2,6 +2,7 @@ import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Image as PdfImage } from '@react-pdf/renderer';
 import { DAY_NAMES, Timesheet } from '@/types/timesheet';
 import { formatDate } from '@/lib/utils/date';
+import { getDidNotWorkReasonInfo } from '@/lib/utils/timesheetDidNotWork';
 
 const styles = StyleSheet.create({
   page: {
@@ -415,7 +416,14 @@ export function PlantTimesheetV2PDF({ timesheet, employeeName }: PlantTimesheetV
               <View style={styles.colMachineOperator}><Text style={styles.cellText}>{entry.did_not_work ? '' : formatHours(entry.machine_operator_hours)}</Text></View>
               <View style={styles.colMaintenanceBreakdown}><Text style={styles.cellText}>{entry.did_not_work ? '' : formatHours(entry.maintenance_breakdown_hours)}</Text></View>
               <View style={styles.colRemarks}>
-                <Text style={styles.remarkText}>{entry.remarks || ''}</Text>
+                <Text style={styles.remarkText}>
+                  {entry.did_not_work
+                    ? getDidNotWorkReasonInfo(
+                        entry.did_not_work,
+                        entry.remarks?.trim() ? entry.remarks : 'Not on Shift'
+                      ).combinedDisplay
+                    : (entry.remarks || '')}
+                </Text>
               </View>
             </View>
           ))}
