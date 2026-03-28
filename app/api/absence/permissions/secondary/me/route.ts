@@ -39,6 +39,10 @@ export async function GET() {
           permissions.add_edit_bookings_all || permissions.add_edit_bookings_team || permissions.add_edit_bookings_own,
         can_view_allowances: permissions.see_allowances_all || permissions.see_allowances_team,
         can_add_edit_allowances: permissions.add_edit_allowances_all || permissions.add_edit_allowances_team,
+        can_view_manage_overview: permissions.see_manage_overview,
+        can_view_manage_reasons: permissions.see_manage_reasons,
+        can_view_manage_work_shifts: permissions.see_manage_work_shifts,
+        can_edit_manage_work_shifts: permissions.edit_manage_work_shifts,
         can_authorise_bookings:
           permissions.authorise_bookings_all || permissions.authorise_bookings_team || permissions.authorise_bookings_own,
       },

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PageLoader } from '@/components/ui/page-loader';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   DropdownMenu,
@@ -47,6 +48,7 @@ interface ProfileRow {
   full_name: string;
   employee_id: string | null;
   team_id: string | null;
+  team_name: string | null;
   baseAllowance: number;
   carryoverDays: number;
   totalAllowance: number;
@@ -260,6 +262,7 @@ export function AllowancesContent({
   const [rows, setRows] = useState<ProfileRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedTeamId, setSelectedTeamId] = useState<string>('all');
   const [sortField, setSortField] = useState<SortField>('full_name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [baseColumnVisibility, setBaseColumnVisibility] = useState<BaseColumnVisibility>(DEFAULT_BASE_COLUMN_VISIBILITY);
@@ -521,6 +524,7 @@ export function AllowancesContent({
           full_name: profile.full_name,
           employee_id: profile.employee_id,
           team_id: profile.team?.id || null,
+          team_name: profile.team?.name || null,
           baseAllowance,
           carryoverDays,
           totalAllowance,
@@ -602,11 +606,43 @@ export function AllowancesContent({
   const allBulkTeamsSelected =
     bulkTeamOptions.length > 0 && selectedBulkTeamCount === bulkTeamOptions.length;
 
+  const teamOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    rows.forEach((row) => {
+      if (!row.team_id) return;
+      if (!map.has(row.team_id)) {
+        map.set(row.team_id, row.team_name || row.team_id);
+      }
+    });
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((left, right) => left.name.localeCompare(right.name));
+  }, [rows]);
+  const actorTeamName =
+    teamOptions.find((team) => team.id === actorTeamId)?.name || (actorTeamId ? 'My Team' : 'No team assigned');
+  const effectiveTeamFilter = scopeTeamOnly ? (actorTeamId || '__no_team_scope__') : selectedTeamId;
+  const isTeamFilterLocked = scopeTeamOnly;
+
+  useEffect(() => {
+    if (!scopeTeamOnly) {
+      setSelectedTeamId((current) => (current === '__no_team_scope__' ? 'all' : current));
+      return;
+    }
+    setSelectedTeamId(actorTeamId || '__no_team_scope__');
+  }, [scopeTeamOnly, actorTeamId]);
+
   const filteredRows = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     const base = rows.filter((row) => {
-      if (scopeTeamOnly && actorTeamId && row.team_id !== actorTeamId) {
-        return false;
+      if (scopeTeamOnly) {
+        if (!actorTeamId) return false;
+        if (row.team_id !== actorTeamId) return false;
+      } else if (effectiveTeamFilter !== 'all') {
+        if (effectiveTeamFilter === 'unassigned') {
+          if (row.team_id) return false;
+        } else if (row.team_id !== effectiveTeamFilter) {
+          return false;
+        }
       }
       if (!term) return true;
       return row.full_name.toLowerCase().includes(term) || row.employee_id?.toLowerCase().includes(term);
@@ -620,7 +656,7 @@ export function AllowancesContent({
       if (sortField === 'upcoming') return direction * ((a.upcoming + a.pending) - (b.upcoming + b.pending));
       return direction * (a.remaining - b.remaining);
     });
-  }, [rows, searchTerm, sortDirection, sortField, scopeTeamOnly, actorTeamId]);
+  }, [rows, searchTerm, sortDirection, sortField, scopeTeamOnly, actorTeamId, effectiveTeamFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
   const paginatedRows = useMemo(
@@ -630,7 +666,7 @@ export function AllowancesContent({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, sortField, sortDirection]);
+  }, [searchTerm, sortField, sortDirection, selectedTeamId, scopeTeamOnly, actorTeamId]);
 
   function toggleBaseColumn(column: keyof BaseColumnVisibility) {
     setBaseColumnVisibility((prev) => {
@@ -978,13 +1014,7 @@ export function AllowancesContent({
   }
 
   if (loading) {
-    return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-12">
-          <p className="text-muted-foreground">Loading...</p>
-        </CardContent>
-      </Card>
-    );
+    return <PageLoader message="Loading allowances..." />;
   }
 
   return (
@@ -1023,6 +1053,26 @@ export function AllowancesContent({
                 className="pl-11 bg-slate-900/50 border-slate-600 text-white"
               />
             </div>
+            <Select value={effectiveTeamFilter} onValueChange={setSelectedTeamId} disabled={isTeamFilterLocked}>
+              <SelectTrigger className="w-full md:w-[190px] border-slate-600">
+                <SelectValue placeholder="Team" />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-950 border-border text-foreground">
+                {isTeamFilterLocked ? (
+                  <SelectItem value={effectiveTeamFilter}>{actorTeamName}</SelectItem>
+                ) : (
+                  <>
+                    <SelectItem value="all">All teams</SelectItem>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {teamOptions.map((team) => (
+                      <SelectItem key={team.id} value={team.id}>
+                        {team.name}
+                      </SelectItem>
+                    ))}
+                  </>
+                )}
+              </SelectContent>
+            </Select>
             <Select
               value={selectedFinancialYearStartYear === null ? undefined : String(selectedFinancialYearStartYear)}
               onValueChange={(value) => setSelectedFinancialYearStartYear(Number(value))}
@@ -1102,7 +1152,11 @@ export function AllowancesContent({
             <div className="text-center py-12">
               <Users className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-white mb-2">No employees found</h3>
-              <p className="text-muted-foreground">Try adjusting your search</p>
+              <p className="text-muted-foreground">
+                {scopeTeamOnly && !actorTeamId
+                  ? 'No team is assigned to your profile, so no allowances are available.'
+                  : 'Try adjusting your search or team filter.'}
+              </p>
             </div>
           ) : (
             <>

@@ -13,6 +13,14 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { PageLoader } from '@/components/ui/page-loader';
 import { applyWorkShiftTemplate, createWorkShiftTemplate, deleteWorkShiftTemplate, fetchWorkShiftMatrix, updateEmployeeWorkShift, updateWorkShiftTemplate } from '@/lib/client/work-shifts';
 import { cloneWorkShiftPattern, STANDARD_WORK_SHIFT_PATTERN } from '@/lib/utils/work-shifts';
 import type { EmployeeWorkShiftRow, WorkShiftPattern, WorkShiftTemplate } from '@/types/work-shifts';
@@ -97,11 +105,22 @@ function isFirstSessionOfDay(_day: (typeof WORK_SHIFT_DAY_ORDER)[number], sessio
   return session === 'am';
 }
 
-export function WorkShiftsContent() {
+interface WorkShiftsContentProps {
+  isReadOnly?: boolean;
+  scopeTeamOnly?: boolean;
+  actorTeamId?: string | null;
+}
+
+export function WorkShiftsContent({
+  isReadOnly = false,
+  scopeTeamOnly = false,
+  actorTeamId = null,
+}: WorkShiftsContentProps) {
   const [templates, setTemplates] = useState<WorkShiftTemplate[]>([]);
   const [employees, setEmployees] = useState<EmployeeWorkShiftRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [selectedTeamId, setSelectedTeamId] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [dialogState, setDialogState] = useState<TemplateDialogState>(createTemplateDialogState());
   const [savingTemplate, setSavingTemplate] = useState(false);
@@ -149,20 +168,56 @@ export function WorkShiftsContent() {
     [templates, selectedTemplateId]
   );
 
-  const filteredEmployees = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    if (!term) {
-      return employees;
+  const teamOptions = useMemo(() => {
+    const byId = new Map<string, string>();
+    employees.forEach((employee) => {
+      if (!employee.team_id) return;
+      if (!byId.has(employee.team_id)) {
+        byId.set(employee.team_id, employee.team_name || employee.team_id);
+      }
+    });
+    return Array.from(byId.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((left, right) => left.name.localeCompare(right.name));
+  }, [employees]);
+
+  const actorTeamName =
+    teamOptions.find((team) => team.id === actorTeamId)?.name || (actorTeamId ? 'My Team' : 'No team assigned');
+  const isTeamFilterLocked = scopeTeamOnly;
+  const canManageTemplates = !scopeTeamOnly;
+  const effectiveTeamFilter = scopeTeamOnly ? (actorTeamId || '__no_team_scope__') : selectedTeamId;
+
+  useEffect(() => {
+    if (!scopeTeamOnly) {
+      setSelectedTeamId((current) => (current === '__no_team_scope__' ? 'all' : current));
+      return;
     }
 
+    setSelectedTeamId(actorTeamId || '__no_team_scope__');
+  }, [scopeTeamOnly, actorTeamId]);
+
+  const filteredEmployees = useMemo(() => {
+    const term = search.trim().toLowerCase();
     return employees.filter((employee) => {
+      if (scopeTeamOnly) {
+        if (!actorTeamId) return false;
+        if (employee.team_id !== actorTeamId) return false;
+      } else if (effectiveTeamFilter !== 'all') {
+        if (effectiveTeamFilter === 'unassigned') {
+          if (employee.team_id) return false;
+        } else if (employee.team_id !== effectiveTeamFilter) {
+          return false;
+        }
+      }
+
+      if (!term) return true;
       return (
         employee.full_name.toLowerCase().includes(term) ||
         (employee.employee_id || '').toLowerCase().includes(term) ||
         (employee.template_name || '').toLowerCase().includes(term)
       );
     });
-  }, [employees, search]);
+  }, [employees, search, scopeTeamOnly, actorTeamId, effectiveTeamFilter]);
 
   async function flushEmployee(profileId: string) {
     const row = rowsRef.current.find((employee) => employee.profile_id === profileId);
@@ -351,11 +406,7 @@ export function WorkShiftsContent() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-absence" />
-      </div>
-    );
+    return <PageLoader message="Loading work shifts..." />;
   }
 
   return (
@@ -370,44 +421,48 @@ export function WorkShiftsContent() {
               </CardDescription>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={() => openCreateDialog()} className="border-slate-600">
-                <Plus className="mr-2 h-4 w-4" />
-                New Template
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => selectedTemplate && openEditDialog(selectedTemplate)}
-                disabled={!selectedTemplate}
-                className="border-slate-600"
-              >
-                <Pencil className="mr-2 h-4 w-4" />
-                Edit
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() =>
-                  selectedTemplate &&
-                  openCreateDialog(
-                    selectedTemplate.pattern,
-                    `${selectedTemplate.name} Copy`,
-                    selectedTemplate.description || ''
-                  )
-                }
-                disabled={!selectedTemplate}
-                className="border-slate-600"
-              >
-                <Copy className="mr-2 h-4 w-4" />
-                Duplicate
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleDeleteTemplate}
-                disabled={!selectedTemplate || selectedTemplate.is_default}
-                className="border-red-500/40 text-red-300 hover:bg-red-500/10"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </Button>
+              {canManageTemplates ? (
+                <>
+                  <Button variant="outline" onClick={() => openCreateDialog()} className="border-slate-600">
+                    <Plus className="mr-2 h-4 w-4" />
+                    New Template
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => selectedTemplate && openEditDialog(selectedTemplate)}
+                    disabled={!selectedTemplate}
+                    className="border-slate-600"
+                  >
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      selectedTemplate &&
+                      openCreateDialog(
+                        selectedTemplate.pattern,
+                        `${selectedTemplate.name} Copy`,
+                        selectedTemplate.description || ''
+                      )
+                    }
+                    disabled={!selectedTemplate}
+                    className="border-slate-600"
+                  >
+                    <Copy className="mr-2 h-4 w-4" />
+                    Duplicate
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleDeleteTemplate}
+                    disabled={!selectedTemplate || selectedTemplate.is_default}
+                    className="border-red-500/40 text-red-300 hover:bg-red-500/10"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                  </Button>
+                </>
+              ) : null}
             </div>
           </div>
         </CardHeader>
@@ -455,7 +510,7 @@ export function WorkShiftsContent() {
             </div>
             <Button
               onClick={handleApplyTemplateToAll}
-              disabled={!selectedTemplate || applyingTemplate}
+              disabled={!selectedTemplate || applyingTemplate || isReadOnly}
               className="bg-absence hover:bg-absence-dark text-white"
             >
               {applyingTemplate ? (
@@ -463,7 +518,7 @@ export function WorkShiftsContent() {
               ) : (
                 <Users className="mr-2 h-4 w-4" />
               )}
-              Apply To All Employees
+              {scopeTeamOnly ? 'Apply To Team' : 'Apply To All Employees'}
             </Button>
           </div>
         </CardContent>
@@ -479,6 +534,26 @@ export function WorkShiftsContent() {
               </CardDescription>
             </div>
             <div className="flex w-full max-w-sm items-center gap-2">
+              <Select value={effectiveTeamFilter} onValueChange={setSelectedTeamId} disabled={isTeamFilterLocked}>
+                <SelectTrigger className="w-[190px] border-slate-600">
+                  <SelectValue placeholder="Filter by team" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-950 border-border text-foreground">
+                  {isTeamFilterLocked ? (
+                    <SelectItem value={effectiveTeamFilter}>{actorTeamName}</SelectItem>
+                  ) : (
+                    <>
+                      <SelectItem value="all">All teams</SelectItem>
+                      <SelectItem value="unassigned">Unassigned</SelectItem>
+                      {teamOptions.map((team) => (
+                        <SelectItem key={team.id} value={team.id}>
+                          {team.name}
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
               <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
@@ -493,7 +568,11 @@ export function WorkShiftsContent() {
         </CardHeader>
         <CardContent>
           {filteredEmployees.length === 0 ? (
-            <div className="py-8 text-center text-muted-foreground">No employees match the current search.</div>
+            <div className="py-8 text-center text-muted-foreground">
+              {scopeTeamOnly && !actorTeamId
+                ? 'No team is assigned to your profile, so no work shift records are available.'
+                : 'No employees match the current search.'}
+            </div>
           ) : (
             <div className="overflow-auto rounded-lg border border-slate-700">
               <table className="w-full min-w-[980px] table-fixed text-sm">
@@ -551,7 +630,7 @@ export function WorkShiftsContent() {
                             size="sm"
                             variant="outline"
                             onClick={() => handleApplyTemplateToEmployee(employee.profile_id)}
-                            disabled={!selectedTemplate}
+                            disabled={!selectedTemplate || isReadOnly}
                             className="h-7 shrink-0 border-slate-600 px-2 text-xs"
                           >
                             Apply
@@ -575,7 +654,7 @@ export function WorkShiftsContent() {
                               <button
                                 type="button"
                                 onClick={() => toggleEmployeeCell(employee.profile_id, cellKey)}
-                                disabled={isSaving}
+                                disabled={isSaving || isReadOnly}
                                 className="mx-auto flex h-7 w-7 items-center justify-center rounded border border-slate-700 transition-all disabled:cursor-not-allowed"
                                 style={
                                   enabled

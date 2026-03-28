@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PageLoader } from '@/components/ui/page-loader';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -79,12 +80,24 @@ export default function AdminAbsencePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
-  const canViewBookings = Boolean(absenceSecondarySnapshot?.flags.can_view_bookings || isAdmin || isManager);
-  const canAddEditBookings = Boolean(absenceSecondarySnapshot?.flags.can_add_edit_bookings || isAdmin || isManager);
-  const canViewAllowances = Boolean(absenceSecondarySnapshot?.flags.can_view_allowances || isAdmin || isManager);
-  const canAddEditAllowances = Boolean(absenceSecondarySnapshot?.flags.can_add_edit_allowances || isAdmin);
-  const canAuthoriseBookings = Boolean(absenceSecondarySnapshot?.flags.can_authorise_bookings || isAdmin || isManager);
-  const canOpenManagePage = canViewBookings || canViewAllowances || canAddEditBookings || canAuthoriseBookings;
+  const isAdminTier = Boolean(isAdmin || isActualSuperAdmin);
+  const canViewBookings = Boolean(absenceSecondarySnapshot?.flags.can_view_bookings || isAdminTier);
+  const canAddEditBookings = Boolean(absenceSecondarySnapshot?.flags.can_add_edit_bookings || isAdminTier);
+  const canViewAllowances = Boolean(absenceSecondarySnapshot?.flags.can_view_allowances || isAdminTier);
+  const canAddEditAllowances = Boolean(absenceSecondarySnapshot?.flags.can_add_edit_allowances || isAdminTier);
+  const canAuthoriseBookings = Boolean(absenceSecondarySnapshot?.flags.can_authorise_bookings || isAdminTier);
+  const canViewOverviewTab = Boolean(absenceSecondarySnapshot?.flags.can_view_manage_overview || isAdminTier);
+  const canViewReasonsTab = Boolean(absenceSecondarySnapshot?.flags.can_view_manage_reasons || isAdminTier);
+  const canViewWorkShiftsTab = Boolean(absenceSecondarySnapshot?.flags.can_view_manage_work_shifts || isAdminTier);
+  const canEditWorkShifts = Boolean(absenceSecondarySnapshot?.flags.can_edit_manage_work_shifts || isAdminTier);
+  const canOpenManagePage =
+    canViewBookings ||
+    canViewAllowances ||
+    canAddEditBookings ||
+    canAuthoriseBookings ||
+    canViewOverviewTab ||
+    canViewReasonsTab ||
+    canViewWorkShiftsTab;
   
   // Filters
   const [profileId, setProfileId] = useState('');
@@ -298,13 +311,19 @@ export default function AdminAbsencePage() {
 
     const allowedTabs: ManageTab[] = [];
     if (canViewBookings) {
-      allowedTabs.push('calendar', 'overview');
+      allowedTabs.push('calendar');
+    }
+    if (canViewOverviewTab) {
+      allowedTabs.push('overview');
     }
     if (canViewAllowances) {
       allowedTabs.push('allowances');
     }
-    if (isAdmin) {
-      allowedTabs.push('reasons', 'work-shifts');
+    if (canViewReasonsTab) {
+      allowedTabs.push('reasons');
+    }
+    if (canViewWorkShiftsTab) {
+      allowedTabs.push('work-shifts');
     }
 
     if (allowedTabs.length > 0 && allowedTabs.includes(requestedTab as typeof allowedTabs[number])) {
@@ -341,7 +360,10 @@ export default function AdminAbsencePage() {
     router,
     includeArchived,
     canViewBookings,
+    canViewOverviewTab,
     canViewAllowances,
+    canViewReasonsTab,
+    canViewWorkShiftsTab,
     protectedTabsUnlocked,
     isProtectedTab,
     openPasswordGate,
@@ -355,13 +377,32 @@ export default function AdminAbsencePage() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (!isAdmin && activeTab === 'reasons') {
-      setActiveTab(canViewBookings ? 'calendar' : canViewAllowances ? 'allowances' : 'calendar');
+    const fallbackTab: ManageTab = canViewBookings
+      ? 'calendar'
+      : canViewAllowances
+      ? 'allowances'
+      : canViewOverviewTab
+      ? 'overview'
+      : canViewWorkShiftsTab
+      ? 'work-shifts'
+      : canViewReasonsTab
+      ? 'reasons'
+      : 'calendar';
+
+    if (!canViewReasonsTab && activeTab === 'reasons') {
+      setActiveTab(fallbackTab);
     }
-    if (!isAdmin && activeTab === 'work-shifts') {
-      setActiveTab(canViewBookings ? 'calendar' : canViewAllowances ? 'allowances' : 'calendar');
+    if (!canViewWorkShiftsTab && activeTab === 'work-shifts') {
+      setActiveTab(fallbackTab);
     }
-  }, [isAdmin, activeTab, canViewBookings, canViewAllowances]);
+  }, [
+    canViewReasonsTab,
+    canViewWorkShiftsTab,
+    activeTab,
+    canViewBookings,
+    canViewAllowances,
+    canViewOverviewTab,
+  ]);
 
   useEffect(() => {
     async function loadAbsenceAnnouncement() {
@@ -387,10 +428,11 @@ export default function AdminAbsencePage() {
   const hasUnsavedAbsenceAnnouncement = absenceAnnouncementInput.trim() !== savedAbsenceAnnouncement.trim();
 
   function handleTabChange(nextTab: ManageTab) {
-    if (!isAdmin && nextTab === 'reasons') return;
-    if (!isAdmin && nextTab === 'work-shifts') return;
+    if (!canViewReasonsTab && nextTab === 'reasons') return;
+    if (!canViewWorkShiftsTab && nextTab === 'work-shifts') return;
     if (!canViewAllowances && nextTab === 'allowances') return;
-    if (!canViewBookings && (nextTab === 'calendar' || nextTab === 'overview')) return;
+    if (!canViewBookings && nextTab === 'calendar') return;
+    if (!canViewOverviewTab && nextTab === 'overview') return;
     if (isProtectedTab(nextTab) && !protectedTabsUnlocked) {
       openPasswordGate(nextTab);
       return;
@@ -490,7 +532,7 @@ export default function AdminAbsencePage() {
       try {
         const [directory, workShiftMatrix] = await Promise.all([
           fetchUserDirectory(),
-          isAdmin ? fetchWorkShiftMatrix() : Promise.resolve(null),
+          canViewWorkShiftsTab ? fetchWorkShiftMatrix() : Promise.resolve(null),
         ]);
         setProfiles(
           directory.map((profile) => ({
@@ -521,7 +563,7 @@ export default function AdminAbsencePage() {
     }
     
     void fetchProfiles();
-  }, [authLoading, canOpenManagePage, isAdmin]);
+  }, [authLoading, canOpenManagePage, canViewWorkShiftsTab]);
 
   useEffect(() => {
     async function loadSelectedProfileShift() {
@@ -706,15 +748,7 @@ export default function AdminAbsencePage() {
   }
   
   if (authLoading || absencePermissionLoading || absenceSecondaryLoading || isLoading) {
-    return (
-      <div className="space-y-6 max-w-7xl">
-        <Card className="">
-          <CardContent className="flex items-center justify-center py-12">
-            <p className="text-muted-foreground">Loading...</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <PageLoader message="Loading absence management..." />;
   }
   
   if (!canAccessAbsenceModule || !canOpenManagePage) return null;
@@ -814,7 +848,7 @@ export default function AdminAbsencePage() {
               Calendar
             </TabsTrigger>
           )}
-          {isAdmin && (
+          {canViewWorkShiftsTab && (
             <TabsTrigger value="work-shifts" className="gap-2">
               <Clock className="h-4 w-4" />
               Work Shifts
@@ -826,13 +860,13 @@ export default function AdminAbsencePage() {
               Allowances
             </TabsTrigger>
           )}
-          {isAdmin && (
+          {canViewReasonsTab && (
             <TabsTrigger value="reasons" className="group gap-2">
               <Filter className="h-4 w-4 text-absence transition-colors group-data-[state=active]:text-white" />
               Reasons
             </TabsTrigger>
           )}
-          {canViewBookings && (
+          {canViewOverviewTab && (
             <TabsTrigger value="overview" className="group gap-2">
               <Wrench className="h-4 w-4 text-absence transition-colors group-data-[state=active]:text-white" />
               Records & Admin
@@ -840,7 +874,7 @@ export default function AdminAbsencePage() {
           )}
         </TabsList>
 
-        {canViewBookings && (
+        {canViewOverviewTab && (
           <TabsContent value="overview" className="space-y-6 mt-0">
             {(isAdmin || isManager) && (
               <Card className="border-border">
@@ -849,7 +883,8 @@ export default function AdminAbsencePage() {
             )}
 
             {/* Absences Table */}
-            <Card className="border-border">
+            {canViewBookings ? (
+              <Card className="border-border">
               <CardHeader>
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div>
@@ -1226,7 +1261,14 @@ export default function AdminAbsencePage() {
                 </>
               )}
               </CardContent>
-            </Card>
+              </Card>
+            ) : (
+              <Card className="border-border">
+                <CardContent className="py-12 text-center text-muted-foreground">
+                  No booking records are available for your current permissions.
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         )}
 
@@ -1236,7 +1278,7 @@ export default function AdminAbsencePage() {
           </TabsContent>
         )}
 
-        {isAdmin && (
+        {canViewReasonsTab && (
           <TabsContent value="reasons" className="space-y-6 mt-0">
             <AbsenceReasonsContent />
           </TabsContent>
@@ -1247,15 +1289,19 @@ export default function AdminAbsencePage() {
             <AllowancesContent
               refreshKey={allowancesRefreshKey}
               isReadOnly={!canAddEditAllowances}
-              scopeTeamOnly={!isAdmin && canViewAllowances && !absenceSecondarySnapshot?.permissions.see_allowances_all}
+              scopeTeamOnly={!isAdminTier && canViewAllowances && !absenceSecondarySnapshot?.permissions.see_allowances_all}
               actorTeamId={absenceSecondarySnapshot?.team_id || null}
             />
           </TabsContent>
         )}
 
-        {isAdmin && (
+        {canViewWorkShiftsTab && (
           <TabsContent value="work-shifts" className="space-y-6 mt-0">
-            <WorkShiftsContent />
+            <WorkShiftsContent
+              isReadOnly={!canEditWorkShifts}
+              scopeTeamOnly={!isAdminTier}
+              actorTeamId={absenceSecondarySnapshot?.team_id || null}
+            />
           </TabsContent>
         )}
       </Tabs>

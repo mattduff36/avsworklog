@@ -10,13 +10,13 @@ describe('absence secondary permissions', () => {
   it('encodes manager defaults from the configured matrix', () => {
     const defaults = getAbsenceSecondaryDefaultMap('manager');
 
-    expect(defaults.see_bookings_all).toBe(true);
+    expect(defaults.see_bookings_all).toBe(false);
     expect(defaults.see_bookings_team).toBe(true);
-    expect(defaults.see_bookings_own).toBe(true);
+    expect(defaults.see_bookings_own).toBe(false);
 
     expect(defaults.add_edit_bookings_all).toBe(false);
     expect(defaults.add_edit_bookings_team).toBe(true);
-    expect(defaults.add_edit_bookings_own).toBe(true);
+    expect(defaults.add_edit_bookings_own).toBe(false);
 
     expect(defaults.see_allowances_all).toBe(false);
     expect(defaults.see_allowances_team).toBe(true);
@@ -24,17 +24,22 @@ describe('absence secondary permissions', () => {
     expect(defaults.add_edit_allowances_all).toBe(false);
     expect(defaults.add_edit_allowances_team).toBe(false);
 
+    expect(defaults.see_manage_overview).toBe(false);
+    expect(defaults.see_manage_reasons).toBe(false);
+    expect(defaults.see_manage_work_shifts).toBe(true);
+    expect(defaults.edit_manage_work_shifts).toBe(true);
+
     expect(defaults.authorise_bookings_all).toBe(false);
     expect(defaults.authorise_bookings_team).toBe(true);
-    expect(defaults.authorise_bookings_own).toBe(true);
+    expect(defaults.authorise_bookings_own).toBe(false);
   });
 
   it('encodes supervisor defaults from the configured matrix', () => {
     const defaults = getAbsenceSecondaryDefaultMap('supervisor');
 
-    expect(defaults.see_bookings_all).toBe(true);
+    expect(defaults.see_bookings_all).toBe(false);
     expect(defaults.see_bookings_team).toBe(true);
-    expect(defaults.see_bookings_own).toBe(true);
+    expect(defaults.see_bookings_own).toBe(false);
 
     expect(defaults.add_edit_bookings_all).toBe(false);
     expect(defaults.add_edit_bookings_team).toBe(true);
@@ -42,6 +47,10 @@ describe('absence secondary permissions', () => {
 
     expect(defaults.see_allowances_all).toBe(false);
     expect(defaults.see_allowances_team).toBe(false);
+    expect(defaults.see_manage_overview).toBe(false);
+    expect(defaults.see_manage_reasons).toBe(false);
+    expect(defaults.see_manage_work_shifts).toBe(true);
+    expect(defaults.edit_manage_work_shifts).toBe(false);
 
     expect(defaults.authorise_bookings_all).toBe(false);
     expect(defaults.authorise_bookings_team).toBe(true);

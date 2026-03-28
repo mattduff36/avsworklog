@@ -50,6 +50,8 @@ interface ProfileDirectoryRow {
   id: string;
   full_name: string | null;
   employee_id: string | null;
+  team_id: string | null;
+  team?: { id?: string | null; name?: string | null } | null;
 }
 
 interface WorkShiftTemplateSummary {
@@ -419,22 +421,35 @@ export async function recalculateAbsenceDurationsForProfiles(
   return updatedCount;
 }
 
-export async function getWorkShiftMatrix(supabase: AnySupabase): Promise<{
+export async function getWorkShiftMatrix(
+  supabase: AnySupabase,
+  options?: {
+    enforceTeamScope?: boolean;
+    teamId?: string | null;
+  }
+): Promise<{
   templates: WorkShiftTemplate[];
   employees: EmployeeWorkShiftRow[];
 }> {
   await ensureStandardWorkShiftTemplate(supabase);
 
-  const { data: profiles, error: profileError } = await supabase
-    .from('profiles')
-    .select('id, full_name, employee_id')
-    .order('full_name', { ascending: true });
+  const enforceTeamScope = Boolean(options?.enforceTeamScope);
+  let profileRows: ProfileDirectoryRow[] = [];
+  if (!enforceTeamScope || options?.teamId) {
+    let profilesQuery = supabase
+      .from('profiles')
+      .select('id, full_name, employee_id, team_id, team:org_teams!profiles_team_id_fkey(id, name)')
+      .order('full_name', { ascending: true });
+    if (enforceTeamScope && options?.teamId) {
+      profilesQuery = profilesQuery.eq('team_id', options.teamId);
+    }
 
-  if (profileError) {
-    throw profileError;
+    const { data: profiles, error: profileError } = await profilesQuery;
+    if (profileError) {
+      throw profileError;
+    }
+    profileRows = (profiles || []) as ProfileDirectoryRow[];
   }
-
-  const profileRows = (profiles || []) as ProfileDirectoryRow[];
   await ensureEmployeeWorkShiftRecords(
     supabase,
     profileRows.map((profile) => profile.id)
@@ -442,30 +457,39 @@ export async function getWorkShiftMatrix(supabase: AnySupabase): Promise<{
 
   const [templateSummaries, employeeRowsResult] = await Promise.all([
     fetchTemplateSummaries(supabase),
-    supabase
-      .from('employee_work_shifts')
-      .select(`
-        id,
-        profile_id,
-        template_id,
-        monday_am,
-        monday_pm,
-        tuesday_am,
-        tuesday_pm,
-        wednesday_am,
-        wednesday_pm,
-        thursday_am,
-        thursday_pm,
-        friday_am,
-        friday_pm,
-        saturday_am,
-        saturday_pm,
-        sunday_am,
-        sunday_pm,
-        created_at,
-        updated_at
-      `)
-      .order('updated_at', { ascending: false }),
+    profileRows.length === 0
+      ? Promise.resolve({
+          data: [] as EmployeeWorkShiftDbRow[],
+          error: null,
+        })
+      : supabase
+          .from('employee_work_shifts')
+          .select(`
+            id,
+            profile_id,
+            template_id,
+            monday_am,
+            monday_pm,
+            tuesday_am,
+            tuesday_pm,
+            wednesday_am,
+            wednesday_pm,
+            thursday_am,
+            thursday_pm,
+            friday_am,
+            friday_pm,
+            saturday_am,
+            saturday_pm,
+            sunday_am,
+            sunday_pm,
+            created_at,
+            updated_at
+          `)
+          .in(
+            'profile_id',
+            profileRows.map((profile) => profile.id)
+          )
+          .order('updated_at', { ascending: false }),
   ]);
 
   if (employeeRowsResult.error) {
@@ -489,6 +513,8 @@ export async function getWorkShiftMatrix(supabase: AnySupabase): Promise<{
         profile_id: row.profile_id,
         full_name: profile.full_name || 'Unknown employee',
         employee_id: profile.employee_id,
+        team_id: profile.team_id || null,
+        team_name: profile.team?.name || null,
         template_id: row.template_id,
         template_name: row.template_id ? templateNameById.get(row.template_id) || null : null,
         updated_at: row.updated_at,

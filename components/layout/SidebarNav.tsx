@@ -624,13 +624,13 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
             <Popover>
               <PopoverTrigger asChild>
                 {isExpanded ? (
-                  <Button
+                  <button
                     ref={viewAsTriggerRef}
-                    variant="outline"
-                    className={`w-full justify-start gap-2 border-border text-xs h-9 ${
+                    type="button"
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                       isViewingAsOverride
-                        ? 'bg-amber-600/30 border-amber-500/50 text-amber-200 hover:bg-amber-600/40 hover:text-amber-100'
-                        : 'bg-slate-800/50 text-muted-foreground hover:bg-slate-700 hover:text-white'
+                        ? 'bg-amber-600/30 text-amber-200 hover:bg-amber-600/40 hover:text-amber-100'
+                        : 'text-muted-foreground hover:bg-slate-800 hover:text-white'
                     }`}
                     onClick={() => {
                       const nextOpen = !viewAsMenuOpen;
@@ -641,16 +641,16 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                     }}
                   >
                     <Eye className="w-4 h-4 flex-shrink-0" />
-                    <span className="flex-1 text-left truncate">
+                    <span className="min-w-0 flex-1 text-left truncate">
                       {selectionSummary}
                     </span>
-                  </Button>
+                  </button>
                 ) : (
                   <Button
                     ref={viewAsTriggerRef}
                     variant="ghost"
                     size="sm"
-                    className={`w-full h-10 p-0 ${isViewingAsOverride ? 'bg-amber-600/30' : 'hover:bg-slate-800'}`}
+                    className={`w-full h-9 p-0 ${isViewingAsOverride ? 'bg-amber-600/30' : 'hover:bg-slate-800'}`}
                     title="View As"
                     onClick={() => {
                       const nextOpen = !viewAsMenuOpen;

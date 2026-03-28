@@ -11,6 +11,10 @@ export const ABSENCE_SECONDARY_PERMISSION_KEYS = [
   'see_allowances_team',
   'add_edit_allowances_all',
   'add_edit_allowances_team',
+  'see_manage_overview',
+  'see_manage_reasons',
+  'see_manage_work_shifts',
+  'edit_manage_work_shifts',
   'authorise_bookings_all',
   'authorise_bookings_team',
   'authorise_bookings_own',
@@ -31,6 +35,10 @@ export interface AbsenceSecondaryPermissionExceptionRecord {
   see_allowances_team?: boolean | null;
   add_edit_allowances_all?: boolean | null;
   add_edit_allowances_team?: boolean | null;
+  see_manage_overview?: boolean | null;
+  see_manage_reasons?: boolean | null;
+  see_manage_work_shifts?: boolean | null;
+  edit_manage_work_shifts?: boolean | null;
   authorise_bookings_all?: boolean | null;
   authorise_bookings_team?: boolean | null;
   authorise_bookings_own?: boolean | null;
@@ -38,12 +46,21 @@ export interface AbsenceSecondaryPermissionExceptionRecord {
 
 export interface AbsenceSecondaryPermissionColumn {
   key: AbsenceSecondaryPermissionKey;
-  scope: 'all' | 'team' | 'own';
-  label: 'ALL' | 'TEAM' | 'OWN';
+  scope: 'all' | 'team' | 'own' | 'toggle';
+  label: 'ALL' | 'TEAM' | 'OWN' | 'ALLOW';
 }
 
 export interface AbsenceSecondaryPermissionHeaderGroup {
-  id: 'see-bookings' | 'add-edit-bookings' | 'see-allowances' | 'add-edit-allowances' | 'authorise-bookings';
+  id:
+    | 'see-bookings'
+    | 'add-edit-bookings'
+    | 'see-allowances'
+    | 'add-edit-allowances'
+    | 'see-manage-overview'
+    | 'see-manage-reasons'
+    | 'see-manage-work-shifts'
+    | 'edit-manage-work-shifts'
+    | 'authorise-bookings';
   title: string;
   subtitle: string;
   columns: AbsenceSecondaryPermissionColumn[];
@@ -89,21 +106,18 @@ export function createNullAbsenceSecondaryOverrideRecord(): Record<AbsenceSecond
 }
 
 const MANAGER_TRUE_KEYS = new Set<AbsenceSecondaryPermissionKey>([
-  'see_bookings_all',
   'see_bookings_team',
-  'see_bookings_own',
   'add_edit_bookings_team',
-  'add_edit_bookings_own',
   'see_allowances_team',
+  'see_manage_work_shifts',
+  'edit_manage_work_shifts',
   'authorise_bookings_team',
-  'authorise_bookings_own',
 ]);
 
 const SUPERVISOR_TRUE_KEYS = new Set<AbsenceSecondaryPermissionKey>([
-  'see_bookings_all',
   'see_bookings_team',
-  'see_bookings_own',
   'add_edit_bookings_team',
+  'see_manage_work_shifts',
   'authorise_bookings_team',
 ]);
 
@@ -191,6 +205,30 @@ export const ABSENCE_SECONDARY_PERMISSION_HEADERS: AbsenceSecondaryPermissionHea
       ],
     },
     {
+      id: 'see-manage-overview',
+      title: 'See Records & Admin Tab',
+      subtitle: 'Show /absence/manage?tab=overview tab',
+      columns: [{ key: 'see_manage_overview', scope: 'toggle', label: 'ALLOW' }],
+    },
+    {
+      id: 'see-manage-reasons',
+      title: 'See Reasons Tab',
+      subtitle: 'Show /absence/manage?tab=reasons tab',
+      columns: [{ key: 'see_manage_reasons', scope: 'toggle', label: 'ALLOW' }],
+    },
+    {
+      id: 'see-manage-work-shifts',
+      title: 'See Work Shifts Tab',
+      subtitle: 'Show /absence/manage?tab=work-shifts tab',
+      columns: [{ key: 'see_manage_work_shifts', scope: 'toggle', label: 'ALLOW' }],
+    },
+    {
+      id: 'edit-manage-work-shifts',
+      title: 'Edit Work Shifts Tab',
+      subtitle: 'Allow updates on /absence/manage?tab=work-shifts tab',
+      columns: [{ key: 'edit_manage_work_shifts', scope: 'toggle', label: 'ALLOW' }],
+    },
+    {
       id: 'authorise-bookings',
       title: 'Authorise Bookings',
       subtitle: 'See and edit /approvals page',
@@ -212,6 +250,10 @@ export const ABSENCE_SECONDARY_PERMISSION_HEADERS: AbsenceSecondaryPermissionHea
     'see_allowances_team',
     'add_edit_allowances_all',
     'add_edit_allowances_team',
+    'see_manage_overview',
+    'see_manage_reasons',
+    'see_manage_work_shifts',
+    'edit_manage_work_shifts',
     'authorise_bookings_all',
     'authorise_bookings_team',
     'authorise_bookings_own',

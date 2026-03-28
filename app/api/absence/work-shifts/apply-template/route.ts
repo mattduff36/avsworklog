@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { requireAdminWorkShiftAccess } from '@/lib/server/absence-work-shift-auth';
+import { getWorkShiftAccessContext } from '@/lib/server/work-shift-access';
 import { applyTemplateToProfiles } from '@/lib/server/work-shifts';
 import type { ApplyWorkShiftTemplateRequest } from '@/types/work-shifts';
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAdminWorkShiftAccess();
-    if (auth.response) {
-      return auth.response;
+    const access = await getWorkShiftAccessContext();
+    if (access.response) {
+      return access.response;
+    }
+    if (!access.context) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (!access.context.canEdit) {
+      return NextResponse.json({ error: 'Forbidden: Work shifts edit access required' }, { status: 403 });
     }
 
     const body = (await request.json()) as ApplyWorkShiftTemplateRequest;
@@ -20,12 +27,37 @@ export async function POST(request: NextRequest) {
     let profileIds = body.profileIds || [];
 
     if ((body.mode || 'selected') === 'all') {
-      const { data, error } = await admin.from('profiles').select('id');
-      if (error) {
-        throw error;
+      if (!access.context.isAdmin && !access.context.teamId) {
+        profileIds = [];
+      } else {
+        const profilesQuery = access.context.isAdmin
+          ? admin.from('profiles').select('id')
+          : admin.from('profiles').select('id').eq('team_id', access.context.teamId as string);
+        const { data, error } = await profilesQuery;
+        if (error) {
+          throw error;
+        }
+
+        profileIds = ((data || []) as Array<{ id: string }>).map((row) => row.id);
+      }
+    } else if (!access.context.isAdmin) {
+      if (!access.context.teamId) {
+        return NextResponse.json({ error: 'Forbidden: No team scope available' }, { status: 403 });
       }
 
-      profileIds = ((data || []) as Array<{ id: string }>).map((row) => row.id);
+      const { data: scopedRows, error: scopedError } = await admin
+        .from('profiles')
+        .select('id')
+        .eq('team_id', access.context.teamId)
+        .in('id', profileIds);
+      if (scopedError) {
+        throw scopedError;
+      }
+
+      const scopedProfileIds = new Set(((scopedRows || []) as Array<{ id: string }>).map((row) => row.id));
+      if (profileIds.some((profileId) => !scopedProfileIds.has(profileId))) {
+        return NextResponse.json({ error: 'Forbidden: One or more employees are outside your team scope' }, { status: 403 });
+      }
     }
 
     if (profileIds.length === 0) {

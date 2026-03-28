@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { requireAdminWorkShiftAccess, requireManagerWorkShiftReadAccess } from '@/lib/server/absence-work-shift-auth';
+import { canAccessProfileForScopedWorkShift, getWorkShiftAccessContext } from '@/lib/server/work-shift-access';
 import { getCurrentUserWorkShift, updateEmployeeWorkShift } from '@/lib/server/work-shifts';
 import type { UpdateEmployeeWorkShiftRequest } from '@/types/work-shifts';
 
@@ -9,12 +9,33 @@ export async function GET(
   { params }: { params: Promise<{ profileId: string }> }
 ) {
   try {
-    const auth = await requireManagerWorkShiftReadAccess();
-    if (auth.response) {
-      return auth.response;
+    const access = await getWorkShiftAccessContext();
+    if (access.response) {
+      return access.response;
+    }
+    if (!access.context) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (!access.context.canView) {
+      return NextResponse.json({ error: 'Forbidden: Work shifts access required' }, { status: 403 });
     }
 
     const { profileId } = await params;
+    const admin = createAdminClient() as unknown as {
+      from: (table: string) => {
+        select: (columns: string) => {
+          eq: (column: string, value: string) => {
+            maybeSingle: () => Promise<{ data: { team_id: string | null } | null; error: { message: string } | null }>;
+          };
+        };
+      };
+    };
+    const canAccessTarget = await canAccessProfileForScopedWorkShift(admin, access.context, profileId);
+    if (!canAccessTarget) {
+      return NextResponse.json({ error: 'Forbidden: Out of scope for this team' }, { status: 403 });
+    }
+
     const workShift = await getCurrentUserWorkShift(createAdminClient(), profileId);
 
     return NextResponse.json({
@@ -35,9 +56,16 @@ export async function PUT(
   { params }: { params: Promise<{ profileId: string }> }
 ) {
   try {
-    const auth = await requireAdminWorkShiftAccess();
-    if (auth.response) {
-      return auth.response;
+    const access = await getWorkShiftAccessContext();
+    if (access.response) {
+      return access.response;
+    }
+    if (!access.context) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (!access.context.canEdit) {
+      return NextResponse.json({ error: 'Forbidden: Work shifts edit access required' }, { status: 403 });
     }
 
     const { profileId } = await params;
@@ -45,6 +73,20 @@ export async function PUT(
 
     if (!body?.pattern || typeof body.pattern !== 'object') {
       return NextResponse.json({ error: 'Pattern payload is required' }, { status: 400 });
+    }
+
+    const admin = createAdminClient() as unknown as {
+      from: (table: string) => {
+        select: (columns: string) => {
+          eq: (column: string, value: string) => {
+            maybeSingle: () => Promise<{ data: { team_id: string | null } | null; error: { message: string } | null }>;
+          };
+        };
+      };
+    };
+    const canAccessTarget = await canAccessProfileForScopedWorkShift(admin, access.context, profileId);
+    if (!canAccessTarget) {
+      return NextResponse.json({ error: 'Forbidden: Out of scope for this team' }, { status: 403 });
     }
 
     const result = await updateEmployeeWorkShift(createAdminClient(), profileId, {

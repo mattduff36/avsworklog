@@ -54,6 +54,10 @@ const GROUP_COLOR_CLASS: Record<AbsenceSecondaryPermissionHeaderGroup['id'], str
   'add-edit-bookings': 'bg-amber-300/90 text-slate-900',
   'see-allowances': 'bg-lime-300/90 text-slate-900',
   'add-edit-allowances': 'bg-green-300/90 text-slate-900',
+  'see-manage-overview': 'bg-indigo-300/90 text-slate-900',
+  'see-manage-reasons': 'bg-purple-300/90 text-slate-900',
+  'see-manage-work-shifts': 'bg-cyan-300/90 text-slate-900',
+  'edit-manage-work-shifts': 'bg-blue-300/90 text-slate-900',
   'authorise-bookings': 'bg-sky-300/90 text-slate-900',
 };
 

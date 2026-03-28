@@ -54,6 +54,8 @@ export interface EmployeeWorkShiftRow {
   profile_id: string;
   full_name: string;
   employee_id: string | null;
+  team_id: string | null;
+  team_name: string | null;
   template_id: string | null;
   template_name: string | null;
   updated_at: string;

@@ -1,16 +1,26 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { requireAdminWorkShiftAccess } from '@/lib/server/absence-work-shift-auth';
+import { getWorkShiftAccessContext } from '@/lib/server/work-shift-access';
 import { getWorkShiftMatrix } from '@/lib/server/work-shifts';
 
 export async function GET() {
   try {
-    const auth = await requireAdminWorkShiftAccess();
-    if (auth.response) {
-      return auth.response;
+    const access = await getWorkShiftAccessContext();
+    if (access.response) {
+      return access.response;
+    }
+    if (!access.context) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const matrix = await getWorkShiftMatrix(createAdminClient());
+    if (!access.context.canView) {
+      return NextResponse.json({ error: 'Forbidden: Work shifts access required' }, { status: 403 });
+    }
+
+    const matrix = await getWorkShiftMatrix(createAdminClient(), {
+      enforceTeamScope: !access.context.isAdmin,
+      teamId: access.context.teamId,
+    });
     return NextResponse.json({
       success: true,
       templates: matrix.templates,
