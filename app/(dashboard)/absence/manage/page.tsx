@@ -243,6 +243,8 @@ export default function AdminAbsencePage() {
   const deleteAbsence = useDeleteAbsence();
   useAbsenceRealtimeQueryInvalidation();
   const [allowancesRefreshKey, setAllowancesRefreshKey] = useState(0);
+  // Temporary gate is intentionally kept in code for future re-enable.
+  const isProtectedTabGateEnabled = false;
   const [protectedTabsUnlocked, setProtectedTabsUnlocked] = useState(false);
   const [pendingProtectedTab, setPendingProtectedTab] = useState<ProtectedManageTab>('overview');
   const [isUnlockingProtectedTab, setIsUnlockingProtectedTab] = useState(false);
@@ -307,7 +309,7 @@ export default function AdminAbsencePage() {
 
     // While protected-tab unlock URL/state sync is in progress, keep the target tab rendered
     // so users never see a temporary fallback tab flash.
-    if (isUnlockingProtectedTab) {
+    if (isProtectedTabGateEnabled && isUnlockingProtectedTab) {
       setActiveTab(pendingProtectedTab);
       if (requestedTab === pendingProtectedTab) {
         setIsUnlockingProtectedTab(false);
@@ -333,7 +335,7 @@ export default function AdminAbsencePage() {
     }
 
     if (allowedTabs.length > 0 && allowedTabs.includes(requestedTab as typeof allowedTabs[number])) {
-      if (isProtectedTab(requestedTab as ManageTab) && !protectedTabsUnlocked) {
+      if (isProtectedTabGateEnabled && isProtectedTab(requestedTab as ManageTab) && !protectedTabsUnlocked) {
         const params = new URLSearchParams(searchParams.toString());
         const protectedTabFallback = allowedTabs.includes('calendar') ? 'calendar' : allowedTabs[0];
         params.set('tab', protectedTabFallback);
@@ -373,6 +375,7 @@ export default function AdminAbsencePage() {
     protectedTabsUnlocked,
     isProtectedTab,
     openPasswordGate,
+    isProtectedTabGateEnabled,
     isUnlockingProtectedTab,
     pendingProtectedTab,
     isAbsenceSecondaryContextLoading,
@@ -440,7 +443,7 @@ export default function AdminAbsencePage() {
     if (!canViewAllowances && nextTab === 'allowances') return;
     if (!canViewBookings && nextTab === 'calendar') return;
     if (!canViewOverviewTab && nextTab === 'overview') return;
-    if (isProtectedTab(nextTab) && !protectedTabsUnlocked) {
+    if (isProtectedTabGateEnabled && isProtectedTab(nextTab) && !protectedTabsUnlocked) {
       openPasswordGate(nextTab);
       return;
     }
@@ -862,20 +865,20 @@ export default function AdminAbsencePage() {
             </TabsTrigger>
           )}
           {canViewAllowances && (
-            <TabsTrigger value="allowances" className="group gap-2">
-              <Briefcase className="h-4 w-4 text-absence transition-colors group-data-[state=active]:text-white" />
+            <TabsTrigger value="allowances" className="gap-2">
+              <Briefcase className="h-4 w-4" />
               Allowances
             </TabsTrigger>
           )}
           {canViewReasonsTab && (
-            <TabsTrigger value="reasons" className="group gap-2">
-              <Filter className="h-4 w-4 text-absence transition-colors group-data-[state=active]:text-white" />
+            <TabsTrigger value="reasons" className="gap-2">
+              <Filter className="h-4 w-4" />
               Reasons
             </TabsTrigger>
           )}
           {canViewOverviewTab && (
-            <TabsTrigger value="overview" className="group gap-2">
-              <Wrench className="h-4 w-4 text-absence transition-colors group-data-[state=active]:text-white" />
+            <TabsTrigger value="overview" className="gap-2">
+              <Wrench className="h-4 w-4" />
               Records & Admin
             </TabsTrigger>
           )}
@@ -1500,68 +1503,70 @@ export default function AdminAbsencePage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showPasswordDialog} onOpenChange={(open) => { if (!open) handlePasswordDialogClose(); }}>
-        <DialogContent className="border-border max-w-sm" onOpenAutoFocus={(e) => { e.preventDefault(); setTimeout(() => passwordInputRef.current?.focus(), 0); }}>
-          <DialogHeader>
-            <DialogTitle className="text-foreground flex items-center gap-2">
-              <Lock className="h-5 w-5 text-absence" />
-              {pendingProtectedTab === 'overview'
-                ? 'Records & Admin — Protected'
-                : pendingProtectedTab === 'reasons'
-                ? 'Reasons — Protected'
-                : 'Allowances — Protected'}
-            </DialogTitle>
-            <DialogDescription className="text-slate-400/90">
-              Enter the password to access the{' '}
-              {pendingProtectedTab === 'overview'
-                ? 'Records & Admin'
-                : pendingProtectedTab === 'reasons'
-                ? 'Reasons'
-                : 'Allowances'}{' '}
-              tab.
-            </DialogDescription>
-          </DialogHeader>
-          <form
-            onSubmit={(e) => { e.preventDefault(); handlePasswordSubmit(); }}
-            className="space-y-4"
-          >
-            <div className="space-y-2">
-              <Label htmlFor="protected-tab-password" className="text-foreground font-medium">Password</Label>
-              <Input
-                ref={passwordInputRef}
-                id="protected-tab-password"
-                type="password"
-                value={passwordInput}
-                onChange={(e) => { setPasswordInput(e.target.value); if (passwordError) setPasswordError(''); }}
-                placeholder="Enter password..."
-                className="bg-slate-950 border-border text-foreground"
-                autoComplete="off"
-              />
-              {passwordError && (
-                <p className="text-sm text-red-400">{passwordError}</p>
-              )}
-            </div>
-            <DialogFooter>
-              {isActualSuperAdmin && (
-                <Button
-                  type="button"
-                  onClick={handleSuperAdminBypass}
-                  variant="outline"
-                  className="border-red-500 text-red-400 hover:bg-red-500/10 hover:text-red-300"
-                >
-                  SuperAdmin Bypass
+      {isProtectedTabGateEnabled ? (
+        <Dialog open={showPasswordDialog} onOpenChange={(open) => { if (!open) handlePasswordDialogClose(); }}>
+          <DialogContent className="border-border max-w-sm" onOpenAutoFocus={(e) => { e.preventDefault(); setTimeout(() => passwordInputRef.current?.focus(), 0); }}>
+            <DialogHeader>
+              <DialogTitle className="text-foreground flex items-center gap-2">
+                <Lock className="h-5 w-5 text-absence" />
+                {pendingProtectedTab === 'overview'
+                  ? 'Records & Admin — Protected'
+                  : pendingProtectedTab === 'reasons'
+                  ? 'Reasons — Protected'
+                  : 'Allowances — Protected'}
+              </DialogTitle>
+              <DialogDescription className="text-slate-400/90">
+                Enter the password to access the{' '}
+                {pendingProtectedTab === 'overview'
+                  ? 'Records & Admin'
+                  : pendingProtectedTab === 'reasons'
+                  ? 'Reasons'
+                  : 'Allowances'}{' '}
+                tab.
+              </DialogDescription>
+            </DialogHeader>
+            <form
+              onSubmit={(e) => { e.preventDefault(); handlePasswordSubmit(); }}
+              className="space-y-4"
+            >
+              <div className="space-y-2">
+                <Label htmlFor="protected-tab-password" className="text-foreground font-medium">Password</Label>
+                <Input
+                  ref={passwordInputRef}
+                  id="protected-tab-password"
+                  type="password"
+                  value={passwordInput}
+                  onChange={(e) => { setPasswordInput(e.target.value); if (passwordError) setPasswordError(''); }}
+                  placeholder="Enter password..."
+                  className="bg-slate-950 border-border text-foreground"
+                  autoComplete="off"
+                />
+                {passwordError && (
+                  <p className="text-sm text-red-400">{passwordError}</p>
+                )}
+              </div>
+              <DialogFooter>
+                {isActualSuperAdmin && (
+                  <Button
+                    type="button"
+                    onClick={handleSuperAdminBypass}
+                    variant="outline"
+                    className="border-red-500 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                  >
+                    SuperAdmin Bypass
+                  </Button>
+                )}
+                <Button type="button" variant="outline" onClick={handlePasswordDialogClose} className="border-border text-muted-foreground">
+                  Cancel
                 </Button>
-              )}
-              <Button type="button" variant="outline" onClick={handlePasswordDialogClose} className="border-border text-muted-foreground">
-                Cancel
-              </Button>
-              <Button type="submit" disabled={!passwordInput} className="bg-absence hover:bg-absence-dark text-white">
-                Unlock
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+                <Button type="submit" disabled={!passwordInput} className="bg-absence hover:bg-absence-dark text-white">
+                  Unlock
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      ) : null}
     </div>
   );
 }

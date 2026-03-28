@@ -716,20 +716,21 @@ export function ManageOverviewAdminActions() {
           ) : (
             <>
               <Button
-                onClick={() => setShowShutdownDialog(true)}
+                onClick={() => setShowCloseYearDialog(true)}
                 variant="outline"
-                className={actionTileClass}
+                className={`${actionTileClass} ${isAdmin ? 'col-start-2 row-start-1' : ''}`}
                 style={{ width: `${actionTileWidthCh}ch` }}
+                disabled={closeTargetFinancialYearStartYear === null}
               >
-                <span className="flex w-full items-center justify-center gap-2 text-center text-sm font-semibold text-foreground">
-                  <Users className="h-4 w-4 text-absence" />
-                  {bulkAbsenceLabel}
+                <span className="flex w-full items-center justify-center gap-2 text-center text-sm font-semibold">
+                  <Lock className="h-4 w-4 text-absence" />
+                  {closeYearLabel}
                 </span>
               </Button>
               <Button
                 onClick={() => setShowGenerateDialog(true)}
                 variant="outline"
-                className={actionTileClass}
+                className={`${actionTileClass} ${isAdmin ? 'col-start-3 row-start-1' : ''}`}
                 style={{ width: `${actionTileWidthCh}ch` }}
               >
                 <span className="flex w-full items-center justify-center gap-2 text-center text-sm font-semibold">
@@ -739,23 +740,9 @@ export function ManageOverviewAdminActions() {
               </Button>
               {isAdmin ? (
                 <Button
-                  onClick={() => setShowUndoCloseYearDialog(true)}
-                  variant="outline"
-                  disabled={!generationStatus?.latestClosedFinancialYearLabel}
-                  className={actionTileClass}
-                  style={{ width: `${actionTileWidthCh}ch` }}
-                >
-                  <span className="flex w-full items-center justify-center gap-2 text-center text-sm font-semibold">
-                    <RotateCcw className="h-4 w-4 text-absence" />
-                    {undoCloseLabel}
-                  </span>
-                </Button>
-              ) : null}
-              {isAdmin ? (
-                <Button
                   onClick={() => setShowPermissionExceptionsDialog(true)}
                   variant="outline"
-                  className={actionTileClass}
+                  className={`${actionTileClass} col-start-1 row-start-2`}
                   style={{ width: `${actionTileWidthCh}ch` }}
                 >
                   <span className="flex w-full items-center justify-center gap-2 text-center text-sm font-semibold">
@@ -764,16 +751,29 @@ export function ManageOverviewAdminActions() {
                   </span>
                 </Button>
               ) : null}
+              {isAdmin ? (
+                <Button
+                  onClick={() => setShowUndoCloseYearDialog(true)}
+                  variant="outline"
+                  disabled={!generationStatus?.latestClosedFinancialYearLabel}
+                  className={`${actionTileClass} col-start-2 row-start-2`}
+                  style={{ width: `${actionTileWidthCh}ch` }}
+                >
+                  <span className="flex w-full items-center justify-center gap-2 text-center text-sm font-semibold">
+                    <RotateCcw className="h-4 w-4 text-absence" />
+                    {undoCloseLabel}
+                  </span>
+                </Button>
+              ) : null}
               <Button
-                onClick={() => setShowCloseYearDialog(true)}
+                onClick={() => setShowShutdownDialog(true)}
                 variant="outline"
-                className={actionTileClass}
+                className={`${actionTileClass} ${isAdmin ? 'col-start-3 row-start-2' : ''}`}
                 style={{ width: `${actionTileWidthCh}ch` }}
-                disabled={closeTargetFinancialYearStartYear === null}
               >
-                <span className="flex w-full items-center justify-center gap-2 text-center text-sm font-semibold">
-                  <Lock className="h-4 w-4 text-absence" />
-                  {closeYearLabel}
+                <span className="flex w-full items-center justify-center gap-2 text-center text-sm font-semibold text-foreground">
+                  <Users className="h-4 w-4 text-absence" />
+                  {bulkAbsenceLabel}
                 </span>
               </Button>
             </>

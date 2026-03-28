@@ -291,10 +291,10 @@ export function AbsenceCalendarAdmin() {
   const actorTeamName = absenceSecondarySnapshot?.team_name || null;
   const scopeTeamOnly = Boolean(
     !isAdminTier &&
-      canAddEditBookings &&
+      canViewBookings &&
       absenceSecondarySnapshot &&
-      !absenceSecondarySnapshot.permissions.add_edit_bookings_all &&
-      absenceSecondarySnapshot.permissions.add_edit_bookings_team
+      !absenceSecondarySnapshot.permissions.see_bookings_all &&
+      absenceSecondarySnapshot.permissions.see_bookings_team
   );
   const isTeamFilterLocked = scopeTeamOnly;
   const effectiveTeamFilter = scopeTeamOnly ? (actorTeamId || '__no_team_scope__') : selectedTeamId;
