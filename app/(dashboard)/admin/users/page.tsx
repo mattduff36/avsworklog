@@ -108,6 +108,12 @@ function formatAdminActivityTimestamp(value?: string | null): string {
   return absolute || 'Unknown';
 }
 
+function isSupervisorRole(role?: { name?: string | null; display_name?: string | null } | null): boolean {
+  const roleName = role?.name?.trim().toLowerCase();
+  const roleDisplayName = role?.display_name?.trim().toLowerCase();
+  return roleName === 'supervisor' || roleDisplayName === 'supervisor';
+}
+
 export default function UsersAdminPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1103,11 +1109,24 @@ export default function UsersAdminPage() {
                                 onClick={() => canQuickEditAssignments && openQuickEdit(user, 'role')}
                                 className="disabled:cursor-default enabled:cursor-pointer"
                               >
-                                <Badge variant={
-                                  user.email === 'admin@mpdee.co.uk' ? 'destructive' :
-                                  user.role?.role_class === 'admin' ? 'destructive' :
-                                  user.role?.role_class === 'manager' ? 'warning' : 'secondary'
-                                }>
+                                <Badge
+                                  variant={
+                                    user.email === 'admin@mpdee.co.uk'
+                                      ? 'destructive'
+                                      : isSupervisorRole(user.role)
+                                        ? 'outline'
+                                        : user.role?.role_class === 'admin'
+                                          ? 'destructive'
+                                          : user.role?.role_class === 'manager'
+                                            ? 'warning'
+                                            : 'secondary'
+                                  }
+                                  className={
+                                    isSupervisorRole(user.role)
+                                      ? 'border-sky-400/50 bg-sky-500/20 text-sky-200 hover:bg-sky-500/30'
+                                      : undefined
+                                  }
+                                >
                                   {user.email === 'admin@mpdee.co.uk' ? 'SuperAdmin' : (user.role?.display_name || 'No Role')}
                                 </Badge>
                               </button>
@@ -1571,15 +1590,24 @@ export default function UsersAdminPage() {
                 </div>
                 <div className="text-sm">
                   <span className="text-muted-foreground">Role:</span>{' '}
-                  <Badge variant={
-                    selectedUser.email === 'admin@mpdee.co.uk' ? 'destructive' :
-                    selectedUser.role?.role_class === 'admin' ? 'destructive' : 'default'
-                  }
-                  className={
-                    selectedUser.email === 'admin@mpdee.co.uk' || selectedUser.role?.role_class === 'admin'
-                      ? undefined
-                      : 'bg-slate-700 border-slate-500 text-slate-100 hover:bg-slate-600'
-                  }>
+                  <Badge
+                    variant={
+                      selectedUser.email === 'admin@mpdee.co.uk'
+                        ? 'destructive'
+                        : selectedUser.role?.role_class === 'admin'
+                          ? 'destructive'
+                          : isSupervisorRole(selectedUser.role)
+                            ? 'outline'
+                            : 'default'
+                    }
+                    className={
+                      selectedUser.email === 'admin@mpdee.co.uk' || selectedUser.role?.role_class === 'admin'
+                        ? undefined
+                        : isSupervisorRole(selectedUser.role)
+                          ? 'border-sky-400/50 bg-sky-500/20 text-sky-200 hover:bg-sky-500/30'
+                          : 'bg-slate-700 border-slate-500 text-slate-100 hover:bg-slate-600'
+                    }
+                  >
                     {selectedUser.email === 'admin@mpdee.co.uk' ? 'SuperAdmin' : (selectedUser.role?.display_name || 'No Role')}
                   </Badge>
                 </div>

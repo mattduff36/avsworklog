@@ -106,16 +106,22 @@ export function createNullAbsenceSecondaryOverrideRecord(): Record<AbsenceSecond
 }
 
 const MANAGER_TRUE_KEYS = new Set<AbsenceSecondaryPermissionKey>([
+  'see_bookings_all',
   'see_bookings_team',
+  'see_bookings_own',
   'add_edit_bookings_team',
+  'add_edit_bookings_own',
   'see_allowances_team',
   'see_manage_work_shifts',
   'edit_manage_work_shifts',
   'authorise_bookings_team',
+  'authorise_bookings_own',
 ]);
 
 const SUPERVISOR_TRUE_KEYS = new Set<AbsenceSecondaryPermissionKey>([
+  'see_bookings_all',
   'see_bookings_team',
+  'see_bookings_own',
   'add_edit_bookings_team',
   'see_manage_work_shifts',
   'authorise_bookings_team',

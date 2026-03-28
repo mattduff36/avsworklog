@@ -19,6 +19,7 @@ export interface EffectiveRoleInfo {
   role_id: string | null;
   role_name: string | null;
   display_name: string | null;
+  role_class: 'admin' | 'manager' | 'employee' | null;
   is_manager_admin: boolean;
   is_super_admin: boolean;
   /** True when the caller is a real super admin and is actively viewing as another role */
@@ -47,6 +48,7 @@ export async function getEffectiveRole(): Promise<EffectiveRoleInfo> {
     role_id: null,
     role_name: null,
     display_name: null,
+    role_class: null,
     is_manager_admin: false,
     is_super_admin: false,
     is_viewing_as: false,
@@ -77,6 +79,7 @@ export async function getEffectiveRole(): Promise<EffectiveRoleInfo> {
           id,
           name,
           display_name,
+          role_class,
           is_manager_admin,
           is_super_admin
         )
@@ -94,6 +97,7 @@ export async function getEffectiveRole(): Promise<EffectiveRoleInfo> {
         id: string;
         name: string;
         display_name: string;
+        role_class: 'admin' | 'manager' | 'employee' | null;
         is_manager_admin: boolean;
         is_super_admin: boolean;
       } | null;
@@ -125,6 +129,7 @@ export async function getEffectiveRole(): Promise<EffectiveRoleInfo> {
       role_id: actualRole?.id ?? null,
       role_name: actualRole?.name ?? null,
       display_name: actualRole?.display_name ?? null,
+      role_class: actualRole?.role_class ?? null,
       is_manager_admin: actualRole?.is_manager_admin ?? false,
       is_super_admin: isActualSuperAdmin,
       is_viewing_as: false,
@@ -149,7 +154,7 @@ export async function getEffectiveRole(): Promise<EffectiveRoleInfo> {
     if (viewAsRoleId) {
       const { data: overrideRole, error: overrideError } = await admin
         .from('roles')
-        .select('id, name, display_name, is_manager_admin, is_super_admin')
+        .select('id, name, display_name, role_class, is_manager_admin, is_super_admin')
         .eq('id', viewAsRoleId)
         .single();
 
@@ -158,6 +163,7 @@ export async function getEffectiveRole(): Promise<EffectiveRoleInfo> {
           id: string;
           name: string;
           display_name: string;
+          role_class: 'admin' | 'manager' | 'employee' | null;
           is_manager_admin: boolean;
           is_super_admin: boolean;
         };
@@ -183,6 +189,7 @@ export async function getEffectiveRole(): Promise<EffectiveRoleInfo> {
       role_id: effectiveRole?.id ?? null,
       role_name: effectiveRole?.name ?? null,
       display_name: effectiveRole?.display_name ?? null,
+      role_class: effectiveRole?.role_class ?? null,
       is_manager_admin: effectiveRole?.is_manager_admin ?? false,
       is_super_admin: effectiveRole?.is_super_admin ?? false,
       is_viewing_as: isViewingAs,

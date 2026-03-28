@@ -64,9 +64,11 @@ interface TimesheetWithProfile extends Timesheet {
 }
 
 function ApprovalsContent() {
-  const { profile, isAdmin, isActualSuperAdmin } = useAuth();
+  const { profile, isAdmin, isSuperAdmin } = useAuth();
   const { hasPermission: canViewApprovals, loading: permissionLoading } = usePermissionCheck('approvals', false);
-  const { data: absenceSecondarySnapshot } = useAbsenceSecondaryPermissions(canViewApprovals);
+  const { data: absenceSecondarySnapshot, isLoading: absenceSecondaryLoading } = useAbsenceSecondaryPermissions(
+    canViewApprovals
+  );
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
@@ -145,11 +147,11 @@ function ApprovalsContent() {
   const approveAbsence = useApproveAbsence();
   const rejectAbsence = useRejectAbsence();
   useAbsenceRealtimeQueryInvalidation();
-  const canAuthoriseBookings = Boolean(absenceSecondarySnapshot?.flags.can_authorise_bookings || isAdmin);
+  const canAuthoriseBookings = Boolean(absenceSecondarySnapshot?.flags.can_authorise_bookings || isAdmin || isSuperAdmin);
   const scopedPendingAbsences = useMemo(() => {
     if (!canAuthoriseBookings) return [] as AbsenceWithRelations[];
     if (!absences || absences.length === 0) return [] as AbsenceWithRelations[];
-    if (isAdmin || isActualSuperAdmin) return absences;
+    if (isAdmin || isSuperAdmin) return absences;
     if (!actorProfileId || !absenceSecondarySnapshot) return [] as AbsenceWithRelations[];
 
     return absences.filter((absence) =>
@@ -170,7 +172,7 @@ function ApprovalsContent() {
         }
       )
     );
-  }, [absences, canAuthoriseBookings, isAdmin, isActualSuperAdmin, actorProfileId, absenceSecondarySnapshot]);
+  }, [absences, canAuthoriseBookings, isAdmin, isSuperAdmin, actorProfileId, absenceSecondarySnapshot]);
 
   const fetchApprovals = useCallback(async (filter: StatusFilter) => {
     try {
@@ -302,7 +304,7 @@ function ApprovalsContent() {
     }
   };
 
-  if (permissionLoading || (!hasLoadedTimesheets && loading)) {
+  if (permissionLoading || absenceSecondaryLoading || (!hasLoadedTimesheets && loading)) {
     return <PageLoader message="Loading approvals..." />;
   }
 

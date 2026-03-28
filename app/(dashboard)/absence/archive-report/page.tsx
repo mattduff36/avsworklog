@@ -7,6 +7,7 @@ import { useAllAbsences, useAllAbsenceReasons } from '@/lib/hooks/useAbsence';
 import { createClient } from '@/lib/supabase/client';
 import { BackButton } from '@/components/ui/back-button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageLoader } from '@/components/ui/page-loader';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -122,13 +123,7 @@ export default function AbsenceArchiveReportPage() {
   }
 
   if (authLoading || absencePermissionLoading || isLoading) {
-    return (
-      <div className="space-y-6 max-w-7xl">
-        <Card>
-          <CardContent className="py-10 text-center text-muted-foreground">Loading archive report...</CardContent>
-        </Card>
-      </div>
-    );
+    return <PageLoader message="Loading archive report..." />;
   }
 
   if (!canAccessAbsenceModule || !canManage) return null;

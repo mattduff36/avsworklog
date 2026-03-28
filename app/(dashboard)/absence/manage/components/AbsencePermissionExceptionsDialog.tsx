@@ -268,7 +268,6 @@ export function AbsencePermissionExceptionsDialog({ open, onOpenChange }: Absenc
                       className={cn('border-b border-slate-700 px-2 py-2 text-center text-xs font-semibold', GROUP_COLOR_CLASS[group.id])}
                     >
                       <div>{group.title}</div>
-                      <div className="mt-0.5 text-[10px] font-medium opacity-80">({group.subtitle})</div>
                     </th>
                   ))}
                   <th

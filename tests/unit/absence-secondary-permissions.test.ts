@@ -10,13 +10,13 @@ describe('absence secondary permissions', () => {
   it('encodes manager defaults from the configured matrix', () => {
     const defaults = getAbsenceSecondaryDefaultMap('manager');
 
-    expect(defaults.see_bookings_all).toBe(false);
+    expect(defaults.see_bookings_all).toBe(true);
     expect(defaults.see_bookings_team).toBe(true);
-    expect(defaults.see_bookings_own).toBe(false);
+    expect(defaults.see_bookings_own).toBe(true);
 
     expect(defaults.add_edit_bookings_all).toBe(false);
     expect(defaults.add_edit_bookings_team).toBe(true);
-    expect(defaults.add_edit_bookings_own).toBe(false);
+    expect(defaults.add_edit_bookings_own).toBe(true);
 
     expect(defaults.see_allowances_all).toBe(false);
     expect(defaults.see_allowances_team).toBe(true);
@@ -31,15 +31,15 @@ describe('absence secondary permissions', () => {
 
     expect(defaults.authorise_bookings_all).toBe(false);
     expect(defaults.authorise_bookings_team).toBe(true);
-    expect(defaults.authorise_bookings_own).toBe(false);
+    expect(defaults.authorise_bookings_own).toBe(true);
   });
 
   it('encodes supervisor defaults from the configured matrix', () => {
     const defaults = getAbsenceSecondaryDefaultMap('supervisor');
 
-    expect(defaults.see_bookings_all).toBe(false);
+    expect(defaults.see_bookings_all).toBe(true);
     expect(defaults.see_bookings_team).toBe(true);
-    expect(defaults.see_bookings_own).toBe(false);
+    expect(defaults.see_bookings_own).toBe(true);
 
     expect(defaults.add_edit_bookings_all).toBe(false);
     expect(defaults.add_edit_bookings_team).toBe(true);

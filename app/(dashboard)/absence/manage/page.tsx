@@ -72,15 +72,15 @@ function isDirectoryAccessError(error: unknown): boolean {
 }
 
 export default function AdminAbsencePage() {
-  const { profile, isAdmin, isManager, isActualSuperAdmin, loading: authLoading } = useAuth();
+  const { profile, isAdmin, isManager, isSuperAdmin, isActualSuperAdmin, loading: authLoading } = useAuth();
   const { hasPermission: canAccessAbsenceModule, loading: absencePermissionLoading } = usePermissionCheck('absence', false);
-  const { data: absenceSecondarySnapshot, isLoading: absenceSecondaryLoading } = useAbsenceSecondaryPermissions(
+  const { data: absenceSecondarySnapshot, isLoading: absenceSecondaryLoading, isFetchedAfterMount: absenceSecondaryFetchedAfterMount } = useAbsenceSecondaryPermissions(
     canAccessAbsenceModule
   );
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
-  const isAdminTier = Boolean(isAdmin || isActualSuperAdmin);
+  const isAdminTier = Boolean(isAdmin || isSuperAdmin);
   const canViewBookings = Boolean(absenceSecondarySnapshot?.flags.can_view_bookings || isAdminTier);
   const canAddEditBookings = Boolean(absenceSecondarySnapshot?.flags.can_add_edit_bookings || isAdminTier);
   const canViewAllowances = Boolean(absenceSecondarySnapshot?.flags.can_view_allowances || isAdminTier);
@@ -98,6 +98,8 @@ export default function AdminAbsencePage() {
     canViewOverviewTab ||
     canViewReasonsTab ||
     canViewWorkShiftsTab;
+  const isAbsenceSecondaryContextLoading =
+    canAccessAbsenceModule && (absenceSecondaryLoading || !absenceSecondaryFetchedAfterMount);
   
   // Filters
   const [profileId, setProfileId] = useState('');
@@ -125,12 +127,10 @@ export default function AdminAbsencePage() {
     includeArchived,
   });
   const actorProfileId = profile?.id || '';
-  const filteredAbsences = useMemo(() => {
-    const term = listSearch.trim().toLowerCase();
-    const filtered = (absences || []).filter((absence) => {
+  const scopedAbsences = useMemo(() => {
+    return (absences || []).filter((absence) => {
       const isAllowedByScope =
-        isAdmin ||
-        isActualSuperAdmin ||
+        isAdminTier ||
         (canViewBookings &&
           Boolean(
             actorProfileId &&
@@ -152,8 +152,19 @@ export default function AdminAbsencePage() {
                 }
               )
           ));
-      if (!isAllowedByScope) return false;
+      return isAllowedByScope;
+    });
+  }, [
+    absences,
+    actorProfileId,
+    canViewBookings,
+    absenceSecondarySnapshot,
+    isAdminTier,
+  ]);
 
+  const filteredAbsences = useMemo(() => {
+    const term = listSearch.trim().toLowerCase();
+    const filtered = scopedAbsences.filter((absence) => {
       if (!term) return true;
       return (
         absence.profiles.full_name.toLowerCase().includes(term) ||
@@ -196,19 +207,14 @@ export default function AdminAbsencePage() {
       }
     });
   }, [
-    absences,
+    scopedAbsences,
     listSearch,
     sortField,
     sortDirection,
-    actorProfileId,
-    canViewBookings,
-    absenceSecondarySnapshot,
-    isAdmin,
-    isActualSuperAdmin,
   ]);
   const pendingCount = useMemo(
-    () => (absences || []).filter((absence) => absence.status === 'pending').length,
-    [absences]
+    () => scopedAbsences.filter((absence) => absence.status === 'pending').length,
+    [scopedAbsences]
   );
 
   const totalPages = Math.max(1, Math.ceil(filteredAbsences.length / PAGE_SIZE));
@@ -276,15 +282,15 @@ export default function AdminAbsencePage() {
     if (
       !authLoading &&
       !absencePermissionLoading &&
-      !absenceSecondaryLoading &&
+      !isAbsenceSecondaryContextLoading &&
       (!canAccessAbsenceModule || !canOpenManagePage)
     ) {
       router.push('/dashboard');
     }
-  }, [authLoading, absencePermissionLoading, absenceSecondaryLoading, canAccessAbsenceModule, canOpenManagePage, router]);
+  }, [authLoading, absencePermissionLoading, isAbsenceSecondaryContextLoading, canAccessAbsenceModule, canOpenManagePage, router]);
 
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading || isAbsenceSecondaryContextLoading) return;
     const tabParam = searchParams.get('tab');
     const resolvedTabParam = tabParam || 'calendar';
     if (!tabParam) {
@@ -369,6 +375,7 @@ export default function AdminAbsencePage() {
     openPasswordGate,
     isUnlockingProtectedTab,
     pendingProtectedTab,
+    isAbsenceSecondaryContextLoading,
   ]);
 
   useEffect(() => {
@@ -595,7 +602,7 @@ export default function AdminAbsencePage() {
 
   const canPerformScopedBookingAction = useCallback(
     (targetProfileId: string, targetTeamId: string | null, mode: 'view' | 'edit') => {
-      if (isAdmin || isActualSuperAdmin) return true;
+      if (isAdminTier) return true;
       if (!actorProfileId || !absenceSecondarySnapshot) return false;
 
       const keys =
@@ -624,7 +631,7 @@ export default function AdminAbsencePage() {
         keys
       );
     },
-    [isAdmin, isActualSuperAdmin, actorProfileId, absenceSecondarySnapshot]
+    [isAdminTier, actorProfileId, absenceSecondarySnapshot]
   );
   
   // Calculate duration
@@ -747,7 +754,7 @@ export default function AdminAbsencePage() {
     }
   }
   
-  if (authLoading || absencePermissionLoading || absenceSecondaryLoading || isLoading) {
+  if (authLoading || absencePermissionLoading || isAbsenceSecondaryContextLoading || isLoading) {
     return <PageLoader message="Loading absence management..." />;
   }
   

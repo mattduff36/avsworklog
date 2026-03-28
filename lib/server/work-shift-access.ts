@@ -36,10 +36,27 @@ export async function getWorkShiftAccessContext(): Promise<
     };
   }
 
-  const [effectiveRole, secondary] = await Promise.all([
-    getEffectiveRole(),
-    getActorAbsenceSecondaryPermissions(user.id),
-  ]);
+  const effectiveRole = await getEffectiveRole();
+  const roleOverride =
+    effectiveRole.user_id === user.id && (effectiveRole.role_name || effectiveRole.is_manager_admin || effectiveRole.is_super_admin)
+      ? {
+          name: effectiveRole.role_name,
+          display_name: effectiveRole.display_name,
+          role_class: effectiveRole.role_class,
+          is_manager_admin: effectiveRole.is_manager_admin,
+          is_super_admin: effectiveRole.is_super_admin,
+        }
+      : undefined;
+
+  const secondary = await getActorAbsenceSecondaryPermissions(user.id, {
+    role: roleOverride,
+    ...(effectiveRole.user_id === user.id
+      ? {
+          team_id: effectiveRole.team_id,
+          team_name: effectiveRole.team_name,
+        }
+      : {}),
+  });
 
   const isAdmin =
     effectiveRole.is_actual_super_admin || effectiveRole.is_super_admin || effectiveRole.role_name === 'admin';

@@ -78,6 +78,12 @@ export interface UpsertAbsenceSecondaryExceptionInput {
   actor_id?: string | null;
 }
 
+export interface AbsenceSecondaryActorContextOverride {
+  role?: RoleShape | null;
+  team_id?: string | null;
+  team_name?: string | null;
+}
+
 export function resolveAbsenceSecondaryRoleTier(role: RoleShape | null | undefined): AbsenceSecondaryRoleTier {
   if (!role) return 'employee';
   if (role.is_super_admin || role.name === 'admin' || role.role_class === 'admin') return 'admin';
@@ -156,7 +162,10 @@ async function fetchProfileWithRole(profileId: string) {
   return data as ProfileWithRoleRow;
 }
 
-export async function getActorAbsenceSecondaryPermissions(profileId: string): Promise<AbsenceSecondaryActorPermissions> {
+export async function getActorAbsenceSecondaryPermissions(
+  profileId: string,
+  contextOverride?: AbsenceSecondaryActorContextOverride
+): Promise<AbsenceSecondaryActorPermissions> {
   const [profile, exceptionRow] = await Promise.all([
     fetchProfileWithRole(profileId),
     (createAdminClient() as unknown as {
@@ -178,17 +187,27 @@ export async function getActorAbsenceSecondaryPermissions(profileId: string): Pr
 
   if (exceptionRow.error) throw new Error(exceptionRow.error.message || 'Failed to load absence secondary exceptions');
 
-  const roleTier = resolveAbsenceSecondaryRoleTier(profile.role);
+  const resolvedRole = contextOverride?.role ?? profile.role;
+  const resolvedTeamId =
+    contextOverride && Object.prototype.hasOwnProperty.call(contextOverride, 'team_id')
+      ? (contextOverride.team_id ?? null)
+      : (profile.team_id ?? null);
+  const resolvedTeamName =
+    contextOverride && Object.prototype.hasOwnProperty.call(contextOverride, 'team_name')
+      ? (contextOverride.team_name ?? null)
+      : (profile.team?.name ?? null);
+
+  const roleTier = resolveAbsenceSecondaryRoleTier(resolvedRole);
   const defaults = getAbsenceSecondaryDefaultMap(roleTier);
   const overrides = normalizeExceptionOverrides(exceptionRow.data || undefined);
   const effective = applyAbsenceSecondaryOverrides(defaults, overrides);
 
   return {
     user_id: profile.id,
-    team_id: profile.team_id || null,
-    team_name: profile.team?.name || null,
-    role_name: profile.role?.name || null,
-    role_display_name: profile.role?.display_name || null,
+    team_id: resolvedTeamId,
+    team_name: resolvedTeamName,
+    role_name: resolvedRole?.name || null,
+    role_display_name: resolvedRole?.display_name || null,
     role_tier: roleTier,
     defaults,
     overrides,

@@ -5,6 +5,7 @@ import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageLoader } from '@/components/ui/page-loader';
 import {
   Select,
   SelectContent,
@@ -191,10 +192,15 @@ function getOldestOpenFinancialYearStartYear(
 }
 
 export function AbsenceCalendarAdmin() {
-  const { profile, isAdmin, isActualSuperAdmin } = useAuth();
-  const { data: absenceSecondarySnapshot, isLoading: absenceSecondaryLoading } = useAbsenceSecondaryPermissions(true);
+  const { profile, isAdmin, isSuperAdmin } = useAuth();
+  const {
+    data: absenceSecondarySnapshot,
+    isLoading: absenceSecondaryLoading,
+    isFetchedAfterMount: absenceSecondaryFetchedAfterMount,
+  } = useAbsenceSecondaryPermissions(true);
   const [generationStatus, setGenerationStatus] = useState<GenerationStatus | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [loadingEmployees, setLoadingEmployees] = useState(true);
   const [carryoverByProfile, setCarryoverByProfile] = useState<Map<string, number>>(new Map());
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('all');
   const [selectedTeamId, setSelectedTeamId] = useState('all');
@@ -272,14 +278,27 @@ export function AbsenceCalendarAdmin() {
   }, [initialMonthIndex]);
 
   const { data: absences, isLoading } = useAllAbsences({});
-  const { data: reasons } = useAllAbsenceReasons();
+  const { data: reasons, isLoading: reasonsLoading } = useAllAbsenceReasons();
   const deleteAbsence = useDeleteAbsence();
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [editTarget, setEditTarget] = useState<AbsenceWithRelations | null>(null);
   const actorProfileId = profile?.id || '';
-  const canViewBookings = Boolean(absenceSecondarySnapshot?.flags.can_view_bookings || isAdmin);
-  const canAddEditBookings = Boolean(absenceSecondarySnapshot?.flags.can_add_edit_bookings || isAdmin);
+  const isAdminTier = Boolean(isAdmin || isSuperAdmin);
+  const canViewBookings = Boolean(absenceSecondarySnapshot?.flags.can_view_bookings || isAdminTier);
+  const canAddEditBookings = Boolean(absenceSecondarySnapshot?.flags.can_add_edit_bookings || isAdminTier);
+  const actorTeamId = absenceSecondarySnapshot?.team_id || null;
+  const actorTeamName = absenceSecondarySnapshot?.team_name || null;
+  const scopeTeamOnly = Boolean(
+    !isAdminTier &&
+      canAddEditBookings &&
+      absenceSecondarySnapshot &&
+      !absenceSecondarySnapshot.permissions.add_edit_bookings_all &&
+      absenceSecondarySnapshot.permissions.add_edit_bookings_team
+  );
+  const isTeamFilterLocked = scopeTeamOnly;
+  const effectiveTeamFilter = scopeTeamOnly ? (actorTeamId || '__no_team_scope__') : selectedTeamId;
+  const isAbsenceSecondaryContextLoading = absenceSecondaryLoading || !absenceSecondaryFetchedAfterMount;
 
   useEffect(() => {
     void loadGenerationStatus();
@@ -310,9 +329,10 @@ export function AbsenceCalendarAdmin() {
   }
 
   async function fetchEmployees() {
+    setLoadingEmployees(true);
     try {
-    const data = await fetchUserDirectory({ includeAllowance: true });
-    const list = data.map((row) => {
+      const data = await fetchUserDirectory({ includeAllowance: true });
+      const list = data.map((row) => {
         return {
           id: String(row.id || ''),
           full_name: String(row.full_name || ''),
@@ -326,6 +346,8 @@ export function AbsenceCalendarAdmin() {
     } catch (error) {
       console.error('Error fetching employees:', error);
       toast.error('Failed to load employee filters');
+    } finally {
+      setLoadingEmployees(false);
     }
   }
 
@@ -371,8 +393,7 @@ export function AbsenceCalendarAdmin() {
       const employee = employeeById.get(absence.profile_id);
       const targetTeamId = absence.profiles.team_id || employee?.team_id || null;
       const canViewTarget =
-        isAdmin ||
-        isActualSuperAdmin ||
+        isAdminTier ||
         (actorProfileId &&
           absenceSecondarySnapshot &&
           canUseScopedAbsencePermission(
@@ -395,10 +416,10 @@ export function AbsenceCalendarAdmin() {
       if (selectedEmployeeId !== 'all' && absence.profile_id !== selectedEmployeeId) return false;
       if (selectedReasonId !== 'all' && absence.reason_id !== selectedReasonId) return false;
       if (selectedStatus !== 'all' && absence.status !== selectedStatus) return false;
-      if (selectedTeamId !== 'all') {
-        if (selectedTeamId === 'unassigned') {
+      if (effectiveTeamFilter !== 'all') {
+        if (effectiveTeamFilter === 'unassigned') {
           if (employee?.team_id) return false;
-        } else if (!employee?.team_id || employee.team_id !== selectedTeamId) {
+        } else if (!employee?.team_id || employee.team_id !== effectiveTeamFilter) {
           return false;
         }
       }
@@ -438,12 +459,11 @@ export function AbsenceCalendarAdmin() {
     employeeById,
     selectedEmployeeId,
     selectedReasonId,
-    selectedTeamId,
+    effectiveTeamFilter,
     selectedStatus,
     actorProfileId,
     absenceSecondarySnapshot,
-    isAdmin,
-    isActualSuperAdmin,
+    isAdminTier,
   ]);
 
   const teamOptions = useMemo(() => {
@@ -460,8 +480,27 @@ export function AbsenceCalendarAdmin() {
   }, [employees]);
 
   const filteredEmployeeOptions = useMemo(() => {
-    return filterEmployeesBySelectedTeam(employees, selectedTeamId);
-  }, [employees, selectedTeamId]);
+    return filterEmployeesBySelectedTeam(employees, effectiveTeamFilter);
+  }, [employees, effectiveTeamFilter]);
+
+  const lockedTeamLabel =
+    actorTeamName ||
+    teamOptions.find((team) => team.value === actorTeamId)?.label ||
+    (actorTeamId ? 'My Team' : 'No team assigned');
+
+  useEffect(() => {
+    if (!scopeTeamOnly) {
+      setSelectedTeamId((current) => (current === '__no_team_scope__' ? 'all' : current));
+      return;
+    }
+    setSelectedTeamId(actorTeamId || '__no_team_scope__');
+  }, [scopeTeamOnly, actorTeamId]);
+
+  const hasActiveFilters =
+    selectedEmployeeId !== 'all' ||
+    selectedReasonId !== 'all' ||
+    selectedStatus !== 'all' ||
+    (!isTeamFilterLocked && selectedTeamId !== 'all');
 
   useEffect(() => {
     if (selectedEmployeeId === 'all') {
@@ -605,7 +644,7 @@ export function AbsenceCalendarAdmin() {
 
   function canEditAbsence(absence: AbsenceWithRelations): boolean {
     if (!canAddEditBookings) return false;
-    if (!isAdmin && !isActualSuperAdmin) {
+    if (!isAdminTier) {
       if (!actorProfileId || !absenceSecondarySnapshot) return false;
       const employee = employeeById.get(absence.profile_id);
       const targetTeamId = absence.profiles.team_id || employee?.team_id || null;
@@ -630,14 +669,8 @@ export function AbsenceCalendarAdmin() {
     return absence.record_source !== 'archived' && !absence.is_bank_holiday && !absence.auto_generated;
   }
 
-  if (isLoading || absenceSecondaryLoading) {
-    return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-12">
-          <p className="text-muted-foreground">Loading calendar...</p>
-        </CardContent>
-      </Card>
-    );
+  if (isLoading || reasonsLoading || loadingEmployees || isAbsenceSecondaryContextLoading) {
+    return <PageLoader message="Loading calendar..." />;
   }
 
   return (
@@ -648,13 +681,13 @@ export function AbsenceCalendarAdmin() {
             <Filter className="h-5 w-5" />
             Filters
           </CardTitle>
-          {(selectedEmployeeId !== 'all' || selectedTeamId !== 'all' || selectedReasonId !== 'all' || selectedStatus !== 'all') && (
+          {hasActiveFilters && (
             <Button
               variant="outline"
               size="sm"
               onClick={() => {
                 setSelectedEmployeeId('all');
-                setSelectedTeamId('all');
+                setSelectedTeamId(isTeamFilterLocked ? (actorTeamId || '__no_team_scope__') : 'all');
                 setSelectedReasonId('all');
                 setSelectedStatus('all');
               }}
@@ -685,18 +718,24 @@ export function AbsenceCalendarAdmin() {
 
             <div>
               <p className="text-sm text-muted-foreground mb-2">Team Name</p>
-              <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
+              <Select value={effectiveTeamFilter} onValueChange={setSelectedTeamId} disabled={isTeamFilterLocked}>
                 <SelectTrigger className="bg-background border-border text-foreground">
                   <SelectValue placeholder="All teams" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All teams</SelectItem>
-                  <SelectItem value="unassigned">Unassigned</SelectItem>
-                  {teamOptions.map((team) => (
-                    <SelectItem key={team.value} value={team.value}>
-                      {team.label}
-                    </SelectItem>
-                  ))}
+                  {isTeamFilterLocked ? (
+                    <SelectItem value={effectiveTeamFilter}>{lockedTeamLabel}</SelectItem>
+                  ) : (
+                    <>
+                      <SelectItem value="all">All teams</SelectItem>
+                      <SelectItem value="unassigned">Unassigned</SelectItem>
+                      {teamOptions.map((team) => (
+                        <SelectItem key={team.value} value={team.value}>
+                          {team.label}
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>

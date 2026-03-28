@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { getActorAbsenceSecondaryPermissions } from '@/lib/server/absence-secondary-permissions';
+import { getEffectiveRole } from '@/lib/utils/view-as';
 
 export async function GET() {
   const supabase = await createClient();
@@ -20,7 +21,28 @@ export async function GET() {
   }
 
   try {
-    const snapshot = await getActorAbsenceSecondaryPermissions(user.id);
+    const effectiveRole = await getEffectiveRole();
+    const roleOverride =
+      effectiveRole.user_id === user.id && (effectiveRole.role_name || effectiveRole.is_manager_admin || effectiveRole.is_super_admin)
+        ? {
+            name: effectiveRole.role_name,
+            display_name: effectiveRole.display_name,
+            role_class: effectiveRole.role_class,
+            is_manager_admin: effectiveRole.is_manager_admin,
+            is_super_admin: effectiveRole.is_super_admin,
+          }
+        : undefined;
+    const hasTeamOverride = effectiveRole.user_id === user.id;
+
+    const snapshot = await getActorAbsenceSecondaryPermissions(user.id, {
+      role: roleOverride,
+      ...(hasTeamOverride
+        ? {
+            team_id: effectiveRole.team_id,
+            team_name: effectiveRole.team_name,
+          }
+        : {}),
+    });
     const permissions = snapshot.effective;
 
     return NextResponse.json({

@@ -149,16 +149,27 @@ function isExpectedAbsenceSubmissionError(message: string): boolean {
 }
 
 export default function AbsencePage() {
-  const { profile, isManager, isAdmin, isActualSuperAdmin } = useAuth();
+  const { profile, isManager, isAdmin, isSuperAdmin } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { hasPermission, loading: permissionLoading } = usePermissionCheck('absence');
-  const { data: absenceSecondarySnapshot, isLoading: secondaryLoading } = useAbsenceSecondaryPermissions(hasPermission);
+  const {
+    data: absenceSecondarySnapshot,
+    isLoading: secondaryLoading,
+    isFetchedAfterMount: secondaryFetchedAfterMount,
+  } = useAbsenceSecondaryPermissions(hasPermission);
+  const isSecondaryContextLoading = hasPermission && (secondaryLoading || !secondaryFetchedAfterMount);
   const actorProfileId = profile?.id || '';
-  const canViewBookings = Boolean(absenceSecondarySnapshot?.flags.can_view_bookings || isAdmin || isManager);
+  const isAdminTier = Boolean(isAdmin || isSuperAdmin);
+  const canViewBookings = Boolean(absenceSecondarySnapshot?.flags.can_view_bookings || isAdminTier || isManager);
+  const canAddEditBookings = Boolean(absenceSecondarySnapshot?.flags.can_add_edit_bookings || isAdminTier);
+  const canViewAllowances = Boolean(absenceSecondarySnapshot?.flags.can_view_allowances || isAdminTier);
+  const canAuthoriseBookings = Boolean(absenceSecondarySnapshot?.flags.can_authorise_bookings || isAdminTier);
+  const canViewOverviewTab = Boolean(absenceSecondarySnapshot?.flags.can_view_manage_overview || isAdminTier);
+  const canViewReasonsTab = Boolean(absenceSecondarySnapshot?.flags.can_view_manage_reasons || isAdminTier);
+  const canViewWorkShiftsTab = Boolean(absenceSecondarySnapshot?.flags.can_view_manage_work_shifts || isAdminTier);
   const canRequestLeave =
-    isAdmin ||
-    isActualSuperAdmin ||
+    isAdminTier ||
     Boolean(
       actorProfileId &&
         absenceSecondarySnapshot &&
@@ -180,12 +191,14 @@ export default function AbsencePage() {
         )
     );
   const canOpenManageLink = Boolean(
-    isAdmin ||
-      isManager ||
-      absenceSecondarySnapshot?.permissions.add_edit_bookings_all ||
-      absenceSecondarySnapshot?.permissions.add_edit_bookings_team ||
-      absenceSecondarySnapshot?.permissions.see_allowances_all ||
-      absenceSecondarySnapshot?.permissions.see_allowances_team
+    isManager ||
+      canViewBookings ||
+      canViewAllowances ||
+      canAddEditBookings ||
+      canAuthoriseBookings ||
+      canViewOverviewTab ||
+      canViewReasonsTab ||
+      canViewWorkShiftsTab
   );
   const [activeTab, setActiveTab] = useState<'calendar' | 'bookings'>('calendar');
   const [showRequestDialog, setShowRequestDialog] = useState(false);
@@ -283,7 +296,7 @@ export default function AbsencePage() {
     end: displayFinancialYear.end,
   });
   const { data: allAbsencesData, isLoading: loadingAllAbsences } = useAllAbsences(
-    isManager || isAdmin ? {} : undefined
+    canViewBookings ? {} : undefined
   );
   const { data: summary, isLoading: loadingSummary } = useAbsenceSummaryForUserFinancialYear({
     start: displayFinancialYear.start,
@@ -299,12 +312,13 @@ export default function AbsencePage() {
       return [];
     }
 
-    if (!actorProfileId || !absenceSecondarySnapshot || (!isManager && !isAdmin && !isActualSuperAdmin)) {
+    if (!actorProfileId || !absenceSecondarySnapshot) {
       return userAbsences?.filter((absence) => absence.status !== 'cancelled') || [];
     }
 
     return (allAbsencesData || []).filter((absence) => {
       if (absence.status === 'cancelled') return false;
+      if (isAdminTier) return true;
       return canUseScopedAbsencePermission(
         {
           permissions: absenceSecondarySnapshot.permissions,
@@ -324,16 +338,14 @@ export default function AbsencePage() {
     });
   }, [
     canViewBookings,
+    isAdminTier,
     actorProfileId,
     absenceSecondarySnapshot,
-    isManager,
-    isAdmin,
-    isActualSuperAdmin,
     userAbsences,
     allAbsencesData,
   ]);
   
-  const loadingAbsences = isManager || isAdmin ? loadingAllAbsences : loadingUserAbsences;
+  const loadingAbsences = canViewBookings ? loadingAllAbsences : loadingUserAbsences;
   // Form state
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -422,6 +434,7 @@ export default function AbsencePage() {
   }, [hasPermission]);
 
   useEffect(() => {
+    if (isSecondaryContextLoading) return;
     const requestedTab = searchParams.get('tab') || 'calendar';
     if (requestedTab === 'calendar' || requestedTab === 'bookings') {
       setActiveTab(requestedTab);
@@ -429,7 +442,7 @@ export default function AbsencePage() {
     }
     setActiveTab('calendar');
     router.replace('/absence?tab=calendar', { scroll: false });
-  }, [searchParams, router]);
+  }, [searchParams, router, isSecondaryContextLoading]);
 
   function handleTabChange(value: 'calendar' | 'bookings') {
     setActiveTab(value);
@@ -782,10 +795,16 @@ export default function AbsencePage() {
   // Show loading while checking permissions
   const isBookingWindowLoading = generationStatusLoading && !generationStatus;
 
-  if (permissionLoading || secondaryLoading || loadingAbsences || loadingSummary || isBookingWindowLoading) {
+  if (permissionLoading || isSecondaryContextLoading || loadingAbsences || loadingSummary || isBookingWindowLoading) {
     return (
       <PageLoader
-        message={permissionLoading ? 'Checking access...' : isBookingWindowLoading ? 'Loading booking window...' : 'Loading absences...'}
+        message={
+          permissionLoading || isSecondaryContextLoading
+            ? 'Checking access...'
+            : isBookingWindowLoading
+            ? 'Loading booking window...'
+            : 'Loading absences...'
+        }
       />
     );
   }

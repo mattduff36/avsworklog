@@ -57,6 +57,7 @@ export function useAbsenceSecondaryPermissions(enabled = true) {
   return useQuery({
     queryKey: ['absence-secondary-permissions', 'me'],
     enabled,
+    refetchOnMount: 'always',
     queryFn: async () => {
       const response = await fetch('/api/absence/permissions/secondary/me', { cache: 'no-store' });
       const payload = (await response.json()) as { error?: string } & Partial<AbsenceSecondarySnapshot>;
