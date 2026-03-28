@@ -1574,6 +1574,11 @@ export default function UsersAdminPage() {
                   <Badge variant={
                     selectedUser.email === 'admin@mpdee.co.uk' ? 'destructive' :
                     selectedUser.role?.role_class === 'admin' ? 'destructive' : 'default'
+                  }
+                  className={
+                    selectedUser.email === 'admin@mpdee.co.uk' || selectedUser.role?.role_class === 'admin'
+                      ? undefined
+                      : 'bg-slate-700 border-slate-500 text-slate-100 hover:bg-slate-600'
                   }>
                     {selectedUser.email === 'admin@mpdee.co.uk' ? 'SuperAdmin' : (selectedUser.role?.display_name || 'No Role')}
                   </Badge>

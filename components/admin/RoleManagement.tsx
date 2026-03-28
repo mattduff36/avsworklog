@@ -287,37 +287,28 @@ export function RoleManagement() {
         key={moduleName}
         className={cn('px-0 py-0.5 text-center', isFirstInTierGroup && TIER_DIVIDER_CLASS)}
       >
-        <TooltipProvider delayDuration={300}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                disabled={isSaving}
-                onClick={() => handleTogglePermission(team, moduleName, !isEnabled)}
-                className="h-6 w-6 rounded flex items-center justify-center mx-auto transition-all duration-150 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                style={
-                  isSaving
-                    ? { backgroundColor: 'hsl(215 20% 18%)', border: '1.5px solid hsl(215 20% 30%)' }
-                    : isEnabled
-                      ? { backgroundColor: color, boxShadow: `0 0 6px ${getModuleColorAlpha(moduleName, 0.25)}` }
-                      : { backgroundColor: 'transparent', border: '1.5px solid hsl(215 20% 30%)' }
-                }
-                aria-label={`${moduleName} for ${team.name}: ${isSaving ? 'saving' : isEnabled ? 'enabled' : 'disabled'}`}
-              >
-                {isSaving ? (
-                  <Loader2 className="h-3.5 w-3.5 text-slate-400 animate-spin" />
-                ) : isEnabled ? (
-                  <Check className="h-3.5 w-3.5 text-white" />
-                ) : (
-                  <Minus className="h-3 w-3 text-slate-600" />
-                )}
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="top" className="text-xs">
-              {isSaving ? 'Saving…' : isEnabled ? 'Enabled' : 'Disabled'}
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <button
+          type="button"
+          disabled={isSaving}
+          onClick={() => handleTogglePermission(team, moduleName, !isEnabled)}
+          className="h-6 w-6 rounded flex items-center justify-center mx-auto transition-all duration-150 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          style={
+            isSaving
+              ? { backgroundColor: 'hsl(215 20% 18%)', border: '1.5px solid hsl(215 20% 30%)' }
+              : isEnabled
+                ? { backgroundColor: color, boxShadow: `0 0 6px ${getModuleColorAlpha(moduleName, 0.25)}` }
+                : { backgroundColor: 'transparent', border: '1.5px solid hsl(215 20% 30%)' }
+          }
+          aria-label={`${moduleName} for ${team.name}: ${isSaving ? 'saving' : isEnabled ? 'enabled' : 'disabled'}`}
+        >
+          {isSaving ? (
+            <Loader2 className="h-3.5 w-3.5 text-slate-400 animate-spin" />
+          ) : isEnabled ? (
+            <Check className="h-3.5 w-3.5 text-white" />
+          ) : (
+            <Minus className="h-3 w-3 text-slate-600" />
+          )}
+        </button>
       </td>
     );
   }
