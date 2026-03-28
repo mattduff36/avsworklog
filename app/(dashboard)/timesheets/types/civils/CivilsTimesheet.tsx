@@ -1170,7 +1170,7 @@ export function CivilsTimesheet({
   }
 
   return (
-    <div className="space-y-4 pb-32 md:pb-6 max-w-5xl">
+    <div className="space-y-4 pb-32 md:pb-6 w-full max-w-[1400px] mx-auto">
       
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-border">
@@ -1408,7 +1408,7 @@ export function CivilsTimesheet({
                       <Input
                         value={entry.job_number}
                         onChange={(e) => handleJobNumberChange(index, e.target.value)}
-                        placeholder="1234-AB"
+                        placeholder={entry.working_in_yard ? "N/A (Yard)" : "1234-AB"}
                         maxLength={7}
                         disabled={disableWorkingInputs || entry.working_in_yard}
                         className="h-16 text-3xl text-center bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground uppercase disabled:opacity-30 disabled:cursor-not-allowed"
@@ -1417,7 +1417,7 @@ export function CivilsTimesheet({
 
                     {/* Status Buttons */}
                     <div className="space-y-3">
-                      <Label className="text-foreground text-xl">Day Status</Label>
+                      <Label className="text-foreground text-xl">Status</Label>
                       <div className="grid grid-cols-2 gap-3">
                         {/* Working in Yard Button */}
                         <button
@@ -1486,11 +1486,11 @@ export function CivilsTimesheet({
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-foreground text-xl">Notes / Remarks</Label>
+                      <Label className="text-foreground text-xl">Remarks</Label>
                       <Input
                         value={entry.remarks}
                         onChange={(e) => updateEntry(index, 'remarks', e.target.value)}
-                        placeholder="Add any notes for this day..."
+                        placeholder="Notes"
                         disabled={isLeaveDayForRow}
                         className="h-16 text-2xl bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground w-full disabled:opacity-30 disabled:cursor-not-allowed"
                       />
@@ -1681,7 +1681,7 @@ export function CivilsTimesheet({
           className="border-slate-600 text-white hover:bg-slate-800"
         >
           <Save className="h-4 w-4 mr-2" />
-          Save as Draft
+          Save Draft
         </Button>
         <Button
           onClick={handleSubmit}

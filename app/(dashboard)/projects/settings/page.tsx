@@ -32,10 +32,12 @@ import {
 import { Loader2, Plus, Pencil, Trash2, FileCheck2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { ProjectDocumentType } from '@/types/rams';
+import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 
 export default function ProjectsSettingsPage() {
   const router = useRouter();
   const { isManager, isAdmin, loading: authLoading } = useAuth();
+  const { hasPermission: canAccessProjectsModule, loading: projectsPermissionLoading } = usePermissionCheck('rams', false);
   const [types, setTypes] = useState<ProjectDocumentType[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -51,10 +53,17 @@ export default function ProjectsSettingsPage() {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    if (!authLoading && !isManager && !isAdmin) {
+    if (authLoading || projectsPermissionLoading) return;
+
+    if (!canAccessProjectsModule) {
+      router.push('/dashboard');
+      return;
+    }
+
+    if (!isManager && !isAdmin) {
       router.push('/projects');
     }
-  }, [isManager, isAdmin, authLoading, router]);
+  }, [isManager, isAdmin, authLoading, projectsPermissionLoading, canAccessProjectsModule, router]);
 
   const fetchTypes = useCallback(async () => {
     setLoading(true);
@@ -72,10 +81,10 @@ export default function ProjectsSettingsPage() {
   }, []);
 
   useEffect(() => {
-    if (!authLoading && (isManager || isAdmin)) {
+    if (!authLoading && !projectsPermissionLoading && canAccessProjectsModule && (isManager || isAdmin)) {
       fetchTypes();
     }
-  }, [authLoading, isManager, isAdmin, fetchTypes]);
+  }, [authLoading, projectsPermissionLoading, canAccessProjectsModule, isManager, isAdmin, fetchTypes]);
 
   const openCreateDialog = () => {
     setEditingType(null);
@@ -173,7 +182,15 @@ export default function ProjectsSettingsPage() {
     }
   };
 
-  if (authLoading || (!isManager && !isAdmin) || loading) {
+  if (authLoading || projectsPermissionLoading || (!isManager && !isAdmin)) {
+    return <PageLoader message="Loading project settings..." />;
+  }
+
+  if (!canAccessProjectsModule) {
+    return null;
+  }
+
+  if (loading) {
     return <PageLoader message="Loading project settings..." />;
   }
 

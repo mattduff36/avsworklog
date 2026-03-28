@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,10 +15,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is manager or admin
-    const profile = await getProfileWithRole(user.id);
-
-    if (!profile || !profile.role?.is_manager_admin) {
+    const canAccessReports = await canEffectiveRoleAccessModule('reports');
+    if (!canAccessReports) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

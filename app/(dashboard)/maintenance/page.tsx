@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, Suspense, useMemo, useRef } from 'react';
+import { useEffect, Suspense, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -8,12 +8,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Loader2, Wrench, Truck, HardHat, Settings } from 'lucide-react';
 import { PageLoader } from '@/components/ui/page-loader';
-import { logger } from '@/lib/utils/logger';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { useMaintenance } from '@/lib/hooks/useMaintenance';
 import { MaintenanceSettings } from '@/app/(dashboard)/maintenance/components/MaintenanceSettings';
-import { createClient } from '@/lib/supabase/client';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
+import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 
 const MaintenanceOverview = dynamic(
   () => import('@/app/(dashboard)/maintenance/components/MaintenanceOverview').then(mod => ({ default: mod.MaintenanceOverview })),
@@ -30,45 +29,15 @@ const MaintenanceOverview = dynamic(
 function MaintenanceContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { profile, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
-  const supabase = createClient();
+  const { isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
+  const { hasPermission: canViewMaintenance, loading: maintenancePermissionLoading } = usePermissionCheck('maintenance', false);
   const { tabletModeEnabled } = useTabletMode();
 
-  const [hasModulePermission, setHasModulePermission] = useState<boolean | null>(null);
   const canManage = isManager || isAdmin || isSuperAdmin;
   const lastAssetFilterRef = useRef<'both' | 'van' | 'hgv' | 'plant'>('both');
 
   const { data: maintenanceData, isLoading: maintenanceLoading, error: maintenanceError } = useMaintenance();
   const showInitialMaintenanceLoading = maintenanceLoading && !maintenanceData;
-
-  useEffect(() => {
-    async function checkPermission() {
-      if (!profile?.id) {
-        setHasModulePermission(false);
-        return;
-      }
-
-      if (isManager || isAdmin || isSuperAdmin) {
-        setHasModulePermission(true);
-        return;
-      }
-
-      try {
-        const response = await fetch('/api/me/permissions', { cache: 'no-store' });
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to load permissions');
-        }
-
-        setHasModulePermission(Boolean(data.permissions?.maintenance));
-      } catch (err) {
-        logger.error('Failed to check maintenance permission', err, 'MaintenancePage');
-        setHasModulePermission(false);
-      }
-    }
-
-    checkPermission();
-  }, [profile?.id, isManager, isAdmin, isSuperAdmin, supabase]);
 
   const validAssetTabs: ReadonlyArray<'both' | 'van' | 'plant' | 'hgv'> = ['both', 'van', 'plant', 'hgv'];
 
@@ -130,11 +99,11 @@ function MaintenanceContent() {
     }
   };
 
-  if (authLoading || hasModulePermission === null) {
+  if (authLoading || maintenancePermissionLoading) {
     return <PageLoader message="Loading maintenance..." />;
   }
 
-  if (!hasModulePermission) {
+  if (!canViewMaintenance) {
     return (
       <div className="container mx-auto p-6">
         <Card>

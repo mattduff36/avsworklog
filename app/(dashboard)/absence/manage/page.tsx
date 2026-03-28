@@ -48,6 +48,7 @@ import { AbsenceAboutHelper } from '@/app/(dashboard)/absence/components/Absence
 import { ManageOverviewAdminActions } from '@/app/(dashboard)/absence/manage/components/ManageOverviewAdminActions';
 import { WorkShiftsContent } from '@/app/(dashboard)/absence/manage/components/WorkShiftsContent';
 import { getErrorMessage, shouldLogAbsenceManageError } from '@/lib/utils/absence-error-handling';
+import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import type { AbsenceWithRelations } from '@/types/absence';
 import type { WorkShiftPattern } from '@/types/work-shifts';
 
@@ -66,7 +67,8 @@ function isDirectoryAccessError(error: unknown): boolean {
 }
 
 export default function AdminAbsencePage() {
-  const { isAdmin, isManager, loading: authLoading } = useAuth();
+  const { isAdmin, isManager, isActualSuperAdmin, loading: authLoading } = useAuth();
+  const { hasPermission: canAccessAbsenceModule, loading: absencePermissionLoading } = usePermissionCheck('absence', false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
@@ -173,6 +175,7 @@ export default function AdminAbsencePage() {
   const [allowancesRefreshKey, setAllowancesRefreshKey] = useState(0);
   const [protectedTabsUnlocked, setProtectedTabsUnlocked] = useState(false);
   const [pendingProtectedTab, setPendingProtectedTab] = useState<ProtectedManageTab>('overview');
+  const [isUnlockingProtectedTab, setIsUnlockingProtectedTab] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState('');
@@ -206,10 +209,10 @@ export default function AdminAbsencePage() {
 
   // Check admin/manager access
   useEffect(() => {
-    if (!authLoading && !isAdmin && !isManager) {
+    if (!authLoading && !absencePermissionLoading && (!canAccessAbsenceModule || (!isAdmin && !isManager))) {
       router.push('/dashboard');
     }
-  }, [isAdmin, isManager, authLoading, router]);
+  }, [isAdmin, isManager, authLoading, absencePermissionLoading, canAccessAbsenceModule, router]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -226,6 +229,17 @@ export default function AdminAbsencePage() {
       router.replace(`/absence/manage?${params.toString()}`, { scroll: false });
     }
     const requestedTab = resolvedTabParam === 'records' ? 'overview' : resolvedTabParam;
+
+    // While protected-tab unlock URL/state sync is in progress, keep the target tab rendered
+    // so users never see a temporary fallback tab flash.
+    if (isUnlockingProtectedTab) {
+      setActiveTab(pendingProtectedTab);
+      if (requestedTab === pendingProtectedTab) {
+        setIsUnlockingProtectedTab(false);
+      }
+      return;
+    }
+
     const allowedTabs: ManageTab[] = ['calendar', 'overview'];
     if (isAdmin) allowedTabs.push('reasons', 'allowances', 'work-shifts');
     else if (isManager) allowedTabs.push('allowances');
@@ -256,7 +270,19 @@ export default function AdminAbsencePage() {
       }
       router.replace(`/absence/manage?${params.toString()}`, { scroll: false });
     }
-  }, [searchParams, authLoading, isAdmin, isManager, router, includeArchived, protectedTabsUnlocked, isProtectedTab, openPasswordGate]);
+  }, [
+    searchParams,
+    authLoading,
+    isAdmin,
+    isManager,
+    router,
+    includeArchived,
+    protectedTabsUnlocked,
+    isProtectedTab,
+    openPasswordGate,
+    isUnlockingProtectedTab,
+    pendingProtectedTab,
+  ]);
 
   useEffect(() => {
     const archivedParam = searchParams.get('archived');
@@ -314,27 +340,42 @@ export default function AdminAbsencePage() {
     router.replace(`/absence/manage?${params.toString()}`, { scroll: false });
   }
 
+  const unlockProtectedTab = useCallback((tab: ProtectedManageTab) => {
+    setPendingProtectedTab(tab);
+    setIsUnlockingProtectedTab(true);
+    setProtectedTabsUnlocked(true);
+    setShowPasswordDialog(false);
+    setPasswordInput('');
+    setPasswordError('');
+    setActiveTab(tab);
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', tab);
+    if (includeArchived) {
+      params.set('archived', '1');
+    } else {
+      params.delete('archived');
+    }
+    router.replace(`/absence/manage?${params.toString()}`, { scroll: false });
+  }, [searchParams, includeArchived, router]);
+
   const handlePasswordSubmit = useCallback(() => {
     if (passwordInput === 'AVS-Access1') {
-      setProtectedTabsUnlocked(true);
-      setShowPasswordDialog(false);
-      setPasswordInput('');
-      setPasswordError('');
-      setActiveTab(pendingProtectedTab);
-      const params = new URLSearchParams(searchParams.toString());
-      params.set('tab', pendingProtectedTab);
-      if (includeArchived) {
-        params.set('archived', '1');
-      } else {
-        params.delete('archived');
-      }
-      router.replace(`/absence/manage?${params.toString()}`, { scroll: false });
+      unlockProtectedTab(pendingProtectedTab);
     } else {
       setPasswordError('Incorrect password. Please try again.');
       setPasswordInput('');
       setTimeout(() => passwordInputRef.current?.focus(), 0);
     }
-  }, [passwordInput, pendingProtectedTab, searchParams, includeArchived, router]);
+  }, [passwordInput, pendingProtectedTab, unlockProtectedTab]);
+
+  const handleSuperAdminBypass = useCallback(() => {
+    if (!isActualSuperAdmin) {
+      return;
+    }
+
+    unlockProtectedTab(pendingProtectedTab);
+  }, [isActualSuperAdmin, pendingProtectedTab, unlockProtectedTab]);
 
   function handlePasswordDialogClose() {
     setShowPasswordDialog(false);
@@ -540,7 +581,7 @@ export default function AdminAbsencePage() {
     }
   }
   
-  if (authLoading || isLoading) {
+  if (authLoading || absencePermissionLoading || isLoading) {
     return (
       <div className="space-y-6 max-w-7xl">
         <Card className="">
@@ -552,7 +593,7 @@ export default function AdminAbsencePage() {
     );
   }
   
-  if (!isAdmin && !isManager) return null;
+  if (!canAccessAbsenceModule || (!isAdmin && !isManager)) return null;
   
   return (
     <div className="space-y-6 max-w-7xl">
@@ -1305,6 +1346,16 @@ export default function AdminAbsencePage() {
               )}
             </div>
             <DialogFooter>
+              {isActualSuperAdmin && (
+                <Button
+                  type="button"
+                  onClick={handleSuperAdminBypass}
+                  variant="outline"
+                  className="border-red-500 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                >
+                  SuperAdmin Bypass
+                </Button>
+              )}
               <Button type="button" variant="outline" onClick={handlePasswordDialogClose} className="border-border text-muted-foreground">
                 Cancel
               </Button>

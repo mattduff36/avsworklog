@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { formatDate } from '@/lib/utils/date';
 import { ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 import { AbsenceAboutHelper } from '@/app/(dashboard)/absence/components/AbsenceAboutHelper';
+import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 
 const PAGE_SIZE = 50;
 
@@ -34,6 +35,7 @@ function formatFinancialYearLabel(startYear: number): string {
 
 export default function AbsenceArchiveReportPage() {
   const { isAdmin, isManager, loading: authLoading } = useAuth();
+  const { hasPermission: canAccessAbsenceModule, loading: absencePermissionLoading } = usePermissionCheck('absence', false);
   const canManage = isAdmin || isManager;
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -58,11 +60,11 @@ export default function AbsenceArchiveReportPage() {
   });
 
   useEffect(() => {
-    if (authLoading) return;
-    if (!canManage) {
+    if (authLoading || absencePermissionLoading) return;
+    if (!canAccessAbsenceModule || !canManage) {
       router.replace('/dashboard');
     }
-  }, [authLoading, canManage, router]);
+  }, [authLoading, absencePermissionLoading, canAccessAbsenceModule, canManage, router]);
 
   const financialYearStartYear = useMemo(() => {
     const fyParam = searchParams.get('fy');
@@ -119,7 +121,7 @@ export default function AbsenceArchiveReportPage() {
     });
   }
 
-  if (authLoading || isLoading) {
+  if (authLoading || absencePermissionLoading || isLoading) {
     return (
       <div className="space-y-6 max-w-7xl">
         <Card>
@@ -129,7 +131,7 @@ export default function AbsenceArchiveReportPage() {
     );
   }
 
-  if (!canManage) return null;
+  if (!canAccessAbsenceModule || !canManage) return null;
 
   return (
     <div className="space-y-6 max-w-7xl">

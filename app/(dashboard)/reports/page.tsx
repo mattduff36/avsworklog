@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { PageLoader } from '@/components/ui/page-loader';
+import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { toast } from 'sonner';
 import { 
   FileText, 
@@ -43,6 +44,7 @@ const getSunday = (date: Date) => {
 };
 
 export default function ReportsPage() {
+  const { hasPermission: canViewReports, loading: reportsPermissionLoading } = usePermissionCheck('reports');
   const [downloading, setDownloading] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('timesheets');
   const [bulkProgress, setBulkProgress] = useState<BulkDownloadProgress>({
@@ -329,10 +331,14 @@ export default function ReportsPage() {
     }
   };
 
-  const isInitialLoading = !dateFrom || !dateTo;
+  const isInitialLoading = reportsPermissionLoading || !dateFrom || !dateTo;
 
   if (isInitialLoading) {
     return <PageLoader message="Preparing reports..." />;
+  }
+
+  if (!canViewReports) {
+    return null;
   }
 
   return (

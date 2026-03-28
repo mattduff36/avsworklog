@@ -7,6 +7,9 @@ import { AlertTriangle, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useTimesheetType } from '../hooks/useTimesheetType';
 import { TimesheetRegistry, isTimesheetTypeImplemented, getTimesheetTypeLabel } from '../types/registry';
+import { PlantTimesheetV2 } from '../types/plant/PlantTimesheetV2Aligned';
+import { PlantTimesheet } from '../types/plant/PlantTimesheet';
+import { resolveTimesheetRenderVariant } from './timesheet-routing';
 
 /**
  * TimesheetRouter Component
@@ -20,9 +23,17 @@ interface TimesheetRouterProps {
   weekEnding: string;
   existingId: string | null;
   userId: string;
+  existingTimesheetType?: string | null;
+  existingTemplateVersion?: number | null;
 }
 
-export function TimesheetRouter({ weekEnding, existingId, userId }: TimesheetRouterProps) {
+export function TimesheetRouter({
+  weekEnding,
+  existingId,
+  userId,
+  existingTimesheetType = null,
+  existingTemplateVersion = null,
+}: TimesheetRouterProps) {
   const { timesheetType, loading, error } = useTimesheetType(userId);
 
   // Loading state
@@ -43,19 +54,40 @@ export function TimesheetRouter({ weekEnding, existingId, userId }: TimesheetRou
     // Still show default timesheet despite error
   }
 
+  // New plant timesheets must always use v2.
+  // Existing records are handled by template-version routing below.
+  if (!existingId && timesheetType === 'plant') {
+    return <PlantTimesheetV2 weekEnding={weekEnding} existingId={existingId} userId={userId} />;
+  }
+
+  const routing = resolveTimesheetRenderVariant({
+    existingId,
+    existingTimesheetType,
+    existingTemplateVersion,
+    resolvedType: timesheetType,
+  });
+
+  if (routing.variant === 'plant-v2') {
+    return <PlantTimesheetV2 weekEnding={weekEnding} existingId={existingId} userId={userId} />;
+  }
+
+  if (routing.variant === 'plant-legacy') {
+    return <PlantTimesheet weekEnding={weekEnding} existingId={existingId} userId={userId} />;
+  }
+
   // Get the timesheet component from registry
-  const TimesheetComponent = timesheetType ? TimesheetRegistry[timesheetType] : null;
+  const TimesheetComponent = routing.type ? TimesheetRegistry[routing.type] : null;
 
   // Timesheet type not implemented (Q11: Fallback to civils with warning)
-  if (!TimesheetComponent || !isTimesheetTypeImplemented(timesheetType || '')) {
-    const attemptedType = timesheetType || 'unknown';
+  if (!TimesheetComponent || !isTimesheetTypeImplemented(routing.type || '')) {
+    const attemptedType = routing.type || 'unknown';
     const attemptedLabel = getTimesheetTypeLabel(attemptedType);
     
     // Fall back to civils timesheet (Q11: Answer B)
     const CivilsTimesheet = TimesheetRegistry['civils'];
     
     return (
-      <div className="space-y-4 max-w-5xl">
+      <div className="space-y-4 w-full max-w-[1400px] mx-auto">
         {/* Warning Banner */}
         <Alert className="bg-amber-500/10 border-amber-500/50">
           <AlertTriangle className="h-5 w-5 text-amber-500" />

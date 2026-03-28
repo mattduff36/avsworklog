@@ -46,6 +46,7 @@ import {
 } from '@/components/ui/dialog';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
+import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 
 export interface UploadingDoc {
   id: string;
@@ -62,6 +63,7 @@ export default function ProjectsManagePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { isManager, isAdmin, loading: authLoading } = useAuth();
+  const { hasPermission: canAccessProjectsModule, loading: projectsPermissionLoading } = usePermissionCheck('rams', false);
 
   // Search / filter / sort state
   const [searchQuery, setSearchQuery] = useState('');
@@ -128,10 +130,17 @@ export default function ProjectsManagePage() {
 
   // Redirect non-managers
   useEffect(() => {
-    if (!authLoading && !isManager && !isAdmin) {
+    if (authLoading || projectsPermissionLoading) return;
+
+    if (!canAccessProjectsModule) {
+      router.push('/dashboard');
+      return;
+    }
+
+    if (!isManager && !isAdmin) {
       router.push('/projects');
     }
-  }, [isManager, isAdmin, authLoading, router]);
+  }, [isManager, isAdmin, authLoading, projectsPermissionLoading, canAccessProjectsModule, router]);
 
   // Derived data
   const allDocuments = useMemo(() => docsData?.documents ?? [], [docsData?.documents]);
@@ -298,8 +307,12 @@ export default function ProjectsManagePage() {
   }, [supabase]);
 
   // Auth guard loading
-  if (authLoading || (!isManager && !isAdmin)) {
+  if (authLoading || projectsPermissionLoading || (!isManager && !isAdmin)) {
     return <PageLoader message="Loading project management..." />;
+  }
+
+  if (!canAccessProjectsModule) {
+    return null;
   }
 
   return (

@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, Wrench, Truck, Settings, HardHat, Plus } from 'lucide-react';
 import { logger } from '@/lib/utils/logger';
+import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 
 // Dynamic import for PlantTable
 const PlantTable = dynamic(
@@ -38,14 +39,14 @@ import { useTabletMode } from '@/components/layout/tablet-mode-context';
 function FleetContent() {
   const searchParams = useSearchParams();
   const router = useNextRouter();
-  const { profile, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
+  const { isManager, isAdmin, loading: authLoading } = useAuth();
+  const { hasPermission: canViewFleet, loading: fleetPermissionLoading } = usePermissionCheck('admin-vans', false);
   const supabase = createClient();
   const { tabletModeEnabled } = useTabletMode();
   
   // Two-level tab state matching Maintenance/Workshop pages
   const [pageTab, setPageTab] = useState<'overview' | 'settings'>('overview');
   const [assetTab, setAssetTab] = useState<'vans' | 'plant' | 'hgvs'>('vans');
-  const [hasModulePermission, setHasModulePermission] = useState<boolean | null>(null);
   
   // Vehicle Category Dialog States
   const [addCategoryDialogOpen, setAddCategoryDialogOpen] = useState(false);
@@ -98,7 +99,7 @@ function FleetContent() {
       setPageTab('overview');
       router.push('/fleet?tab=vans', { scroll: false });
     }
-  }, [searchParams, authLoading, isManager, isAdmin, isSuperAdmin, router, validAssetTabs]);
+  }, [searchParams, authLoading, isManager, isAdmin, router, validAssetTabs]);
   // Fetch maintenance data
   const { data: maintenanceData, isLoading: maintenanceLoading, error: maintenanceError } = useMaintenance();
   
@@ -208,37 +209,6 @@ function FleetContent() {
     }
   };
 
-  // Check maintenance module permission
-  useEffect(() => {
-    async function checkPermission() {
-      if (!profile?.id) {
-        setHasModulePermission(false);
-        return;
-      }
-      
-      // Managers and admins have full access
-      if (isManager || isAdmin || isSuperAdmin) {
-        setHasModulePermission(true);
-        return;
-      }
-      
-      try {
-        const response = await fetch('/api/me/permissions', { cache: 'no-store' });
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to load permissions');
-        }
-
-        setHasModulePermission(Boolean(data.permissions?.maintenance));
-      } catch (err) {
-        logger.error('Failed to check maintenance permission', err, 'FleetPage');
-        setHasModulePermission(false);
-      }
-    }
-    
-    checkPermission();
-  }, [profile?.id, isManager, isAdmin, isSuperAdmin, supabase]);
-  
   // Fetch data on initial load based on active tab from URL
   useEffect(() => {
     if (pageTab === 'settings') {
@@ -371,16 +341,13 @@ function FleetContent() {
     fetchHgvCategories();
   };
   
-  // Check access
-  const hasAccess = hasModulePermission;
-  
   // Show loading while auth or permissions are being checked
-  if (authLoading || hasModulePermission === null) {
+  if (authLoading || fleetPermissionLoading) {
     return <PageLoader message="Loading fleet..." />;
   }
   
   // Show access denied if no permission
-  if (!hasAccess) {
+  if (!canViewFleet) {
     return (
       <div className="container mx-auto p-6">
         <Card>

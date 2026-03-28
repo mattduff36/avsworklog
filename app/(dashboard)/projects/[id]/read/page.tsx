@@ -12,6 +12,7 @@ import { BackButton } from '@/components/ui/back-button';
 import { SignRAMSModal } from '@/components/rams/SignRAMSModal';
 import { toast } from 'sonner';
 import { RAMSErrorBoundary } from '@/components/rams/RAMSErrorBoundary';
+import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 
 interface RAMSDocument {
   id: string;
@@ -37,6 +38,7 @@ function ReadRAMSContent() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { hasPermission: canAccessProjectsModule, loading: projectsPermissionLoading } = usePermissionCheck('rams');
   const documentId = params.id as string;
   
   const [ramsDocument, setRamsDocument] = useState<RAMSDocument | null>(null);
@@ -130,8 +132,10 @@ function ReadRAMSContent() {
   }, [documentId, supabase, router]);
 
   useEffect(() => {
-    fetchDocument();
-  }, [fetchDocument]);
+    if (!projectsPermissionLoading && canAccessProjectsModule) {
+      fetchDocument();
+    }
+  }, [projectsPermissionLoading, canAccessProjectsModule, fetchDocument]);
 
   useEffect(() => {
     if (searchParams.get('openSign') === '1' && assignment && assignment.status !== 'signed' && !loading) {
@@ -362,6 +366,14 @@ function ReadRAMSContent() {
     router.push('/projects');
   };
 
+
+  if (projectsPermissionLoading) {
+    return <PageLoader message="Loading RAMS document..." />;
+  }
+
+  if (!canAccessProjectsModule) {
+    return null;
+  }
 
   if (loading) {
     return <PageLoader message="Loading RAMS document..." />;

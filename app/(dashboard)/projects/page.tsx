@@ -13,6 +13,7 @@ import { formatDate } from '@/lib/utils/date';
 import { formatFileSize } from '@/lib/utils/file-validation';
 import { RecordVisitorSignatureModal } from '@/components/rams/RecordVisitorSignatureModal';
 import { RAMSErrorBoundary } from '@/components/rams/RAMSErrorBoundary';
+import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 
 interface RAMSDocument {
   id: string;
@@ -42,6 +43,7 @@ function isDocumentComplete(doc: RAMSDocument): boolean {
 
 export default function RAMSPage() {
   const { user, isManager, isAdmin, loading: authLoading } = useAuth();
+  const { hasPermission: canViewProjects, loading: projectsPermissionLoading } = usePermissionCheck('rams');
   const [documents, setDocuments] = useState<RAMSDocument[]>([]);
   const [filteredDocuments, setFilteredDocuments] = useState<RAMSDocument[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,12 +86,12 @@ export default function RAMSPage() {
   }, []);
 
   useEffect(() => {
-    if (!authLoading && user) {
+    if (!authLoading && !projectsPermissionLoading && canViewProjects && user) {
       fetchDocuments();
-    } else if (!authLoading) {
+    } else if (!authLoading && !projectsPermissionLoading) {
       setLoading(false);
     }
-  }, [authLoading, fetchDocuments, user]);
+  }, [authLoading, projectsPermissionLoading, canViewProjects, fetchDocuments, user]);
 
   useEffect(() => {
     let filtered = documents;
@@ -118,8 +120,12 @@ export default function RAMSPage() {
   const pendingCount = documents.filter(doc => !isDocumentComplete(doc)).length;
 
   // Show loading while checking auth
-  if (authLoading || loading) {
+  if (authLoading || projectsPermissionLoading || loading) {
     return <PageLoader message="Loading projects..." />;
+  }
+
+  if (!canViewProjects) {
+    return null;
   }
 
   return (

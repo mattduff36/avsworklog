@@ -1,0 +1,120 @@
+import { describe, expect, it } from 'vitest';
+import {
+  buildValidationErrors,
+  isPlantEntryComplete,
+  recalculateEntry,
+  type PlantEntryDraft,
+} from '@/app/(dashboard)/timesheets/types/plant/plant-timesheet-v2-utils';
+
+function createEntry(overrides: Partial<PlantEntryDraft> = {}): PlantEntryDraft {
+  return {
+    day_of_week: 1,
+    did_not_work: false,
+    didNotWorkReason: null,
+    job_number: '',
+    working_in_yard: false,
+    time_started: '',
+    time_finished: '',
+    operator_travel_hours: '',
+    operator_yard_hours: '',
+    operator_working_hours: null,
+    daily_total: null,
+    machine_travel_hours: '',
+    machine_start_time: '',
+    machine_finish_time: '',
+    machine_working_hours: null,
+    machine_standing_hours: '',
+    machine_operator_hours: '',
+    maintenance_breakdown_hours: '',
+    remarks: '',
+    ...overrides,
+  };
+}
+
+describe('PlantTimesheetV2 calculations', () => {
+  it('calculates operator, machine, and total working hours', () => {
+    const result = recalculateEntry(
+      createEntry({
+        time_started: '08:00',
+        time_finished: '16:30',
+        operator_travel_hours: '1.25',
+        operator_yard_hours: '0.75',
+        machine_start_time: '07:00',
+        machine_finish_time: '15:00',
+      })
+    );
+
+    expect(result.operator_working_hours).toBe(8.5);
+    expect(result.machine_working_hours).toBe(8);
+    expect(result.daily_total).toBe(10.5);
+  });
+
+  it('preserves normalized leave daily totals when requested', () => {
+    const result = recalculateEntry(
+      createEntry({
+        did_not_work: true,
+        didNotWorkReason: 'Holiday',
+        daily_total: 9,
+        remarks: 'Annual Leave',
+      }),
+      { preserveDailyTotal: true }
+    );
+
+    expect(result.daily_total).toBe(9);
+  });
+
+  it('adds paid leave hours for partial leave recalculation', () => {
+    const result = recalculateEntry(
+      createEntry({
+        time_started: '12:00',
+        time_finished: '17:00',
+        operator_travel_hours: '1',
+      }),
+      { paidLeaveHours: 4.5 }
+    );
+
+    expect(result.daily_total).toBe(10.5);
+  });
+
+  it('forces locked leave totals to paid leave hours', () => {
+    const result = recalculateEntry(
+      createEntry({
+        time_started: '08:00',
+        time_finished: '17:00',
+        operator_travel_hours: '1',
+        daily_total: 99,
+      }),
+      { paidLeaveHours: 9, isLeaveLocked: true }
+    );
+
+    expect(result.daily_total).toBe(9);
+  });
+
+  it('requires operator and machine start/finish when row contains data', () => {
+    const entries = [
+      createEntry({
+        operator_travel_hours: '1',
+        machine_start_time: '08:00',
+      }),
+    ];
+
+    const errors = buildValidationErrors(entries);
+    expect(Object.keys(errors).length).toBe(1);
+    expect(errors[0]).toContain('Operator start time');
+    expect(errors[0]).toContain('Operator finish time');
+    expect(errors[0]).toContain('Machine finish time');
+  });
+
+  it('does not add validation errors for empty rows', () => {
+    const errors = buildValidationErrors([createEntry()]);
+    expect(errors).toEqual({});
+  });
+
+  it('marks entries complete using civils parity rules', () => {
+    const leaveState = { isOnApprovedLeave: true } as unknown as Parameters<typeof isPlantEntryComplete>[1];
+    expect(isPlantEntryComplete(createEntry({ time_started: '08:00', time_finished: '16:00' }))).toBe(true);
+    expect(isPlantEntryComplete(createEntry({ did_not_work: true }))).toBe(true);
+    expect(isPlantEntryComplete(createEntry(), leaveState)).toBe(true);
+    expect(isPlantEntryComplete(createEntry())).toBe(false);
+  });
+});

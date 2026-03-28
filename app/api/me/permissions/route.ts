@@ -5,6 +5,16 @@ import { getEffectiveRole } from '@/lib/utils/view-as';
 import { ALL_MODULES } from '@/types/roles';
 import { getPermissionMapForUser, isMissingTeamPermissionSchemaError } from '@/lib/server/team-permissions';
 
+interface EffectiveRoleSnapshot {
+  is_super_admin: boolean;
+  is_actual_super_admin: boolean;
+  is_viewing_as: boolean;
+}
+
+export function shouldGrantFullAccessSnapshot(effectiveRole: EffectiveRoleSnapshot): boolean {
+  return effectiveRole.is_super_admin || (effectiveRole.is_actual_super_admin && !effectiveRole.is_viewing_as);
+}
+
 function isTransientPermissionError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return /fetch failed|ECONNRESET|ETIMEDOUT|ENOTFOUND|socket hang up|schema cache/i.test(message);
@@ -39,7 +49,9 @@ export async function GET() {
 
   try {
     const effectiveRole = await withRetry(() => getEffectiveRole());
-    if (effectiveRole.is_actual_super_admin || effectiveRole.is_super_admin) {
+    const hasFullAccessSnapshot = shouldGrantFullAccessSnapshot(effectiveRole);
+
+    if (hasFullAccessSnapshot) {
       const fullAccessPermissions = ALL_MODULES.reduce<Record<string, boolean>>((acc, moduleName) => {
         acc[moduleName] = true;
         return acc;

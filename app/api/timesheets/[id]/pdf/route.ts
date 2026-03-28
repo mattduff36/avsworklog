@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { renderToStream } from '@react-pdf/renderer';
 import { TimesheetPDF } from '@/lib/pdf/timesheet-pdf';
+import { PlantTimesheetV2PDF } from '@/lib/pdf/plant-timesheet-v2-pdf';
+import { shouldUsePlantTimesheetV2Template } from '@/lib/pdf/timesheet-template-selector';
 import type { Timesheet } from '@/types/timesheet';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
@@ -68,12 +70,20 @@ export async function GET(
       employeeError: employeeError?.message
     });
 
+    const typedTimesheetData = typedTimesheet as unknown as Timesheet;
+    const shouldUsePlantV2Template = shouldUsePlantTimesheetV2Template(typedTimesheetData);
+
     // Generate PDF
     const stream = await renderToStream(
-      TimesheetPDF({
-        timesheet: typedTimesheet as unknown as Timesheet,
-        employeeName: employeeName,
-      })
+      shouldUsePlantV2Template
+        ? PlantTimesheetV2PDF({
+            timesheet: typedTimesheetData,
+            employeeName: employeeName,
+          })
+        : TimesheetPDF({
+            timesheet: typedTimesheetData,
+            employeeName: employeeName,
+          })
     );
 
     // Convert stream to buffer

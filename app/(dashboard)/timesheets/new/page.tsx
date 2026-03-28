@@ -28,6 +28,8 @@ function NewTimesheetContent() {
   const [timesheetId, setTimesheetId] = useState<string | null>(existingId);
   const [showForm, setShowForm] = useState(false);
   const [loadedWeek, setLoadedWeek] = useState<string>('');
+  const [existingTimesheetType, setExistingTimesheetType] = useState<string | null>(null);
+  const [existingTemplateVersion, setExistingTemplateVersion] = useState<number | null>(null);
 
   // If editing existing timesheet, load its week ending and skip selector (Q6: Answer A)
   useEffect(() => {
@@ -36,18 +38,22 @@ function NewTimesheetContent() {
         try {
           const { data, error } = await supabase
             .from('timesheets')
-            .select('week_ending')
+            .select('week_ending, timesheet_type, template_version')
             .eq('id', existingId)
             .single();
           
           if (error) throw error;
           
           setLoadedWeek(data.week_ending);
+          setExistingTimesheetType(data.timesheet_type || null);
+          setExistingTemplateVersion(data.template_version ?? null);
           setShowForm(true);
           setTimesheetId(existingId);
         } catch (err) {
           console.error('Error loading existing timesheet:', err);
           // Fall back to showing week selector
+          setExistingTimesheetType(null);
+          setExistingTemplateVersion(null);
           setShowForm(false);
         }
       }
@@ -57,10 +63,38 @@ function NewTimesheetContent() {
   }, [existingId, user, supabase]);
 
   // Handle week selection from WeekSelector
-  const handleWeekSelected = (weekEnding: string, existingTimesheetId: string | null) => {
+  const handleWeekSelected = async (weekEnding: string, existingTimesheetId: string | null) => {
     setSelectedWeek(weekEnding);
+    setLoadedWeek(weekEnding);
     setTimesheetId(existingTimesheetId);
-    setShowForm(true);
+
+    if (!existingTimesheetId) {
+      setExistingTimesheetType(null);
+      setExistingTemplateVersion(null);
+      setShowForm(true);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('timesheets')
+        .select('timesheet_type, template_version, week_ending')
+        .eq('id', existingTimesheetId)
+        .single();
+
+      if (error) throw error;
+
+      setExistingTimesheetType(data.timesheet_type || null);
+      setExistingTemplateVersion(data.template_version ?? null);
+      setLoadedWeek(data.week_ending || weekEnding);
+    } catch (err) {
+      console.error('Error loading timesheet metadata from week selector:', err);
+      // Fallback keeps current behavior but avoids stale metadata.
+      setExistingTimesheetType(null);
+      setExistingTemplateVersion(null);
+    } finally {
+      setShowForm(true);
+    }
   };
 
   // Show WeekSelector for new timesheets
@@ -88,6 +122,8 @@ function NewTimesheetContent() {
         weekEnding={weekToUse}
         existingId={timesheetId}
         userId={user.id}
+        existingTimesheetType={existingTimesheetType}
+        existingTemplateVersion={existingTemplateVersion}
       />
     );
   }

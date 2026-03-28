@@ -6,10 +6,10 @@ import JSZip from 'jszip';
 import { InspectionPDF } from '@/lib/pdf/inspection-pdf';
 import { VanInspectionPDF } from '@/lib/pdf/van-inspection-pdf';
 import { isVanCategory } from '@/lib/checklists/vehicle-checklists';
-import { getProfileWithRole } from '@/lib/utils/permissions';
 import { getVehicleCategoryName } from '@/lib/utils/deprecation-logger';
 import type { VanInspection } from '@/types/inspection';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
 const MAX_INSPECTIONS_PER_PDF = 80;
 
@@ -36,9 +36,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const profile = await getProfileWithRole(user.id);
-    if (!profile?.role?.is_manager_admin) {
-      return NextResponse.json({ error: 'Unauthorized - Admin/Manager access required' }, { status: 403 });
+    const canAccessReports = await canEffectiveRoleAccessModule('reports');
+    if (!canAccessReports) {
+      return NextResponse.json({ error: 'Forbidden - Reports access required' }, { status: 403 });
     }
 
     // Fetch all non-draft inspections within the date range
@@ -213,9 +213,9 @@ export async function POST(request: NextRequest) {
           return;
         }
 
-        const profile = await getProfileWithRole(user.id);
-        if (!profile?.role?.is_manager_admin) {
-          controller.enqueue(encoder.encode(JSON.stringify({ error: 'Unauthorized - Admin/Manager access required' }) + '\n'));
+        const canAccessReports = await canEffectiveRoleAccessModule('reports');
+        if (!canAccessReports) {
+          controller.enqueue(encoder.encode(JSON.stringify({ error: 'Forbidden - Reports access required' }) + '\n'));
           controller.close();
           return;
         }

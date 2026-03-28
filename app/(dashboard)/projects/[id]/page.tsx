@@ -33,6 +33,7 @@ import { BackButton } from '@/components/ui/back-button';
 import { formatDate } from '@/lib/utils/date';
 import { AssignEmployeesModal } from '@/components/rams/AssignEmployeesModal';
 import { formatFileSize } from '@/lib/utils/file-validation';
+import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 
 interface RAMSDocument {
   id: string;
@@ -77,6 +78,7 @@ export default function RAMSDetailsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isManager, isAdmin, loading: authLoading } = useAuth();
+  const { hasPermission: canAccessProjectsModule, loading: projectsPermissionLoading } = usePermissionCheck('rams', false);
   const documentId = params.id as string;
 
   const [ramsDocument, setRamsDocument] = useState<RAMSDocument | null>(null);
@@ -93,10 +95,17 @@ export default function RAMSDetailsPage() {
 
   // Redirect non-managers/admins
   useEffect(() => {
-    if (!authLoading && !isManager && !isAdmin) {
+    if (authLoading || projectsPermissionLoading) return;
+
+    if (!canAccessProjectsModule) {
+      router.push('/dashboard');
+      return;
+    }
+
+    if (!isManager && !isAdmin) {
       router.push('/projects');
     }
-  }, [isManager, isAdmin, authLoading, router]);
+  }, [isManager, isAdmin, authLoading, projectsPermissionLoading, canAccessProjectsModule, router]);
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab') || 'employees';
@@ -196,10 +205,10 @@ export default function RAMSDetailsPage() {
   }, [documentId, supabase]);
 
   useEffect(() => {
-    if (!authLoading && (isManager || isAdmin) && documentId) {
+    if (!authLoading && !projectsPermissionLoading && canAccessProjectsModule && (isManager || isAdmin) && documentId) {
       fetchDocumentDetails();
     }
-  }, [documentId, authLoading, isManager, isAdmin, fetchDocumentDetails]);
+  }, [documentId, authLoading, projectsPermissionLoading, canAccessProjectsModule, isManager, isAdmin, fetchDocumentDetails]);
 
   const handleAssignSuccess = () => {
     setAssignModalOpen(false);
@@ -305,7 +314,15 @@ export default function RAMSDetailsPage() {
   };
 
   // Show loading while checking auth or redirecting
-  if (authLoading || (!isManager && !isAdmin) || loading) {
+  if (authLoading || projectsPermissionLoading || (!isManager && !isAdmin)) {
+    return <PageLoader message="Loading project details..." />;
+  }
+
+  if (!canAccessProjectsModule) {
+    return null;
+  }
+
+  if (loading) {
     return <PageLoader message="Loading project details..." />;
   }
 
