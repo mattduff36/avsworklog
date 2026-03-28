@@ -76,8 +76,8 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
     }
   }, []);
 
-  const isInsideSidebarHoverZone = useCallback((target: Node | null) => {
-    if (!target) return false;
+  const isInsideSidebarHoverZone = useCallback((target: EventTarget | null) => {
+    if (!(typeof Node !== 'undefined' && target instanceof Node)) return false;
 
     return Boolean(
       sidebarRef.current?.contains(target) ||
@@ -94,7 +94,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
     }, HOVER_EXPAND_DELAY_MS);
   }, [open, hoverExpanded]);
 
-  const handleSidebarMouseLeave = useCallback((relatedTarget: Node | null) => {
+  const handleSidebarMouseLeave = useCallback((relatedTarget: EventTarget | null) => {
     clearHoverExpandTimer();
     if (isInsideSidebarHoverZone(relatedTarget) || open) return;
 
@@ -102,7 +102,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
     setViewAsMenuOpen(false);
   }, [clearHoverExpandTimer, isInsideSidebarHoverZone, open]);
 
-  const handleViewAsMenuMouseLeave = useCallback((relatedTarget: Node | null) => {
+  const handleViewAsMenuMouseLeave = useCallback((relatedTarget: EventTarget | null) => {
     if (isInsideSidebarHoverZone(relatedTarget) || open) return;
 
     clearHoverExpandTimer();
@@ -478,7 +478,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
           isExpanded ? 'w-64' : 'w-16'
         }`}
         onMouseEnter={handleSidebarMouseEnter}
-        onMouseLeave={(event) => handleSidebarMouseLeave(event.relatedTarget as Node | null)}
+        onMouseLeave={(event) => handleSidebarMouseLeave(event.relatedTarget)}
       >
         {/* Header */}
         <div className="h-16 flex items-center justify-between px-3 border-b border-border">
@@ -681,7 +681,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                   maxHeight: `${viewAsMenuPosition.maxHeight}px`,
                   color: '#e2e8f0',
                 }}
-                onMouseLeave={(event) => handleViewAsMenuMouseLeave(event.relatedTarget as Node | null)}
+                onMouseLeave={(event) => handleViewAsMenuMouseLeave(event.relatedTarget)}
               >
                 {viewAsPopoverContent}
               </div>
