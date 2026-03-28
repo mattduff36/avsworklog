@@ -6,10 +6,10 @@ import { getDidNotWorkReasonInfo } from '@/lib/utils/timesheetDidNotWork';
 
 const styles = StyleSheet.create({
   page: {
-    paddingTop: 28,
-    paddingBottom: 28,
-    paddingHorizontal: 18,
-    fontSize: 8,
+    paddingTop: 24,
+    paddingBottom: 24,
+    paddingHorizontal: 28,
+    fontSize: 9,
     fontFamily: 'Helvetica',
   },
   formNumber: {
@@ -103,25 +103,25 @@ const styles = StyleSheet.create({
     minHeight: 28,
   },
   headerText: {
-    fontSize: 6,
+    fontSize: 7,
     textAlign: 'center',
     lineHeight: 1.15,
   },
   cellText: {
-    fontSize: 7,
+    fontSize: 8,
     textAlign: 'center',
   },
   dayCellText: {
-    fontSize: 7,
+    fontSize: 8,
     textAlign: 'left',
   },
   remarkText: {
-    fontSize: 7,
+    fontSize: 8,
     textAlign: 'left',
     lineHeight: 1.25,
   },
   colDay: {
-    width: '7%',
+    width: '6%',
     borderRightWidth: 1,
     borderRightColor: '#000',
     justifyContent: 'center',
@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   colTotalWorking: {
-    width: '7%',
+    width: '6%',
     borderRightWidth: 1,
     borderRightColor: '#000',
     justifyContent: 'center',
@@ -184,37 +184,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   colMachineWorking: {
-    width: '7%',
+    width: '6%',
     borderRightWidth: 1,
     borderRightColor: '#000',
     justifyContent: 'center',
     paddingHorizontal: 2,
   },
   colMachineStanding: {
-    width: '7%',
+    width: '6%',
     borderRightWidth: 1,
     borderRightColor: '#000',
     justifyContent: 'center',
     paddingHorizontal: 2,
   },
   colMachineOperator: {
-    width: '7%',
+    width: '6%',
     borderRightWidth: 1,
     borderRightColor: '#000',
     justifyContent: 'center',
     paddingHorizontal: 2,
   },
   colMaintenanceBreakdown: {
-    width: '7%',
+    width: '6%',
     borderRightWidth: 1,
     borderRightColor: '#000',
     justifyContent: 'center',
     paddingHorizontal: 2,
   },
   colRemarks: {
-    width: '16%',
+    width: '22%',
     justifyContent: 'center',
-    paddingHorizontal: 3,
+    paddingHorizontal: 4,
   },
   footer: {
     marginTop: 14,
@@ -314,7 +314,7 @@ export function PlantTimesheetV2PDF({ timesheet, employeeName }: PlantTimesheetV
 
   return (
     <Document>
-      <Page size="A4" style={styles.page}>
+      <Page size="A4" orientation="landscape" style={styles.page}>
         <View style={styles.formNumber}>
           <Text>{formNumber}</Text>
         </View>
