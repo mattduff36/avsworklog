@@ -20,7 +20,7 @@ import { MODULE_CSS_VAR } from '@/types/roles';
 import { cn } from '@/lib/utils';
 
 /** Visible vertical rule between job-role tier columns (header + full matrix height). */
-const TIER_DIVIDER_CLASS = 'border-l-2 border-slate-400';
+const TIER_DIVIDER_CLASS = 'border-l border-slate-400';
 
 function getModuleColor(mod: ModuleName): string {
   return `hsl(var(${MODULE_CSS_VAR[mod]}))`;
