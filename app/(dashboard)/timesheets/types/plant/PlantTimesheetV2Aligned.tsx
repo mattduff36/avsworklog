@@ -240,6 +240,7 @@ export function PlantTimesheetV2({
   const [hiredPlantIdSerial, setHiredPlantIdSerial] = useState('');
   const [hiredPlantDescription, setHiredPlantDescription] = useState('');
   const [hiredPlantHiringCompany, setHiredPlantHiringCompany] = useState('');
+  const [pendingExistingMachineReg, setPendingExistingMachineReg] = useState('');
 
   const [siteAddress, setSiteAddress] = useState('');
   const [hirerName, setHirerName] = useState('');
@@ -428,6 +429,7 @@ export function PlantTimesheetV2({
         setHiredPlantDescription(timesheetData.hired_plant_description || '');
         setHiredPlantHiringCompany(timesheetData.hired_plant_hiring_company || '');
         setSelectedPlantId('');
+        setPendingExistingMachineReg(hired ? '' : (timesheetData.reg_number || ''));
 
         const { data: entriesData, error: entriesError } = await supabase
           .from('timesheet_entries')
@@ -470,16 +472,6 @@ export function PlantTimesheetV2({
         });
 
         setEntries(fullWeek);
-
-        if (!hired) {
-          const machineReg = timesheetData.reg_number || '';
-          const matchedPlant = plants.find((plant) => plant.plant_id === machineReg);
-          if (matchedPlant) {
-            setSelectedPlantId(matchedPlant.id);
-          } else {
-            setSelectedPlantId('');
-          }
-        }
       } catch (loadError) {
         if (!cancelled) {
           console.error('Error loading existing plant timesheet:', loadError);
@@ -498,7 +490,17 @@ export function PlantTimesheetV2({
     return () => {
       cancelled = true;
     };
-  }, [authLoading, initialExistingId, plants, profile, router, supabase, user]);
+  }, [authLoading, initialExistingId, profile, router, supabase, user]);
+
+  useEffect(() => {
+    if (isHiredPlant) return;
+    if (!pendingExistingMachineReg) return;
+    if (!plants.length) return;
+
+    const matchedPlant = plants.find((plant) => plant.plant_id === pendingExistingMachineReg);
+    setSelectedPlantId(matchedPlant?.id || '');
+    setPendingExistingMachineReg('');
+  }, [isHiredPlant, pendingExistingMachineReg, plants]);
 
   useEffect(() => {
     if (isHiredPlant || !plants.length || !selectedPlantId) return;
@@ -711,6 +713,8 @@ export function PlantTimesheetV2({
   };
 
   const handleMachineSelection = (value: string) => {
+    setPendingExistingMachineReg('');
+
     if (value === NO_MACHINE_SENTINEL) {
       setIsHiredPlant(false);
       setSelectedPlantId('');
