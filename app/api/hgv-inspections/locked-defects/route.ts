@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { LOCKED_INSPECTION_DEFECT_STATUSES } from '@/lib/utils/inspectionDefectTaskStatuses';
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest) {
       `)
       .eq('hgv_id', hgvId)
       .eq('action_type', 'inspection_defect')
-      .in('status', ['logged', 'on_hold', 'in_progress']);
+      .in('status', LOCKED_INSPECTION_DEFECT_STATUSES as unknown as string[]);
 
     if (tasksError) {
       return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 });

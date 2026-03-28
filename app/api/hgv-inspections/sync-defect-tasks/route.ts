@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { createClient as createSupabaseClient, type SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '@/types/database';
 import { buildInspectionDefectSignature, extractInspectionDefectSignature } from '@/lib/utils/inspectionDefectSignature';
+import { ACTIVE_INSPECTION_DEFECT_STATUSES } from '@/lib/utils/inspectionDefectTaskStatuses';
 
 type ActionInsert = Database['public']['Tables']['actions']['Insert'];
 type ActionUpdate = Database['public']['Tables']['actions']['Update'];
@@ -24,17 +25,36 @@ interface ExistingInspectionDefectTask {
   inspection_id: string | null;
   inspection_item_id: string | null;
   hgv_id: string | null;
+  created_at: string | null;
 }
 
-const ACTIVE_TASK_STATUSES = ['pending', 'logged', 'on_hold', 'in_progress'] as const;
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const DAY_NAME_TO_NUMBER: Record<string, number> = {
+  mon: 1,
+  monday: 1,
+  tue: 2,
+  tues: 2,
+  tuesday: 2,
+  wed: 3,
+  wednesday: 3,
+  thu: 4,
+  thur: 4,
+  thurs: 4,
+  thursday: 4,
+  fri: 5,
+  friday: 5,
+  sat: 6,
+  saturday: 6,
+  sun: 7,
+  sunday: 7,
+};
 
 function buildDayRange(days?: number[], dayOfWeek?: number | null): string {
-  const normalizedDays = Array.isArray(days) && days.length > 0
+  const normalizedDays = normalizeDayNumbers(Array.isArray(days) && days.length > 0
     ? days
     : dayOfWeek
       ? [dayOfWeek]
-      : [];
+      : []);
 
   if (normalizedDays.length === 0) {
     return '';
@@ -44,9 +64,104 @@ function buildDayRange(days?: number[], dayOfWeek?: number | null): string {
     return DAY_NAMES[normalizedDays[0] - 1] || `Day ${normalizedDays[0]}`;
   }
 
-  const firstDay = DAY_NAMES[normalizedDays[0] - 1] || `Day ${normalizedDays[0]}`;
-  const lastDay = DAY_NAMES[normalizedDays[normalizedDays.length - 1] - 1] || `Day ${normalizedDays[normalizedDays.length - 1]}`;
-  return `${firstDay.substring(0, 3)}-${lastDay.substring(0, 3)}`;
+  const segments: string[] = [];
+  let segmentStart = normalizedDays[0];
+  let segmentEnd = normalizedDays[0];
+
+  const formatSegment = (startDay: number, endDay: number): string => {
+    const startLabel = (DAY_NAMES[startDay - 1] || `Day ${startDay}`).substring(0, 3);
+    const endLabel = (DAY_NAMES[endDay - 1] || `Day ${endDay}`).substring(0, 3);
+    return startDay === endDay ? startLabel : `${startLabel}-${endLabel}`;
+  };
+
+  for (let i = 1; i < normalizedDays.length; i++) {
+    const day = normalizedDays[i];
+    if (day === segmentEnd + 1) {
+      segmentEnd = day;
+      continue;
+    }
+
+    segments.push(formatSegment(segmentStart, segmentEnd));
+    segmentStart = day;
+    segmentEnd = day;
+  }
+
+  segments.push(formatSegment(segmentStart, segmentEnd));
+  return segments.join(', ');
+}
+
+function normalizeDayNumbers(days: number[]): number[] {
+  return Array.from(new Set(days.filter((day) => day >= 1 && day <= 7))).sort((a, b) => a - b);
+}
+
+function getPayloadDayNumbers(days?: number[], dayOfWeek?: number | null): number[] {
+  const normalizedDays = Array.isArray(days) && days.length > 0
+    ? days
+    : dayOfWeek
+      ? [dayOfWeek]
+      : [];
+  return normalizeDayNumbers(normalizedDays);
+}
+
+function parseDayToken(token: string): number[] {
+  const cleaned = token.trim().toLowerCase().replace(/\./g, '');
+
+  if (!cleaned) {
+    return [];
+  }
+
+  if (cleaned.includes('-')) {
+    const [startToken, endToken] = cleaned.split('-', 2);
+    const startDay = DAY_NAME_TO_NUMBER[startToken.trim()];
+    const endDay = DAY_NAME_TO_NUMBER[endToken.trim()];
+
+    if (!startDay || !endDay) {
+      return [];
+    }
+
+    if (startDay <= endDay) {
+      return Array.from({ length: endDay - startDay + 1 }, (_, idx) => startDay + idx);
+    }
+
+    return [
+      ...Array.from({ length: 8 - startDay }, (_, idx) => startDay + idx),
+      ...Array.from({ length: endDay }, (_, idx) => idx + 1),
+    ];
+  }
+
+  const dayNumber = DAY_NAME_TO_NUMBER[cleaned];
+  return dayNumber ? [dayNumber] : [];
+}
+
+function extractDayNumbersFromDescription(description?: string | null): number[] {
+  if (!description) {
+    return [];
+  }
+
+  const dayMatch = description.match(/Item\s+\d+\s*-\s*[^\n]*\(([^)]+)\)/i);
+  if (!dayMatch) {
+    return [];
+  }
+
+  const dayTokens = dayMatch[1].split(',');
+  const parsedDays = dayTokens.flatMap(parseDayToken);
+  return normalizeDayNumbers(parsedDays);
+}
+
+function mergeTaskAndPayloadDayNumbers(
+  tasks: ExistingInspectionDefectTask[],
+  payloadDays: number[]
+): number[] {
+  const merged = new Set<number>(payloadDays);
+
+  for (const task of tasks) {
+    const taskDays = extractDayNumbersFromDescription(task.description);
+    for (const day of taskDays) {
+      merged.add(day);
+    }
+  }
+
+  return normalizeDayNumbers(Array.from(merged));
 }
 
 function addTaskToSignatureMap(
@@ -59,6 +174,52 @@ function addTaskToSignatureMap(
   }
 
   map.get(signature)!.push(task);
+}
+
+function getTaskCreatedAt(task: ExistingInspectionDefectTask): number {
+  if (!task.created_at) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+  const timestamp = new Date(task.created_at).getTime();
+  return Number.isFinite(timestamp) ? timestamp : Number.MAX_SAFE_INTEGER;
+}
+
+function sortByCreatedAtThenId(tasks: ExistingInspectionDefectTask[]): ExistingInspectionDefectTask[] {
+  return [...tasks].sort((a, b) => {
+    const timeDiff = getTaskCreatedAt(a) - getTaskCreatedAt(b);
+    if (timeDiff !== 0) {
+      return timeDiff;
+    }
+    return a.id.localeCompare(b.id);
+  });
+}
+
+async function closeDuplicateTask(
+  supabaseAdmin: SupabaseClient,
+  duplicateTaskId: string,
+  keeperTaskId: string,
+  createdBy: string
+): Promise<boolean> {
+  const updates: ActionUpdate = {
+    status: 'completed',
+    actioned: true,
+    actioned_at: new Date().toISOString(),
+    actioned_by: createdBy,
+    actioned_comment: `Auto-closed duplicate inspection defect task. Kept oldest task ${keeperTaskId}.`,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error } = await supabaseAdmin
+    .from('actions')
+    .update(updates)
+    .eq('id', duplicateTaskId);
+
+  if (error) {
+    console.error(`Error auto-closing duplicate HGV defect task ${duplicateTaskId}:`, error);
+    return false;
+  }
+
+  return true;
 }
 
 export async function POST(request: NextRequest) {
@@ -116,11 +277,12 @@ export async function POST(request: NextRequest) {
         description,
         inspection_id,
         inspection_item_id,
-        hgv_id
+        hgv_id,
+        created_at
       `)
       .eq('hgv_id', hgvId)
       .eq('action_type', 'inspection_defect')
-      .in('status', ACTIVE_TASK_STATUSES as unknown as string[]);
+      .in('status', ACTIVE_INSPECTION_DEFECT_STATUSES as unknown as string[]);
 
     const { data: existingInspectionTasks } = await supabaseAdmin
       .from('actions')
@@ -131,7 +293,8 @@ export async function POST(request: NextRequest) {
         description,
         inspection_id,
         inspection_item_id,
-        hgv_id
+        hgv_id,
+        created_at
       `)
       .eq('inspection_id', inspectionId)
       .eq('action_type', 'inspection_defect');
@@ -156,30 +319,57 @@ export async function POST(request: NextRequest) {
     let created = 0;
     let updated = 0;
     let skipped = 0;
+    let dedupedClosed = 0;
     const duplicates: Array<{ signature: string; taskIds: string[] }> = [];
+    const autoClosedTaskIds = new Set<string>();
 
     for (const defect of defects) {
       const signature = buildInspectionDefectSignature({
         item_number: defect.item_number,
         item_description: defect.item_description,
       });
-      const dayRange = buildDayRange(defect.days, defect.dayOfWeek);
+      const payloadDays = getPayloadDayNumbers(defect.days, defect.dayOfWeek);
+      let activeTasksForDefect = activeTasksMap.get(signature) || [];
+      const existingTasksForInspection = existingInspectionMap.get(signature) || [];
+      const mergedDays = mergeTaskAndPayloadDayNumbers(activeTasksForDefect, payloadDays);
+      const dayRange = buildDayRange(mergedDays);
       const daySuffix = dayRange ? ` (${dayRange})` : '';
       const commentText = defect.comment ? `\nComment: ${defect.comment}` : '';
       const title = `${hgvReg} - ${defect.item_description}${daySuffix}`;
       const description = `HGV inspection defect found:\nItem ${defect.item_number} - ${defect.item_description}${daySuffix}${commentText}`;
 
-      const activeTasksForDefect = activeTasksMap.get(signature) || [];
-      const existingTasksForInspection = existingInspectionMap.get(signature) || [];
+      if (activeTasksForDefect.length > 1) {
+        const sortedTasks = sortByCreatedAtThenId(activeTasksForDefect);
+        const keeperTask = sortedTasks[0];
+        const duplicateTasks = sortedTasks.slice(1);
 
-      if (existingTasksForInspection.length > 1) {
         duplicates.push({
           signature,
-          taskIds: existingTasksForInspection.map((task) => task.id),
+          taskIds: sortedTasks.map((task) => task.id),
         });
+
+        for (const duplicateTask of duplicateTasks) {
+          const closed = await closeDuplicateTask(
+            supabaseAdmin,
+            duplicateTask.id,
+            keeperTask.id,
+            createdBy
+          );
+
+          if (closed) {
+            dedupedClosed++;
+            duplicateTask.status = 'completed';
+            autoClosedTaskIds.add(duplicateTask.id);
+          }
+        }
+
+        activeTasksForDefect = [keeperTask];
+        activeTasksMap.set(signature, activeTasksForDefect);
       }
 
-      const currentInspectionTask = existingTasksForInspection.find((task) => task.status !== 'completed');
+      const currentInspectionTask = existingTasksForInspection.find(
+        (task) => task.status !== 'completed' && !autoClosedTaskIds.has(task.id)
+      );
 
       if (currentInspectionTask) {
         const updates: ActionUpdate = {
@@ -204,7 +394,26 @@ export async function POST(request: NextRequest) {
       }
 
       if (activeTasksForDefect.length > 0) {
-        skipped++;
+        const keeperTask = sortByCreatedAtThenId(activeTasksForDefect)[0];
+        const updates: ActionUpdate = {
+          title,
+          description,
+          inspection_item_id: defect.primaryInspectionItemId,
+          hgv_id: hgvId,
+          updated_at: new Date().toISOString(),
+        };
+
+        const { error: updateError } = await supabaseAdmin
+          .from('actions')
+          .update(updates)
+          .eq('id', keeperTask.id);
+
+        if (updateError) {
+          console.error(`Error updating oldest HGV defect task ${keeperTask.id}:`, updateError);
+          skipped++;
+        } else {
+          updated++;
+        }
         continue;
       }
 
@@ -220,23 +429,28 @@ export async function POST(request: NextRequest) {
         workshop_category_id: repairCategory?.id || null,
       };
 
-      const { error: insertError } = await supabaseAdmin
+      const { data: insertedTask, error: insertError } = await supabaseAdmin
         .from('actions')
-        .insert([taskData]);
+        .insert([taskData])
+        .select(`
+          id,
+          status,
+          title,
+          description,
+          inspection_id,
+          inspection_item_id,
+          hgv_id,
+          created_at
+        `)
+        .single();
 
       if (!insertError) {
         created++;
-        const insertedTask: ExistingInspectionDefectTask = {
-          id: `${inspectionId}:${defect.primaryInspectionItemId}`,
-          status: 'pending',
-          title,
-          description,
-          inspection_id: inspectionId,
-          inspection_item_id: defect.primaryInspectionItemId,
-          hgv_id: hgvId,
-        };
-        addTaskToSignatureMap(activeTasksMap, signature, insertedTask);
-        addTaskToSignatureMap(existingInspectionMap, signature, insertedTask);
+
+        if (insertedTask) {
+          addTaskToSignatureMap(activeTasksMap, signature, insertedTask as ExistingInspectionDefectTask);
+          addTaskToSignatureMap(existingInspectionMap, signature, insertedTask as ExistingInspectionDefectTask);
+        }
       } else {
         console.error(`Error creating HGV defect task for ${signature}:`, insertError);
       }
@@ -246,8 +460,9 @@ export async function POST(request: NextRequest) {
       created,
       updated,
       skipped,
+      dedupedClosed,
       duplicates,
-      message: `Sync complete: ${created} created, ${updated} updated, ${skipped} skipped${duplicates.length > 0 ? `, ${duplicates.length} duplicate groups found` : ''}`,
+      message: `Sync complete: ${created} created, ${updated} updated, ${skipped} skipped, ${dedupedClosed} duplicates auto-closed${duplicates.length > 0 ? `, ${duplicates.length} duplicate groups found` : ''}`,
     });
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

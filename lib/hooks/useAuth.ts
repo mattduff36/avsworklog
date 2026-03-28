@@ -33,6 +33,16 @@ interface EffectiveRole {
   team_name?: string | null;
 }
 
+const extractErrorMessage = (err: unknown): string => {
+  if (!err) return '';
+  if (err instanceof Error) return err.message || '';
+  if (typeof err === 'string') return err;
+  if (typeof err === 'object' && err !== null && 'message' in err) {
+    return String((err as { message?: unknown }).message || '');
+  }
+  return '';
+};
+
 const isNetworkFetchError = (err: unknown): boolean => {
   if (!err) return false;
   if (err instanceof TypeError) {
@@ -42,15 +52,26 @@ const isNetworkFetchError = (err: unknown): boolean => {
       err.message.toLowerCase().includes('network')
     );
   }
-  if (typeof err === 'object' && err !== null && 'message' in err) {
-    const msg = String((err as { message?: unknown }).message || '');
-    return (
-      msg.includes('Failed to fetch') ||
-      msg.includes('NetworkError') ||
-      msg.toLowerCase().includes('network')
-    );
-  }
-  return false;
+
+  const msg = extractErrorMessage(err);
+  return (
+    msg.includes('Failed to fetch') ||
+    msg.includes('NetworkError') ||
+    msg.toLowerCase().includes('network')
+  );
+};
+
+const isAuthSessionError = (err: unknown): boolean => {
+  const msg = extractErrorMessage(err).toLowerCase();
+  if (!msg) return false;
+
+  return (
+    msg.includes('jwt expired') ||
+    msg.includes('auth session missing') ||
+    msg.includes('invalid jwt') ||
+    msg.includes('refresh token') ||
+    msg.includes('session from session_id claim in jwt does not exist')
+  );
 };
 
 export function useAuth() {
@@ -86,6 +107,13 @@ export function useAuth() {
     `;
 
     try {
+      const handleExpiredSession = async () => {
+        console.warn('Profile fetch skipped (session expired)');
+        setUser(null);
+        setProfile(null);
+        await supabase.auth.signOut();
+      };
+
       const { data, error } = await supabase
         .from('profiles')
         .select(profileSelect)
@@ -104,6 +132,10 @@ export function useAuth() {
             .single();
           
           if (retryError) {
+            if (isAuthSessionError(retryError)) {
+              await handleExpiredSession();
+              return;
+            }
             // Not actionable in most cases (profile creation trigger timing) + avoid console.error interception
             console.warn('Profile not found after retry:', retryError);
             // Only clear profile if we didn't already have one
@@ -117,6 +149,10 @@ export function useAuth() {
             console.warn('Profile fetch failed (network issue)');
             return;
           }
+          if (isAuthSessionError(error)) {
+            await handleExpiredSession();
+            return;
+          }
           console.error('Error fetching profile:', error);
           setProfile(prev => prev ?? null);
         }
@@ -126,10 +162,15 @@ export function useAuth() {
     } catch (error) {
       if (isNetworkFetchError(error)) {
         console.warn('Profile fetch failed (network issue)');
+      } else if (isAuthSessionError(error)) {
+        console.warn('Profile fetch skipped (session expired)');
+        setUser(null);
+        setProfile(null);
+        await supabase.auth.signOut();
       } else {
         console.error('Error fetching profile:', error);
+        setProfile(prev => prev ?? null);
       }
-      setProfile(prev => prev ?? null);
     } finally {
       setLoading(false);
     }
@@ -266,7 +307,12 @@ export function useAuth() {
         }
       } catch (error) {
         // Avoid escalating transient network issues (common on mobile)
-        if (!isNetworkFetchError(error)) {
+        if (isAuthSessionError(error)) {
+          console.warn('Role change check skipped (session expired)');
+          setUser(null);
+          setProfile(null);
+          await supabase.auth.signOut();
+        } else if (!isNetworkFetchError(error)) {
           console.error('Error checking for role changes:', error);
         } else {
           console.warn('Role change check skipped (network issue)');

@@ -56,11 +56,20 @@ type ManageSortDirection = 'asc' | 'desc';
 type ManageTab = 'overview' | 'calendar' | 'reasons' | 'allowances' | 'work-shifts';
 type ProtectedManageTab = 'overview' | 'allowances' | 'reasons';
 
+function isDirectoryAccessError(error: unknown): boolean {
+  const message = getErrorMessage(error, '').toLowerCase();
+  return (
+    message.includes('forbidden') ||
+    message.includes('unauthorized') ||
+    message.includes('jwt expired')
+  );
+}
+
 export default function AdminAbsencePage() {
   const { isAdmin, isManager, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const canManage = isAdmin || isManager;
   
   // Filters
@@ -366,6 +375,10 @@ export default function AdminAbsencePage() {
   
   // Fetch profiles
   useEffect(() => {
+    if (authLoading || !canManage) {
+      return;
+    }
+
     async function fetchProfiles() {
       try {
         const [directory, workShiftMatrix] = await Promise.all([
@@ -388,13 +401,19 @@ export default function AdminAbsencePage() {
           setWorkShiftPatternByProfileId(nextPatternByProfileId);
         }
       } catch (error) {
+        if (isDirectoryAccessError(error)) {
+          console.warn('Skipping profile directory load due permissions/session');
+          setProfiles([]);
+          setWorkShiftPatternByProfileId({});
+          return;
+        }
         console.error('Error fetching profiles:', error);
         return;
       }
     }
     
-    fetchProfiles();
-  }, [supabase, isAdmin]);
+    void fetchProfiles();
+  }, [authLoading, canManage, isAdmin]);
 
   useEffect(() => {
     async function loadSelectedProfileShift() {

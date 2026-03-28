@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { LOCKED_INSPECTION_DEFECT_STATUSES } from '@/lib/utils/inspectionDefectTaskStatuses';
 
 /**
  * GET /api/plant-inspections/locked-defects?plantId=xxx
@@ -8,7 +9,7 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
  * Returns locked checklist items for a plant where existing defect tasks are active.
  * Uses service role to bypass RLS (inspectors can't read actions table).
  * 
- * Locked items are those with workshop tasks in statuses: logged, on_hold, in_progress
+ * Locked items are those with workshop tasks in statuses: pending, logged, on_hold, in_progress
  * 
  * Returns: { lockedItems: Array<{ item_number, item_description, status, actionId, comment }> }
  */
@@ -56,7 +57,7 @@ export async function GET(request: NextRequest) {
       `)
       .eq('plant_id', plantId)
       .eq('action_type', 'inspection_defect')
-      .in('status', ['logged', 'on_hold', 'in_progress']);
+      .in('status', LOCKED_INSPECTION_DEFECT_STATUSES as unknown as string[]);
 
     if (tasksError) {
       console.error('Error fetching plant tasks:', tasksError);

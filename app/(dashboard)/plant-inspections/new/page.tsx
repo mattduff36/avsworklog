@@ -752,11 +752,12 @@ function NewPlantInspectionContent() {
         lockedItems.forEach((item: { item_number?: string; status?: string; comment?: string; actionId?: string }) => {
           const key = `${item.item_number ?? ''}`;
           const statusLabel = 
+            item.status === 'pending' ? 'pending' :
             item.status === 'on_hold' ? 'on hold' :
             item.status === 'logged' ? 'logged' :
             'in progress';
           loggedMap.set(key, {
-            comment: item.comment || `Defect ${statusLabel} by management`,
+            comment: item.comment || `Defect ${statusLabel} with workshop`,
             actionId: item.actionId ?? ''
           });
         });
@@ -1606,7 +1607,7 @@ function NewPlantInspectionContent() {
                       <h4 className="text-base font-medium text-white leading-tight">{item}</h4>
                       {isLogged && (
                         <Badge className="mt-2 bg-red-500/20 text-red-400 border-red-500/30">
-                          LOGGED DEFECT
+                          LOCKED DEFECT
                         </Badge>
                       )}
                     </div>
@@ -1697,7 +1698,7 @@ function NewPlantInspectionContent() {
                         {item}
                         {isLogged && (
                           <Badge className="ml-2 bg-red-500/20 text-red-400 border-red-500/30 text-xs">
-                            LOGGED
+                            LOCKED
                           </Badge>
                         )}
                       </td>

@@ -661,11 +661,17 @@ function NewHgvInspectionContent() {
       const initialStates: Record<string, InspectionStatus> = {};
       const initialComments: Record<string, string> = {};
 
-      for (const item of lockedItems as Array<{ item_number: number; comment: string; actionId: string }>) {
+      for (const item of lockedItems as Array<{ item_number: number; status?: string; comment: string; actionId: string }>) {
         const key = `${item.item_number}`;
-        map.set(key, { comment: item.comment || 'Defect in progress', actionId: item.actionId });
+        const statusLabel =
+          item.status === 'pending' ? 'pending' :
+          item.status === 'on_hold' ? 'on hold' :
+          item.status === 'logged' ? 'logged' :
+          'in progress';
+        const lockComment = item.comment || `Defect ${statusLabel} with workshop`;
+        map.set(key, { comment: lockComment, actionId: item.actionId });
         initialStates[key] = 'attention';
-        initialComments[key] = item.comment || 'Defect in progress';
+        initialComments[key] = lockComment;
       }
 
       setLoggedDefects(map);
@@ -1418,7 +1424,7 @@ function NewHgvInspectionContent() {
                           <h4 className="text-base font-medium text-white leading-tight">{item}</h4>
                           {isLocked && (
                             <Badge className="mt-2 bg-red-500/20 text-red-400 border-red-500/30">
-                              LOGGED DEFECT
+                              LOCKED DEFECT
                             </Badge>
                           )}
                         </div>
