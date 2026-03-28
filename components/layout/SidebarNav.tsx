@@ -46,6 +46,8 @@ interface SidebarNavProps {
   onToggle: () => void;
 }
 
+const HOVER_EXPAND_DELAY_MS = 1000;
+
 export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   const pathname = usePathname();
   const { isAdmin, isManager, effectiveRole, isViewingAs, isActualSuperAdmin } = useAuth();
@@ -57,11 +59,73 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   const [allRoles, setAllRoles] = useState<RoleOption[]>([]);
   const [allTeams, setAllTeams] = useState<TeamOption[]>([]);
   const [viewAsMenuOpen, setViewAsMenuOpen] = useState(false);
+  const [hoverExpanded, setHoverExpanded] = useState(false);
   const [viewAsMenuPosition, setViewAsMenuPosition] = useState({ left: 0, bottom: 12, maxHeight: 320 });
+  const sidebarRef = useRef<HTMLDivElement | null>(null);
   const viewAsTriggerRef = useRef<HTMLButtonElement | null>(null);
   const viewAsMenuRef = useRef<HTMLDivElement | null>(null);
+  const hoverExpandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { enabledModuleSet: userPermissions } = usePermissionSnapshot();
   const { count: pendingAbsenceCount } = usePendingAbsenceCount(isManager || isAdmin);
+  const isExpanded = open || hoverExpanded;
+
+  const clearHoverExpandTimer = useCallback(() => {
+    if (hoverExpandTimerRef.current) {
+      clearTimeout(hoverExpandTimerRef.current);
+      hoverExpandTimerRef.current = null;
+    }
+  }, []);
+
+  const isInsideSidebarHoverZone = useCallback((target: Node | null) => {
+    if (!target) return false;
+
+    return Boolean(
+      sidebarRef.current?.contains(target) ||
+      viewAsMenuRef.current?.contains(target)
+    );
+  }, []);
+
+  const handleSidebarMouseEnter = useCallback(() => {
+    if (open || hoverExpanded || hoverExpandTimerRef.current) return;
+
+    hoverExpandTimerRef.current = setTimeout(() => {
+      setHoverExpanded(true);
+      hoverExpandTimerRef.current = null;
+    }, HOVER_EXPAND_DELAY_MS);
+  }, [open, hoverExpanded]);
+
+  const handleSidebarMouseLeave = useCallback((relatedTarget: Node | null) => {
+    clearHoverExpandTimer();
+    if (isInsideSidebarHoverZone(relatedTarget) || open) return;
+
+    setHoverExpanded(false);
+    setViewAsMenuOpen(false);
+  }, [clearHoverExpandTimer, isInsideSidebarHoverZone, open]);
+
+  const handleViewAsMenuMouseLeave = useCallback((relatedTarget: Node | null) => {
+    if (isInsideSidebarHoverZone(relatedTarget) || open) return;
+
+    clearHoverExpandTimer();
+    setHoverExpanded(false);
+    setViewAsMenuOpen(false);
+  }, [isInsideSidebarHoverZone, open, clearHoverExpandTimer]);
+
+  const handleNavLinkClick = useCallback(() => {
+    clearHoverExpandTimer();
+    setHoverExpanded(false);
+    setViewAsMenuOpen(false);
+  }, [clearHoverExpandTimer]);
+
+  const handleBackdropClick = useCallback(() => {
+    if (open) {
+      onToggle();
+      return;
+    }
+
+    clearHoverExpandTimer();
+    setHoverExpanded(false);
+    setViewAsMenuOpen(false);
+  }, [open, onToggle, clearHoverExpandTimer]);
 
   // Fetch user email, all roles, and current view-as selection
   useEffect(() => {
@@ -106,17 +170,23 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
     }
   }, [effectiveRole?.name, effectiveRole?.is_super_admin, isViewingAs, isManager, isAdmin, tabletModeEnabled]);
 
-  // Collapse sidebar on route change (don't close completely)
+  useEffect(
+    () => () => {
+      clearHoverExpandTimer();
+    },
+    [clearHoverExpandTimer]
+  );
+
+  // Keep transient hover state clean on route changes
   const prevPathnameRef = useRef(pathname);
   useEffect(() => {
     if (prevPathnameRef.current !== pathname) {
       prevPathnameRef.current = pathname;
       setViewAsMenuOpen(false);
-      if (open) {
-        onToggle();
-      }
+      clearHoverExpandTimer();
+      setHoverExpanded(false);
     }
-  }, [pathname, open, onToggle]);
+  }, [pathname, clearHoverExpandTimer]);
 
   useEffect(() => {
     if (!viewAsMenuOpen) return;
@@ -152,11 +222,11 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
     const maxHeight = Math.max(240, viewportHeight - bottomOffset - 24);
 
     setViewAsMenuPosition({
-      left: Math.round(triggerRect.right + (open ? 16 : 12)),
+      left: Math.round(triggerRect.right + (isExpanded ? 16 : 12)),
       bottom: bottomOffset,
       maxHeight,
     });
-  }, [open]);
+  }, [isExpanded]);
 
   useEffect(() => {
     if (!viewAsMenuOpen) return;
@@ -173,7 +243,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
       window.removeEventListener('resize', syncPosition);
       window.removeEventListener('scroll', syncPosition, true);
     };
-  }, [viewAsMenuOpen, open, updateViewAsMenuPosition]);
+  }, [viewAsMenuOpen, isExpanded, updateViewAsMenuPosition]);
 
   const isSuperAdmin = isActualSuperAdmin;
   const isViewingAsOverride = isSuperAdmin && (viewAsRoleId !== '' || viewAsTeamId !== '');
@@ -396,21 +466,24 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
       {/* Backdrop - only show when expanded */}
       <div
         className={`fixed inset-0 bg-black/50 z-[50] transition-opacity duration-300 ${
-          open ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          isExpanded ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
-        onClick={onToggle}
+        onClick={handleBackdropClick}
       />
 
       {/* Sidebar - Always visible on desktop, hidden on mobile */}
       <div
+        ref={sidebarRef}
         className={`hidden md:flex md:flex-col fixed left-0 top-[68px] bottom-0 bg-slate-900 border-r border-slate-700 z-[60] transition-all duration-300 ease-in-out ${
-          open ? 'w-64' : 'w-16'
+          isExpanded ? 'w-64' : 'w-16'
         }`}
+        onMouseEnter={handleSidebarMouseEnter}
+        onMouseLeave={(event) => handleSidebarMouseLeave(event.relatedTarget as Node | null)}
       >
         {/* Header */}
         <div className="h-16 flex items-center justify-between px-3 border-b border-border">
           <h2 className={`text-lg font-semibold text-white transition-opacity duration-200 ${
-            open ? 'opacity-100 delay-300' : 'opacity-0 w-0 overflow-hidden'
+            isExpanded ? 'opacity-100 delay-300' : 'opacity-0 w-0 overflow-hidden'
           }`}>
             {isManager ? 'Manager Menu' : 'Admin Tools'}
           </h2>
@@ -421,7 +494,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
             className="text-muted-foreground hover:text-white hover:bg-slate-800"
             title={open ? 'Collapse menu' : 'Expand menu'}
           >
-            <PanelLeftClose className={`h-5 w-5 transition-transform duration-300 ${open ? '' : 'rotate-180'}`} />
+            <PanelLeftClose className={`h-5 w-5 transition-transform duration-300 ${isExpanded ? '' : 'rotate-180'}`} />
           </Button>
         </div>
 
@@ -429,9 +502,9 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
         <div className={`overflow-y-auto py-4 ${isSuperAdmin ? 'h-[calc(100vh-10rem)]' : 'h-[calc(100vh-8.25rem)]'}`}>
           {/* Manager Links */}
           {(isManager || isAdmin) && sidebarManagerLinks.length > 0 && (
-          <div className={open ? 'px-3 mb-6' : 'px-2 mb-6'}>
+          <div className={isExpanded ? 'px-3 mb-6' : 'px-2 mb-6'}>
             <div className={`px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider transition-opacity duration-200 ${
-              open ? 'opacity-100 delay-300' : 'opacity-0 h-0 overflow-hidden'
+              isExpanded ? 'opacity-100 delay-300' : 'opacity-0 h-0 overflow-hidden'
             }`}>
               Management
             </div>
@@ -444,9 +517,10 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                   <Link
                     key={link.href}
                     href={link.href}
-                    title={!open ? link.label : undefined}
+                    title={!isExpanded ? link.label : undefined}
+                    onClick={handleNavLinkClick}
                     className={`flex items-center rounded-md text-sm font-medium transition-colors ${
-                      open ? 'gap-3 px-3 py-2' : 'justify-center py-3'
+                      isExpanded ? 'gap-3 px-3 py-2' : 'justify-center py-3'
                     } ${
                       isActive
                         ? 'bg-avs-yellow text-slate-900'
@@ -454,19 +528,19 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                     }`}
                   >
                     <div className="relative">
-                      <Icon className={open ? 'w-4 h-4' : 'w-5 h-5'} />
-                      {!open && badgeCount > 0 && (
+                      <Icon className={isExpanded ? 'w-4 h-4' : 'w-5 h-5'} />
+                      {!isExpanded && badgeCount > 0 && (
                         <span className="absolute -top-2 -right-2 min-w-[1.1rem] px-1 h-[1.1rem] rounded-full bg-red-500 text-white text-[10px] leading-none flex items-center justify-center font-semibold">
                           {badgeCount > 99 ? '99+' : badgeCount}
                         </span>
                       )}
                     </div>
                     <span className={`transition-opacity duration-200 whitespace-nowrap ${
-                      open ? 'opacity-100 delay-300' : 'opacity-0 w-0 overflow-hidden'
+                      isExpanded ? 'opacity-100 delay-300' : 'opacity-0 w-0 overflow-hidden'
                     }`}>
                       {link.label}
                     </span>
-                    {open && badgeCount > 0 && (
+                    {isExpanded && badgeCount > 0 && (
                       <span className="ml-auto min-w-[1.25rem] h-5 px-1 rounded-full bg-red-500 text-white text-[11px] leading-none flex items-center justify-center font-semibold">
                         {badgeCount > 99 ? '99+' : badgeCount}
                       </span>
@@ -480,9 +554,9 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
 
           {/* Admin Links */}
           {adminLinks.length > 0 && (
-            <div className={open ? 'px-3 mb-6' : 'px-2 mb-6'}>
+            <div className={isExpanded ? 'px-3 mb-6' : 'px-2 mb-6'}>
               <div className={`px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider transition-opacity duration-200 ${
-                open ? 'opacity-100 delay-300' : 'opacity-0 h-0 overflow-hidden'
+                isExpanded ? 'opacity-100 delay-300' : 'opacity-0 h-0 overflow-hidden'
               }`}>
                 Administration
               </div>
@@ -494,18 +568,19 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                     <Link
                       key={link.href}
                       href={link.href}
-                      title={!open ? link.label : undefined}
+                      title={!isExpanded ? link.label : undefined}
+                      onClick={handleNavLinkClick}
                       className={`flex items-center rounded-md text-sm font-medium transition-colors ${
-                        open ? 'gap-3 px-3 py-2' : 'justify-center py-3'
+                        isExpanded ? 'gap-3 px-3 py-2' : 'justify-center py-3'
                       } ${
                         isActive
                           ? 'bg-avs-yellow text-slate-900 [&>svg]:text-slate-900'
                           : 'text-muted-foreground hover:bg-slate-800 hover:text-white'
                       }`}
                     >
-                      <Icon className={open ? 'w-4 h-4' : 'w-5 h-5'} />
+                      <Icon className={isExpanded ? 'w-4 h-4' : 'w-5 h-5'} />
                       <span className={`transition-opacity duration-200 whitespace-nowrap ${
-                        open ? 'opacity-100 delay-300' : 'opacity-0 w-0 overflow-hidden'
+                        isExpanded ? 'opacity-100 delay-300' : 'opacity-0 w-0 overflow-hidden'
                       }`}>
                         {link.label}
                       </span>
@@ -518,27 +593,28 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
 
           {/* Developer Tools - SuperAdmin Only */}
           {showDeveloperTools && (
-            <div className={open ? 'px-3' : 'px-2'}>
+            <div className={isExpanded ? 'px-3' : 'px-2'}>
               <div className={`px-3 py-2 text-xs font-semibold text-red-500 uppercase tracking-wider transition-opacity duration-200 ${
-                open ? 'opacity-100 delay-300' : 'opacity-0 h-0 overflow-hidden'
+                isExpanded ? 'opacity-100 delay-300' : 'opacity-0 h-0 overflow-hidden'
               }`}>
                 Developer
               </div>
               <div className="space-y-1">
                 <Link
                   href="/debug"
-                  title={!open ? 'Debug Console' : undefined}
+                  title={!isExpanded ? 'Debug Console' : undefined}
+                  onClick={handleNavLinkClick}
                   className={`flex items-center rounded-md text-sm font-medium transition-colors ${
-                    open ? 'gap-3 px-3 py-2' : 'justify-center py-3'
+                    isExpanded ? 'gap-3 px-3 py-2' : 'justify-center py-3'
                   } ${
                     pathname === '/debug'
                       ? 'bg-red-600 text-white'
                       : 'text-red-500 hover:bg-slate-800 hover:text-red-400'
                   }`}
                 >
-                  <Bug className={open ? 'w-4 h-4' : 'w-5 h-5'} />
+                  <Bug className={isExpanded ? 'w-4 h-4' : 'w-5 h-5'} />
                   <span className={`transition-opacity duration-200 whitespace-nowrap ${
-                    open ? 'opacity-100 delay-300' : 'opacity-0 w-0 overflow-hidden'
+                    isExpanded ? 'opacity-100 delay-300' : 'opacity-0 w-0 overflow-hidden'
                   }`}>
                     Debug Console
                   </span>
@@ -553,7 +629,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
           <div className="border-t border-slate-700 p-3 mt-auto">
             <Popover>
               <PopoverTrigger asChild>
-                {open ? (
+                {isExpanded ? (
                   <Button
                     ref={viewAsTriggerRef}
                     variant="outline"
@@ -605,6 +681,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                   maxHeight: `${viewAsMenuPosition.maxHeight}px`,
                   color: '#e2e8f0',
                 }}
+                onMouseLeave={(event) => handleViewAsMenuMouseLeave(event.relatedTarget as Node | null)}
               >
                 {viewAsPopoverContent}
               </div>
