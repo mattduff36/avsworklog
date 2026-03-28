@@ -289,6 +289,7 @@ export function AbsenceCalendarAdmin() {
   const canAddEditBookings = Boolean(absenceSecondarySnapshot?.flags.can_add_edit_bookings || isAdminTier);
   const actorTeamId = absenceSecondarySnapshot?.team_id || null;
   const actorTeamName = absenceSecondarySnapshot?.team_name || null;
+  const hasAbsenceSecondarySnapshot = Boolean(absenceSecondarySnapshot?.permissions && absenceSecondarySnapshot?.flags);
   const scopeTeamOnly = Boolean(
     !isAdminTier &&
       canViewBookings &&
@@ -298,7 +299,8 @@ export function AbsenceCalendarAdmin() {
   );
   const isTeamFilterLocked = scopeTeamOnly;
   const effectiveTeamFilter = scopeTeamOnly ? (actorTeamId || '__no_team_scope__') : selectedTeamId;
-  const isAbsenceSecondaryContextLoading = absenceSecondaryLoading || !absenceSecondaryFetchedAfterMount;
+  const isAbsenceSecondaryContextLoading =
+    absenceSecondaryLoading || (!absenceSecondaryFetchedAfterMount && !hasAbsenceSecondarySnapshot);
 
   useEffect(() => {
     void loadGenerationStatus();

@@ -158,7 +158,9 @@ export default function AbsencePage() {
     isLoading: secondaryLoading,
     isFetchedAfterMount: secondaryFetchedAfterMount,
   } = useAbsenceSecondaryPermissions(hasPermission);
-  const isSecondaryContextLoading = hasPermission && (secondaryLoading || !secondaryFetchedAfterMount);
+  const hasAbsenceSecondarySnapshot = Boolean(absenceSecondarySnapshot?.permissions && absenceSecondarySnapshot?.flags);
+  const isSecondaryContextLoading =
+    hasPermission && (secondaryLoading || (!secondaryFetchedAfterMount && !hasAbsenceSecondarySnapshot));
   const actorProfileId = profile?.id || '';
   const isAdminTier = Boolean(isAdmin || isSuperAdmin);
   const canViewBookings = Boolean(absenceSecondarySnapshot?.flags.can_view_bookings || isAdminTier || isManager);

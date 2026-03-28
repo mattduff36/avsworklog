@@ -98,8 +98,9 @@ export default function AdminAbsencePage() {
     canViewOverviewTab ||
     canViewReasonsTab ||
     canViewWorkShiftsTab;
+  const hasAbsenceSecondarySnapshot = Boolean(absenceSecondarySnapshot?.permissions && absenceSecondarySnapshot?.flags);
   const isAbsenceSecondaryContextLoading =
-    canAccessAbsenceModule && (absenceSecondaryLoading || !absenceSecondaryFetchedAfterMount);
+    canAccessAbsenceModule && (absenceSecondaryLoading || (!absenceSecondaryFetchedAfterMount && !hasAbsenceSecondarySnapshot));
   
   // Filters
   const [profileId, setProfileId] = useState('');
