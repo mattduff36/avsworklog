@@ -28,8 +28,9 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { createClient } from '@/lib/supabase/client';
 import { getErrorMessage, shouldLogAbsenceManageError } from '@/lib/utils/absence-error-handling';
 import { getCurrentFinancialYear } from '@/lib/utils/date';
-import { Loader2, Lock, RotateCcw, Sparkles, Trash2, Users } from 'lucide-react';
+import { Loader2, Lock, RotateCcw, ShieldCheck, Sparkles, Trash2, Users } from 'lucide-react';
 import { toast } from 'sonner';
+import { AbsencePermissionExceptionsDialog } from '@/app/(dashboard)/absence/manage/components/AbsencePermissionExceptionsDialog';
 
 interface BulkEmployeeOption {
   id: string;
@@ -152,6 +153,7 @@ export function ManageOverviewAdminActions() {
   const [showUndoCloseYearDialog, setShowUndoCloseYearDialog] = useState(false);
   const [showShutdownDialog, setShowShutdownDialog] = useState(false);
   const [showBulkUndoDialog, setShowBulkUndoDialog] = useState(false);
+  const [showPermissionExceptionsDialog, setShowPermissionExceptionsDialog] = useState(false);
   const [generatingAllowances, setGeneratingAllowances] = useState(false);
   const [removingGeneratedYear, setRemovingGeneratedYear] = useState(false);
   const [closingCurrentYear, setClosingCurrentYear] = useState(false);
@@ -703,10 +705,10 @@ export function ManageOverviewAdminActions() {
             ) : null}
           </div>
         </div>
-        <div className="inline-grid grid-cols-2 gap-2 self-start">
+        <div className="inline-grid grid-cols-3 gap-2 self-start">
           {generationStatusHydrating ? (
             <div
-              className={`${actionTileClass} col-span-2 flex items-center justify-center`}
+              className={`${actionTileClass} col-span-3 flex items-center justify-center`}
               style={{ width: `${actionTileWidthCh}ch` }}
             >
               <Loader2 className="h-4 w-4 animate-spin text-absence" />
@@ -746,6 +748,19 @@ export function ManageOverviewAdminActions() {
                   <span className="flex w-full items-center justify-center gap-2 text-center text-sm font-semibold">
                     <RotateCcw className="h-4 w-4 text-absence" />
                     {undoCloseLabel}
+                  </span>
+                </Button>
+              ) : null}
+              {isAdmin ? (
+                <Button
+                  onClick={() => setShowPermissionExceptionsDialog(true)}
+                  variant="outline"
+                  className={actionTileClass}
+                  style={{ width: `${actionTileWidthCh}ch` }}
+                >
+                  <span className="flex w-full items-center justify-center gap-2 text-center text-sm font-semibold">
+                    <ShieldCheck className="h-4 w-4 text-absence" />
+                    Exceptions Matrix
                   </span>
                 </Button>
               ) : null}
@@ -1283,6 +1298,11 @@ export function ManageOverviewAdminActions() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AbsencePermissionExceptionsDialog
+        open={showPermissionExceptionsDialog}
+        onOpenChange={setShowPermissionExceptionsDialog}
+      />
     </>
   );
 }

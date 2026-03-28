@@ -49,6 +49,10 @@ import { ManageOverviewAdminActions } from '@/app/(dashboard)/absence/manage/com
 import { WorkShiftsContent } from '@/app/(dashboard)/absence/manage/components/WorkShiftsContent';
 import { getErrorMessage, shouldLogAbsenceManageError } from '@/lib/utils/absence-error-handling';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
+import {
+  canUseScopedAbsencePermission,
+  useAbsenceSecondaryPermissions,
+} from '@/lib/hooks/useAbsenceSecondaryPermissions';
 import type { AbsenceWithRelations } from '@/types/absence';
 import type { WorkShiftPattern } from '@/types/work-shifts';
 
@@ -67,12 +71,20 @@ function isDirectoryAccessError(error: unknown): boolean {
 }
 
 export default function AdminAbsencePage() {
-  const { isAdmin, isManager, isActualSuperAdmin, loading: authLoading } = useAuth();
+  const { profile, isAdmin, isManager, isActualSuperAdmin, loading: authLoading } = useAuth();
   const { hasPermission: canAccessAbsenceModule, loading: absencePermissionLoading } = usePermissionCheck('absence', false);
+  const { data: absenceSecondarySnapshot, isLoading: absenceSecondaryLoading } = useAbsenceSecondaryPermissions(
+    canAccessAbsenceModule
+  );
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
-  const canManage = isAdmin || isManager;
+  const canViewBookings = Boolean(absenceSecondarySnapshot?.flags.can_view_bookings || isAdmin || isManager);
+  const canAddEditBookings = Boolean(absenceSecondarySnapshot?.flags.can_add_edit_bookings || isAdmin || isManager);
+  const canViewAllowances = Boolean(absenceSecondarySnapshot?.flags.can_view_allowances || isAdmin || isManager);
+  const canAddEditAllowances = Boolean(absenceSecondarySnapshot?.flags.can_add_edit_allowances || isAdmin);
+  const canAuthoriseBookings = Boolean(absenceSecondarySnapshot?.flags.can_authorise_bookings || isAdmin || isManager);
+  const canOpenManagePage = canViewBookings || canViewAllowances || canAddEditBookings || canAuthoriseBookings;
   
   // Filters
   const [profileId, setProfileId] = useState('');
@@ -99,9 +111,36 @@ export default function AdminAbsencePage() {
     status,
     includeArchived,
   });
+  const actorProfileId = profile?.id || '';
   const filteredAbsences = useMemo(() => {
     const term = listSearch.trim().toLowerCase();
     const filtered = (absences || []).filter((absence) => {
+      const isAllowedByScope =
+        isAdmin ||
+        isActualSuperAdmin ||
+        (canViewBookings &&
+          Boolean(
+            actorProfileId &&
+              absenceSecondarySnapshot &&
+              canUseScopedAbsencePermission(
+                {
+                  permissions: absenceSecondarySnapshot.permissions,
+                  team_id: absenceSecondarySnapshot.team_id,
+                },
+                actorProfileId,
+                {
+                  profile_id: absence.profile_id,
+                  team_id: absence.profiles.team_id || null,
+                },
+                {
+                  all: 'see_bookings_all',
+                  team: 'see_bookings_team',
+                  own: 'see_bookings_own',
+                }
+              )
+          ));
+      if (!isAllowedByScope) return false;
+
       if (!term) return true;
       return (
         absence.profiles.full_name.toLowerCase().includes(term) ||
@@ -143,7 +182,17 @@ export default function AdminAbsencePage() {
           return 0;
       }
     });
-  }, [absences, listSearch, sortField, sortDirection]);
+  }, [
+    absences,
+    listSearch,
+    sortField,
+    sortDirection,
+    actorProfileId,
+    canViewBookings,
+    absenceSecondarySnapshot,
+    isAdmin,
+    isActualSuperAdmin,
+  ]);
   const pendingCount = useMemo(
     () => (absences || []).filter((absence) => absence.status === 'pending').length,
     [absences]
@@ -160,7 +209,9 @@ export default function AdminAbsencePage() {
   }, [listSearch, sortField, sortDirection, profileId, dateFrom, dateTo, reasonId, status]);
 
   const { data: reasons } = useAllAbsenceReasons();
-  const [profiles, setProfiles] = useState<Array<{ id: string; full_name: string; employee_id: string | null }>>([]);
+  const [profiles, setProfiles] = useState<
+    Array<{ id: string; full_name: string; employee_id: string | null; team_id: string | null }>
+  >([]);
   const [workShiftPatternByProfileId, setWorkShiftPatternByProfileId] = useState<Record<string, WorkShiftPattern>>({});
   const [absenceAnnouncementInput, setAbsenceAnnouncementInput] = useState('');
   const [savedAbsenceAnnouncement, setSavedAbsenceAnnouncement] = useState('');
@@ -209,10 +260,15 @@ export default function AdminAbsencePage() {
 
   // Check admin/manager access
   useEffect(() => {
-    if (!authLoading && !absencePermissionLoading && (!canAccessAbsenceModule || (!isAdmin && !isManager))) {
+    if (
+      !authLoading &&
+      !absencePermissionLoading &&
+      !absenceSecondaryLoading &&
+      (!canAccessAbsenceModule || !canOpenManagePage)
+    ) {
       router.push('/dashboard');
     }
-  }, [isAdmin, isManager, authLoading, absencePermissionLoading, canAccessAbsenceModule, router]);
+  }, [authLoading, absencePermissionLoading, absenceSecondaryLoading, canAccessAbsenceModule, canOpenManagePage, router]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -240,27 +296,35 @@ export default function AdminAbsencePage() {
       return;
     }
 
-    const allowedTabs: ManageTab[] = ['calendar', 'overview'];
-    if (isAdmin) allowedTabs.push('reasons', 'allowances', 'work-shifts');
-    else if (isManager) allowedTabs.push('allowances');
+    const allowedTabs: ManageTab[] = [];
+    if (canViewBookings) {
+      allowedTabs.push('calendar', 'overview');
+    }
+    if (canViewAllowances) {
+      allowedTabs.push('allowances');
+    }
+    if (isAdmin) {
+      allowedTabs.push('reasons', 'work-shifts');
+    }
 
-    if (allowedTabs.includes(requestedTab as typeof allowedTabs[number])) {
+    if (allowedTabs.length > 0 && allowedTabs.includes(requestedTab as typeof allowedTabs[number])) {
       if (isProtectedTab(requestedTab as ManageTab) && !protectedTabsUnlocked) {
         const params = new URLSearchParams(searchParams.toString());
-        params.set('tab', 'calendar');
+        const protectedTabFallback = allowedTabs.includes('calendar') ? 'calendar' : allowedTabs[0];
+        params.set('tab', protectedTabFallback);
         if (includeArchived) {
           params.set('archived', '1');
         } else {
           params.delete('archived');
         }
-        setActiveTab('calendar');
+        setActiveTab(protectedTabFallback);
         router.replace(`/absence/manage?${params.toString()}`, { scroll: false });
         openPasswordGate(requestedTab as ProtectedManageTab);
       } else {
         setActiveTab(requestedTab as ManageTab);
       }
     } else {
-      const fallback = allowedTabs[0];
+      const fallback = allowedTabs[0] || 'calendar';
       const params = new URLSearchParams(searchParams.toString());
       params.set('tab', fallback);
       if (includeArchived) {
@@ -274,9 +338,10 @@ export default function AdminAbsencePage() {
     searchParams,
     authLoading,
     isAdmin,
-    isManager,
     router,
     includeArchived,
+    canViewBookings,
+    canViewAllowances,
     protectedTabsUnlocked,
     isProtectedTab,
     openPasswordGate,
@@ -291,12 +356,12 @@ export default function AdminAbsencePage() {
 
   useEffect(() => {
     if (!isAdmin && activeTab === 'reasons') {
-      setActiveTab('calendar');
+      setActiveTab(canViewBookings ? 'calendar' : canViewAllowances ? 'allowances' : 'calendar');
     }
     if (!isAdmin && activeTab === 'work-shifts') {
-      setActiveTab('calendar');
+      setActiveTab(canViewBookings ? 'calendar' : canViewAllowances ? 'allowances' : 'calendar');
     }
-  }, [isAdmin, activeTab]);
+  }, [isAdmin, activeTab, canViewBookings, canViewAllowances]);
 
   useEffect(() => {
     async function loadAbsenceAnnouncement() {
@@ -324,7 +389,8 @@ export default function AdminAbsencePage() {
   function handleTabChange(nextTab: ManageTab) {
     if (!isAdmin && nextTab === 'reasons') return;
     if (!isAdmin && nextTab === 'work-shifts') return;
-    if (!canManage && nextTab === 'allowances') return;
+    if (!canViewAllowances && nextTab === 'allowances') return;
+    if (!canViewBookings && (nextTab === 'calendar' || nextTab === 'overview')) return;
     if (isProtectedTab(nextTab) && !protectedTabsUnlocked) {
       openPasswordGate(nextTab);
       return;
@@ -416,7 +482,7 @@ export default function AdminAbsencePage() {
   
   // Fetch profiles
   useEffect(() => {
-    if (authLoading || !canManage) {
+    if (authLoading || !canOpenManagePage) {
       return;
     }
 
@@ -431,6 +497,7 @@ export default function AdminAbsencePage() {
             id: profile.id,
             full_name: profile.full_name || 'Unknown User',
             employee_id: profile.employee_id,
+            team_id: profile.team?.id || null,
           }))
         );
 
@@ -454,7 +521,7 @@ export default function AdminAbsencePage() {
     }
     
     void fetchProfiles();
-  }, [authLoading, canManage, isAdmin]);
+  }, [authLoading, canOpenManagePage, isAdmin]);
 
   useEffect(() => {
     async function loadSelectedProfileShift() {
@@ -475,6 +542,48 @@ export default function AdminAbsencePage() {
 
     void loadSelectedProfileShift();
   }, [selectedProfileId, workShiftPatternByProfileId]);
+
+  const profileTeamIdById = useMemo(() => {
+    const map = new Map<string, string | null>();
+    profiles.forEach((entry) => {
+      map.set(entry.id, entry.team_id || null);
+    });
+    return map;
+  }, [profiles]);
+
+  const canPerformScopedBookingAction = useCallback(
+    (targetProfileId: string, targetTeamId: string | null, mode: 'view' | 'edit') => {
+      if (isAdmin || isActualSuperAdmin) return true;
+      if (!actorProfileId || !absenceSecondarySnapshot) return false;
+
+      const keys =
+        mode === 'view'
+          ? {
+              all: 'see_bookings_all' as const,
+              team: 'see_bookings_team' as const,
+              own: 'see_bookings_own' as const,
+            }
+          : {
+              all: 'add_edit_bookings_all' as const,
+              team: 'add_edit_bookings_team' as const,
+              own: 'add_edit_bookings_own' as const,
+            };
+
+      return canUseScopedAbsencePermission(
+        {
+          permissions: absenceSecondarySnapshot.permissions,
+          team_id: absenceSecondarySnapshot.team_id,
+        },
+        actorProfileId,
+        {
+          profile_id: targetProfileId,
+          team_id: targetTeamId,
+        },
+        keys
+      );
+    },
+    [isAdmin, isActualSuperAdmin, actorProfileId, absenceSecondarySnapshot]
+  );
   
   // Calculate duration
   const duration = startDate 
@@ -503,13 +612,28 @@ export default function AdminAbsencePage() {
   }
 
   function canEditAbsence(absence: AbsenceWithRelations): boolean {
-    return absence.record_source !== 'archived' && !absence.is_bank_holiday && !absence.auto_generated;
+    const targetTeamId = absence.profiles.team_id || profileTeamIdById.get(absence.profile_id) || null;
+    return (
+      canAddEditBookings &&
+      canPerformScopedBookingAction(absence.profile_id, targetTeamId, 'edit') &&
+      absence.record_source !== 'archived' &&
+      !absence.is_bank_holiday &&
+      !absence.auto_generated
+    );
   }
 
   // Handle create
   async function handleCreate() {
     if (!selectedProfileId || !selectedReasonId || !startDate) {
       toast.error('Please fill in all required fields');
+      return;
+    }
+
+    if (
+      !canAddEditBookings ||
+      !canPerformScopedBookingAction(selectedProfileId, profileTeamIdById.get(selectedProfileId) || null, 'edit')
+    ) {
+      toast.error('You do not have permission to create bookings for this user');
       return;
     }
     
@@ -581,7 +705,7 @@ export default function AdminAbsencePage() {
     }
   }
   
-  if (authLoading || absencePermissionLoading || isLoading) {
+  if (authLoading || absencePermissionLoading || absenceSecondaryLoading || isLoading) {
     return (
       <div className="space-y-6 max-w-7xl">
         <Card className="">
@@ -593,7 +717,7 @@ export default function AdminAbsencePage() {
     );
   }
   
-  if (!canAccessAbsenceModule || (!isAdmin && !isManager)) return null;
+  if (!canAccessAbsenceModule || !canOpenManagePage) return null;
   
   return (
     <div className="space-y-6 max-w-7xl">
@@ -612,13 +736,15 @@ export default function AdminAbsencePage() {
             </div>
           </div>
           <div className="flex flex-col sm:flex-row gap-2">
-            <Button
-              onClick={() => setShowCreateDialog(true)}
-              className="w-full sm:w-auto bg-absence hover:bg-absence-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Create Absence
-            </Button>
+            {canAddEditBookings ? (
+              <Button
+                onClick={() => setShowCreateDialog(true)}
+                className="w-full sm:w-auto bg-absence hover:bg-absence-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create Absence
+              </Button>
+            ) : null}
           </div>
         </div>
       </div>
@@ -682,17 +808,19 @@ export default function AdminAbsencePage() {
 
       <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as ManageTab)} className="space-y-6">
         <TabsList>
-          <TabsTrigger value="calendar" className="gap-2">
-            <Calendar className="h-4 w-4" />
-            Calendar
-          </TabsTrigger>
+          {canViewBookings && (
+            <TabsTrigger value="calendar" className="gap-2">
+              <Calendar className="h-4 w-4" />
+              Calendar
+            </TabsTrigger>
+          )}
           {isAdmin && (
             <TabsTrigger value="work-shifts" className="gap-2">
               <Clock className="h-4 w-4" />
               Work Shifts
             </TabsTrigger>
           )}
-          {canManage && (
+          {canViewAllowances && (
             <TabsTrigger value="allowances" className="group gap-2">
               <Briefcase className="h-4 w-4 text-absence transition-colors group-data-[state=active]:text-white" />
               Allowances
@@ -704,45 +832,48 @@ export default function AdminAbsencePage() {
               Reasons
             </TabsTrigger>
           )}
-          <TabsTrigger value="overview" className="group gap-2">
-            <Wrench className="h-4 w-4 text-absence transition-colors group-data-[state=active]:text-white" />
-            Records & Admin
-          </TabsTrigger>
+          {canViewBookings && (
+            <TabsTrigger value="overview" className="group gap-2">
+              <Wrench className="h-4 w-4 text-absence transition-colors group-data-[state=active]:text-white" />
+              Records & Admin
+            </TabsTrigger>
+          )}
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-6 mt-0">
-          {canManage && (
-            <Card className="border-border">
-              <ManageOverviewAdminActions />
-            </Card>
-          )}
+        {canViewBookings && (
+          <TabsContent value="overview" className="space-y-6 mt-0">
+            {(isAdmin || isManager) && (
+              <Card className="border-border">
+                <ManageOverviewAdminActions />
+              </Card>
+            )}
 
-          {/* Absences Table */}
-          <Card className="border-border">
-            <CardHeader>
-              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <CardTitle className="text-foreground">
-                    Absence Records
-                  </CardTitle>
-                  <CardDescription className="text-muted-foreground">
-                    {filteredAbsences.length} records found{pendingCount > 0 ? ` · ${pendingCount} pending` : ''}
-                  </CardDescription>
+            {/* Absences Table */}
+            <Card className="border-border">
+              <CardHeader>
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <CardTitle className="text-foreground">
+                      Absence Records
+                    </CardTitle>
+                    <CardDescription className="text-muted-foreground">
+                      {filteredAbsences.length} records found{pendingCount > 0 ? ` · ${pendingCount} pending` : ''}
+                    </CardDescription>
+                  </div>
+                  {pendingCount > 0 && canAuthoriseBookings && (
+                    <Link href="/approvals?tab=absences" className="w-full md:w-auto">
+                      <Button
+                        variant="outline"
+                        className="w-full md:w-auto border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
+                      >
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Review Pending in Approvals
+                      </Button>
+                    </Link>
+                  )}
                 </div>
-                {pendingCount > 0 && (
-                  <Link href="/approvals?tab=absences" className="w-full md:w-auto">
-                    <Button
-                      variant="outline"
-                      className="w-full md:w-auto border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
-                    >
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      Review Pending in Approvals
-                    </Button>
-                  </Link>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
+              </CardHeader>
+              <CardContent>
               <div className="rounded-lg border border-border/60 bg-slate-900/20 p-4 mb-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
                   <h3 className="flex items-center gap-2 text-foreground font-medium">
@@ -948,16 +1079,18 @@ export default function AdminAbsencePage() {
                                     <Pencil className="h-4 w-4" />
                                   </Button>
                                 )}
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDelete(absence.id)}
-                                  disabled={absence.record_source === 'archived'}
-                                  className="px-2 text-red-500 hover:text-red-400 hover:bg-red-500/10"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                                {absence.status === 'pending' && absence.record_source !== 'archived' && (
+                                {canEditAbsence(absence) && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDelete(absence.id)}
+                                    disabled={absence.record_source === 'archived'}
+                                    className="px-2 text-red-500 hover:text-red-400 hover:bg-red-500/10"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {canAuthoriseBookings && absence.status === 'pending' && absence.record_source !== 'archived' && (
                                   <Link href="/approvals?tab=absences">
                                     <Button
                                       variant="outline"
@@ -1032,16 +1165,18 @@ export default function AdminAbsencePage() {
                                 <Pencil className="h-4 w-4" />
                               </Button>
                             )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDelete(absence.id)}
-                              disabled={absence.record_source === 'archived'}
-                              className="px-2 text-red-500 hover:text-red-400 hover:bg-red-500/10"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                            {absence.status === 'pending' && absence.record_source !== 'archived' && (
+                            {canEditAbsence(absence) && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDelete(absence.id)}
+                                disabled={absence.record_source === 'archived'}
+                                className="px-2 text-red-500 hover:text-red-400 hover:bg-red-500/10"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {canAuthoriseBookings && absence.status === 'pending' && absence.record_source !== 'archived' && (
                               <Link href="/approvals?tab=absences">
                                 <Button
                                   variant="outline"
@@ -1090,13 +1225,16 @@ export default function AdminAbsencePage() {
                   )}
                 </>
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
 
-        <TabsContent value="calendar" className="space-y-6 mt-0">
-          <AbsenceCalendarAdmin />
-        </TabsContent>
+        {canViewBookings && (
+          <TabsContent value="calendar" className="space-y-6 mt-0">
+            <AbsenceCalendarAdmin />
+          </TabsContent>
+        )}
 
         {isAdmin && (
           <TabsContent value="reasons" className="space-y-6 mt-0">
@@ -1104,9 +1242,14 @@ export default function AdminAbsencePage() {
           </TabsContent>
         )}
 
-        {canManage && (
+        {canViewAllowances && (
           <TabsContent value="allowances" className="space-y-6 mt-0">
-            <AllowancesContent refreshKey={allowancesRefreshKey} />
+            <AllowancesContent
+              refreshKey={allowancesRefreshKey}
+              isReadOnly={!canAddEditAllowances}
+              scopeTeamOnly={!isAdmin && canViewAllowances && !absenceSecondarySnapshot?.permissions.see_allowances_all}
+              actorTeamId={absenceSecondarySnapshot?.team_id || null}
+            />
           </TabsContent>
         )}
 

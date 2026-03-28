@@ -46,6 +46,7 @@ interface ProfileRow {
   id: string;
   full_name: string;
   employee_id: string | null;
+  team_id: string | null;
   baseAllowance: number;
   carryoverDays: number;
   totalAllowance: number;
@@ -239,7 +240,19 @@ function getOldestOpenFinancialYearStartYear(
   return latestGeneratedFinancialYearStartYear;
 }
 
-export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
+interface AllowancesContentProps {
+  refreshKey?: number;
+  isReadOnly?: boolean;
+  scopeTeamOnly?: boolean;
+  actorTeamId?: string | null;
+}
+
+export function AllowancesContent({
+  refreshKey,
+  isReadOnly = false,
+  scopeTeamOnly = false,
+  actorTeamId = null,
+}: AllowancesContentProps) {
   const supabase = createClient();
   const searchParams = useSearchParams();
   const currentFinancialYear = getCurrentFinancialYear();
@@ -299,7 +312,7 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
   );
   const isSelectedFinancialYearClosed =
     selectedFinancialYearStartYear !== null && closedFinancialYearStartYears.has(selectedFinancialYearStartYear);
-  const isSelectedYearReadOnly = isSelectedFinancialYearClosed;
+  const isSelectedYearReadOnly = isSelectedFinancialYearClosed || isReadOnly;
   const selectedYearCarryoverTargetLabel = useMemo(
     () => buildFinancialYearFromStartYear((selectedFinancialYearStartYear ?? fallbackFinancialYearStartYear) + 1).label,
     [selectedFinancialYearStartYear, fallbackFinancialYearStartYear]
@@ -507,6 +520,7 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
           id: profile.id,
           full_name: profile.full_name,
           employee_id: profile.employee_id,
+          team_id: profile.team?.id || null,
           baseAllowance,
           carryoverDays,
           totalAllowance,
@@ -591,6 +605,9 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
   const filteredRows = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     const base = rows.filter((row) => {
+      if (scopeTeamOnly && actorTeamId && row.team_id !== actorTeamId) {
+        return false;
+      }
       if (!term) return true;
       return row.full_name.toLowerCase().includes(term) || row.employee_id?.toLowerCase().includes(term);
     });
@@ -603,7 +620,7 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
       if (sortField === 'upcoming') return direction * ((a.upcoming + a.pending) - (b.upcoming + b.pending));
       return direction * (a.remaining - b.remaining);
     });
-  }, [rows, searchTerm, sortDirection, sortField]);
+  }, [rows, searchTerm, sortDirection, sortField, scopeTeamOnly, actorTeamId]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
   const paginatedRows = useMemo(
@@ -983,6 +1000,11 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
               <p className="mt-2 text-xs text-amber-300">
                 This financial year is now closed. The remaining values shown below are the final carryover record moved
                 into {selectedYearCarryoverTargetLabel}. Negative remaining values reduced that following year&apos;s allowance.
+              </p>
+            ) : null}
+            {isReadOnly ? (
+              <p className="mt-2 text-xs text-sky-300">
+                Read-only access: you can view allowances but cannot edit them.
               </p>
             ) : null}
           </div>
@@ -1737,6 +1759,7 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
                   value={newAllowance}
                   onChange={(e) => setNewAllowance(e.target.value)}
                   placeholder="28"
+                  disabled={isReadOnly}
                   className="bg-slate-950 border-border text-foreground"
                 />
               </div>
@@ -1802,7 +1825,7 @@ export function AllowancesContent({ refreshKey }: { refreshKey?: number }) {
             >
               Cancel
             </Button>
-            <Button onClick={handleUpdate} disabled={submitting} className="bg-absence hover:bg-absence-dark text-white">
+            <Button onClick={handleUpdate} disabled={submitting || isReadOnly} className="bg-absence hover:bg-absence-dark text-white">
               {submitting ? 'Updating...' : 'Update'}
             </Button>
           </DialogFooter>

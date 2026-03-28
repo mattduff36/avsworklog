@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
+import { useAuth } from '@/lib/hooks/useAuth';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,6 +32,10 @@ import {
   useAbsenceSummaryForEmployee,
   useAbsenceRealtimeQueryInvalidation,
 } from '@/lib/hooks/useAbsence';
+import {
+  canUseScopedAbsencePermission,
+  useAbsenceSecondaryPermissions,
+} from '@/lib/hooks/useAbsenceSecondaryPermissions';
 import { toast } from 'sonner';
 import { TimesheetsApprovalTable, COLUMN_VISIBILITY_STORAGE_KEY, DEFAULT_COLUMN_VISIBILITY } from './components/TimesheetsApprovalTable';
 import type { ColumnVisibility } from './components/TimesheetsApprovalTable';
@@ -59,10 +64,13 @@ interface TimesheetWithProfile extends Timesheet {
 }
 
 function ApprovalsContent() {
+  const { profile, isAdmin, isActualSuperAdmin } = useAuth();
   const { hasPermission: canViewApprovals, loading: permissionLoading } = usePermissionCheck('approvals', false);
+  const { data: absenceSecondarySnapshot } = useAbsenceSecondaryPermissions(canViewApprovals);
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
+  const actorProfileId = profile?.id || '';
   
   const [timesheets, setTimesheets] = useState<TimesheetWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -137,6 +145,32 @@ function ApprovalsContent() {
   const approveAbsence = useApproveAbsence();
   const rejectAbsence = useRejectAbsence();
   useAbsenceRealtimeQueryInvalidation();
+  const canAuthoriseBookings = Boolean(absenceSecondarySnapshot?.flags.can_authorise_bookings || isAdmin);
+  const scopedPendingAbsences = useMemo(() => {
+    if (!canAuthoriseBookings) return [] as AbsenceWithRelations[];
+    if (!absences || absences.length === 0) return [] as AbsenceWithRelations[];
+    if (isAdmin || isActualSuperAdmin) return absences;
+    if (!actorProfileId || !absenceSecondarySnapshot) return [] as AbsenceWithRelations[];
+
+    return absences.filter((absence) =>
+      canUseScopedAbsencePermission(
+        {
+          permissions: absenceSecondarySnapshot.permissions,
+          team_id: absenceSecondarySnapshot.team_id,
+        },
+        actorProfileId,
+        {
+          profile_id: absence.profile_id,
+          team_id: absence.profiles.team_id || null,
+        },
+        {
+          all: 'authorise_bookings_all',
+          team: 'authorise_bookings_team',
+          own: 'authorise_bookings_own',
+        }
+      )
+    );
+  }, [absences, canAuthoriseBookings, isAdmin, isActualSuperAdmin, actorProfileId, absenceSecondarySnapshot]);
 
   const fetchApprovals = useCallback(async (filter: StatusFilter) => {
     try {
@@ -419,12 +453,12 @@ function ApprovalsContent() {
               <div className="flex items-center gap-2">
                 <Calendar className="h-5 w-5" />
                 <span className="text-sm font-medium">Absences</span>
-                {absences && absences.length > 0 && (
+                {scopedPendingAbsences.length > 0 && (
                   <Badge 
                     variant="secondary"
                     className={activeTab === 'absences' ? "bg-white/20 text-white border-white/30" : ""}
                   >
-                    {absences.length}
+                    {scopedPendingAbsences.length}
                   </Badge>
                 )}
               </div>
@@ -630,7 +664,7 @@ function ApprovalsContent() {
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </CardContent>
               </Card>
-            ) : !absences || absences.length === 0 ? (
+            ) : !canAuthoriseBookings || scopedPendingAbsences.length === 0 ? (
               <Card className="border-border">
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <CheckCircle2 className="h-12 w-12 text-green-400 mb-3" />
@@ -702,7 +736,7 @@ function ApprovalsContent() {
                 {absenceViewMode === 'table' && (
                   <div className="hidden md:block">
                     <AbsencesApprovalTable
-                      absences={absences}
+                      absences={scopedPendingAbsences}
                       onApprove={async (id) => {
                         try { await approveAbsence.mutateAsync(id); }
                         catch (e) { console.error('Error approving absence:', e); }
@@ -720,7 +754,7 @@ function ApprovalsContent() {
 
                 {/* Card View - Always on mobile, conditional on desktop */}
                 <div className={absenceViewMode === 'table' ? 'md:hidden space-y-4' : 'space-y-4'}>
-                  {absences.map((absence) => (
+                  {scopedPendingAbsences.map((absence) => (
                     <AbsenceApprovalCard
                       key={absence.id}
                       absence={absence}

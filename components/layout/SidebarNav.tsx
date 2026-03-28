@@ -474,7 +474,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
       {/* Sidebar - Always visible on desktop, hidden on mobile */}
       <div
         ref={sidebarRef}
-        className={`hidden md:flex md:flex-col fixed left-0 top-[68px] bottom-0 bg-slate-900 border-r border-slate-700 z-[60] transition-all duration-300 ease-in-out ${
+        className={`hidden md:flex md:flex-col fixed left-0 top-[68px] bottom-0 bg-slate-900 border-r border-slate-700 z-[60] overflow-x-hidden transition-all duration-300 ease-in-out ${
           isExpanded ? 'w-64' : 'w-16'
         }`}
         onMouseEnter={handleSidebarMouseEnter}
@@ -499,12 +499,12 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
         </div>
 
         {/* Navigation */}
-        <div className={`overflow-y-auto py-4 ${isSuperAdmin ? 'h-[calc(100vh-10rem)]' : 'h-[calc(100vh-8.25rem)]'}`}>
+        <div className={`overflow-y-auto overflow-x-hidden py-4 ${isSuperAdmin ? 'h-[calc(100vh-10rem)]' : 'h-[calc(100vh-8.25rem)]'}`}>
           {/* Manager Links */}
           {(isManager || isAdmin) && sidebarManagerLinks.length > 0 && (
-          <div className={isExpanded ? 'px-3 mb-6' : 'px-2 mb-6'}>
+          <div className="px-3 mb-6">
             <div className={`px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider transition-opacity duration-200 ${
-              isExpanded ? 'opacity-100 delay-300' : 'opacity-0 h-0 overflow-hidden'
+              isExpanded ? 'opacity-100 delay-300' : 'opacity-0 pointer-events-none'
             }`}>
               Management
             </div>
@@ -519,23 +519,21 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                     href={link.href}
                     title={!isExpanded ? link.label : undefined}
                     onClick={handleNavLinkClick}
-                    className={`flex items-center rounded-md text-sm font-medium transition-colors ${
-                      isExpanded ? 'gap-3 px-3 py-2' : 'justify-center py-3'
-                    } ${
+                    className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                       isActive
                         ? 'bg-avs-yellow text-slate-900'
                         : 'text-muted-foreground hover:bg-slate-800 hover:text-white'
                     }`}
                   >
-                    <div className="relative">
-                      <Icon className={isExpanded ? 'w-4 h-4' : 'w-5 h-5'} />
+                    <div className="relative flex-shrink-0">
+                      <Icon className="w-4 h-4" />
                       {!isExpanded && badgeCount > 0 && (
                         <span className="absolute -top-2 -right-2 min-w-[1.1rem] px-1 h-[1.1rem] rounded-full bg-red-500 text-white text-[10px] leading-none flex items-center justify-center font-semibold">
                           {badgeCount > 99 ? '99+' : badgeCount}
                         </span>
                       )}
                     </div>
-                    <span className={`transition-opacity duration-200 whitespace-nowrap ${
+                    <span className={`min-w-0 transition-opacity duration-200 whitespace-nowrap ${
                       isExpanded ? 'opacity-100 delay-300' : 'opacity-0 w-0 overflow-hidden'
                     }`}>
                       {link.label}
@@ -554,9 +552,9 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
 
           {/* Admin Links */}
           {adminLinks.length > 0 && (
-            <div className={isExpanded ? 'px-3 mb-6' : 'px-2 mb-6'}>
+            <div className="px-3 mb-6">
               <div className={`px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider transition-opacity duration-200 ${
-                isExpanded ? 'opacity-100 delay-300' : 'opacity-0 h-0 overflow-hidden'
+                isExpanded ? 'opacity-100 delay-300' : 'opacity-0 pointer-events-none'
               }`}>
                 Administration
               </div>
@@ -570,16 +568,14 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                       href={link.href}
                       title={!isExpanded ? link.label : undefined}
                       onClick={handleNavLinkClick}
-                      className={`flex items-center rounded-md text-sm font-medium transition-colors ${
-                        isExpanded ? 'gap-3 px-3 py-2' : 'justify-center py-3'
-                      } ${
+                      className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                         isActive
                           ? 'bg-avs-yellow text-slate-900 [&>svg]:text-slate-900'
                           : 'text-muted-foreground hover:bg-slate-800 hover:text-white'
                       }`}
                     >
-                      <Icon className={isExpanded ? 'w-4 h-4' : 'w-5 h-5'} />
-                      <span className={`transition-opacity duration-200 whitespace-nowrap ${
+                      <Icon className="w-4 h-4 flex-shrink-0" />
+                      <span className={`min-w-0 transition-opacity duration-200 whitespace-nowrap ${
                         isExpanded ? 'opacity-100 delay-300' : 'opacity-0 w-0 overflow-hidden'
                       }`}>
                         {link.label}
@@ -593,9 +589,9 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
 
           {/* Developer Tools - SuperAdmin Only */}
           {showDeveloperTools && (
-            <div className={isExpanded ? 'px-3' : 'px-2'}>
+            <div className="px-3">
               <div className={`px-3 py-2 text-xs font-semibold text-red-500 uppercase tracking-wider transition-opacity duration-200 ${
-                isExpanded ? 'opacity-100 delay-300' : 'opacity-0 h-0 overflow-hidden'
+                isExpanded ? 'opacity-100 delay-300' : 'opacity-0 pointer-events-none'
               }`}>
                 Developer
               </div>
@@ -604,16 +600,14 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                   href="/debug"
                   title={!isExpanded ? 'Debug Console' : undefined}
                   onClick={handleNavLinkClick}
-                  className={`flex items-center rounded-md text-sm font-medium transition-colors ${
-                    isExpanded ? 'gap-3 px-3 py-2' : 'justify-center py-3'
-                  } ${
+                  className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                     pathname === '/debug'
                       ? 'bg-red-600 text-white'
                       : 'text-red-500 hover:bg-slate-800 hover:text-red-400'
                   }`}
                 >
-                  <Bug className={isExpanded ? 'w-4 h-4' : 'w-5 h-5'} />
-                  <span className={`transition-opacity duration-200 whitespace-nowrap ${
+                  <Bug className="w-4 h-4 flex-shrink-0" />
+                  <span className={`min-w-0 transition-opacity duration-200 whitespace-nowrap ${
                     isExpanded ? 'opacity-100 delay-300' : 'opacity-0 w-0 overflow-hidden'
                   }`}>
                     Debug Console

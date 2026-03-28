@@ -18,6 +18,7 @@ export interface AbsenceWithRelations extends Absence {
   profiles: {
     full_name: string;
     employee_id: string | null;
+    team_id?: string | null;
   };
   created_by_profile?: {
     full_name: string;

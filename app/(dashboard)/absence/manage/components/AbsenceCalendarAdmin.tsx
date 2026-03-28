@@ -21,6 +21,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { createClient } from '@/lib/supabase/client';
+import { useAuth } from '@/lib/hooks/useAuth';
+import {
+  canUseScopedAbsencePermission,
+  useAbsenceSecondaryPermissions,
+} from '@/lib/hooks/useAbsenceSecondaryPermissions';
 import {
   Dialog,
   DialogContent,
@@ -186,6 +191,8 @@ function getOldestOpenFinancialYearStartYear(
 }
 
 export function AbsenceCalendarAdmin() {
+  const { profile, isAdmin, isActualSuperAdmin } = useAuth();
+  const { data: absenceSecondarySnapshot, isLoading: absenceSecondaryLoading } = useAbsenceSecondaryPermissions(true);
   const [generationStatus, setGenerationStatus] = useState<GenerationStatus | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [carryoverByProfile, setCarryoverByProfile] = useState<Map<string, number>>(new Map());
@@ -270,6 +277,9 @@ export function AbsenceCalendarAdmin() {
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [editTarget, setEditTarget] = useState<AbsenceWithRelations | null>(null);
+  const actorProfileId = profile?.id || '';
+  const canViewBookings = Boolean(absenceSecondarySnapshot?.flags.can_view_bookings || isAdmin);
+  const canAddEditBookings = Boolean(absenceSecondarySnapshot?.flags.can_add_edit_bookings || isAdmin);
 
   useEffect(() => {
     void loadGenerationStatus();
@@ -346,15 +356,46 @@ export function AbsenceCalendarAdmin() {
   const monthEnd = useMemo(() => endOfMonth(currentMonth), [currentMonth]);
   const gridStart = useMemo(() => startOfWeek(monthStart, { weekStartsOn: 1 }), [monthStart]);
   const gridEnd = useMemo(() => endOfWeek(monthEnd, { weekStartsOn: 1 }), [monthEnd]);
+  const employeeById = useMemo(() => {
+    const map = new Map<string, Employee>();
+    employees.forEach((employee) => {
+      map.set(employee.id, employee);
+    });
+    return map;
+  }, [employees]);
 
   const calendarEvents = useMemo(() => {
     const filteredAbsences = (absences || []).filter((absence) => {
+      if (!canViewBookings) return false;
       if (absence.status === 'cancelled') return false;
+      const employee = employeeById.get(absence.profile_id);
+      const targetTeamId = absence.profiles.team_id || employee?.team_id || null;
+      const canViewTarget =
+        isAdmin ||
+        isActualSuperAdmin ||
+        (actorProfileId &&
+          absenceSecondarySnapshot &&
+          canUseScopedAbsencePermission(
+            {
+              permissions: absenceSecondarySnapshot.permissions,
+              team_id: absenceSecondarySnapshot.team_id,
+            },
+            actorProfileId,
+            {
+              profile_id: absence.profile_id,
+              team_id: targetTeamId,
+            },
+            {
+              all: 'see_bookings_all',
+              team: 'see_bookings_team',
+              own: 'see_bookings_own',
+            }
+          ));
+      if (!canViewTarget) return false;
       if (selectedEmployeeId !== 'all' && absence.profile_id !== selectedEmployeeId) return false;
       if (selectedReasonId !== 'all' && absence.reason_id !== selectedReasonId) return false;
       if (selectedStatus !== 'all' && absence.status !== selectedStatus) return false;
       if (selectedTeamId !== 'all') {
-        const employee = employees.find((emp) => emp.id === absence.profile_id);
         if (selectedTeamId === 'unassigned') {
           if (employee?.team_id) return false;
         } else if (!employee?.team_id || employee.team_id !== selectedTeamId) {
@@ -367,7 +408,7 @@ export function AbsenceCalendarAdmin() {
     return filteredAbsences.map((absence) => {
       const start = parseIsoDateAsLocalMidnight(absence.date);
       const end = absence.end_date ? parseIsoDateAsLocalMidnight(absence.end_date) : start;
-      const employee = employees.find((emp) => emp.id === absence.profile_id);
+      const employee = employeeById.get(absence.profile_id);
 
       return {
         id: absence.id,
@@ -391,7 +432,19 @@ export function AbsenceCalendarAdmin() {
         end,
       } as CalendarEvent;
     });
-  }, [absences, employees, selectedEmployeeId, selectedReasonId, selectedTeamId, selectedStatus]);
+  }, [
+    absences,
+    canViewBookings,
+    employeeById,
+    selectedEmployeeId,
+    selectedReasonId,
+    selectedTeamId,
+    selectedStatus,
+    actorProfileId,
+    absenceSecondarySnapshot,
+    isAdmin,
+    isActualSuperAdmin,
+  ]);
 
   const teamOptions = useMemo(() => {
     const teamMap = new Map<string, string>();
@@ -551,10 +604,33 @@ export function AbsenceCalendarAdmin() {
   }
 
   function canEditAbsence(absence: AbsenceWithRelations): boolean {
+    if (!canAddEditBookings) return false;
+    if (!isAdmin && !isActualSuperAdmin) {
+      if (!actorProfileId || !absenceSecondarySnapshot) return false;
+      const employee = employeeById.get(absence.profile_id);
+      const targetTeamId = absence.profiles.team_id || employee?.team_id || null;
+      const canEditTarget = canUseScopedAbsencePermission(
+        {
+          permissions: absenceSecondarySnapshot.permissions,
+          team_id: absenceSecondarySnapshot.team_id,
+        },
+        actorProfileId,
+        {
+          profile_id: absence.profile_id,
+          team_id: targetTeamId,
+        },
+        {
+          all: 'add_edit_bookings_all',
+          team: 'add_edit_bookings_team',
+          own: 'add_edit_bookings_own',
+        }
+      );
+      if (!canEditTarget) return false;
+    }
     return absence.record_source !== 'archived' && !absence.is_bank_holiday && !absence.auto_generated;
   }
 
-  if (isLoading) {
+  if (isLoading || absenceSecondaryLoading) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-12">

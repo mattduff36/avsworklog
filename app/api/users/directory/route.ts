@@ -31,7 +31,8 @@ export async function GET(request: NextRequest) {
         effectiveRole.is_actual_super_admin ||
         effectiveRole.is_super_admin ||
         effectiveRole.role_name === 'admin' ||
-        effectiveRole.is_manager_admin
+        effectiveRole.is_manager_admin ||
+        effectiveRole.role_name === 'supervisor'
       )
   );
   if (!canViewDirectory) {
@@ -41,7 +42,8 @@ export async function GET(request: NextRequest) {
     effectiveRole.is_actual_super_admin ||
     effectiveRole.is_super_admin ||
     effectiveRole.role_name === 'admin';
-  const shouldScopeToTeam = effectiveRole.is_manager_admin && !isAdminOrSuper;
+  const shouldScopeToTeam =
+    (effectiveRole.is_manager_admin || effectiveRole.role_name === 'supervisor') && !isAdminOrSuper;
 
   const includeRole = isTruthy(request.nextUrl.searchParams.get('includeRole'));
   const includeAllowance = isTruthy(request.nextUrl.searchParams.get('includeAllowance'));

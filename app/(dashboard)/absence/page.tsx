@@ -3,6 +3,10 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
+import {
+  canUseScopedAbsencePermission,
+  useAbsenceSecondaryPermissions,
+} from '@/lib/hooks/useAbsenceSecondaryPermissions';
 import { fetchAbsenceMessage } from '@/lib/client/absence-message';
 import { fetchCurrentWorkShift } from '@/lib/client/work-shifts';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -145,10 +149,44 @@ function isExpectedAbsenceSubmissionError(message: string): boolean {
 }
 
 export default function AbsencePage() {
-  const { profile, isManager, isAdmin } = useAuth();
+  const { profile, isManager, isAdmin, isActualSuperAdmin } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { hasPermission, loading: permissionLoading } = usePermissionCheck('absence');
+  const { data: absenceSecondarySnapshot, isLoading: secondaryLoading } = useAbsenceSecondaryPermissions(hasPermission);
+  const actorProfileId = profile?.id || '';
+  const canViewBookings = Boolean(absenceSecondarySnapshot?.flags.can_view_bookings || isAdmin || isManager);
+  const canRequestLeave =
+    isAdmin ||
+    isActualSuperAdmin ||
+    Boolean(
+      actorProfileId &&
+        absenceSecondarySnapshot &&
+        canUseScopedAbsencePermission(
+          {
+            permissions: absenceSecondarySnapshot.permissions,
+            team_id: absenceSecondarySnapshot.team_id,
+          },
+          actorProfileId,
+          {
+            profile_id: actorProfileId,
+            team_id: absenceSecondarySnapshot.team_id || null,
+          },
+          {
+            all: 'add_edit_bookings_all',
+            team: 'add_edit_bookings_team',
+            own: 'add_edit_bookings_own',
+          }
+        )
+    );
+  const canOpenManageLink = Boolean(
+    isAdmin ||
+      isManager ||
+      absenceSecondarySnapshot?.permissions.add_edit_bookings_all ||
+      absenceSecondarySnapshot?.permissions.add_edit_bookings_team ||
+      absenceSecondarySnapshot?.permissions.see_allowances_all ||
+      absenceSecondarySnapshot?.permissions.see_allowances_team
+  );
   const [activeTab, setActiveTab] = useState<'calendar' | 'bookings'>('calendar');
   const [showRequestDialog, setShowRequestDialog] = useState(false);
   const [generationStatus, setGenerationStatus] = useState<GenerationStatus | null>(null);
@@ -257,11 +295,43 @@ export default function AbsencePage() {
   useAbsenceRealtimeQueryInvalidation();
   
   const calendarAbsences = useMemo(() => {
-    if (!(isManager || isAdmin)) {
-      return userAbsences?.filter(a => a.status !== 'cancelled') || [];
+    if (!canViewBookings) {
+      return [];
     }
-    return allAbsencesData?.filter(a => a.status !== 'cancelled') || [];
-  }, [isManager, isAdmin, userAbsences, allAbsencesData]);
+
+    if (!actorProfileId || !absenceSecondarySnapshot || (!isManager && !isAdmin && !isActualSuperAdmin)) {
+      return userAbsences?.filter((absence) => absence.status !== 'cancelled') || [];
+    }
+
+    return (allAbsencesData || []).filter((absence) => {
+      if (absence.status === 'cancelled') return false;
+      return canUseScopedAbsencePermission(
+        {
+          permissions: absenceSecondarySnapshot.permissions,
+          team_id: absenceSecondarySnapshot.team_id,
+        },
+        actorProfileId,
+        {
+          profile_id: absence.profile_id,
+          team_id: absence.profiles.team_id || null,
+        },
+        {
+          all: 'see_bookings_all',
+          team: 'see_bookings_team',
+          own: 'see_bookings_own',
+        }
+      );
+    });
+  }, [
+    canViewBookings,
+    actorProfileId,
+    absenceSecondarySnapshot,
+    isManager,
+    isAdmin,
+    isActualSuperAdmin,
+    userAbsences,
+    allAbsencesData,
+  ]);
   
   const loadingAbsences = isManager || isAdmin ? loadingAllAbsences : loadingUserAbsences;
   // Form state
@@ -401,6 +471,11 @@ export default function AbsencePage() {
   // Handle form submission
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (!canRequestLeave) {
+      toast.error('You do not have permission to create or edit your own bookings.');
+      return;
+    }
     
     if (!selectedReasonId || !selectedReason) {
       toast.error('Please select an absence reason');
@@ -477,6 +552,10 @@ export default function AbsencePage() {
   
   // Handle request from day modal
   function handleRequestFromDay() {
+    if (!canRequestLeave) {
+      toast.error('You do not have permission to create or edit your own bookings.');
+      return;
+    }
     if (selectedDate) {
       if (formatDateISO(selectedDate) > bookingMaxDate) {
         toast.error(`Leave can only be booked up to ${formatDate(bookingMaxDate)}.`);
@@ -703,7 +782,7 @@ export default function AbsencePage() {
   // Show loading while checking permissions
   const isBookingWindowLoading = generationStatusLoading && !generationStatus;
 
-  if (permissionLoading || loadingAbsences || loadingSummary || isBookingWindowLoading) {
+  if (permissionLoading || secondaryLoading || loadingAbsences || loadingSummary || isBookingWindowLoading) {
     return (
       <PageLoader
         message={permissionLoading ? 'Checking access...' : isBookingWindowLoading ? 'Loading booking window...' : 'Loading absences...'}
@@ -727,14 +806,14 @@ export default function AbsencePage() {
               Absence & Leave
             </h1>
             <p className="text-muted-foreground">
-              {isManager || isAdmin
+              {canOpenManageLink
                 ? 'Manage annual leave and view absence records'
                 : 'Request annual leave and view your absence records'}
             </p>
           </div>
 
           <div className="flex items-center gap-2">
-            {(isManager || isAdmin) && (
+            {canOpenManageLink && (
               <Link href="/absence/manage">
                 <Button variant="outline" className="border-border text-muted-foreground">
                   <Settings className="h-4 w-4 mr-2" />
@@ -745,7 +824,7 @@ export default function AbsencePage() {
             <Button
               className="bg-absence hover:bg-absence-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
               onClick={() => setShowRequestDialog(true)}
-              disabled={isSelectedFinancialYearClosed}
+              disabled={isSelectedFinancialYearClosed || !canRequestLeave}
             >
               <Plus className="h-4 w-4 mr-2" />
               Request Leave

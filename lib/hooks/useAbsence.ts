@@ -389,7 +389,7 @@ export function useAbsencesForUserFinancialYear(financialYear?: Pick<FinancialYe
         .select(`
           *,
           absence_reasons (*),
-          profiles!absences_profile_id_fkey (full_name, employee_id)
+          profiles!absences_profile_id_fkey (full_name, employee_id, team_id)
         `)
         .eq('profile_id', user.id)
         .gte('date', start.toISOString().split('T')[0])
@@ -752,8 +752,8 @@ export function useAllAbsences(filters?: {
           const tableName = source === 'archived' ? 'absences_archive' : 'absences';
           const profileJoin =
             source === 'archived'
-              ? 'profiles!absences_archive_profile_id_fkey (full_name, employee_id)'
-              : 'profiles!absences_profile_id_fkey (full_name, employee_id)';
+              ? 'profiles!absences_archive_profile_id_fkey (full_name, employee_id, team_id)'
+              : 'profiles!absences_profile_id_fkey (full_name, employee_id, team_id)';
           const createdByJoin =
             source === 'archived'
               ? 'created_by_profile:profiles!absences_archive_created_by_fkey (full_name)'
@@ -837,7 +837,7 @@ export function usePendingAbsences() {
         .select(`
           *,
           absence_reasons (*),
-          profiles!absences_profile_id_fkey (full_name, employee_id)
+          profiles!absences_profile_id_fkey (full_name, employee_id, team_id)
         `)
         .eq('status', 'pending')
         .order('date', { ascending: true });
