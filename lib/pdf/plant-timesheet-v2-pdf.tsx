@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
     lineHeight: 1.25,
   },
   colDay: {
-    width: '6%',
+    width: '8%',
     borderRightWidth: 1,
     borderRightColor: '#000',
     justifyContent: 'center',
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   colRemarks: {
-    width: '22%',
+    width: '20%',
     justifyContent: 'center',
     paddingHorizontal: 4,
   },
@@ -401,7 +401,7 @@ export function PlantTimesheetV2PDF({ timesheet, employeeName }: PlantTimesheetV
           {allDays.map((entry) => (
             <View key={entry.day_of_week} style={styles.tableRow}>
               <View style={styles.colDay}>
-                <Text style={styles.dayCellText}>{DAY_NAMES[entry.day_of_week - 1].toUpperCase()}</Text>
+                <Text style={styles.dayCellText}>{DAY_NAMES[entry.day_of_week - 1].substring(0, 3).toUpperCase()}</Text>
               </View>
               <View style={styles.colOperatorTravel}><Text style={styles.cellText}>{entry.did_not_work ? '' : formatHours(entry.operator_travel_hours)}</Text></View>
               <View style={styles.colOperatorStart}><Text style={styles.cellText}>{entry.did_not_work ? '' : (entry.time_started || '')}</Text></View>
