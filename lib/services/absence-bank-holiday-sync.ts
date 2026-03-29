@@ -25,6 +25,15 @@ export interface BankHolidaySeedResult {
   carryoverGenerated: number;
 }
 
+export interface ProfileBankHolidaySeedResult {
+  financialYearStartYear: number;
+  financialYearLabel: string;
+  bankHolidayCount: number;
+  employeeCount: number;
+  created: number;
+  skippedExisting: number;
+}
+
 export interface AbsenceGenerationStatus {
   currentFinancialYearStartYear: number;
   latestGeneratedFinancialYearStartYear: number;
@@ -64,7 +73,7 @@ export interface AbsenceGenerationUndoResult {
   restoredCarryovers: number;
 }
 
-interface BankHolidayEvent {
+export interface BankHolidayEvent {
   title: string;
   date: string;
 }
@@ -143,6 +152,19 @@ export interface UndoBulkAbsenceBatchResult {
   removedAbsences: number;
 }
 
+export interface ReplayBulkAbsenceForProfileResult {
+  selectedBatchCount: number;
+  appliedBatchCount: number;
+  skippedOutOfRangeCount: number;
+  totalCreatedCount: number;
+  totalDuplicateCount: number;
+  totalConflictingWorkingDaysSkipped: number;
+  warningCount: number;
+  warnings: BulkAbsenceAllowanceWarning[];
+  conflicts: BulkAbsenceConflictDetail[];
+  appliedBatchIds: string[];
+}
+
 const ABSENCE_CARRYOVER_GENERATION_SOURCE = 'absence-year-end-carryover';
 
 export function getFinancialYearStartYear(date: Date): number {
@@ -193,6 +215,14 @@ function addDaysIso(isoDate: string, days: number): string {
   const date = toDateAtMidnight(isoDate);
   date.setDate(date.getDate() + days);
   return formatIsoDate(date);
+}
+
+function maxIsoDate(...values: string[]): string {
+  return values.reduce((maxValue, value) => (value > maxValue ? value : maxValue));
+}
+
+function minIsoDate(...values: string[]): string {
+  return values.reduce((minValue, value) => (value < minValue ? value : minValue));
 }
 
 function countWeekdaysInInterval(interval: DateInterval, pattern?: WorkShiftPattern | null): number {
@@ -408,7 +438,7 @@ export async function generateFinancialYearCarryovers(
   return rowsToInsert.length;
 }
 
-async function getFinancialYearBankHolidays(startYear: number): Promise<BankHolidayEvent[]> {
+export async function getFinancialYearBankHolidays(startYear: number): Promise<BankHolidayEvent[]> {
   const bounds = buildFinancialYearBounds(startYear);
   const startIso = formatIsoDate(bounds.start);
   const endIso = formatIsoDate(bounds.end);
@@ -421,6 +451,28 @@ async function getFinancialYearBankHolidays(startYear: number): Promise<BankHoli
   return [...eventsStartYear, ...eventsEndYear]
     .filter((event) => event.date >= startIso && event.date <= endIso)
     .filter((event) => isWeekdayIsoDate(event.date));
+}
+
+async function getEligibleEmployeesByIds(
+  supabase: AnySupabase,
+  profileIds: string[]
+): Promise<Array<{ id: string }>> {
+  const uniqueProfileIds = Array.from(new Set(profileIds.filter(Boolean)));
+  if (uniqueProfileIds.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, annual_holiday_allowance_days')
+    .in('id', uniqueProfileIds)
+    .gt('annual_holiday_allowance_days', 0);
+
+  if (error) {
+    throw error;
+  }
+
+  return (data || []).map((row: { id: string }) => ({ id: row.id }));
 }
 
 export async function seedFinancialYearBankHolidays(
@@ -506,6 +558,102 @@ export async function seedFinancialYearBankHolidays(
     created: rowsToInsert.length,
     skippedExisting: allRows.length - rowsToInsert.length,
     carryoverGenerated: 0,
+  };
+}
+
+export async function seedRemainingFinancialYearBankHolidaysForProfiles(options: {
+  supabase: AnySupabase;
+  profileIds: string[];
+  financialYearStartYear?: number;
+  fromDate?: string;
+  dryRun?: boolean;
+}): Promise<ProfileBankHolidaySeedResult> {
+  const financialYearStartYear = options.financialYearStartYear ?? getFinancialYearStartYear(new Date());
+  const financialYear = buildFinancialYearBounds(financialYearStartYear);
+  const annualLeaveReasonId = await getAnnualLeaveReasonId(options.supabase);
+  const employees = await getEligibleEmployeesByIds(options.supabase, options.profileIds);
+  const bankHolidays = await getFinancialYearBankHolidays(financialYearStartYear);
+  const financialYearStartIso = formatIsoDate(financialYear.start);
+  const financialYearEndIso = formatIsoDate(financialYear.end);
+  const fromDateIso = normalizeIsoDate(options.fromDate || formatIsoDate(new Date()));
+  const effectiveStartIso = maxIsoDate(financialYearStartIso, fromDateIso);
+  const futureBankHolidays = bankHolidays.filter(
+    (holiday) => holiday.date >= effectiveStartIso && holiday.date <= financialYearEndIso
+  );
+
+  const allRows = employees.flatMap((employee) =>
+    futureBankHolidays.map((holiday) => {
+      const holidayKey = buildHolidayKey(employee.id, holiday.date);
+      return {
+        profile_id: employee.id,
+        date: holiday.date,
+        end_date: null,
+        reason_id: annualLeaveReasonId,
+        duration_days: 1,
+        is_half_day: false,
+        half_day_session: null,
+        notes: `Auto-added UK bank holiday: ${holiday.title}`,
+        status: 'approved' as const,
+        created_by: null,
+        approved_by: null,
+        approved_at: new Date().toISOString(),
+        is_bank_holiday: true,
+        auto_generated: true,
+        generation_source: getGenerationSource(financialYear.label),
+        holiday_key: holidayKey,
+      };
+    })
+  );
+
+  if (allRows.length === 0) {
+    return {
+      financialYearStartYear,
+      financialYearLabel: financialYear.label,
+      bankHolidayCount: futureBankHolidays.length,
+      employeeCount: employees.length,
+      created: 0,
+      skippedExisting: 0,
+    };
+  }
+
+  const { data: existingRows, error: existingError } = await options.supabase
+    .from('absences')
+    .select('holiday_key')
+    .eq('auto_generated', true)
+    .eq('is_bank_holiday', true)
+    .eq('generation_source', getGenerationSource(financialYear.label))
+    .in('profile_id', employees.map((employee) => employee.id));
+
+  if (existingError) {
+    throw existingError;
+  }
+
+  const existingKeys = new Set(
+    ((existingRows || []) as Array<{ holiday_key: string | null }>)
+      .map((row) => row.holiday_key)
+      .filter((key): key is string => Boolean(key))
+  );
+
+  const rowsToInsert = allRows.filter((row) => !existingKeys.has(row.holiday_key));
+
+  if (!options.dryRun && rowsToInsert.length > 0) {
+    const batchSize = 500;
+    for (let i = 0; i < rowsToInsert.length; i += batchSize) {
+      const chunk = rowsToInsert.slice(i, i + batchSize);
+      const { error } = await options.supabase.from('absences').insert(chunk);
+      if (error) {
+        throw error;
+      }
+    }
+  }
+
+  return {
+    financialYearStartYear,
+    financialYearLabel: financialYear.label,
+    bankHolidayCount: futureBankHolidays.length,
+    employeeCount: employees.length,
+    created: rowsToInsert.length,
+    skippedExisting: allRows.length - rowsToInsert.length,
   };
 }
 
@@ -1311,13 +1459,26 @@ export async function bookBulkAbsence(
 
 export async function listBulkAbsenceBatches(
   supabase: AnySupabase,
-  limit = 25
+  options?: number | { limit?: number; financialYearStartYear?: number }
 ): Promise<BulkAbsenceBatchSummary[]> {
-  const { data, error } = await supabase
+  const resolvedOptions = typeof options === 'number' ? { limit: options } : (options || {});
+  const limit = resolvedOptions.limit ?? 25;
+  let query = supabase
     .from('absence_bulk_batches')
     .select('id, reason_id, reason_name, start_date, end_date, notes, apply_to_all, role_names, explicit_profile_ids, targeted_count, created_count, duplicate_count, created_at, created_by_profile:profiles!absence_bulk_batches_created_by_fkey(full_name)')
     .order('created_at', { ascending: false })
     .limit(limit);
+
+  if (typeof resolvedOptions.financialYearStartYear === 'number') {
+    const financialYear = buildFinancialYearBounds(resolvedOptions.financialYearStartYear);
+    const financialYearStartIso = formatIsoDate(financialYear.start);
+    const financialYearEndIso = formatIsoDate(financialYear.end);
+    query = query
+      .lte('start_date', financialYearEndIso)
+      .gte('end_date', financialYearStartIso);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw error;
@@ -1342,6 +1503,116 @@ export async function listBulkAbsenceBatches(
       createdByName: creator?.full_name || null,
     };
   });
+}
+
+export async function replayBulkAbsenceBatchesForProfile(options: {
+  supabase: AnySupabase;
+  actorProfileId: string;
+  profileId: string;
+  batchIds: string[];
+  financialYearStartYear?: number;
+  fromDate?: string;
+  bookBulkAbsenceFn?: typeof bookBulkAbsence;
+}): Promise<ReplayBulkAbsenceForProfileResult> {
+  const selectedBatchIds = Array.from(new Set(options.batchIds.filter(Boolean)));
+  const bookBulkAbsenceFn = options.bookBulkAbsenceFn || bookBulkAbsence;
+  if (selectedBatchIds.length === 0) {
+    return {
+      selectedBatchCount: 0,
+      appliedBatchCount: 0,
+      skippedOutOfRangeCount: 0,
+      totalCreatedCount: 0,
+      totalDuplicateCount: 0,
+      totalConflictingWorkingDaysSkipped: 0,
+      warningCount: 0,
+      warnings: [],
+      conflicts: [],
+      appliedBatchIds: [],
+    };
+  }
+
+  const financialYearStartYear = options.financialYearStartYear ?? getFinancialYearStartYear(new Date());
+  const financialYear = buildFinancialYearBounds(financialYearStartYear);
+  const financialYearStartIso = formatIsoDate(financialYear.start);
+  const financialYearEndIso = formatIsoDate(financialYear.end);
+  const fromDateIso = normalizeIsoDate(options.fromDate || formatIsoDate(new Date()));
+  const replayStartFloor = maxIsoDate(financialYearStartIso, fromDateIso);
+
+  const { data: selectedBatches, error: batchError } = await options.supabase
+    .from('absence_bulk_batches')
+    .select('id, reason_id, reason_name, start_date, end_date, notes')
+    .in('id', selectedBatchIds);
+
+  if (batchError) {
+    throw batchError;
+  }
+
+  const batches = (selectedBatches || []) as Array<{
+    id: string;
+    reason_id: string;
+    reason_name: string;
+    start_date: string;
+    end_date: string;
+    notes: string | null;
+  }>;
+
+  const foundIds = new Set(batches.map((batch) => batch.id));
+  const missingBatchIds = selectedBatchIds.filter((batchId) => !foundIds.has(batchId));
+  if (missingBatchIds.length > 0) {
+    throw new Error(`Unknown bulk batch IDs: ${missingBatchIds.join(', ')}`);
+  }
+
+  let appliedBatchCount = 0;
+  let skippedOutOfRangeCount = 0;
+  let totalCreatedCount = 0;
+  let totalDuplicateCount = 0;
+  let totalConflictingWorkingDaysSkipped = 0;
+  const warnings: BulkAbsenceAllowanceWarning[] = [];
+  const conflicts: BulkAbsenceConflictDetail[] = [];
+  const appliedBatchIds: string[] = [];
+
+  for (const batch of batches) {
+    const clippedStart = maxIsoDate(batch.start_date, replayStartFloor);
+    const clippedEnd = minIsoDate(batch.end_date, financialYearEndIso);
+
+    if (clippedStart > clippedEnd) {
+      skippedOutOfRangeCount += 1;
+      continue;
+    }
+
+    const replayResult = await bookBulkAbsenceFn({
+      supabase: options.supabase,
+      actorProfileId: options.actorProfileId,
+      reasonId: batch.reason_id,
+      startDate: clippedStart,
+      endDate: clippedEnd,
+      notes: batch.notes || undefined,
+      applyToAll: false,
+      employeeIds: [options.profileId],
+      confirm: true,
+    });
+
+    appliedBatchCount += 1;
+    appliedBatchIds.push(batch.id);
+    totalCreatedCount += replayResult.createdCount;
+    totalDuplicateCount += replayResult.duplicateCount;
+    totalConflictingWorkingDaysSkipped += replayResult.conflictingWorkingDaysSkipped;
+    warnings.push(...replayResult.warnings);
+    conflicts.push(...replayResult.conflicts);
+  }
+
+  return {
+    selectedBatchCount: selectedBatchIds.length,
+    appliedBatchCount,
+    skippedOutOfRangeCount,
+    totalCreatedCount,
+    totalDuplicateCount,
+    totalConflictingWorkingDaysSkipped,
+    warningCount: warnings.length,
+    warnings,
+    conflicts,
+    appliedBatchIds,
+  };
 }
 
 export async function undoBulkAbsenceBatch(

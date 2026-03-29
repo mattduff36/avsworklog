@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PageLoader } from '@/components/ui/page-loader';
-import { Clipboard, Clock, Download, Filter, Loader2, Plus, Trash2, User } from 'lucide-react';
+import { Clipboard, Clock, Download, Filter, Loader2, Plus, Trash2, User, LayoutGrid, Table2, Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
@@ -19,6 +19,20 @@ import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { formatDate } from '@/lib/utils/date';
 import type { Employee } from '@/types/common';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  DEFAULT_HGV_INSPECTIONS_COLUMN_VISIBILITY,
+  HgvInspectionsColumnVisibility,
+  HgvInspectionsListTable,
+  HGV_INSPECTIONS_COLUMN_VISIBILITY_STORAGE_KEY,
+} from './components/HgvInspectionsListTable';
 
 interface HgvInspectionWithRelations {
   id: string;
@@ -65,6 +79,15 @@ function HgvInspectionsContent() {
   const [downloading, setDownloading] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [displayCount, setDisplayCount] = useState(pageSize);
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('hgv-inspections-view-mode') as 'cards' | 'table') || 'cards';
+    }
+    return 'cards';
+  });
+  const [columnVisibility, setColumnVisibility] = useState<HgvInspectionsColumnVisibility>(
+    DEFAULT_HGV_INSPECTIONS_COLUMN_VISIBILITY
+  );
 
   const [selectedEmployeeId, setSelectedEmployeeId] = useQueryState('employee', {
     defaultValue: 'all',
@@ -182,6 +205,18 @@ function HgvInspectionsContent() {
   }, [pageSize, selectedEmployeeId, hgvFilter]);
 
   useEffect(() => {
+    try {
+      const saved = localStorage.getItem(HGV_INSPECTIONS_COLUMN_VISIBILITY_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as Partial<HgvInspectionsColumnVisibility>;
+        setColumnVisibility((prev) => ({ ...prev, ...parsed }));
+      }
+    } catch {
+      // Ignore invalid persisted state
+    }
+  }, []);
+
+  useEffect(() => {
     fetchFilters();
   }, [fetchFilters]);
 
@@ -244,6 +279,14 @@ function HgvInspectionsContent() {
         : 'text-green-500';
     return <Clock className={`h-5 w-5 ${iconColorClass}`} />;
   };
+
+  function toggleColumn(column: keyof HgvInspectionsColumnVisibility) {
+    setColumnVisibility((prev) => {
+      const next = { ...prev, [column]: !prev[column] };
+      localStorage.setItem(HGV_INSPECTIONS_COLUMN_VISIBILITY_STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  }
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -342,7 +385,91 @@ function HgvInspectionsContent() {
               Refreshing HGV checks...
             </div>
           )}
-          <div className="grid gap-4">
+
+          {isElevatedUser && (
+            <div className="hidden md:flex items-center justify-end gap-2">
+              {viewMode === 'table' && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="border-slate-600">
+                      <Settings2 className="h-4 w-4 mr-2" />
+                      Columns
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56 bg-slate-900 border border-border">
+                    <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.employeeId}
+                      onCheckedChange={() => toggleColumn('employeeId')}
+                    >
+                      Employee ID
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.nickname}
+                      onCheckedChange={() => toggleColumn('nickname')}
+                    >
+                      Nickname
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.status}
+                      onCheckedChange={() => toggleColumn('status')}
+                    >
+                      Status
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.submittedAt}
+                      onCheckedChange={() => toggleColumn('submittedAt')}
+                    >
+                      Submitted
+                    </DropdownMenuCheckboxItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-0">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setViewMode('table');
+                    localStorage.setItem('hgv-inspections-view-mode', 'table');
+                  }}
+                  className={`h-8 px-3 ${viewMode === 'table' ? 'bg-white text-slate-900' : 'text-muted-foreground hover:text-white'}`}
+                >
+                  <Table2 className="h-4 w-4 mr-1.5" />
+                  Table
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setViewMode('cards');
+                    localStorage.setItem('hgv-inspections-view-mode', 'cards');
+                  }}
+                  className={`h-8 px-3 ${viewMode === 'cards' ? 'bg-white text-slate-900' : 'text-muted-foreground hover:text-white'}`}
+                >
+                  <LayoutGrid className="h-4 w-4 mr-1.5" />
+                  Cards
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {isElevatedUser && viewMode === 'table' && (
+            <div className="hidden md:block">
+              <HgvInspectionsListTable
+                inspections={inspections.slice(0, displayCount)}
+                columnVisibility={columnVisibility}
+                downloadingId={downloading}
+                deletingId={deleting}
+                showDeleteActions={isElevatedUser}
+                onDownloadPDF={handleDownloadPDF}
+                onDeleteInspection={handleDelete}
+              />
+            </div>
+          )}
+
+          <div className={isElevatedUser && viewMode === 'table' ? 'md:hidden grid gap-4' : 'grid gap-4'}>
             {inspections.slice(0, displayCount).map((inspection) => (
             <Card
               key={inspection.id}

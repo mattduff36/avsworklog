@@ -15,12 +15,20 @@ import { getRecentVehicleIds, splitVehiclesByRecent } from '@/lib/utils/recentVe
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Clipboard, Clock, User, Download, Trash2, Filter, FileText, Truck, Loader2 } from 'lucide-react';
+import { Plus, Clipboard, Clock, User, Download, Trash2, Filter, FileText, Truck, Loader2, LayoutGrid, Table2, Settings2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { toast } from 'sonner';
 import { VanInspection } from '@/types/inspection';
 import { Employee, InspectionStatusFilter } from '@/types/common';
 import { useQueryState } from 'nuqs';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +40,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
+import {
+  DEFAULT_VAN_INSPECTIONS_COLUMN_VISIBILITY,
+  VAN_INSPECTIONS_COLUMN_VISIBILITY_STORAGE_KEY,
+  VanInspectionsColumnVisibility,
+  VanInspectionsListTable,
+} from './components/VanInspectionsListTable';
 
 interface InspectionWithVehicle extends VanInspection {
   vans: {
@@ -40,6 +54,12 @@ interface InspectionWithVehicle extends VanInspection {
   };
   has_reported_defect?: boolean;
   has_inform_workshop_task?: boolean;
+}
+
+interface DeleteDialogInspectionInput {
+  id: string;
+  inspection_date: string;
+  vans?: { reg_number?: string | null } | null;
 }
 
 interface Vehicle {
@@ -88,6 +108,15 @@ function InspectionsContent() {
   const [deleting, setDeleting] = useState(false);
   const [displayCount, setDisplayCount] = useState(pageSize);
   const [hasMore, setHasMore] = useState(false);
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('van-inspections-view-mode') as 'cards' | 'table') || 'cards';
+    }
+    return 'cards';
+  });
+  const [columnVisibility, setColumnVisibility] = useState<VanInspectionsColumnVisibility>(
+    DEFAULT_VAN_INSPECTIONS_COLUMN_VISIBILITY
+  );
   const supabase = createClient();
 
   // Fetch employees and vehicles
@@ -284,6 +313,18 @@ function InspectionsContent() {
   }, [pageSize, selectedEmployeeId, statusFilter, vehicleFilter]);
 
   useEffect(() => {
+    try {
+      const saved = localStorage.getItem(VAN_INSPECTIONS_COLUMN_VISIBILITY_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as Partial<VanInspectionsColumnVisibility>;
+        setColumnVisibility((prev) => ({ ...prev, ...parsed }));
+      }
+    } catch {
+      // Ignore invalid persisted state
+    }
+  }, []);
+
+  useEffect(() => {
     fetchInspections();
   }, [fetchInspections]);
 
@@ -340,6 +381,14 @@ function InspectionsContent() {
 
     return <Clipboard className={`h-5 w-5 ${iconColorClass}`} />;
   };
+
+  function toggleColumn(column: keyof VanInspectionsColumnVisibility) {
+    setColumnVisibility((prev) => {
+      const next = { ...prev, [column]: !prev[column] };
+      localStorage.setItem(VAN_INSPECTIONS_COLUMN_VISIBILITY_STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  }
 
   const handleDownloadPDF = async (e: React.MouseEvent, inspectionId: string) => {
     e.preventDefault();
@@ -407,7 +456,7 @@ function InspectionsContent() {
     }
   };
 
-  const openDeleteDialog = (e: React.MouseEvent, inspection: InspectionWithVehicle) => {
+  const openDeleteDialog = (e: React.MouseEvent, inspection: DeleteDialogInspectionInput) => {
     e.stopPropagation(); // Prevent card click
     setInspectionToDelete({
       id: inspection.id,
@@ -605,7 +654,91 @@ function InspectionsContent() {
               Refreshing daily checks...
             </div>
           )}
-          <div className="grid gap-4">
+
+          {isElevatedUser && (
+            <div className="hidden md:flex items-center justify-end gap-2">
+              {viewMode === 'table' && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="border-slate-600">
+                      <Settings2 className="h-4 w-4 mr-2" />
+                      Columns
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56 bg-slate-900 border border-border">
+                    <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.employeeId}
+                      onCheckedChange={() => toggleColumn('employeeId')}
+                    >
+                      Employee ID
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.vehicleCategory}
+                      onCheckedChange={() => toggleColumn('vehicleCategory')}
+                    >
+                      Vehicle Category
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.status}
+                      onCheckedChange={() => toggleColumn('status')}
+                    >
+                      Status
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.submittedAt}
+                      onCheckedChange={() => toggleColumn('submittedAt')}
+                    >
+                      Submitted
+                    </DropdownMenuCheckboxItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-0">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setViewMode('table');
+                    localStorage.setItem('van-inspections-view-mode', 'table');
+                  }}
+                  className={`h-8 px-3 ${viewMode === 'table' ? 'bg-white text-slate-900' : 'text-muted-foreground hover:text-white'}`}
+                >
+                  <Table2 className="h-4 w-4 mr-1.5" />
+                  Table
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setViewMode('cards');
+                    localStorage.setItem('van-inspections-view-mode', 'cards');
+                  }}
+                  className={`h-8 px-3 ${viewMode === 'cards' ? 'bg-white text-slate-900' : 'text-muted-foreground hover:text-white'}`}
+                >
+                  <LayoutGrid className="h-4 w-4 mr-1.5" />
+                  Cards
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {isElevatedUser && viewMode === 'table' && (
+            <div className="hidden md:block">
+              <VanInspectionsListTable
+                inspections={inspections}
+                columnVisibility={columnVisibility}
+                downloadingId={downloading}
+                deleting={deleting}
+                showDeleteActions={isElevatedUser}
+                onDownloadPDF={handleDownloadPDF}
+                onOpenDeleteDialog={openDeleteDialog}
+              />
+            </div>
+          )}
+
+          <div className={isElevatedUser && viewMode === 'table' ? 'md:hidden grid gap-4' : 'grid gap-4'}>
             {inspections.map((inspection) => {
               const inspectionStatus = inspection.status as string;
               return (

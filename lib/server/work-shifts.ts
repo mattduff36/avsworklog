@@ -222,6 +222,11 @@ async function fetchTemplateSummaries(supabase: AnySupabase): Promise<WorkShiftT
   });
 }
 
+export async function listWorkShiftTemplates(supabase: AnySupabase): Promise<WorkShiftTemplate[]> {
+  const summaries = await fetchTemplateSummaries(supabase);
+  return summaries.map((summary) => summary.template);
+}
+
 export async function ensureStandardWorkShiftTemplate(supabase: AnySupabase): Promise<WorkShiftTemplate> {
   const { data: existingDefault, error: existingError } = await supabase
     .from('work_shift_templates')

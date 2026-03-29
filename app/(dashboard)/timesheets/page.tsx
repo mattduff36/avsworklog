@@ -13,16 +13,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { PageLoader } from '@/components/ui/page-loader';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, FileText, Clock, CheckCircle2, XCircle, Download, Trash2, Filter, Package, AlertTriangle, Loader2 } from 'lucide-react';
+import { Plus, FileText, Clock, CheckCircle2, XCircle, Download, Trash2, Filter, Package, AlertTriangle, Loader2, LayoutGrid, Table2, Settings2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { Timesheet } from '@/types/timesheet';
 import { TimesheetStatusFilter } from '@/types/common';
 import {
-  canUseScopedAbsencePermission,
   useAbsenceSecondaryPermissions,
 } from '@/lib/hooks/useAbsenceSecondaryPermissions';
 import { filterEmployeesBySelectedTeam } from '@/lib/utils/absence-admin';
+import { canShowTimesheetInList } from '@/lib/utils/timesheet-visibility';
 import { toast } from 'sonner';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +41,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  DEFAULT_TIMESHEETS_LIST_COLUMN_VISIBILITY,
+  TIMESHEETS_LIST_COLUMN_VISIBILITY_STORAGE_KEY,
+  TimesheetsListColumnVisibility,
+  TimesheetsListTable,
+} from './components/TimesheetsListTable';
 
 interface TimesheetWithProfile extends Timesheet {
   profile?: {
@@ -80,6 +94,15 @@ export default function TimesheetsPage() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [displayCount, setDisplayCount] = useState(pageSize);
   const [hasMore, setHasMore] = useState(false);
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('timesheets-view-mode') as 'cards' | 'table') || 'cards';
+    }
+    return 'cards';
+  });
+  const [columnVisibility, setColumnVisibility] = useState<TimesheetsListColumnVisibility>(
+    DEFAULT_TIMESHEETS_LIST_COLUMN_VISIBILITY
+  );
   const supabase = createClient();
   const actorProfileId = user?.id || '';
   const canAuthoriseBookings = Boolean(absenceSecondarySnapshot?.flags.can_authorise_bookings || isAdminTier);
@@ -165,49 +188,50 @@ export default function TimesheetsPage() {
     }
   }, [filteredEmployeeOptions, selectedEmployeeId]);
 
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(TIMESHEETS_LIST_COLUMN_VISIBILITY_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as Partial<TimesheetsListColumnVisibility>;
+        setColumnVisibility((prev) => ({ ...prev, ...parsed }));
+      }
+    } catch {
+      // Ignore invalid persisted state
+    }
+  }, []);
+
   const lockedTeamLabel =
     actorTeamName ||
     teamOptions.find((team) => team.value === actorTeamId)?.label ||
     (actorTeamId ? 'My Team' : 'No team assigned');
 
+  function toggleColumn(column: keyof TimesheetsListColumnVisibility) {
+    setColumnVisibility((prev) => {
+      const next = { ...prev, [column]: !prev[column] };
+      localStorage.setItem(TIMESHEETS_LIST_COLUMN_VISIBILITY_STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  }
+
   const applyClientScopeFilters = useCallback(
     (rows: TimesheetWithProfile[]) => {
-      let scopedRows = rows;
-
-      if (isElevatedUser && !isAdminTier) {
-        if (!canAuthoriseBookings || !actorProfileId || !absenceSecondarySnapshot) {
-          scopedRows = [];
-        } else {
-          scopedRows = scopedRows.filter((timesheet) =>
-            canUseScopedAbsencePermission(
-              {
-                permissions: absenceSecondarySnapshot.permissions,
-                team_id: absenceSecondarySnapshot.team_id,
-              },
-              actorProfileId,
-              {
-                profile_id: timesheet.user_id,
-                team_id: timesheet.profile?.team_id || null,
-              },
-              {
-                all: 'authorise_bookings_all',
-                team: 'authorise_bookings_team',
-                own: 'authorise_bookings_own',
-              }
-            )
-          );
-        }
-      }
-
-      if (isElevatedUser && effectiveTeamFilter !== 'all') {
-        scopedRows = scopedRows.filter((timesheet) => {
-          const targetTeamId = timesheet.profile?.team_id || null;
-          if (effectiveTeamFilter === 'unassigned') return !targetTeamId;
-          return targetTeamId === effectiveTeamFilter;
-        });
-      }
-
-      return scopedRows;
+      return rows.filter((timesheet) =>
+        canShowTimesheetInList({
+          actor: {
+            isElevatedUser,
+            isAdminTier,
+            actorProfileId,
+            actorTeamId: absenceSecondarySnapshot?.team_id || null,
+            canAuthoriseBookings,
+            permissions: absenceSecondarySnapshot?.permissions || null,
+          },
+          target: {
+            profileId: timesheet.user_id,
+            teamId: timesheet.profile?.team_id || null,
+          },
+          effectiveTeamFilter,
+        })
+      );
     },
     [
       isElevatedUser,
@@ -683,7 +707,90 @@ export default function TimesheetsPage() {
         </Card>
       ) : (
         <>
-          <div className="grid gap-4">
+          {isElevatedUser && (
+            <div className="hidden md:flex items-center justify-end gap-2">
+              {viewMode === 'table' && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="border-slate-600">
+                      <Settings2 className="h-4 w-4 mr-2" />
+                      Columns
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56 bg-slate-900 border border-border">
+                    <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.employeeId}
+                      onCheckedChange={() => toggleColumn('employeeId')}
+                    >
+                      Employee ID
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.regNumber}
+                      onCheckedChange={() => toggleColumn('regNumber')}
+                    >
+                      Reg Number
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.status}
+                      onCheckedChange={() => toggleColumn('status')}
+                    >
+                      Status
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.submittedAt}
+                      onCheckedChange={() => toggleColumn('submittedAt')}
+                    >
+                      Submitted
+                    </DropdownMenuCheckboxItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+
+              <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-0">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setViewMode('table');
+                    localStorage.setItem('timesheets-view-mode', 'table');
+                  }}
+                  className={`h-8 px-3 ${viewMode === 'table' ? 'bg-white text-slate-900' : 'text-muted-foreground hover:text-white'}`}
+                >
+                  <Table2 className="h-4 w-4 mr-1.5" />
+                  Table
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setViewMode('cards');
+                    localStorage.setItem('timesheets-view-mode', 'cards');
+                  }}
+                  className={`h-8 px-3 ${viewMode === 'cards' ? 'bg-white text-slate-900' : 'text-muted-foreground hover:text-white'}`}
+                >
+                  <LayoutGrid className="h-4 w-4 mr-1.5" />
+                  Cards
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {isElevatedUser && viewMode === 'table' && (
+            <div className="hidden md:block">
+              <TimesheetsListTable
+                timesheets={timesheets}
+                columnVisibility={columnVisibility}
+                downloadingId={downloading}
+                showDeleteActions={isElevatedUser}
+                onDownloadPDF={handleDownloadPDF}
+                onOpenDeleteDialog={openDeleteDialog}
+              />
+            </div>
+          )}
+
+          <div className={isElevatedUser && viewMode === 'table' ? 'md:hidden grid gap-4' : 'grid gap-4'}>
             {timesheets.map((timesheet) => (
             <Card 
               key={timesheet.id} 

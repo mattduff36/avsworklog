@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useState, useEffect, useMemo } from 'react';
+import { Fragment, useState, useEffect, useMemo, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,6 +9,7 @@ import { PageLoader } from '@/components/ui/page-loader';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -26,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -49,7 +51,10 @@ import { fetchAdminTeamDirectory } from '@/lib/admin/team-directory-client';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import type { Database } from '@/types/database';
+import type { WorkShiftPattern, WorkShiftTemplate } from '@/types/work-shifts';
+import { WORK_SHIFT_DAY_LABELS, WORK_SHIFT_DAY_ORDER } from '@/types/work-shifts';
 import { getRoleSortPriority } from '@/lib/config/roles-core';
+import { calculateNewUserRemainingLeaveDefault, roundToNearestHalfDay } from '@/lib/utils/absence-onboarding';
 import { formatDateTime } from '@/lib/utils/date';
 
 const RoleManagement = dynamic(() => import('@/components/admin/RoleManagement').then(m => ({ default: m.RoleManagement })), { 
@@ -91,6 +96,120 @@ type ProfileWithEmail = ProfileWithRole & UserActivitySummary;
 
 type TabType = 'users' | 'roles' | 'teams' | 'permissions';
 type UserStatusTab = 'active' | 'deleted';
+type BinaryChoice = 'yes' | 'no' | '';
+
+interface AddUserFormData {
+  email: string;
+  full_name: string;
+  phone_number: string;
+  employee_id: string;
+  role_id: string;
+  line_manager_id: string;
+  team_id: string;
+  work_shift_template_id: string;
+  annual_allowance_days: string;
+  remaining_leave_days: string;
+  auto_book_bank_holidays: BinaryChoice;
+  auto_apply_bulk_bookings: BinaryChoice;
+  selected_bulk_batch_ids: string[];
+}
+
+interface BulkAbsenceBatchOption {
+  id: string;
+  reasonName: string;
+  startDate: string;
+  endDate: string;
+  notes: string | null;
+}
+
+interface OnboardingContextPayload {
+  success: boolean;
+  financialYear: {
+    startYear: number;
+    label: string;
+    startDate: string;
+    endDate: string;
+  };
+  bankHolidays: {
+    totalCount: number;
+    passedCount: number;
+    remainingCount: number;
+    today: string;
+  };
+  workShiftTemplates: WorkShiftTemplate[];
+  bulkAbsenceBatches: Array<{
+    id: string;
+    reasonName: string;
+    startDate: string;
+    endDate: string;
+    notes: string | null;
+  }>;
+}
+
+function summarizeWorkShiftPattern(pattern: WorkShiftPattern): string {
+  const segments: string[] = [];
+  let activeLabel = '';
+  let rangeStart = 0;
+
+  function getDayStatusLabel(dayKey: (typeof WORK_SHIFT_DAY_ORDER)[number]): string {
+    const am = pattern[`${dayKey}_am`];
+    const pm = pattern[`${dayKey}_pm`];
+    if (am && pm) return 'AM+PM';
+    if (am) return 'AM';
+    if (pm) return 'PM';
+    return 'Off';
+  }
+
+  function pushSegment(startIndex: number, endIndex: number, label: string) {
+    const startLabel = WORK_SHIFT_DAY_LABELS[WORK_SHIFT_DAY_ORDER[startIndex]];
+    const endLabel = WORK_SHIFT_DAY_LABELS[WORK_SHIFT_DAY_ORDER[endIndex]];
+    const dayLabel = startIndex === endIndex ? startLabel : `${startLabel}-${endLabel}`;
+    segments.push(`${dayLabel} ${label}`);
+  }
+
+  WORK_SHIFT_DAY_ORDER.forEach((dayKey, index) => {
+    const statusLabel = getDayStatusLabel(dayKey);
+    if (index === 0) {
+      activeLabel = statusLabel;
+      rangeStart = 0;
+      return;
+    }
+    if (statusLabel !== activeLabel) {
+      pushSegment(rangeStart, index - 1, activeLabel);
+      rangeStart = index;
+      activeLabel = statusLabel;
+    }
+  });
+
+  pushSegment(rangeStart, WORK_SHIFT_DAY_ORDER.length - 1, activeLabel);
+  return segments.join(', ');
+}
+
+function createInitialFormData(): AddUserFormData {
+  return {
+    email: '',
+    full_name: '',
+    phone_number: '',
+    employee_id: '',
+    role_id: '',
+    line_manager_id: '',
+    team_id: '',
+    work_shift_template_id: '',
+    annual_allowance_days: '28',
+    remaining_leave_days: '',
+    auto_book_bank_holidays: '',
+    auto_apply_bulk_bookings: '',
+    selected_bulk_batch_ids: [],
+  };
+}
+
+function normalizeHalfDayString(rawValue: string): string {
+  const trimmed = rawValue.trim();
+  if (!trimmed) return '';
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed)) return rawValue;
+  return String(roundToNearestHalfDay(parsed));
+}
 
 function isDeletedUserProfile(user: { full_name?: string | null }): boolean {
   return Boolean(user.full_name?.includes('(Deleted User)'));
@@ -179,17 +298,13 @@ export default function UsersAdminPage() {
   const [isNewUser, setIsNewUser] = useState(false);
 
   // Form states
-  const [formData, setFormData] = useState({
-    email: '',
-    full_name: '',
-    phone_number: '',
-    employee_id: '',
-    role_id: '',
-    line_manager_id: '',
-    team_id: '',
-  });
+  const [formData, setFormData] = useState<AddUserFormData>(createInitialFormData);
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState('');
+  const [workShiftTemplates, setWorkShiftTemplates] = useState<WorkShiftTemplate[]>([]);
+  const [bulkAbsenceOptions, setBulkAbsenceOptions] = useState<BulkAbsenceBatchOption[]>([]);
+  const [onboardingFinancialYearLabel, setOnboardingFinancialYearLabel] = useState('');
+  const [onboardingContextLoading, setOnboardingContextLoading] = useState(false);
   const [quickEditTarget, setQuickEditTarget] = useState<{
     userId: string;
     field: 'role' | 'team';
@@ -301,6 +416,22 @@ export default function UsersAdminPage() {
   const selectedAddTeamManagers = useMemo(() => {
     return formData.team_id ? teamDetailsById.get(formData.team_id) || null : null;
   }, [formData.team_id, teamDetailsById]);
+  const selectedAddTeamHasManager = Boolean(
+    selectedAddTeamManagers?.manager_1_id || selectedAddTeamManagers?.manager_2_id
+  );
+  const selectedWorkShiftTemplate = useMemo(
+    () => workShiftTemplates.find((template) => template.id === formData.work_shift_template_id) || null,
+    [workShiftTemplates, formData.work_shift_template_id]
+  );
+
+  const getDefaultRemainingLeaveDays = useCallback((totalAllowanceRaw: string): string => {
+    const parsedAllowance = Number(totalAllowanceRaw);
+    if (!Number.isFinite(parsedAllowance)) return '';
+    const result = calculateNewUserRemainingLeaveDefault({
+      annualAllowanceDays: parsedAllowance,
+    });
+    return String(result.defaultRemainingLeaveDays);
+  }, []);
 
   // Helper function to fetch users with emails
   async function fetchUsersWithEmails() {
@@ -406,6 +537,46 @@ export default function UsersAdminPage() {
       fetchUsers();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canManageUsers]);
+
+  useEffect(() => {
+    if (!addDialogOpen) return;
+    setFormData((prev) => {
+      if (prev.remaining_leave_days) return prev;
+      const nextRemaining = getDefaultRemainingLeaveDays(prev.annual_allowance_days);
+      if (nextRemaining === prev.remaining_leave_days) return prev;
+      return { ...prev, remaining_leave_days: nextRemaining };
+    });
+  }, [addDialogOpen, getDefaultRemainingLeaveDays]);
+
+  useEffect(function () {
+    async function fetchOnboardingContext() {
+      try {
+        setOnboardingContextLoading(true);
+        const response = await fetch('/api/admin/users/onboarding-context', { cache: 'no-store' });
+        const payload = (await response.json()) as OnboardingContextPayload & { error?: string };
+        if (!response.ok) {
+          throw new Error(payload.error || 'Failed to load onboarding context');
+        }
+        setWorkShiftTemplates(payload.workShiftTemplates || []);
+        setBulkAbsenceOptions((payload.bulkAbsenceBatches || []).map((batch) => ({
+          id: batch.id,
+          reasonName: batch.reasonName,
+          startDate: batch.startDate,
+          endDate: batch.endDate,
+          notes: batch.notes || null,
+        })));
+        setOnboardingFinancialYearLabel(payload.financialYear?.label || '');
+      } catch (error) {
+        console.error('Error fetching onboarding context:', error);
+      } finally {
+        setOnboardingContextLoading(false);
+      }
+    }
+
+    if (canManageUsers) {
+      fetchOnboardingContext();
+    }
   }, [canManageUsers]);
 
   // Fetch team metadata used by the Org V2 admin UI
@@ -550,6 +721,51 @@ export default function UsersAdminPage() {
       setFormError('Please select a role');
       return;
     }
+
+    if (!formData.team_id) {
+      setFormError('Please select a team');
+      return;
+    }
+
+    if (!selectedAddTeamHasManager) {
+      setFormError('Selected team has no configured manager. Set Manager 1 or Manager 2 before creating the user.');
+      return;
+    }
+
+    if (!formData.work_shift_template_id) {
+      setFormError('Please select a work shift template');
+      return;
+    }
+
+    const annualAllowance = Number(formData.annual_allowance_days);
+    const remainingLeaveRaw = Number(formData.remaining_leave_days);
+    const remainingLeave = Number.isFinite(remainingLeaveRaw)
+      ? roundToNearestHalfDay(remainingLeaveRaw)
+      : remainingLeaveRaw;
+    if (!Number.isFinite(annualAllowance)) {
+      setFormError('Please enter a valid total annual leave allowance');
+      return;
+    }
+    if (!Number.isFinite(remainingLeave)) {
+      setFormError('Please enter a valid remaining annual leave value');
+      return;
+    }
+
+    if (formData.auto_book_bank_holidays === '') {
+      setFormError('Please choose whether to auto-book remaining bank holidays');
+      return;
+    }
+
+    if (formData.auto_apply_bulk_bookings === '') {
+      setFormError('Please choose whether to auto-apply bulk absence bookings');
+      return;
+    }
+
+    if (formData.auto_apply_bulk_bookings === 'yes' && formData.selected_bulk_batch_ids.length === 0) {
+      setFormError('Please select at least one bulk absence booking to auto-apply');
+      return;
+    }
+
     try {
       setFormLoading(true);
       setFormError('');
@@ -565,7 +781,14 @@ export default function UsersAdminPage() {
           employee_id: formData.employee_id,
           role_id: formData.role_id,
           line_manager_id: formData.line_manager_id || null,
-          team_id: formData.team_id || null,
+          team_id: formData.team_id,
+          work_shift_template_id: formData.work_shift_template_id,
+          annual_allowance_days: annualAllowance,
+          remaining_leave_days: remainingLeave,
+          auto_book_bank_holidays: formData.auto_book_bank_holidays === 'yes',
+          auto_apply_bulk_bookings: formData.auto_apply_bulk_bookings === 'yes',
+          selected_bulk_batch_ids:
+            formData.auto_apply_bulk_bookings === 'yes' ? formData.selected_bulk_batch_ids : [],
         }),
       });
 
@@ -588,15 +811,7 @@ export default function UsersAdminPage() {
       setPasswordDisplayDialogOpen(true);
 
       // Reset form and close dialog
-      setFormData({
-        email: '',
-        full_name: '',
-        phone_number: '',
-        employee_id: '',
-        role_id: '',
-        line_manager_id: '',
-        team_id: '',
-      });
+      setFormData(createInitialFormData());
       setAddDialogOpen(false);
     } catch (error) {
       console.error('Error creating user:', error);
@@ -699,15 +914,11 @@ export default function UsersAdminPage() {
 
   // Open edit dialog
   function openAddDialog() {
-    setFormData({
-      email: '',
-      full_name: '',
-      phone_number: '',
-      employee_id: '',
-      role_id: '',
-      line_manager_id: '',
-      team_id: '',
-    });
+    const initialFormData = createInitialFormData();
+    initialFormData.work_shift_template_id =
+      workShiftTemplates.find((template) => template.is_default)?.id || '';
+    initialFormData.remaining_leave_days = getDefaultRemainingLeaveDays(initialFormData.annual_allowance_days);
+    setFormData(initialFormData);
     setFormError('');
     setAddDialogOpen(true);
   }
@@ -724,6 +935,12 @@ export default function UsersAdminPage() {
       role_id: userProfile.role_id || '',
       line_manager_id: userProfile.line_manager_id || '',
       team_id: userProfile.team_id || '',
+      work_shift_template_id: '',
+      annual_allowance_days: '28',
+      remaining_leave_days: '',
+      auto_book_bank_holidays: '',
+      auto_apply_bulk_bookings: '',
+      selected_bulk_batch_ids: [],
     });
     setFormError('');
     setEditDialogOpen(true);
@@ -987,7 +1204,7 @@ export default function UsersAdminPage() {
                   placeholder="Search by name, email, or employee ID..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-11 bg-slate-900/50 border-slate-600 text-white"
+                  className="pl-11 bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground"
                 />
               </div>
             </div>
@@ -996,7 +1213,7 @@ export default function UsersAdminPage() {
               <div className="space-y-2">
                 <Label>Filter by Team</Label>
                 <Select value={teamFilter} onValueChange={setTeamFilter}>
-                  <SelectTrigger className="bg-input border-border text-white">
+                  <SelectTrigger className="bg-input border-border text-white data-[placeholder]:[&>span]:!text-muted-foreground">
                     <SelectValue placeholder="All teams" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1013,7 +1230,7 @@ export default function UsersAdminPage() {
               <div className="space-y-2">
                 <Label>Filter by Line Manager</Label>
                 <Select value={managerFilter} onValueChange={setManagerFilter}>
-                  <SelectTrigger className="bg-input border-border text-white">
+                  <SelectTrigger className="bg-input border-border text-white data-[placeholder]:[&>span]:!text-muted-foreground">
                     <SelectValue placeholder="All managers" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1138,7 +1355,7 @@ export default function UsersAdminPage() {
                                   <p className="text-xs text-muted-foreground">{user.full_name || user.email}</p>
                                 </div>
                                 <Select value={quickEditValue} onValueChange={setQuickEditValue}>
-                                  <SelectTrigger className="bg-input border-border text-white">
+                                  <SelectTrigger className="bg-input border-border text-white data-[placeholder]:[&>span]:!text-muted-foreground">
                                     <SelectValue placeholder="Select role" />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -1201,7 +1418,7 @@ export default function UsersAdminPage() {
                                   <p className="text-xs text-muted-foreground">{user.full_name || user.email}</p>
                                 </div>
                                 <Select value={quickEditValue || 'none'} onValueChange={(value) => setQuickEditValue(value === 'none' ? '' : value)}>
-                                  <SelectTrigger className="bg-input border-border text-white">
+                                  <SelectTrigger className="bg-input border-border text-white data-[placeholder]:[&>span]:!text-muted-foreground">
                                     <SelectValue placeholder="Select team" />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -1310,120 +1527,283 @@ export default function UsersAdminPage() {
 
       {/* Add User Dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent className="border-border text-white">
+        <DialogContent className="border-border text-white max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Add New User</DialogTitle>
             <DialogDescription className="text-muted-foreground">
               Create a new user account with email and password
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="flex-1 overflow-y-auto pr-1 space-y-4">
             {formError && (
               <div className="bg-red-500/10 border border-red-500/50 rounded p-3 text-sm text-red-400">
                 {formError}
               </div>
             )}
-            <div className="bg-blue-500/10 border border-blue-500/50 rounded p-3 text-sm text-blue-400">
+            <div className="bg-blue-500/10 border border-blue-500/50 rounded-lg p-3 text-sm text-blue-300">
               <strong>Note:</strong> A secure temporary password will be automatically generated and sent to the user&apos;s email address.
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="add-email">Email *</Label>
-              <Input
-                id="add-email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="user@example.com"
-                className="bg-input border-border text-white placeholder:text-muted-foreground"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="add-name">Full Name *</Label>
-              <Input
-                id="add-name"
-                value={formData.full_name}
-                onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                placeholder="John Smith"
-                className="bg-input border-border text-white placeholder:text-muted-foreground"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="add-phone">Phone Number</Label>
-              <Input
-                id="add-phone"
-                type="tel"
-                value={formData.phone_number}
-                onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
-                placeholder="07123 456789"
-                className="bg-input border-border text-white placeholder:text-muted-foreground"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="add-employee-id">Employee ID</Label>
-              <Input
-                id="add-employee-id"
-                value={formData.employee_id}
-                onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
-                placeholder="E001"
-                className="bg-input border-border text-white placeholder:text-muted-foreground"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="add-role">Role *</Label>
-              <Select value={formData.role_id} onValueChange={(value) => setFormData({ ...formData, role_id: value })}>
-                <SelectTrigger className="bg-input border-border text-white">
-                  <SelectValue placeholder="Select a role" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableRoles.map((role) => (
-                    <SelectItem key={role.id} value={role.id}>
-                      {role.display_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="add-team-id">Primary Team</Label>
-                <Select
-                  value={formData.team_id || 'none'}
-                  onValueChange={(value) => setFormData({ ...formData, team_id: value === 'none' ? '' : value })}
-                >
-                  <SelectTrigger id="add-team-id" className="bg-input border-border text-white">
-                    <SelectValue placeholder="Select team" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No team</SelectItem>
-                    {teamOptions.map((team) => (
-                      <SelectItem key={team.id} value={team.id}>
-                        {team.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Manager 1</Label>
-                <div className="rounded-md border border-input bg-input px-3 py-2 text-sm text-white">
-                  {selectedAddTeamManagers?.manager_1_name || 'No Manager 1'}
+            <div className="rounded-lg border border-[hsl(var(--absence-primary)/0.25)] bg-[hsl(var(--absence-primary)/0.06)] p-4 md:p-5">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  <div className="rounded-lg border border-border bg-slate-900/40 p-4 space-y-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Account Details</p>
+                    <div className="space-y-2">
+                      <Label htmlFor="add-email">Email *</Label>
+                      <Input
+                        id="add-email"
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        placeholder="user@example.com"
+                        className="bg-slate-950 border-border text-white placeholder:text-muted-foreground"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="add-name">Full Name *</Label>
+                      <Input
+                        id="add-name"
+                        value={formData.full_name}
+                        onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                        placeholder="John Smith"
+                        className="bg-slate-950 border-border text-white placeholder:text-muted-foreground"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="add-phone">Phone Number</Label>
+                        <Input
+                          id="add-phone"
+                          type="tel"
+                          value={formData.phone_number}
+                          onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
+                          placeholder="07123 456789"
+                          className="bg-slate-950 border-border text-white placeholder:text-muted-foreground"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="add-employee-id">Employee ID</Label>
+                        <Input
+                          id="add-employee-id"
+                          value={formData.employee_id}
+                          onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
+                          placeholder="E001"
+                          className="bg-slate-950 border-border text-white placeholder:text-muted-foreground"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="add-role">Role *</Label>
+                      <Select value={formData.role_id} onValueChange={(value) => setFormData({ ...formData, role_id: value })}>
+                        <SelectTrigger className="bg-slate-950 border-border text-white data-[placeholder]:[&>span]:!text-muted-foreground">
+                          <SelectValue placeholder="Select a role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableRoles.map((role) => (
+                            <SelectItem key={role.id} value={role.id}>
+                              {role.display_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-border bg-slate-900/40 p-4 space-y-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Team and Shift</p>
+                    <div className="space-y-2">
+                      <Label htmlFor="add-team-id">Team Name *</Label>
+                      <Select
+                        value={formData.team_id}
+                        onValueChange={(value) => setFormData({ ...formData, team_id: value })}
+                      >
+                        <SelectTrigger id="add-team-id" className="bg-slate-950 border-border text-white data-[placeholder]:[&>span]:!text-muted-foreground">
+                          <SelectValue placeholder="Select team" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {teamOptions.map((team) => (
+                            <SelectItem key={team.id} value={team.id}>
+                              {team.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Confirm Team manager *</Label>
+                      <div className="rounded-md border border-border bg-slate-950 px-3 py-2 text-sm text-white">
+                        {[
+                          selectedAddTeamManagers?.manager_1_name,
+                          selectedAddTeamManagers?.manager_2_name,
+                        ].filter(Boolean).join(', ') || 'No team manager configured'}
+                      </div>
+                      <p className="text-xs text-muted-foreground">Inherited from selected team and cannot be changed here.</p>
+                      {formData.team_id && !selectedAddTeamHasManager && (
+                        <p className="text-xs text-red-400">This team has no manager configured, so user creation is blocked.</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="add-work-shift-template">Work Shift *</Label>
+                      <Select
+                        value={formData.work_shift_template_id}
+                        onValueChange={(value) => setFormData({ ...formData, work_shift_template_id: value })}
+                      >
+                        <SelectTrigger id="add-work-shift-template" className="bg-slate-950 border-border text-white data-[placeholder]:[&>span]:!text-muted-foreground">
+                          <SelectValue placeholder={onboardingContextLoading ? 'Loading work shifts...' : 'Select work shift template'} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {workShiftTemplates.map((template) => (
+                            <SelectItem key={template.id} value={template.id}>
+                              {template.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {selectedWorkShiftTemplate && (
+                        <p className="text-xs text-muted-foreground">
+                          {summarizeWorkShiftPattern(selectedWorkShiftTemplate.pattern)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground">Inherited automatically from the selected team.</p>
-              </div>
-              <div className="space-y-2">
-                <Label>Manager 2</Label>
-                <div className="rounded-md border border-input bg-input px-3 py-2 text-sm text-white">
-                  {selectedAddTeamManagers?.manager_2_name || 'No Manager 2'}
+
+                <div className="space-y-4">
+                  <div className="rounded-lg border border-border bg-slate-900/40 p-4 space-y-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Annual Leave Setup</p>
+                    <div className="space-y-2">
+                      <Label htmlFor="add-annual-allowance">Total Annual Leave Allowance *</Label>
+                      <Input
+                        id="add-annual-allowance"
+                        type="number"
+                        step="0.01"
+                        value={formData.annual_allowance_days}
+                        onChange={(e) => {
+                          const nextAnnualAllowance = e.target.value;
+                          setFormData((prev) => ({
+                            ...prev,
+                            annual_allowance_days: nextAnnualAllowance,
+                            remaining_leave_days: getDefaultRemainingLeaveDays(nextAnnualAllowance),
+                          }));
+                        }}
+                        className="bg-slate-950 border-border text-white"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="add-remaining-allowance">Remaining Annual Leave ({onboardingFinancialYearLabel || 'current FY'}) *</Label>
+                      <Input
+                        id="add-remaining-allowance"
+                        type="number"
+                        step="0.5"
+                        value={formData.remaining_leave_days}
+                        onChange={(e) => setFormData({ ...formData, remaining_leave_days: e.target.value })}
+                        onBlur={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            remaining_leave_days: normalizeHalfDayString(e.target.value),
+                          }))
+                        }
+                        className="bg-slate-950 border-border text-white"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Auto-calculated from prorated allowance based on start date, rounded to the nearest 0.5 day.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-border bg-slate-900/40 p-4 space-y-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Automation</p>
+                    <div className="space-y-2">
+                      <Label>Auto-book remaining Bank Holidays? *</Label>
+                      <RadioGroup
+                        value={formData.auto_book_bank_holidays}
+                        onValueChange={(value) =>
+                          setFormData({ ...formData, auto_book_bank_holidays: value as BinaryChoice })
+                        }
+                        className="grid grid-cols-2 gap-3"
+                      >
+                        <div className="flex items-center gap-2 rounded-md border border-border bg-slate-950 px-3 py-2">
+                          <RadioGroupItem id="add-bank-holiday-yes" value="yes" />
+                          <Label htmlFor="add-bank-holiday-yes" className="text-sm font-normal">Yes</Label>
+                        </div>
+                        <div className="flex items-center gap-2 rounded-md border border-border bg-slate-950 px-3 py-2">
+                          <RadioGroupItem id="add-bank-holiday-no" value="no" />
+                          <Label htmlFor="add-bank-holiday-no" className="text-sm font-normal">No</Label>
+                        </div>
+                      </RadioGroup>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Auto-book the following bulk absence bookings this year? *</Label>
+                      <RadioGroup
+                        value={formData.auto_apply_bulk_bookings}
+                        onValueChange={(value) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            auto_apply_bulk_bookings: value as BinaryChoice,
+                            selected_bulk_batch_ids: value === 'yes' ? prev.selected_bulk_batch_ids : [],
+                          }))
+                        }
+                        className="grid grid-cols-2 gap-3"
+                      >
+                        <div className="flex items-center gap-2 rounded-md border border-border bg-slate-950 px-3 py-2">
+                          <RadioGroupItem id="add-bulk-yes" value="yes" />
+                          <Label htmlFor="add-bulk-yes" className="text-sm font-normal">Yes</Label>
+                        </div>
+                        <div className="flex items-center gap-2 rounded-md border border-border bg-slate-950 px-3 py-2">
+                          <RadioGroupItem id="add-bulk-no" value="no" />
+                          <Label htmlFor="add-bulk-no" className="text-sm font-normal">No</Label>
+                        </div>
+                      </RadioGroup>
+                      {formData.auto_apply_bulk_bookings === 'yes' && (
+                        <>
+                          {bulkAbsenceOptions.length === 0 ? (
+                            <p className="text-xs text-muted-foreground">
+                              No bulk absence bookings found for {onboardingFinancialYearLabel || 'the current financial year'}.
+                            </p>
+                          ) : (
+                            <div className="max-h-52 space-y-2 overflow-y-auto rounded-md border border-border bg-slate-950/70 p-3">
+                              {bulkAbsenceOptions.map((batch) => {
+                                const isChecked = formData.selected_bulk_batch_ids.includes(batch.id);
+                                return (
+                                  <label key={batch.id} className="flex cursor-pointer items-start gap-2 rounded-md border border-slate-800 bg-slate-900/40 px-2 py-2">
+                                    <Checkbox
+                                      checked={isChecked}
+                                      onCheckedChange={(checked) => {
+                                        const shouldCheck = checked === true;
+                                        setFormData((prev) => {
+                                          const current = new Set(prev.selected_bulk_batch_ids);
+                                          if (shouldCheck) current.add(batch.id);
+                                          else current.delete(batch.id);
+                                          return { ...prev, selected_bulk_batch_ids: Array.from(current) };
+                                        });
+                                      }}
+                                    />
+                                    <span className="text-xs text-slate-200">
+                                      {batch.reasonName}: {new Date(batch.startDate).toLocaleDateString()} - {new Date(batch.endDate).toLocaleDateString()}
+                                    </span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground">Inherited automatically from the selected team.</p>
               </div>
-            </>
+            </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="pt-4 border-t border-border">
             <Button variant="outline" onClick={() => setAddDialogOpen(false)} className="border-slate-600 text-white hover:bg-slate-800">
               Cancel
             </Button>
-            <Button onClick={handleAddUser} disabled={formLoading} className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900">
+            <Button
+              onClick={handleAddUser}
+              disabled={formLoading || onboardingContextLoading}
+              className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900"
+            >
               {formLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1497,7 +1877,7 @@ export default function UsersAdminPage() {
             <div className="space-y-2">
               <Label htmlFor="edit-role">Role *</Label>
               <Select value={formData.role_id} onValueChange={(value) => setFormData({ ...formData, role_id: value })}>
-                <SelectTrigger className="bg-input border-border text-white">
+                <SelectTrigger className="bg-input border-border text-white data-[placeholder]:[&>span]:!text-muted-foreground">
                   <SelectValue placeholder="Select a role" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1516,7 +1896,7 @@ export default function UsersAdminPage() {
                   value={formData.team_id || 'none'}
                   onValueChange={(value) => setFormData({ ...formData, team_id: value === 'none' ? '' : value })}
                 >
-                  <SelectTrigger id="edit-team-id" className="bg-input border-border text-white">
+                  <SelectTrigger id="edit-team-id" className="bg-input border-border text-white data-[placeholder]:[&>span]:!text-muted-foreground">
                     <SelectValue placeholder="Select team" />
                   </SelectTrigger>
                   <SelectContent>

@@ -6,6 +6,14 @@ import { getEffectiveRole } from '@/lib/utils/view-as';
 import { canEffectiveRoleAccessModule, canEffectiveRoleAssignRole } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { isMissingTeamManagerSchemaError, reconcileProfileHierarchy } from '@/lib/server/team-managers';
+import { applyTemplateToProfiles } from '@/lib/server/work-shifts';
+import {
+  buildFinancialYearBounds,
+  getFinancialYearStartYear,
+  replayBulkAbsenceBatchesForProfile,
+  seedRemainingFinancialYearBankHolidaysForProfiles,
+} from '@/lib/services/absence-bank-holiday-sync';
+import { roundToNearestHalfDay } from '@/lib/utils/absence-onboarding';
 
 function isMissingHierarchySchemaError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
@@ -19,6 +27,13 @@ function isMissingHierarchySchemaError(error: unknown): boolean {
     message.includes('column') ||
     message.includes('does not exist')
   );
+}
+
+function formatIsoDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 async function validateHierarchyReferences(
@@ -99,7 +114,35 @@ export async function POST(request: NextRequest) {
 
     // Get request body
     const body = await request.json();
-    const { email, full_name, phone_number, employee_id, role_id, line_manager_id, team_id } = body;
+    const {
+      email,
+      full_name,
+      phone_number,
+      employee_id,
+      role_id,
+      line_manager_id,
+      team_id,
+      work_shift_template_id,
+      annual_allowance_days,
+      remaining_leave_days,
+      auto_book_bank_holidays,
+      auto_apply_bulk_bookings,
+      selected_bulk_batch_ids,
+    } = body as {
+      email?: string;
+      full_name?: string;
+      phone_number?: string | null;
+      employee_id?: string | null;
+      role_id?: string;
+      line_manager_id?: string | null;
+      team_id?: string | null;
+      work_shift_template_id?: string;
+      annual_allowance_days?: number;
+      remaining_leave_days?: number;
+      auto_book_bank_holidays?: boolean;
+      auto_apply_bulk_bookings?: boolean;
+      selected_bulk_batch_ids?: string[];
+    };
 
     // Validate required fields (password is now auto-generated)
     if (!email || !full_name) {
@@ -113,6 +156,46 @@ export async function POST(request: NextRequest) {
     if (!role_id) {
       return NextResponse.json({ error: 'Role is required' }, { status: 400 });
     }
+
+    const normalizedTeamId = typeof team_id === 'string' ? team_id.trim() : '';
+    if (!normalizedTeamId) {
+      return NextResponse.json({ error: 'Team is required' }, { status: 400 });
+    }
+
+    const normalizedTemplateId = typeof work_shift_template_id === 'string' ? work_shift_template_id.trim() : '';
+    if (!normalizedTemplateId) {
+      return NextResponse.json({ error: 'Work shift template is required' }, { status: 400 });
+    }
+
+    if (!Number.isFinite(annual_allowance_days)) {
+      return NextResponse.json({ error: 'Total annual leave allowance is required' }, { status: 400 });
+    }
+
+    if (!Number.isFinite(remaining_leave_days)) {
+      return NextResponse.json({ error: 'Remaining annual leave is required' }, { status: 400 });
+    }
+
+    if (typeof auto_book_bank_holidays !== 'boolean') {
+      return NextResponse.json({ error: 'Auto-book bank holidays decision is required' }, { status: 400 });
+    }
+
+    if (typeof auto_apply_bulk_bookings !== 'boolean') {
+      return NextResponse.json({ error: 'Bulk absence selection decision is required' }, { status: 400 });
+    }
+
+    if (!Array.isArray(selected_bulk_batch_ids)) {
+      return NextResponse.json({ error: 'Bulk absence selection payload is required' }, { status: 400 });
+    }
+    const normalizedBulkBatchIds = Array.from(new Set(selected_bulk_batch_ids.filter(Boolean)));
+    if (auto_apply_bulk_bookings && normalizedBulkBatchIds.length === 0) {
+      return NextResponse.json(
+        { error: 'Select at least one bulk absence booking when auto-apply is enabled' },
+        { status: 400 }
+      );
+    }
+
+    const normalizedAnnualAllowanceDays = Number(annual_allowance_days);
+    const normalizedRemainingLeaveDays = roundToNearestHalfDay(Number(remaining_leave_days));
 
     // Validate role_id is a valid UUID and exists in database
     const supabaseAdmin = getSupabaseAdmin();
@@ -138,9 +221,78 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const { data: teamRow, error: teamLookupError } = await supabaseAdmin
+      .from('org_teams')
+      .select('id, manager_1_profile_id, manager_2_profile_id')
+      .eq('id', normalizedTeamId)
+      .single();
+
+    if (teamLookupError || !teamRow) {
+      return NextResponse.json({ error: 'Selected team does not exist.' }, { status: 400 });
+    }
+
+    const hasConfiguredManager = Boolean(
+      (teamRow as { manager_1_profile_id?: string | null }).manager_1_profile_id ||
+      (teamRow as { manager_2_profile_id?: string | null }).manager_2_profile_id
+    );
+    if (!hasConfiguredManager) {
+      return NextResponse.json(
+        { error: 'Selected team has no configured manager. Configure Manager 1 or Manager 2 first.' },
+        { status: 400 }
+      );
+    }
+
+    const { data: templateRow, error: templateError } = await supabaseAdmin
+      .from('work_shift_templates')
+      .select('id')
+      .eq('id', normalizedTemplateId)
+      .maybeSingle();
+    if (templateError || !templateRow) {
+      return NextResponse.json({ error: 'Selected work shift template does not exist.' }, { status: 400 });
+    }
+
+    const financialYearStartYear = getFinancialYearStartYear(new Date());
+    const financialYearBounds = buildFinancialYearBounds(financialYearStartYear);
+    const financialYearStartIso = formatIsoDate(financialYearBounds.start);
+    const financialYearEndIso = formatIsoDate(financialYearBounds.end);
+
+    if (normalizedBulkBatchIds.length > 0) {
+      const { data: bulkBatchRows, error: bulkBatchError } = await supabaseAdmin
+        .from('absence_bulk_batches')
+        .select('id, start_date, end_date')
+        .in('id', normalizedBulkBatchIds);
+
+      if (bulkBatchError) {
+        return NextResponse.json(
+          { error: 'Failed to validate selected bulk absence bookings.' },
+          { status: 500 }
+        );
+      }
+
+      const bulkRows = (bulkBatchRows || []) as Array<{ id: string; start_date: string; end_date: string }>;
+      const foundIds = new Set(bulkRows.map((row) => row.id));
+      const missingIds = normalizedBulkBatchIds.filter((id: string) => !foundIds.has(id));
+      if (missingIds.length > 0) {
+        return NextResponse.json(
+          { error: `Some selected bulk absence bookings no longer exist: ${missingIds.join(', ')}` },
+          { status: 400 }
+        );
+      }
+
+      const outOfFinancialYear = bulkRows.filter(
+        (row) => row.start_date > financialYearEndIso || row.end_date < financialYearStartIso
+      );
+      if (outOfFinancialYear.length > 0) {
+        return NextResponse.json(
+          { error: 'Selected bulk absence bookings must overlap the current financial year.' },
+          { status: 400 }
+        );
+      }
+    }
+
     const hierarchyValidation = await validateHierarchyReferences(supabaseAdmin, {
       line_manager_id: line_manager_id || null,
-      team_id: team_id || null,
+      team_id: normalizedTeamId,
     });
     if (!hierarchyValidation.ok) {
       return NextResponse.json(
@@ -184,7 +336,7 @@ export async function POST(request: NextRequest) {
     const selfManagerValidation = await validateHierarchyReferences(supabaseAdmin, {
       profile_id: authData.user.id,
       line_manager_id: line_manager_id || null,
-      team_id: team_id || null,
+      team_id: normalizedTeamId,
     });
     if (!selfManagerValidation.ok) {
       await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
@@ -206,13 +358,14 @@ export async function POST(request: NextRequest) {
       phone_number: phone_number || null,
       employee_id: employee_id || null,
       role_id,
+      annual_holiday_allowance_days: normalizedAnnualAllowanceDays,
       must_change_password: true,
     };
 
     const hierarchyProfilePayload = {
       ...baseProfilePayload,
       line_manager_id: line_manager_id || null,
-      team_id: team_id || null,
+      team_id: normalizedTeamId,
     };
 
     let hierarchyFieldsPersisted = true;
@@ -259,33 +412,97 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Send email to user with temporary password
-    const emailResult = await sendPasswordEmail({
-      to: email,
-      userName: full_name,
-      temporaryPassword,
-      isReset: false,
-    });
+    const todayIso = formatIsoDate(new Date());
+    try {
+      const carryoverAdjustmentDays = normalizedRemainingLeaveDays - normalizedAnnualAllowanceDays;
+      const carryoverPayload = {
+        profile_id: authData.user.id,
+        financial_year_start_year: financialYearStartYear,
+        source_financial_year_start_year: financialYearStartYear - 1,
+        carried_days: carryoverAdjustmentDays,
+        auto_generated: false,
+        generation_source: 'admin-user-onboarding-adjustment',
+        generated_at: new Date().toISOString(),
+        generated_by: effectiveRole.user_id,
+      };
 
-    if (!emailResult.success) {
-      console.warn('Failed to send welcome email:', emailResult.error);
-      // Don't fail the user creation if email fails - just log it
+      const { error: carryoverError } = await supabaseAdmin
+        .from('absence_allowance_carryovers')
+        .upsert(carryoverPayload, { onConflict: 'profile_id,financial_year_start_year' });
+
+      if (carryoverError) {
+        throw carryoverError;
+      }
+
+      await applyTemplateToProfiles(supabaseAdmin, normalizedTemplateId, [authData.user.id]);
+
+      const bankHolidayBooking = auto_book_bank_holidays
+        ? await seedRemainingFinancialYearBankHolidaysForProfiles({
+            supabase: supabaseAdmin,
+            profileIds: [authData.user.id],
+            financialYearStartYear,
+            fromDate: todayIso,
+          })
+        : null;
+
+      const bulkReplayResult =
+        auto_apply_bulk_bookings && normalizedBulkBatchIds.length > 0
+          ? await replayBulkAbsenceBatchesForProfile({
+              supabase: supabaseAdmin,
+              actorProfileId: effectiveRole.user_id,
+              profileId: authData.user.id,
+              batchIds: normalizedBulkBatchIds,
+              financialYearStartYear,
+              fromDate: todayIso,
+            })
+          : null;
+
+      // Send email to user with temporary password
+      const emailResult = await sendPasswordEmail({
+        to: email,
+        userName: full_name,
+        temporaryPassword,
+        isReset: false,
+      });
+
+      if (!emailResult.success) {
+        console.warn('Failed to send welcome email:', emailResult.error);
+        // Don't fail the user creation if email fails - just log it
+      }
+
+      return NextResponse.json({
+        success: true,
+        user: {
+          id: authData.user.id,
+          email: authData.user.email,
+          full_name,
+          employee_id,
+          role_id,
+          team_id: normalizedTeamId,
+          work_shift_template_id: normalizedTemplateId,
+        },
+        temporaryPassword, // Return password to show admin
+        emailSent: emailResult.success,
+        hierarchyFieldsPersisted,
+        hierarchyWarning: hierarchyWarning || hierarchyValidation.warning || selfManagerValidation.warning || null,
+        onboardingActions: {
+          annual_allowance_days: normalizedAnnualAllowanceDays,
+          remaining_leave_days: normalizedRemainingLeaveDays,
+          auto_book_bank_holidays,
+          auto_apply_bulk_bookings,
+          bankHolidayBooking,
+          bulkReplayResult,
+        },
+      });
+    } catch (onboardingError) {
+      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+      return NextResponse.json(
+        {
+          error: onboardingError instanceof Error ? onboardingError.message : 'Failed to apply onboarding actions',
+        },
+        { status: 500 }
+      );
     }
-
-    return NextResponse.json({
-      success: true,
-      user: {
-        id: authData.user.id,
-        email: authData.user.email,
-        full_name,
-        employee_id,
-        role_id,
-      },
-      temporaryPassword, // Return password to show admin
-      emailSent: emailResult.success,
-      hierarchyFieldsPersisted,
-      hierarchyWarning: hierarchyWarning || hierarchyValidation.warning || selfManagerValidation.warning || null,
-    });
   } catch (error) {
     console.error('Error creating user:', error);
 

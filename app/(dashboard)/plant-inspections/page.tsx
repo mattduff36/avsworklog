@@ -14,12 +14,20 @@ import { PageLoader } from '@/components/ui/page-loader';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Clipboard, Clock, User, Download, Trash2, Filter, Wrench, Loader2 } from 'lucide-react';
+import { Plus, Clipboard, Clock, User, Download, Trash2, Filter, Wrench, Loader2, LayoutGrid, Table2, Settings2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { toast } from 'sonner';
 import { PlantInspection } from '@/types/inspection';
 import { Employee, InspectionStatusFilter } from '@/types/common';
 import { useQueryState } from 'nuqs';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +39,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
+import {
+  DEFAULT_PLANT_INSPECTIONS_COLUMN_VISIBILITY,
+  PLANT_INSPECTIONS_COLUMN_VISIBILITY_STORAGE_KEY,
+  PlantInspectionsColumnVisibility,
+  PlantInspectionsListTable,
+} from './components/PlantInspectionsListTable';
 
 interface InspectionWithPlant extends PlantInspection {
   plant: {
@@ -41,6 +55,14 @@ interface InspectionWithPlant extends PlantInspection {
   } | null;
   has_reported_defect?: boolean;
   has_inform_workshop_task?: boolean;
+}
+
+interface DeleteDialogInspectionInput {
+  id: string;
+  inspection_date: string;
+  is_hired_plant: boolean;
+  hired_plant_id_serial?: string | null;
+  plant?: { plant_id?: string | null } | null;
 }
 
 interface Plant {
@@ -88,6 +110,15 @@ function PlantInspectionsContent() {
   const [inspectionToDelete, setInspectionToDelete] = useState<{ id: string; plantId: string; date: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [displayCount, setDisplayCount] = useState(pageSize);
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('plant-inspections-view-mode') as 'cards' | 'table') || 'cards';
+    }
+    return 'cards';
+  });
+  const [columnVisibility, setColumnVisibility] = useState<PlantInspectionsColumnVisibility>(
+    DEFAULT_PLANT_INSPECTIONS_COLUMN_VISIBILITY
+  );
   const supabase = createClient();
 
   useEffect(() => {
@@ -263,6 +294,18 @@ function PlantInspectionsContent() {
   }, [pageSize, selectedEmployeeId, statusFilter, plantFilter]);
 
   useEffect(() => {
+    try {
+      const saved = localStorage.getItem(PLANT_INSPECTIONS_COLUMN_VISIBILITY_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as Partial<PlantInspectionsColumnVisibility>;
+        setColumnVisibility((prev) => ({ ...prev, ...parsed }));
+      }
+    } catch {
+      // Ignore invalid persisted state
+    }
+  }, []);
+
+  useEffect(() => {
     fetchInspections();
   }, [fetchInspections]);
 
@@ -318,6 +361,14 @@ function PlantInspectionsContent() {
     return <Clipboard className={`h-5 w-5 ${iconColorClass}`} />;
   };
 
+  function toggleColumn(column: keyof PlantInspectionsColumnVisibility) {
+    setColumnVisibility((prev) => {
+      const next = { ...prev, [column]: !prev[column] };
+      localStorage.setItem(PLANT_INSPECTIONS_COLUMN_VISIBILITY_STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  }
+
   const handleDownloadPDF = async (e: React.MouseEvent, inspectionId: string) => {
     e.preventDefault();
     e.stopPropagation();
@@ -348,7 +399,7 @@ function PlantInspectionsContent() {
     }
   };
 
-  const openDeleteDialog = (e: React.MouseEvent, inspection: InspectionWithPlant) => {
+  const openDeleteDialog = (e: React.MouseEvent, inspection: DeleteDialogInspectionInput) => {
     e.stopPropagation();
     setInspectionToDelete({
       id: inspection.id,
@@ -518,7 +569,90 @@ function PlantInspectionsContent() {
               Refreshing plant checks...
             </div>
           )}
-          <div className="grid gap-4">
+          {isElevatedUser && (
+            <div className="hidden md:flex items-center justify-end gap-2">
+              {viewMode === 'table' && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="border-slate-600">
+                      <Settings2 className="h-4 w-4 mr-2" />
+                      Columns
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56 bg-slate-900 border border-border">
+                    <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.employeeId}
+                      onCheckedChange={() => toggleColumn('employeeId')}
+                    >
+                      Employee ID
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.category}
+                      onCheckedChange={() => toggleColumn('category')}
+                    >
+                      Category
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.status}
+                      onCheckedChange={() => toggleColumn('status')}
+                    >
+                      Status
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={columnVisibility.submittedAt}
+                      onCheckedChange={() => toggleColumn('submittedAt')}
+                    >
+                      Submitted
+                    </DropdownMenuCheckboxItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-0">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setViewMode('table');
+                    localStorage.setItem('plant-inspections-view-mode', 'table');
+                  }}
+                  className={`h-8 px-3 ${viewMode === 'table' ? 'bg-white text-slate-900' : 'text-muted-foreground hover:text-white'}`}
+                >
+                  <Table2 className="h-4 w-4 mr-1.5" />
+                  Table
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setViewMode('cards');
+                    localStorage.setItem('plant-inspections-view-mode', 'cards');
+                  }}
+                  className={`h-8 px-3 ${viewMode === 'cards' ? 'bg-white text-slate-900' : 'text-muted-foreground hover:text-white'}`}
+                >
+                  <LayoutGrid className="h-4 w-4 mr-1.5" />
+                  Cards
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {isElevatedUser && viewMode === 'table' && (
+            <div className="hidden md:block">
+              <PlantInspectionsListTable
+                inspections={inspections.slice(0, displayCount)}
+                columnVisibility={columnVisibility}
+                downloadingId={downloading}
+                deleting={deleting}
+                showDeleteActions={isElevatedUser}
+                onDownloadPDF={handleDownloadPDF}
+                onOpenDeleteDialog={openDeleteDialog}
+              />
+            </div>
+          )}
+
+          <div className={isElevatedUser && viewMode === 'table' ? 'md:hidden grid gap-4' : 'grid gap-4'}>
             {inspections.slice(0, displayCount).map((inspection) => {
               const inspectionStatus = inspection.status as string;
               return (

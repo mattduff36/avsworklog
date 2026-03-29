@@ -312,6 +312,7 @@ export function Navbar() {
     userPermissions,
     effectiveIsAdmin
   );
+  const mobileManagerLinks = managerLinks.filter((item) => item.href !== '/absence/manage');
   const adminLinks = getFilteredNavByPermissions(
     adminNavItems,
     userPermissions,
@@ -489,7 +490,7 @@ export function Navbar() {
               })}
               
               {/* Manager/Admin Section (Mobile) */}
-              {(managerLinks.length > 0 || adminLinks.length > 0) && (
+              {(mobileManagerLinks.length > 0 || adminLinks.length > 0) && (
                 <>
                   <div className="my-3 border-t border-border/50"></div>
                   
@@ -497,7 +498,7 @@ export function Navbar() {
                   <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
                     Management
                   </div>
-                  {managerLinks.map((item) => {
+                  {mobileManagerLinks.map((item) => {
                     const Icon = item.icon;
                     const isActive = isLinkActive(item.href);
                     const activeColors = getNavItemActiveColors(item.href);
