@@ -77,9 +77,10 @@ function getUserFacingMessage(log: ErrorLogEntry): UserFacingMessageSnapshot | n
 
 function getErrorClassification(log: ErrorLogEntry): ErrorClassificationSnapshot | null {
   const additionalData = (log.additional_data as Record<string, unknown> | null) || null;
-  if (!additionalData || typeof additionalData.errorClassification !== 'object') return null;
+  const classificationRaw = additionalData?.errorClassification;
+  if (!classificationRaw || typeof classificationRaw !== 'object') return null;
 
-  const classification = additionalData.errorClassification as Record<string, unknown>;
+  const classification = classificationRaw as Record<string, unknown>;
   const category = typeof classification.category === 'string' ? classification.category : null;
   if (!category) return null;
 
@@ -92,9 +93,10 @@ function getErrorClassification(log: ErrorLogEntry): ErrorClassificationSnapshot
 
 function getUserAction(log: ErrorLogEntry): UserActionSnapshot | null {
   const additionalData = (log.additional_data as Record<string, unknown> | null) || null;
-  if (!additionalData || typeof additionalData.userAction !== 'object') return null;
+  const actionRaw = additionalData?.userAction;
+  if (!actionRaw || typeof actionRaw !== 'object') return null;
 
-  const action = additionalData.userAction as Record<string, unknown>;
+  const action = actionRaw as Record<string, unknown>;
   const actionType = typeof action.actionType === 'string' ? action.actionType : 'unknown';
   const label = typeof action.label === 'string' ? action.label : null;
   const element = typeof action.element === 'string' ? action.element : null;

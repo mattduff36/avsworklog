@@ -19,6 +19,7 @@ export interface Database {
           employee_id: string | null
           full_name: string
           phone_number: string | null
+          avatar_url: string | null
           role: string | null
           role_id: string | null
           must_change_password: boolean
@@ -31,6 +32,7 @@ export interface Database {
           employee_id?: string | null
           full_name: string
           phone_number?: string | null
+          avatar_url?: string | null
           role?: string | null
           role_id?: string | null
           must_change_password?: boolean
@@ -43,12 +45,36 @@ export interface Database {
           employee_id?: string | null
           full_name?: string
           phone_number?: string | null
+          avatar_url?: string | null
           role?: string | null
           role_id?: string | null
           must_change_password?: boolean
           annual_holiday_allowance_days?: number | null
           created_at?: string
           updated_at?: string
+        }
+      }
+      user_page_visits: {
+        Row: {
+          id: string
+          user_id: string
+          path: string
+          visited_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          path: string
+          visited_at?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          path?: string
+          visited_at?: string
+          created_at?: string
         }
       }
       roles: {

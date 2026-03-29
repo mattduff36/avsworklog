@@ -60,7 +60,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   const [allTeams, setAllTeams] = useState<TeamOption[]>([]);
   const [viewAsMenuOpen, setViewAsMenuOpen] = useState(false);
   const [hoverExpanded, setHoverExpanded] = useState(false);
-  const [viewAsMenuPosition, setViewAsMenuPosition] = useState({ left: 0, bottom: 12, maxHeight: 320 });
+  const [viewAsMenuPosition, setViewAsMenuPosition] = useState({ left: 12, top: 12, maxHeight: 320 });
   const sidebarRef = useRef<HTMLDivElement | null>(null);
   const viewAsTriggerRef = useRef<HTMLButtonElement | null>(null);
   const viewAsMenuRef = useRef<HTMLDivElement | null>(null);
@@ -217,13 +217,28 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
     const triggerRect = viewAsTriggerRef.current?.getBoundingClientRect();
     if (!triggerRect) return;
 
+    const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
-    const bottomOffset = Math.max(12, Math.round(viewportHeight - triggerRect.bottom));
-    const maxHeight = Math.max(240, viewportHeight - bottomOffset - 24);
+    const menuWidth = 256; // matches w-64
+    const margin = 12;
+    const preferredLeft = Math.round(triggerRect.right + (isExpanded ? 16 : 12));
+    const maxLeft = Math.max(margin, viewportWidth - menuWidth - margin);
+    const clampedLeft = Math.min(Math.max(margin, preferredLeft), maxLeft);
+    const spaceBelow = viewportHeight - triggerRect.bottom - margin;
+    const spaceAbove = triggerRect.top - margin;
+    const openUpwards = spaceBelow < 220 && spaceAbove > spaceBelow;
+    const fallbackAvailable = viewportHeight - margin * 2;
+    const targetAvailable = openUpwards ? spaceAbove : spaceBelow;
+    const maxHeight = Math.max(160, Math.min(fallbackAvailable, Math.floor(targetAvailable - 8)));
+    const preferredTop = openUpwards
+      ? Math.round(triggerRect.top - maxHeight - 8)
+      : Math.round(triggerRect.bottom + 8);
+    const maxTop = Math.max(margin, viewportHeight - maxHeight - margin);
+    const clampedTop = Math.min(Math.max(margin, preferredTop), maxTop);
 
     setViewAsMenuPosition({
-      left: Math.round(triggerRect.right + (isExpanded ? 16 : 12)),
-      bottom: bottomOffset,
+      left: clampedLeft,
+      top: clampedTop,
       maxHeight,
     });
   }, [isExpanded]);
@@ -442,18 +457,24 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
             isViewingAsOverride ? 'bg-amber-600/30' : 'hover:bg-slate-800'
           }`}
           title={selectedRole || selectedTeam ? `Viewing as ${selectionSummary}` : 'View As'}
-          onClick={() => setViewAsMenuOpen((prev) => !prev)}
+          onClick={() => {
+            const nextOpen = !viewAsMenuOpen;
+            if (nextOpen) {
+              requestAnimationFrame(() => updateViewAsMenuPosition());
+            }
+            setViewAsMenuOpen(nextOpen);
+          }}
         >
           <Eye className={`w-5 h-5 ${isViewingAsOverride ? 'text-amber-300' : 'text-slate-400 hover:text-white'}`} />
         </Button>
         {viewAsMenuOpen && (
           <div
             ref={viewAsMenuRef}
-            className="fixed z-[80] w-64 p-2 bg-slate-900 border border-slate-700 shadow-2xl overflow-y-auto rounded-md"
+            className="fixed z-[80] w-64 max-w-[calc(100vw-1.5rem)] p-2 bg-slate-900 border border-slate-700 shadow-2xl overflow-y-auto rounded-md"
             style={{
-              left: 60,
-              bottom: 16,
-              maxHeight: 'calc(100vh - 32px)',
+              left: `${viewAsMenuPosition.left}px`,
+              top: `${viewAsMenuPosition.top}px`,
+              maxHeight: `${viewAsMenuPosition.maxHeight}px`,
               color: '#e2e8f0',
             }}
           >
@@ -671,10 +692,10 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
             {viewAsMenuOpen && (
               <div
                 ref={viewAsMenuRef}
-                className="fixed z-[80] w-64 p-2 bg-slate-900 border border-slate-700 shadow-2xl overflow-y-auto rounded-md"
+                className="fixed z-[80] w-64 max-w-[calc(100vw-1.5rem)] p-2 bg-slate-900 border border-slate-700 shadow-2xl overflow-y-auto rounded-md"
                 style={{
                   left: `${viewAsMenuPosition.left}px`,
-                  bottom: `${viewAsMenuPosition.bottom}px`,
+                  top: `${viewAsMenuPosition.top}px`,
                   maxHeight: `${viewAsMenuPosition.maxHeight}px`,
                   color: '#e2e8f0',
                 }}

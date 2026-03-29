@@ -461,8 +461,8 @@ export default function ActionsPage() {
     } catch (err) {
       const errorContextId = 'actions-delete-action-error';
       console.error('Error deleting action:', err, { errorContextId });
-      toast.error('Failed to delete action', { id: errorContextId });
       setError('Failed to delete action');
+      toast.error('Failed to delete action', { id: errorContextId });
     }
   };
 

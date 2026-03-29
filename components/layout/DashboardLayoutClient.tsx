@@ -1,6 +1,7 @@
 'use client';
 
 import { usePathname, useSearchParams } from 'next/navigation';
+import { useEffect, useRef } from 'react';
 import { Navbar } from '@/components/layout/Navbar';
 import { DashboardContent } from '@/components/layout/DashboardContent';
 import { MessageBlockingCheck } from '@/components/messages/MessageBlockingCheck';
@@ -31,9 +32,33 @@ function DashboardLayoutShell({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { tabletModeEnabled, tabletModeInfoOpen, dismissTabletModeInfo } = useTabletMode();
+  const lastTrackedPathRef = useRef<string>('');
   
   // Determine the accent color based on current route
   const accent = getAccentFromRoute(pathname, searchParams);
+
+  useEffect(() => {
+    if (!pathname) return;
+
+    const query = searchParams?.toString() || '';
+    const nextPath = query ? `${pathname}?${query}` : pathname;
+    if (lastTrackedPathRef.current === nextPath) return;
+    lastTrackedPathRef.current = nextPath;
+
+    const timer = window.setTimeout(() => {
+      fetch('/api/me/page-visits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: nextPath }),
+      }).catch(() => {
+        // Avoid noisy console logs for non-critical tracking telemetry.
+      });
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [pathname, searchParams]);
 
   return (
     <div 

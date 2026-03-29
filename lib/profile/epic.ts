@@ -1,0 +1,2 @@
+export const PROFILE_HUB_PRD_EPIC_ID = 'PRD-EPIC-PROFILE-HUB-001';
+

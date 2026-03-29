@@ -11,6 +11,8 @@ import {
   Bell,
   Bug,
   HelpCircle,
+  MonitorSmartphone,
+  UserCircle2,
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { NotificationPanel } from '@/components/messages/NotificationPanel';
@@ -103,16 +105,20 @@ export function Navbar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { user, profile, signOut, isAdmin, isManager, isActualSuperAdmin, isViewingAs } = useAuth();
-  const { tabletModeEnabled } = useTabletMode();
+  const { tabletModeEnabled, toggleTabletMode } = useTabletMode();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false); // Sidebar starts collapsed
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isMounted, setIsMounted] = useState(false); // Track client hydration
   const [isCompact, setIsCompact] = useState(false);
+  const [desktopMenuOpen, setDesktopMenuOpen] = useState(false);
+  const [desktopMenuPosition, setDesktopMenuPosition] = useState({ left: 0, top: 0, maxHeight: 320 });
   const navRef = useRef<HTMLDivElement>(null);
   const isCompactRef = useRef(false);
   const expandedWidthRef = useRef(0);
+  const desktopMenuTriggerRef = useRef<HTMLButtonElement>(null);
+  const desktopMenuRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
 
   // useAuth now provides effective role flags (respecting View As cookie)
@@ -136,7 +142,74 @@ export function Navbar() {
     setMobileMenuOpen(false);
     setSidebarOpen(false);
     setNotificationPanelOpen(false);
+    setDesktopMenuOpen(false);
   }, [tabletModeEnabled]);
+
+  const updateDesktopMenuPosition = () => {
+    const triggerRect = desktopMenuTriggerRef.current?.getBoundingClientRect();
+    if (!triggerRect) return;
+
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const menuWidth = 224; // matches w-56
+    const margin = 12;
+    const preferredLeft = Math.round(triggerRect.right - menuWidth);
+    const maxLeft = Math.max(margin, viewportWidth - menuWidth - margin);
+    const clampedLeft = Math.min(Math.max(margin, preferredLeft), maxLeft);
+    const spaceBelow = viewportHeight - triggerRect.bottom - margin;
+    const spaceAbove = triggerRect.top - margin;
+    const openUpwards = spaceBelow < 200 && spaceAbove > spaceBelow;
+    const availableHeight = Math.max(0, Math.floor((openUpwards ? spaceAbove : spaceBelow) - 8));
+    const top = openUpwards
+      ? Math.max(margin, Math.round(triggerRect.top - availableHeight - 8))
+      : Math.max(margin, Math.round(triggerRect.bottom + 8));
+
+    setDesktopMenuPosition({
+      left: clampedLeft,
+      top,
+      maxHeight: availableHeight,
+    });
+  };
+
+  useEffect(() => {
+    if (!desktopMenuOpen) return;
+
+    updateDesktopMenuPosition();
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target as Node;
+      if (desktopMenuTriggerRef.current?.contains(target) || desktopMenuRef.current?.contains(target)) {
+        return;
+      }
+      setDesktopMenuOpen(false);
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setDesktopMenuOpen(false);
+      }
+    }
+
+    function syncPosition() {
+      updateDesktopMenuPosition();
+    }
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
+    window.addEventListener('resize', syncPosition);
+    window.addEventListener('scroll', syncPosition, true);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+      window.removeEventListener('resize', syncPosition);
+      window.removeEventListener('scroll', syncPosition, true);
+    };
+  }, [desktopMenuOpen]);
+
+  useEffect(() => {
+    setDesktopMenuOpen(false);
+  }, [pathname]);
 
   // Auto-compact: switch to icon-only when labels would overflow the nav container
   useEffect(() => {
@@ -318,6 +391,8 @@ export function Navbar() {
     userPermissions,
     effectiveIsAdmin
   );
+  const hasMobileManagementLinks = mobileManagerLinks.length > 0 || adminLinks.length > 0;
+  const hasMobileDeveloperLinks = isActualSuperAdmin && !isViewingAs;
 
   return (
     <>
@@ -397,53 +472,102 @@ export function Navbar() {
 
             {/* Right side */}
             <div className="flex items-center space-x-2 ml-auto">
-              {/* Tablet Mode toggle */}
+              {/* Desktop burger menu (non-tablet mode only) */}
               <div className="hidden md:flex items-center">
-                <TabletModeToggleActions />
-              </div>
-
-              {/* Help link (desktop only) */}
-              <Link
-                href="/help"
-                title="Help"
-                className={`hidden md:inline-flex items-center justify-center rounded-md p-2 text-sm transition-colors ${
-                  isLinkActive('/help')
-                    ? 'bg-avs-yellow text-slate-900'
-                    : 'text-muted-foreground hover:text-white hover:bg-slate-800/50'
-                }`}
-              >
-                <HelpCircle className="w-4 h-4" />
-              </Link>
-
-              {/* Notification Bell */}
-              <div className="relative">
                 <Button
+                  ref={desktopMenuTriggerRef}
                   variant="ghost"
                   size="sm"
-                  onClick={() => setNotificationPanelOpen(!notificationPanelOpen)}
                   className="text-muted-foreground hover:text-white hover:bg-slate-800/50 relative"
-                  title="Notifications"
+                  title="Menu"
+                  aria-haspopup="menu"
+                  aria-expanded={desktopMenuOpen}
+                  onClick={() => {
+                    const nextOpen = !desktopMenuOpen;
+                    if (nextOpen) {
+                      requestAnimationFrame(() => updateDesktopMenuPosition());
+                    }
+                    setDesktopMenuOpen(nextOpen);
+                  }}
                 >
-                  <Bell className="w-4 h-4" />
+                  <Menu className="w-4 h-4" />
                   {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-600 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 h-5 min-w-5 px-1 bg-red-600 text-white text-[11px] font-bold rounded-full flex items-center justify-center">
                       {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                   )}
                 </Button>
-              </div>
+                {desktopMenuOpen && (
+                  <div
+                    ref={desktopMenuRef}
+                    role="menu"
+                    className="fixed z-[80] w-56 max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-md border border-border bg-slate-900 p-1 shadow-2xl"
+                    style={{
+                      left: `${desktopMenuPosition.left}px`,
+                      top: `${desktopMenuPosition.top}px`,
+                      maxHeight: `${desktopMenuPosition.maxHeight}px`,
+                    }}
+                  >
+                    <div className="px-2 py-1.5 text-sm font-semibold text-slate-300">Quick Menu</div>
+                    <div className="-mx-1 my-1 h-px bg-muted" />
 
-              {/* Sign Out button (desktop only) */}
-              <div className="hidden md:flex items-center">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleSignOut}
-                  className="text-muted-foreground hover:text-white hover:bg-slate-800/50"
-                  title="Sign Out"
-                >
-                  <LogOut className="w-4 h-4" />
-                </Button>
+                    <Link
+                      href="/profile"
+                      className="relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-slate-200 outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+                      onClick={() => setDesktopMenuOpen(false)}
+                    >
+                      <UserCircle2 className="w-4 h-4" />
+                      Profile
+                    </Link>
+
+                    <button
+                      type="button"
+                      className="relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-slate-200 outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+                      onClick={() => {
+                        setDesktopMenuOpen(false);
+                        setNotificationPanelOpen(true);
+                      }}
+                    >
+                      <Bell className="w-4 h-4" />
+                      Notifications
+                    </button>
+
+                    <Link
+                      href="/help"
+                      className="relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-slate-200 outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+                      onClick={() => setDesktopMenuOpen(false)}
+                    >
+                      <HelpCircle className="w-4 h-4" />
+                      Help
+                    </Link>
+
+                    <button
+                      type="button"
+                      className="relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-slate-200 outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+                      onClick={() => {
+                        setDesktopMenuOpen(false);
+                        toggleTabletMode();
+                      }}
+                    >
+                      <MonitorSmartphone className="w-4 h-4" />
+                      {tabletModeEnabled ? 'Disable Tablet Mode' : 'Enable Tablet Mode'}
+                    </button>
+
+                    <div className="-mx-1 my-1 h-px bg-muted" />
+
+                    <button
+                      type="button"
+                      className="relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-slate-200 outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+                      onClick={() => {
+                        setDesktopMenuOpen(false);
+                        void handleSignOut();
+                      }}
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Sign Out
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Mobile menu button */}
@@ -465,128 +589,140 @@ export function Navbar() {
         {/* Mobile menu */}
         {!tabletModeEnabled && mobileMenuOpen && (
           <div className="md:hidden border-t border-border/50 bg-slate-900/95 backdrop-blur-xl">
-            <div className="px-2 pt-2 pb-3 space-y-1">
-              {/* Dashboard + Employee Navigation */}
-              {[...dashboardNav, ...employeeNav].map((item) => {
-                const Icon = item.icon;
-                const isActive = isLinkActive(item.href);
-                const activeColors = getNavItemActiveColors(item.href);
-                const iconColorClass = getNavItemIconColor(item.href);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
-                      isActive
-                        ? `${activeColors.bg} ${activeColors.text}`
-                        : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
-                    }`}
-                  >
-                    <Icon className={`w-5 h-5 mr-3 ${isActive ? '' : iconColorClass}`} />
-                    {item.label}
-                  </Link>
-                );
-              })}
-              
-              {/* Manager/Admin Section (Mobile) */}
-              {(mobileManagerLinks.length > 0 || adminLinks.length > 0) && (
-                <>
-                  <div className="my-3 border-t border-border/50"></div>
-                  
-                  {/* Management Section */}
-                  <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                    Management
-                  </div>
-                  {mobileManagerLinks.map((item) => {
+            <div className="px-2 pt-2 pb-3">
+              <div className={`grid gap-3 ${hasMobileManagementLinks ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                <div className="space-y-1">
+                  {[...dashboardNav, ...employeeNav.filter((item) => item.href !== '/help' && item.href !== '/profile')].map((item) => {
                     const Icon = item.icon;
                     const isActive = isLinkActive(item.href);
                     const activeColors = getNavItemActiveColors(item.href);
                     const iconColorClass = getNavItemIconColor(item.href);
-                    const badgeCount = item.href === '/absence/manage' ? pendingAbsenceCount : 0;
                     return (
                       <Link
                         key={item.href}
                         href={item.href}
                         onClick={() => setMobileMenuOpen(false)}
-                        className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
+                        className={`flex items-center px-3 py-2 text-lg font-medium rounded-md ${
                           isActive
                             ? `${activeColors.bg} ${activeColors.text}`
                             : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
                         }`}
                       >
-                        <Icon className={`w-5 h-5 mr-3 ${isActive ? '' : iconColorClass}`} />
-                        <span>{item.label}</span>
-                        {badgeCount > 0 && (
-                          <span className="ml-auto min-w-[1.25rem] h-5 px-1 rounded-full bg-red-500 text-white text-[11px] leading-none flex items-center justify-center font-semibold">
-                            {badgeCount > 99 ? '99+' : badgeCount}
-                          </span>
-                        )}
+                        <Icon className={`w-6 h-6 mr-3 ${isActive ? '' : iconColorClass}`} />
+                        {item.label}
                       </Link>
                     );
                   })}
-                  
-                  {/* Admin Links */}
-                  {adminLinks.length > 0 && (
-                    <>
-                      <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider mt-4">
-                        Administration
-                      </div>
-                      {adminLinks.map((item) => {
-                        const Icon = item.icon;
-                        const isActive = isLinkActive(item.href);
-                        const activeColors = getNavItemActiveColors(item.href);
-                        const iconColorClass = getNavItemIconColor(item.href);
-                        return (
-                          <Link
-                            key={item.href}
-                            href={item.href}
-                            onClick={() => setMobileMenuOpen(false)}
-                            className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
-                              isActive
-                                ? `${activeColors.bg} ${activeColors.text}`
-                                : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
-                            }`}
-                          >
-                            <Icon className={`w-5 h-5 mr-3 ${isActive ? '' : iconColorClass}`} />
-                            {item.label}
-                          </Link>
-                        );
-                      })}
-                    </>
-                  )}
-                  
-                  {/* Developer Tools (Mobile) - SuperAdmin Only (not when viewing as another role) */}
-                  {isActualSuperAdmin && !isViewingAs && (
-                    <>
-                      <div className="px-3 py-2 text-xs font-semibold text-red-500 uppercase tracking-wider mt-4">
-                        Developer
-                      </div>
-                      <Link
-                        href="/debug"
-                        onClick={() => setMobileMenuOpen(false)}
-                        className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
-                          pathname === '/debug'
-                            ? 'bg-red-600 text-white'
-                            : 'text-red-500 hover:bg-slate-800/50 hover:text-red-400'
-                        }`}
-                      >
-                        <Bug className="w-5 h-5 mr-3" />
-                        Debug Console
-                      </Link>
-                    </>
-                  )}
-                </>
-              )}
+                </div>
+
+                {hasMobileManagementLinks ? (
+                  <div className="space-y-1">
+                    {[...mobileManagerLinks, ...adminLinks].map((item) => {
+                      const Icon = item.icon;
+                      const isActive = isLinkActive(item.href);
+                      const activeColors = getNavItemActiveColors(item.href);
+                      const iconColorClass = getNavItemIconColor(item.href);
+                      const badgeCount = item.href === '/absence/manage' ? pendingAbsenceCount : 0;
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={() => setMobileMenuOpen(false)}
+                          className={`flex items-center px-3 py-2 text-lg font-medium rounded-md ${
+                            isActive
+                              ? `${activeColors.bg} ${activeColors.text}`
+                              : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
+                          }`}
+                        >
+                          <Icon className={`w-6 h-6 mr-3 ${isActive ? '' : iconColorClass}`} />
+                          <span>{item.label}</span>
+                          {badgeCount > 0 && (
+                            <span className="ml-auto min-w-[1.25rem] h-5 px-1 rounded-full bg-red-500 text-white text-[11px] leading-none flex items-center justify-center font-semibold">
+                              {badgeCount > 99 ? '99+' : badgeCount}
+                            </span>
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
             </div>
             <div className="pt-4 pb-3 border-t border-border/50">
-              <div className="px-2 space-y-2">
+              <div className={`px-2 grid gap-3 ${hasMobileDeveloperLinks ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                <div className="space-y-1">
+                  <Link
+                    href="/profile"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center px-3 py-2 text-lg font-medium rounded-md ${
+                      isLinkActive('/profile')
+                        ? 'bg-avs-yellow text-slate-900'
+                        : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
+                    }`}
+                  >
+                    <UserCircle2
+                      className={`w-6 h-6 mr-3 ${isLinkActive('/profile') ? 'text-slate-900' : 'text-avs-yellow'}`}
+                    />
+                    Profile
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      setNotificationPanelOpen(true);
+                    }}
+                    className="flex w-full items-center px-3 py-2 text-lg font-medium rounded-md text-muted-foreground hover:bg-slate-800/50 hover:text-white"
+                  >
+                    <Bell className="w-6 h-6 mr-3 text-avs-yellow" />
+                    Notifications
+                    {unreadCount > 0 && (
+                      <span className="ml-auto min-w-[1.25rem] h-5 px-1 rounded-full bg-red-500 text-white text-[11px] leading-none flex items-center justify-center font-semibold">
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </span>
+                    )}
+                  </button>
+
+                  <Link
+                    href="/help"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center px-3 py-2 text-lg font-medium rounded-md ${
+                      isLinkActive('/help')
+                        ? 'bg-avs-yellow text-slate-900'
+                        : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
+                    }`}
+                  >
+                    <HelpCircle
+                      className={`w-6 h-6 mr-3 ${isLinkActive('/help') ? 'text-slate-900' : 'text-avs-yellow'}`}
+                    />
+                    Help
+                  </Link>
+                </div>
+
+                {hasMobileDeveloperLinks ? (
+                  <div className="space-y-1">
+                    <Link
+                      href="/debug"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`flex items-center px-3 py-2 text-lg font-medium rounded-md ${
+                        pathname === '/debug'
+                          ? 'bg-red-600 text-white'
+                          : 'text-red-500 hover:bg-slate-800/50 hover:text-red-400'
+                      }`}
+                    >
+                      <Bug className="w-6 h-6 mr-3" />
+                      Debug Console
+                    </Link>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="mt-3 pt-3 border-t border-border/50 px-2">
                 <Button
-                  variant="ghost"
-                  className="w-full justify-start text-muted-foreground hover:text-white hover:bg-slate-800/50"
+                  variant="destructive"
+                  className="w-full justify-center bg-red-600 text-lg text-white hover:bg-red-500"
                   onClick={handleSignOut}
                 >
-                  <LogOut className="w-4 h-4 mr-2" />
                   Sign Out
                 </Button>
               </div>

@@ -86,6 +86,7 @@ export function useAuth() {
       id,
       full_name,
       phone_number,
+      avatar_url,
       employee_id,
       role_id,
       super_admin,

@@ -54,6 +54,14 @@ function applyAlphaToHSL(color: string): string {
   return 'hsl(215 16% 47% / 0.15)'; // slate-600 with 15% opacity
 }
 
+function getInitials(fullName: string | null | undefined): string {
+  const normalized = (fullName || '').trim();
+  if (!normalized) return 'U';
+  const parts = normalized.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
+  return `${parts[0].slice(0, 1)}${parts[parts.length - 1].slice(0, 1)}`.toUpperCase();
+}
+
 export default function DashboardPage() {
   const { profile, isManager, isAdmin, isActualSuperAdmin, isViewingAs, effectiveRole } = useAuth();
   const { tabletModeEnabled } = useTabletMode();
@@ -312,13 +320,35 @@ export default function DashboardPage() {
 
           {/* Actual Content */}
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-white">
-                Welcome back, {profile?.full_name}
-              </h1>
-              <p className="text-slate-400 mt-1">
-                {headerSubtitle}
-              </p>
+            <div className="flex items-center gap-4 min-w-0">
+              <Link
+                href="/profile"
+                aria-label="Open profile page"
+                className="relative block h-11 w-11 shrink-0 overflow-hidden rounded-full border border-slate-600 bg-slate-900/30 transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-avs-yellow md:h-14 md:w-14"
+              >
+                {profile?.avatar_url ? (
+                  <Image
+                    src={profile.avatar_url}
+                    alt={`${profile?.full_name || 'User'} avatar`}
+                    fill
+                    unoptimized
+                    loader={({ src }) => src}
+                    className="object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-slate-800 text-sm font-semibold text-avs-yellow">
+                    {getInitials(profile?.full_name)}
+                  </div>
+                )}
+              </Link>
+              <div className="min-w-0">
+                <h1 className="truncate text-3xl font-bold text-white">
+                  Welcome back, {profile?.full_name}
+                </h1>
+                <p className="mt-1 text-slate-400">
+                  {headerSubtitle}
+                </p>
+              </div>
             </div>
             <div className="hidden md:flex items-center justify-end">
               <TabletModeToggleActions size="dashboard" />
