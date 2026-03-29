@@ -91,6 +91,33 @@ export function AbsencesApprovalTable({
     return `${days} days`;
   };
 
+  const getStatusBadge = (status: string) => {
+    if (status === 'approved') {
+      return (
+        <Badge variant="success" className="bg-green-500/10 text-green-600 border-green-500/20">
+          <CheckCircle2 className="h-3 w-3 mr-1" />
+          Approved
+        </Badge>
+      );
+    }
+
+    if (status === 'rejected') {
+      return (
+        <Badge variant="destructive">
+          <XCircle className="h-3 w-3 mr-1" />
+          Rejected
+        </Badge>
+      );
+    }
+
+    return (
+      <Badge variant="warning">
+        <Clock className="h-3 w-3 mr-1" />
+        Pending
+      </Badge>
+    );
+  };
+
   return (
     <div className="space-y-3">
       <div className="border border-slate-700 rounded-lg overflow-hidden">
@@ -237,10 +264,7 @@ export function AbsencesApprovalTable({
                 )}
 
                 <TableCell>
-                  <Badge variant="warning">
-                    <Clock className="h-3 w-3 mr-1" />
-                    Pending
-                  </Badge>
+                  {getStatusBadge(absence.status)}
                 </TableCell>
 
                 {columnVisibility.submittedAt && (
@@ -250,26 +274,30 @@ export function AbsencesApprovalTable({
                 )}
 
                 <TableCell className="text-right">
-                  <div className="flex items-center justify-end gap-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onReject(absence.id)}
-                      className="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all h-8 px-2"
-                    >
-                      <XCircle className="h-3.5 w-3.5 mr-1" />
-                      Reject
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onApprove(absence.id)}
-                      className="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all h-8 px-2"
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                      Approve
-                    </Button>
-                  </div>
+                  {absence.status === 'pending' ? (
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onReject(absence.id)}
+                        className="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all h-8 px-2"
+                      >
+                        <XCircle className="h-3.5 w-3.5 mr-1" />
+                        Reject
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onApprove(absence.id)}
+                        className="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all h-8 px-2"
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                        Payroll Received
+                      </Button>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">No actions</span>
+                  )}
                 </TableCell>
               </TableRow>
             ))}

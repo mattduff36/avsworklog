@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
+import { useQueryState } from 'nuqs';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FileText, Clock, CheckCircle2, XCircle, User, Filter, Calendar, Package, LayoutGrid, Table2, Settings2, Loader2 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -24,9 +26,9 @@ import Link from 'next/link';
 import { formatDate } from '@/lib/utils/date';
 import { Timesheet } from '@/types/timesheet';
 import { AbsenceWithRelations } from '@/types/absence';
-import { TimesheetStatusFilter, StatusFilter } from '@/types/common';
+import { AbsenceStatusFilter, TimesheetStatusFilter, StatusFilter } from '@/types/common';
 import {
-  usePendingAbsences,
+  useAllAbsences,
   useApproveAbsence,
   useRejectAbsence,
   useAbsenceSummaryForEmployee,
@@ -36,6 +38,8 @@ import {
   canUseScopedAbsencePermission,
   useAbsenceSecondaryPermissions,
 } from '@/lib/hooks/useAbsenceSecondaryPermissions';
+import { fetchUserDirectory } from '@/lib/client/user-directory';
+import { filterEmployeesBySelectedTeam } from '@/lib/utils/absence-admin';
 import { toast } from 'sonner';
 import { TimesheetsApprovalTable, COLUMN_VISIBILITY_STORAGE_KEY, DEFAULT_COLUMN_VISIBILITY } from './components/TimesheetsApprovalTable';
 import type { ColumnVisibility } from './components/TimesheetsApprovalTable';
@@ -63,6 +67,16 @@ interface TimesheetWithProfile extends Timesheet {
   timesheet_entries?: TimesheetEntry[];
 }
 
+interface FilterEmployee {
+  id: string;
+  full_name: string;
+  employee_id: string | null;
+  team_id: string | null;
+  team_name: string | null;
+}
+
+type ApprovalsTab = 'timesheets' | 'absences';
+
 function ApprovalsContent() {
   const { profile, isAdmin, isSuperAdmin } = useAuth();
   const { hasPermission: canViewApprovals, loading: permissionLoading } = usePermissionCheck('approvals', false);
@@ -70,16 +84,26 @@ function ApprovalsContent() {
     canViewApprovals
   );
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const [tabParam, setTabParam] = useQueryState('tab', {
+    defaultValue: 'timesheets',
+    clearOnDefault: true,
+    shallow: true,
+  });
   const supabase = createClient();
   const actorProfileId = profile?.id || '';
+  const isAdminTier = Boolean(isAdmin || isSuperAdmin);
+  const activeTab: ApprovalsTab = tabParam === 'absences' ? 'absences' : 'timesheets';
   
   const [timesheets, setTimesheets] = useState<TimesheetWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasLoadedTimesheets, setHasLoadedTimesheets] = useState(false);
-  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'timesheets');
   const [timesheetFilter, setTimesheetFilter] = useState<TimesheetStatusFilter>('pending');
-  const statusFilter: StatusFilter = timesheetFilter;
+  const [absenceStatusFilter, setAbsenceStatusFilter] = useState<AbsenceStatusFilter>('pending');
+  const statusFilter: StatusFilter = activeTab === 'timesheets' ? timesheetFilter : absenceStatusFilter;
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState('all');
+  const [selectedTeamId, setSelectedTeamId] = useState('all');
+  const [employees, setEmployees] = useState<FilterEmployee[]>([]);
+  const [employeesLoading, setEmployeesLoading] = useState(false);
 
   // View mode (cards vs table) - persisted to localStorage per tab
   const [timesheetViewMode, setTimesheetViewMode] = useState<'cards' | 'table'>(() => {
@@ -143,15 +167,114 @@ function ApprovalsContent() {
   const [processingInProgress, setProcessingInProgress] = useState(false);
   
   // Absence hooks
-  const { data: absences, isLoading: absencesLoading } = usePendingAbsences();
+  const allAbsenceFilters = useMemo(() => ({ includeArchived: false }), []);
+  const { data: absences, isLoading: absencesLoading } = useAllAbsences(allAbsenceFilters);
   const approveAbsence = useApproveAbsence();
   const rejectAbsence = useRejectAbsence();
   useAbsenceRealtimeQueryInvalidation();
   const canAuthoriseBookings = Boolean(absenceSecondarySnapshot?.flags.can_authorise_bookings || isAdmin || isSuperAdmin);
-  const scopedPendingAbsences = useMemo(() => {
+  const actorTeamId = absenceSecondarySnapshot?.team_id || null;
+  const actorTeamName = absenceSecondarySnapshot?.team_name || null;
+  const scopeTeamOnly = Boolean(
+    !isAdminTier &&
+      canAuthoriseBookings &&
+      absenceSecondarySnapshot &&
+      !absenceSecondarySnapshot.permissions.authorise_bookings_all &&
+      absenceSecondarySnapshot.permissions.authorise_bookings_team
+  );
+  const isTeamFilterLocked = scopeTeamOnly;
+  const effectiveTeamFilter = scopeTeamOnly ? (actorTeamId || '__no_team_scope__') : selectedTeamId;
+
+  useEffect(() => {
+    if (!scopeTeamOnly) {
+      setSelectedTeamId((current) => (current === '__no_team_scope__' ? 'all' : current));
+      return;
+    }
+    setSelectedTeamId(actorTeamId || '__no_team_scope__');
+  }, [scopeTeamOnly, actorTeamId]);
+
+  const employeeById = useMemo(() => {
+    const map = new Map<string, FilterEmployee>();
+    employees.forEach((employee) => {
+      map.set(employee.id, employee);
+    });
+    return map;
+  }, [employees]);
+
+  const teamOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    employees.forEach((employee) => {
+      if (!employee.team_id) return;
+      if (!map.has(employee.team_id)) {
+        map.set(employee.team_id, employee.team_name || employee.team_id);
+      }
+    });
+
+    return Array.from(map.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [employees]);
+
+  const filteredEmployeeOptions = useMemo(
+    () => filterEmployeesBySelectedTeam(employees, effectiveTeamFilter),
+    [employees, effectiveTeamFilter]
+  );
+
+  const lockedTeamLabel =
+    actorTeamName ||
+    teamOptions.find((team) => team.value === actorTeamId)?.label ||
+    (actorTeamId ? 'My Team' : 'No team assigned');
+
+  useEffect(() => {
+    if (selectedEmployeeId === 'all') return;
+    const employeeStillVisible = filteredEmployeeOptions.some((employee) => employee.id === selectedEmployeeId);
+    if (!employeeStillVisible) {
+      setSelectedEmployeeId('all');
+    }
+  }, [filteredEmployeeOptions, selectedEmployeeId]);
+
+  useEffect(() => {
+    if (!canViewApprovals) return;
+    let isMounted = true;
+
+    async function loadEmployees() {
+      setEmployeesLoading(true);
+      try {
+        const directory = await fetchUserDirectory({ includeRole: true, limit: 500 });
+        if (!isMounted) return;
+
+        setEmployees(
+          directory.map((employee) => ({
+            id: employee.id,
+            full_name: employee.full_name || 'Unknown User',
+            employee_id: employee.employee_id || null,
+            team_id: employee.team?.id || null,
+            team_name: employee.team?.name || null,
+          }))
+        );
+      } catch (error) {
+        console.error('Error loading approvals filters:', error);
+        if (isMounted) {
+          toast.error('Failed to load approvals filters');
+        }
+      } finally {
+        if (isMounted) {
+          setEmployeesLoading(false);
+        }
+      }
+    }
+
+    void loadEmployees();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [canViewApprovals]);
+
+  const scopedAbsences = useMemo(() => {
     if (!canAuthoriseBookings) return [] as AbsenceWithRelations[];
     if (!absences || absences.length === 0) return [] as AbsenceWithRelations[];
-    if (isAdmin || isSuperAdmin) return absences;
+    if (isAdminTier) return absences;
     if (!actorProfileId || !absenceSecondarySnapshot) return [] as AbsenceWithRelations[];
 
     return absences.filter((absence) =>
@@ -172,14 +295,77 @@ function ApprovalsContent() {
         }
       )
     );
-  }, [absences, canAuthoriseBookings, isAdmin, isSuperAdmin, actorProfileId, absenceSecondarySnapshot]);
+  }, [absences, canAuthoriseBookings, isAdminTier, actorProfileId, absenceSecondarySnapshot]);
 
-  const fetchApprovals = useCallback(async (filter: StatusFilter) => {
+  const filteredAbsences = useMemo(() => {
+    return scopedAbsences.filter((absence) => {
+      if (absence.status === 'cancelled') return false;
+      if (selectedEmployeeId !== 'all' && absence.profile_id !== selectedEmployeeId) return false;
+
+      if (effectiveTeamFilter !== 'all') {
+        const targetTeamId = absence.profiles.team_id || null;
+        if (effectiveTeamFilter === 'unassigned') {
+          if (targetTeamId) return false;
+        } else if (targetTeamId !== effectiveTeamFilter) {
+          return false;
+        }
+      }
+
+      if (absenceStatusFilter !== 'all' && absence.status !== absenceStatusFilter) return false;
+      return true;
+    });
+  }, [scopedAbsences, selectedEmployeeId, effectiveTeamFilter, absenceStatusFilter]);
+
+  const scopedTimesheets = useMemo(() => {
+    if (timesheets.length === 0) return [] as TimesheetWithProfile[];
+    if (isAdminTier) return timesheets;
+    if (!canAuthoriseBookings || !actorProfileId || !absenceSecondarySnapshot) return [] as TimesheetWithProfile[];
+
+    return timesheets.filter((timesheet) =>
+      canUseScopedAbsencePermission(
+        {
+          permissions: absenceSecondarySnapshot.permissions,
+          team_id: absenceSecondarySnapshot.team_id,
+        },
+        actorProfileId,
+        {
+          profile_id: timesheet.user_id,
+          team_id: employeeById.get(timesheet.user_id)?.team_id || null,
+        },
+        {
+          all: 'authorise_bookings_all',
+          team: 'authorise_bookings_team',
+          own: 'authorise_bookings_own',
+        }
+      )
+    );
+  }, [timesheets, isAdminTier, canAuthoriseBookings, actorProfileId, absenceSecondarySnapshot, employeeById]);
+
+  const filteredTimesheets = useMemo(() => {
+    return scopedTimesheets.filter((timesheet) => {
+      if (selectedEmployeeId !== 'all' && timesheet.user_id !== selectedEmployeeId) return false;
+
+      const targetTeamId = employeeById.get(timesheet.user_id)?.team_id || null;
+      if (effectiveTeamFilter !== 'all') {
+        if (effectiveTeamFilter === 'unassigned') {
+          if (targetTeamId) return false;
+        } else if (targetTeamId !== effectiveTeamFilter) {
+          return false;
+        }
+      }
+
+      if (timesheetFilter === 'pending') return timesheet.status === 'submitted';
+      if (timesheetFilter !== 'all') return timesheet.status === timesheetFilter;
+      return true;
+    });
+  }, [scopedTimesheets, selectedEmployeeId, employeeById, effectiveTeamFilter, timesheetFilter]);
+
+  const fetchApprovals = useCallback(async () => {
     try {
       setLoading(true);
       
       // Build query for timesheets
-      let timesheetQuery = supabase
+      const timesheetQuery = supabase
         .from('timesheets')
         .select(`
           *,
@@ -194,20 +380,6 @@ function ApprovalsContent() {
             did_not_work
           )
         `);
-
-      // Apply status filter
-      if (filter === 'pending') {
-        timesheetQuery = timesheetQuery.eq('status', 'submitted');
-      } else if (filter === 'approved') {
-        timesheetQuery = timesheetQuery.eq('status', 'approved');
-      } else if (filter === 'rejected') {
-        timesheetQuery = timesheetQuery.eq('status', 'rejected');
-      } else if (filter === 'processed') {
-        timesheetQuery = timesheetQuery.eq('status', 'processed');
-      } else if (filter === 'adjusted') {
-        timesheetQuery = timesheetQuery.eq('status', 'adjusted');
-      }
-      // 'all' doesn't filter
 
       const { data: timesheetData, error: timesheetError } = await timesheetQuery
         .order('submitted_at', { ascending: false });
@@ -228,9 +400,9 @@ function ApprovalsContent() {
         router.push('/dashboard');
         return;
       }
-      fetchApprovals(statusFilter);
+      fetchApprovals();
     }
-  }, [canViewApprovals, permissionLoading, router, fetchApprovals, statusFilter]);
+  }, [canViewApprovals, permissionLoading, router, fetchApprovals]);
 
   const handleQuickApprove = async (_type: 'timesheet', id: string) => {
     try {
@@ -244,7 +416,7 @@ function ApprovalsContent() {
       if (error) throw error;
 
       // Refresh data
-      await fetchApprovals(statusFilter);
+      await fetchApprovals();
     } catch (error) {
       console.error('Error approving:', error);
     }
@@ -266,7 +438,7 @@ function ApprovalsContent() {
       if (error) throw error;
 
       // Refresh data
-      await fetchApprovals(statusFilter);
+      await fetchApprovals();
     } catch (error) {
       console.error('Error rejecting:', error);
     }
@@ -295,7 +467,7 @@ function ApprovalsContent() {
       toast.success('Timesheet marked as Manager Approved');
       setProcessModalOpen(false);
       setProcessingTimesheetId(null);
-      await fetchApprovals(statusFilter);
+      await fetchApprovals();
     } catch (error) {
       console.error('Error processing timesheet:', error);
       toast.error('Failed to mark timesheet as Manager Approved');
@@ -304,38 +476,74 @@ function ApprovalsContent() {
     }
   };
 
-  if (permissionLoading || absenceSecondaryLoading || (!hasLoadedTimesheets && loading)) {
+  const activeTabLoading =
+    activeTab === 'timesheets' ? (!hasLoadedTimesheets && loading) : absencesLoading;
+
+  if (permissionLoading || absenceSecondaryLoading || employeesLoading || activeTabLoading) {
     return <PageLoader message="Loading approvals..." />;
   }
 
-  const totalCount = timesheets.length;
+  if (!canViewApprovals) {
+    return null;
+  }
 
-  const getFilterLabel = (filter: StatusFilter): string => {
+  const totalCount = activeTab === 'timesheets' ? filteredTimesheets.length : filteredAbsences.length;
+
+  const getFilterLabel = (filter: StatusFilter, tab: ApprovalsTab = activeTab): string => {
+    if (tab === 'absences') {
+      if (filter === 'approved') return 'Approved';
+      if (filter === 'pending') return 'Pending';
+      if (filter === 'rejected') return 'Rejected';
+      if (filter === 'all') return 'All';
+      return filter;
+    }
+
     switch (filter) {
-      case 'pending': return 'Pending';
-      case 'approved': return 'Payroll Received';
-      case 'rejected': return 'Rejected';
-      case 'processed': return 'Manager Approved';
-      case 'adjusted': return 'Adjusted';
-      case 'all': return 'All';
-      default: return filter;
+      case 'pending':
+        return 'Pending';
+      case 'approved':
+        return 'Payroll Received';
+      case 'rejected':
+        return 'Rejected';
+      case 'processed':
+        return 'Manager Approved';
+      case 'adjusted':
+        return 'Adjusted';
+      case 'all':
+        return 'All';
+      default:
+        return filter;
     }
   };
 
-  // Get filter options (timesheet-focused approvals)
-  const getFilterOptions = (): StatusFilter[] => {
-    if (activeTab === 'timesheets') {
-      return ['pending', 'approved', 'rejected', 'processed', 'adjusted', 'all'];
-    }
-    // Absences tab still reuses the same label set, but only 'pending' is relevant there
-    return ['pending', 'approved', 'rejected'];
-  };
+  const getFilterOptions = (): StatusFilter[] =>
+    activeTab === 'timesheets'
+      ? ['pending', 'approved', 'rejected', 'processed', 'adjusted', 'all']
+      : ['pending', 'approved', 'rejected', 'all'];
 
-  // Handle filter change (timesheet approvals only)
   const handleFilterChange = (filter: StatusFilter) => {
     if (activeTab === 'timesheets') {
       setTimesheetFilter(filter as TimesheetStatusFilter);
+      return;
     }
+    setAbsenceStatusFilter(filter as AbsenceStatusFilter);
+  };
+
+  const hasActiveFilters =
+    selectedEmployeeId !== 'all' ||
+    (!isTeamFilterLocked && selectedTeamId !== 'all') ||
+    (activeTab === 'timesheets' ? timesheetFilter !== 'pending' : absenceStatusFilter !== 'pending');
+
+  const clearFilters = () => {
+    setSelectedEmployeeId('all');
+    setSelectedTeamId(isTeamFilterLocked ? (actorTeamId || '__no_team_scope__') : 'all');
+    setTimesheetFilter('pending');
+    setAbsenceStatusFilter('pending');
+  };
+
+  const handleTabChange = (tab: string) => {
+    if (tab !== 'timesheets' && tab !== 'absences') return;
+    void setTabParam(tab);
   };
 
   const getStatusBadge = (status: string) => {
@@ -419,7 +627,84 @@ function ApprovalsContent() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Card className="bg-white dark:bg-slate-900 border-border">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-foreground flex items-center gap-2">
+              <Filter className="h-4 w-4" />
+              Filters
+            </CardTitle>
+            {hasActiveFilters ? (
+              <Button variant="outline" size="sm" onClick={clearFilters} className="border-border text-muted-foreground">
+                Clear Filters
+              </Button>
+            ) : null}
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <p className="text-sm text-muted-foreground mb-2">Employee</p>
+              <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+                <SelectTrigger className="bg-background border-border text-foreground">
+                  <SelectValue placeholder="All employees" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All employees</SelectItem>
+                  {filteredEmployeeOptions.map((employee) => (
+                    <SelectItem key={employee.id} value={employee.id}>
+                      {employee.full_name}
+                      {employee.employee_id ? ` (${employee.employee_id})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <p className="text-sm text-muted-foreground mb-2">Team</p>
+              <Select value={effectiveTeamFilter} onValueChange={setSelectedTeamId} disabled={isTeamFilterLocked}>
+                <SelectTrigger className="bg-background border-border text-foreground">
+                  <SelectValue placeholder="All teams" />
+                </SelectTrigger>
+                <SelectContent>
+                  {isTeamFilterLocked ? (
+                    <SelectItem value={effectiveTeamFilter}>{lockedTeamLabel}</SelectItem>
+                  ) : (
+                    <>
+                      <SelectItem value="all">All teams</SelectItem>
+                      <SelectItem value="unassigned">Unassigned</SelectItem>
+                      {teamOptions.map((team) => (
+                        <SelectItem key={team.value} value={team.value}>
+                          {team.label}
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <p className="text-sm text-muted-foreground mb-2">Status</p>
+              <Select value={statusFilter} onValueChange={(value) => handleFilterChange(value as StatusFilter)}>
+                <SelectTrigger className="bg-background border-border text-foreground">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {getFilterOptions().map((filter) => (
+                    <SelectItem key={filter} value={filter}>
+                      {getFilterLabel(filter)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
           <TabsList className="grid w-full max-w-3xl grid-cols-2 h-auto p-0 bg-slate-100 dark:bg-slate-800 rounded-lg">
             <TabsTrigger 
               value="timesheets" 
@@ -433,12 +718,12 @@ function ApprovalsContent() {
               <div className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
                 <span className="text-sm font-medium">Timesheets</span>
-                {timesheets.length > 0 && (
+                {filteredTimesheets.length > 0 && (
                   <Badge 
                     variant="secondary" 
                     className={activeTab === 'timesheets' ? "bg-white/20 text-white border-white/30" : ""}
                   >
-                    {timesheets.length}
+                    {filteredTimesheets.length}
                   </Badge>
                 )}
               </div>
@@ -455,45 +740,17 @@ function ApprovalsContent() {
               <div className="flex items-center gap-2">
                 <Calendar className="h-5 w-5" />
                 <span className="text-sm font-medium">Absences</span>
-                {scopedPendingAbsences.length > 0 && (
+                {filteredAbsences.length > 0 && (
                   <Badge 
                     variant="secondary"
                     className={activeTab === 'absences' ? "bg-white/20 text-white border-white/30" : ""}
                   >
-                    {scopedPendingAbsences.length}
+                    {filteredAbsences.length}
                   </Badge>
                 )}
               </div>
             </TabsTrigger>
           </TabsList>
-
-          {/* Status Filter Buttons - Now below tabs */}
-          <Card className="bg-white dark:bg-slate-900 border-border mt-6">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground mr-2">Filter by status:</span>
-                <div className="flex gap-2 flex-wrap">
-                  {getFilterOptions().map((filter) => (
-                    <Button
-                      key={filter}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleFilterChange(filter)}
-                      className={statusFilter === filter ? 'bg-white text-slate-900 border-white/80 hover:bg-slate-200' : 'border-slate-600 text-muted-foreground hover:bg-slate-700/50'}
-                    >
-                      {filter === 'pending' && <Clock className="h-3 w-3 mr-1" />}
-                      {filter === 'approved' && <CheckCircle2 className="h-3 w-3 mr-1" />}
-                      {filter === 'rejected' && <XCircle className="h-3 w-3 mr-1" />}
-                      {filter === 'processed' && <Package className="h-3 w-3 mr-1" />}
-                      {filter === 'adjusted' && <Package className="h-3 w-3 mr-1" />}
-                      {getFilterLabel(filter)}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
 
           <TabsContent value="timesheets" className="mt-6 space-y-4">
             {loading ? (
@@ -502,7 +759,7 @@ function ApprovalsContent() {
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </CardContent>
               </Card>
-            ) : timesheets.length === 0 ? (
+            ) : filteredTimesheets.length === 0 ? (
               <Card className="border-border">
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   {statusFilter === 'pending' ? (
@@ -579,7 +836,7 @@ function ApprovalsContent() {
                 {timesheetViewMode === 'table' && (
                   <div className="hidden md:block">
                     <TimesheetsApprovalTable
-                      timesheets={timesheets}
+                      timesheets={filteredTimesheets}
                       onApprove={async (id) => { await handleQuickApprove('timesheet', id); }}
                       onReject={async (id) => { await handleQuickReject('timesheet', id); }}
                       onProcess={handleOpenProcessModal}
@@ -590,7 +847,7 @@ function ApprovalsContent() {
 
                 {/* Card View - Always on mobile, conditional on desktop */}
                 <div className={timesheetViewMode === 'table' ? 'md:hidden space-y-4' : 'space-y-4'}>
-                  {timesheets.map((timesheet) => (
+                  {filteredTimesheets.map((timesheet) => (
                     <Link key={timesheet.id} href={`/timesheets/${timesheet.id}`} className="block">
                       <Card className="bg-white dark:bg-slate-900 border-border hover:shadow-lg hover:border-timesheet/50 transition-all duration-200 cursor-pointer">
                         <CardHeader>
@@ -643,7 +900,24 @@ function ApprovalsContent() {
                                   className="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all"
                                 >
                                   <CheckCircle2 className="h-4 w-4 mr-1" />
-                                  Approve
+                                  Payroll Received
+                                </Button>
+                              </div>
+                            )}
+                            {timesheet.status === 'approved' && (
+                              <div className="flex gap-2" onClick={(e) => e.preventDefault()}>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleOpenProcessModal(timesheet.id);
+                                  }}
+                                  className="border-avs-yellow/50 text-avs-yellow hover:bg-avs-yellow hover:text-slate-900 hover:border-avs-yellow active:bg-avs-yellow-hover active:scale-95 transition-all"
+                                >
+                                  <Package className="h-4 w-4 mr-1" />
+                                  Manager Approved
                                 </Button>
                               </div>
                             )}
@@ -666,13 +940,17 @@ function ApprovalsContent() {
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </CardContent>
               </Card>
-            ) : !canAuthoriseBookings || scopedPendingAbsences.length === 0 ? (
+            ) : !canAuthoriseBookings || filteredAbsences.length === 0 ? (
               <Card className="border-border">
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <CheckCircle2 className="h-12 w-12 text-green-400 mb-3" />
-                  <h3 className="text-lg font-semibold text-white mb-1">All caught up!</h3>
+                  <h3 className="text-lg font-semibold text-white mb-1">
+                    {statusFilter === 'pending' ? 'All caught up!' : `No ${getFilterLabel(statusFilter).toLowerCase()} absences`}
+                  </h3>
                   <p className="text-sm text-muted-foreground">
-                    There are no pending absence approvals at the moment
+                    {statusFilter === 'pending'
+                      ? 'There are no pending absence approvals at the moment'
+                      : `There are no ${getFilterLabel(statusFilter).toLowerCase()} absences to display`}
                   </p>
                 </CardContent>
               </Card>
@@ -738,7 +1016,7 @@ function ApprovalsContent() {
                 {absenceViewMode === 'table' && (
                   <div className="hidden md:block">
                     <AbsencesApprovalTable
-                      absences={scopedPendingAbsences}
+                      absences={filteredAbsences}
                       onApprove={async (id) => {
                         try { await approveAbsence.mutateAsync(id); }
                         catch (e) { console.error('Error approving absence:', e); }
@@ -756,7 +1034,7 @@ function ApprovalsContent() {
 
                 {/* Card View - Always on mobile, conditional on desktop */}
                 <div className={absenceViewMode === 'table' ? 'md:hidden space-y-4' : 'space-y-4'}>
-                  {scopedPendingAbsences.map((absence) => (
+                  {filteredAbsences.map((absence) => (
                     <AbsenceApprovalCard
                       key={absence.id}
                       absence={absence}
@@ -797,8 +1075,11 @@ function AbsenceApprovalCard({
   const [rejecting, setRejecting] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const { data: summary } = useAbsenceSummaryForEmployee(absence.profile_id);
+  const canActionAbsence = absence.status === 'pending';
   
   async function handleApprove() {
+    if (!canActionAbsence) return;
+
     // Check allowance for Annual Leave
     if (isAnnualLeaveReason(absence.absence_reasons.name)) {
       const projectedRemaining = (summary?.remaining || 0) - absence.duration_days;
@@ -825,6 +1106,8 @@ function AbsenceApprovalCard({
   }
   
   async function handleReject() {
+    if (!canActionAbsence) return;
+
     if (!rejectionReason.trim()) {
       toast.error('Rejection reason required', {
         description: 'Please provide a reason for rejecting this absence request.',
@@ -844,6 +1127,33 @@ function AbsenceApprovalCard({
   const projectedRemaining = isAnnualLeaveReason(absence.absence_reasons.name)
     ? (summary?.remaining || 0) - absence.duration_days 
     : null;
+
+  const getAbsenceStatusBadge = () => {
+    if (absence.status === 'approved') {
+      return (
+        <Badge variant="success" className="bg-green-500/10 text-green-600 border-green-500/20">
+          <CheckCircle2 className="h-3 w-3 mr-1" />
+          Approved
+        </Badge>
+      );
+    }
+
+    if (absence.status === 'rejected') {
+      return (
+        <Badge variant="destructive">
+          <XCircle className="h-3 w-3 mr-1" />
+          Rejected
+        </Badge>
+      );
+    }
+
+    return (
+      <Badge variant="warning">
+        <Clock className="h-3 w-3 mr-1" />
+        Pending
+      </Badge>
+    );
+  };
   
   return (
     <Card className="bg-white dark:bg-slate-900 border-border hover:shadow-lg hover:border-purple-500/50 transition-all duration-200">
@@ -880,10 +1190,7 @@ function AbsenceApprovalCard({
               </CardDescription>
             </div>
           </div>
-          <Badge variant="warning">
-            <Clock className="h-3 w-3 mr-1" />
-            Pending
-          </Badge>
+          {getAbsenceStatusBadge()}
         </div>
       </CardHeader>
       <CardContent>
@@ -929,7 +1236,7 @@ function AbsenceApprovalCard({
             </div>
           )}
 
-          {rejecting ? (
+          {canActionAbsence && rejecting ? (
             <div className="space-y-3">
               <div>
                 <Label htmlFor="rejectionReason">Rejection Reason *</Label>
@@ -965,7 +1272,7 @@ function AbsenceApprovalCard({
                 </Button>
               </div>
             </div>
-          ) : (
+          ) : canActionAbsence ? (
             <div className="flex items-center justify-between">
               <div className="text-sm text-muted-foreground">
                 Submitted {formatDate(absence.created_at)}
@@ -987,9 +1294,18 @@ function AbsenceApprovalCard({
                   className="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all"
                 >
                   <CheckCircle2 className="h-4 w-4 mr-1" />
-                  Approve
+                  Payroll Received
                 </Button>
               </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                Submitted {formatDate(absence.created_at)}
+              </div>
+              <Badge variant="outline" className="border-border text-muted-foreground capitalize">
+                {absence.status}
+              </Badge>
             </div>
           )}
         </div>

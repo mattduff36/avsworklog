@@ -319,7 +319,7 @@ export function TimesheetsApprovalTable({
                             className="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all h-8 px-2"
                           >
                             <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                            Approve
+                            Payroll Received
                           </Button>
                         </>
                       )}
@@ -331,7 +331,7 @@ export function TimesheetsApprovalTable({
                           className="border-avs-yellow/50 text-avs-yellow hover:bg-avs-yellow hover:text-slate-900 hover:border-avs-yellow active:bg-avs-yellow-hover active:scale-95 transition-all h-8 px-2"
                         >
                           <Package className="h-3.5 w-3.5 mr-1" />
-                          Process
+                          Manager Approved
                         </Button>
                       )}
                     </div>

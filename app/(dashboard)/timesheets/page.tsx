@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useTimesheetRealtime } from '@/lib/hooks/useRealtime';
@@ -10,14 +10,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
 import { PageLoader } from '@/components/ui/page-loader';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, FileText, Clock, CheckCircle2, XCircle, User, Download, Trash2, Filter, Package, AlertTriangle, Loader2 } from 'lucide-react';
+import { Plus, FileText, Clock, CheckCircle2, XCircle, Download, Trash2, Filter, Package, AlertTriangle, Loader2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { Timesheet } from '@/types/timesheet';
-import { Employee, TimesheetStatusFilter } from '@/types/common';
+import { TimesheetStatusFilter } from '@/types/common';
+import {
+  canUseScopedAbsencePermission,
+  useAbsenceSecondaryPermissions,
+} from '@/lib/hooks/useAbsenceSecondaryPermissions';
+import { filterEmployeesBySelectedTeam } from '@/lib/utils/absence-admin';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -33,20 +37,41 @@ import {
 interface TimesheetWithProfile extends Timesheet {
   profile?: {
     full_name: string;
+    employee_id?: string | null;
+    team_id?: string | null;
   };
+}
+
+interface TimesheetFilterEmployee {
+  id: string;
+  full_name: string;
+  employee_id: string | null;
+  has_module_access?: boolean;
+  team_id: string | null;
+  team_name: string | null;
 }
 
 export default function TimesheetsPage() {
   const { user, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
   const { hasPermission, loading: permissionLoading } = usePermissionCheck('timesheets');
+  const {
+    data: absenceSecondarySnapshot,
+    isLoading: absenceSecondaryLoading,
+    isFetchedAfterMount: absenceSecondaryFetchedAfterMount,
+  } = useAbsenceSecondaryPermissions(hasPermission);
   const isElevatedUser = isManager || isAdmin || isSuperAdmin;
+  const isAdminTier = Boolean(isAdmin || isSuperAdmin);
+  const hasAbsenceSecondarySnapshot = Boolean(absenceSecondarySnapshot?.permissions && absenceSecondarySnapshot?.flags);
+  const isAbsenceSecondaryContextLoading =
+    hasPermission && (absenceSecondaryLoading || (!absenceSecondaryFetchedAfterMount && !hasAbsenceSecondarySnapshot));
   const pageSize = isElevatedUser ? 20 : 10;
   const router = useRouter();
   const [timesheets, setTimesheets] = useState<TimesheetWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [employees, setEmployees] = useState<TimesheetFilterEmployee[]>([]);
   const [employeesLoading, setEmployeesLoading] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('all');
+  const [selectedTeamId, setSelectedTeamId] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<TimesheetStatusFilter>('all');
   const [downloading, setDownloading] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -56,38 +81,143 @@ export default function TimesheetsPage() {
   const [displayCount, setDisplayCount] = useState(pageSize);
   const [hasMore, setHasMore] = useState(false);
   const supabase = createClient();
+  const actorProfileId = user?.id || '';
+  const canAuthoriseBookings = Boolean(absenceSecondarySnapshot?.flags.can_authorise_bookings || isAdminTier);
+  const actorTeamId = absenceSecondarySnapshot?.team_id || null;
+  const actorTeamName = absenceSecondarySnapshot?.team_name || null;
+  const scopeTeamOnly = Boolean(
+    isElevatedUser &&
+      !isAdminTier &&
+      canAuthoriseBookings &&
+      absenceSecondarySnapshot &&
+      !absenceSecondarySnapshot.permissions.authorise_bookings_all &&
+      absenceSecondarySnapshot.permissions.authorise_bookings_team
+  );
+  const isTeamFilterLocked = scopeTeamOnly;
+  const effectiveTeamFilter = scopeTeamOnly ? (actorTeamId || '__no_team_scope__') : selectedTeamId;
 
   useEffect(() => {
-    if (user && isElevatedUser) {
-      const fetchEmployees = async () => {
-        setEmployeesLoading(true);
-        try {
-          const data = await fetchUserDirectory({ module: 'timesheets', limit: 200 });
-          setEmployees(
-            data.map((employee) => ({
-              id: employee.id,
-              full_name: employee.full_name || 'Unknown User',
-              employee_id: employee.employee_id,
-              has_module_access: employee.has_module_access,
-            }))
-          );
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          const isNetworkFailure =
-            message.includes('Failed to fetch') || message.includes('NetworkError') || message.toLowerCase().includes('network');
-          if (isNetworkFailure) {
-            console.warn('Unable to load employees (network):', err);
-          } else {
-            console.error('Error fetching employees:', err);
-          }
-        } finally {
-          setEmployeesLoading(false);
-        }
-      };
-
-      fetchEmployees();
+    if (!scopeTeamOnly) {
+      setSelectedTeamId((current) => (current === '__no_team_scope__' ? 'all' : current));
+      return;
     }
-  }, [user, isElevatedUser, supabase]);
+    setSelectedTeamId(actorTeamId || '__no_team_scope__');
+  }, [scopeTeamOnly, actorTeamId]);
+
+  useEffect(() => {
+    if (!user || !isElevatedUser) return;
+
+    const fetchEmployees = async () => {
+      setEmployeesLoading(true);
+      try {
+        const data = await fetchUserDirectory({ module: 'timesheets', limit: 200 });
+        setEmployees(
+          data.map((employee) => ({
+            id: employee.id,
+            full_name: employee.full_name || 'Unknown User',
+            employee_id: employee.employee_id || null,
+            has_module_access: employee.has_module_access,
+            team_id: employee.team?.id || null,
+            team_name: employee.team?.name || null,
+          }))
+        );
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        const isNetworkFailure =
+          message.includes('Failed to fetch') || message.includes('NetworkError') || message.toLowerCase().includes('network');
+        if (isNetworkFailure) {
+          console.warn('Unable to load employees (network):', err);
+        } else {
+          console.error('Error fetching employees:', err);
+        }
+      } finally {
+        setEmployeesLoading(false);
+      }
+    };
+
+    void fetchEmployees();
+  }, [user, isElevatedUser]);
+
+  const teamOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    employees.forEach((employee) => {
+      if (!employee.team_id) return;
+      if (!map.has(employee.team_id)) {
+        map.set(employee.team_id, employee.team_name || employee.team_id);
+      }
+    });
+
+    return Array.from(map.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [employees]);
+
+  const filteredEmployeeOptions = useMemo(
+    () => filterEmployeesBySelectedTeam(employees, effectiveTeamFilter),
+    [employees, effectiveTeamFilter]
+  );
+
+  useEffect(() => {
+    if (selectedEmployeeId === 'all') return;
+    const employeeStillVisible = filteredEmployeeOptions.some((employee) => employee.id === selectedEmployeeId);
+    if (!employeeStillVisible) {
+      setSelectedEmployeeId('all');
+    }
+  }, [filteredEmployeeOptions, selectedEmployeeId]);
+
+  const lockedTeamLabel =
+    actorTeamName ||
+    teamOptions.find((team) => team.value === actorTeamId)?.label ||
+    (actorTeamId ? 'My Team' : 'No team assigned');
+
+  const applyClientScopeFilters = useCallback(
+    (rows: TimesheetWithProfile[]) => {
+      let scopedRows = rows;
+
+      if (isElevatedUser && !isAdminTier) {
+        if (!canAuthoriseBookings || !actorProfileId || !absenceSecondarySnapshot) {
+          scopedRows = [];
+        } else {
+          scopedRows = scopedRows.filter((timesheet) =>
+            canUseScopedAbsencePermission(
+              {
+                permissions: absenceSecondarySnapshot.permissions,
+                team_id: absenceSecondarySnapshot.team_id,
+              },
+              actorProfileId,
+              {
+                profile_id: timesheet.user_id,
+                team_id: timesheet.profile?.team_id || null,
+              },
+              {
+                all: 'authorise_bookings_all',
+                team: 'authorise_bookings_team',
+                own: 'authorise_bookings_own',
+              }
+            )
+          );
+        }
+      }
+
+      if (isElevatedUser && effectiveTeamFilter !== 'all') {
+        scopedRows = scopedRows.filter((timesheet) => {
+          const targetTeamId = timesheet.profile?.team_id || null;
+          if (effectiveTeamFilter === 'unassigned') return !targetTeamId;
+          return targetTeamId === effectiveTeamFilter;
+        });
+      }
+
+      return scopedRows;
+    },
+    [
+      isElevatedUser,
+      isAdminTier,
+      canAuthoriseBookings,
+      actorProfileId,
+      absenceSecondarySnapshot,
+      effectiveTeamFilter,
+    ]
+  );
 
   const fetchTimesheets = useCallback(async () => {
     if (!user || authLoading) return;
@@ -95,39 +225,72 @@ export default function TimesheetsPage() {
     setFetchError(null);
     
     try {
-      let query = supabase
-        .from('timesheets')
-        .select(`
-          *,
-          profile:profiles!timesheets_user_id_fkey(full_name)
-        `)
-        .order('week_ending', { ascending: false })
-        .range(0, displayCount);
+      const targetCount = displayCount + 1;
+      const requiresChunkedClientFiltering = isElevatedUser && (!isAdminTier || effectiveTeamFilter !== 'all');
 
-      // Filter based on user role and selection
-      if (!isElevatedUser) {
-        // Regular employees only see their own
-        query = query.eq('user_id', user.id);
-      } else if (selectedEmployeeId && selectedEmployeeId !== 'all') {
-        // Manager filtering by specific employee
-        query = query.eq('user_id', selectedEmployeeId);
+      const buildQuery = (rangeStart: number, rangeEnd: number) => {
+        let query = supabase
+          .from('timesheets')
+          .select(`
+            *,
+            profile:profiles!timesheets_user_id_fkey(full_name, employee_id, team_id)
+          `)
+          .order('week_ending', { ascending: false })
+          .range(rangeStart, rangeEnd);
+
+        // Filter based on user role and selection
+        if (!isElevatedUser) {
+          query = query.eq('user_id', user.id);
+        } else if (selectedEmployeeId && selectedEmployeeId !== 'all') {
+          query = query.eq('user_id', selectedEmployeeId);
+        }
+
+        // Apply status filter
+        if (statusFilter === 'pending') {
+          query = query.eq('status', 'submitted');
+        } else if (statusFilter !== 'all') {
+          query = query.eq('status', statusFilter);
+        }
+
+        return query;
+      };
+
+      if (!requiresChunkedClientFiltering) {
+        const { data, error } = await buildQuery(0, displayCount);
+        if (error) throw error;
+
+        const rows = (data || []) as TimesheetWithProfile[];
+        setHasMore(rows.length > displayCount);
+        setTimesheets(rows.slice(0, displayCount));
+        return;
       }
-      // If manager and 'all' selected, show all timesheets
 
-      // Apply status filter
-      if (statusFilter === 'pending') {
-        query = query.eq('status', 'submitted');
-      } else if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter);
+      const chunkSize = Math.max(displayCount + 1, pageSize * 2);
+      let offset = 0;
+      let reachedEnd = false;
+      const collectedRows: TimesheetWithProfile[] = [];
+
+      while (!reachedEnd && collectedRows.length < targetCount) {
+        const { data, error } = await buildQuery(offset, offset + chunkSize - 1);
+        if (error) throw error;
+
+        const dbRows = (data || []) as TimesheetWithProfile[];
+        const filteredRows = applyClientScopeFilters(dbRows);
+        const remainingSlots = targetCount - collectedRows.length;
+
+        if (filteredRows.length > 0 && remainingSlots > 0) {
+          collectedRows.push(...filteredRows.slice(0, remainingSlots));
+        }
+
+        if (dbRows.length < chunkSize) {
+          reachedEnd = true;
+        } else {
+          offset += chunkSize;
+        }
       }
-      // 'all' doesn't filter by status
 
-      const { data, error } = await query;
-
-      if (error) throw error;
-      const rows = data || [];
-      setHasMore(rows.length > displayCount);
-      setTimesheets(rows.slice(0, displayCount));
+      setHasMore(collectedRows.length > displayCount);
+      setTimesheets(collectedRows.slice(0, displayCount));
     } catch (error) {
       const message = (() => {
         if (error instanceof Error) return error.message;
@@ -163,11 +326,23 @@ export default function TimesheetsPage() {
     } finally {
       setLoading(false);
     }
-  }, [user, authLoading, isElevatedUser, selectedEmployeeId, statusFilter, supabase, displayCount]);
+  }, [
+    user,
+    authLoading,
+    isElevatedUser,
+    isAdminTier,
+    selectedEmployeeId,
+    statusFilter,
+    supabase,
+    displayCount,
+    effectiveTeamFilter,
+    pageSize,
+    applyClientScopeFilters,
+  ]);
 
   useEffect(() => {
     setDisplayCount(pageSize);
-  }, [pageSize, selectedEmployeeId, statusFilter]);
+  }, [pageSize, selectedEmployeeId, statusFilter, effectiveTeamFilter]);
 
   useEffect(() => {
     fetchTimesheets();
@@ -348,7 +523,7 @@ export default function TimesheetsPage() {
     }
   };
 
-  if (permissionLoading) {
+  if (permissionLoading || isAbsenceSecondaryContextLoading) {
     return <PageLoader message="Loading timesheets..." />;
   }
 
@@ -376,71 +551,84 @@ export default function TimesheetsPage() {
             </Button>
           </Link>
         </div>
-        
-        {/* Manager: Employee Filter */}
-        {isElevatedUser && (
-          <div className="pt-4 border-t border-border min-h-[72px]">
-            {employeesLoading ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading employee filter...
-              </div>
-            ) : employees.length > 0 ? (
-              <div className="flex items-center gap-3 max-w-md">
-                <Label htmlFor="employee-filter" className="text-white text-sm flex items-center gap-2 whitespace-nowrap">
-                  <User className="h-4 w-4" />
-                  View timesheets for:
-                </Label>
-                <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-                  <SelectTrigger id="employee-filter" className="h-10 border-border text-white">
-                    <SelectValue placeholder="Select employee" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Employees</SelectItem>
-                    {employees.map((employee) => (
-                      <SelectItem key={employee.id} value={employee.id} disabled={employee.has_module_access === false}>
-                        {employee.full_name}
-                        {employee.employee_id && ` (${employee.employee_id})`}
-                        {employee.has_module_access === false && ' - No Timesheets access'}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">No employees available for filtering.</p>
-            )}
-          </div>
-        )}
       </div>
 
-      {/* Status Filter - Only show for managers */}
       {isElevatedUser && (
         <Card className="border-border">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-slate-400 mr-2">Filter by status:</span>
-              <div className="flex gap-2 flex-wrap">
-                {(['all', 'draft', 'pending', 'approved', 'rejected', 'processed', 'adjusted'] as TimesheetStatusFilter[]).map((filter) => (
-                  <Button
-                    key={filter}
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setStatusFilter(filter)}
-                    className={statusFilter === filter ? 'bg-white text-slate-900 border-white/80 hover:bg-slate-200' : 'border-slate-600 text-muted-foreground hover:bg-slate-700/50'}
-                  >
-                    {filter === 'pending' && <Clock className="h-3 w-3 mr-1" />}
-                    {filter === 'approved' && <CheckCircle2 className="h-3 w-3 mr-1" />}
-                    {filter === 'rejected' && <XCircle className="h-3 w-3 mr-1" />}
-                    {filter === 'processed' && <Package className="h-3 w-3 mr-1" />}
-                    {filter === 'adjusted' && <AlertTriangle className="h-3 w-3 mr-1" />}
-                    {filter === 'draft' && <FileText className="h-3 w-3 mr-1" />}
-                    {getFilterLabel(filter)}
-                  </Button>
-                ))}
+          <CardHeader className="pb-3">
+            <CardTitle className="text-foreground flex items-center gap-2">
+              <Filter className="h-4 w-4" />
+              Filters
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {employeesLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading filters...
               </div>
-            </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Employee</p>
+                  <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+                    <SelectTrigger className="bg-background border-border text-foreground">
+                      <SelectValue placeholder="All employees" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All employees</SelectItem>
+                      {filteredEmployeeOptions.map((employee) => (
+                        <SelectItem key={employee.id} value={employee.id} disabled={employee.has_module_access === false}>
+                          {employee.full_name}
+                          {employee.employee_id ? ` (${employee.employee_id})` : ''}
+                          {employee.has_module_access === false ? ' - No Timesheets access' : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Team</p>
+                  <Select value={effectiveTeamFilter} onValueChange={setSelectedTeamId} disabled={isTeamFilterLocked}>
+                    <SelectTrigger className="bg-background border-border text-foreground">
+                      <SelectValue placeholder="All teams" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {isTeamFilterLocked ? (
+                        <SelectItem value={effectiveTeamFilter}>{lockedTeamLabel}</SelectItem>
+                      ) : (
+                        <>
+                          <SelectItem value="all">All teams</SelectItem>
+                          <SelectItem value="unassigned">Unassigned</SelectItem>
+                          {teamOptions.map((team) => (
+                            <SelectItem key={team.value} value={team.value}>
+                              {team.label}
+                            </SelectItem>
+                          ))}
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Status</p>
+                  <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as TimesheetStatusFilter)}>
+                    <SelectTrigger className="bg-background border-border text-foreground">
+                      <SelectValue placeholder="All statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(['all', 'draft', 'pending', 'approved', 'rejected', 'processed', 'adjusted'] as TimesheetStatusFilter[]).map((filter) => (
+                        <SelectItem key={filter} value={filter}>
+                          {getFilterLabel(filter)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -473,16 +661,24 @@ export default function TimesheetsPage() {
         <Card className="border-border">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <FileText className="h-16 w-16 text-slate-400 mb-4" />
-            <h3 className="text-lg font-semibold text-white mb-2">No timesheets yet</h3>
+            <h3 className="text-lg font-semibold text-white mb-2">
+              {isElevatedUser ? 'No timesheets found' : 'No timesheets yet'}
+            </h3>
             <p className="text-slate-400 mb-4">
-              Create your first timesheet to get started
+              {isElevatedUser
+                ? canAuthoriseBookings
+                  ? 'No timesheets match the selected filters.'
+                  : 'Your Authorise Bookings permissions do not allow viewing additional timesheets.'
+                : 'Create your first timesheet to get started'}
             </p>
-            <Link href="/timesheets/new">
-              <Button className="bg-timesheet hover:bg-timesheet-dark text-white transition-all duration-200 active:scale-95">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Timesheet
-              </Button>
-            </Link>
+            {!isElevatedUser && (
+              <Link href="/timesheets/new">
+                <Button className="bg-timesheet hover:bg-timesheet-dark text-white transition-all duration-200 active:scale-95">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Timesheet
+                </Button>
+              </Link>
+            )}
           </CardContent>
         </Card>
       ) : (
