@@ -5,11 +5,46 @@
  */
 
 import { createClient } from '@/lib/supabase/client';
+import { toast } from 'sonner';
 
 export interface ErrorHandlingMetadata {
   wasHandled: boolean;
   didShowMessage: boolean | null;
   messageChannel?: 'toast' | 'inline' | 'modal' | 'unknown';
+  userMessage?: string | null;
+  userMessageTitle?: string | null;
+  userMessageDescription?: string | null;
+  correlationKey?: string | null;
+}
+
+export type ErrorClassificationCategory =
+  | 'user_error_expected'
+  | 'codebase_error'
+  | 'connection_error'
+  | 'other';
+
+export interface ErrorClassificationMetadata {
+  category: ErrorClassificationCategory;
+  confidence: 'high' | 'medium' | 'low';
+  reason: string;
+}
+
+interface UserActionMetadata {
+  actionType: 'click' | 'submit' | 'keyboard' | 'navigation' | 'unknown';
+  label: string | null;
+  element: string | null;
+  href: string | null;
+  pageUrl: string;
+  timestamp: string;
+  ageMs: number;
+}
+
+interface ToastErrorMetadata {
+  correlationKey: string | null;
+  title: string;
+  description: string | null;
+  combinedMessage: string;
+  shownAt: number;
 }
 
 export interface ErrorLog {
@@ -33,6 +68,226 @@ class ErrorLogger {
   private isProcessing = false;
   private isLogging = false; // Prevent recursive logging
   private lastEmailSentDate: string | null = null; // Track last daily email sent
+  private latestToastError: ToastErrorMetadata | null = null;
+  private latestToastErrorsByKey = new Map<string, ToastErrorMetadata>();
+  private latestUserAction: Omit<UserActionMetadata, 'ageMs' | 'timestamp'> & { timestampMs: number } | null = null;
+
+  private asText(value: unknown): string | null {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : null;
+    }
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return String(value);
+    }
+    return null;
+  }
+
+  private truncate(value: string, maxLength = 140): string {
+    if (value.length <= maxLength) return value;
+    return `${value.slice(0, maxLength - 1)}...`;
+  }
+
+  private describeElement(target: EventTarget | null): { label: string | null; element: string | null; href: string | null } {
+    if (!(target instanceof Element)) return { label: null, element: null, href: null };
+
+    const rawText = target.textContent?.replace(/\s+/g, ' ').trim() || '';
+    const label =
+      this.asText(target.getAttribute('data-error-action')) ||
+      this.asText(target.getAttribute('aria-label')) ||
+      (rawText ? this.truncate(rawText) : null);
+
+    const classes = target.className
+      .toString()
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .join('.');
+    const id = target.id ? `#${target.id}` : '';
+    const classSuffix = classes ? `.${classes}` : '';
+    const element = `${target.tagName.toLowerCase()}${id}${classSuffix}`;
+    const href = target instanceof HTMLAnchorElement ? target.href : null;
+
+    return { label, element, href };
+  }
+
+  private recordUserAction(actionType: UserActionMetadata['actionType'], target: EventTarget | null): void {
+    const { label, element, href } = this.describeElement(target);
+    this.latestUserAction = {
+      actionType,
+      label,
+      element,
+      href,
+      pageUrl: typeof window !== 'undefined' ? window.location.href : 'N/A',
+      timestampMs: Date.now(),
+    };
+  }
+
+  private getRecentUserAction(maxAgeMs: number): UserActionMetadata | null {
+    if (!this.latestUserAction) return null;
+    const ageMs = Date.now() - this.latestUserAction.timestampMs;
+    if (ageMs > maxAgeMs) return null;
+
+    return {
+      actionType: this.latestUserAction.actionType,
+      label: this.latestUserAction.label,
+      element: this.latestUserAction.element,
+      href: this.latestUserAction.href,
+      pageUrl: this.latestUserAction.pageUrl,
+      timestamp: new Date(this.latestUserAction.timestampMs).toISOString(),
+      ageMs,
+    };
+  }
+
+  private classifyError(
+    message: string,
+    args: unknown[],
+    componentName?: string | null
+  ): ErrorClassificationMetadata {
+    const normalized = (message || '').toLowerCase();
+
+    const hasAny = (patterns: string[]): boolean => patterns.some((pattern) => normalized.includes(pattern));
+
+    const isConnection = hasAny([
+      'failed to fetch',
+      'networkerror',
+      'network request failed',
+      'network error',
+      'authretryablefetcherror',
+      'err_internet_disconnected',
+      'err_network_changed',
+      'timeout',
+      'connection',
+    ]);
+    if (isConnection) {
+      return {
+        category: 'connection_error',
+        confidence: 'high',
+        reason: 'Network/connectivity markers found in error message.',
+      };
+    }
+
+    const serializedArgs = (() => {
+      try {
+        return JSON.stringify(args).toLowerCase();
+      } catch {
+        return '';
+      }
+    })();
+    const isExpectedUserError =
+      hasAny([
+        'validation',
+        'required',
+        'already exists',
+        'duplicate',
+        'forbidden',
+        'unauthorized',
+        'permission denied',
+        'cannot coerce the result to a single json object',
+      ]) ||
+      (normalized.includes('pgrst116') || serializedArgs.includes('pgrst116')) ||
+      (normalized.includes('0 rows') || serializedArgs.includes('0 rows'));
+    if (isExpectedUserError) {
+      return {
+        category: 'user_error_expected',
+        confidence: 'medium',
+        reason: 'Validation/permission/not-found style failure pattern.',
+      };
+    }
+
+    const isCodebaseError =
+      hasAny([
+        'typeerror',
+        'referenceerror',
+        'syntaxerror',
+        'cannot read properties',
+        'is not a function',
+        'undefined is not',
+      ]) ||
+      componentName === 'Global Error Handler' ||
+      componentName === 'Unhandled Promise Rejection' ||
+      componentName === 'Error Boundary';
+    if (isCodebaseError) {
+      return {
+        category: 'codebase_error',
+        confidence: 'high',
+        reason: 'Runtime exception signature indicates application defect.',
+      };
+    }
+
+    return {
+      category: 'other',
+      confidence: 'low',
+      reason: 'No strong classification signal found.',
+    };
+  }
+
+  private extractToastContextKey(options?: unknown): string | null {
+    if (!options || typeof options !== 'object') return null;
+    const candidate = (options as { id?: unknown }).id;
+    return this.asText(candidate);
+  }
+
+  private extractErrorContextKey(args: unknown[]): string | null {
+    for (const arg of args) {
+      if (!arg || typeof arg !== 'object' || arg instanceof Error) continue;
+      const contextObject = arg as {
+        errorContextId?: unknown;
+        toastId?: unknown;
+        errorToastId?: unknown;
+        errorContextKey?: unknown;
+      };
+      const candidate =
+        this.asText(contextObject.errorContextId) ||
+        this.asText(contextObject.toastId) ||
+        this.asText(contextObject.errorToastId) ||
+        this.asText(contextObject.errorContextKey);
+      if (candidate) return candidate;
+    }
+    return null;
+  }
+
+  private captureToastErrorMetadata(message: unknown, options?: unknown): void {
+    const correlationKey = this.extractToastContextKey(options);
+    const title = this.asText(message) || 'Error';
+    const description = this.asText((options as { description?: unknown } | undefined)?.description) || null;
+    const combinedMessage = description ? `${title} - ${description}` : title;
+
+    const snapshot: ToastErrorMetadata = {
+      correlationKey,
+      title,
+      description,
+      combinedMessage,
+      shownAt: Date.now(),
+    };
+    this.latestToastError = snapshot;
+    if (correlationKey) {
+      this.latestToastErrorsByKey.set(correlationKey, snapshot);
+    }
+  }
+
+  private consumeRecentToastError(maxAgeMs: number): ToastErrorMetadata | null {
+    if (!this.latestToastError) return null;
+    if (Date.now() - this.latestToastError.shownAt > maxAgeMs) return null;
+    const matched = this.latestToastError;
+    this.latestToastError = null;
+    return matched;
+  }
+
+  private consumeRecentToastErrorByKey(key: string, maxAgeMs: number): ToastErrorMetadata | null {
+    const matched = this.latestToastErrorsByKey.get(key);
+    if (!matched) return null;
+    if (Date.now() - matched.shownAt > maxAgeMs) {
+      this.latestToastErrorsByKey.delete(key);
+      return null;
+    }
+    this.latestToastErrorsByKey.delete(key);
+    if (this.latestToastError?.correlationKey === key) {
+      this.latestToastError = null;
+    }
+    return matched;
+  }
 
   /**
    * Some errors are caused by browser quirks, extensions, or third-party snippets.
@@ -58,6 +313,31 @@ class ErrorLogger {
     }
     // Set up global error handlers
     if (typeof window !== 'undefined') {
+      window.addEventListener(
+        'click',
+        (event) => this.recordUserAction('click', event.target),
+        true
+      );
+      window.addEventListener(
+        'submit',
+        (event) => this.recordUserAction('submit', event.target),
+        true
+      );
+      window.addEventListener(
+        'keydown',
+        (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            this.recordUserAction('keyboard', event.target);
+          }
+        },
+        true
+      );
+      window.addEventListener(
+        'popstate',
+        () => this.recordUserAction('navigation', null),
+        true
+      );
+
       // Capture unhandled errors
       window.addEventListener('error', (event) => {
         const errorMessage = event.error?.message || event.message || 'Unknown error';
@@ -196,33 +476,62 @@ class ErrorLogger {
         
         // Only log if it looks like an actual error (not React warnings)
         if (!errorMessage.includes('Warning:') && !errorMessage.includes('%c')) {
-          // Capture navigation context to help diagnose stale-bundle issues
-          let navigationEntry: { type?: string; duration?: number } | null = null;
-          try {
-            const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
-            if (nav) navigationEntry = { type: nav.type, duration: Math.round(nav.duration) };
-          } catch { /* ignore */ }
+          // Delay one tick so a toast.error call in the same catch block can be correlated.
+          window.setTimeout(() => {
+            // Capture navigation context to help diagnose stale-bundle issues
+            let navigationEntry: { type?: string; duration?: number } | null = null;
+            try {
+              const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+              if (nav) navigationEntry = { type: nav.type, duration: Math.round(nav.duration) };
+            } catch { /* ignore */ }
 
-          this.logError({
-            error: new Error(`Console Error: ${errorMessage}`),
-            componentName: 'Console Error',
-            additionalData: { 
-              args,
-              description: 'Error logged via console.error() in application code',
-              pageUrl: typeof window !== 'undefined' ? window.location.href : 'N/A',
-              callStack: new Error().stack,
-              // Deployment ID baked into running bundle at build time.
-              // If this differs from the latest server deployment, the user is
-              // running a stale bundle (old tab, bfcache, etc.).
-              bundleDeploymentId: process.env.NEXT_PUBLIC_VERCEL_DEPLOYMENT_ID || 'local',
-              // Navigation type: 'navigate' | 'reload' | 'back_forward' | 'prerender'
-              // 'back_forward' = Chrome restored page from bfcache
-              navigationEntry,
-              errorHandling: { wasHandled: true, didShowMessage: false } as ErrorHandlingMetadata,
-            },
-          });
+            const explicitContextKey = this.extractErrorContextKey(args);
+            const toastMessage = explicitContextKey
+              ? this.consumeRecentToastErrorByKey(explicitContextKey, 10000)
+              : this.consumeRecentToastError(2500);
+
+            this.logError({
+              error: new Error(`Console Error: ${errorMessage}`),
+              componentName: 'Console Error',
+              additionalData: { 
+                args,
+                description: 'Error logged via console.error() in application code',
+                pageUrl: typeof window !== 'undefined' ? window.location.href : 'N/A',
+                callStack: new Error().stack,
+                // Deployment ID baked into running bundle at build time.
+                // If this differs from the latest server deployment, the user is
+                // running a stale bundle (old tab, bfcache, etc.).
+                bundleDeploymentId: process.env.NEXT_PUBLIC_VERCEL_DEPLOYMENT_ID || 'local',
+                // Navigation type: 'navigate' | 'reload' | 'back_forward' | 'prerender'
+                // 'back_forward' = Chrome restored page from bfcache
+                navigationEntry,
+                userMessage: toastMessage ? toastMessage.combinedMessage : null,
+                userMessageTitle: toastMessage ? toastMessage.title : null,
+                userMessageDescription: toastMessage ? toastMessage.description : null,
+                toastCorrelationKey: explicitContextKey || toastMessage?.correlationKey || null,
+                errorHandling: {
+                  wasHandled: true,
+                  didShowMessage: Boolean(toastMessage),
+                  messageChannel: toastMessage ? 'toast' : 'unknown',
+                  userMessage: toastMessage ? toastMessage.combinedMessage : null,
+                  userMessageTitle: toastMessage ? toastMessage.title : null,
+                  userMessageDescription: toastMessage ? toastMessage.description : null,
+                  correlationKey: explicitContextKey || toastMessage?.correlationKey || null,
+                } as ErrorHandlingMetadata,
+              },
+            });
+          }, 0);
         }
       };
+
+      const originalToastError = toast.error.bind(toast);
+      toast.error = ((message: unknown, options?: unknown) => {
+        this.captureToastErrorMetadata(message, options);
+        return originalToastError(
+          message as Parameters<typeof toast.error>[0],
+          options as Parameters<typeof toast.error>[1]
+        );
+      }) as typeof toast.error;
     }
   }
 
@@ -252,6 +561,27 @@ class ErrorLogger {
     
     try {
       const errorObj = typeof error === 'string' ? new Error(error) : error;
+      const normalizedAdditionalData: Record<string, unknown> = {
+        ...(additionalData || {}),
+      };
+      const args = Array.isArray(normalizedAdditionalData.args)
+        ? (normalizedAdditionalData.args as unknown[])
+        : [];
+
+      if (!normalizedAdditionalData.errorClassification) {
+        normalizedAdditionalData.errorClassification = this.classifyError(
+          errorObj.message || String(error),
+          args,
+          componentName
+        );
+      }
+
+      if (!normalizedAdditionalData.userAction) {
+        const recentAction = this.getRecentUserAction(45000);
+        if (recentAction) {
+          normalizedAdditionalData.userAction = recentAction;
+        }
+      }
       
       // Get current user if available
       const { data: { user } } = await this.supabase.auth.getUser();
@@ -266,7 +596,7 @@ class ErrorLogger {
         page_url: typeof window !== 'undefined' ? window.location.href : 'N/A',
         user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A',
         component_name: componentName,
-        additional_data: additionalData,
+        additional_data: Object.keys(normalizedAdditionalData).length > 0 ? normalizedAdditionalData : null,
       };
 
       // Add to queue

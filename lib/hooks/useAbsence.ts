@@ -52,16 +52,20 @@ export function useAbsenceRealtimeQueryInvalidation() {
 
 async function assertAbsenceFinancialYearOpen(
   supabase: ReturnType<typeof createClient>,
-  id: string
-): Promise<void> {
+  id: string,
+  options?: { treatMissingAsNoop?: boolean }
+): Promise<boolean> {
   const { data, error } = await supabase
     .from('absences')
     .select('date')
     .eq('id', id)
-    .single();
+    .maybeSingle();
 
   if (error) throw error;
-  if (!data?.date) throw new Error('Absence record not found');
+  if (!data?.date) {
+    if (options?.treatMissingAsNoop) return false;
+    throw new Error('Absence record not found');
+  }
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError) throw authError;
   if (!authData.user) throw new Error('Not authenticated');
@@ -102,6 +106,8 @@ async function assertAbsenceFinancialYearOpen(
   if (isClosedFinancialYearDate(data.date) && !actorIsManagerOrHigher) {
     throw new Error('This absence is in a closed financial year and is read-only');
   }
+
+  return true;
 }
 
 async function resolveAbsenceDuration(
@@ -674,15 +680,20 @@ export function useCancelAbsence() {
   
   return useMutation({
     mutationFn: async (id: string) => {
-      await assertAbsenceFinancialYearOpen(supabase, id);
+      const canProceed = await assertAbsenceFinancialYearOpen(supabase, id, { treatMissingAsNoop: true });
+      if (!canProceed) {
+        // Stale UI state: record already removed or unavailable. Treat as an idempotent success.
+        return { id, status: 'cancelled' } as const;
+      }
       const { data, error } = await supabase
         .from('absences')
         .update({ status: 'cancelled' })
         .eq('id', id)
         .select()
-        .single();
+        .maybeSingle();
       
       if (error) throw error;
+      if (!data) return { id, status: 'cancelled' } as const;
       return data;
     },
     onSuccess: () => {

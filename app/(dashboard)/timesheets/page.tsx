@@ -316,6 +316,7 @@ export default function TimesheetsPage() {
       setHasMore(collectedRows.length > displayCount);
       setTimesheets(collectedRows.slice(0, displayCount));
     } catch (error) {
+      const errorContextId = 'timesheets-fetch-list-error';
       const message = (() => {
         if (error instanceof Error) return error.message;
         if (typeof error === 'string') return error;
@@ -330,20 +331,22 @@ export default function TimesheetsPage() {
 
       // Avoid escalating common mobile/offline network failures into centralized error logs
       if (isNetworkFailure) {
-        console.warn('Unable to load timesheets (network):', error);
+        console.error('Unable to load timesheets (network):', error, { errorContextId, network: true });
       } else {
-        console.error('Error fetching timesheets:', error);
+        console.error('Error fetching timesheets:', error, { errorContextId });
       }
 
       // Always set inline error state so the UI shows feedback even if toast fails
       if (!navigator.onLine || isNetworkFailure) {
         setFetchError('Unable to load timesheets. Please check your internet connection.');
         toast.error('Unable to load timesheets', {
+          id: errorContextId,
           description: 'Please check your internet connection.',
         });
       } else {
         setFetchError('Unable to load timesheets. Please try again.');
         toast.error('Unable to load timesheets', {
+          id: errorContextId,
           description: 'Something went wrong. Please try again.',
         });
       }
@@ -389,6 +392,7 @@ export default function TimesheetsPage() {
           });
         } else if (status === 'rejected') {
           toast.error('Timesheet rejected', {
+            id: 'timesheets-realtime-rejected-status',
             description: 'A timesheet has been rejected. Please review the comments.',
           });
         } else if (status === 'processed') {
@@ -451,6 +455,7 @@ export default function TimesheetsPage() {
     e.stopPropagation();
     
     setDownloading(timesheetId);
+    const errorContextId = `timesheets-download-pdf-${timesheetId}`;
     try {
       const response = await fetch(`/api/timesheets/${timesheetId}/pdf`);
       if (!response.ok) {
@@ -474,6 +479,7 @@ export default function TimesheetsPage() {
         });
 
         toast.error('Failed to download PDF', {
+          id: errorContextId,
           description: serverMessage || 'Please try again or contact support if the problem persists.',
         });
         return;
@@ -497,12 +503,13 @@ export default function TimesheetsPage() {
         msg.toLowerCase().includes('network');
 
       if (isNetworkFailure) {
-        console.warn('Timesheet PDF download failed (network):', error);
+        console.error('Timesheet PDF download failed (network):', error, { errorContextId, network: true });
       } else {
-        console.error('Timesheet PDF download failed:', error);
+        console.error('Timesheet PDF download failed:', error, { errorContextId });
       }
 
       toast.error('Failed to download PDF', {
+        id: errorContextId,
         description: isNetworkFailure
           ? 'Please check your internet connection and try again.'
           : 'Please try again or contact support if the problem persists.',
@@ -525,6 +532,7 @@ export default function TimesheetsPage() {
     if (!timesheetToDelete) return;
 
     setDeleting(true);
+    const errorContextId = `timesheets-delete-${timesheetToDelete.id}`;
     try {
       const response = await fetch(`/api/timesheets/${timesheetToDelete.id}/delete`, {
         method: 'DELETE',
@@ -540,8 +548,10 @@ export default function TimesheetsPage() {
       setTimesheetToDelete(null);
       fetchTimesheets(); // Refresh list
     } catch (err) {
-      console.error('Error deleting timesheet:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to delete timesheet');
+      console.error('Error deleting timesheet:', err, { errorContextId });
+      toast.error(err instanceof Error ? err.message : 'Failed to delete timesheet', {
+        id: errorContextId,
+      });
     } finally {
       setDeleting(false);
     }

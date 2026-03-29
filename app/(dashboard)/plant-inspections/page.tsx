@@ -257,6 +257,7 @@ function PlantInspectionsContent() {
         }))
       );
     } catch (error) {
+      const errorContextId = 'plant-inspections-fetch-list-error';
       const message = (() => {
         if (error instanceof Error) return error.message;
         if (typeof error === 'string') return error;
@@ -270,14 +271,15 @@ function PlantInspectionsContent() {
         message.includes('Failed to fetch') || message.includes('NetworkError') || message.toLowerCase().includes('network');
 
       if (isNetworkFailure) {
-        console.warn('Unable to load plant inspections (network):', error);
+        console.error('Unable to load plant inspections (network):', error, { errorContextId, network: true });
       } else {
-        console.error('Error fetching plant inspections:', error);
+        console.error('Error fetching plant inspections:', error, { errorContextId });
       }
 
       if (!navigator.onLine || isNetworkFailure) {
         try {
           toast.error('Unable to load plant inspections', {
+            id: errorContextId,
             description: 'Please check your internet connection.',
           });
         } catch {
@@ -374,6 +376,7 @@ function PlantInspectionsContent() {
     e.stopPropagation();
     
     setDownloading(inspectionId);
+    const errorContextId = `plant-inspections-download-pdf-${inspectionId}`;
     try {
       const response = await fetch(`/api/plant-inspections/${inspectionId}/pdf`);
       if (!response.ok) {
@@ -390,8 +393,9 @@ function PlantInspectionsContent() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      console.error('Error downloading PDF:', error);
+      console.error('Error downloading PDF:', error, { errorContextId });
       toast.error('Failed to download PDF', {
+        id: errorContextId,
         description: 'Please try again or contact support if the problem persists.',
       });
     } finally {
@@ -415,6 +419,7 @@ function PlantInspectionsContent() {
     if (!inspectionToDelete) return;
 
     setDeleting(true);
+    const errorContextId = `plant-inspections-delete-${inspectionToDelete.id}`;
     try {
       const response = await fetch(`/api/plant-inspections/${inspectionToDelete.id}/delete`, {
         method: 'DELETE',
@@ -430,8 +435,10 @@ function PlantInspectionsContent() {
       setInspectionToDelete(null);
       fetchInspections();
     } catch (err: unknown) {
-      console.error('Error deleting plant inspection:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to delete inspection');
+      console.error('Error deleting plant inspection:', err, { errorContextId });
+      toast.error(err instanceof Error ? err.message : 'Failed to delete inspection', {
+        id: errorContextId,
+      });
     } finally {
       setDeleting(false);
     }

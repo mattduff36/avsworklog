@@ -64,7 +64,7 @@ export default function CustomerHistoryPage({ params }: PageProps) {
       const data = await res.json();
       setCustomer(data.customer);
     } catch {
-      toast.error('Customer not found');
+      toast.error('Customer not found', { id: 'customers-history-load-customer-not-found' });
       router.push('/customers');
     }
   }, [id, router]);

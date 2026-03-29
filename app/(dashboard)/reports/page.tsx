@@ -90,6 +90,7 @@ export default function ReportsPage() {
     filename: string,
     params?: Record<string, string>
   ) => {
+    const errorContextId = 'reports-download-report-error';
     setDownloading(endpoint);
     try {
       const queryParams = new URLSearchParams({
@@ -102,7 +103,9 @@ export default function ReportsPage() {
       
       if (!response.ok) {
         const error = await response.json();
+        console.error('Failed to generate report:', error, { errorContextId, endpoint, filename });
         toast.error('Failed to generate report', {
+          id: errorContextId,
           description: error.error || 'Please try again or contact support.',
         });
         return;
@@ -118,8 +121,9 @@ export default function ReportsPage() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      console.error('Error downloading report:', error);
+      console.error('Error downloading report:', error, { errorContextId, endpoint, filename });
       toast.error('Failed to download report', {
+        id: errorContextId,
         description: 'Please try again or contact support if the problem persists.',
       });
     } finally {
@@ -128,6 +132,7 @@ export default function ReportsPage() {
   };
 
   const downloadBulkInspectionPDFs = async () => {
+    const errorContextId = 'reports-bulk-inspections-download-error';
     // Create abort controller for potential cancellation
     abortControllerRef.current = new AbortController();
     
@@ -152,7 +157,9 @@ export default function ReportsPage() {
 
       if (!response.ok) {
         const error = await response.json();
+        console.error('Failed to generate bulk PDFs:', error, { errorContextId });
         toast.error('Failed to generate bulk PDFs', {
+          id: errorContextId,
           description: error.error || 'Please try again or contact support.',
         });
         setBulkProgress(prev => ({ ...prev, isDownloading: false, status: '' }));
@@ -160,7 +167,9 @@ export default function ReportsPage() {
       }
 
       if (!response.body) {
+        console.error('Bulk PDF stream missing response body', { errorContextId });
         toast.error('Failed to generate bulk PDFs', {
+          id: errorContextId,
           description: 'No response received from server.',
         });
         setBulkProgress(prev => ({ ...prev, isDownloading: false, status: '' }));
@@ -185,7 +194,9 @@ export default function ReportsPage() {
               const data = JSON.parse(buffer);
 
               if (data.error) {
+                console.error('Error during bulk download (final buffer):', data.error, { errorContextId });
                 toast.error('Error during bulk download', {
+                  id: errorContextId,
                   description: data.error,
                 });
                 setBulkProgress(prev => ({ ...prev, isDownloading: false, status: '' }));
@@ -222,7 +233,7 @@ export default function ReportsPage() {
                 });
               }
             } catch (parseError) {
-              console.error('Error parsing final buffer:', parseError, 'Buffer:', buffer);
+              console.error('Error parsing final buffer:', parseError, 'Buffer:', buffer, { errorContextId });
             }
           }
           break;
@@ -244,7 +255,9 @@ export default function ReportsPage() {
             const data = JSON.parse(line);
 
             if (data.error) {
+              console.error('Error during bulk download (stream):', data.error, { errorContextId });
               toast.error('Error during bulk download', {
+                id: errorContextId,
                 description: data.error,
               });
               setBulkProgress(prev => ({ ...prev, isDownloading: false, status: '' }));
@@ -302,7 +315,7 @@ export default function ReportsPage() {
               break;
             }
           } catch (parseError) {
-            console.error('Error parsing stream data:', parseError, 'Line:', line);
+            console.error('Error parsing stream data:', parseError, 'Line:', line, { errorContextId });
           }
         }
 
@@ -315,8 +328,9 @@ export default function ReportsPage() {
       if (error instanceof Error && error.name === 'AbortError') {
         console.log('Download cancelled');
       } else {
-        console.error('Error downloading bulk PDFs:', error);
+        console.error('Error downloading bulk PDFs:', error, { errorContextId });
         toast.error('Failed to download bulk PDFs', {
+          id: errorContextId,
           description: 'Please try again or contact support if the problem persists.',
         });
       }

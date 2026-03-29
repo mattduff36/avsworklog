@@ -288,8 +288,9 @@ function FleetContent() {
       setSelectedCategory(null);
       fetchCategories(); // Refresh categories
     } catch (error: unknown) {
-      console.error('Error deleting category:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to delete category');
+      const errorContextId = 'fleet-delete-van-category-error';
+      console.error('Error deleting category:', error, { errorContextId });
+      toast.error(error instanceof Error ? error.message : 'Failed to delete category', { id: errorContextId });
     } finally {
       setDeletingCategory(false);
     }
@@ -330,8 +331,9 @@ function FleetContent() {
       setSelectedHgvCategory(null);
       fetchHgvCategories();
     } catch (error: unknown) {
-      console.error('Error deleting HGV category:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to delete HGV category');
+      const errorContextId = 'fleet-delete-hgv-category-error';
+      console.error('Error deleting HGV category:', error, { errorContextId });
+      toast.error(error instanceof Error ? error.message : 'Failed to delete HGV category', { id: errorContextId });
     } finally {
       setDeletingHgvCategory(false);
     }

@@ -85,8 +85,9 @@ export default function SuggestionsManagePage() {
       setCounts((result.firstPagePayload?.counts as Record<string, number> | undefined) || {});
       setCountsLoaded(true);
     } catch (error) {
-      console.error('Error fetching suggestions:', error);
-      toast.error('Failed to load suggestions');
+      const errorContextId = 'suggestions-manage-fetch-list-error';
+      console.error('Error fetching suggestions:', error, { errorContextId });
+      toast.error('Failed to load suggestions', { id: errorContextId });
       setCountsLoaded(true);
     } finally {
       setLoading(false);
@@ -117,7 +118,9 @@ export default function SuggestionsManagePage() {
         setSuggestionUpdates(data.updates || []);
       }
     } catch (error) {
-      console.error('Error fetching suggestion details:', error);
+      const errorContextId = 'suggestions-manage-fetch-details-error';
+      console.error('Error fetching suggestion details:', error, { errorContextId });
+      toast.error('Failed to load suggestion details', { id: errorContextId });
     } finally {
       setLoadingDetail(false);
     }
@@ -149,8 +152,9 @@ export default function SuggestionsManagePage() {
         throw new Error(data.error || 'Failed to update suggestion');
       }
     } catch (error) {
-      console.error('Error updating suggestion:', error);
-      toast.error('Failed to update suggestion');
+      const errorContextId = 'suggestions-manage-update-suggestion-error';
+      console.error('Error updating suggestion:', error, { errorContextId });
+      toast.error('Failed to update suggestion', { id: errorContextId });
     } finally {
       setUpdating(false);
     }

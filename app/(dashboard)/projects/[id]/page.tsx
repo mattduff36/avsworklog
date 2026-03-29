@@ -137,13 +137,15 @@ export default function RAMSDetailsPage() {
         .maybeSingle();
 
       if (docError) {
+        const errorContextId = 'projects-details-fetch-document-error';
         console.error('Error fetching document:', {
           error: docError,
           message: docError.message,
           code: docError.code,
           details: docError.details,
           hint: docError.hint,
-          documentId
+          documentId,
+          errorContextId,
         });
         setLoading(false);
         return;
@@ -198,7 +200,9 @@ export default function RAMSDetailsPage() {
 
       setIsFavourite(!!favData);
     } catch (error) {
-      console.error('Error fetching document details:', error);
+      const errorContextId = 'projects-details-fetch-page-data-error';
+      console.error('Error fetching document details:', error, { errorContextId });
+      toast.error('Failed to load document details', { id: errorContextId });
     } finally {
       setLoading(false);
     }
@@ -236,7 +240,9 @@ export default function RAMSDetailsPage() {
         toast.success('Added to favourites');
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to update favourites');
+      const errorContextId = 'projects-details-toggle-favourite-error';
+      console.error('Error updating favourites:', error, { errorContextId });
+      toast.error(error instanceof Error ? error.message : 'Failed to update favourites', { id: errorContextId });
     } finally {
       setFavouriteLoading(false);
     }
@@ -265,7 +271,8 @@ export default function RAMSDetailsPage() {
         document.body.removeChild(a);
       }
     } catch (error) {
-      console.error('Error downloading document:', error);
+      const errorContextId = 'projects-details-download-document-error';
+      console.error('Error downloading document:', error, { errorContextId });
       // Fallback to opening/viewing if download fails
       try {
         const { data } = await supabase.storage
@@ -284,7 +291,8 @@ export default function RAMSDetailsPage() {
           }
         }
       } catch (fallbackError) {
-        console.error('Fallback also failed:', fallbackError);
+        console.error('Fallback also failed:', fallbackError, { errorContextId });
+        toast.error('Failed to download or open document', { id: errorContextId });
       }
     }
   };
@@ -309,7 +317,9 @@ export default function RAMSDetailsPage() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      console.error('Error exporting PDF:', error);
+      const errorContextId = 'projects-details-export-pdf-error';
+      console.error('Error exporting PDF:', error, { errorContextId });
+      toast.error('Failed to export signatures PDF', { id: errorContextId });
     }
   };
 

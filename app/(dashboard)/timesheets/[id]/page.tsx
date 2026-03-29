@@ -145,7 +145,8 @@ export default function ViewTimesheetPage() {
         setEditing(true);
       }
     } catch (err) {
-      console.error('Error fetching timesheet:', err);
+      const errorContextId = 'timesheet-details-fetch-error';
+      console.error('Error fetching timesheet:', err, { errorContextId });
       setError(err instanceof Error ? err.message : 'Failed to load timesheet');
     } finally {
       setLoading(false);
@@ -270,8 +271,10 @@ export default function ViewTimesheetPage() {
       await fetchTimesheet(timesheet.id);
       setEditing(false);
     } catch (err) {
-      console.error('Error saving timesheet:', err);
+      const errorContextId = 'timesheet-details-save-error';
+      console.error('Error saving timesheet:', err, { errorContextId });
       setError(err instanceof Error ? err.message : 'Failed to save timesheet');
+      toast.error(err instanceof Error ? err.message : 'Failed to save timesheet', { id: errorContextId });
     } finally {
       setSaving(false);
     }
@@ -307,8 +310,10 @@ export default function ViewTimesheetPage() {
 
       router.push('/timesheets');
     } catch (err) {
-      console.error('Error submitting timesheet:', err);
+      const errorContextId = 'timesheet-details-submit-error';
+      console.error('Error submitting timesheet:', err, { errorContextId });
       setError(err instanceof Error ? err.message : 'Failed to submit timesheet');
+      toast.error(err instanceof Error ? err.message : 'Failed to submit timesheet', { id: errorContextId });
     } finally {
       setSaving(false);
     }
@@ -341,7 +346,7 @@ export default function ViewTimesheetPage() {
   const handleReject = async () => {
     if (!timesheet || (!isManager && !isAdmin && !isSuperAdmin)) return;
     if (rejectionComments.trim().length === 0) {
-      toast.error('Please provide a reason for rejection');
+      toast.error('Please provide a reason for rejection', { id: 'timesheet-details-reject-validation-missing-reason' });
       return;
     }
 
@@ -363,13 +368,14 @@ export default function ViewTimesheetPage() {
       if (!response.ok) {
         const data = await response.json().catch(() => null) as { error?: string } | null;
         const errorMessage = data?.error || 'Failed to reject timesheet';
+        const rejectionErrorContextId = 'timesheet-details-reject-error';
 
         if (response.status === 404 && errorMessage === 'Timesheet not found') {
           setTimesheet(null);
           setEntries([]);
           setSignature(null);
           setError('Timesheet not found. It may have been deleted.');
-          toast.error('Timesheet not found. It may have been deleted.');
+          toast.error('Timesheet not found. It may have been deleted.', { id: rejectionErrorContextId });
           return;
         }
 
@@ -381,11 +387,12 @@ export default function ViewTimesheetPage() {
       await fetchTimesheet(timesheet.id);
     } catch (err) {
       const message = getActionErrorMessage(err, 'Failed to reject timesheet');
+      const errorContextId = 'timesheet-details-reject-error';
       if (!isExpectedTimesheetActionError(message)) {
-        console.error('Rejection error:', err);
+        console.error('Rejection error:', err, { errorContextId });
       }
       setError(message);
-      toast.error(message);
+      toast.error(message, { id: errorContextId });
     } finally {
       setSaving(false);
     }
@@ -410,8 +417,10 @@ export default function ViewTimesheetPage() {
       toast.success('Timesheet marked as Manager Approved');
       await fetchTimesheet(timesheet.id);
     } catch (err) {
+      const errorContextId = 'timesheet-details-mark-manager-approved-error';
       setError(err instanceof Error ? err.message : 'Failed to mark as Manager Approved');
-      toast.error(err instanceof Error ? err.message : 'Failed to mark as Manager Approved');
+      console.error('Error marking timesheet as Manager Approved:', err, { errorContextId });
+      toast.error(err instanceof Error ? err.message : 'Failed to mark as Manager Approved', { id: errorContextId });
     } finally {
       setSaving(false);
     }
@@ -447,8 +456,9 @@ export default function ViewTimesheetPage() {
       setDataChanged(false);
       await fetchTimesheet(timesheet.id);
     } catch (err) {
-      console.error('Adjustment error:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to mark as adjusted');
+      const errorContextId = 'timesheet-details-adjust-error';
+      console.error('Adjustment error:', err, { errorContextId });
+      toast.error(err instanceof Error ? err.message : 'Failed to mark as adjusted', { id: errorContextId });
       throw err; // Re-throw to let modal handle it
     }
   };

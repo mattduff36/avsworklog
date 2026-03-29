@@ -193,11 +193,15 @@ function NewInspectionContent() {
   const ensureDraftSaved = async (options: { silent?: boolean } = {}): Promise<string | null> => {
     const { silent = false } = options;
     if (!user || !selectedEmployeeId || !vehicleId) {
-      if (!silent) toast.error('Select a vehicle, employee and week before adding photos');
+      if (!silent) toast.error('Select a vehicle, employee and week before adding photos', {
+        id: 'van-inspections-new-validation-photos-core-fields',
+      });
       return null;
     }
     if (!weekEnding || weekEnding.trim() === '') {
-      if (!silent) toast.error('Select a week ending date before adding photos');
+      if (!silent) toast.error('Select a week ending date before adding photos', {
+        id: 'van-inspections-new-validation-photos-week-required',
+      });
       return null;
     }
     setSavingDraftForPhoto(true);
@@ -299,9 +303,10 @@ function NewInspectionContent() {
       window.history.replaceState(null, '', `/van-inspections/new?id=${draft.id}`);
       return draft.id;
     } catch (err) {
-      console.error('Silent draft save failed:', err);
+      const errorContextId = 'van-inspections-new-silent-draft-save-error';
+      console.error('Silent draft save failed:', err, { errorContextId });
       if (!silent) {
-        toast.error('Could not auto-save draft. Please try again.');
+        toast.error('Could not auto-save draft. Please try again.', { id: errorContextId });
       }
       return null;
     } finally {
@@ -929,6 +934,7 @@ function NewInspectionContent() {
     if (defectsWithoutComments.length > 0) {
       setError(`Please add comments for all defects: ${defectsWithoutComments.join(', ')}`);
       toast.error('Missing defect comments', {
+        id: 'van-inspections-new-validation-missing-defect-comments',
         description: `Please add comments for: ${defectsWithoutComments.slice(0, 3).join(', ')}${defectsWithoutComments.length > 3 ? '...' : ''}`,
       });
       setShowConfirmSubmitDialog(false);
@@ -945,6 +951,7 @@ function NewInspectionContent() {
     if (informWorkshop && inspectorComments.trim().length < 10) {
       setError('Workshop notification requires at least 10 characters in the comment field');
       toast.error('Comment too short', {
+        id: 'van-inspections-new-validation-workshop-comment-too-short',
         description: 'Add at least 10 characters to your end-of-inspection notes to create a workshop task.',
       });
       setShowConfirmSubmitDialog(false);
@@ -1406,10 +1413,12 @@ function NewInspectionContent() {
             throw new Error(errorData.error || 'Failed to create workshop task');
           }
         } catch (informError) {
-          console.error('Error in inform-workshop flow:', informError);
+          const errorContextId = 'van-inspections-new-inform-workshop-error';
+          console.error('Error in inform-workshop flow:', informError, { errorContextId });
           const errorMsg = informError instanceof Error ? informError.message : 'Failed to create workshop task';
           setError(`Inspection saved, but workshop task creation failed: ${errorMsg}`);
           toast.error('Workshop task creation failed', {
+            id: errorContextId,
             description: errorMsg,
           });
           setLoading(false);
@@ -1435,15 +1444,16 @@ function NewInspectionContent() {
       // Navigate back to inspections list
       router.push('/van-inspections');
     } catch (err) {
-      console.error('Error saving inspection:', err);
-      console.error('Error details:', JSON.stringify(err, null, 2));
+      const errorContextId = 'van-inspections-new-save-inspection-error';
+      console.error('Error saving inspection:', err, { errorContextId });
+      console.error('Error details:', JSON.stringify(err, null, 2), { errorContextId });
       
       // Get detailed error message
       let errorMessage = 'An unexpected error occurred';
       
       if (err instanceof Error) {
         errorMessage = err.message;
-        console.error('Error stack:', err.stack);
+        console.error('Error stack:', err.stack, { errorContextId });
       }
       
       showErrorWithReport(
@@ -2284,7 +2294,9 @@ function NewInspectionContent() {
             <Button
               onClick={() => {
                 if (!resolutionComment.trim()) {
-                  toast.error('Please provide an explanation');
+                  toast.error('Please provide an explanation', {
+                    id: 'van-inspections-new-validation-resolution-comment-required',
+                  });
                   return;
                 }
                 if (pendingResolution) {

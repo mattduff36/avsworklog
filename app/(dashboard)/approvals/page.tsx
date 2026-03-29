@@ -253,9 +253,10 @@ function ApprovalsContent() {
           }))
         );
       } catch (error) {
-        console.error('Error loading approvals filters:', error);
+        const errorContextId = 'approvals-load-filters-error';
+        console.error('Error loading approvals filters:', error, { errorContextId });
         if (isMounted) {
-          toast.error('Failed to load approvals filters');
+          toast.error('Failed to load approvals filters', { id: errorContextId });
         }
       } finally {
         if (isMounted) {
@@ -387,7 +388,9 @@ function ApprovalsContent() {
       if (timesheetError) throw timesheetError;
       setTimesheets(timesheetData || []);
     } catch (error) {
-      console.error('Error fetching approvals:', error);
+      const errorContextId = 'approvals-fetch-list-error';
+      console.error('Error fetching approvals:', error, { errorContextId });
+      toast.error('Failed to load approvals', { id: errorContextId });
     } finally {
       setLoading(false);
       setHasLoadedTimesheets(true);
@@ -418,7 +421,9 @@ function ApprovalsContent() {
       // Refresh data
       await fetchApprovals();
     } catch (error) {
-      console.error('Error approving:', error);
+      const errorContextId = 'approvals-quick-approve-error';
+      console.error('Error approving:', error, { errorContextId });
+      toast.error('Failed to approve timesheet', { id: errorContextId });
     }
   };
 
@@ -440,7 +445,9 @@ function ApprovalsContent() {
       // Refresh data
       await fetchApprovals();
     } catch (error) {
-      console.error('Error rejecting:', error);
+      const errorContextId = 'approvals-quick-reject-error';
+      console.error('Error rejecting:', error, { errorContextId });
+      toast.error('Failed to reject timesheet', { id: errorContextId });
     }
   };
 
@@ -469,8 +476,9 @@ function ApprovalsContent() {
       setProcessingTimesheetId(null);
       await fetchApprovals();
     } catch (error) {
-      console.error('Error processing timesheet:', error);
-      toast.error('Failed to mark timesheet as Manager Approved');
+      const errorContextId = 'approvals-process-timesheet-error';
+      console.error('Error processing timesheet:', error, { errorContextId });
+      toast.error('Failed to mark timesheet as Manager Approved', { id: errorContextId });
     } finally {
       setProcessingInProgress(false);
     }
@@ -1019,13 +1027,21 @@ function ApprovalsContent() {
                       absences={filteredAbsences}
                       onApprove={async (id) => {
                         try { await approveAbsence.mutateAsync(id); }
-                        catch (e) { console.error('Error approving absence:', e); }
+                        catch (e) {
+                          const errorContextId = 'approvals-table-absence-approve-error';
+                          console.error('Error approving absence:', e, { errorContextId });
+                          toast.error('Failed to approve absence', { id: errorContextId });
+                        }
                       }}
                       onReject={async (id) => {
                         const reason = prompt('Enter rejection reason:');
                         if (!reason) return;
                         try { await rejectAbsence.mutateAsync({ id, reason }); }
-                        catch (e) { console.error('Error rejecting absence:', e); }
+                        catch (e) {
+                          const errorContextId = 'approvals-table-absence-reject-error';
+                          console.error('Error rejecting absence:', e, { errorContextId });
+                          toast.error('Failed to reject absence', { id: errorContextId });
+                        }
                       }}
                       columnVisibility={absenceColumnVisibility}
                     />
@@ -1101,7 +1117,9 @@ function AbsenceApprovalCard({
     try {
       await onApprove.mutateAsync(absence.id);
     } catch (error) {
-      console.error('Error approving absence:', error);
+      const errorContextId = 'approvals-absence-approve-error';
+      console.error('Error approving absence:', error, { errorContextId });
+      toast.error('Failed to approve absence', { id: errorContextId });
     }
   }
   
@@ -1110,6 +1128,7 @@ function AbsenceApprovalCard({
 
     if (!rejectionReason.trim()) {
       toast.error('Rejection reason required', {
+        id: 'approvals-rejection-reason-required',
         description: 'Please provide a reason for rejecting this absence request.',
       });
       return;
@@ -1120,7 +1139,9 @@ function AbsenceApprovalCard({
       setRejecting(false);
       setRejectionReason('');
     } catch (error) {
-      console.error('Error rejecting absence:', error);
+      const errorContextId = 'approvals-absence-reject-error';
+      console.error('Error rejecting absence:', error, { errorContextId });
+      toast.error('Failed to reject absence', { id: errorContextId });
     }
   }
   

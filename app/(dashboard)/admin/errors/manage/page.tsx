@@ -91,8 +91,9 @@ export default function ErrorReportsManagePage() {
       setCounts((result.firstPagePayload?.counts as Record<string, number> | undefined) || {});
       setCountsLoaded(true);
     } catch (error) {
-      console.error('Error fetching error reports:', error);
-      toast.error('Failed to load error reports');
+      const errorContextId = 'admin-errors-fetch-reports-error';
+      console.error('Error fetching error reports:', error, { errorContextId });
+      toast.error('Failed to load error reports', { id: errorContextId });
       setCountsLoaded(true);
     } finally {
       setLoading(false);
@@ -123,7 +124,9 @@ export default function ErrorReportsManagePage() {
         setReportUpdates(data.updates || []);
       }
     } catch (error) {
-      console.error('Error fetching report details:', error);
+      const errorContextId = 'admin-errors-fetch-report-details-error';
+      console.error('Error fetching report details:', error, { errorContextId });
+      toast.error('Failed to load error report details', { id: errorContextId });
     } finally {
       setLoadingDetail(false);
     }
@@ -155,8 +158,9 @@ export default function ErrorReportsManagePage() {
         throw new Error(data.error || 'Failed to update error report');
       }
     } catch (error) {
-      console.error('Error updating report:', error);
-      toast.error('Failed to update error report');
+      const errorContextId = 'admin-errors-update-report-error';
+      console.error('Error updating report:', error, { errorContextId });
+      toast.error('Failed to update error report', { id: errorContextId });
     } finally {
       setUpdating(false);
     }

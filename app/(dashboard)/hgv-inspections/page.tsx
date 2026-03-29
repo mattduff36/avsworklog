@@ -193,8 +193,9 @@ function HgvInspectionsContent() {
         }))
       );
     } catch (error) {
-      console.error('Error fetching HGV inspections:', error);
-      toast.error('Failed to load HGV inspections');
+      const errorContextId = 'hgv-inspections-fetch-list-error';
+      console.error('Error fetching HGV inspections:', error, { errorContextId });
+      toast.error('Failed to load HGV inspections', { id: errorContextId });
     } finally {
       setLoading(false);
     }
@@ -228,6 +229,7 @@ function HgvInspectionsContent() {
     e.preventDefault();
     e.stopPropagation();
     setDownloading(inspectionId);
+    const errorContextId = `hgv-inspections-download-pdf-${inspectionId}`;
     try {
       const response = await fetch(`/api/hgv-inspections/${inspectionId}/pdf`);
       if (!response.ok) {
@@ -242,8 +244,9 @@ function HgvInspectionsContent() {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-    } catch {
-      toast.error('Failed to download PDF');
+    } catch (error) {
+      console.error('Error downloading HGV inspection PDF:', error, { errorContextId });
+      toast.error('Failed to download PDF', { id: errorContextId });
     } finally {
       setDownloading(null);
     }
@@ -255,6 +258,7 @@ function HgvInspectionsContent() {
     if (!confirm('Delete this inspection? This cannot be undone.')) return;
 
     setDeleting(inspectionId);
+    const errorContextId = `hgv-inspections-delete-${inspectionId}`;
     try {
       const response = await fetch(`/api/hgv-inspections/${inspectionId}/delete`, { method: 'DELETE' });
       if (!response.ok) {
@@ -262,8 +266,9 @@ function HgvInspectionsContent() {
       }
       toast.success('Daily check deleted');
       fetchInspections();
-    } catch {
-      toast.error('Failed to delete inspection');
+    } catch (error) {
+      console.error('Error deleting HGV inspection:', error, { errorContextId });
+      toast.error('Failed to delete inspection', { id: errorContextId });
     } finally {
       setDeleting(null);
     }

@@ -20,6 +20,7 @@ import { InspectionPhotoGallery } from '@/components/inspections/InspectionPhoto
 import { InspectionPhotoTiles } from '@/components/inspections/InspectionPhotoTiles';
 import { useInspectionPhotos } from '@/lib/hooks/useInspectionPhotos';
 import { getInspectionPhotoKey } from '@/lib/inspection-photos';
+import { toast } from 'sonner';
 
 interface InspectionWithDetails extends VanInspection {
   vans: {
@@ -99,8 +100,11 @@ export default function ViewInspectionPage() {
         setEditing(true);
       }
     } catch (err) {
-      console.error('Error fetching inspection:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load inspection');
+      const errorContextId = 'van-inspection-details-fetch-error';
+      console.error('Error fetching inspection:', err, { errorContextId });
+      const message = err instanceof Error ? err.message : 'Failed to load inspection';
+      setError(message);
+      toast.error(message, { id: errorContextId });
     } finally {
       setLoading(false);
     }
@@ -343,9 +347,11 @@ export default function ViewInspectionPage() {
       setEditing(false);
       console.log('[Mobile Debug] Save process complete!');
     } catch (err) {
-      console.error('[Mobile Debug] Error saving inspection:', err);
+      const errorContextId = 'van-inspection-details-save-error';
+      console.error('[Mobile Debug] Error saving inspection:', err, { errorContextId });
       const errorMessage = err instanceof Error ? err.message : 'Failed to save inspection';
       setError(errorMessage);
+      toast.error(errorMessage, { id: errorContextId });
       
       // Log to error logger if available
       if (typeof window !== 'undefined' && (window as Window & { errorLogger?: { logError: (opts: unknown) => void } }).errorLogger) {
@@ -532,8 +538,11 @@ export default function ViewInspectionPage() {
 
       router.push('/van-inspections');
     } catch (err) {
-      console.error('Error submitting inspection:', err);
-      setError(err instanceof Error ? err.message : 'Failed to submit inspection');
+      const errorContextId = 'van-inspection-details-submit-error';
+      console.error('Error submitting inspection:', err, { errorContextId });
+      const message = err instanceof Error ? err.message : 'Failed to submit inspection';
+      setError(message);
+      toast.error(message, { id: errorContextId });
     } finally {
       setSaving(false);
     }

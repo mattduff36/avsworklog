@@ -124,8 +124,9 @@ export default function FAQEditorPage() {
         setCategories(data.categories);
       }
     } catch (error) {
-      console.error('Error fetching categories:', error);
-      toast.error('Failed to load categories');
+      const errorContextId = 'admin-faq-fetch-categories-error';
+      console.error('Error fetching categories:', error, { errorContextId });
+      toast.error('Failed to load categories', { id: errorContextId });
     } finally {
       setLoadingCategories(false);
     }
@@ -146,8 +147,9 @@ export default function FAQEditorPage() {
         setArticles(data.articles);
       }
     } catch (error) {
-      console.error('Error fetching articles:', error);
-      toast.error('Failed to load articles');
+      const errorContextId = 'admin-faq-fetch-articles-error';
+      console.error('Error fetching articles:', error, { errorContextId });
+      toast.error('Failed to load articles', { id: errorContextId });
     } finally {
       setLoadingArticles(false);
     }
@@ -187,7 +189,7 @@ export default function FAQEditorPage() {
 
   const handleSaveCategory = async () => {
     if (!categoryForm.name.trim() || !categoryForm.slug.trim()) {
-      toast.error('Name and slug are required');
+      toast.error('Name and slug are required', { id: 'admin-faq-category-validation-missing-fields' });
       return;
     }
 
@@ -214,8 +216,9 @@ export default function FAQEditorPage() {
         throw new Error(data.error || 'Failed to save category');
       }
     } catch (error) {
-      console.error('Error saving category:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to save category');
+      const errorContextId = 'admin-faq-save-category-error';
+      console.error('Error saving category:', error, { errorContextId });
+      toast.error(error instanceof Error ? error.message : 'Failed to save category', { id: errorContextId });
     } finally {
       setSavingCategory(false);
     }
@@ -240,8 +243,9 @@ export default function FAQEditorPage() {
         throw new Error(data.error || 'Failed to delete category');
       }
     } catch (error) {
-      console.error('Error deleting category:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to delete category');
+      const errorContextId = 'admin-faq-delete-category-error';
+      console.error('Error deleting category:', error, { errorContextId });
+      toast.error(error instanceof Error ? error.message : 'Failed to delete category', { id: errorContextId });
     } finally {
       setDeleting(false);
     }
@@ -278,7 +282,9 @@ export default function FAQEditorPage() {
 
   const handleSaveArticle = async () => {
     if (!articleForm.category_id || !articleForm.title.trim() || !articleForm.slug.trim() || !articleForm.content_md.trim()) {
-      toast.error('Category, title, slug, and content are required');
+      toast.error('Category, title, slug, and content are required', {
+        id: 'admin-faq-article-validation-missing-fields',
+      });
       return;
     }
 
@@ -305,8 +311,9 @@ export default function FAQEditorPage() {
         throw new Error(data.error || 'Failed to save article');
       }
     } catch (error) {
-      console.error('Error saving article:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to save article');
+      const errorContextId = 'admin-faq-save-article-error';
+      console.error('Error saving article:', error, { errorContextId });
+      toast.error(error instanceof Error ? error.message : 'Failed to save article', { id: errorContextId });
     } finally {
       setSavingArticle(false);
     }
@@ -331,8 +338,9 @@ export default function FAQEditorPage() {
         throw new Error(data.error || 'Failed to delete article');
       }
     } catch (error) {
-      console.error('Error deleting article:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to delete article');
+      const errorContextId = 'admin-faq-delete-article-error';
+      console.error('Error deleting article:', error, { errorContextId });
+      toast.error(error instanceof Error ? error.message : 'Failed to delete article', { id: errorContextId });
     } finally {
       setDeleting(false);
     }

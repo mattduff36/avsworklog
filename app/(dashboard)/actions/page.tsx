@@ -267,12 +267,12 @@ export default function ActionsPage() {
     if (!selectedActionId) return;
     
     if (!loggedComment.trim()) {
-      toast.error('Comment is required');
+      toast.error('Comment is required', { id: 'actions-logged-comment-required' });
       return;
     }
 
     if (loggedComment.length > 40) {
-      toast.error('Comment must be 40 characters or less');
+      toast.error('Comment must be 40 characters or less', { id: 'actions-logged-comment-too-long' });
       return;
     }
 
@@ -305,8 +305,9 @@ export default function ActionsPage() {
         fetchActions();
       }, 500);
     } catch (err) {
-      console.error('Error marking as logged:', err);
-      toast.error('Failed to mark as logged');
+      const errorContextId = 'actions-mark-logged-error';
+      console.error('Error marking as logged:', err, { errorContextId });
+      toast.error('Failed to mark as logged', { id: errorContextId });
       setCompletingActions(prev => {
         const newSet = new Set(prev);
         newSet.delete(selectedActionId);
@@ -343,8 +344,9 @@ export default function ActionsPage() {
         fetchActions();
       }, 500);
     } catch (err) {
-      console.error('Error marking as complete:', err);
-      toast.error('Failed to mark as complete');
+      const errorContextId = 'actions-mark-complete-error';
+      console.error('Error marking as complete:', err, { errorContextId });
+      toast.error('Failed to mark as complete', { id: errorContextId });
       setCompletingActions(prev => {
         const newSet = new Set(prev);
         newSet.delete(actionId);
@@ -385,8 +387,9 @@ export default function ActionsPage() {
         fetchActions();
       }, 500);
     } catch (err) {
-      console.error('Error undoing complete:', err);
-      toast.error('Failed to undo complete');
+      const errorContextId = 'actions-undo-complete-error';
+      console.error('Error undoing complete:', err, { errorContextId });
+      toast.error('Failed to undo complete', { id: errorContextId });
       setCompletingActions(prev => {
         const newSet = new Set(prev);
         newSet.delete(actionId);
@@ -423,8 +426,9 @@ export default function ActionsPage() {
         fetchActions();
       }, 500);
     } catch (err) {
-      console.error('Error undoing logged:', err);
-      toast.error('Failed to undo logged');
+      const errorContextId = 'actions-undo-logged-error';
+      console.error('Error undoing logged:', err, { errorContextId });
+      toast.error('Failed to undo logged', { id: errorContextId });
       setCompletingActions(prev => {
         const newSet = new Set(prev);
         newSet.delete(actionId);
@@ -455,7 +459,9 @@ export default function ActionsPage() {
       // Refresh the list
       fetchActions();
     } catch (err) {
-      console.error('Error deleting action:', err);
+      const errorContextId = 'actions-delete-action-error';
+      console.error('Error deleting action:', err, { errorContextId });
+      toast.error('Failed to delete action', { id: errorContextId });
       setError('Failed to delete action');
     }
   };

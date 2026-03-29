@@ -115,8 +115,9 @@ export default function NotificationsPage() {
         setNotifications(data.notifications || []);
       }
     } catch (error) {
-      console.error('Error fetching notifications:', error);
-      toast.error('Failed to load notifications');
+      const errorContextId = 'notifications-fetch-list-error';
+      console.error('Error fetching notifications:', error, { errorContextId });
+      toast.error('Failed to load notifications', { id: errorContextId });
     } finally {
       setLoading(false);
       setIsRefreshingNotifications(false);
@@ -207,8 +208,9 @@ export default function NotificationsPage() {
         throw new Error(data.error || 'Failed to fetch notifications');
       }
     } catch (error) {
-      console.error('Error fetching admin notifications:', error);
-      toast.error('Failed to load user notifications');
+      const errorContextId = 'notifications-fetch-admin-list-error';
+      console.error('Error fetching admin notifications:', error, { errorContextId });
+      toast.error('Failed to load user notifications', { id: errorContextId });
     } finally {
       setLoadingAdminNotifications(false);
     }
@@ -262,8 +264,9 @@ export default function NotificationsPage() {
         throw new Error(data.error || 'Failed to update preference');
       }
     } catch (error) {
-      console.error('Error updating preference:', error);
-      toast.error('Failed to update preference');
+      const errorContextId = 'notifications-update-preference-error';
+      console.error('Error updating preference:', error, { errorContextId });
+      toast.error('Failed to update preference', { id: errorContextId });
     } finally {
       setSavingPrefModule(null);
     }

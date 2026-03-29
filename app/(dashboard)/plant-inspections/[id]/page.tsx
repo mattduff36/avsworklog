@@ -19,6 +19,7 @@ import { Database } from '@/types/database';
 import { InspectionPhotoGallery } from '@/components/inspections/InspectionPhotoGallery';
 import { useInspectionPhotos } from '@/lib/hooks/useInspectionPhotos';
 import { getInspectionPhotoKey } from '@/lib/inspection-photos';
+import { toast } from 'sonner';
 
 interface PlantInspectionWithDetails {
   id: string;
@@ -145,8 +146,11 @@ export default function ViewPlantInspectionPage() {
       
       // Plant inspections no longer support draft editing
     } catch (err) {
-      console.error('Error fetching inspection:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load inspection');
+      const errorContextId = 'plant-inspection-details-fetch-error';
+      console.error('Error fetching inspection:', err, { errorContextId });
+      const message = err instanceof Error ? err.message : 'Failed to load inspection';
+      setError(message);
+      toast.error(message, { id: errorContextId });
     } finally {
       setLoading(false);
     }
@@ -350,9 +354,11 @@ export default function ViewPlantInspectionPage() {
       await fetchInspection(inspection.id);
       setEditing(false);
     } catch (err) {
-      console.error('Error saving inspection:', err);
+      const errorContextId = 'plant-inspection-details-save-error';
+      console.error('Error saving inspection:', err, { errorContextId });
       const errorMessage = err instanceof Error ? err.message : 'Failed to save inspection';
       setError(errorMessage);
+      toast.error(errorMessage, { id: errorContextId });
     } finally {
       setSaving(false);
     }
@@ -388,8 +394,11 @@ export default function ViewPlantInspectionPage() {
 
       router.push('/plant-inspections');
     } catch (err) {
-      console.error('Error submitting inspection:', err);
-      setError(err instanceof Error ? err.message : 'Failed to submit inspection');
+      const errorContextId = 'plant-inspection-details-submit-error';
+      console.error('Error submitting inspection:', err, { errorContextId });
+      const message = err instanceof Error ? err.message : 'Failed to submit inspection';
+      setError(message);
+      toast.error(message, { id: errorContextId });
     } finally {
       setSaving(false);
     }

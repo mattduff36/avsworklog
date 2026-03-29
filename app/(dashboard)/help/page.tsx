@@ -108,8 +108,9 @@ export default function HelpPage() {
         setCategories(data.categories);
       }
     } catch (error) {
-      console.error('Error fetching FAQ:', error);
-      toast.error('Failed to load FAQ content');
+      const errorContextId = 'help-faq-fetch-error';
+      console.error('Error fetching FAQ:', error, { errorContextId });
+      toast.error('Failed to load FAQ content', { id: errorContextId });
     } finally {
       if (isInitialLoad) {
         setLoading(false);
@@ -256,7 +257,7 @@ export default function HelpPage() {
   // Handle suggestion submission
   const handleSubmitSuggestion = async () => {
     if (!suggestionTitle.trim() || !suggestionBody.trim()) {
-      toast.error('Please fill in both title and description');
+      toast.error('Please fill in both title and description', { id: 'help-suggestion-validation-missing-fields' });
       return;
     }
 
@@ -287,8 +288,9 @@ export default function HelpPage() {
         throw new Error(data.error || 'Failed to submit suggestion');
       }
     } catch (error) {
-      console.error('Error submitting suggestion:', error);
-      toast.error('Failed to submit suggestion');
+      const errorContextId = 'help-submit-suggestion-error';
+      console.error('Error submitting suggestion:', error, { errorContextId });
+      toast.error('Failed to submit suggestion', { id: errorContextId });
     } finally {
       setSubmittingSuggestion(false);
     }
@@ -297,12 +299,12 @@ export default function HelpPage() {
   // Handle error report submission
   const handleSubmitError = async () => {
     if (!errorTitle.trim() || !errorDescription.trim()) {
-      toast.error('Please fill in both title and description');
+      toast.error('Please fill in both title and description', { id: 'help-error-report-validation-missing-fields' });
       return;
     }
 
     if (!errorPageSelection) {
-      toast.error('Please select which page/feature this error relates to');
+      toast.error('Please select which page/feature this error relates to', { id: 'help-error-report-validation-missing-page' });
       return;
     }
 
@@ -352,8 +354,9 @@ export default function HelpPage() {
         throw new Error(data?.error || 'Failed to submit error report');
       }
     } catch (error) {
-      console.error('Error submitting error report:', error);
-      toast.error('Failed to submit error report');
+      const errorContextId = 'help-submit-error-report-error';
+      console.error('Error submitting error report:', error, { errorContextId });
+      toast.error('Failed to submit error report', { id: errorContextId });
     } finally {
       setSubmittingError(false);
     }

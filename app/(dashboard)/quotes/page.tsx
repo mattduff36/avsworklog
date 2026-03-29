@@ -99,8 +99,9 @@ export default function QuotesPage() {
         setApprovers(data.approvers || []);
       }
     } catch (error) {
-      console.error('Error fetching data:', error);
-      toast.error('Unable to load quotes right now.');
+      const errorContextId = 'quotes-fetch-data-error';
+      console.error('Error fetching data:', error, { errorContextId });
+      toast.error('Unable to load quotes right now.', { id: errorContextId });
     } finally {
       setLoading(false);
     }
@@ -109,7 +110,7 @@ export default function QuotesPage() {
   useEffect(() => {
     if (permissionLoading) return;
     if (!canViewQuotes) {
-      toast.error('You do not have access to quotes.');
+      toast.error('You do not have access to quotes.', { id: 'quotes-access-denied' });
       router.push('/dashboard');
       return;
     }

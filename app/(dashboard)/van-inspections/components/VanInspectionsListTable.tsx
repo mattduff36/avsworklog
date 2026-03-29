@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowUpDown, Download, Trash2 } from 'lucide-react';
+import { ArrowUpDown, Clipboard, Clock, Download, Trash2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -27,6 +27,8 @@ export const DEFAULT_VAN_INSPECTIONS_COLUMN_VISIBILITY: VanInspectionsColumnVisi
 interface VanInspectionRow {
   id: string;
   status: 'draft' | 'submitted';
+  has_reported_defect?: boolean;
+  has_inform_workshop_task?: boolean;
   inspection_date: string;
   inspection_end_date: string | null;
   submitted_at: string | null;
@@ -60,6 +62,20 @@ function getStatusBadge(status: string) {
   };
   const config = variants[status as keyof typeof variants] || variants.draft;
   return <Badge variant={config.variant}>{config.label}</Badge>;
+}
+
+function getStatusIcon(inspection: VanInspectionRow) {
+  const iconColorClass = inspection.has_inform_workshop_task
+    ? 'text-inspection'
+    : inspection.has_reported_defect
+      ? 'text-red-500'
+      : 'text-green-500';
+
+  if (inspection.status === 'submitted') {
+    return <Clock className={`h-4 w-4 ${iconColorClass}`} />;
+  }
+
+  return <Clipboard className={`h-4 w-4 ${iconColorClass}`} />;
 }
 
 function formatInspectionRange(startDate: string, endDate: string | null) {
@@ -215,7 +231,12 @@ export function VanInspectionsListTable({
                 {formatInspectionRange(inspection.inspection_date, inspection.inspection_end_date)}
               </TableCell>
               {columnVisibility.status && (
-                <TableCell>{getStatusBadge(inspection.status)}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    {getStatusIcon(inspection)}
+                    {getStatusBadge(inspection.status)}
+                  </div>
+                </TableCell>
               )}
               {columnVisibility.submittedAt && (
                 <TableCell className="text-muted-foreground">

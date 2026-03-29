@@ -258,7 +258,7 @@ export default function ProjectsManagePage() {
       } else {
         let errorMsg = 'Failed to upload document';
         try { const data = JSON.parse(xhr.responseText); if (data.error) errorMsg = data.error; } catch { /* use default */ }
-        toast.error(errorMsg);
+        toast.error(errorMsg, { id: 'projects-manage-upload-document-error' });
         setUploadingDocs(prev =>
           prev.map(d => d.id === uploadId ? { ...d, status: 'error', progress: 0 } : d)
         );
@@ -267,7 +267,9 @@ export default function ProjectsManagePage() {
 
     xhr.addEventListener('error', () => {
       xhrMapRef.current.delete(uploadId);
-      toast.error('Upload failed. Please check your connection.');
+      toast.error('Upload failed. Please check your connection.', {
+        id: 'projects-manage-upload-network-error',
+      });
       setUploadingDocs(prev =>
         prev.map(d => d.id === uploadId ? { ...d, status: 'error', progress: 0 } : d)
       );
@@ -279,7 +281,7 @@ export default function ProjectsManagePage() {
 
   const handleViewFavourite = useCallback(async (fav: FavouriteRow) => {
     if (!fav.document.file_path) {
-      toast.error('File path not available');
+      toast.error('File path not available', { id: 'projects-manage-view-favourite-filepath-missing' });
       return;
     }
     setPdfViewerTitle(fav.document.title);
@@ -295,11 +297,11 @@ export default function ProjectsManagePage() {
       if (data?.signedUrl) {
         setPdfViewerUrl(data.signedUrl);
       } else {
-        toast.error('Could not generate document URL');
+        toast.error('Could not generate document URL', { id: 'projects-manage-view-favourite-url-generation-error' });
         setPdfViewerOpen(false);
       }
     } catch {
-      toast.error('Failed to load document');
+      toast.error('Failed to load document', { id: 'projects-manage-view-favourite-load-error' });
       setPdfViewerOpen(false);
     } finally {
       setPdfViewerLoading(false);

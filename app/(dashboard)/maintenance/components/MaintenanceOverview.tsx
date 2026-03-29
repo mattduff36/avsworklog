@@ -621,12 +621,12 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     if (!selectedTask) return;
 
     if (!loggedComment.trim()) {
-      toast.error('Please add a comment');
+      toast.error('Please add a comment', { id: 'maintenance-overview-validation-log-comment-required' });
       return;
     }
 
     if (loggedComment.length > 300) {
-      toast.error('Comment must be 300 characters or less');
+      toast.error('Comment must be 300 characters or less', { id: 'maintenance-overview-validation-log-comment-too-long' });
       return;
     }
 
@@ -670,8 +670,9 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         fetchVehicleHistory(vehicleId, isPlantAsset(vehicleId), true);
       }
     } catch (error: unknown) {
-      console.error('Error marking task in progress:', error instanceof Error ? error.message : error);
-      toast.error('Failed to update task');
+      const errorContextId = 'maintenance-overview-mark-in-progress-error';
+      console.error('Error marking task in progress:', error instanceof Error ? error.message : error, { errorContextId });
+      toast.error('Failed to update task', { id: errorContextId });
     }
   };
 
@@ -713,8 +714,9 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         fetchVehicleHistory(vehicleId, isPlantAsset(vehicleId), true);
       }
     } catch (error: unknown) {
-      console.error('Error undoing task:', error instanceof Error ? error.message : error);
-      toast.error('Failed to undo task');
+      const errorContextId = 'maintenance-overview-undo-task-error';
+      console.error('Error undoing task:', error instanceof Error ? error.message : error, { errorContextId });
+      toast.error('Failed to undo task', { id: errorContextId });
     }
   };
 
@@ -854,8 +856,9 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         return newSet;
       });
     } catch (error: unknown) {
-      console.error('Error marking task complete:', error instanceof Error ? error.message : error);
-      toast.error('Failed to complete task');
+      const errorContextId = 'maintenance-overview-mark-complete-error';
+      console.error('Error marking task complete:', error instanceof Error ? error.message : error, { errorContextId });
+      toast.error('Failed to complete task', { id: errorContextId });
       setUpdatingStatus(prev => {
         const newSet = new Set(prev);
         newSet.delete(taskId);
@@ -875,12 +878,16 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     if (!onHoldingTask) return;
 
     if (!onHoldComment.trim()) {
-      toast.error('Please add a comment explaining why this task is on hold');
+      toast.error('Please add a comment explaining why this task is on hold', {
+        id: 'maintenance-overview-validation-on-hold-comment-required',
+      });
       return;
     }
 
     if (onHoldComment.length > 300) {
-      toast.error('Comment must be 300 characters or less');
+      toast.error('Comment must be 300 characters or less', {
+        id: 'maintenance-overview-validation-on-hold-comment-too-long',
+      });
       return;
     }
 
@@ -923,8 +930,9 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         fetchVehicleHistory(vehicleId, isPlantAsset(vehicleId), true);
       }
     } catch (error: unknown) {
-      console.error('Error marking task on hold:', error);
-      toast.error('Failed to update task');
+      const errorContextId = 'maintenance-overview-mark-on-hold-error';
+      console.error('Error marking task on hold:', error, { errorContextId });
+      toast.error('Failed to update task', { id: errorContextId });
     }
   };
 
@@ -939,12 +947,16 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     if (!resumingTask) return;
 
     if (!resumeComment.trim()) {
-      toast.error('Please add a comment about resuming this task');
+      toast.error('Please add a comment about resuming this task', {
+        id: 'maintenance-overview-validation-resume-comment-required',
+      });
       return;
     }
 
     if (resumeComment.length > 300) {
-      toast.error('Comment must be 300 characters or less');
+      toast.error('Comment must be 300 characters or less', {
+        id: 'maintenance-overview-validation-resume-comment-too-long',
+      });
       return;
     }
 
@@ -987,8 +999,9 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         fetchVehicleHistory(vehicleId, isPlantAsset(vehicleId), true);
       }
     } catch (error: unknown) {
-      console.error('Error resuming task:', error instanceof Error ? error.message : error);
-      toast.error('Failed to resume task');
+      const errorContextId = 'maintenance-overview-resume-task-error';
+      console.error('Error resuming task:', error instanceof Error ? error.message : error, { errorContextId });
+      toast.error('Failed to resume task', { id: errorContextId });
     }
   };
 

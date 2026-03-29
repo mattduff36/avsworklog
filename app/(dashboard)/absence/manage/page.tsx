@@ -424,8 +424,9 @@ export default function AdminAbsencePage() {
         setAbsenceAnnouncementInput(message);
         setSavedAbsenceAnnouncement(message);
       } catch (error) {
-        console.error('Error loading absence announcement:', error);
-        toast.error('Failed to load absence message');
+        const errorContextId = 'absence-manage-load-announcement-error';
+        console.error('Error loading absence announcement:', error, { errorContextId });
+        toast.error('Failed to load absence message', { id: errorContextId });
       } finally {
         setLoadingAbsenceAnnouncement(false);
       }
@@ -513,8 +514,9 @@ export default function AdminAbsencePage() {
       setIsAbsenceAnnouncementFocused(false);
       toast.success(message ? 'Absence message updated' : 'Absence message cleared');
     } catch (error) {
-      console.error('Error saving absence announcement:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to save absence message');
+      const errorContextId = 'absence-manage-save-announcement-error';
+      console.error('Error saving absence announcement:', error, { errorContextId });
+      toast.error(error instanceof Error ? error.message : 'Failed to save absence message', { id: errorContextId });
     } finally {
       setIsAbsenceAnnouncementFocused(false);
       setSavingAbsenceAnnouncement(false);
@@ -678,7 +680,7 @@ export default function AdminAbsencePage() {
   // Handle create
   async function handleCreate() {
     if (!selectedProfileId || !selectedReasonId || !startDate) {
-      toast.error('Please fill in all required fields');
+      toast.error('Please fill in all required fields', { id: 'absence-manage-create-validation-required-fields' });
       return;
     }
 
@@ -686,7 +688,9 @@ export default function AdminAbsencePage() {
       !canAddEditBookings ||
       !canPerformScopedBookingAction(selectedProfileId, profileTeamIdById.get(selectedProfileId) || null, 'edit')
     ) {
-      toast.error('You do not have permission to create bookings for this user');
+      toast.error('You do not have permission to create bookings for this user', {
+        id: 'absence-manage-create-validation-permission-denied',
+      });
       return;
     }
     
@@ -724,12 +728,13 @@ export default function AdminAbsencePage() {
       setShowCreateDialog(false);
     } catch (error) {
       const message = getErrorMessage(error, 'Failed to create absence');
+      const errorContextId = 'absence-manage-create-error';
       if (shouldLogAbsenceManageError(error)) {
-        console.error('Error creating absence:', error);
+        console.error('Error creating absence:', error, { errorContextId });
       } else {
         console.warn('Create absence request rejected:', message);
       }
-      toast.error(message);
+      toast.error(message, { id: errorContextId });
     } finally {
       setSubmitting(false);
     }
@@ -751,8 +756,9 @@ export default function AdminAbsencePage() {
       setShowDeleteDialog(false);
       setDeleteTargetId(null);
     } catch (error) {
-      console.error('Error deleting:', error);
-      toast.error('Failed to delete absence');
+      const errorContextId = 'absence-manage-delete-error';
+      console.error('Error deleting:', error, { errorContextId });
+      toast.error('Failed to delete absence', { id: errorContextId });
     } finally {
       setDeleteSubmitting(false);
     }

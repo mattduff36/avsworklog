@@ -274,6 +274,7 @@ function InspectionsContent() {
       setHasMore(rows.length > displayCount);
       setInspections(enrichedRows.slice(0, displayCount));
     } catch (error) {
+      const errorContextId = 'van-inspections-fetch-list-error';
       const message = (() => {
         if (error instanceof Error) return error.message;
         if (typeof error === 'string') return error;
@@ -288,15 +289,16 @@ function InspectionsContent() {
 
       // Avoid escalating common mobile/offline network failures into centralized error logs
       if (isNetworkFailure) {
-        console.warn('Unable to load inspections (network):', error);
+        console.error('Unable to load inspections (network):', error, { errorContextId, network: true });
       } else {
-        console.error('Error fetching inspections:', error);
+        console.error('Error fetching inspections:', error, { errorContextId });
       }
 
       // Show friendly message if offline or network failure
       if (!navigator.onLine || isNetworkFailure) {
         try {
           toast.error('Unable to load inspections', {
+            id: errorContextId,
             description: 'Please check your internet connection.',
           });
         } catch {
@@ -395,6 +397,7 @@ function InspectionsContent() {
     e.stopPropagation();
     
     setDownloading(inspectionId);
+    const errorContextId = `van-inspections-download-pdf-${inspectionId}`;
     try {
       const response = await fetch(`/api/van-inspections/${inspectionId}/pdf`);
       if (!response.ok) {
@@ -418,6 +421,7 @@ function InspectionsContent() {
         });
 
         toast.error('Failed to download PDF', {
+          id: errorContextId,
           description: serverMessage || 'Please try again or contact support if the problem persists.',
         });
         return;
@@ -441,12 +445,13 @@ function InspectionsContent() {
         msg.toLowerCase().includes('network');
 
       if (isNetworkFailure) {
-        console.warn('Inspection PDF download failed (network):', error);
+        console.error('Inspection PDF download failed (network):', error, { errorContextId, network: true });
       } else {
-        console.error('Inspection PDF download failed:', error);
+        console.error('Inspection PDF download failed:', error, { errorContextId });
       }
 
       toast.error('Failed to download PDF', {
+        id: errorContextId,
         description: isNetworkFailure
           ? 'Please check your internet connection and try again.'
           : 'Please try again or contact support if the problem persists.',
@@ -470,6 +475,7 @@ function InspectionsContent() {
     if (!inspectionToDelete) return;
 
     setDeleting(true);
+    const errorContextId = `van-inspections-delete-${inspectionToDelete.id}`;
     try {
       const response = await fetch(`/api/van-inspections/${inspectionToDelete.id}/delete`, {
         method: 'DELETE',
@@ -485,8 +491,10 @@ function InspectionsContent() {
       setInspectionToDelete(null);
       fetchInspections(); // Refresh list
     } catch (err: unknown) {
-      console.error('Error deleting inspection:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to delete inspection');
+      console.error('Error deleting inspection:', err, { errorContextId });
+      toast.error(err instanceof Error ? err.message : 'Failed to delete inspection', {
+        id: errorContextId,
+      });
     } finally {
       setDeleting(false);
     }

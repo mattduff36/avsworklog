@@ -31,8 +31,9 @@ export default function CustomersPage() {
       });
       setCustomers(items);
     } catch (error) {
-      console.error('Error fetching customers:', error);
-      toast.error('Failed to load customers');
+      const errorContextId = 'customers-fetch-list-error';
+      console.error('Error fetching customers:', error, { errorContextId });
+      toast.error('Failed to load customers', { id: errorContextId });
     } finally {
       setLoading(false);
     }
@@ -41,7 +42,7 @@ export default function CustomersPage() {
   useEffect(() => {
     if (permissionLoading) return;
     if (!canViewCustomers) {
-      toast.error('Access denied');
+      toast.error('Access denied', { id: 'customers-access-denied' });
       router.push('/dashboard');
       return;
     }

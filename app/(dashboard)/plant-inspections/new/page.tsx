@@ -198,7 +198,9 @@ function NewPlantInspectionContent() {
     const { data, error } = await query.maybeSingle();
 
     if (error) {
-      console.error('Failed to check for existing plant inspection:', error);
+      console.error('Failed to check for existing plant inspection:', error, {
+        errorContextId: 'plant-inspections-new-check-existing-error',
+      });
       return null;
     }
 
@@ -254,16 +256,21 @@ function NewPlantInspectionContent() {
     options: { showToast?: boolean } = {}
   ): Promise<boolean> => {
     const { showToast = true } = options;
+    const errorContextId = 'plant-inspections-new-merge-draft-error';
     if (!selectedEmployeeId || !inspectionDate) {
-      toast.error('Select an employee and inspection date before continuing');
+      toast.error('Select an employee and inspection date before continuing', {
+        id: 'plant-inspections-new-validation-missing-employee-date',
+      });
       return false;
     }
     if (!isHiredPlant && !selectedPlantId) {
-      toast.error('Select a plant before continuing');
+      toast.error('Select a plant before continuing', { id: 'plant-inspections-new-validation-missing-plant' });
       return false;
     }
     if (isHiredPlant && !hiredPlantIdSerial.trim()) {
-      toast.error('Enter the hired plant ID / serial before continuing');
+      toast.error('Enter the hired plant ID / serial before continuing', {
+        id: 'plant-inspections-new-validation-missing-hired-serial',
+      });
       return false;
     }
 
@@ -322,9 +329,9 @@ function NewPlantInspectionContent() {
       return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not merge with existing draft';
-      console.error('Failed to merge into existing plant draft:', err);
+      console.error('Failed to merge into existing plant draft:', err, { errorContextId });
       if (showToast) {
-        toast.error(message);
+        toast.error(message, { id: errorContextId });
       }
       return false;
     }
@@ -362,7 +369,9 @@ function NewPlantInspectionContent() {
       return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to discard draft';
-      toast.error(message);
+      const errorContextId = 'plant-inspections-new-discard-draft-error';
+      console.error('Failed to discard plant draft:', err, { errorContextId });
+      toast.error(message, { id: errorContextId });
       return false;
     }
   }, [existingInspectionId]);
@@ -400,20 +409,26 @@ function NewPlantInspectionContent() {
       }
       const merged = await mergeIntoExistingDraft(existingInspectionId, { showToast: false });
       if (!merged && !silent) {
-        toast.error('Could not auto-save draft. Please try again.');
+        toast.error('Could not auto-save draft. Please try again.', { id: 'plant-inspections-new-autosave-draft-error' });
       }
       return merged ? existingInspectionId : null;
     }
     if (!user || !selectedEmployeeId) {
-      if (!silent) toast.error('Select an employee before adding photos');
+      if (!silent) toast.error('Select an employee before adding photos', {
+        id: 'plant-inspections-new-validation-photos-employee-required',
+      });
       return null;
     }
     if (!isHiredPlant && !selectedPlantId) {
-      if (!silent) toast.error('Select a plant before adding photos');
+      if (!silent) toast.error('Select a plant before adding photos', {
+        id: 'plant-inspections-new-validation-photos-plant-required',
+      });
       return null;
     }
     if (!inspectionDate || inspectionDate.trim() === '') {
-      if (!silent) toast.error('Select an inspection date before adding photos');
+      if (!silent) toast.error('Select an inspection date before adding photos', {
+        id: 'plant-inspections-new-validation-photos-date-required',
+      });
       return null;
     }
 
@@ -476,9 +491,10 @@ function NewPlantInspectionContent() {
       window.history.replaceState(null, '', `/plant-inspections/new?id=${draft.id}`);
       return draft.id;
     } catch (err) {
-      console.error('Silent draft save failed:', err);
+      const errorContextId = 'plant-inspections-new-silent-draft-save-error';
+      console.error('Silent draft save failed:', err, { errorContextId });
       if (!silent) {
-        toast.error('Could not auto-save draft. Please try again.');
+        toast.error('Could not auto-save draft. Please try again.', { id: errorContextId });
       }
       return null;
     } finally {
@@ -862,6 +878,7 @@ function NewPlantInspectionContent() {
     if (missingItems.length > 0) {
       setError(`Please select Pass, Fail, or N/A for all items. Missing: ${missingItems.slice(0, 3).join(', ')}${missingItems.length > 3 ? ` and ${missingItems.length - 3} more` : ''}`);
       toast.error('Incomplete checklist', {
+        id: 'plant-inspections-new-validation-incomplete-checklist',
         description: `${missingItems.length} item${missingItems.length > 1 ? 's' : ''} still need a status`,
       });
       setShowConfirmSubmitDialog(false);
@@ -885,6 +902,7 @@ function NewPlantInspectionContent() {
     if (defectsWithoutComments.length > 0) {
       setError(`Please add comments for all defects: ${defectsWithoutComments.join(', ')}`);
       toast.error('Missing defect comments', {
+        id: 'plant-inspections-new-validation-missing-defect-comments',
         description: `Please add comments for: ${defectsWithoutComments.slice(0, 3).join(', ')}${defectsWithoutComments.length > 3 ? '...' : ''}`,
       });
       setShowConfirmSubmitDialog(false);
@@ -897,7 +915,7 @@ function NewPlantInspectionContent() {
     // Validate inform workshop (not applicable for hired plant)
     if (!isHiredPlant && informWorkshop && inspectorComments.trim().length < 10) {
       setError('Workshop notification requires at least 10 characters in the comment field');
-      toast.error('Comment too short');
+      toast.error('Comment too short', { id: 'plant-inspections-new-validation-workshop-comment-too-short' });
       setShowConfirmSubmitDialog(false);
       scrollToTarget(document.getElementById('inspector-comments'));
       return;
@@ -1182,9 +1200,10 @@ function NewPlantInspectionContent() {
               throw new Error(errorData.error || 'Failed to sync defect tasks');
             }
           } catch (error) {
-            console.error('Error syncing defect tasks:', error);
+            const errorContextId = 'plant-inspections-new-sync-defect-tasks-error';
+            console.error('Error syncing defect tasks:', error, { errorContextId });
             const errorMsg = error instanceof Error ? error.message : 'Failed to sync defect tasks';
-            toast.error(`Warning: Inspection saved, but ${errorMsg}`);
+            toast.error(`Warning: Inspection saved, but ${errorMsg}`, { id: errorContextId });
           }
         }
       }
@@ -1213,7 +1232,8 @@ function NewPlantInspectionContent() {
             throw new Error(errorData.error || 'Failed to create workshop task');
           }
         } catch (informError) {
-          console.error('Error in inform-workshop flow:', informError);
+          const errorContextId = 'plant-inspections-new-inform-workshop-error';
+          console.error('Error in inform-workshop flow:', informError, { errorContextId });
           const errorMsg = informError instanceof Error ? informError.message : 'Failed to create workshop task';
           setError(`Inspection saved, but workshop task creation failed: ${errorMsg}`);
           setLoading(false);
@@ -1252,13 +1272,14 @@ function NewPlantInspectionContent() {
         } else {
           setError('An inspection for this plant and date already exists. Please select a different plant or date.');
           toast.error('Duplicate inspection', {
+            id: 'plant-inspections-new-duplicate-inspection-error',
             description: 'An inspection already exists for this plant on this date.',
           });
         }
         return;
       }
 
-      console.error('Error saving inspection:', err);
+      console.error('Error saving inspection:', err, { errorContextId: 'plant-inspections-new-save-inspection-error' });
       
       showErrorWithReport(
         'Failed to save inspection',

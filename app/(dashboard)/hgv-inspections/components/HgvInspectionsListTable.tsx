@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowUpDown, Download, Trash2 } from 'lucide-react';
+import { ArrowUpDown, Clock, Download, Trash2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -27,6 +27,8 @@ export const DEFAULT_HGV_INSPECTIONS_COLUMN_VISIBILITY: HgvInspectionsColumnVisi
 interface HgvInspectionRow {
   id: string;
   status: 'submitted';
+  has_reported_defect?: boolean;
+  has_inform_workshop_task?: boolean;
   inspection_date: string;
   inspection_end_date: string | null;
   submitted_at: string | null;
@@ -46,6 +48,16 @@ interface HgvInspectionsListTableProps {
 
 type SortField = 'employee' | 'hgv' | 'date' | 'submittedAt';
 type SortDirection = 'asc' | 'desc';
+
+function getStatusIcon(inspection: HgvInspectionRow) {
+  const iconColorClass = inspection.has_inform_workshop_task
+    ? 'text-inspection'
+    : inspection.has_reported_defect
+      ? 'text-red-500'
+      : 'text-green-500';
+
+  return <Clock className={`h-4 w-4 ${iconColorClass}`} />;
+}
 
 function formatInspectionRange(startDate: string, endDate: string | null) {
   if (endDate && endDate !== startDate) {
@@ -185,7 +197,10 @@ export function HgvInspectionsListTable({
               </TableCell>
               {columnVisibility.status && (
                 <TableCell>
-                  <Badge className="border-inspection/40 bg-inspection/10 text-inspection">Submitted</Badge>
+                  <div className="flex items-center gap-2">
+                    {getStatusIcon(inspection)}
+                    <Badge className="border-inspection/40 bg-inspection/10 text-inspection">Submitted</Badge>
+                  </div>
                 </TableCell>
               )}
               {columnVisibility.submittedAt && (

@@ -231,7 +231,9 @@ export default function DashboardPage() {
         setPendingQuotesCount(metrics.pendingQuotesCount);
         setErrorLogsCount(metrics.errorLogsCount);
       } catch (error) {
-        console.error('Error loading dashboard metrics:', error);
+        console.error('Error loading dashboard metrics:', error, {
+          errorContextId: 'dashboard-load-metrics-error',
+        });
         if (active) {
           setPendingApprovals(canViewApprovals ? buildPendingApprovalsSummary(0, 0) : []);
           setActionsSummary(

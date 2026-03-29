@@ -74,7 +74,9 @@ export default function ProjectsSettingsPage() {
         setTypes(data.types);
       }
     } catch (error) {
-      console.error('Error fetching document types:', error);
+      const errorContextId = 'projects-settings-fetch-document-types-error';
+      console.error('Error fetching document types:', error, { errorContextId });
+      toast.error('Failed to load document types', { id: errorContextId });
     } finally {
       setLoading(false);
     }
@@ -104,7 +106,7 @@ export default function ProjectsSettingsPage() {
 
   const handleSave = async () => {
     if (!formName.trim()) {
-      toast.error('Name is required');
+      toast.error('Name is required', { id: 'projects-settings-validation-name-required' });
       return;
     }
 
@@ -132,7 +134,9 @@ export default function ProjectsSettingsPage() {
       setDialogOpen(false);
       fetchTypes();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to save document type');
+      const errorContextId = 'projects-settings-save-document-type-error';
+      console.error('Error saving document type:', error, { errorContextId });
+      toast.error(error instanceof Error ? error.message : 'Failed to save document type', { id: errorContextId });
     } finally {
       setSaving(false);
     }
@@ -155,7 +159,9 @@ export default function ProjectsSettingsPage() {
       toast.success(type.is_active ? 'Document type deactivated' : 'Document type activated');
       fetchTypes();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to update');
+      const errorContextId = 'projects-settings-toggle-document-type-error';
+      console.error('Error updating document type active state:', error, { errorContextId });
+      toast.error(error instanceof Error ? error.message : 'Failed to update', { id: errorContextId });
     }
   };
 
@@ -176,7 +182,9 @@ export default function ProjectsSettingsPage() {
       setTypeToDelete(null);
       fetchTypes();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to delete');
+      const errorContextId = 'projects-settings-delete-document-type-error';
+      console.error('Error deleting document type:', error, { errorContextId });
+      toast.error(error instanceof Error ? error.message : 'Failed to delete', { id: errorContextId });
     } finally {
       setDeleting(false);
     }

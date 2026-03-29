@@ -148,7 +148,9 @@ function NewHgvInspectionContent() {
       .maybeSingle();
 
     if (error) {
-      console.error('Failed to check for existing inspection:', error);
+      console.error('Failed to check for existing inspection:', error, {
+        errorContextId: 'hgv-inspections-new-check-existing-error',
+      });
       return null;
     }
 
@@ -200,8 +202,11 @@ function NewHgvInspectionContent() {
     options: { showToast?: boolean } = {}
   ): Promise<boolean> => {
     const { showToast = true } = options;
+    const errorContextId = 'hgv-inspections-new-merge-draft-error';
     if (!hgvId || !inspectionDate || !selectedEmployeeId) {
-      toast.error('Select an HGV, employee and date before continuing');
+      toast.error('Select an HGV, employee and date before continuing', {
+        id: 'hgv-inspections-new-validation-missing-core-fields',
+      });
       return false;
     }
 
@@ -255,9 +260,9 @@ function NewHgvInspectionContent() {
       return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not merge with existing draft';
-      console.error('Failed to merge into existing HGV draft:', err);
+      console.error('Failed to merge into existing HGV draft:', err, { errorContextId });
       if (showToast) {
-        toast.error(message);
+        toast.error(message, { id: errorContextId });
       }
       return false;
     }
@@ -295,7 +300,9 @@ function NewHgvInspectionContent() {
       return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to discard draft';
-      toast.error(message);
+      const errorContextId = 'hgv-inspections-new-discard-draft-error';
+      console.error('Failed to discard HGV draft:', err, { errorContextId });
+      toast.error(message, { id: errorContextId });
       return false;
     }
   }, [existingInspectionId]);
@@ -334,16 +341,20 @@ function NewHgvInspectionContent() {
       }
       const merged = await mergeIntoExistingDraft(existingInspectionId, { showToast: false });
       if (!merged && !silent) {
-        toast.error('Could not auto-save draft. Please try again.');
+        toast.error('Could not auto-save draft. Please try again.', { id: 'hgv-inspections-new-autosave-draft-error' });
       }
       return merged ? existingInspectionId : null;
     }
     if (!user || !selectedEmployeeId || !hgvId) {
-      if (!silent) toast.error('Select an HGV, employee and date before adding photos');
+      if (!silent) toast.error('Select an HGV, employee and date before adding photos', {
+        id: 'hgv-inspections-new-validation-photos-core-fields',
+      });
       return null;
     }
     if (!inspectionDate) {
-      if (!silent) toast.error('Select an inspection date before adding photos');
+      if (!silent) toast.error('Select an inspection date before adding photos', {
+        id: 'hgv-inspections-new-validation-photos-date-required',
+      });
       return null;
     }
 
@@ -417,9 +428,10 @@ function NewHgvInspectionContent() {
       window.history.replaceState(null, '', `/hgv-inspections/new?id=${draft.id}`);
       return draft.id;
     } catch (err) {
-      console.error('Silent draft save failed:', err);
+      const errorContextId = 'hgv-inspections-new-silent-draft-save-error';
+      console.error('Silent draft save failed:', err, { errorContextId });
       if (!silent) {
-        toast.error('Could not auto-save draft. Please try again.');
+        toast.error('Could not auto-save draft. Please try again.', { id: errorContextId });
       }
       return null;
     } finally {
@@ -492,8 +504,9 @@ function NewHgvInspectionContent() {
         await loadLockedDefects(draft.hgv_id, 'merge');
       }
     } catch (err) {
-      console.error('Error loading HGV draft:', err);
-      toast.error('Failed to load draft inspection');
+      const errorContextId = 'hgv-inspections-new-load-draft-error';
+      console.error('Error loading HGV draft:', err, { errorContextId });
+      toast.error('Failed to load draft inspection', { id: errorContextId });
     } finally {
       isDraftHydratedRef.current = true;
       setLoading(false);
@@ -999,8 +1012,10 @@ function NewHgvInspectionContent() {
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to save inspection';
+      const errorContextId = 'hgv-inspections-new-save-inspection-error';
+      console.error('Error saving HGV inspection:', err, { errorContextId });
       setError(message);
-      toast.error(message);
+      toast.error(message, { id: errorContextId });
     } finally {
       saveInspectionInFlightRef.current = false;
       setLoading(false);

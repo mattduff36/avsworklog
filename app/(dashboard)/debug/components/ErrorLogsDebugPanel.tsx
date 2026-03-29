@@ -31,6 +31,88 @@ type ErrorSeverity = 'urgent' | 'important' | 'medium' | 'low';
 
 const UNHANDLED_COMPONENTS = ['Global Error Handler', 'Unhandled Promise Rejection', 'Error Boundary'];
 
+interface UserFacingMessageSnapshot {
+  title: string | null;
+  description: string | null;
+  combined: string;
+}
+
+interface ErrorClassificationSnapshot {
+  category: string;
+  confidence: string;
+  reason: string;
+}
+
+interface UserActionSnapshot {
+  actionType: string;
+  label: string | null;
+  element: string | null;
+  href: string | null;
+  pageUrl: string | null;
+  timestamp: string | null;
+  ageMs: number | null;
+}
+
+function getUserFacingMessage(log: ErrorLogEntry): UserFacingMessageSnapshot | null {
+  const additionalData = (log.additional_data as Record<string, unknown> | null) || null;
+  if (!additionalData) return null;
+
+  const errorHandling = (additionalData.errorHandling as Record<string, unknown> | undefined) || undefined;
+  const directMessage = typeof additionalData.userMessage === 'string' ? additionalData.userMessage : null;
+  const directTitle = typeof additionalData.userMessageTitle === 'string' ? additionalData.userMessageTitle : null;
+  const directDescription = typeof additionalData.userMessageDescription === 'string' ? additionalData.userMessageDescription : null;
+
+  const handlingMessage = typeof errorHandling?.userMessage === 'string' ? errorHandling.userMessage : null;
+  const handlingTitle = typeof errorHandling?.userMessageTitle === 'string' ? errorHandling.userMessageTitle : null;
+  const handlingDescription =
+    typeof errorHandling?.userMessageDescription === 'string' ? errorHandling.userMessageDescription : null;
+
+  const title = directTitle || handlingTitle;
+  const description = directDescription || handlingDescription;
+  const combined = directMessage || handlingMessage || (title && description ? `${title} - ${description}` : title);
+
+  if (!combined) return null;
+  return { title: title || null, description: description || null, combined };
+}
+
+function getErrorClassification(log: ErrorLogEntry): ErrorClassificationSnapshot | null {
+  const additionalData = (log.additional_data as Record<string, unknown> | null) || null;
+  if (!additionalData || typeof additionalData.errorClassification !== 'object') return null;
+
+  const classification = additionalData.errorClassification as Record<string, unknown>;
+  const category = typeof classification.category === 'string' ? classification.category : null;
+  if (!category) return null;
+
+  return {
+    category,
+    confidence: typeof classification.confidence === 'string' ? classification.confidence : 'unknown',
+    reason: typeof classification.reason === 'string' ? classification.reason : '',
+  };
+}
+
+function getUserAction(log: ErrorLogEntry): UserActionSnapshot | null {
+  const additionalData = (log.additional_data as Record<string, unknown> | null) || null;
+  if (!additionalData || typeof additionalData.userAction !== 'object') return null;
+
+  const action = additionalData.userAction as Record<string, unknown>;
+  const actionType = typeof action.actionType === 'string' ? action.actionType : 'unknown';
+  const label = typeof action.label === 'string' ? action.label : null;
+  const element = typeof action.element === 'string' ? action.element : null;
+  const href = typeof action.href === 'string' ? action.href : null;
+  const pageUrl = typeof action.pageUrl === 'string' ? action.pageUrl : null;
+  const timestamp = typeof action.timestamp === 'string' ? action.timestamp : null;
+  const ageMs = typeof action.ageMs === 'number' ? action.ageMs : null;
+
+  return { actionType, label, element, href, pageUrl, timestamp, ageMs };
+}
+
+function formatCategoryLabel(category: string): string {
+  if (category === 'user_error_expected') return 'Expected User Error';
+  if (category === 'codebase_error') return 'Codebase Error';
+  if (category === 'connection_error') return 'Connection Error';
+  return 'Other';
+}
+
 function getErrorSeverity(log: ErrorLogEntry): ErrorSeverity {
   const handling = (log.additional_data as Record<string, unknown> | null)?.errorHandling as
     | { wasHandled?: boolean; didShowMessage?: boolean | null }
@@ -256,6 +338,14 @@ export function ErrorLogsDebugPanel({ supabase }: ErrorLogsDebugPanelProps) {
     const isMobile = log.user_agent.includes('Mobile') || log.user_agent.includes('iPhone') || log.user_agent.includes('Android');
     const browserMatch = log.user_agent.match(/(Chrome|Safari|Firefox|Edge)\/[\d.]+/);
     const browser = browserMatch ? browserMatch[0] : 'Unknown';
+    const userFacingMessage = getUserFacingMessage(log);
+    const classification = getErrorClassification(log);
+    const userAction = getUserAction(log);
+    const userActionSummary = userAction
+      ? `${userAction.actionType}${userAction.label ? ` | ${userAction.label}` : ''}${userAction.element ? ` | ${userAction.element}` : ''}${
+          userAction.ageMs !== null ? ` | ${Math.round(userAction.ageMs)}ms before error` : ''
+        }`
+      : null;
 
     const content = `ERROR LOG ENTRY
 =================
@@ -271,6 +361,9 @@ ${log.error_message}
 TIMESTAMP: ${new Date(log.timestamp).toLocaleString('en-GB')}
 USER: ${log.user_name && log.user_email ? `${log.user_name} (${log.user_email})` : log.user_name || log.user_email || 'Anonymous'}
 PAGE URL: ${log.page_url}
+${classification ? `ERROR CLASSIFICATION:\n${formatCategoryLabel(classification.category)} (${classification.confidence})${classification.reason ? ` - ${classification.reason}` : ''}\n` : ''}
+${userActionSummary ? `USER ACTION BEFORE ERROR:\n${userActionSummary}\n` : ''}
+${userFacingMessage ? `USER MESSAGE SHOWN:\n${userFacingMessage.combined}\n` : ''}
 
 ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional_data ? `ADDITIONAL DATA:\n${JSON.stringify(log.additional_data, null, 2)}` : ''}`;
 
@@ -558,6 +651,9 @@ ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional
                           const isExpanded = expandedErrors.includes(log.id);
                           const severity = getErrorSeverity(log);
                           const badgeProps = getErrorBadgeProps(severity);
+                          const classification = getErrorClassification(log);
+                          const userAction = getUserAction(log);
+                          const userFacingMessage = getUserFacingMessage(log);
 
                           return (
                             <div
@@ -580,6 +676,11 @@ ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional
                                       <Badge variant={badgeProps.variant} className={badgeProps.className}>
                                         {log.error_type}
                                       </Badge>
+                                      {classification && (
+                                        <Badge variant="outline" className="text-xs">
+                                          {formatCategoryLabel(classification.category)}
+                                        </Badge>
+                                      )}
                                       {log.component_name && (
                                         <Badge variant="outline" className="text-xs">
                                           {log.component_name}
@@ -651,6 +752,37 @@ ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional
                                     </div>
                                   )}
 
+                                  {classification && (
+                                    <div>
+                                      <p className="text-xs font-semibold text-muted-foreground mb-1">ERROR CLASSIFICATION:</p>
+                                      <p className="text-xs font-mono bg-muted/50 rounded p-2 whitespace-pre-wrap break-words">
+                                        {formatCategoryLabel(classification.category)} ({classification.confidence})
+                                        {classification.reason ? ` - ${classification.reason}` : ''}
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {userAction && (
+                                    <div>
+                                      <p className="text-xs font-semibold text-muted-foreground mb-1">USER ACTION BEFORE ERROR:</p>
+                                      <p className="text-xs font-mono bg-muted/50 rounded p-2 whitespace-pre-wrap break-words">
+                                        {userAction.actionType}
+                                        {userAction.label ? ` | ${userAction.label}` : ''}
+                                        {userAction.element ? ` | ${userAction.element}` : ''}
+                                        {userAction.ageMs !== null ? ` | ${Math.round(userAction.ageMs)}ms before error` : ''}
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {userFacingMessage && (
+                                    <div>
+                                      <p className="text-xs font-semibold text-muted-foreground mb-1">USER MESSAGE SHOWN:</p>
+                                      <p className="text-xs font-mono bg-muted/50 rounded p-2 whitespace-pre-wrap break-words">
+                                        {userFacingMessage.combined}
+                                      </p>
+                                    </div>
+                                  )}
+
                                   {log.additional_data && (
                                     <div>
                                       <p className="text-xs font-semibold text-muted-foreground mb-1">ADDITIONAL DATA:</p>
@@ -686,6 +818,9 @@ ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional
                           const isExpanded = expandedErrors.includes(log.id);
                           const severity = getErrorSeverity(log);
                           const badgeProps = getErrorBadgeProps(severity);
+                          const classification = getErrorClassification(log);
+                          const userAction = getUserAction(log);
+                          const userFacingMessage = getUserFacingMessage(log);
 
                           return (
                             <div
@@ -708,6 +843,11 @@ ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional
                                       <Badge variant={badgeProps.variant} className={badgeProps.className}>
                                         {log.error_type}
                                       </Badge>
+                                      {classification && (
+                                        <Badge variant="outline" className="text-xs">
+                                          {formatCategoryLabel(classification.category)}
+                                        </Badge>
+                                      )}
                                       {log.component_name && (
                                         <Badge variant="outline" className="text-xs">
                                           {log.component_name}
@@ -776,6 +916,37 @@ ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional
                                       <pre className="text-xs font-mono bg-red-500/10 border border-red-500/20 rounded p-3 overflow-x-auto whitespace-pre-wrap break-all max-h-64 overflow-y-auto">
                                         {log.error_stack}
                                       </pre>
+                                    </div>
+                                  )}
+
+                                  {classification && (
+                                    <div>
+                                      <p className="text-xs font-semibold text-muted-foreground mb-1">ERROR CLASSIFICATION:</p>
+                                      <p className="text-xs font-mono bg-muted/50 rounded p-2 whitespace-pre-wrap break-words">
+                                        {formatCategoryLabel(classification.category)} ({classification.confidence})
+                                        {classification.reason ? ` - ${classification.reason}` : ''}
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {userAction && (
+                                    <div>
+                                      <p className="text-xs font-semibold text-muted-foreground mb-1">USER ACTION BEFORE ERROR:</p>
+                                      <p className="text-xs font-mono bg-muted/50 rounded p-2 whitespace-pre-wrap break-words">
+                                        {userAction.actionType}
+                                        {userAction.label ? ` | ${userAction.label}` : ''}
+                                        {userAction.element ? ` | ${userAction.element}` : ''}
+                                        {userAction.ageMs !== null ? ` | ${Math.round(userAction.ageMs)}ms before error` : ''}
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {userFacingMessage && (
+                                    <div>
+                                      <p className="text-xs font-semibold text-muted-foreground mb-1">USER MESSAGE SHOWN:</p>
+                                      <p className="text-xs font-mono bg-muted/50 rounded p-2 whitespace-pre-wrap break-words">
+                                        {userFacingMessage.combined}
+                                      </p>
                                     </div>
                                   )}
 

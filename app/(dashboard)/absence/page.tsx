@@ -366,6 +366,7 @@ export default function AbsencePage() {
 
   async function loadGenerationStatus() {
     setGenerationStatusLoading(true);
+    const errorContextId = 'absence-load-generation-status-error';
     try {
       const response = await fetch('/api/absence/generation/status');
       const payload = (await response.json()) as GenerationStatus & { error?: string };
@@ -374,8 +375,8 @@ export default function AbsencePage() {
       }
       setGenerationStatus(payload);
     } catch (error) {
-      console.error('Error loading absence generation status:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to load booking window');
+      console.error('Error loading absence generation status:', error, { errorContextId });
+      toast.error(error instanceof Error ? error.message : 'Failed to load booking window', { id: errorContextId });
     } finally {
       setGenerationStatusLoading(false);
     }
@@ -488,41 +489,50 @@ export default function AbsencePage() {
     e.preventDefault();
 
     if (!canRequestLeave) {
-      toast.error('You do not have permission to create or edit your own bookings.');
+      toast.error('You do not have permission to create or edit your own bookings.', {
+        id: 'absence-submit-validation-permission-denied',
+      });
       return;
     }
     
     if (!selectedReasonId || !selectedReason) {
-      toast.error('Please select an absence reason');
+      toast.error('Please select an absence reason', { id: 'absence-submit-validation-reason-required' });
       return;
     }
     
     if (!startDate) {
-      toast.error('Please select a start date');
+      toast.error('Please select a start date', { id: 'absence-submit-validation-start-date-required' });
       return;
     }
 
     if (startDate > bookingMaxDate || (endDate && endDate > bookingMaxDate)) {
-      toast.error(`Leave can only be booked up to ${formatDate(bookingMaxDate)}.`);
+      toast.error(`Leave can only be booked up to ${formatDate(bookingMaxDate)}.`, {
+        id: 'absence-submit-validation-max-booking-window',
+      });
       return;
     }
 
     if (isClosedFinancialYearRequest(startDate) || (endDate && isClosedFinancialYearRequest(endDate))) {
-      toast.error('This financial year is closed for bookings.');
+      toast.error('This financial year is closed for bookings.', {
+        id: 'absence-submit-validation-financial-year-closed',
+      });
       return;
     }
     
     if (requestedDays <= 0) {
-      toast.error('Selected dates do not include a working day');
+      toast.error('Selected dates do not include a working day', {
+        id: 'absence-submit-validation-no-working-days',
+      });
       return;
     }
 
     if (deductsAllowance && projectedRemaining < ANNUAL_LEAVE_MIN_REMAINING_DAYS) {
-      toast.error('Insufficient annual leave allowance');
+      toast.error('Insufficient annual leave allowance', { id: 'absence-submit-validation-insufficient-allowance' });
       return;
     }
     
     setSubmitting(true);
+    const errorContextId = 'absence-submit-request-error';
     
     try {
       await createAbsence.mutateAsync({
@@ -551,9 +561,9 @@ export default function AbsencePage() {
     } catch (error) {
       const message = getErrorMessage(error, 'Failed to submit request');
       if (!isExpectedAbsenceSubmissionError(message)) {
-        console.error('Error submitting request:', error);
+        console.error('Error submitting request:', error, { errorContextId });
       }
-      toast.error(message);
+      toast.error(message, { id: errorContextId });
     } finally {
       setSubmitting(false);
     }
@@ -568,16 +578,22 @@ export default function AbsencePage() {
   // Handle request from day modal
   function handleRequestFromDay() {
     if (!canRequestLeave) {
-      toast.error('You do not have permission to create or edit your own bookings.');
+      toast.error('You do not have permission to create or edit your own bookings.', {
+        id: 'absence-day-request-validation-permission-denied',
+      });
       return;
     }
     if (selectedDate) {
       if (formatDateISO(selectedDate) > bookingMaxDate) {
-        toast.error(`Leave can only be booked up to ${formatDate(bookingMaxDate)}.`);
+        toast.error(`Leave can only be booked up to ${formatDate(bookingMaxDate)}.`, {
+          id: 'absence-day-request-validation-max-booking-window',
+        });
         return;
       }
       if (isClosedFinancialYearRequest(formatDateISO(selectedDate))) {
-        toast.error('This financial year is closed for bookings.');
+        toast.error('This financial year is closed for bookings.', {
+          id: 'absence-day-request-validation-financial-year-closed',
+        });
         return;
       }
       setStartDate(formatDateISO(selectedDate));
@@ -597,6 +613,7 @@ export default function AbsencePage() {
 
   async function confirmCancelAbsence() {
     if (!cancelTargetId) return;
+    const cancelErrorContextId = 'absence-cancel-error';
     setCancelSubmitting(true);
     try {
       await cancelAbsence.mutateAsync(cancelTargetId);
@@ -604,8 +621,8 @@ export default function AbsencePage() {
       setShowCancelDialog(false);
       setCancelTargetId(null);
     } catch (error) {
-      console.error('Error cancelling:', error);
-      toast.error('Failed to cancel absence');
+      console.error('Error cancelling:', error, { errorContextId: cancelErrorContextId });
+      toast.error('Failed to cancel absence', { id: cancelErrorContextId });
     } finally {
       setCancelSubmitting(false);
     }
