@@ -435,6 +435,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
     return (
       <div className="hidden md:block fixed bottom-4 left-4 z-[70]">
         <Button
+          ref={viewAsTriggerRef}
           variant="ghost"
           size="icon"
           className={`h-10 w-10 ${
@@ -447,6 +448,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
         </Button>
         {viewAsMenuOpen && (
           <div
+            ref={viewAsMenuRef}
             className="fixed z-[80] w-64 p-2 bg-slate-900 border border-slate-700 shadow-2xl overflow-y-auto rounded-md"
             style={{
               left: 60,
