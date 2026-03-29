@@ -448,10 +448,13 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
             </Button>
           </PopoverTrigger>
           <PopoverContent
-            side="top"
-            align="start"
+            side="right"
+            align="end"
             sideOffset={8}
-            className="w-64 p-2 bg-slate-900 border border-slate-700 shadow-2xl max-h-[70vh] overflow-y-auto"
+            avoidCollisions
+            sticky="always"
+            collisionPadding={12}
+            className="w-64 p-2 bg-slate-900 border border-slate-700 shadow-2xl max-h-[calc(100vh-24px)] overflow-y-auto"
             style={{ color: '#e2e8f0' }}
           >
             {viewAsPopoverContent}
