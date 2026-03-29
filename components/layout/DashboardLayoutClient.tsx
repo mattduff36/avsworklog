@@ -33,7 +33,7 @@ function DashboardLayoutShell({
   const searchParams = useSearchParams();
   const { tabletModeEnabled, tabletModeInfoOpen, dismissTabletModeInfo } = useTabletMode();
   const lastTrackedPathRef = useRef<string>('');
-  const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const heartbeatIntervalRef = useRef<number | null>(null);
   
   const getCurrentTrackedPath = useCallback(() => {
     if (!pathname) return '';
