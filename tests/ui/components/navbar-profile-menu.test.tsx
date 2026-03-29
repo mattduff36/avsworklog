@@ -5,6 +5,16 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { Navbar } from '@/components/layout/Navbar';
 
+const authMockState = {
+  user: { id: 'user-1' },
+  profile: { id: 'user-1', full_name: 'Test User' },
+  signOut: vi.fn(async () => ({ error: null })),
+  isAdmin: false,
+  isManager: false,
+  isActualSuperAdmin: false,
+  isViewingAs: false,
+};
+
 vi.mock('next/link', () => ({
   default: ({ children, href, ...props }: { children: ReactNode; href: string }) => (
     <a href={href} {...props}>
@@ -27,15 +37,7 @@ vi.mock('@/lib/supabase/client', () => ({
 }));
 
 vi.mock('@/lib/hooks/useAuth', () => ({
-  useAuth: () => ({
-    user: { id: 'user-1' },
-    profile: { id: 'user-1', full_name: 'Test User' },
-    signOut: vi.fn(async () => ({ error: null })),
-    isAdmin: false,
-    isManager: false,
-    isActualSuperAdmin: false,
-    isViewingAs: false,
-  }),
+  useAuth: () => authMockState,
 }));
 
 vi.mock('@/lib/hooks/usePermissionSnapshot', () => ({
@@ -72,16 +74,52 @@ vi.mock('@/components/messages/NotificationPanel', () => ({
 describe('Navbar desktop burger menu', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.assign(authMockState, {
+      user: { id: 'user-1' },
+      profile: { id: 'user-1', full_name: 'Test User' },
+      isAdmin: false,
+      isManager: false,
+      isActualSuperAdmin: false,
+      isViewingAs: false,
+    });
+
     // @ts-expect-error - tests provide a lightweight ResizeObserver mock.
     global.ResizeObserver = class {
       observe() {}
       disconnect() {}
     };
-    global.fetch = vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      json: async () => ({ success: true, unread_count: 2 }),
-    })) as unknown as typeof fetch;
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+
+      if (url.includes('/api/superadmin/active-users')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            success: true,
+            activeWindowMinutes: 5,
+            generatedAt: '2026-03-30T12:00:00.000Z',
+            activeNowUsers: [],
+            recentUsers: [
+              {
+                userId: 'u1',
+                fullName: 'User One',
+                lastVisitedAt: '2026-03-30T11:59:00.000Z',
+                path: '/dashboard',
+                roleDisplayName: 'Admin',
+                teamName: 'HQ',
+              },
+            ],
+          }),
+        } as Response;
+      }
+
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true, unread_count: 2 }),
+      } as Response;
+    }) as unknown as typeof fetch;
   });
 
   it('renders expected desktop burger actions and opens notifications panel', async () => {
@@ -106,6 +144,48 @@ describe('Navbar desktop burger menu', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('notification-panel-open')).toBeInTheDocument();
+    });
+  });
+
+  it('shows mobile Active Now for superadmin and opens dialog', async () => {
+    Object.assign(authMockState, {
+      isActualSuperAdmin: true,
+      isViewingAs: false,
+    });
+
+    const { container } = render(<Navbar />);
+    const mobileMenuButton = container.querySelector('button.md\\:hidden');
+    expect(mobileMenuButton).toBeTruthy();
+
+    fireEvent.click(mobileMenuButton as HTMLButtonElement);
+
+    await waitFor(() => {
+      expect(screen.getByText('Active Now')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Active Now'));
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Active Now').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText(/users active within the last/i)).toBeInTheDocument();
+    });
+  });
+
+  it('hides mobile developer links when viewing as another role', async () => {
+    Object.assign(authMockState, {
+      isActualSuperAdmin: true,
+      isViewingAs: true,
+    });
+
+    const { container } = render(<Navbar />);
+    const mobileMenuButton = container.querySelector('button.md\\:hidden');
+    expect(mobileMenuButton).toBeTruthy();
+
+    fireEvent.click(mobileMenuButton as HTMLButtonElement);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Debug Console')).not.toBeInTheDocument();
+      expect(screen.queryByText('Active Now')).not.toBeInTheDocument();
     });
   });
 });

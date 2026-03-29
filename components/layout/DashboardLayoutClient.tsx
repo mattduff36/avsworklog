@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useSearchParams } from 'next/navigation';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { Navbar } from '@/components/layout/Navbar';
 import { DashboardContent } from '@/components/layout/DashboardContent';
 import { MessageBlockingCheck } from '@/components/messages/MessageBlockingCheck';
@@ -33,32 +33,80 @@ function DashboardLayoutShell({
   const searchParams = useSearchParams();
   const { tabletModeEnabled, tabletModeInfoOpen, dismissTabletModeInfo } = useTabletMode();
   const lastTrackedPathRef = useRef<string>('');
+  const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  
+  const getCurrentTrackedPath = useCallback(() => {
+    if (!pathname) return '';
+    const query = searchParams?.toString() || '';
+    return query ? `${pathname}?${query}` : pathname;
+  }, [pathname, searchParams]);
+
+  const trackPageVisit = useCallback((path: string) => {
+    if (!path) return;
+    fetch('/api/me/page-visits', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path }),
+    }).catch(() => {
+      // Avoid noisy console logs for non-critical tracking telemetry.
+    });
+  }, []);
   
   // Determine the accent color based on current route
   const accent = getAccentFromRoute(pathname, searchParams);
 
   useEffect(() => {
-    if (!pathname) return;
-
-    const query = searchParams?.toString() || '';
-    const nextPath = query ? `${pathname}?${query}` : pathname;
+    const nextPath = getCurrentTrackedPath();
+    if (!nextPath) return;
     if (lastTrackedPathRef.current === nextPath) return;
     lastTrackedPathRef.current = nextPath;
 
     const timer = window.setTimeout(() => {
-      fetch('/api/me/page-visits', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: nextPath }),
-      }).catch(() => {
-        // Avoid noisy console logs for non-critical tracking telemetry.
-      });
+      trackPageVisit(nextPath);
     }, 250);
 
     return () => {
       window.clearTimeout(timer);
     };
-  }, [pathname, searchParams]);
+  }, [getCurrentTrackedPath, trackPageVisit]);
+
+  useEffect(() => {
+    const stopHeartbeat = () => {
+      if (!heartbeatIntervalRef.current) return;
+      window.clearInterval(heartbeatIntervalRef.current);
+      heartbeatIntervalRef.current = null;
+    };
+
+    const sendHeartbeat = () => {
+      if (document.hidden) return;
+      const currentPath = getCurrentTrackedPath();
+      if (!currentPath) return;
+      trackPageVisit(currentPath);
+    };
+
+    const startHeartbeat = () => {
+      stopHeartbeat();
+      if (document.hidden) return;
+      heartbeatIntervalRef.current = window.setInterval(sendHeartbeat, 60_000);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        stopHeartbeat();
+        return;
+      }
+      sendHeartbeat();
+      startHeartbeat();
+    };
+
+    startHeartbeat();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      stopHeartbeat();
+    };
+  }, [getCurrentTrackedPath, trackPageVisit]);
 
   return (
     <div 

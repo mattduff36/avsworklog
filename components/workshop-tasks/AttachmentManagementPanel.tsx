@@ -34,6 +34,20 @@ interface AttachmentManagementPanelProps {
   taxonomyMode?: 'van' | 'plant' | 'hgv';
 }
 
+function normalizeTemplateAppliesTo(rawValues?: string[] | null): string[] {
+  // Legacy rows stored "vehicle", which now maps to "van".
+  const normalized = (rawValues || [])
+    .map((value) => value.trim().toLowerCase())
+    .map((value) => (value === 'vehicle' ? 'van' : value))
+    .filter(Boolean);
+
+  if (normalized.length === 0) {
+    return ['van', 'hgv', 'plant'];
+  }
+
+  return Array.from(new Set(normalized));
+}
+
 export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagementPanelProps) {
   const { tabletModeEnabled } = useTabletMode();
   const supabase = createClient();
@@ -109,7 +123,9 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
 
   // Filter templates by taxonomy mode if provided
   const filteredTemplates = taxonomyMode 
-    ? templates.filter(t => (t.applies_to || ['van', 'hgv', 'plant']).includes(taxonomyMode))
+    ? templates.filter((template) =>
+        normalizeTemplateAppliesTo(template.applies_to).includes(taxonomyMode)
+      )
     : templates;
 
   // Auto-select first template (from filtered templates)
@@ -131,7 +147,7 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
     const defaultName = editingTemplate?.name ?? '';
     const defaultDescription = editingTemplate?.description ?? '';
     const defaultActive = editingTemplate?.is_active ?? true;
-    const defaultAppliesTo = editingTemplate?.applies_to || ['van', 'hgv', 'plant'];
+    const defaultAppliesTo = normalizeTemplateAppliesTo(editingTemplate?.applies_to);
     return (
       templateName.trim() !== defaultName.trim() ||
       templateDescription.trim() !== defaultDescription.trim() ||
@@ -181,7 +197,7 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
     setTemplateName(template.name);
     setTemplateDescription(template.description || '');
     setTemplateActive(template.is_active);
-    const appliesTo = template.applies_to || ['van', 'hgv', 'plant'];
+    const appliesTo = normalizeTemplateAppliesTo(template.applies_to);
     setTemplateAppliesToVehicle(appliesTo.includes('van'));
     setTemplateAppliesToHgv(appliesTo.includes('hgv'));
     setTemplateAppliesToPlant(appliesTo.includes('plant'));

@@ -4,7 +4,15 @@ import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { 
+  Activity,
   Menu, 
   X, 
   LogOut,
@@ -18,6 +26,7 @@ import { useState, useEffect, useRef } from 'react';
 import { NotificationPanel } from '@/components/messages/NotificationPanel';
 import { TabletModeToggleActions } from '@/components/layout/TabletModeToggleActions';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
+import { ActiveNowUsersPanel } from '@/components/layout/ActiveNowUsersPanel';
 import { SidebarNav } from './SidebarNav';
 import { createClient } from '@/lib/supabase/client';
 import { usePermissionSnapshot } from '@/lib/hooks/usePermissionSnapshot';
@@ -113,6 +122,7 @@ export function Navbar() {
   const [isMounted, setIsMounted] = useState(false); // Track client hydration
   const [isCompact, setIsCompact] = useState(false);
   const [desktopMenuOpen, setDesktopMenuOpen] = useState(false);
+  const [activeNowDialogOpen, setActiveNowDialogOpen] = useState(false);
   const [desktopMenuPosition, setDesktopMenuPosition] = useState({ left: 0, top: 0, maxHeight: 320 });
   const navRef = useRef<HTMLDivElement>(null);
   const isCompactRef = useRef(false);
@@ -143,6 +153,7 @@ export function Navbar() {
     setSidebarOpen(false);
     setNotificationPanelOpen(false);
     setDesktopMenuOpen(false);
+    setActiveNowDialogOpen(false);
   }, [tabletModeEnabled]);
 
   const updateDesktopMenuPosition = () => {
@@ -701,6 +712,18 @@ export function Navbar() {
 
                 {hasMobileDeveloperLinks ? (
                   <div className="space-y-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        setActiveNowDialogOpen(true);
+                      }}
+                      className="flex w-full items-center px-3 py-2 text-lg font-medium rounded-md text-red-500 hover:bg-slate-800/50 hover:text-red-400"
+                    >
+                      <Activity className="w-6 h-6 mr-3" />
+                      Active Now
+                    </button>
+
                     <Link
                       href="/debug"
                       onClick={() => setMobileMenuOpen(false)}
@@ -747,6 +770,22 @@ export function Navbar() {
                 .catch(console.error);
             }}
           />
+        )}
+
+        {!tabletModeEnabled && (
+          <Dialog open={activeNowDialogOpen} onOpenChange={setActiveNowDialogOpen}>
+            <DialogContent className="border-slate-700 bg-slate-900 text-white max-w-xl max-h-[85vh] overflow-hidden flex flex-col p-0">
+              <DialogHeader className="px-5 pt-5">
+                <DialogTitle>Active Now</DialogTitle>
+                <DialogDescription className="text-slate-400">
+                  Superadmin visibility for currently active and recently active users.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="overflow-y-auto px-3 pb-4">
+                <ActiveNowUsersPanel open={activeNowDialogOpen} />
+              </div>
+            </DialogContent>
+          </Dialog>
         )}
       </nav>
     </>

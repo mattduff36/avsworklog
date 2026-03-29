@@ -5,7 +5,9 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger } from '@/components/ui/popover';
+import { ActiveNowUsersPanel } from '@/components/layout/ActiveNowUsersPanel';
 import {
+  Activity,
   PanelLeftClose,
   Bug,
   Eye,
@@ -61,9 +63,13 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   const [viewAsMenuOpen, setViewAsMenuOpen] = useState(false);
   const [hoverExpanded, setHoverExpanded] = useState(false);
   const [viewAsMenuPosition, setViewAsMenuPosition] = useState({ left: 12, top: 12, maxHeight: 320 });
+  const [activeUsersPanelOpen, setActiveUsersPanelOpen] = useState(false);
+  const [activeUsersPanelPosition, setActiveUsersPanelPosition] = useState({ left: 12, top: 12, maxHeight: 320 });
   const sidebarRef = useRef<HTMLDivElement | null>(null);
   const viewAsTriggerRef = useRef<HTMLButtonElement | null>(null);
   const viewAsMenuRef = useRef<HTMLDivElement | null>(null);
+  const activeUsersTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const activeUsersPanelRef = useRef<HTMLDivElement | null>(null);
   const hoverExpandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { enabledModuleSet: userPermissions } = usePermissionSnapshot();
   const { count: pendingAbsenceCount } = usePendingAbsenceCount(isManager || isAdmin);
@@ -81,7 +87,8 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
 
     return Boolean(
       sidebarRef.current?.contains(target) ||
-      viewAsMenuRef.current?.contains(target)
+      viewAsMenuRef.current?.contains(target) ||
+      activeUsersPanelRef.current?.contains(target)
     );
   }, []);
 
@@ -100,6 +107,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
 
     setHoverExpanded(false);
     setViewAsMenuOpen(false);
+    setActiveUsersPanelOpen(false);
   }, [clearHoverExpandTimer, isInsideSidebarHoverZone, open]);
 
   const handleViewAsMenuMouseLeave = useCallback((relatedTarget: EventTarget | null) => {
@@ -108,12 +116,14 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
     clearHoverExpandTimer();
     setHoverExpanded(false);
     setViewAsMenuOpen(false);
+    setActiveUsersPanelOpen(false);
   }, [isInsideSidebarHoverZone, open, clearHoverExpandTimer]);
 
   const handleNavLinkClick = useCallback(() => {
     clearHoverExpandTimer();
     setHoverExpanded(false);
     setViewAsMenuOpen(false);
+    setActiveUsersPanelOpen(false);
   }, [clearHoverExpandTimer]);
 
   const handleBackdropClick = useCallback(() => {
@@ -125,6 +135,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
     clearHoverExpandTimer();
     setHoverExpanded(false);
     setViewAsMenuOpen(false);
+    setActiveUsersPanelOpen(false);
   }, [open, onToggle, clearHoverExpandTimer]);
 
   // Fetch user email, all roles, and current view-as selection
@@ -183,6 +194,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
     if (prevPathnameRef.current !== pathname) {
       prevPathnameRef.current = pathname;
       setViewAsMenuOpen(false);
+      setActiveUsersPanelOpen(false);
       clearHoverExpandTimer();
       setHoverExpanded(false);
     }
@@ -212,6 +224,31 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
       document.removeEventListener('keydown', handleEscape);
     };
   }, [viewAsMenuOpen]);
+
+  useEffect(() => {
+    if (!activeUsersPanelOpen) return;
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target as Node;
+      if (activeUsersTriggerRef.current?.contains(target) || activeUsersPanelRef.current?.contains(target)) {
+        return;
+      }
+      setActiveUsersPanelOpen(false);
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setActiveUsersPanelOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [activeUsersPanelOpen]);
 
   const updateViewAsMenuPosition = useCallback(() => {
     const triggerRect = viewAsTriggerRef.current?.getBoundingClientRect();
@@ -243,6 +280,36 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
     });
   }, [isExpanded]);
 
+  const updateActiveUsersPanelPosition = useCallback(() => {
+    const triggerRect = activeUsersTriggerRef.current?.getBoundingClientRect();
+    if (!triggerRect) return;
+
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const panelWidth = 352; // matches w-[22rem]
+    const margin = 12;
+    const preferredLeft = Math.round(triggerRect.right + (isExpanded ? 16 : 12));
+    const maxLeft = Math.max(margin, viewportWidth - panelWidth - margin);
+    const clampedLeft = Math.min(Math.max(margin, preferredLeft), maxLeft);
+    const spaceBelow = viewportHeight - triggerRect.bottom - margin;
+    const spaceAbove = triggerRect.top - margin;
+    const openUpwards = spaceBelow < 280 && spaceAbove > spaceBelow;
+    const fallbackAvailable = viewportHeight - margin * 2;
+    const targetAvailable = openUpwards ? spaceAbove : spaceBelow;
+    const maxHeight = Math.max(220, Math.min(fallbackAvailable, Math.floor(targetAvailable - 8)));
+    const preferredTop = openUpwards
+      ? Math.round(triggerRect.top - maxHeight - 8)
+      : Math.round(triggerRect.bottom + 8);
+    const maxTop = Math.max(margin, viewportHeight - maxHeight - margin);
+    const clampedTop = Math.min(Math.max(margin, preferredTop), maxTop);
+
+    setActiveUsersPanelPosition({
+      left: clampedLeft,
+      top: clampedTop,
+      maxHeight,
+    });
+  }, [isExpanded]);
+
   useEffect(() => {
     if (!viewAsMenuOpen) return;
 
@@ -260,9 +327,31 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
     };
   }, [viewAsMenuOpen, isExpanded, updateViewAsMenuPosition]);
 
+  useEffect(() => {
+    if (!activeUsersPanelOpen) return;
+
+    updateActiveUsersPanelPosition();
+
+    function syncPosition() {
+      updateActiveUsersPanelPosition();
+    }
+
+    window.addEventListener('resize', syncPosition);
+    window.addEventListener('scroll', syncPosition, true);
+    return () => {
+      window.removeEventListener('resize', syncPosition);
+      window.removeEventListener('scroll', syncPosition, true);
+    };
+  }, [activeUsersPanelOpen, isExpanded, updateActiveUsersPanelPosition]);
+
   const isSuperAdmin = isActualSuperAdmin;
   const isViewingAsOverride = isSuperAdmin && (viewAsRoleId !== '' || viewAsTeamId !== '');
   const showDeveloperTools = isSuperAdmin && !isViewingAsOverride;
+
+  useEffect(() => {
+    if (showDeveloperTools) return;
+    setActiveUsersPanelOpen(false);
+  }, [showDeveloperTools]);
 
   if (tabletModeEnabled) return null;
 
@@ -462,6 +551,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
             if (nextOpen) {
               requestAnimationFrame(() => updateViewAsMenuPosition());
             }
+            setActiveUsersPanelOpen(false);
             setViewAsMenuOpen(nextOpen);
           }}
         >
@@ -620,6 +710,32 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                 Developer
               </div>
               <div className="space-y-1">
+                <button
+                  ref={activeUsersTriggerRef}
+                  type="button"
+                  title={!isExpanded ? 'Active Now' : undefined}
+                  onClick={() => {
+                    const nextOpen = !activeUsersPanelOpen;
+                    if (nextOpen) {
+                      requestAnimationFrame(() => updateActiveUsersPanelPosition());
+                    }
+                    setViewAsMenuOpen(false);
+                    setActiveUsersPanelOpen(nextOpen);
+                  }}
+                  className={`flex w-full items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    activeUsersPanelOpen
+                      ? 'bg-red-600/20 text-red-300'
+                      : 'text-red-500 hover:bg-slate-800 hover:text-red-400'
+                  }`}
+                >
+                  <Activity className="w-4 h-4 flex-shrink-0" />
+                  <span className={`min-w-0 transition-opacity duration-200 whitespace-nowrap ${
+                    isExpanded ? 'opacity-100 delay-300' : 'opacity-0 w-0 overflow-hidden'
+                  }`}>
+                    Active Now
+                  </span>
+                </button>
+
                 <Link
                   href="/debug"
                   title={!isExpanded ? 'Debug Console' : undefined}
@@ -661,6 +777,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                       if (nextOpen) {
                         requestAnimationFrame(() => updateViewAsMenuPosition());
                       }
+                      setActiveUsersPanelOpen(false);
                       setViewAsMenuOpen(nextOpen);
                     }}
                   >
@@ -681,6 +798,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
                       if (nextOpen) {
                         requestAnimationFrame(() => updateViewAsMenuPosition());
                       }
+                      setActiveUsersPanelOpen(false);
                       setViewAsMenuOpen(nextOpen);
                     }}
                   >
@@ -707,6 +825,20 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
           </div>
         )}
       </div>
+      {activeUsersPanelOpen && (
+        <div
+          ref={activeUsersPanelRef}
+          className="fixed z-[80] w-[22rem] max-w-[calc(100vw-1.5rem)] border border-slate-700 bg-slate-900 shadow-2xl overflow-y-auto rounded-md"
+          style={{
+            left: `${activeUsersPanelPosition.left}px`,
+            top: `${activeUsersPanelPosition.top}px`,
+            maxHeight: `${activeUsersPanelPosition.maxHeight}px`,
+          }}
+          onMouseLeave={(event) => handleViewAsMenuMouseLeave(event.relatedTarget)}
+        >
+          <ActiveNowUsersPanel open={activeUsersPanelOpen} />
+        </div>
+      )}
     </>
   );
 }
