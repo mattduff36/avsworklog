@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Popover, PopoverTrigger } from '@/components/ui/popover';
 import {
   PanelLeftClose,
   Bug,
@@ -434,32 +434,30 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
 
     return (
       <div className="hidden md:block fixed bottom-4 left-4 z-[70]">
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className={`h-10 w-10 ${
-                isViewingAsOverride ? 'bg-amber-600/30' : 'hover:bg-slate-800'
-              }`}
-              title={selectedRole || selectedTeam ? `Viewing as ${selectionSummary}` : 'View As'}
-            >
-              <Eye className={`w-5 h-5 ${isViewingAsOverride ? 'text-amber-300' : 'text-slate-400 hover:text-white'}`} />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent
-            side="right"
-            align="end"
-            sideOffset={8}
-            avoidCollisions
-            sticky="always"
-            collisionPadding={12}
-            className="w-64 p-2 bg-slate-900 border border-slate-700 shadow-2xl max-h-[calc(100vh-24px)] overflow-y-auto"
-            style={{ color: '#e2e8f0' }}
+        <Button
+          variant="ghost"
+          size="icon"
+          className={`h-10 w-10 ${
+            isViewingAsOverride ? 'bg-amber-600/30' : 'hover:bg-slate-800'
+          }`}
+          title={selectedRole || selectedTeam ? `Viewing as ${selectionSummary}` : 'View As'}
+          onClick={() => setViewAsMenuOpen((prev) => !prev)}
+        >
+          <Eye className={`w-5 h-5 ${isViewingAsOverride ? 'text-amber-300' : 'text-slate-400 hover:text-white'}`} />
+        </Button>
+        {viewAsMenuOpen && (
+          <div
+            className="fixed z-[80] w-64 p-2 bg-slate-900 border border-slate-700 shadow-2xl overflow-y-auto rounded-md"
+            style={{
+              left: 60,
+              bottom: 16,
+              maxHeight: 'calc(100vh - 32px)',
+              color: '#e2e8f0',
+            }}
           >
             {viewAsPopoverContent}
-          </PopoverContent>
-        </Popover>
+          </div>
+        )}
       </div>
     );
   }
