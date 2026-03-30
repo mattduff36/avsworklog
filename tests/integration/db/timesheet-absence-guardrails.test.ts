@@ -179,6 +179,97 @@ describeSuite('Timesheet absence guardrails — database integration', () => {
     expect((insertedEntry?.remarks || '').toLowerCase()).toBe((annualReason!.name || '').toLowerCase());
   });
 
+  it('keeps working-hour entry when annual leave timesheet-work override is enabled', async () => {
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id')
+      .limit(1)
+      .single();
+
+    expect(profileError).toBeNull();
+    expect(profile?.id).toBeTruthy();
+
+    const { data: annualReason, error: reasonError } = await supabase
+      .from('absence_reasons')
+      .select('id, name')
+      .ilike('name', 'annual leave')
+      .limit(1)
+      .single();
+
+    expect(reasonError).toBeNull();
+    expect(annualReason?.id).toBeTruthy();
+
+    const weekEnding = getUniqueSunday();
+    const dayOfWeek = 1; // Monday
+    const entryDate = getEntryDateFromWeekEnding(weekEnding, dayOfWeek);
+
+    const { data: insertedAbsence, error: absenceError } = await supabase
+      .from('absences')
+      .insert({
+        profile_id: profile!.id,
+        date: entryDate,
+        end_date: null,
+        reason_id: annualReason!.id,
+        duration_days: 1,
+        is_half_day: false,
+        status: 'approved',
+        notes: 'integration-test leave override fixture',
+        allow_timesheet_work_on_leave: true,
+        created_by: profile!.id,
+        approved_by: profile!.id,
+        approved_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single();
+
+    expect(absenceError).toBeNull();
+    expect(insertedAbsence?.id).toBeTruthy();
+    cleanup.absenceIds.push(insertedAbsence!.id);
+
+    const { data: insertedTimesheet, error: timesheetError } = await supabase
+      .from('timesheets')
+      .insert({
+        user_id: profile!.id,
+        week_ending: weekEnding,
+        status: 'draft',
+        timesheet_type: 'civils',
+      })
+      .select('id')
+      .single();
+
+    expect(timesheetError).toBeNull();
+    expect(insertedTimesheet?.id).toBeTruthy();
+    cleanup.timesheetIds.push(insertedTimesheet!.id);
+
+    const { data: insertedEntry, error: entryInsertError } = await supabase
+      .from('timesheet_entries')
+      .insert({
+        timesheet_id: insertedTimesheet!.id,
+        day_of_week: dayOfWeek,
+        time_started: '08:00',
+        time_finished: '12:00',
+        job_number: '1234-AB',
+        working_in_yard: false,
+        did_not_work: false,
+        daily_total: 4,
+        remarks: 'worked during leave',
+      })
+      .select('id, did_not_work, time_started, time_finished, job_number, working_in_yard, daily_total, remarks')
+      .single();
+
+    expect(entryInsertError).toBeNull();
+    expect(insertedEntry?.id).toBeTruthy();
+    cleanup.entryIds.push(insertedEntry!.id);
+
+    expect(insertedEntry?.did_not_work).toBe(false);
+    expect(insertedEntry?.time_started).toBe('08:00:00');
+    expect(insertedEntry?.time_finished).toBe('12:00:00');
+    expect(insertedEntry?.job_number).toBe('1234-AB');
+    expect(insertedEntry?.working_in_yard).toBe(false);
+    expect(Number(insertedEntry?.daily_total || 0)).toBe(4);
+    expect(insertedEntry?.remarks).toBe('worked during leave');
+  });
+
   it('does not full-day-coerce entries when absence is half-day only', async () => {
     const { data: profile, error: profileError } = await supabase
       .from('profiles')

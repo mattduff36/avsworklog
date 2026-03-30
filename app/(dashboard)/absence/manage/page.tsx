@@ -44,7 +44,10 @@ import Link from 'next/link';
 import { AbsenceReasonsContent } from '@/app/(dashboard)/absence/manage/components/AbsenceReasonsContent';
 import { AllowancesContent } from '@/app/(dashboard)/absence/manage/components/AllowancesContent';
 import { AbsenceCalendarAdmin } from '@/app/(dashboard)/absence/manage/components/AbsenceCalendarAdmin';
-import { AbsenceEditDialog } from '@/app/(dashboard)/absence/manage/components/AbsenceEditDialog';
+import {
+  AbsenceEditDialog,
+  type AbsenceEditDialogMode,
+} from '@/app/(dashboard)/absence/manage/components/AbsenceEditDialog';
 import { AbsenceAboutHelper } from '@/app/(dashboard)/absence/components/AbsenceAboutHelper';
 import { ManageOverviewAdminActions } from '@/app/(dashboard)/absence/manage/components/ManageOverviewAdminActions';
 import { WorkShiftsContent } from '@/app/(dashboard)/absence/manage/components/WorkShiftsContent';
@@ -61,6 +64,11 @@ type ManageSortField = 'employee' | 'reason' | 'status' | 'date' | 'duration' | 
 type ManageSortDirection = 'asc' | 'desc';
 type ManageTab = 'overview' | 'calendar' | 'reasons' | 'allowances' | 'work-shifts';
 type ProtectedManageTab = 'overview' | 'allowances' | 'reasons';
+const ANNUAL_LEAVE_REASON_NAME = 'annual leave';
+
+function normalizeReasonName(value: string | null | undefined): string {
+  return (value || '').trim().toLowerCase();
+}
 
 function isDirectoryAccessError(error: unknown): boolean {
   const message = getErrorMessage(error, '').toLowerCase();
@@ -260,6 +268,7 @@ export default function AdminAbsencePage() {
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [editTarget, setEditTarget] = useState<AbsenceWithRelations | null>(null);
+  const [editMode, setEditMode] = useState<AbsenceEditDialogMode>('full');
   const [selectedProfileId, setSelectedProfileId] = useState('');
   const [selectedReasonId, setSelectedReasonId] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -666,12 +675,38 @@ export default function AdminAbsencePage() {
     return `${days} ${days === 1 ? 'day' : 'days'}`;
   }
 
-  function canEditAbsence(absence: AbsenceWithRelations): boolean {
+  function isAnnualLeaveAbsence(absence: AbsenceWithRelations): boolean {
+    return normalizeReasonName(absence.absence_reasons.name) === ANNUAL_LEAVE_REASON_NAME;
+  }
+
+  function canEditAbsenceByScope(absence: AbsenceWithRelations): boolean {
     const targetTeamId = absence.profiles.team_id || profileTeamIdById.get(absence.profile_id) || null;
     return (
       canAddEditBookings &&
       canPerformScopedBookingAction(absence.profile_id, targetTeamId, 'edit') &&
-      absence.record_source !== 'archived' &&
+      absence.record_source !== 'archived'
+    );
+  }
+
+  function getAbsenceEditMode(absence: AbsenceWithRelations): AbsenceEditDialogMode | null {
+    if (!canEditAbsenceByScope(absence)) {
+      return null;
+    }
+
+    const isProtectedConfirmedBooking =
+      absence.status === 'approved' &&
+      (absence.is_bank_holiday || absence.auto_generated || Boolean(absence.bulk_batch_id));
+
+    if (isProtectedConfirmedBooking) {
+      return isAnnualLeaveAbsence(absence) ? 'override-only' : null;
+    }
+
+    return 'full';
+  }
+
+  function canDeleteAbsence(absence: AbsenceWithRelations): boolean {
+    return (
+      canEditAbsenceByScope(absence) &&
       !absence.is_bank_holiday &&
       !absence.auto_generated
     );
@@ -1077,7 +1112,12 @@ export default function AdminAbsencePage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {paginatedAbsences.map((absence) => (
+                        {paginatedAbsences.map((absence) => {
+                          const nextEditMode = getAbsenceEditMode(absence);
+                          const canEdit = Boolean(nextEditMode);
+                          const canDelete = canDeleteAbsence(absence);
+
+                          return (
                           <TableRow key={absence.id} className="border-slate-700 hover:bg-slate-800/30">
                             <TableCell className={
                               absence.status === 'pending'
@@ -1121,17 +1161,21 @@ export default function AdminAbsencePage() {
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
-                                {canEditAbsence(absence) && (
+                                {canEdit && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => setEditTarget(absence)}
+                                    onClick={() => {
+                                      if (!nextEditMode) return;
+                                      setEditMode(nextEditMode);
+                                      setEditTarget(absence);
+                                    }}
                                     className="px-2 text-absence hover:text-absence hover:bg-absence/10"
                                   >
                                     <Pencil className="h-4 w-4" />
                                   </Button>
                                 )}
-                                {canEditAbsence(absence) && (
+                                {canDelete && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -1156,13 +1200,19 @@ export default function AdminAbsencePage() {
                               </div>
                             </TableCell>
                           </TableRow>
-                        ))}
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </div>
 
                   <div className="md:hidden space-y-3">
-                    {paginatedAbsences.map((absence) => (
+                    {paginatedAbsences.map((absence) => {
+                      const nextEditMode = getAbsenceEditMode(absence);
+                      const canEdit = Boolean(nextEditMode);
+                      const canDelete = canDeleteAbsence(absence);
+
+                      return (
                       <div
                         key={absence.id}
                         className="p-4 rounded-lg bg-slate-800/30 border border-border/50 hover:border-slate-600 transition-colors"
@@ -1207,17 +1257,21 @@ export default function AdminAbsencePage() {
                             </div>
                           </div>
                           <div className="flex gap-2">
-                            {canEditAbsence(absence) && (
+                            {canEdit && (
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => setEditTarget(absence)}
+                                onClick={() => {
+                                  if (!nextEditMode) return;
+                                  setEditMode(nextEditMode);
+                                  setEditTarget(absence);
+                                }}
                                 className="px-2 text-absence hover:text-absence hover:bg-absence/10"
                               >
                                 <Pencil className="h-4 w-4" />
                               </Button>
                             )}
-                            {canEditAbsence(absence) && (
+                            {canDelete && (
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -1242,7 +1296,8 @@ export default function AdminAbsencePage() {
                           </div>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   {totalPages > 1 && (
@@ -1480,10 +1535,12 @@ export default function AdminAbsencePage() {
       <AbsenceEditDialog
         absence={editTarget}
         reasons={reasons || []}
+        mode={editMode}
         open={!!editTarget}
         onOpenChange={(open) => {
           if (!open) {
             setEditTarget(null);
+            setEditMode('full');
           }
         }}
       />

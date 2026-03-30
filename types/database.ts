@@ -1919,6 +1919,7 @@ export interface Database {
           generation_source: string | null
           holiday_key: string | null
           bulk_batch_id: string | null
+          allow_timesheet_work_on_leave: boolean
           created_at: string
           updated_at: string
         }
@@ -1941,6 +1942,7 @@ export interface Database {
           generation_source?: string | null
           holiday_key?: string | null
           bulk_batch_id?: string | null
+          allow_timesheet_work_on_leave?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -1963,6 +1965,7 @@ export interface Database {
           generation_source?: string | null
           holiday_key?: string | null
           bulk_batch_id?: string | null
+          allow_timesheet_work_on_leave?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -2039,6 +2042,7 @@ export interface Database {
           auto_generated: boolean
           generation_source: string | null
           holiday_key: string | null
+          allow_timesheet_work_on_leave: boolean
           created_at: string
           updated_at: string
           financial_year_start_year: number
@@ -2064,6 +2068,7 @@ export interface Database {
           auto_generated?: boolean
           generation_source?: string | null
           holiday_key?: string | null
+          allow_timesheet_work_on_leave?: boolean
           created_at: string
           updated_at: string
           financial_year_start_year: number
@@ -2089,6 +2094,7 @@ export interface Database {
           auto_generated?: boolean
           generation_source?: string | null
           holiday_key?: string | null
+          allow_timesheet_work_on_leave?: boolean
           created_at?: string
           updated_at?: string
           financial_year_start_year?: number

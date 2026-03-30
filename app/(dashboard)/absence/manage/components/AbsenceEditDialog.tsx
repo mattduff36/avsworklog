@@ -6,7 +6,7 @@ import { fetchEmployeeWorkShift } from '@/lib/client/work-shifts';
 import { useUpdateAbsence } from '@/lib/hooks/useAbsence';
 import { getErrorMessage, shouldLogAbsenceManageError } from '@/lib/utils/absence-error-handling';
 import { calculateDurationDays } from '@/lib/utils/date';
-import type { AbsenceReason, AbsenceWithRelations } from '@/types/absence';
+import type { AbsenceReason, AbsenceUpdate, AbsenceWithRelations } from '@/types/absence';
 import type { WorkShiftPattern } from '@/types/work-shifts';
 import { Button } from '@/components/ui/button';
 import {
@@ -29,11 +29,20 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 
+const ANNUAL_LEAVE_REASON_NAME = 'annual leave';
+
+export type AbsenceEditDialogMode = 'full' | 'override-only';
+
+function normalizeReasonName(value: string | null | undefined): string {
+  return (value || '').trim().toLowerCase();
+}
+
 interface AbsenceEditDialogProps {
   absence: AbsenceWithRelations | null;
   reasons: AbsenceReason[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  mode?: AbsenceEditDialogMode;
 }
 
 export function AbsenceEditDialog({
@@ -41,6 +50,7 @@ export function AbsenceEditDialog({
   reasons,
   open,
   onOpenChange,
+  mode = 'full',
 }: AbsenceEditDialogProps) {
   const updateAbsence = useUpdateAbsence();
   const [startDate, setStartDate] = useState('');
@@ -49,6 +59,7 @@ export function AbsenceEditDialog({
   const [isHalfDay, setIsHalfDay] = useState(false);
   const [halfDaySession, setHalfDaySession] = useState<'AM' | 'PM'>('AM');
   const [notes, setNotes] = useState('');
+  const [allowTimesheetWorkOnLeave, setAllowTimesheetWorkOnLeave] = useState(false);
   const [workShiftPattern, setWorkShiftPattern] = useState<WorkShiftPattern | undefined>(undefined);
   const [submitting, setSubmitting] = useState(false);
 
@@ -63,6 +74,7 @@ export function AbsenceEditDialog({
     setIsHalfDay(absence.is_half_day);
     setHalfDaySession(absence.half_day_session || 'AM');
     setNotes(absence.notes || '');
+    setAllowTimesheetWorkOnLeave(Boolean(absence.allow_timesheet_work_on_leave));
   }, [absence, open]);
 
   useEffect(() => {
@@ -97,6 +109,25 @@ export function AbsenceEditDialog({
     [reasons, absence?.reason_id]
   );
 
+  const selectedReasonName = useMemo(() => {
+    if (reasonId) {
+      const selectedReason = editableReasons.find((reason) => reason.id === reasonId);
+      if (selectedReason?.name) {
+        return selectedReason.name;
+      }
+    }
+    return absence?.absence_reasons.name || '';
+  }, [reasonId, editableReasons, absence?.absence_reasons.name]);
+
+  const canUseTimesheetWorkOverride =
+    normalizeReasonName(selectedReasonName) === ANNUAL_LEAVE_REASON_NAME;
+
+  useEffect(() => {
+    if (!canUseTimesheetWorkOverride && allowTimesheetWorkOnLeave) {
+      setAllowTimesheetWorkOnLeave(false);
+    }
+  }, [canUseTimesheetWorkOverride, allowTimesheetWorkOnLeave]);
+
   const duration = useMemo(() => {
     if (!startDate) {
       return 0;
@@ -118,28 +149,36 @@ export function AbsenceEditDialog({
       return;
     }
 
-    if (!startDate || !reasonId) {
+    if (mode !== 'override-only' && (!startDate || !reasonId)) {
       toast.error('Please complete the required fields');
       return;
     }
 
-    if (isHalfDay && endDate && endDate !== startDate) {
+    if (mode !== 'override-only' && isHalfDay && endDate && endDate !== startDate) {
       toast.error('Half-day absences must be a single day');
       return;
     }
+
+    const updates: AbsenceUpdate =
+      mode === 'override-only'
+        ? {
+            allow_timesheet_work_on_leave: canUseTimesheetWorkOverride ? allowTimesheetWorkOnLeave : false,
+          }
+        : {
+            date: startDate,
+            end_date: isHalfDay ? null : endDate || null,
+            reason_id: reasonId,
+            is_half_day: isHalfDay,
+            half_day_session: isHalfDay ? halfDaySession : null,
+            notes: notes.trim() || null,
+            allow_timesheet_work_on_leave: canUseTimesheetWorkOverride ? allowTimesheetWorkOnLeave : false,
+          };
 
     setSubmitting(true);
     try {
       await updateAbsence.mutateAsync({
         id: absence.id,
-        updates: {
-          date: startDate,
-          end_date: isHalfDay ? null : endDate || null,
-          reason_id: reasonId,
-          is_half_day: isHalfDay,
-          half_day_session: isHalfDay ? halfDaySession : null,
-          notes: notes.trim() || null,
-        },
+        updates,
       });
 
       toast.success('Absence updated');
@@ -163,11 +202,19 @@ export function AbsenceEditDialog({
         <DialogHeader>
           <DialogTitle className="text-foreground">Edit Booking</DialogTitle>
           <DialogDescription className="text-slate-400/90">
-            Update the selected absence booking without deleting and recreating it.
+            {mode === 'override-only'
+              ? 'Update this booking override so timesheet hours can be entered while leave stays in place.'
+              : 'Update the selected absence booking without deleting and recreating it.'}
           </DialogDescription>
         </DialogHeader>
 
         <div className="rounded-lg border border-[hsl(var(--absence-primary)/0.25)] bg-[hsl(var(--absence-primary)/0.06)] p-4 space-y-4">
+          {mode === 'override-only' ? (
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+              Protected booking: only the timesheet-work override can be changed for this booking.
+            </div>
+          ) : null}
+
           <div className="space-y-1.5">
             <Label className="text-foreground font-medium">Employee</Label>
             <div className="rounded-md border border-border bg-slate-950 px-3 py-2 text-sm text-slate-300">
@@ -178,7 +225,13 @@ export function AbsenceEditDialog({
 
           <div className="space-y-1.5">
             <Label htmlFor="absence-edit-reason" className="text-foreground font-medium">Reason *</Label>
-            <Select value={reasonId} onValueChange={setReasonId}>
+            <Select
+              value={reasonId}
+              onValueChange={(value) => {
+                setReasonId(value);
+              }}
+              disabled={mode === 'override-only'}
+            >
               <SelectTrigger id="absence-edit-reason" className="bg-slate-950 border-border text-foreground">
                 <SelectValue placeholder="Select reason" />
               </SelectTrigger>
@@ -205,6 +258,7 @@ export function AbsenceEditDialog({
                     setEndDate('');
                   }
                 }}
+                disabled={mode === 'override-only'}
                 className="bg-slate-950 border-border text-foreground"
               />
             </div>
@@ -216,7 +270,7 @@ export function AbsenceEditDialog({
                 value={endDate}
                 onChange={(event) => setEndDate(event.target.value)}
                 min={startDate}
-                disabled={!startDate || isHalfDay}
+                disabled={mode === 'override-only' || !startDate || isHalfDay}
                 className="bg-slate-950 border-border text-foreground"
               />
             </div>
@@ -234,6 +288,7 @@ export function AbsenceEditDialog({
                     setEndDate('');
                   }
                 }}
+                disabled={mode === 'override-only'}
                 className="rounded border-border"
               />
               <span className="text-sm text-slate-400/90">Half Day</span>
@@ -248,6 +303,7 @@ export function AbsenceEditDialog({
                     value="AM"
                     checked={halfDaySession === 'AM'}
                     onChange={() => setHalfDaySession('AM')}
+                    disabled={mode === 'override-only'}
                   />
                   <span className="text-sm text-slate-400/90">AM</span>
                 </label>
@@ -258,6 +314,7 @@ export function AbsenceEditDialog({
                     value="PM"
                     checked={halfDaySession === 'PM'}
                     onChange={() => setHalfDaySession('PM')}
+                    disabled={mode === 'override-only'}
                   />
                   <span className="text-sm text-slate-400/90">PM</span>
                 </label>
@@ -272,8 +329,33 @@ export function AbsenceEditDialog({
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
               placeholder="Optional notes..."
+              disabled={mode === 'override-only'}
               className="bg-slate-950 border-border text-foreground min-h-[88px]"
             />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-foreground font-medium">Timesheet override</Label>
+            <label className="flex items-start gap-2 rounded-md border border-border bg-slate-950 px-3 py-2">
+              <input
+                type="checkbox"
+                checked={allowTimesheetWorkOnLeave}
+                onChange={(event) => setAllowTimesheetWorkOnLeave(event.target.checked)}
+                disabled={!canUseTimesheetWorkOverride}
+                className="mt-0.5 rounded border-border"
+              />
+              <span className="text-sm text-slate-300">
+                Allow working hours in timesheets for this annual leave booking.
+                <span className="block text-xs text-muted-foreground mt-1">
+                  When enabled, users can enter normal working time/job data for the booking day while leave remains and paid leave hours are still credited.
+                </span>
+              </span>
+            </label>
+            {!canUseTimesheetWorkOverride ? (
+              <p className="text-xs text-muted-foreground">
+                This override is only available for Annual leave bookings.
+              </p>
+            ) : null}
           </div>
 
           {startDate && (
@@ -295,7 +377,11 @@ export function AbsenceEditDialog({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={submitting || !startDate || !reasonId}
+            disabled={
+              submitting ||
+              !absence ||
+              (mode === 'override-only' ? !canUseTimesheetWorkOverride : !startDate || !reasonId)
+            }
             className="bg-absence hover:bg-absence-dark text-white"
           >
             {submitting ? 'Saving...' : 'Save Changes'}

@@ -605,7 +605,9 @@ export function useUpdateAbsence() {
       await assertAbsenceFinancialYearOpen(supabase, id);
       const { data: existingAbsence, error: existingAbsenceError } = await supabase
         .from('absences')
-        .select('profile_id, date, end_date, reason_id, duration_days, is_half_day, half_day_session, status, notes')
+        .select(
+          'profile_id, date, end_date, reason_id, duration_days, is_half_day, half_day_session, status, notes, is_bank_holiday, auto_generated, bulk_batch_id, allow_timesheet_work_on_leave'
+        )
         .eq('id', id)
         .single();
 
@@ -621,6 +623,45 @@ export function useUpdateAbsence() {
         key: K,
         fallback: TExisting
       ) => (hasUpdateField(key) ? (updates[key] as TExisting) : fallback);
+      const hasOverrideUpdate = hasUpdateField('allow_timesheet_work_on_leave');
+      const updateKeys = Object.keys(updates);
+      const hasOnlyOverrideUpdate = updateKeys.length > 0 && updateKeys.every((key) => key === 'allow_timesheet_work_on_leave');
+      const isProtectedConfirmedBooking =
+        existingAbsence.status === 'approved' &&
+        (existingAbsence.is_bank_holiday || existingAbsence.auto_generated || Boolean(existingAbsence.bulk_batch_id));
+      const finalReasonId = resolveUpdatedField('reason_id', existingAbsence.reason_id);
+      const finalAllowTimesheetWorkOnLeave = resolveUpdatedField(
+        'allow_timesheet_work_on_leave',
+        existingAbsence.allow_timesheet_work_on_leave
+      );
+      const annualLeaveReasonId = await getAnnualLeaveReasonIdByReason(supabase, finalReasonId);
+      const isFinalReasonAnnualLeave = annualLeaveReasonId === finalReasonId;
+
+      if (isProtectedConfirmedBooking && !hasOverrideUpdate) {
+        throw new Error('Protected confirmed bookings can only update the timesheet work override');
+      }
+
+      if (isProtectedConfirmedBooking && !hasOnlyOverrideUpdate) {
+        throw new Error('Protected confirmed bookings only allow timesheet work override updates');
+      }
+
+      if (finalAllowTimesheetWorkOnLeave && !isFinalReasonAnnualLeave) {
+        throw new Error('Timesheet work override is only available for Annual leave bookings');
+      }
+
+      if (hasOnlyOverrideUpdate) {
+        const { data, error } = await supabase
+          .from('absences')
+          .update({
+            allow_timesheet_work_on_leave: Boolean(finalAllowTimesheetWorkOnLeave),
+          })
+          .eq('id', id)
+          .select()
+          .single();
+
+        if (error) throw error;
+        return data;
+      }
 
       const validatedAbsence = await buildValidatedAbsence(
         supabase,
@@ -656,6 +697,7 @@ export function useUpdateAbsence() {
           half_day_session: validatedAbsence.half_day_session,
           status: validatedAbsence.status,
           notes: validatedAbsence.notes,
+          allow_timesheet_work_on_leave: finalAllowTimesheetWorkOnLeave,
         })
         .eq('id', id)
         .select()

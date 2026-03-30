@@ -53,6 +53,30 @@ describe('timesheet off-day resolver', () => {
     expect(tuesday?.paidLeaveHours).toBe(PAID_LEAVE_DAILY_HOURS);
   });
 
+  it('keeps annual leave credit but unlocks work entry when override is enabled', () => {
+    const states = resolveTimesheetOffDayStates(
+      '2026-03-29',
+      [
+        {
+          date: '2026-03-24',
+          end_date: null,
+          is_half_day: false,
+          allow_timesheet_work_on_leave: true,
+          absence_reasons: { name: 'Annual Leave', color: '#7c3aed', is_paid: true },
+        },
+      ],
+      STANDARD_WORK_SHIFT_PATTERN
+    );
+
+    const tuesday = states.find((row) => row.day_of_week === 2);
+    expect(tuesday?.isOnApprovedLeave).toBe(true);
+    expect(tuesday?.isAnnualLeave).toBe(true);
+    expect(tuesday?.isLeaveLocked).toBe(false);
+    expect(tuesday?.isPartialLeave).toBe(true);
+    expect(tuesday?.workWindow).toBeNull();
+    expect(tuesday?.paidLeaveHours).toBe(PAID_LEAVE_DAILY_HOURS);
+  });
+
   it('still marks approved leave when work-shift pattern is unavailable', () => {
     const states = resolveTimesheetOffDayStates(
       '2026-03-29',
@@ -224,6 +248,43 @@ describe('timesheet off-day normalization', () => {
     expect(normalized[1].did_not_work).toBe(false);
     expect(normalized[1].daily_total).toBe(9.5);
     expect(normalized[1].remarks).toBe('Annual Leave (AM)');
+  });
+
+  it('adds worked hours on full-day annual leave when override is enabled', () => {
+    const entries = buildEntries();
+    entries[1] = {
+      ...entries[1],
+      time_started: '08:00',
+      time_finished: '12:00',
+      job_number: '1234-AB',
+      did_not_work: false,
+    };
+
+    const states = resolveTimesheetOffDayStates(
+      '2026-03-29',
+      [
+        {
+          date: '2026-03-24',
+          end_date: null,
+          is_half_day: false,
+          allow_timesheet_work_on_leave: true,
+          absence_reasons: { name: 'Annual Leave', is_paid: true },
+        },
+      ],
+      STANDARD_WORK_SHIFT_PATTERN
+    );
+
+    const normalized = normalizeTimesheetEntriesForOffDays(entries, states, {
+      enforceLeaveOverwrite: true,
+      applyNonShiftDefaults: true,
+    });
+
+    // 08:00-12:00 = 4.00 worked hours + 9.00 paid leave = 13.00
+    expect(normalized[1].did_not_work).toBe(false);
+    expect(normalized[1].time_started).toBe('08:00');
+    expect(normalized[1].time_finished).toBe('12:00');
+    expect(normalized[1].daily_total).toBe(13);
+    expect(normalized[1].remarks).toBe('Annual Leave');
   });
 
   it('defaults non-shift days to Off Shift when no work was entered', () => {

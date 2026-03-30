@@ -51,7 +51,10 @@ import {
 import { AlertTriangle, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Filter, Settings2, Trash2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import type { AbsenceWithRelations } from '@/types/absence';
-import { AbsenceEditDialog } from '@/app/(dashboard)/absence/manage/components/AbsenceEditDialog';
+import {
+  AbsenceEditDialog,
+  type AbsenceEditDialogMode,
+} from '@/app/(dashboard)/absence/manage/components/AbsenceEditDialog';
 
 type Employee = {
   id: string;
@@ -110,6 +113,7 @@ const DEFAULT_DETAIL_VISIBILITY: DetailVisibility = {
   approvedDate: true,
   remainingAllowance: true,
 };
+const ANNUAL_LEAVE_REASON_NAME = 'annual leave';
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
@@ -134,6 +138,10 @@ function isDirectoryAccessError(error: unknown): boolean {
     message.includes('unauthorized') ||
     message.includes('jwt expired')
   );
+}
+
+function normalizeReasonName(value: string | null | undefined): string {
+  return (value || '').trim().toLowerCase();
 }
 
 function getReasonColor(name: string, color?: string | null): string {
@@ -308,6 +316,7 @@ export function AbsenceCalendarAdmin() {
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [editTarget, setEditTarget] = useState<AbsenceWithRelations | null>(null);
+  const [editMode, setEditMode] = useState<AbsenceEditDialogMode>('full');
   const actorProfileId = profile?.id || '';
   const isAdminTier = Boolean(isAdmin || isSuperAdmin);
   const canViewBookings = Boolean(absenceSecondarySnapshot?.flags.can_view_bookings || isAdminTier);
@@ -674,7 +683,11 @@ export function AbsenceCalendarAdmin() {
     setShowDayModal(true);
   }
 
-  function canEditAbsence(absence: AbsenceWithRelations): boolean {
+  function isAnnualLeaveAbsence(absence: AbsenceWithRelations): boolean {
+    return normalizeReasonName(absence.absence_reasons.name) === ANNUAL_LEAVE_REASON_NAME;
+  }
+
+  function canEditAbsenceByScope(absence: AbsenceWithRelations): boolean {
     if (!canAddEditBookings) return false;
     if (!isAdminTier) {
       if (!actorProfileId || !absenceSecondarySnapshot) return false;
@@ -698,7 +711,23 @@ export function AbsenceCalendarAdmin() {
       );
       if (!canEditTarget) return false;
     }
-    return absence.record_source !== 'archived' && !absence.is_bank_holiday && !absence.auto_generated;
+    return absence.record_source !== 'archived';
+  }
+
+  function getAbsenceEditMode(absence: AbsenceWithRelations): AbsenceEditDialogMode | null {
+    if (!canEditAbsenceByScope(absence)) {
+      return null;
+    }
+
+    const isProtectedConfirmedBooking =
+      absence.status === 'approved' &&
+      (absence.is_bank_holiday || absence.auto_generated || Boolean(absence.bulk_batch_id));
+
+    if (isProtectedConfirmedBooking) {
+      return isAnnualLeaveAbsence(absence) ? 'override-only' : null;
+    }
+
+    return 'full';
   }
 
   if (isLoading || reasonsLoading || loadingEmployees || isAbsenceSecondaryContextLoading) {
@@ -1130,7 +1159,8 @@ export function AbsenceCalendarAdmin() {
                           <div className="flex w-full flex-col items-stretch gap-2">
                             {(() => {
                               const target = (absences || []).find((absence) => absence.id === event.id) || null;
-                            const canEditTarget = Boolean(target && canEditAbsence(target) && !isSelectedFinancialYearClosed);
+                              const nextEditMode = target ? getAbsenceEditMode(target) : null;
+                              const canEditTarget = Boolean(nextEditMode && !isSelectedFinancialYearClosed);
 
                               return (
                                 <Button
@@ -1138,7 +1168,8 @@ export function AbsenceCalendarAdmin() {
                                   size="sm"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    if (target && canEditTarget) {
+                                    if (target && canEditTarget && nextEditMode) {
+                                      setEditMode(nextEditMode);
                                       setEditTarget(target);
                                     }
                                   }}
@@ -1188,10 +1219,12 @@ export function AbsenceCalendarAdmin() {
       <AbsenceEditDialog
         absence={editTarget}
         reasons={reasons || []}
+        mode={editMode}
         open={!!editTarget}
         onOpenChange={(open) => {
           if (!open) {
             setEditTarget(null);
+            setEditMode('full');
           }
         }}
       />

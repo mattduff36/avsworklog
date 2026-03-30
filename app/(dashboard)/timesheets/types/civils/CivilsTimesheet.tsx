@@ -212,7 +212,7 @@ export function CivilsTimesheet({
         const { startIso, endIso } = getTimesheetWeekIsoBounds(weekEnding);
         const absenceResult = await supabase
           .from('absences')
-          .select('date, end_date, is_half_day, half_day_session, absence_reasons(name,color,is_paid)')
+          .select('date, end_date, is_half_day, half_day_session, allow_timesheet_work_on_leave, absence_reasons(name,color,is_paid)')
           .eq('profile_id', selectedEmployeeId)
           .eq('status', 'approved')
           .lte('date', endIso);

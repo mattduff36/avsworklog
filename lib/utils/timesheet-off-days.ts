@@ -12,6 +12,7 @@ export interface ApprovedAbsenceForTimesheet {
   end_date: string | null;
   is_half_day?: boolean | null;
   half_day_session?: LeaveSession | null;
+  allow_timesheet_work_on_leave?: boolean | null;
   absence_reasons?: { name?: string | null; color?: string | null; is_paid?: boolean | null } | null;
 }
 
@@ -21,6 +22,7 @@ export interface TimesheetLeaveLabel {
   session: LeaveSession | 'FULL';
   color: string | null;
   isPaid: boolean;
+  blocksWorkingEntry: boolean;
 }
 
 export interface TimesheetWorkWindow {
@@ -156,6 +158,8 @@ function toLeaveLabel(row: ApprovedAbsenceForTimesheet): TimesheetLeaveLabel {
   const reasonName = row.absence_reasons?.name?.trim() || 'Approved Leave';
   const isHalf = Boolean(row.is_half_day);
   const session: LeaveSession | 'FULL' = isHalf && row.half_day_session ? row.half_day_session : 'FULL';
+  const isAnnualLeave = normalizeReasonName(reasonName) === 'annual leave';
+  const allowsTimesheetWork = isAnnualLeave && Boolean(row.allow_timesheet_work_on_leave);
 
   return {
     reasonName,
@@ -163,6 +167,7 @@ function toLeaveLabel(row: ApprovedAbsenceForTimesheet): TimesheetLeaveLabel {
     session,
     color: row.absence_reasons?.color || null,
     isPaid: Boolean(row.absence_reasons?.is_paid),
+    blocksWorkingEntry: !allowsTimesheetWork,
   };
 }
 
@@ -193,8 +198,12 @@ export function resolveTimesheetOffDayStates(
         return weight(a.session) - weight(b.session);
       });
 
-    const hasAmLeave = leaveLabels.some((label) => label.session === 'FULL' || label.session === 'AM');
-    const hasPmLeave = leaveLabels.some((label) => label.session === 'FULL' || label.session === 'PM');
+    const hasAmLeave = leaveLabels.some(
+      (label) => label.blocksWorkingEntry && (label.session === 'FULL' || label.session === 'AM')
+    );
+    const hasPmLeave = leaveLabels.some(
+      (label) => label.blocksWorkingEntry && (label.session === 'FULL' || label.session === 'PM')
+    );
     const isOnApprovedLeave = leaveLabels.length > 0;
     const isLeaveLocked = hasAmLeave && hasPmLeave;
     const isPartialLeave = isOnApprovedLeave && !isLeaveLocked;
