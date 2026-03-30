@@ -798,7 +798,9 @@ export function CivilsTimesheet({
       offDayKey === currentOffDayKey && offDayStates.length > 0
         ? (normalizeTimesheetEntriesForOffDays(newEntries, offDayStates, {
             enforceLeaveOverwrite: true,
-            applyNonShiftDefaults: true,
+            // Keep approved-leave guardrails, but do not re-force "Not on Shift" while the
+            // user is actively editing. This allows weekend overtime overrides.
+            applyNonShiftDefaults: false,
           }) as TimesheetEntryDraft[])
         : newEntries;
 
