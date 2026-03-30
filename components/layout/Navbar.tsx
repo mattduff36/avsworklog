@@ -19,6 +19,7 @@ import {
   Bell,
   Bug,
   HelpCircle,
+  Download,
   MonitorSmartphone,
   UserCircle2,
 } from 'lucide-react';
@@ -110,6 +111,23 @@ function getNavItemIconColor(href: string): string {
   return 'text-avs-yellow';
 }
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+}
+
+function checkStandaloneMode(): boolean {
+  if (typeof window === 'undefined') return false;
+
+  const isStandaloneDisplayMode =
+    typeof window.matchMedia === 'function'
+      ? window.matchMedia('(display-mode: standalone)').matches
+      : false;
+  const isIOSStandalone = (window.navigator as { standalone?: boolean }).standalone === true;
+
+  return isStandaloneDisplayMode || isIOSStandalone;
+}
+
 export function Navbar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -124,6 +142,8 @@ export function Navbar() {
   const [desktopMenuOpen, setDesktopMenuOpen] = useState(false);
   const [activeNowDialogOpen, setActiveNowDialogOpen] = useState(false);
   const [desktopMenuPosition, setDesktopMenuPosition] = useState({ left: 0, top: 0, maxHeight: 320 });
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [isStandaloneApp, setIsStandaloneApp] = useState(false);
   const navRef = useRef<HTMLDivElement>(null);
   const isCompactRef = useRef(false);
   const expandedWidthRef = useRef(0);
@@ -155,6 +175,28 @@ export function Navbar() {
     setDesktopMenuOpen(false);
     setActiveNowDialogOpen(false);
   }, [tabletModeEnabled]);
+
+  useEffect(() => {
+    setIsStandaloneApp(checkStandaloneMode());
+
+    const handleBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setDeferredInstallPrompt(event as BeforeInstallPromptEvent);
+    };
+
+    const handleAppInstalled = () => {
+      setDeferredInstallPrompt(null);
+      setIsStandaloneApp(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt as EventListener);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt as EventListener);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
 
   const updateDesktopMenuPosition = () => {
     const triggerRect = desktopMenuTriggerRef.current?.getBoundingClientRect();
@@ -342,6 +384,21 @@ export function Navbar() {
     }
   };
 
+  const handleInstallApp = async () => {
+    setMobileMenuOpen(false);
+
+    if (isStandaloneApp) return;
+
+    if (deferredInstallPrompt) {
+      await deferredInstallPrompt.prompt();
+      await deferredInstallPrompt.userChoice;
+      setDeferredInstallPrompt(null);
+      return;
+    }
+
+    window.alert('Open your browser menu and tap "Install app" (or "Add to Home screen") to install SQUIRES.');
+  };
+
   // Helper function to check if a nav link is active
   const isLinkActive = (href: string): boolean => {
     if (!pathname) return false;
@@ -404,6 +461,7 @@ export function Navbar() {
   );
   const hasMobileManagementLinks = mobileManagerLinks.length > 0 || adminLinks.length > 0;
   const hasMobileDeveloperLinks = isActualSuperAdmin && !isViewingAs;
+  const showInstallAppLink = !isStandaloneApp;
 
   return (
     <>
@@ -708,6 +766,19 @@ export function Navbar() {
                     />
                     Help
                   </Link>
+
+                  {showInstallAppLink ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void handleInstallApp();
+                      }}
+                      className="flex w-full items-center px-3 py-2 text-lg font-medium rounded-md text-muted-foreground hover:bg-slate-800/50 hover:text-white"
+                    >
+                      <Download className="w-6 h-6 mr-3 text-avs-yellow" />
+                      Install App
+                    </button>
+                  ) : null}
                 </div>
 
                 {hasMobileDeveloperLinks ? (

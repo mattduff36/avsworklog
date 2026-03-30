@@ -171,6 +171,36 @@ describe('Navbar desktop burger menu', () => {
     });
   });
 
+  it('opens the PWA install prompt from mobile menu', async () => {
+    const promptMock = vi.fn(async () => {});
+    const beforeInstallEvent = Object.assign(new Event('beforeinstallprompt'), {
+      prompt: promptMock,
+      userChoice: Promise.resolve({ outcome: 'accepted' as const, platform: 'web' }),
+    });
+
+    const { container } = render(<Navbar />);
+
+    await waitFor(() => {
+      expect(screen.getByTitle('Menu')).toBeInTheDocument();
+    });
+
+    window.dispatchEvent(beforeInstallEvent as Event);
+
+    const mobileMenuButton = container.querySelector('button.md\\:hidden');
+    expect(mobileMenuButton).toBeTruthy();
+    fireEvent.click(mobileMenuButton as HTMLButtonElement);
+
+    await waitFor(() => {
+      expect(screen.getByText('Install App')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Install App'));
+
+    await waitFor(() => {
+      expect(promptMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('hides mobile developer links when viewing as another role', async () => {
     Object.assign(authMockState, {
       isActualSuperAdmin: true,
