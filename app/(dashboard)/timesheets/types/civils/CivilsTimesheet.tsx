@@ -75,6 +75,9 @@ const createBlankEntry = (dayOfWeek: number): TimesheetEntryDraft => ({
   bankHolidayWarningShown: false,
 });
 
+const createBlankWeekEntries = (): TimesheetEntryDraft[] =>
+  Array.from({ length: 7 }, (_, i) => createBlankEntry(i + 1));
+
 export function CivilsTimesheet({
   weekEnding: initialWeekEnding,
   existingId: initialExistingId,
@@ -131,7 +134,7 @@ export function CivilsTimesheet({
 
   // Initialize entries for all 7 days (with didNotWorkReason tracking)
   const [entries, setEntries] = useState<TimesheetEntryDraft[]>(
-    Array.from({ length: 7 }, (_, i) => createBlankEntry(i + 1))
+    createBlankWeekEntries()
   );
   const [offDayStates, setOffDayStates] = useState<TimesheetOffDayState[]>([]);
   const [offDayKey, setOffDayKey] = useState<string>('');
@@ -446,6 +449,18 @@ export function CivilsTimesheet({
       }
     } catch (err) {
       console.error('Error fetching employees:', err);
+    }
+  };
+
+  const handleSelectedEmployeeChange = (nextEmployeeId: string) => {
+    setSelectedEmployeeId(nextEmployeeId);
+
+    // New timesheets should always start from a clean week for the chosen employee.
+    // This prevents prior employee leave defaults from leaking into the new selection.
+    if (!existingTimesheetId) {
+      setEntries(createBlankWeekEntries());
+      setTimeErrors({});
+      setActiveDay('0');
     }
   };
 
@@ -1248,7 +1263,7 @@ export function CivilsTimesheet({
                 <User className="h-4 w-4" />
                 Creating timesheet for
               </Label>
-              <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+              <Select value={selectedEmployeeId} onValueChange={handleSelectedEmployeeChange}>
                 <SelectTrigger className="h-12 text-base bg-slate-900/50 border-slate-600 text-white">
                   <SelectValue placeholder="Select employee..." />
                 </SelectTrigger>

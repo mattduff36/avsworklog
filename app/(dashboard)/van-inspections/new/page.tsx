@@ -97,6 +97,38 @@ type ProfileWithRole = {
 
 const STICKY_NAV_OFFSET_PX = 96;
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  if (error && typeof error === 'object' && 'message' in error) {
+    return String((error as { message?: unknown }).message || '');
+  }
+
+  return '';
+}
+
+function isTransientNetworkError(error: unknown): boolean {
+  const message = getErrorMessage(error).toLowerCase();
+  if (!message) return false;
+
+  return (
+    message.includes('failed to fetch') ||
+    message.includes('load failed') ||
+    message.includes('networkerror') ||
+    message.includes('network request failed') ||
+    message.includes('err_internet_disconnected') ||
+    message.includes('err_network_changed') ||
+    message.includes('aborterror') ||
+    message.includes('the user aborted a request')
+  );
+}
+
 function NewInspectionContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -304,7 +336,11 @@ function NewInspectionContent() {
       return draft.id;
     } catch (err) {
       const errorContextId = 'van-inspections-new-silent-draft-save-error';
-      console.error('Silent draft save failed:', err, { errorContextId });
+      if (isTransientNetworkError(err)) {
+        console.warn('Silent draft save skipped due transient network error');
+      } else {
+        console.error('Silent draft save failed:', err, { errorContextId });
+      }
       if (!silent) {
         toast.error('Could not auto-save draft. Please try again.', { id: errorContextId });
       }
@@ -503,7 +539,11 @@ function NewInspectionContent() {
             setSelectedEmployeeId(user.id);
           }
         } catch (err) {
-          console.error('Error fetching employees:', err);
+          if (isTransientNetworkError(err)) {
+            console.warn('Employee directory fetch skipped due transient network error');
+          } else {
+            console.error('Error fetching employees:', err);
+          }
         }
       };
       fetchEmployees();
@@ -1445,8 +1485,12 @@ function NewInspectionContent() {
       router.push('/van-inspections');
     } catch (err) {
       const errorContextId = 'van-inspections-new-save-inspection-error';
-      console.error('Error saving inspection:', err, { errorContextId });
-      console.error('Error details:', JSON.stringify(err, null, 2), { errorContextId });
+      if (isTransientNetworkError(err)) {
+        console.warn('Inspection save failed due transient network error');
+      } else {
+        console.error('Error saving inspection:', err, { errorContextId });
+        console.error('Error details:', JSON.stringify(err, null, 2), { errorContextId });
+      }
       
       // Get detailed error message
       let errorMessage = 'An unexpected error occurred';

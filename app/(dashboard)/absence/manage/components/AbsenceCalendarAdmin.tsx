@@ -111,6 +111,31 @@ const DEFAULT_DETAIL_VISIBILITY: DetailVisibility = {
   remainingAllowance: true,
 };
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  if (error && typeof error === 'object' && 'message' in error) {
+    return String((error as { message?: unknown }).message || '');
+  }
+
+  return '';
+}
+
+function isDirectoryAccessError(error: unknown): boolean {
+  const message = getErrorMessage(error).toLowerCase();
+  return (
+    message.includes('forbidden') ||
+    message.includes('unauthorized') ||
+    message.includes('jwt expired')
+  );
+}
+
 function getReasonColor(name: string, color?: string | null): string {
   if (color && color.trim().length > 0) {
     return color;
@@ -346,8 +371,13 @@ export function AbsenceCalendarAdmin() {
       });
       setEmployees(list);
     } catch (error) {
-      console.error('Error fetching employees:', error);
-      toast.error('Failed to load employee filters');
+      if (isDirectoryAccessError(error)) {
+        console.warn('Skipping employee directory load due permissions/session');
+        setEmployees([]);
+      } else {
+        console.error('Error fetching employees:', error);
+        toast.error('Failed to load employee filters');
+      }
     } finally {
       setLoadingEmployees(false);
     }

@@ -79,6 +79,9 @@ const HIRER_RECENT_SCOPE = 'timesheet_plant_hirer';
 const SITE_ADDRESS_RECENT_SCOPE = 'timesheet_plant_site_address';
 const JOB_NUMBER_REGEX = /^\d{4}-[A-Z]{2}$/;
 
+const createBlankPlantWeekEntries = (): PlantEntryDraft[] =>
+  Array.from({ length: 7 }, (_, index) => createBlankEntry(index + 1));
+
 function formatDerivedHours(value: number | null): string {
   if (value === null) return '';
   return value.toFixed(2);
@@ -249,7 +252,7 @@ export function PlantTimesheetV2({
   const [managerComments, setManagerComments] = useState('');
 
   const [entries, setEntries] = useState<PlantEntryDraft[]>(
-    Array.from({ length: 7 }, (_, index) => createBlankEntry(index + 1))
+    createBlankPlantWeekEntries()
   );
   const [activeDay, setActiveDay] = useState('0');
 
@@ -712,6 +715,20 @@ export function PlantTimesheetV2({
     });
   };
 
+  const handleSelectedEmployeeChange = (nextEmployeeId: string) => {
+    setSelectedEmployeeId(nextEmployeeId);
+
+    // New timesheets should reset daily rows when switching employee context
+    // to avoid carrying over prior employee leave defaults/values.
+    if (!existingTimesheetId) {
+      setEntries(createBlankPlantWeekEntries());
+      setTimeErrors({});
+      setRowErrors({});
+      setError('');
+      setActiveDay('0');
+    }
+  };
+
   const handleMachineSelection = (value: string) => {
     setPendingExistingMachineReg('');
 
@@ -1026,7 +1043,11 @@ export function PlantTimesheetV2({
                 <User className="h-4 w-4" />
                 Creating timesheet for
               </Label>
-              <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId} disabled={Boolean(existingTimesheetId)}>
+              <Select
+                value={selectedEmployeeId}
+                onValueChange={handleSelectedEmployeeChange}
+                disabled={Boolean(existingTimesheetId)}
+              >
                 <SelectTrigger id="employee" className="h-12 text-base bg-slate-900/50 border-slate-600 text-white">
                   <SelectValue placeholder="Select employee..." />
                 </SelectTrigger>
