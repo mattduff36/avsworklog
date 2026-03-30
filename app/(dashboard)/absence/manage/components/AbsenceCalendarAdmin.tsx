@@ -1101,7 +1101,7 @@ export function AbsenceCalendarAdmin() {
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0 flex-1">
-                          <p className="font-medium text-foreground flex items-center gap-2">
+                          <div className="font-medium text-foreground flex items-center gap-2">
                             <span className="h-2.5 w-2.5 rounded-full flex-shrink-0 ring-1 ring-white/10" style={{ backgroundColor: event.reasonColor }} />
                             {event.reasonName}
                             {event.isBankHoliday && (
@@ -1109,7 +1109,7 @@ export function AbsenceCalendarAdmin() {
                                 Bank Holiday
                               </Badge>
                             )}
-                          </p>
+                          </div>
                           <p className="text-sm text-muted-foreground">
                             {event.employeeName}
                             {event.employeeId ? ` (${event.employeeId})` : ''}

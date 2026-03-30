@@ -161,10 +161,60 @@ export default function ViewTimesheetPage() {
 
   const updateEntry = (dayIndex: number, field: string, value: string | boolean | number | null) => {
     const newEntries = [...entries];
-    newEntries[dayIndex] = {
-      ...newEntries[dayIndex],
+    const currentEntry = newEntries[dayIndex];
+
+    if (field === 'did_not_work') {
+      const nextDidNotWork = Boolean(value);
+      const nextRemarks =
+        nextDidNotWork && (!currentEntry.remarks || currentEntry.remarks.trim().length === 0)
+          ? 'Did Not Work'
+          : currentEntry.remarks;
+
+      newEntries[dayIndex] = {
+        ...currentEntry,
+        did_not_work: nextDidNotWork,
+        time_started: nextDidNotWork ? null : currentEntry.time_started,
+        time_finished: nextDidNotWork ? null : currentEntry.time_finished,
+        job_number: nextDidNotWork ? null : currentEntry.job_number,
+        working_in_yard: nextDidNotWork ? false : currentEntry.working_in_yard,
+        daily_total: nextDidNotWork ? 0 : currentEntry.daily_total,
+        remarks: nextRemarks,
+      };
+
+      if (nextDidNotWork) {
+        setManuallyEditedDays((prev) => {
+          const next = new Set(prev);
+          next.delete(dayIndex);
+          return next;
+        });
+      }
+
+      setEntries(newEntries);
+
+      if (timesheet?.status === 'approved' && originalData) {
+        setDataChanged(true);
+      }
+      return;
+    }
+
+    const nextEntry = {
+      ...currentEntry,
       [field]: value,
     };
+
+    if (
+      (field === 'time_started' || field === 'time_finished' || field === 'job_number' || field === 'working_in_yard') &&
+      value !== null &&
+      value !== false &&
+      value !== ''
+    ) {
+      nextEntry.did_not_work = false;
+      if (nextEntry.remarks === 'Did Not Work') {
+        nextEntry.remarks = null;
+      }
+    }
+
+    newEntries[dayIndex] = nextEntry;
 
     // Auto-calculate daily total if both times are present
     if (field === 'time_started' || field === 'time_finished') {
@@ -601,6 +651,7 @@ export default function ViewTimesheetPage() {
                   <th className="text-left p-2 font-medium">Time Started</th>
                   <th className="text-left p-2 font-medium">Time Finished</th>
                   <th className="text-left p-2 font-medium">Job Number</th>
+                  <th className="text-center p-2 font-medium">Did Not Work</th>
                   <th className="text-center p-2 font-medium">In Yard</th>
                   <th className="text-right p-2 font-medium">Total Hours</th>
                   <th className="text-left p-2 font-medium">Remarks</th>
@@ -616,6 +667,7 @@ export default function ViewTimesheetPage() {
                           type="time"
                           value={entry.time_started || ''}
                           onChange={(e) => updateEntry(index, 'time_started', e.target.value)}
+                          disabled={entry.did_not_work}
                           className="w-32 text-slate-900"
                         />
                       ) : (
@@ -628,6 +680,7 @@ export default function ViewTimesheetPage() {
                           type="time"
                           value={entry.time_finished || ''}
                           onChange={(e) => updateEntry(index, 'time_finished', e.target.value)}
+                          disabled={entry.did_not_work}
                           className="w-32 text-slate-900"
                         />
                       ) : (
@@ -635,7 +688,31 @@ export default function ViewTimesheetPage() {
                       )}
                     </td>
                     <td className="p-2">
-                      <span className="text-sm font-mono">{(entry as TimesheetEntry & { job_number?: string }).job_number || (entry.working_in_yard ? 'YARD' : '-')}</span>
+                      {canEdit ? (
+                        <Input
+                          value={(entry as TimesheetEntry & { job_number?: string }).job_number || ''}
+                          onChange={(e) => updateEntry(index, 'job_number', e.target.value.toUpperCase())}
+                          disabled={entry.did_not_work}
+                          placeholder={entry.working_in_yard ? 'YARD' : 'Job #'}
+                          className="w-32 font-mono text-slate-900"
+                        />
+                      ) : (
+                        <span className="text-sm font-mono">
+                          {(entry as TimesheetEntry & { job_number?: string }).job_number || (entry.working_in_yard ? 'YARD' : '-')}
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-2 text-center">
+                      {canEdit ? (
+                        <input
+                          type="checkbox"
+                          checked={entry.did_not_work}
+                          onChange={(e) => updateEntry(index, 'did_not_work', e.target.checked)}
+                          className="w-4 h-4"
+                        />
+                      ) : (
+                        entry.did_not_work && <XCircle className="h-4 w-4 inline text-amber-600" />
+                      )}
                     </td>
                     <td className="p-2 text-center">
                       {canEdit ? (
@@ -643,6 +720,7 @@ export default function ViewTimesheetPage() {
                           type="checkbox"
                           checked={entry.working_in_yard}
                           onChange={(e) => updateEntry(index, 'working_in_yard', e.target.checked)}
+                          disabled={entry.did_not_work}
                           className="w-4 h-4"
                         />
                       ) : (
@@ -659,6 +737,7 @@ export default function ViewTimesheetPage() {
                             const val = e.target.value === '' ? null : parseFloat(e.target.value);
                             updateEntry(index, 'daily_total', val);
                           }}
+                          disabled={entry.did_not_work}
                           className={`w-24 text-right font-semibold ${
                             manuallyEditedDays.has(index) 
                               ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-300 dark:border-blue-700' 
@@ -685,7 +764,7 @@ export default function ViewTimesheetPage() {
                   </tr>
                 ))}
                 <tr className="bg-secondary/50 font-bold">
-                  <td colSpan={5} className="p-2 text-right">
+                  <td colSpan={6} className="p-2 text-right">
                     Weekly Total:
                   </td>
                   <td className="p-2 text-right text-lg">
@@ -713,6 +792,7 @@ export default function ViewTimesheetPage() {
                           type="time"
                           value={entry.time_started || ''}
                           onChange={(e) => updateEntry(index, 'time_started', e.target.value)}
+                          disabled={entry.did_not_work}
                         />
                       ) : (
                         <p className="text-sm">{entry.time_started || '-'}</p>
@@ -725,6 +805,7 @@ export default function ViewTimesheetPage() {
                           type="time"
                           value={entry.time_finished || ''}
                           onChange={(e) => updateEntry(index, 'time_finished', e.target.value)}
+                          disabled={entry.did_not_work}
                         />
                       ) : (
                         <p className="text-sm">{entry.time_finished || '-'}</p>
@@ -733,7 +814,37 @@ export default function ViewTimesheetPage() {
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Job Number</Label>
-                    <p className="text-sm font-mono">{(entry as TimesheetEntry & { job_number?: string }).job_number || (entry.working_in_yard ? 'YARD' : '-')}</p>
+                    {canEdit ? (
+                      <Input
+                        value={(entry as TimesheetEntry & { job_number?: string }).job_number || ''}
+                        onChange={(e) => updateEntry(index, 'job_number', e.target.value.toUpperCase())}
+                        disabled={entry.did_not_work}
+                        placeholder={entry.working_in_yard ? 'YARD' : 'Job #'}
+                        className="font-mono"
+                      />
+                    ) : (
+                      <p className="text-sm font-mono">
+                        {(entry as TimesheetEntry & { job_number?: string }).job_number || (entry.working_in_yard ? 'YARD' : '-')}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {canEdit ? (
+                      <>
+                        <input
+                          type="checkbox"
+                          id={`did-not-work-${index}`}
+                          checked={entry.did_not_work}
+                          onChange={(e) => updateEntry(index, 'did_not_work', e.target.checked)}
+                          className="w-4 h-4"
+                        />
+                        <Label htmlFor={`did-not-work-${index}`} className="text-sm">
+                          Did Not Work
+                        </Label>
+                      </>
+                    ) : (
+                      entry.did_not_work && <span className="text-sm text-amber-600">Did Not Work</span>
+                    )}
                   </div>
                   <div className="flex items-center space-x-2">
                     {canEdit ? (
@@ -743,6 +854,7 @@ export default function ViewTimesheetPage() {
                           id={`yard-${index}`}
                           checked={entry.working_in_yard}
                           onChange={(e) => updateEntry(index, 'working_in_yard', e.target.checked)}
+                          disabled={entry.did_not_work}
                           className="w-4 h-4"
                         />
                         <Label htmlFor={`yard-${index}`} className="text-sm">
@@ -777,6 +889,7 @@ export default function ViewTimesheetPage() {
                             const val = e.target.value === '' ? null : parseFloat(e.target.value);
                             updateEntry(index, 'daily_total', val);
                           }}
+                          disabled={entry.did_not_work}
                           className={`w-24 text-right text-lg font-bold ${
                             manuallyEditedDays.has(index) 
                               ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-300 dark:border-blue-700' 
