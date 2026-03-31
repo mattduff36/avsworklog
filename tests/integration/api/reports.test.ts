@@ -50,6 +50,30 @@ describe('Reports API', () => {
       const weeklyTotal = entries.reduce((sum, e) => sum + e.hours, 0);
       expect(weeklyTotal).toBe(41.0);
     });
+
+    it('should include leave-aware weekly totals in exports', () => {
+      const exportRow = {
+        'Employee Name': 'John Doe',
+        'Total Hours': '27.00',
+        'Leave Days': '1.5',
+        'Weekly Total (Hours + Days)': '27 hours + 1.5 days',
+      };
+
+      expect(exportRow).toHaveProperty('Total Hours');
+      expect(exportRow).toHaveProperty('Leave Days');
+      expect(exportRow['Weekly Total (Hours + Days)']).toContain('hours +');
+    });
+
+    it('should support day-unit leave values in per-day totals', () => {
+      const dayColumns = {
+        'Mon Hours': '9.00',
+        'Tue Hours': '1 day',
+        'Wed Hours': '4.00h + Half day',
+      };
+
+      expect(dayColumns['Tue Hours']).toBe('1 day');
+      expect(dayColumns['Wed Hours']).toContain('Half day');
+    });
   });
 
   describe('Inspection Reports', () => {

@@ -30,6 +30,27 @@ function isMissingTeamTimesheetTypeError(error: unknown): boolean {
   return /org_teams.*timesheet_type.*does not exist|timesheet_type.*does not exist/i.test(message);
 }
 
+function isMissingTimesheetOverrideSchemaError(error: unknown): boolean {
+  const message = getErrorMessage(error);
+  return /timesheet_type_exceptions.*does not exist|relation.*timesheet_type_exceptions|schema cache/i.test(message);
+}
+
+export function normalizeTimesheetType(value: unknown): TimesheetType | null {
+  if (value === 'civils' || value === 'plant') return value;
+  return null;
+}
+
+export function resolveTimesheetTypeWithOverride(params: {
+  overrideType?: unknown;
+  teamType?: unknown;
+  roleType?: unknown;
+}): TimesheetType {
+  const overrideType = normalizeTimesheetType(params.overrideType);
+  const teamType = normalizeTimesheetType(params.teamType);
+  const roleType = normalizeTimesheetType(params.roleType);
+  return overrideType || teamType || roleType || DEFAULT_TIMESHEET_TYPE;
+}
+
 async function fetchRoleTimesheetType(supabase: ReturnType<typeof createClient>, userId: string) {
   const { data, error } = await supabase
     .from('profiles')
@@ -62,25 +83,41 @@ export function useTimesheetType(userId?: string): UseTimesheetTypeReturn {
       }
 
       try {
-        // Prefer the team-level setting, but keep the role fallback while
-        // existing data is being migrated across.
-        const { data, error: fetchError } = await supabase
-          .from('profiles')
-          .select(`
-            team:org_teams!profiles_team_id_fkey (
-              timesheet_type
-            ),
-            role:roles (
-              timesheet_type
-            )
-          `)
-          .eq('id', userId)
-          .single();
+        // Precedence for new sheets:
+        // user override -> team default -> role fallback -> civils.
+        const [
+          { data, error: fetchError },
+          { data: overrideData, error: overrideError },
+        ] = await Promise.all([
+          supabase
+            .from('profiles')
+            .select(`
+              team:org_teams!profiles_team_id_fkey (
+                timesheet_type
+              ),
+              role:roles (
+                timesheet_type
+              )
+            `)
+            .eq('id', userId)
+            .single(),
+          supabase
+            .from('timesheet_type_exceptions')
+            .select('timesheet_type')
+            .eq('profile_id', userId)
+            .maybeSingle(),
+        ]);
+
+        if (overrideError && !isMissingTimesheetOverrideSchemaError(overrideError)) {
+          throw overrideError;
+        }
+
+        const overrideType = normalizeTimesheetType(overrideData?.timesheet_type);
 
         if (fetchError) {
           if (isMissingTeamTimesheetTypeError(fetchError)) {
             const fallbackType = await fetchRoleTimesheetType(supabase, userId);
-            setTimesheetType(fallbackType);
+            setTimesheetType((overrideType || fallbackType) as TimesheetType);
             setError(null);
             return;
           }
@@ -89,11 +126,11 @@ export function useTimesheetType(userId?: string): UseTimesheetTypeReturn {
 
         const teamData = data?.team as { timesheet_type?: string | null } | null;
         const roleData = data?.role as { timesheet_type?: string | null } | null;
-        const type = (
-          teamData?.timesheet_type ||
-          roleData?.timesheet_type ||
-          DEFAULT_TIMESHEET_TYPE
-        ) as TimesheetType;
+        const type = resolveTimesheetTypeWithOverride({
+          overrideType,
+          teamType: teamData?.timesheet_type,
+          roleType: roleData?.timesheet_type,
+        });
 
         setTimesheetType(type);
         setError(null);

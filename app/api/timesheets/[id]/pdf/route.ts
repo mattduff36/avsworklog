@@ -7,6 +7,11 @@ import { shouldUsePlantTimesheetV2Template } from '@/lib/pdf/timesheet-template-
 import type { Timesheet } from '@/types/timesheet';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import {
+  type ApprovedAbsenceForTimesheet,
+  getTimesheetWeekIsoBounds,
+  resolveTimesheetOffDayStates,
+} from '@/lib/utils/timesheet-off-days';
 
 export async function GET(
   request: NextRequest,
@@ -72,6 +77,23 @@ export async function GET(
 
     const typedTimesheetData = typedTimesheet as unknown as Timesheet;
     const shouldUsePlantV2Template = shouldUsePlantTimesheetV2Template(typedTimesheetData);
+    const { startIso, endIso } = getTimesheetWeekIsoBounds(typedTimesheetData.week_ending);
+    const { data: absenceData, error: absenceError } = await db
+      .from('absences')
+      .select('date, end_date, is_half_day, half_day_session, allow_timesheet_work_on_leave, absence_reasons(name,color,is_paid)')
+      .eq('profile_id', typedTimesheet.user_id)
+      .eq('status', 'approved')
+      .lte('date', endIso);
+
+    if (absenceError) {
+      console.warn('Failed to resolve leave state for PDF generation:', absenceError);
+    }
+
+    const approvedAbsences = ((absenceData || []) as ApprovedAbsenceForTimesheet[]).filter((row) => {
+      const rowEnd = row.end_date || row.date;
+      return row.date <= endIso && rowEnd >= startIso;
+    });
+    const offDayStates = resolveTimesheetOffDayStates(typedTimesheetData.week_ending, approvedAbsences, null);
 
     // Generate PDF
     const stream = await renderToStream(
@@ -79,10 +101,12 @@ export async function GET(
         ? PlantTimesheetV2PDF({
             timesheet: typedTimesheetData,
             employeeName: employeeName,
+            offDayStates,
           })
         : TimesheetPDF({
             timesheet: typedTimesheetData,
             employeeName: employeeName,
+            offDayStates,
           })
     );
 

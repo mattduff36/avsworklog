@@ -5,19 +5,33 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Calendar, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Calendar, AlertCircle, CheckCircle2, User } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { getWeekEnding, formatDateISO } from '@/lib/utils/date';
+import { Employee } from '@/types/common';
 
 interface WeekSelectorProps {
-  userId: string;
+  targetUserId: string;
   onWeekSelected: (weekEnding: string, existingTimesheetId: string | null) => void;
   initialWeek?: string | null;
+  canSelectEmployee?: boolean;
+  employees?: Employee[];
+  selectedEmployeeId?: string;
+  onSelectedEmployeeChange?: (employeeId: string) => void;
 }
 
-export function WeekSelector({ userId, onWeekSelected, initialWeek }: WeekSelectorProps) {
+export function WeekSelector({
+  targetUserId,
+  onWeekSelected,
+  initialWeek,
+  canSelectEmployee = false,
+  employees = [],
+  selectedEmployeeId = '',
+  onSelectedEmployeeChange,
+}: WeekSelectorProps) {
   const supabase = createClient();
   const [selectedDate, setSelectedDate] = useState(initialWeek || '');
   const [checking, setChecking] = useState(false);
@@ -32,6 +46,14 @@ export function WeekSelector({ userId, onWeekSelected, initialWeek }: WeekSelect
       setSelectedDate(defaultWeek);
     }
   }, [initialWeek, selectedDate]);
+
+  // Switching the target employee must clear stale validation state
+  // from a previously checked employee/week combination.
+  useEffect(() => {
+    setError('');
+    setExistingTimesheet(null);
+    setShowSuccess(false);
+  }, [targetUserId]);
 
   // Check if a date is a Sunday
   const isSunday = (dateString: string): boolean => {
@@ -60,6 +82,11 @@ export function WeekSelector({ userId, onWeekSelected, initialWeek }: WeekSelect
       return;
     }
 
+    if (!targetUserId) {
+      setError('Please select an employee first');
+      return;
+    }
+
     // Validate date is a Sunday
     if (!isSunday(selectedDate)) {
       setError('Week ending must be a Sunday. Please select a Sunday date.');
@@ -73,7 +100,7 @@ export function WeekSelector({ userId, onWeekSelected, initialWeek }: WeekSelect
       const { data: existing, error: queryError } = await supabase
         .from('timesheets')
         .select('id, status')
-        .eq('user_id', userId)
+        .eq('user_id', targetUserId)
         .eq('week_ending', selectedDate)
         .maybeSingle();
 
@@ -129,6 +156,29 @@ export function WeekSelector({ userId, onWeekSelected, initialWeek }: WeekSelect
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Date Picker */}
+          {canSelectEmployee && (
+            <div className="space-y-2">
+              <Label htmlFor="employee" className="text-foreground text-lg flex items-center gap-2">
+                <User className="h-4 w-4" />
+                Creating timesheet for
+              </Label>
+              <Select value={selectedEmployeeId} onValueChange={(value) => onSelectedEmployeeChange?.(value)}>
+                <SelectTrigger id="employee" className="h-12 text-base bg-white dark:bg-slate-900 border-border text-foreground">
+                  <SelectValue placeholder="Select employee..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {employees.map((employee) => (
+                    <SelectItem key={employee.id} value={employee.id} disabled={employee.has_module_access === false}>
+                      {employee.full_name}
+                      {employee.employee_id ? ` (${employee.employee_id})` : ''}
+                      {employee.has_module_access === false ? ' - No Timesheets access' : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="week-ending" className="text-foreground text-lg">
               Week Ending Date (Must be Sunday)
@@ -187,7 +237,7 @@ export function WeekSelector({ userId, onWeekSelected, initialWeek }: WeekSelect
           {/* Continue Button */}
           <Button
             onClick={handleProceed}
-            disabled={!selectedDate || checking || showSuccess}
+            disabled={!selectedDate || !targetUserId || checking || showSuccess}
             className="w-full h-14 text-lg bg-timesheet hover:bg-timesheet-dark text-white font-semibold"
           >
             {checking ? (

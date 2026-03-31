@@ -101,6 +101,7 @@ export const MANAGEMENT_MODULES: ModuleName[] = [
   'faq-editor',
   'error-reports',
   'admin-users',
+  'admin-settings',
   'customers',
   'quotes',
 ];
@@ -122,6 +123,7 @@ export const MODULE_SHORT_NAMES: Record<ModuleName, string> = {
   'faq-editor': 'FAQ',
   'error-reports': 'Errors',
   'admin-users': 'Users',
+  'admin-settings': 'Settings',
   'admin-vans': 'Fleet',
   'customers': 'Customers',
   'quotes': 'Quotes',
@@ -144,6 +146,7 @@ export const MODULE_CSS_VAR: Record<ModuleName, string> = {
   'faq-editor': '--avs-yellow',
   'error-reports': '--avs-yellow',
   'admin-users': '--avs-yellow',
+  'admin-settings': '--avs-yellow',
   'admin-vans': '--fleet-primary',
   'customers': '--avs-yellow',
   'quotes': '--avs-yellow',
@@ -167,6 +170,7 @@ export type ModuleName =
   | 'faq-editor'
   | 'error-reports'
   | 'admin-users'
+  | 'admin-settings'
   | 'admin-vans'
   | 'customers'
   | 'quotes';
@@ -188,6 +192,7 @@ export const ALL_MODULES: ModuleName[] = [
   'faq-editor',
   'error-reports',
   'admin-users',
+  'admin-settings',
   'admin-vans',
   'customers',
   'quotes',
@@ -210,6 +215,7 @@ export const MODULE_DISPLAY_NAMES: Record<ModuleName, string> = {
   'faq-editor': 'FAQ Editor',
   'error-reports': 'Error Reports',
   'admin-users': 'User Management',
+  'admin-settings': 'Admin Settings',
   'admin-vans': 'Fleet Management',
   'customers': 'Customers',
   'quotes': 'Quotes',
@@ -232,6 +238,7 @@ export const MODULE_DESCRIPTIONS: Record<ModuleName, string> = {
   'faq-editor': 'Manage FAQ categories and articles',
   'error-reports': 'Review and resolve submitted error reports',
   'admin-users': 'Manage user accounts',
+  'admin-settings': 'Manage admin-only tools and settings',
   'admin-vans': 'Manage fleet assets',
   'customers': 'Manage customer directory',
   'quotes': 'Create and track customer quotations',

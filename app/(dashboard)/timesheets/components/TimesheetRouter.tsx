@@ -16,13 +16,14 @@ import { resolveTimesheetRenderVariant } from './timesheet-routing';
  * 
  * Phase 5: Dynamic Routing
  * Routes users to the correct timesheet component based on their role.
- * Falls back to Civils timesheet if type not implemented (Q11: Answer B).
+ * Falls back to Standard timesheet if type not implemented (Q11: Answer B).
  */
 
 interface TimesheetRouterProps {
   weekEnding: string;
   existingId: string | null;
   userId: string;
+  onSelectedEmployeeChange?: (employeeId: string) => void;
   existingTimesheetType?: string | null;
   existingTemplateVersion?: number | null;
 }
@@ -31,6 +32,7 @@ export function TimesheetRouter({
   weekEnding,
   existingId,
   userId,
+  onSelectedEmployeeChange,
   existingTimesheetType = null,
   existingTemplateVersion = null,
 }: TimesheetRouterProps) {
@@ -57,7 +59,14 @@ export function TimesheetRouter({
   // New plant timesheets must always use v2.
   // Existing records are handled by template-version routing below.
   if (!existingId && timesheetType === 'plant') {
-    return <PlantTimesheetV2 weekEnding={weekEnding} existingId={existingId} userId={userId} />;
+    return (
+      <PlantTimesheetV2
+        weekEnding={weekEnding}
+        existingId={existingId}
+        userId={userId}
+        onSelectedEmployeeChange={onSelectedEmployeeChange}
+      />
+    );
   }
 
   const routing = resolveTimesheetRenderVariant({
@@ -68,22 +77,36 @@ export function TimesheetRouter({
   });
 
   if (routing.variant === 'plant-v2') {
-    return <PlantTimesheetV2 weekEnding={weekEnding} existingId={existingId} userId={userId} />;
+    return (
+      <PlantTimesheetV2
+        weekEnding={weekEnding}
+        existingId={existingId}
+        userId={userId}
+        onSelectedEmployeeChange={onSelectedEmployeeChange}
+      />
+    );
   }
 
   if (routing.variant === 'plant-legacy') {
-    return <PlantTimesheet weekEnding={weekEnding} existingId={existingId} userId={userId} />;
+    return (
+      <PlantTimesheet
+        weekEnding={weekEnding}
+        existingId={existingId}
+        userId={userId}
+        onSelectedEmployeeChange={onSelectedEmployeeChange}
+      />
+    );
   }
 
   // Get the timesheet component from registry
   const TimesheetComponent = routing.type ? TimesheetRegistry[routing.type] : null;
 
-  // Timesheet type not implemented (Q11: Fallback to civils with warning)
+  // Timesheet type not implemented (Q11: fallback to standard type with warning)
   if (!TimesheetComponent || !isTimesheetTypeImplemented(routing.type || '')) {
     const attemptedType = routing.type || 'unknown';
     const attemptedLabel = getTimesheetTypeLabel(attemptedType);
     
-    // Fall back to civils timesheet (Q11: Answer B)
+    // Fall back to standard timesheet type (internal key: civils)
     const CivilsTimesheet = TimesheetRegistry['civils'];
     
     return (
@@ -95,7 +118,7 @@ export function TimesheetRouter({
             <p className="font-semibold mb-2">Timesheet Type Not Available</p>
             <p className="text-sm mb-3">
               Your role is configured to use <span className="font-semibold">{attemptedLabel}</span>, 
-              but this timesheet type is not yet available. You&apos;ve been given the standard Civils timesheet instead.
+              but this timesheet type is not yet available. You&apos;ve been given the Standard Timesheet instead.
             </p>
             <p className="text-sm">
               Please contact your administrator if you believe this is incorrect.
@@ -103,9 +126,14 @@ export function TimesheetRouter({
           </AlertDescription>
         </Alert>
 
-        {/* Show civils timesheet as fallback */}
+        {/* Show standard timesheet as fallback */}
         {CivilsTimesheet ? (
-          <CivilsTimesheet weekEnding={weekEnding} existingId={existingId} userId={userId} />
+          <CivilsTimesheet
+            weekEnding={weekEnding}
+            existingId={existingId}
+            userId={userId}
+            onSelectedEmployeeChange={onSelectedEmployeeChange}
+          />
         ) : (
           <Card className="">
             <CardHeader>
@@ -129,5 +157,12 @@ export function TimesheetRouter({
   }
 
   // Success: Render the correct timesheet component
-  return <TimesheetComponent weekEnding={weekEnding} existingId={existingId} userId={userId} />;
+  return (
+    <TimesheetComponent
+      weekEnding={weekEnding}
+      existingId={existingId}
+      userId={userId}
+      onSelectedEmployeeChange={onSelectedEmployeeChange}
+    />
+  );
 }

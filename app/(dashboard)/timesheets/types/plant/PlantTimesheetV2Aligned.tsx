@@ -47,6 +47,7 @@ import {
   normalizeTimesheetEntriesForOffDays,
   resolveTimesheetOffDayStates,
 } from '@/lib/utils/timesheet-off-days';
+import { buildLeaveAwareTotals, formatLeaveAwareWeeklyDisplayMultiline } from '@/lib/utils/timesheet-leave-totals';
 import type { WorkShiftPattern } from '@/types/work-shifts';
 import {
   buildValidationErrors,
@@ -63,6 +64,7 @@ interface PlantTimesheetV2Props {
   weekEnding: string;
   existingId: string | null;
   userId?: string;
+  onSelectedEmployeeChange?: (employeeId: string) => void;
 }
 
 interface PlantAsset {
@@ -222,6 +224,7 @@ export function PlantTimesheetV2({
   weekEnding: initialWeekEnding,
   existingId: initialExistingId,
   userId: managerSelectedUserId,
+  onSelectedEmployeeChange,
 }: PlantTimesheetV2Props) {
   const router = useRouter();
   const { user, profile, loading: authLoading, isManager, isAdmin, isSuperAdmin } = useAuth();
@@ -270,13 +273,20 @@ export function PlantTimesheetV2({
 
   const currentOffDayKey = selectedEmployeeId && weekEnding ? `${selectedEmployeeId}:${weekEnding}` : '';
   const offDayMap = useMemo(
-    () => new Map(offDayStates.map((state) => [state.day_of_week, state] as const)),
-    [offDayStates]
+    () =>
+      offDayKey === currentOffDayKey
+        ? new Map(offDayStates.map((state) => [state.day_of_week, state] as const))
+        : new Map<number, TimesheetOffDayState>(),
+    [currentOffDayKey, offDayKey, offDayStates]
   );
 
-  const weeklyTotal = useMemo(
-    () => entries.reduce((sum, entry) => sum + (entry.daily_total || 0), 0),
-    [entries]
+  const leaveAwareTotals = useMemo(
+    () => buildLeaveAwareTotals(entries, offDayStates),
+    [entries, offDayStates]
+  );
+  const weeklyTotalMultiline = formatLeaveAwareWeeklyDisplayMultiline(
+    leaveAwareTotals.weekly.workedHours,
+    leaveAwareTotals.weekly.leaveDays
   );
 
   const selectedPlant = useMemo(
@@ -346,6 +356,13 @@ export function PlantTimesheetV2({
       cancelled = true;
     };
   }, [authLoading, hasElevatedPermissions, managerSelectedUserId, user]);
+
+  useEffect(() => {
+    if (!managerSelectedUserId) return;
+    setSelectedEmployeeId((current) =>
+      current === managerSelectedUserId ? current : managerSelectedUserId
+    );
+  }, [managerSelectedUserId]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -550,12 +567,15 @@ export function PlantTimesheetV2({
           console.warn('Failed to load work shift pattern for plant timesheet off-day defaults:', workShiftError);
         }
 
+        if (cancelled) return;
+
         const resolvedStates = resolveTimesheetOffDayStates(
           weekEnding,
           filteredAbsences,
           resolvedPattern
         );
 
+        if (cancelled) return;
         setOffDayStates(resolvedStates);
         setOffDayKey(requestKey);
       } catch (offDayError) {
@@ -717,6 +737,7 @@ export function PlantTimesheetV2({
 
   const handleSelectedEmployeeChange = (nextEmployeeId: string) => {
     setSelectedEmployeeId(nextEmployeeId);
+    onSelectedEmployeeChange?.(nextEmployeeId);
 
     // New timesheets should reset daily rows when switching employee context
     // to avoid carrying over prior employee leave defaults/values.
@@ -1010,7 +1031,7 @@ export function PlantTimesheetV2({
           </div>
           <div className="bg-timesheet/10 dark:bg-timesheet/20 border border-timesheet/30 rounded-lg px-3 py-2">
             <div className="text-xs text-muted-foreground">Total</div>
-            <div className="text-lg font-bold text-foreground">{formatHours(weeklyTotal)}h</div>
+            <div className="text-lg font-bold text-foreground whitespace-pre-line text-right">{weeklyTotalMultiline}</div>
           </div>
         </div>
       </div>
@@ -1265,7 +1286,7 @@ export function PlantTimesheetV2({
                     <div className="text-center mb-4">
                       <h3 className="text-3xl font-bold text-foreground">{DAY_NAMES[index]}</h3>
                       <p className="text-xl font-semibold text-timesheet">
-                        {entry.daily_total !== null ? formatHours(entry.daily_total) : '0.00'}h
+                        {leaveAwareTotals.rowByDay.get(entry.day_of_week)?.display ?? `${formatHours(entry.daily_total)}h`}
                       </p>
                     </div>
 
@@ -1427,7 +1448,7 @@ export function PlantTimesheetV2({
                       <div className="space-y-2">
                         <Label className="text-foreground text-xl">Total Hours</Label>
                         <div className="text-3xl font-semibold text-timesheet">
-                          {entry.daily_total !== null ? formatHours(entry.daily_total) : '0.00'}
+                          {leaveAwareTotals.rowByDay.get(entry.day_of_week)?.display ?? `${formatHours(entry.daily_total)}h`}
                         </div>
                       </div>
 
@@ -1693,7 +1714,7 @@ export function PlantTimesheetV2({
                           </div>
                         </td>
                         <td className="p-3 text-right font-semibold text-timesheet">
-                          {entry.daily_total !== null ? formatHours(entry.daily_total) : '0.00'}
+                          {leaveAwareTotals.rowByDay.get(entry.day_of_week)?.display ?? `${formatHours(entry.daily_total)}h`}
                         </td>
                         <td className="p-3">
                           <Input
@@ -1806,8 +1827,8 @@ export function PlantTimesheetV2({
                   <td colSpan={6} className="p-3 text-right text-white">
                     Weekly Total:
                   </td>
-                  <td className="p-3 text-right text-lg text-timesheet">
-                    {formatHours(weeklyTotal)}h
+                  <td className="p-3 text-right text-lg text-timesheet whitespace-pre-line">
+                    {weeklyTotalMultiline}
                   </td>
                   <td></td>
                 </tr>

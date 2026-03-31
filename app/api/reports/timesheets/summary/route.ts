@@ -9,17 +9,20 @@ import {
   formatExcelHours, 
   formatExcelStatus
 } from '@/lib/utils/excel';
+import type { ApprovedAbsenceForTimesheet } from '@/lib/utils/timesheet-off-days';
+import { getTimesheetWeekIsoBounds, resolveTimesheetOffDayStates } from '@/lib/utils/timesheet-off-days';
+import { buildLeaveAwareTotals, buildLeaveDaysBreakdown } from '@/lib/utils/timesheet-leave-totals';
 
 type AbsenceReasonRow = {
   is_paid?: boolean | null;
   name?: string | null;
 };
 
-type AbsenceRow = {
+interface AbsenceRow extends ApprovedAbsenceForTimesheet {
   profile_id: string;
   duration_days?: number | null;
   absence_reasons?: AbsenceReasonRow | null;
-};
+}
 
 type TimesheetEntryRow = {
   day_of_week: number;
@@ -100,6 +103,9 @@ function buildAbsenceQuery(
       profile_id,
       date,
       end_date,
+      is_half_day,
+      half_day_session,
+      allow_timesheet_work_on_leave,
       duration_days,
       status,
       absence_reasons (
@@ -123,7 +129,7 @@ function buildAbsenceQuery(
 
 // Helper function to group absences by employee
 function groupAbsencesByEmployee(absences: AbsenceRow[]) {
-  const absencesByEmployee = new Map<string, { paidDays: number; unpaidDays: number; reasons: string[] }>();
+  const absencesByEmployee = new Map<string, { paidDays: number; unpaidDays: number; reasons: string[]; rows: AbsenceRow[] }>();
   
   absences.forEach((absence) => {
     const employeeId = absence.profile_id;
@@ -132,7 +138,7 @@ function groupAbsencesByEmployee(absences: AbsenceRow[]) {
     const reasonName = absence.absence_reasons?.name || 'Unknown';
     
     if (!absencesByEmployee.has(employeeId)) {
-      absencesByEmployee.set(employeeId, { paidDays: 0, unpaidDays: 0, reasons: [] });
+      absencesByEmployee.set(employeeId, { paidDays: 0, unpaidDays: 0, reasons: [], rows: [] });
     }
     
     const employeeAbsences = absencesByEmployee.get(employeeId)!;
@@ -145,6 +151,7 @@ function groupAbsencesByEmployee(absences: AbsenceRow[]) {
     if (!employeeAbsences.reasons.includes(reasonName)) {
       employeeAbsences.reasons.push(reasonName);
     }
+    employeeAbsences.rows.push(absence);
   });
   
   return absencesByEmployee;
@@ -153,7 +160,7 @@ function groupAbsencesByEmployee(absences: AbsenceRow[]) {
 // Helper function to transform timesheets to Excel rows
 function transformTimesheetsToExcel(
   timesheets: TimesheetRow[],
-  absencesByEmployee: Map<string, { paidDays: number; unpaidDays: number; reasons: string[] }>
+  absencesByEmployee: Map<string, { paidDays: number; unpaidDays: number; reasons: string[]; rows: AbsenceRow[] }>
 ) {
   const DAY_NAMES = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   const excelData: Array<Record<string, string>> = [];
@@ -162,7 +169,16 @@ function transformTimesheetsToExcel(
     const employee = timesheet.employee;
     const entries = timesheet.timesheet_entries || [];
     const sortedEntries = [...entries].sort((a, b) => a.day_of_week - b.day_of_week);
-    const totalHours = entries.reduce((sum, entry) => sum + (entry.did_not_work ? 0 : (entry.daily_total ?? 0)), 0);
+    const weekBounds = getTimesheetWeekIsoBounds(timesheet.week_ending);
+    const employeeAbsenceState = absencesByEmployee.get(timesheet.user_id) || { paidDays: 0, unpaidDays: 0, reasons: [], rows: [] };
+    const weekAbsences = employeeAbsenceState.rows.filter((absence) => {
+      const absenceEnd = absence.end_date || absence.date;
+      return absence.date <= weekBounds.endIso && absenceEnd >= weekBounds.startIso;
+    });
+    const offDayStates = resolveTimesheetOffDayStates(timesheet.week_ending, weekAbsences, null);
+    const leaveAwareTotals = buildLeaveAwareTotals(entries, offDayStates);
+    const leaveDaysBreakdown = buildLeaveDaysBreakdown(offDayStates);
+    const totalHours = leaveAwareTotals.weekly.workedHours;
 
     const row: Record<string, string> = {
       'Employee Name': employee?.full_name || 'Unknown',
@@ -170,6 +186,8 @@ function transformTimesheetsToExcel(
       'Week Ending': formatExcelDate(timesheet.week_ending),
       'Status': formatExcelStatus(timesheet.status),
       'Total Hours': formatExcelHours(totalHours),
+      'Leave Days': leaveDaysBreakdown.leaveDays > 0 ? leaveDaysBreakdown.leaveDays.toFixed(1) : '-',
+      'Weekly Total (Hours + Days)': leaveAwareTotals.weekly.display,
     };
 
     const jobNumbers: string[] = [];
@@ -180,8 +198,11 @@ function transformTimesheetsToExcel(
     sortedEntries.forEach((entry) => {
       const dayName = DAY_NAMES[entry.day_of_week] || '';
       const day = dayName.substring(0, 3);
+      const rowTotal = leaveAwareTotals.rowByDay.get(entry.day_of_week);
 
-      if (entry.did_not_work) {
+      if (rowTotal?.hasLeave) {
+        row[`${day} Hours`] = rowTotal.display;
+      } else if (entry.did_not_work) {
         const reasonInfo = getDidNotWorkReasonInfo(entry.did_not_work, entry.remarks);
         row[`${day} Hours`] = `DNW - ${reasonInfo.reasonDisplay}`;
         dnwDays += 1;
@@ -193,9 +214,9 @@ function transformTimesheetsToExcel(
           dnwDetails.push(`${dayName}: Unknown`);
         }
       } else if (entry.working_in_yard) {
-        row[`${day} Hours`] = `${formatExcelHours(entry.daily_total ?? null)} (Yard)`;
+        row[`${day} Hours`] = `${formatExcelHours(rowTotal?.workedHours ?? entry.daily_total ?? null)} (Yard)`;
       } else {
-        row[`${day} Hours`] = formatExcelHours(entry.daily_total ?? null);
+        row[`${day} Hours`] = formatExcelHours(rowTotal?.workedHours ?? entry.daily_total ?? null);
       }
 
       if (entry.job_number && !entry.did_not_work) {
@@ -208,7 +229,7 @@ function transformTimesheetsToExcel(
     row['DNW Reasons'] = dnwReasons.size > 0 ? [...dnwReasons].join(', ') : '-';
     row['DNW Details'] = dnwDetails.length > 0 ? dnwDetails.join('; ') : '-';
     
-    const employeeAbsences = absencesByEmployee.get(timesheet.user_id) || { paidDays: 0, unpaidDays: 0, reasons: [] };
+    const employeeAbsences = absencesByEmployee.get(timesheet.user_id) || { paidDays: 0, unpaidDays: 0, reasons: [], rows: [] };
     row['Paid Absence (Days)'] = employeeAbsences.paidDays > 0 ? employeeAbsences.paidDays.toFixed(1) : '-';
     row['Unpaid Absence (Days)'] = employeeAbsences.unpaidDays > 0 ? employeeAbsences.unpaidDays.toFixed(1) : '-';
     row['Absence Reasons'] = employeeAbsences.reasons.join(', ') || '-';
@@ -267,16 +288,17 @@ export async function GET(request: NextRequest) {
     const approvedTimesheets = excelData.filter(row => row['Status'] === 'Approved');
     if (approvedTimesheets.length > 0) {
       const totalHours = approvedTimesheets.reduce((sum, row) => sum + (parseFloat(row['Total Hours']) || 0), 0);
+    const totalLeaveDays = approvedTimesheets.reduce((sum, row) => sum + (parseFloat(row['Leave Days']) || 0), 0);
 
       excelData.push({
-        'Employee Name': '', 'Employee ID': '', 'Week Ending': '', 'Status': '', 'Total Hours': '',
+      'Employee Name': '', 'Employee ID': '', 'Week Ending': '', 'Status': '', 'Total Hours': '', 'Leave Days': '', 'Weekly Total (Hours + Days)': '',
         'Mon Hours': '', 'Tue Hours': '', 'Wed Hours': '', 'Thu Hours': '', 'Fri Hours': '', 'Sat Hours': '', 'Sun Hours': '',
         'Job Numbers': '', 'DNW Days': '', 'DNW Reasons': '', 'DNW Details': '', 'Paid Absence (Days)': '', 'Unpaid Absence (Days)': '', 'Absence Reasons': '', 'Submitted': '', 'Reviewed': '',
       });
 
       excelData.push({
         'Employee Name': 'TOTALS (Approved Only)', 'Employee ID': '', 'Week Ending': '',
-        'Status': `${approvedTimesheets.length} timesheets`, 'Total Hours': totalHours.toFixed(2),
+      'Status': `${approvedTimesheets.length} timesheets`, 'Total Hours': totalHours.toFixed(2), 'Leave Days': totalLeaveDays.toFixed(1), 'Weekly Total (Hours + Days)': `${totalHours.toFixed(2)} hours + ${totalLeaveDays.toFixed(1)} days`,
         'Mon Hours': '', 'Tue Hours': '', 'Wed Hours': '', 'Thu Hours': '', 'Fri Hours': '', 'Sat Hours': '', 'Sun Hours': '',
         'Job Numbers': '', 'DNW Days': '', 'DNW Reasons': '', 'DNW Details': '', 'Paid Absence (Days)': '', 'Unpaid Absence (Days)': '', 'Absence Reasons': '', 'Submitted': '', 'Reviewed': '',
       });
@@ -291,6 +313,8 @@ export async function GET(request: NextRequest) {
         { header: 'Week Ending', key: 'Week Ending', width: 12 },
         { header: 'Status', key: 'Status', width: 10 },
         { header: 'Total Hours', key: 'Total Hours', width: 12 },
+        { header: 'Leave Days', key: 'Leave Days', width: 12 },
+        { header: 'Weekly Total (Hours + Days)', key: 'Weekly Total (Hours + Days)', width: 24 },
         { header: 'Mon Hours', key: 'Mon Hours', width: 12 },
         { header: 'Tue Hours', key: 'Tue Hours', width: 12 },
         { header: 'Wed Hours', key: 'Wed Hours', width: 12 },

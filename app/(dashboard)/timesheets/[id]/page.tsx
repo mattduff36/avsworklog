@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { createClient } from '@/lib/supabase/client';
@@ -21,6 +21,13 @@ import SignaturePad from '@/components/forms/SignaturePad';
 import { Database } from '@/types/database';
 import { TimesheetAdjustmentModal } from '@/components/timesheets/TimesheetAdjustmentModal';
 import { toast } from 'sonner';
+import {
+  type ApprovedAbsenceForTimesheet,
+  type TimesheetOffDayState,
+  getTimesheetWeekIsoBounds,
+  resolveTimesheetOffDayStates,
+} from '@/lib/utils/timesheet-off-days';
+import { buildLeaveAwareTotals, formatLeaveAwareWeeklyDisplayMultiline } from '@/lib/utils/timesheet-leave-totals';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,6 +60,7 @@ export default function ViewTimesheetPage() {
   const [originalData, setOriginalData] = useState<{entries: TimesheetEntry[], regNumber: string | null} | null>(null);
   const [dataChanged, setDataChanged] = useState(false);
   const [manuallyEditedDays, setManuallyEditedDays] = useState<Set<number>>(new Set());
+  const [offDayStates, setOffDayStates] = useState<TimesheetOffDayState[]>([]);
 
   const getActionErrorMessage = (err: unknown, fallback: string) => {
     return err instanceof Error && err.message.trim().length > 0 ? err.message : fallback;
@@ -82,6 +90,7 @@ export default function ViewTimesheetPage() {
         if (timesheetError.code === 'PGRST116') {
           setTimesheet(null);
           setEntries([]);
+          setOffDayStates([]);
           setSignature(null);
           setError('Timesheet not found. It may have been deleted.');
           setLoading(false);
@@ -94,6 +103,7 @@ export default function ViewTimesheetPage() {
       if (!isManager && !isAdmin && !isSuperAdmin && timesheetData.user_id !== user?.id) {
         setTimesheet(null);
         setEntries([]);
+        setOffDayStates([]);
         setSignature(null);
         setError('You do not have permission to view this timesheet');
         setLoading(false);
@@ -131,6 +141,28 @@ export default function ViewTimesheetPage() {
       });
 
       setEntries(fullWeek);
+
+      try {
+        const { startIso, endIso } = getTimesheetWeekIsoBounds(timesheetData.week_ending);
+        const { data: absenceData, error: absenceError } = await supabase
+          .from('absences')
+          .select('date, end_date, is_half_day, half_day_session, allow_timesheet_work_on_leave, absence_reasons(name,color,is_paid)')
+          .eq('profile_id', timesheetData.user_id)
+          .eq('status', 'approved')
+          .lte('date', endIso);
+
+        if (absenceError) throw absenceError;
+
+        const approvedAbsences = ((absenceData || []) as ApprovedAbsenceForTimesheet[]).filter((row) => {
+          const rowEnd = row.end_date || row.date;
+          return row.date <= endIso && rowEnd >= startIso;
+        });
+
+        setOffDayStates(resolveTimesheetOffDayStates(timesheetData.week_ending, approvedAbsences, null));
+      } catch (absenceLookupError) {
+        console.warn('Failed to resolve leave state for timesheet details view:', absenceLookupError);
+        setOffDayStates(resolveTimesheetOffDayStates(timesheetData.week_ending, [], null));
+      }
       
       // Store original data if this is an approved timesheet (for change tracking)
       if (timesheetData.status === 'approved') {
@@ -250,9 +282,14 @@ export default function ViewTimesheetPage() {
     }
   };
 
-  const weeklyTotal = entries.reduce((sum, entry) => {
-    return sum + (entry.daily_total || 0);
-  }, 0);
+  const leaveAwareTotals = useMemo(
+    () => buildLeaveAwareTotals(entries, offDayStates),
+    [entries, offDayStates]
+  );
+  const weeklyTotalMultiline = formatLeaveAwareWeeklyDisplayMultiline(
+    leaveAwareTotals.weekly.workedHours,
+    leaveAwareTotals.weekly.leaveDays
+  );
 
   const handleSave = async () => {
     if (!timesheet || !user) return;
@@ -728,7 +765,7 @@ export default function ViewTimesheetPage() {
                       )}
                     </td>
                     <td className="p-2 text-right font-semibold">
-                      {canEdit && hasElevatedAccess ? (
+                      {canEdit && hasElevatedAccess && !leaveAwareTotals.rowByDay.get(entry.day_of_week)?.hasLeave ? (
                         <Input
                           type="number"
                           step="0.25"
@@ -746,7 +783,7 @@ export default function ViewTimesheetPage() {
                         />
                       ) : (
                         <span className={manuallyEditedDays.has(index) ? 'text-blue-600 dark:text-blue-400' : ''}>
-                          {entry.daily_total !== null ? formatHours(entry.daily_total) : '0.00'}
+                          {leaveAwareTotals.rowByDay.get(entry.day_of_week)?.display || `${formatHours(entry.daily_total)}h`}
                         </span>
                       )}
                     </td>
@@ -767,8 +804,8 @@ export default function ViewTimesheetPage() {
                   <td colSpan={6} className="p-2 text-right">
                     Weekly Total:
                   </td>
-                  <td className="p-2 text-right text-lg">
-                    {formatHours(weeklyTotal)}
+                  <td className="p-2 text-right text-lg whitespace-pre-line">
+                    {weeklyTotalMultiline}
                   </td>
                   <td></td>
                 </tr>
@@ -880,7 +917,7 @@ export default function ViewTimesheetPage() {
                   <div className="pt-2 border-t">
                     <div className="flex justify-between items-center gap-2">
                       <span className="text-sm font-medium">Daily Total:</span>
-                      {canEdit && hasElevatedAccess ? (
+                      {canEdit && hasElevatedAccess && !leaveAwareTotals.rowByDay.get(entry.day_of_week)?.hasLeave ? (
                         <Input
                           type="number"
                           step="0.25"
@@ -898,7 +935,7 @@ export default function ViewTimesheetPage() {
                         />
                       ) : (
                         <span className={`text-lg font-bold ${manuallyEditedDays.has(index) ? 'text-blue-600 dark:text-blue-400' : ''}`}>
-                          {entry.daily_total !== null ? formatHours(entry.daily_total) : '0.00'} hrs
+                          {leaveAwareTotals.rowByDay.get(entry.day_of_week)?.display || `${formatHours(entry.daily_total)}h`}
                         </span>
                       )}
                     </div>
@@ -911,8 +948,8 @@ export default function ViewTimesheetPage() {
               <CardContent className="pt-6">
                 <div className="flex justify-between items-center">
                   <span className="text-lg font-semibold">Weekly Total:</span>
-                  <span className="text-2xl font-bold">
-                    {formatHours(weeklyTotal)} hrs
+                  <span className="text-2xl font-bold text-right whitespace-pre-line">
+                    {weeklyTotalMultiline}
                   </span>
                 </div>
               </CardContent>

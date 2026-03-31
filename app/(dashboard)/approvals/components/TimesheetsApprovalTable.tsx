@@ -15,8 +15,10 @@ import {
 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { Timesheet } from '@/types/timesheet';
+import { formatLeaveAwareWeeklyDisplayMultiline } from '@/lib/utils/timesheet-leave-totals';
 
 interface TimesheetEntry {
+  day_of_week: number;
   daily_total: number | null;
   job_number: string | null;
   working_in_yard: boolean;
@@ -29,6 +31,9 @@ interface TimesheetWithProfile extends Timesheet {
     employee_id: string;
   };
   timesheet_entries?: TimesheetEntry[];
+  leave_total_display?: string;
+  leave_worked_hours?: number;
+  leave_days?: number;
 }
 
 export interface ColumnVisibility {
@@ -104,7 +109,7 @@ export function TimesheetsApprovalTable({
         case 'date':
           return m * (new Date(a.week_ending).getTime() - new Date(b.week_ending).getTime());
         case 'totalHours':
-          return m * (computeTotalHours(a.timesheet_entries) - computeTotalHours(b.timesheet_entries));
+          return m * ((a.leave_worked_hours ?? computeTotalHours(a.timesheet_entries)) - (b.leave_worked_hours ?? computeTotalHours(b.timesheet_entries)));
         case 'status':
           return m * (a.status || '').localeCompare(b.status || '');
         case 'submittedAt':
@@ -252,7 +257,10 @@ export function TimesheetsApprovalTable({
           </TableHeader>
           <TableBody>
             {sortedTimesheets.map((ts) => {
-              const totalHours = computeTotalHours(ts.timesheet_entries);
+              const totalHours = ts.leave_worked_hours ?? computeTotalHours(ts.timesheet_entries);
+              const totalDisplay = ts.leave_days !== undefined
+                ? formatLeaveAwareWeeklyDisplayMultiline(totalHours, ts.leave_days)
+                : (ts.leave_total_display || (totalHours > 0 ? `${totalHours.toFixed(1)}h` : '-'));
               const jobNumbers = computeJobNumbers(ts.timesheet_entries);
 
               return (
@@ -276,8 +284,8 @@ export function TimesheetsApprovalTable({
                   </TableCell>
 
                   {columnVisibility.totalHours && (
-                    <TableCell className="text-muted-foreground font-mono">
-                      {totalHours > 0 ? totalHours.toFixed(1) : '-'}
+                    <TableCell className="text-muted-foreground font-mono whitespace-pre-line">
+                      {totalDisplay}
                     </TableCell>
                   )}
 

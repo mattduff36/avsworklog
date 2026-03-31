@@ -8,16 +8,20 @@ import {
   formatExcelDate,
   formatExcelHours
 } from '@/lib/utils/excel';
+import type { ApprovedAbsenceForTimesheet } from '@/lib/utils/timesheet-off-days';
+import { getTimesheetWeekIsoBounds, resolveTimesheetOffDayStates } from '@/lib/utils/timesheet-off-days';
+import { buildLeaveAwareTotals, buildLeaveDaysBreakdown } from '@/lib/utils/timesheet-leave-totals';
 
 type AbsenceReasonRow = {
+  name?: string | null;
   is_paid?: boolean | null;
 };
 
-type AbsenceRow = {
+interface AbsenceRow extends ApprovedAbsenceForTimesheet {
   profile_id: string;
   duration_days?: number | null;
   absence_reasons?: AbsenceReasonRow | null;
-};
+}
 
 type TimesheetEntryRow = {
   day_of_week: number;
@@ -111,6 +115,9 @@ export async function GET(request: NextRequest) {
         profile_id,
         date,
         end_date,
+        is_half_day,
+        half_day_session,
+        allow_timesheet_work_on_leave,
         duration_days,
         status,
         absence_reasons (
@@ -150,9 +157,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Group absences by employee for easier lookup
-    // Convert absence days to hours (9 hours per day as standard working day)
-    const HOURS_PER_DAY = 9;
     const absencesByEmployee = new Map<string, { paidDays: number; unpaidDays: number }>();
+    const absenceRowsByEmployee = new Map<string, AbsenceRow[]>();
 
     if (absences && absences.length > 0) {
       (absences as AbsenceRow[]).forEach((absence) => {
@@ -170,6 +176,10 @@ export async function GET(request: NextRequest) {
         } else {
           employeeAbsences.unpaidDays += days;
         }
+
+        const employeeRows = absenceRowsByEmployee.get(employeeId) || [];
+        employeeRows.push(absence);
+        absenceRowsByEmployee.set(employeeId, employeeRows);
       });
     }
 
@@ -189,6 +199,14 @@ export async function GET(request: NextRequest) {
     (timesheets as TimesheetRow[]).forEach((timesheet) => {
       const employee = timesheet.employee;
       const entries = timesheet.timesheet_entries || [];
+      const { startIso, endIso } = getTimesheetWeekIsoBounds(timesheet.week_ending);
+      const employeeAbsenceRows = (absenceRowsByEmployee.get(timesheet.user_id) || []).filter((absence) => {
+        const absenceEnd = absence.end_date || absence.date;
+        return absence.date <= endIso && absenceEnd >= startIso;
+      });
+      const offDayStates = resolveTimesheetOffDayStates(timesheet.week_ending, employeeAbsenceRows, null);
+      const leaveAwareTotals = buildLeaveAwareTotals(entries, offDayStates);
+      const leaveDaysBreakdown = buildLeaveDaysBreakdown(offDayStates);
 
       // Calculate hours by category based on new payroll rules:
       // - Mon-Fri: All hours at basic rate (no limit)
@@ -219,7 +237,7 @@ export async function GET(request: NextRequest) {
           return;
         }
 
-        const hours = entry.daily_total ?? 0;
+        const hours = leaveAwareTotals.rowByDay.get(entry.day_of_week)?.workedHours ?? (entry.daily_total ?? 0);
         const dayOfWeek = entry.day_of_week; // Integer: 1=Mon, 2=Tue, ..., 6=Sat, 7=Sun
         const isNightShift = entry.night_shift || false;
         const isBankHoliday = entry.bank_holiday || false;
@@ -242,8 +260,8 @@ export async function GET(request: NextRequest) {
 
       // Get absence data for this employee
       const employeeAbsences = absencesByEmployee.get(timesheet.user_id) || { paidDays: 0, unpaidDays: 0 };
-      const paidAbsenceHours = employeeAbsences.paidDays * HOURS_PER_DAY;
-      const unpaidAbsenceHours = employeeAbsences.unpaidDays * HOURS_PER_DAY;
+      const paidAbsenceHours = employeeAbsences.paidDays > 0 ? Number((employeeAbsences.paidDays * 9).toFixed(2)) : null;
+      const unpaidAbsenceHours = employeeAbsences.unpaidDays > 0 ? Number((employeeAbsences.unpaidDays * 9).toFixed(2)) : null;
 
       excelData.push({
         'Employee Name': employee?.full_name || 'Unknown',
@@ -252,6 +270,11 @@ export async function GET(request: NextRequest) {
         'Basic Hours (Mon-Fri)': formatExcelHours(basicHours),
         'Overtime 1.5x (Weekend)': formatExcelHours(overtime15Hours),
         'Overtime 2x (Night/Bank Holiday)': formatExcelHours(overtime2Hours),
+        'Worked Hours': formatExcelHours(leaveAwareTotals.weekly.workedHours),
+        'Leave Days': leaveDaysBreakdown.leaveDays > 0 ? leaveDaysBreakdown.leaveDays.toFixed(1) : '-',
+        'Paid Absence (Days)': leaveDaysBreakdown.paidLeaveDays > 0 ? leaveDaysBreakdown.paidLeaveDays.toFixed(1) : '-',
+        'Unpaid Absence (Days)': leaveDaysBreakdown.unpaidLeaveDays > 0 ? leaveDaysBreakdown.unpaidLeaveDays.toFixed(1) : '-',
+        'Weekly Total (Hours + Days)': leaveAwareTotals.weekly.display,
         'Paid Absence Hours': formatExcelHours(paidAbsenceHours),
         'Unpaid Absence Hours': formatExcelHours(unpaidAbsenceHours),
         'Total Hours': formatExcelHours(totalHours),
@@ -263,6 +286,10 @@ export async function GET(request: NextRequest) {
     const totalBasic = excelData.reduce((sum, row) => sum + (parseFloat(row['Basic Hours (Mon-Fri)']) || 0), 0);
     const totalOvertime15 = excelData.reduce((sum, row) => sum + (parseFloat(row['Overtime 1.5x (Weekend)']) || 0), 0);
     const totalOvertime2 = excelData.reduce((sum, row) => sum + (parseFloat(row['Overtime 2x (Night/Bank Holiday)']) || 0), 0);
+    const totalWorkedHours = excelData.reduce((sum, row) => sum + (parseFloat(row['Worked Hours']) || 0), 0);
+    const totalLeaveDays = excelData.reduce((sum, row) => sum + (parseFloat(row['Leave Days']) || 0), 0);
+    const totalPaidDays = excelData.reduce((sum, row) => sum + (parseFloat(row['Paid Absence (Days)']) || 0), 0);
+    const totalUnpaidDays = excelData.reduce((sum, row) => sum + (parseFloat(row['Unpaid Absence (Days)']) || 0), 0);
     const totalPaidAbsence = excelData.reduce((sum, row) => sum + (parseFloat(row['Paid Absence Hours']) || 0), 0);
     const totalUnpaidAbsence = excelData.reduce((sum, row) => sum + (parseFloat(row['Unpaid Absence Hours']) || 0), 0);
     const totalHours = excelData.reduce((sum, row) => sum + (parseFloat(row['Total Hours']) || 0), 0);
@@ -274,6 +301,11 @@ export async function GET(request: NextRequest) {
       'Basic Hours (Mon-Fri)': '',
       'Overtime 1.5x (Weekend)': '',
       'Overtime 2x (Night/Bank Holiday)': '',
+      'Worked Hours': '',
+      'Leave Days': '',
+      'Paid Absence (Days)': '',
+      'Unpaid Absence (Days)': '',
+      'Weekly Total (Hours + Days)': '',
       'Paid Absence Hours': '',
       'Unpaid Absence Hours': '',
       'Total Hours': '',
@@ -287,6 +319,11 @@ export async function GET(request: NextRequest) {
       'Basic Hours (Mon-Fri)': totalBasic.toFixed(2),
       'Overtime 1.5x (Weekend)': totalOvertime15.toFixed(2),
       'Overtime 2x (Night/Bank Holiday)': totalOvertime2.toFixed(2),
+      'Worked Hours': totalWorkedHours.toFixed(2),
+      'Leave Days': totalLeaveDays.toFixed(1),
+      'Paid Absence (Days)': totalPaidDays.toFixed(1),
+      'Unpaid Absence (Days)': totalUnpaidDays.toFixed(1),
+      'Weekly Total (Hours + Days)': `${totalWorkedHours.toFixed(2)} hours + ${totalLeaveDays.toFixed(1)} days`,
       'Paid Absence Hours': totalPaidAbsence.toFixed(2),
       'Unpaid Absence Hours': totalUnpaidAbsence.toFixed(2),
       'Total Hours': totalHours.toFixed(2),
@@ -318,6 +355,11 @@ export async function GET(request: NextRequest) {
           { header: 'Basic Hours (Mon-Fri)', key: 'Basic Hours (Mon-Fri)', width: 18 },
           { header: 'Overtime 1.5x (Weekend)', key: 'Overtime 1.5x (Weekend)', width: 20 },
           { header: 'Overtime 2x (Night/Bank Holiday)', key: 'Overtime 2x (Night/Bank Holiday)', width: 26 },
+          { header: 'Worked Hours', key: 'Worked Hours', width: 14 },
+          { header: 'Leave Days', key: 'Leave Days', width: 12 },
+          { header: 'Paid Absence (Days)', key: 'Paid Absence (Days)', width: 18 },
+          { header: 'Unpaid Absence (Days)', key: 'Unpaid Absence (Days)', width: 20 },
+          { header: 'Weekly Total (Hours + Days)', key: 'Weekly Total (Hours + Days)', width: 26 },
           { header: 'Paid Absence Hours', key: 'Paid Absence Hours', width: 18 },
           { header: 'Unpaid Absence Hours', key: 'Unpaid Absence Hours', width: 20 },
           { header: 'Total Hours', key: 'Total Hours', width: 12 },

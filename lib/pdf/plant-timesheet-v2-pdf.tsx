@@ -3,6 +3,8 @@ import { Document, Page, Text, View, StyleSheet, Image as PdfImage } from '@reac
 import { DAY_NAMES, Timesheet } from '@/types/timesheet';
 import { formatDate } from '@/lib/utils/date';
 import { getDidNotWorkReasonInfo } from '@/lib/utils/timesheetDidNotWork';
+import type { TimesheetOffDayState } from '@/lib/utils/timesheet-off-days';
+import { buildLeaveAwareTotals } from '@/lib/utils/timesheet-leave-totals';
 
 const styles = StyleSheet.create({
   page: {
@@ -278,6 +280,7 @@ const styles = StyleSheet.create({
 interface PlantTimesheetV2PDFProps {
   timesheet: Timesheet;
   employeeName?: string | null;
+  offDayStates?: TimesheetOffDayState[];
 }
 
 function formatHours(value: number | null | undefined): string {
@@ -285,7 +288,7 @@ function formatHours(value: number | null | undefined): string {
   return Number(value).toFixed(2);
 }
 
-export function PlantTimesheetV2PDF({ timesheet, employeeName }: PlantTimesheetV2PDFProps) {
+export function PlantTimesheetV2PDF({ timesheet, employeeName, offDayStates = [] }: PlantTimesheetV2PDFProps) {
   const sortedEntries = (timesheet.entries || []).sort((a, b) => a.day_of_week - b.day_of_week);
   const allDays = [1, 2, 3, 4, 5, 6, 7].map((dayNum) => {
     const entry = sortedEntries.find((item) => item.day_of_week === dayNum);
@@ -309,7 +312,7 @@ export function PlantTimesheetV2PDF({ timesheet, employeeName }: PlantTimesheetV
     };
   });
 
-  const totalWorkingHours = allDays.reduce((sum, entry) => sum + (entry.daily_total || 0), 0);
+  const leaveAwareTotals = buildLeaveAwareTotals(allDays, offDayStates);
   const formNumber = timesheet.id ? timesheet.id.slice(-5).toUpperCase() : '00000';
 
   return (
@@ -407,7 +410,7 @@ export function PlantTimesheetV2PDF({ timesheet, employeeName }: PlantTimesheetV
               <View style={styles.colOperatorStart}><Text style={styles.cellText}>{entry.did_not_work ? '' : (entry.time_started || '')}</Text></View>
               <View style={styles.colOperatorFinish}><Text style={styles.cellText}>{entry.did_not_work ? '' : (entry.time_finished || '')}</Text></View>
               <View style={styles.colOperatorYard}><Text style={styles.cellText}>{entry.did_not_work ? '' : formatHours(entry.operator_yard_hours)}</Text></View>
-              <View style={styles.colTotalWorking}><Text style={styles.cellText}>{entry.did_not_work ? '' : formatHours(entry.daily_total)}</Text></View>
+              <View style={styles.colTotalWorking}><Text style={styles.cellText}>{leaveAwareTotals.rowByDay.get(entry.day_of_week)?.display || ''}</Text></View>
               <View style={styles.colMachineTravel}><Text style={styles.cellText}>{entry.did_not_work ? '' : formatHours(entry.machine_travel_hours)}</Text></View>
               <View style={styles.colMachineStart}><Text style={styles.cellText}>{entry.did_not_work ? '' : (entry.machine_start_time || '')}</Text></View>
               <View style={styles.colMachineFinish}><Text style={styles.cellText}>{entry.did_not_work ? '' : (entry.machine_finish_time || '')}</Text></View>
@@ -436,7 +439,7 @@ export function PlantTimesheetV2PDF({ timesheet, employeeName }: PlantTimesheetV
             <View style={styles.colOperatorStart}><Text style={styles.cellText}></Text></View>
             <View style={styles.colOperatorFinish}><Text style={styles.cellText}></Text></View>
             <View style={styles.colOperatorYard}><Text style={styles.cellText}></Text></View>
-            <View style={styles.colTotalWorking}><Text style={{ ...styles.cellText, fontWeight: 'bold' }}>{formatHours(totalWorkingHours)}</Text></View>
+            <View style={styles.colTotalWorking}><Text style={{ ...styles.cellText, fontWeight: 'bold' }}>{leaveAwareTotals.weekly.display}</Text></View>
             <View style={styles.colMachineTravel}><Text style={styles.cellText}></Text></View>
             <View style={styles.colMachineStart}><Text style={styles.cellText}></Text></View>
             <View style={styles.colMachineFinish}><Text style={styles.cellText}></Text></View>

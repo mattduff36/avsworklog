@@ -47,12 +47,19 @@ import { AbsencesApprovalTable, ABSENCE_COLUMN_VISIBILITY_STORAGE_KEY, DEFAULT_A
 import type { AbsenceColumnVisibility } from './components/AbsencesApprovalTable';
 import { ProcessTimesheetModal } from './components/ProcessTimesheetModal';
 import { PageLoader } from '@/components/ui/page-loader';
+import {
+  type ApprovedAbsenceForTimesheet,
+  getTimesheetWeekIsoBounds,
+  resolveTimesheetOffDayStates,
+} from '@/lib/utils/timesheet-off-days';
+import { buildLeaveAwareTotals, formatLeaveAwareWeeklyDisplayMultiline } from '@/lib/utils/timesheet-leave-totals';
 
 function isAnnualLeaveReason(name: string): boolean {
   return name.trim().toLowerCase() === 'annual leave';
 }
 
 interface TimesheetEntry {
+  day_of_week: number;
   daily_total: number | null;
   job_number: string | null;
   working_in_yard: boolean;
@@ -65,6 +72,13 @@ interface TimesheetWithProfile extends Timesheet {
     employee_id: string;
   };
   timesheet_entries?: TimesheetEntry[];
+  leave_total_display?: string;
+  leave_worked_hours?: number;
+  leave_days?: number;
+}
+
+interface ApprovedAbsenceForApprovals extends ApprovedAbsenceForTimesheet {
+  profile_id: string;
 }
 
 interface FilterEmployee {
@@ -375,6 +389,7 @@ function ApprovalsContent() {
             employee_id
           ),
           timesheet_entries (
+            day_of_week,
             daily_total,
             job_number,
             working_in_yard,
@@ -386,7 +401,70 @@ function ApprovalsContent() {
         .order('submitted_at', { ascending: false });
 
       if (timesheetError) throw timesheetError;
-      setTimesheets(timesheetData || []);
+      const typedTimesheets = (timesheetData || []) as TimesheetWithProfile[];
+      const timesheetsWithLeaveTotals = typedTimesheets.map((timesheet) => ({
+        ...timesheet,
+        leave_total_display: undefined,
+        leave_worked_hours: undefined,
+        leave_days: undefined,
+      }));
+
+      const userIds = [...new Set(typedTimesheets.map((timesheet) => timesheet.user_id).filter(Boolean))];
+      if (userIds.length === 0) {
+        setTimesheets(timesheetsWithLeaveTotals);
+        return;
+      }
+
+      const weekBounds = typedTimesheets.map((timesheet) => {
+        const { startIso, endIso } = getTimesheetWeekIsoBounds(timesheet.week_ending);
+        return {
+          timesheetId: timesheet.id,
+          profileId: timesheet.user_id,
+          weekEnding: timesheet.week_ending,
+          startIso,
+          endIso,
+        };
+      });
+
+      const minStartIso = weekBounds.reduce((min, row) => (row.startIso < min ? row.startIso : min), weekBounds[0].startIso);
+      const maxEndIso = weekBounds.reduce((max, row) => (row.endIso > max ? row.endIso : max), weekBounds[0].endIso);
+
+      const { data: absencesData, error: absencesError } = await supabase
+        .from('absences')
+        .select('profile_id, date, end_date, is_half_day, half_day_session, allow_timesheet_work_on_leave, absence_reasons(name,color,is_paid)')
+        .in('profile_id', userIds)
+        .eq('status', 'approved')
+        .lte('date', maxEndIso);
+
+      if (absencesError) throw absencesError;
+
+      const approvedAbsences = (absencesData || []) as ApprovedAbsenceForApprovals[];
+      const absencesByProfile = new Map<string, ApprovedAbsenceForApprovals[]>();
+      approvedAbsences.forEach((absence) => {
+        const existing = absencesByProfile.get(absence.profile_id) || [];
+        existing.push(absence);
+        absencesByProfile.set(absence.profile_id, existing);
+      });
+
+      const enriched = timesheetsWithLeaveTotals.map((timesheet) => {
+        const { startIso, endIso } = getTimesheetWeekIsoBounds(timesheet.week_ending);
+        const employeeAbsences = absencesByProfile.get(timesheet.user_id) || [];
+        const weekAbsences = employeeAbsences.filter((absence) => {
+          const absenceEnd = absence.end_date || absence.date;
+          return absence.date <= endIso && absenceEnd >= startIso && absenceEnd >= minStartIso;
+        });
+        const offDayStates = resolveTimesheetOffDayStates(timesheet.week_ending, weekAbsences, null);
+        const leaveAwareTotals = buildLeaveAwareTotals(timesheet.timesheet_entries || [], offDayStates);
+
+        return {
+          ...timesheet,
+          leave_total_display: leaveAwareTotals.weekly.display,
+          leave_worked_hours: leaveAwareTotals.weekly.workedHours,
+          leave_days: leaveAwareTotals.weekly.leaveDays,
+        };
+      });
+
+      setTimesheets(enriched);
     } catch (error) {
       const errorContextId = 'approvals-fetch-list-error';
       console.error('Error fetching approvals:', error, { errorContextId });
@@ -855,7 +933,11 @@ function ApprovalsContent() {
 
                 {/* Card View - Always on mobile, conditional on desktop */}
                 <div className={timesheetViewMode === 'table' ? 'md:hidden space-y-4' : 'space-y-4'}>
-                  {filteredTimesheets.map((timesheet) => (
+                  {filteredTimesheets.map((timesheet) => {
+                    const cardTotalDisplay = typeof timesheet.leave_worked_hours === 'number' && typeof timesheet.leave_days === 'number'
+                      ? formatLeaveAwareWeeklyDisplayMultiline(timesheet.leave_worked_hours, timesheet.leave_days)
+                      : timesheet.leave_total_display;
+                    return (
                     <Link key={timesheet.id} href={`/timesheets/${timesheet.id}`} className="block">
                       <Card className="bg-white dark:bg-slate-900 border-border hover:shadow-lg hover:border-timesheet/50 transition-all duration-200 cursor-pointer">
                         <CardHeader>
@@ -881,6 +963,9 @@ function ApprovalsContent() {
                             <div className="text-sm text-muted-foreground">
                               {timesheet.submitted_at ? `Submitted ${formatDate(timesheet.submitted_at)}` : 'Not submitted'}
                               {timesheet.reg_number && ` • Reg: ${timesheet.reg_number}`}
+                              {cardTotalDisplay && (
+                                <p className="mt-1 whitespace-pre-line">{`Total: ${cardTotalDisplay}`}</p>
+                              )}
                             </div>
                             {timesheet.status === 'submitted' && (
                               <div className="flex gap-2" onClick={(e) => e.preventDefault()}>
@@ -933,7 +1018,8 @@ function ApprovalsContent() {
                         </CardContent>
                       </Card>
                     </Link>
-                  ))}
+                    );
+                  })}
                 </div>
               </>
             )}

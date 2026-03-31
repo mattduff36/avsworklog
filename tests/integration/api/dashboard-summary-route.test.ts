@@ -47,6 +47,7 @@ describe('GET /api/dashboard/summary', () => {
     vi.mocked(getEffectiveRole).mockResolvedValue({
       role_id: 'employee-role',
       role_name: 'employee',
+      role_class: 'employee',
       display_name: 'Employee',
       is_manager_admin: false,
       is_super_admin: false,
@@ -74,6 +75,7 @@ describe('GET /api/dashboard/summary', () => {
       'faq-editor': false,
       'error-reports': true,
       'admin-users': false,
+      'admin-settings': false,
       'admin-vans': false,
       customers: false,
       quotes: true,

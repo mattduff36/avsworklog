@@ -15,6 +15,7 @@ type TimesheetProps = {
   weekEnding: string;
   existingId: string | null;
   userId?: string; // For managers creating for others
+  onSelectedEmployeeChange?: (employeeId: string) => void;
 };
 
 import { CivilsTimesheet } from './civils/CivilsTimesheet';
@@ -36,8 +37,8 @@ export const TimesheetRegistry: Record<string, React.ComponentType<TimesheetProp
 export const TimesheetTypeOptions = [
   { 
     value: 'civils', 
-    label: 'Civils Timesheet (Default)',
-    description: 'Standard weekly timesheet for civil engineering work'
+    label: 'Standard Timesheet',
+    description: 'Standard weekly timesheet format'
   },
   { 
     value: 'plant', 

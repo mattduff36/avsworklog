@@ -28,4 +28,8 @@ describe('timesheet registry', () => {
   it('returns the expected label for plant', () => {
     expect(getTimesheetTypeLabel('plant')).toBe('Plant Timesheet');
   });
+
+  it('returns the expected label for the default timesheet type', () => {
+    expect(getTimesheetTypeLabel('civils')).toBe('Standard Timesheet');
+  });
 });

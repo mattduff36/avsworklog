@@ -35,6 +35,7 @@ import {
   normalizeTimesheetEntriesForOffDays,
   resolveTimesheetOffDayStates,
 } from '@/lib/utils/timesheet-off-days';
+import { buildLeaveAwareTotals, formatLeaveAwareWeeklyDisplayMultiline } from '@/lib/utils/timesheet-leave-totals';
 
 /**
  * Civils Timesheet Component
@@ -52,6 +53,7 @@ interface CivilsTimesheetProps {
   existingId: string | null;
   userId?: string;
   timesheetType?: 'civils' | 'plant';
+  onSelectedEmployeeChange?: (employeeId: string) => void;
 }
 
 type TimesheetEntryDraft = TimesheetEntryLike & {
@@ -83,6 +85,7 @@ export function CivilsTimesheet({
   existingId: initialExistingId,
   userId: managerSelectedUserId,
   timesheetType = 'civils',
+  onSelectedEmployeeChange,
 }: CivilsTimesheetProps) {
   const router = useRouter();
   const { user, profile, isManager, isAdmin, isSuperAdmin } = useAuth();
@@ -124,7 +127,7 @@ export function CivilsTimesheet({
   const [suggestedRegNumber, setSuggestedRegNumber] = useState<string | null>(null);
   const [showSuggestedVehiclePrompt, setShowSuggestedVehiclePrompt] = useState(false);
   const [vehiclePromptDismissed, setVehiclePromptDismissed] = useState(false);
-  const timesheetTypeLabel = timesheetType === 'plant' ? 'Plant' : 'Civils';
+  const timesheetTypeLabel = timesheetType === 'plant' ? 'Plant' : 'Standard';
   const timesheetHeaderTitle = existingTimesheetId
     ? `Edit ${timesheetTypeLabel} Timesheet`
     : `New ${timesheetTypeLabel} Timesheet`;
@@ -174,6 +177,14 @@ export function CivilsTimesheet({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, hasElevatedPermissions]);
+
+  // Keep local selected employee aligned when parent context changes.
+  useEffect(() => {
+    if (!managerSelectedUserId) return;
+    setSelectedEmployeeId((current) =>
+      current === managerSelectedUserId ? current : managerSelectedUserId
+    );
+  }, [managerSelectedUserId]);
 
   // Load existing timesheet if ID is provided via props
   useEffect(() => {
@@ -237,12 +248,15 @@ export function CivilsTimesheet({
           console.warn('Failed to load work shift pattern for timesheet off-day defaults:', workShiftError);
         }
 
+        if (cancelled) return;
+
         const resolvedStates = resolveTimesheetOffDayStates(
           weekEnding,
           filteredAbsences,
           resolvedPattern
         );
 
+        if (cancelled) return;
         setOffDayStates(resolvedStates);
         setOffDayKey(requestKey);
       } catch (offDayError) {
@@ -454,6 +468,7 @@ export function CivilsTimesheet({
 
   const handleSelectedEmployeeChange = (nextEmployeeId: string) => {
     setSelectedEmployeeId(nextEmployeeId);
+    onSelectedEmployeeChange?.(nextEmployeeId);
 
     // New timesheets should always start from a clean week for the chosen employee.
     // This prevents prior employee leave defaults from leaking into the new selection.
@@ -822,10 +837,14 @@ export function CivilsTimesheet({
     setEntries(normalizedEntries);
   };
 
-  // Calculate weekly total
-  const weeklyTotal = entries.reduce((sum, entry) => {
-    return sum + (entry.daily_total || 0);
-  }, 0);
+  const leaveAwareTotals = useMemo(
+    () => buildLeaveAwareTotals(entries, offDayStates),
+    [entries, offDayStates]
+  );
+  const weeklyTotalMultiline = formatLeaveAwareWeeklyDisplayMultiline(
+    leaveAwareTotals.weekly.workedHours,
+    leaveAwareTotals.weekly.leaveDays
+  );
 
   const isEntryComplete = (entry: TimesheetEntryDraft, dayIndex: number): boolean => {
     const offDay = getOffDayForIndex(dayIndex);
@@ -1217,7 +1236,7 @@ export function CivilsTimesheet({
           {/* Weekly Total Badge */}
           <div className="bg-timesheet/10 dark:bg-timesheet/20 border border-timesheet/30 rounded-lg px-3 py-2">
             <div className="text-xs text-muted-foreground">Total</div>
-            <div className="text-lg font-bold text-foreground">{formatHours(weeklyTotal)}h</div>
+            <div className="text-lg font-bold text-foreground whitespace-pre-line text-right">{weeklyTotalMultiline}</div>
           </div>
         </div>
       </div>
@@ -1263,7 +1282,11 @@ export function CivilsTimesheet({
                 <User className="h-4 w-4" />
                 Creating timesheet for
               </Label>
-              <Select value={selectedEmployeeId} onValueChange={handleSelectedEmployeeChange}>
+              <Select
+                value={selectedEmployeeId}
+                onValueChange={handleSelectedEmployeeChange}
+                disabled={Boolean(existingTimesheetId)}
+              >
                 <SelectTrigger className="h-12 text-base bg-slate-900/50 border-slate-600 text-white">
                   <SelectValue placeholder="Select employee..." />
                 </SelectTrigger>
@@ -1376,7 +1399,7 @@ export function CivilsTimesheet({
                   <div className="text-center mb-4">
                     <h3 className="text-3xl font-bold text-foreground">{DAY_NAMES[index]}</h3>
                     <p className="text-xl font-semibold text-timesheet">
-                      {entry.daily_total !== null ? formatHours(entry.daily_total) : '0.00'}h
+                      {leaveAwareTotals.rowByDay.get(entry.day_of_week)?.display ?? `${formatHours(entry.daily_total)}h`}
                     </p>
                   </div>
 
@@ -1659,7 +1682,7 @@ export function CivilsTimesheet({
                       </div>
                     </td>
                     <td className="p-3 text-right font-semibold text-timesheet">
-                      {entry.daily_total !== null ? formatHours(entry.daily_total) : '0.00'}
+                      {leaveAwareTotals.rowByDay.get(entry.day_of_week)?.display ?? `${formatHours(entry.daily_total)}h`}
                     </td>
                     <td className="p-3">
                       <Input
@@ -1676,8 +1699,8 @@ export function CivilsTimesheet({
                   <td colSpan={5} className="p-3 text-right text-white">
                     Weekly Total:
                   </td>
-                  <td className="p-3 text-right text-lg text-timesheet">
-                    {formatHours(weeklyTotal)}h
+                  <td className="p-3 text-right text-lg text-timesheet whitespace-pre-line">
+                    {weeklyTotalMultiline}
                   </td>
                   <td></td>
                 </tr>
@@ -1779,6 +1802,7 @@ export function CivilsTimesheet({
         onConfirm={handleConfirmSubmission}
         weekEnding={weekEnding}
         entries={entries}
+        offDayStates={offDayStates}
         regNumber={regNumber}
         submitting={false}
       />

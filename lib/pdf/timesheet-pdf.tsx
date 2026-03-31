@@ -3,6 +3,8 @@ import { Document, Page, Text, View, StyleSheet, Image as PdfImage } from '@reac
 import { Timesheet, DAY_NAMES } from '@/types/timesheet';
 import { formatDate } from '@/lib/utils/date';
 import { getDidNotWorkReasonInfo } from '@/lib/utils/timesheetDidNotWork';
+import type { TimesheetOffDayState } from '@/lib/utils/timesheet-off-days';
+import { buildLeaveAwareTotals } from '@/lib/utils/timesheet-leave-totals';
 
 // Create styles for the PDF matching the scanned form
 const styles = StyleSheet.create({
@@ -181,15 +183,13 @@ const styles = StyleSheet.create({
 interface TimesheetPDFProps {
   timesheet: Timesheet;
   employeeName?: string;
+  offDayStates?: TimesheetOffDayState[];
 }
 
-export function TimesheetPDF({ timesheet, employeeName }: TimesheetPDFProps) {
+export function TimesheetPDF({ timesheet, employeeName, offDayStates = [] }: TimesheetPDFProps) {
   // Sort entries by day of week
   const sortedEntries = (timesheet.entries || []).sort((a, b) => a.day_of_week - b.day_of_week);
   
-  // Calculate total hours
-  const totalHours = sortedEntries.reduce((sum, entry) => sum + (entry.daily_total || 0), 0);
-
   // Get form number (last 5 digits of ID or full ID if shorter)
   const formNumber = timesheet.id 
     ? timesheet.id.slice(-5).toUpperCase() 
@@ -223,6 +223,7 @@ export function TimesheetPDF({ timesheet, employeeName }: TimesheetPDFProps) {
       did_not_work: false,
     };
   });
+  const leaveAwareTotals = buildLeaveAwareTotals(allDays, offDayStates);
 
   return (
     <Document>
@@ -313,7 +314,7 @@ export function TimesheetPDF({ timesheet, employeeName }: TimesheetPDFProps) {
               </View>
               <View style={styles.colDailyTotal}>
                 <Text style={styles.cellText}>
-                  {entry.did_not_work ? '' : (entry.daily_total ? entry.daily_total.toFixed(2) : '')}
+                  {leaveAwareTotals.rowByDay.get(entry.day_of_week)?.display || ''}
                 </Text>
               </View>
               <View style={styles.colRemarks}>
@@ -344,7 +345,7 @@ export function TimesheetPDF({ timesheet, employeeName }: TimesheetPDFProps) {
               <Text style={styles.cellText}></Text>
             </View>
             <View style={styles.colDailyTotal}>
-              <Text style={[styles.cellText, { fontWeight: 'bold' }]}>{totalHours.toFixed(2)}</Text>
+              <Text style={[styles.cellText, { fontWeight: 'bold' }]}>{leaveAwareTotals.weekly.display}</Text>
             </View>
             <View style={styles.colRemarks}>
               <Text style={styles.cellText}></Text>

@@ -29,6 +29,7 @@ import {
   AlertTriangle,
   Building2,
   Receipt,
+  SlidersHorizontal,
   LucideIcon
 } from 'lucide-react';
 import { ModuleName } from '@/types/roles';
@@ -201,6 +202,13 @@ export const adminNavItems: NavItem[] = [
     icon: Users,
     module: 'admin-users',
     category: 'admin'
+  },
+  {
+    href: '/admin/settings',
+    label: 'Admin Settings',
+    icon: SlidersHorizontal,
+    module: 'admin-settings',
+    category: 'admin',
   },
   { 
     href: '/admin/faq', 

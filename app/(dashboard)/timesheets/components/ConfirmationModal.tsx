@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { DAY_NAMES } from '@/types/timesheet';
 import { formatHours } from '@/lib/utils/time-calculations';
+import type { TimesheetOffDayState } from '@/lib/utils/timesheet-off-days';
+import { buildLeaveAwareTotals, formatLeaveAwareWeeklyDisplayMultiline } from '@/lib/utils/timesheet-leave-totals';
 
 interface TimesheetEntry {
   day_of_week: number;
@@ -35,6 +37,7 @@ interface ConfirmationModalProps {
   onConfirm: () => void;
   weekEnding: string;
   entries: TimesheetEntry[];
+  offDayStates?: TimesheetOffDayState[];
   regNumber: string;
   submitting: boolean;
 }
@@ -45,13 +48,20 @@ export function ConfirmationModal({
   onConfirm,
   weekEnding,
   entries,
+  offDayStates = [],
   regNumber,
   submitting,
 }: ConfirmationModalProps) {
-  
-  // Calculate summary data
-  const totalHours = entries.reduce((sum, entry) => sum + (entry.daily_total || 0), 0);
-  const daysWorked = entries.filter(entry => !entry.did_not_work && entry.daily_total && entry.daily_total > 0).length;
+  const leaveAwareTotals = buildLeaveAwareTotals(entries, offDayStates);
+  const weeklyTotalMultiline = formatLeaveAwareWeeklyDisplayMultiline(
+    leaveAwareTotals.weekly.workedHours,
+    leaveAwareTotals.weekly.leaveDays
+  );
+  const totalHours = leaveAwareTotals.weekly.workedHours;
+  const daysWorked = entries.filter((entry) => {
+    const row = leaveAwareTotals.rowByDay.get(entry.day_of_week);
+    return !entry.did_not_work && (row?.workedHours || 0) > 0;
+  }).length;
   const uniqueJobNumbers = new Set(
     entries
       .filter(entry => entry.job_number && !entry.working_in_yard)
@@ -105,9 +115,9 @@ export function ConfirmationModal({
             <div className="bg-slate-50 dark:bg-slate-800/50 border border-border rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
                 <Clock className="h-4 w-4 text-muted-foreground" />
-                <p className="text-xs text-muted-foreground dark:text-muted-foreground font-medium">Total Hours</p>
+                <p className="text-xs text-muted-foreground dark:text-muted-foreground font-medium">Weekly Total</p>
               </div>
-              <p className="text-2xl font-bold text-foreground">{formatHours(totalHours)}</p>
+              <p className="text-xl font-bold text-foreground whitespace-pre-line">{weeklyTotalMultiline}</p>
             </div>
 
             {/* Days Worked */}
@@ -159,7 +169,8 @@ export function ConfirmationModal({
             </div>
             <div className="divide-y divide-slate-200 dark:divide-slate-700">
               {entries.map((entry, index) => {
-                const hasWork = entry.daily_total && entry.daily_total > 0;
+                const rowTotal = leaveAwareTotals.rowByDay.get(entry.day_of_week);
+                const hasWork = (rowTotal?.workedHours || 0) > 0;
                 return (
                   <div 
                     key={index} 
@@ -183,7 +194,7 @@ export function ConfirmationModal({
                                   : 'No times'}
                               </span>
                               <span className="font-semibold text-foreground">
-                                {entry.daily_total ? `${formatHours(entry.daily_total)}h` : '0h'}
+                                {rowTotal?.display || `${formatHours(entry.daily_total)}h`}
                               </span>
                             </>
                           )}
