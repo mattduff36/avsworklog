@@ -57,10 +57,14 @@ export function ConfirmationModal({
     leaveAwareTotals.weekly.workedHours,
     leaveAwareTotals.weekly.leaveDays
   );
-  const totalHours = leaveAwareTotals.weekly.workedHours;
+  const rawTotalHours = entries.reduce((sum, entry) => sum + (entry.daily_total || 0), 0);
   const daysWorked = entries.filter((entry) => {
     const row = leaveAwareTotals.rowByDay.get(entry.day_of_week);
     return !entry.did_not_work && (row?.workedHours || 0) > 0;
+  }).length;
+  const daysCoveredByWorkOrLeave = entries.filter((entry) => {
+    const row = leaveAwareTotals.rowByDay.get(entry.day_of_week);
+    return !entry.did_not_work && (((row?.workedHours || 0) > 0) || Boolean(row?.hasLeave));
   }).length;
   const uniqueJobNumbers = new Set(
     entries
@@ -73,9 +77,9 @@ export function ConfirmationModal({
 
   // Generate warnings (Q9 requirements)
   const warnings: string[] = [];
-  if (totalHours > 60) warnings.push('Total hours exceed 60 hours - please verify all entries');
-  if (totalHours < 10) warnings.push('Total hours are less than 10 - please ensure this is correct');
-  if (daysWorked === 0) warnings.push('No working days recorded - is this correct?');
+  if (rawTotalHours > 60) warnings.push('Total hours exceed 60 hours - please verify all entries');
+  if (rawTotalHours < 10) warnings.push('Total hours are less than 10 - please ensure this is correct');
+  if (daysCoveredByWorkOrLeave === 0) warnings.push('No working days recorded - is this correct?');
   if (daysWithMissingJobs > 0) warnings.push(`${daysWithMissingJobs} day(s) missing job numbers`);
 
   const formatDate = (dateString: string): string => {
