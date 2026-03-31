@@ -40,6 +40,7 @@ import {
 } from '@/lib/hooks/useAbsenceSecondaryPermissions';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { filterEmployeesBySelectedTeam } from '@/lib/utils/absence-admin';
+import { hasAccountsTimesheetFullVisibilityOverride } from '@/lib/utils/timesheet-visibility';
 import { toast } from 'sonner';
 import { TimesheetsApprovalTable, COLUMN_VISIBILITY_STORAGE_KEY, DEFAULT_COLUMN_VISIBILITY } from './components/TimesheetsApprovalTable';
 import type { ColumnVisibility } from './components/TimesheetsApprovalTable';
@@ -105,7 +106,11 @@ function ApprovalsContent() {
   });
   const supabase = createClient();
   const actorProfileId = profile?.id || '';
-  const isAdminTier = Boolean(isAdmin || isSuperAdmin);
+  const hasAccountsVisibilityOverride = hasAccountsTimesheetFullVisibilityOverride(
+    absenceSecondarySnapshot?.role_name,
+    absenceSecondarySnapshot?.team_name
+  );
+  const isAdminTier = Boolean(isAdmin || isSuperAdmin || hasAccountsVisibilityOverride);
   const activeTab: ApprovalsTab = tabParam === 'absences' ? 'absences' : 'timesheets';
   
   const [timesheets, setTimesheets] = useState<TimesheetWithProfile[]>([]);
@@ -186,7 +191,12 @@ function ApprovalsContent() {
   const approveAbsence = useApproveAbsence();
   const rejectAbsence = useRejectAbsence();
   useAbsenceRealtimeQueryInvalidation();
-  const canAuthoriseBookings = Boolean(absenceSecondarySnapshot?.flags.can_authorise_bookings || isAdmin || isSuperAdmin);
+  const canAuthoriseBookings = Boolean(
+    absenceSecondarySnapshot?.flags.can_authorise_bookings ||
+      isAdmin ||
+      isSuperAdmin ||
+      hasAccountsVisibilityOverride
+  );
   const actorTeamId = absenceSecondarySnapshot?.team_id || null;
   const actorTeamName = absenceSecondarySnapshot?.team_name || null;
   const scopeTeamOnly = Boolean(
