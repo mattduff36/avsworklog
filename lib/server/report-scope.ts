@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getUsersWithModuleAccess } from '@/lib/server/team-permissions';
 import { getEffectiveRole, type EffectiveRoleInfo } from '@/lib/utils/view-as';
+import { hasAccountsTimesheetFullVisibilityOverride } from '@/lib/utils/timesheet-visibility';
 import type { ModuleName } from '@/types/roles';
 
 export interface ReportScopeContext {
@@ -22,7 +23,11 @@ function isManagerLikeRole(effectiveRole: EffectiveRoleInfo): boolean {
 
 export async function getReportScopeContext(): Promise<ReportScopeContext> {
   const effectiveRole = await getEffectiveRole();
-  const isAdminTier = isAdminTierRole(effectiveRole);
+  const hasAccountsVisibilityOverride = hasAccountsTimesheetFullVisibilityOverride(
+    effectiveRole.role_name,
+    effectiveRole.team_name
+  );
+  const isAdminTier = isAdminTierRole(effectiveRole) || hasAccountsVisibilityOverride;
   const isManagerLike = isManagerLikeRole(effectiveRole);
 
   return {
