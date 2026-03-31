@@ -20,6 +20,19 @@ interface TimesheetListVisibilityArgs {
   effectiveTeamFilter: string;
 }
 
+export function hasAccountsTimesheetFullVisibilityOverride(
+  roleName: string | null | undefined,
+  teamName: string | null | undefined
+): boolean {
+  const normalizedRoleName = (roleName || '').trim().toLowerCase();
+  const normalizedTeamName = (teamName || '').trim().toLowerCase();
+
+  return (
+    normalizedTeamName === 'accounts' &&
+    (normalizedRoleName === 'manager' || normalizedRoleName === 'supervisor')
+  );
+}
+
 function canActorAuthoriseTarget(actor: TimesheetActorScope, target: TimesheetTargetScope): boolean {
   if (!actor.permissions || !actor.actorProfileId || !actor.canAuthoriseBookings) return false;
   if (actor.permissions.authorise_bookings_all) return true;

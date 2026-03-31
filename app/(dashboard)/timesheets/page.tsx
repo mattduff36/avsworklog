@@ -21,7 +21,7 @@ import {
   useAbsenceSecondaryPermissions,
 } from '@/lib/hooks/useAbsenceSecondaryPermissions';
 import { filterEmployeesBySelectedTeam } from '@/lib/utils/absence-admin';
-import { canShowTimesheetInList } from '@/lib/utils/timesheet-visibility';
+import { canShowTimesheetInList, hasAccountsTimesheetFullVisibilityOverride } from '@/lib/utils/timesheet-visibility';
 import { toast } from 'sonner';
 import {
   DropdownMenu,
@@ -73,8 +73,12 @@ export default function TimesheetsPage() {
     isLoading: absenceSecondaryLoading,
     isFetchedAfterMount: absenceSecondaryFetchedAfterMount,
   } = useAbsenceSecondaryPermissions(hasPermission);
-  const isElevatedUser = isManager || isAdmin || isSuperAdmin;
-  const isAdminTier = Boolean(isAdmin || isSuperAdmin);
+  const hasAccountsVisibilityOverride = hasAccountsTimesheetFullVisibilityOverride(
+    absenceSecondarySnapshot?.role_name,
+    absenceSecondarySnapshot?.team_name
+  );
+  const isElevatedUser = isManager || isAdmin || isSuperAdmin || hasAccountsVisibilityOverride;
+  const isAdminTier = Boolean(isAdmin || isSuperAdmin || hasAccountsVisibilityOverride);
   const hasAbsenceSecondarySnapshot = Boolean(absenceSecondarySnapshot?.permissions && absenceSecondarySnapshot?.flags);
   const isAbsenceSecondaryContextLoading =
     hasPermission && (absenceSecondaryLoading || (!absenceSecondaryFetchedAfterMount && !hasAbsenceSecondarySnapshot));

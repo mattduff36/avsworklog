@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowUpDown, Download, FileText, Package, Trash2 } from 'lucide-react';
+import { ArrowUpDown, Download, FileText, Trash2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -235,12 +235,6 @@ export function TimesheetsListTable({
                       <Badge variant="outline" className="border-slate-600 text-slate-400">
                         <FileText className="h-3 w-3 mr-1" />
                         N/A
-                      </Badge>
-                    )}
-                    {timesheet.status === 'processed' && (
-                      <Badge variant="outline" className="border-blue-500/30 text-blue-400 bg-blue-500/10">
-                        <Package className="h-3 w-3 mr-1" />
-                        Final
                       </Badge>
                     )}
                   </div>

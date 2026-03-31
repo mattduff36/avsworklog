@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 const ACTIVE_WINDOW_MINUTES = 5;
 const MAX_VISITS_TO_SCAN = 5000;
 const RECENT_USERS_LIMIT = 5;
+const EXCLUDED_ACTIVE_NOW_EMAIL = 'admin@mpdee.co.uk';
 
 interface ActiveUserSummary {
   userId: string;
@@ -89,6 +90,32 @@ function isSuperAdminProfile(profile: {
   return profile.super_admin === true || profile.role?.is_super_admin === true;
 }
 
+async function resolveExcludedUserId(admin: ReturnType<typeof createAdminClient>): Promise<string | null> {
+  const perPage = 1000;
+  let page = 1;
+
+  while (true) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
+    if (error) {
+      console.warn('Unable to resolve excluded active-now user:', error.message);
+      return null;
+    }
+
+    const matchedUser = data.users.find((candidate) => candidate.email === EXCLUDED_ACTIVE_NOW_EMAIL);
+    if (matchedUser?.id) {
+      return matchedUser.id;
+    }
+
+    if (data.users.length < perPage) {
+      break;
+    }
+
+    page += 1;
+  }
+
+  return null;
+}
+
 export async function GET() {
   const supabase = await createClient();
   const {
@@ -121,7 +148,7 @@ export async function GET() {
     role?: { is_super_admin?: boolean | null } | null;
   };
 
-  const isActualSuperAdmin = isSuperAdminProfile(typedProfile) || user.email === 'admin@mpdee.co.uk';
+  const isActualSuperAdmin = isSuperAdminProfile(typedProfile) || user.email === EXCLUDED_ACTIVE_NOW_EMAIL;
   if (!isActualSuperAdmin) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -148,9 +175,20 @@ export async function GET() {
     );
   }
 
+  const excludedUserIds = new Set<string>();
+  if (user.email === EXCLUDED_ACTIVE_NOW_EMAIL) {
+    excludedUserIds.add(user.id);
+  }
+
+  const resolvedExcludedUserId = await resolveExcludedUserId(admin);
+  if (resolvedExcludedUserId) {
+    excludedUserIds.add(resolvedExcludedUserId);
+  }
+
   const latestByUserId = new Map<string, ActiveUserSummary>();
   for (const rawVisit of (visits || []) as ActiveVisitRow[]) {
     if (!rawVisit.user_id || !rawVisit.visited_at) continue;
+    if (excludedUserIds.has(rawVisit.user_id)) continue;
     if (latestByUserId.has(rawVisit.user_id)) continue;
     latestByUserId.set(rawVisit.user_id, toActiveUserSummary(rawVisit));
   }

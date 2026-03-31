@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { getAbsenceSecondaryDefaultMap } from '@/types/absence-permissions';
-import { canShowTimesheetInList } from '@/lib/utils/timesheet-visibility';
+import {
+  canShowTimesheetInList,
+  hasAccountsTimesheetFullVisibilityOverride,
+} from '@/lib/utils/timesheet-visibility';
 
 describe('canShowTimesheetInList', () => {
   const managerPermissions = getAbsenceSecondaryDefaultMap('manager');
@@ -83,5 +86,23 @@ describe('canShowTimesheetInList', () => {
     });
 
     expect(canSeeOutOfTeamRow).toBe(false);
+  });
+});
+
+describe('hasAccountsTimesheetFullVisibilityOverride', () => {
+  it('returns true for Accounts manager', () => {
+    expect(hasAccountsTimesheetFullVisibilityOverride('manager', 'Accounts')).toBe(true);
+  });
+
+  it('returns true for Accounts supervisor with mixed casing', () => {
+    expect(hasAccountsTimesheetFullVisibilityOverride('Supervisor', 'aCCoUnts')).toBe(true);
+  });
+
+  it('returns false for non-Accounts manager', () => {
+    expect(hasAccountsTimesheetFullVisibilityOverride('manager', 'Operations')).toBe(false);
+  });
+
+  it('returns false for Accounts employee', () => {
+    expect(hasAccountsTimesheetFullVisibilityOverride('employee', 'Accounts')).toBe(false);
   });
 });

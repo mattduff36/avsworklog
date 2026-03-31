@@ -16,8 +16,27 @@ interface MockVisitRow {
   };
 }
 
-function createAdminClientMock(visits: MockVisitRow[], isSuperAdmin = true) {
+interface MockAuthUser {
+  id: string;
+  email?: string;
+}
+
+function createAdminClientMock(visits: MockVisitRow[], isSuperAdmin = true, authUsers: MockAuthUser[] = []) {
   return {
+    auth: {
+      admin: {
+        async listUsers({ page = 1, perPage = 1000 }: { page?: number; perPage?: number }) {
+          const start = (page - 1) * perPage;
+          const end = start + perPage;
+          return {
+            data: {
+              users: authUsers.slice(start, end),
+            },
+            error: null,
+          };
+        },
+      },
+    },
     from(table: string) {
       if (table === 'profiles') {
         return {
@@ -130,7 +149,13 @@ describe('GET /api/superadmin/active-users', () => {
     ];
 
     const { createAdminClient } = await import('@/lib/supabase/admin');
-    vi.mocked(createAdminClient).mockReturnValue(createAdminClientMock(visits) as never);
+    vi.mocked(createAdminClient).mockReturnValue(
+      createAdminClientMock(visits, true, [
+        { id: 'super-1', email: 'admin@mpdee.co.uk' },
+        { id: 'u1', email: 'u1@example.com' },
+        { id: 'u2', email: 'u2@example.com' },
+      ]) as never
+    );
 
     const response = await GET();
     const payload = await response.json();
@@ -146,6 +171,58 @@ describe('GET /api/superadmin/active-users', () => {
       'u4',
       'u5',
     ]);
+  });
+
+  it('excludes admin@mpdee.co.uk from active and recent lists for any superadmin viewer', async () => {
+    const { createClient } = await import('@/lib/supabase/server');
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'super-2', email: 'other-superadmin@example.com' } },
+          error: null,
+        }),
+      },
+    } as never);
+
+    const visits: MockVisitRow[] = [
+      {
+        user_id: 'excluded-user-id',
+        path: '/dashboard',
+        visited_at: '2026-03-30T11:59:50.000Z',
+        profile: { full_name: 'Admin Account', role: [{ display_name: 'Super Admin' }], team: [{ name: 'HQ' }] },
+      },
+      {
+        user_id: 'u2',
+        path: '/timesheets',
+        visited_at: '2026-03-30T11:58:00.000Z',
+        profile: { full_name: 'User Two', role: [{ display_name: 'Manager' }], team: [{ name: 'Civils' }] },
+      },
+      {
+        user_id: 'u3',
+        path: '/projects',
+        visited_at: '2026-03-30T11:40:00.000Z',
+        profile: { full_name: 'User Three', role: [{ display_name: 'Employee' }], team: [{ name: 'Ops' }] },
+      },
+    ];
+
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+    vi.mocked(createAdminClient).mockReturnValue(
+      createAdminClientMock(visits, true, [
+        { id: 'super-2', email: 'other-superadmin@example.com' },
+        { id: 'excluded-user-id', email: 'admin@mpdee.co.uk' },
+        { id: 'u2', email: 'u2@example.com' },
+        { id: 'u3', email: 'u3@example.com' },
+      ]) as never
+    );
+
+    const response = await GET();
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.activeNowUsers.map((entry: { userId: string }) => entry.userId)).toEqual(['u2']);
+    expect(payload.recentUsers.map((entry: { userId: string }) => entry.userId)).toEqual(['u2', 'u3']);
+    expect(payload.activeNowUsers.find((entry: { userId: string }) => entry.userId === 'excluded-user-id')).toBeFalsy();
+    expect(payload.recentUsers.find((entry: { userId: string }) => entry.userId === 'excluded-user-id')).toBeFalsy();
   });
 
   it('returns 403 for non-superadmin users', async () => {
