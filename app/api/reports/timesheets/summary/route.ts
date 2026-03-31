@@ -176,7 +176,13 @@ function transformTimesheetsToExcel(
       return absence.date <= weekBounds.endIso && absenceEnd >= weekBounds.startIso;
     });
     const offDayStates = resolveTimesheetOffDayStates(timesheet.week_ending, weekAbsences, null);
-    const leaveAwareTotals = buildLeaveAwareTotals(entries, offDayStates);
+    const leaveAwareTotals = buildLeaveAwareTotals(
+      entries.map((entry) => ({
+        day_of_week: entry.day_of_week,
+        daily_total: entry.daily_total ?? null,
+      })),
+      offDayStates
+    );
     const leaveDaysBreakdown = buildLeaveDaysBreakdown(offDayStates);
     const totalHours = leaveAwareTotals.weekly.workedHours;
 

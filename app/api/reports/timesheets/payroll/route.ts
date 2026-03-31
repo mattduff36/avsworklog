@@ -205,7 +205,13 @@ export async function GET(request: NextRequest) {
         return absence.date <= endIso && absenceEnd >= startIso;
       });
       const offDayStates = resolveTimesheetOffDayStates(timesheet.week_ending, employeeAbsenceRows, null);
-      const leaveAwareTotals = buildLeaveAwareTotals(entries, offDayStates);
+      const leaveAwareTotals = buildLeaveAwareTotals(
+        entries.map((entry) => ({
+          day_of_week: entry.day_of_week,
+          daily_total: entry.daily_total ?? null,
+        })),
+        offDayStates
+      );
       const leaveDaysBreakdown = buildLeaveDaysBreakdown(offDayStates);
 
       // Calculate hours by category based on new payroll rules:
