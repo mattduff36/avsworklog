@@ -386,9 +386,7 @@ export function AbsencePermissionExceptionsDialog({ open, onOpenChange }: Absenc
                     {flattenedColumns.map(({ column }) => {
                       const cellKey = `${row.profile_id}:${column.id}`;
                       const isSaving = savingCellKey === cellKey || resettingRowId === row.profile_id;
-                      const isTriState = column.mode === 'tri-state' && column.viewKey && column.editKey;
-
-                      if (isTriState) {
+                      if (column.mode === 'tri-state' && column.viewKey && column.editKey) {
                         const viewKey = column.viewKey;
                         const editKey = column.editKey;
                         const state = resolveTriState(row, viewKey, editKey);
