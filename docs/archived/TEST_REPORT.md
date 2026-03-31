@@ -164,7 +164,7 @@ npm run test:ui       # Open Vitest UI
 - ✅ Should require comments before submission
 - ✅ Should enable submission when comment provided
 
-**Suzanne Squires Prioritization:**
+**Suzanne Squires Prioritisation:**
 - ✅ Should show Suzanne Squires at top of list
 - ✅ Should mark Suzanne as "(Recommended)"
 

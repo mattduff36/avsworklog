@@ -219,7 +219,7 @@ describe('Plant Maintenance Type Structure Bug Fixes', () => {
   });
 
   describe('Auto-fetch logic improvements', () => {
-    it('should prioritize alert counts over individual status checks', () => {
+    it('should prioritise alert counts over individual status checks', () => {
       const vehicles = [
         // Vehicle with alerts
         { 

@@ -234,7 +234,7 @@ Tablet Mode will be an explicit, user-triggered UI mode for workshop users that 
 
 ### Inspections
 - Keep current logic, improve interaction density only.
-- Prioritize card-first usability in mode-on.
+- Prioritise card-first usability in mode-on.
 
 ### Workshop Tasks
 - Improve create/edit dialog touch behavior.

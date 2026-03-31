@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { getDidNotWorkReasonInfo } from '@/lib/utils/timesheetDidNotWork';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { filterTimesheetRowsForReportScope } from '@/lib/server/reports-timesheet-scope';
 import {
   generateExcelFile,
   formatExcelDate,
@@ -37,6 +38,7 @@ type TimesheetEntryRow = {
 type EmployeeRow = {
   full_name?: string | null;
   employee_id?: string | null;
+  team_id?: string | null;
 };
 
 type TimesheetRow = {
@@ -62,6 +64,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    const canAccessTimesheets = await canEffectiveRoleAccessModule('timesheets');
+    if (!canAccessTimesheets) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     // Get query parameters
     const searchParams = request.nextUrl.searchParams;
     const dateFrom = searchParams.get('dateFrom');
@@ -79,7 +86,8 @@ export async function GET(request: NextRequest) {
         employee:profiles!timesheets_user_id_fkey (
           id,
           full_name,
-          employee_id
+          employee_id,
+          team_id
         ),
         timesheet_entries (
           day_of_week,
@@ -152,16 +160,20 @@ export async function GET(request: NextRequest) {
       // Continue without absences rather than fail completely
     }
 
-    if (!timesheets || timesheets.length === 0) {
+    const scopedTimesheets = await filterTimesheetRowsForReportScope((timesheets || []) as TimesheetRow[]);
+    if (scopedTimesheets.length === 0) {
       return NextResponse.json({ error: 'No approved timesheets found for the specified criteria' }, { status: 404 });
     }
+
+    const scopedEmployeeIds = new Set(scopedTimesheets.map((timesheet) => timesheet.user_id));
+    const scopedAbsences = ((absences || []) as AbsenceRow[]).filter((absence) => scopedEmployeeIds.has(absence.profile_id));
 
     // Group absences by employee for easier lookup
     const absencesByEmployee = new Map<string, { paidDays: number; unpaidDays: number }>();
     const absenceRowsByEmployee = new Map<string, AbsenceRow[]>();
 
-    if (absences && absences.length > 0) {
-      (absences as AbsenceRow[]).forEach((absence) => {
+    if (scopedAbsences.length > 0) {
+      scopedAbsences.forEach((absence) => {
         const employeeId = absence.profile_id;
         const isPaid = absence.absence_reasons?.is_paid || false;
         const days = absence.duration_days || 0;
@@ -196,7 +208,7 @@ export async function GET(request: NextRequest) {
       7: 'Sunday',
     };
 
-    (timesheets as TimesheetRow[]).forEach((timesheet) => {
+    scopedTimesheets.forEach((timesheet) => {
       const employee = timesheet.employee;
       const entries = timesheet.timesheet_entries || [];
       const { startIso, endIso } = getTimesheetWeekIsoBounds(timesheet.week_ending);
@@ -320,7 +332,7 @@ export async function GET(request: NextRequest) {
 
     excelData.push({
       'Employee Name': 'TOTALS',
-      'Employee ID': `${timesheets.length} timesheets`,
+      'Employee ID': `${scopedTimesheets.length} timesheets`,
       'Week Ending': '',
       'Basic Hours (Mon-Fri)': totalBasic.toFixed(2),
       'Overtime 1.5x (Weekend)': totalOvertime15.toFixed(2),

@@ -18,7 +18,7 @@ export async function GET() {
     }
 
     const matrix = await getWorkShiftMatrix(createAdminClient(), {
-      enforceTeamScope: !access.context.isAdmin,
+      enforceTeamScope: !(access.context.isAdmin || access.context.canViewAll),
       teamId: access.context.teamId,
     });
     return NextResponse.json({

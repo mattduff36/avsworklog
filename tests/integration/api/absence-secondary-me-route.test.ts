@@ -47,8 +47,8 @@ describe('absence secondary me route', () => {
       ...defaults,
       see_bookings_team: true,
       add_edit_bookings_team: true,
-      see_manage_work_shifts: true,
-      edit_manage_work_shifts: false,
+      see_manage_work_shifts_team: true,
+      edit_manage_work_shifts_team: false,
     };
 
     vi.mocked(getActorAbsenceSecondaryPermissions).mockResolvedValue({

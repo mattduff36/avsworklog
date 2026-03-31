@@ -31,7 +31,7 @@ export async function GET(
         };
       };
     };
-    const canAccessTarget = await canAccessProfileForScopedWorkShift(admin, access.context, profileId);
+    const canAccessTarget = await canAccessProfileForScopedWorkShift(admin, access.context, profileId, 'view');
     if (!canAccessTarget) {
       return NextResponse.json({ error: 'Forbidden: Out of scope for this team' }, { status: 403 });
     }
@@ -84,7 +84,7 @@ export async function PUT(
         };
       };
     };
-    const canAccessTarget = await canAccessProfileForScopedWorkShift(admin, access.context, profileId);
+    const canAccessTarget = await canAccessProfileForScopedWorkShift(admin, access.context, profileId, 'edit');
     if (!canAccessTarget) {
       return NextResponse.json({ error: 'Forbidden: Out of scope for this team' }, { status: 403 });
     }

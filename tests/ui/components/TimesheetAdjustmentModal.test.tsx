@@ -105,7 +105,7 @@ describe('TimesheetAdjustmentModal', () => {
     });
   });
 
-  describe('Suzanne Squires prioritization', () => {
+  describe('Suzanne Squires prioritisation', () => {
     it('should show Suzanne Squires at the top of the list', async () => {
       const suzanne = createSuzanneSquiresApiResponse();
       const manager2 = createManagerApiResponse({

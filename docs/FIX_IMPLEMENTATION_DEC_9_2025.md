@@ -350,7 +350,7 @@ If issues occur:
 4. **Error categorization**
    - Tag errors by type (network, auth, data, etc.)
    - Filter error logs by category
-   - Prioritize fixes by impact
+   - Prioritise fixes by impact
 
 ---
 

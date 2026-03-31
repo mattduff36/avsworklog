@@ -38,7 +38,7 @@
 
 ## 🎯 Recommended Next Steps
 
-Based on the comprehensive audit, here are prioritized improvements you can implement next:
+Based on the comprehensive audit, here are prioritised improvements you can implement next:
 
 ### OPTION A: Quick Wins (1-2 days) ⚡ **RECOMMENDED START HERE**
 

@@ -82,7 +82,7 @@ Need to sync all remaining affected vehicles. The MOT API now has correct data f
 
 ## Long-Term Solution
 
-### Option 1: Prioritize MOT API's motTestDueDate (RECOMMENDED)
+### Option 1: Prioritise MOT API's motTestDueDate (RECOMMENDED)
 The MOT API now returns a `motTestDueDate` field for new vehicles. Code already uses this correctly (lines 349-352):
 
 ```typescript

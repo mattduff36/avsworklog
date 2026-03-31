@@ -10,14 +10,17 @@ import { Progress } from '@/components/ui/progress';
 import { PageLoader } from '@/components/ui/page-loader';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { toast } from 'sonner';
-import { 
-  FileText, 
-  Calendar, 
-  Loader2,
-  Clipboard,
+import { useQueryState } from 'nuqs';
+import {
+  Calendar,
+  ClipboardList,
   Download,
+  FileArchive,
+  FileText,
+  Loader2,
   Package,
-  FileArchive
+  PlaneTakeoff,
+  Settings,
 } from 'lucide-react';
 
 interface BulkDownloadProgress {
@@ -29,323 +32,567 @@ interface BulkDownloadProgress {
   status: string;
 }
 
-const getMonday = (date: Date) => {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  return new Date(d.setDate(diff));
-};
+interface ReportCardConfig {
+  title: string;
+  description: string;
+  endpoint: string;
+  filenamePrefix: string;
+  buttonClassName: string;
+}
 
-const getSunday = (date: Date) => {
+interface ReportActionCardProps {
+  report: ReportCardConfig;
+  dateFrom: string;
+  dateTo: string;
+  downloadingEndpoint: string | null;
+  onDownload: (endpoint: string, filename: string) => Promise<void>;
+}
+
+interface ReportDateRangeCardProps {
+  dateFrom: string;
+  dateTo: string;
+  onDateFromChange: (value: string) => void;
+  onDateToChange: (value: string) => void;
+  onSetLastWeek: () => void;
+  onSetLastMonth: () => void;
+  onSetThisMonth: () => void;
+}
+
+interface UserSuggestedReport {
+  id: string;
+  title: string;
+  description: string;
+  suggestedBy: string | null;
+  createdAt: string;
+}
+
+type ReportsPageTab = 'overview' | 'settings';
+type ReportsFilterTab = 'timesheets' | 'daily-checks' | 'absence-leave' | 'future';
+
+const TIMESHEET_REPORTS: ReportCardConfig[] = [
+  {
+    title: 'Weekly Timesheet Summary',
+    description: 'Daily hours, leave-aware totals, and did-not-work details.',
+    endpoint: '/api/reports/timesheets/summary',
+    filenamePrefix: 'Timesheet_Summary',
+    buttonClassName: 'bg-timesheet hover:bg-timesheet-dark text-white',
+  },
+  {
+    title: 'Payroll Export',
+    description: 'Approved worked hours with overtime and leave breakdown for payroll.',
+    endpoint: '/api/reports/timesheets/payroll',
+    filenamePrefix: 'Payroll_Export',
+    buttonClassName: 'bg-timesheet hover:bg-timesheet-dark text-white',
+  },
+];
+
+const DAILY_CHECK_REPORTS: ReportCardConfig[] = [
+  {
+    title: 'Daily Checks Compliance Summary',
+    description: 'Daily check completion and compliance performance across van, plant, and HGV checks.',
+    endpoint: '/api/reports/inspections/compliance',
+    filenamePrefix: 'Daily_Checks_Compliance',
+    buttonClassName: 'bg-inspection hover:bg-inspection-dark text-white',
+  },
+  {
+    title: 'Daily Checks Defects Log',
+    description: 'All reported daily check defects requiring review and follow-up actions.',
+    endpoint: '/api/reports/inspections/defects',
+    filenamePrefix: 'Daily_Checks_Defects_Log',
+    buttonClassName: 'bg-inspection hover:bg-inspection-dark text-white',
+  },
+];
+
+const ABSENCE_REPORTS: ReportCardConfig[] = [
+  {
+    title: 'Absence & Leave Bookings',
+    description: 'Approved active and archived bookings that overlap the selected date range.',
+    endpoint: '/api/reports/absence-leave/bookings',
+    filenamePrefix: 'Absence_Leave_Bookings',
+    buttonClassName: 'bg-absence hover:bg-absence-dark text-white',
+  },
+];
+
+const DEFAULT_USER_SUGGESTIONS: Array<Pick<UserSuggestedReport, 'title' | 'description'>> = [
+  {
+    title: 'Approval SLA & Backlog',
+    description: 'Approval turnaround times and outstanding workload by module and team.',
+  },
+  {
+    title: 'Maintenance Risk Window',
+    description: 'Vehicles and equipment due or overdue by mileage/date with severity ranking.',
+  },
+  {
+    title: 'Quotes Conversion Funnel',
+    description: 'Quotes created, accepted, declined, and aging pipeline by customer owner/team.',
+  },
+];
+
+function formatDateInput(date: Date): string {
+  return date.toISOString().split('T')[0];
+}
+
+function getMonday(date: Date): Date {
+  const nextDate = new Date(date);
+  const day = nextDate.getDay();
+  const diff = nextDate.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(nextDate.setDate(diff));
+}
+
+function getSunday(date: Date): Date {
   const monday = getMonday(date);
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
   return sunday;
-};
+}
 
-export default function ReportsPage() {
-  const { hasPermission: canViewReports, loading: reportsPermissionLoading } = usePermissionCheck('reports');
-  const [downloading, setDownloading] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('timesheets');
-  const [bulkProgress, setBulkProgress] = useState<BulkDownloadProgress>({
+function resetBulkProgress(): BulkDownloadProgress {
+  return {
     isDownloading: false,
     current: 0,
     total: 0,
     currentPart: 1,
     totalParts: 1,
     status: '',
-  });
-  const abortControllerRef = useRef<AbortController | null>(null);
+  };
+}
 
-  // Form state
+function isReportsPageTab(value: string): value is ReportsPageTab {
+  return value === 'overview' || value === 'settings';
+}
+
+function isReportsFilterTab(value: string): value is ReportsFilterTab {
+  return value === 'timesheets' || value === 'daily-checks' || value === 'absence-leave' || value === 'future';
+}
+
+function downloadBase64File(fileName: string, base64Data: string, contentType: string): void {
+  const binaryString = atob(base64Data);
+  const bytes = new Uint8Array(binaryString.length);
+
+  for (let index = 0; index < binaryString.length; index += 1) {
+    bytes[index] = binaryString.charCodeAt(index);
+  }
+
+  const blob = new Blob([bytes], { type: contentType });
+  const url = window.URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(anchor);
+}
+
+function ReportActionCard({ report, dateFrom, dateTo, downloadingEndpoint, onDownload }: ReportActionCardProps) {
+  const isDownloading = downloadingEndpoint === report.endpoint;
+
+  return (
+    <Card className="border-border transition-colors hover:border-avs-yellow/40">
+      <CardContent className="flex flex-col gap-4 p-6 md:flex-row md:items-start md:justify-between">
+        <div className="space-y-2">
+          <h3 className="text-lg font-semibold text-foreground">{report.title}</h3>
+          <p className="text-sm text-muted-foreground">{report.description}</p>
+        </div>
+
+        <Button
+          onClick={() => onDownload(report.endpoint, `${report.filenamePrefix}_${dateFrom}_to_${dateTo}.xlsx`)}
+          disabled={isDownloading}
+          variant="default"
+          className={`${report.buttonClassName} md:ml-4`}
+        >
+          {isDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+          Download
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ReportDateRangeCard({
+  dateFrom,
+  dateTo,
+  onDateFromChange,
+  onDateToChange,
+  onSetLastWeek,
+  onSetLastMonth,
+  onSetThisMonth,
+}: ReportDateRangeCardProps) {
+  return (
+    <Card className="border-border">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-foreground">
+          <Calendar className="h-5 w-5 text-avs-yellow" />
+          Report Date Range
+        </CardTitle>
+        <CardDescription>
+          This report tab uses the selected date range. Default selection is the previous week.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="report-date-from">Date From</Label>
+            <Input id="report-date-from" type="date" value={dateFrom} onChange={(event) => onDateFromChange(event.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="report-date-to">Date To</Label>
+            <Input id="report-date-to" type="date" value={dateTo} onChange={(event) => onDateToChange(event.target.value)} />
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={onSetLastWeek}>
+            Last Week
+          </Button>
+          <Button variant="outline" size="sm" onClick={onSetLastMonth}>
+            Last Month
+          </Button>
+          <Button variant="outline" size="sm" onClick={onSetThisMonth}>
+            This Month
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function ReportsPage() {
+  const { hasPermission: canViewReports, loading: reportsPermissionLoading } = usePermissionCheck('reports');
+  const [tabParam, setTabParam] = useQueryState('tab', {
+    defaultValue: 'overview',
+    clearOnDefault: true,
+    shallow: true,
+  });
+  const [reportTabParam, setReportTabParam] = useQueryState('reportTab', {
+    defaultValue: 'timesheets',
+    clearOnDefault: true,
+    shallow: true,
+  });
+  const [downloadingEndpoint, setDownloadingEndpoint] = useState<string | null>(null);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [bulkProgress, setBulkProgress] = useState<BulkDownloadProgress>(resetBulkProgress());
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const hasSeededDefaultSuggestionsRef = useRef(false);
+  const [suggestedReportTitle, setSuggestedReportTitle] = useState('');
+  const [suggestedReportDescription, setSuggestedReportDescription] = useState('');
+  const [userSuggestedReports, setUserSuggestedReports] = useState<UserSuggestedReport[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [suggestionSubmitting, setSuggestionSubmitting] = useState(false);
 
   const setLastWeek = useCallback(() => {
     const today = new Date();
     const lastWeekEnd = new Date(today);
-    lastWeekEnd.setDate(today.getDate() - today.getDay() - (today.getDay() === 0 ? 0 : 1)); // Last Sunday (or today if Sunday)
-    const lastWeekStart = getMonday(lastWeekEnd);
-    const lastWeekSunday = getSunday(lastWeekStart); // Get the actual Sunday (Mon + 6 days = 7 days total)
-    
-    setDateFrom(lastWeekStart.toISOString().split('T')[0]);
-    setDateTo(lastWeekSunday.toISOString().split('T')[0]);
+    lastWeekEnd.setDate(today.getDate() - today.getDay() - (today.getDay() === 0 ? 0 : 1));
+    const start = getMonday(lastWeekEnd);
+    const end = getSunday(start);
+    setDateFrom(formatDateInput(start));
+    setDateTo(formatDateInput(end));
+  }, []);
+
+  const setLastMonth = useCallback(() => {
+    const today = new Date();
+    const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const end = new Date(today.getFullYear(), today.getMonth(), 0);
+    setDateFrom(formatDateInput(start));
+    setDateTo(formatDateInput(end));
+  }, []);
+
+  const setThisMonth = useCallback(() => {
+    const today = new Date();
+    const start = new Date(today.getFullYear(), today.getMonth(), 1);
+    setDateFrom(formatDateInput(start));
+    setDateTo(formatDateInput(today));
   }, []);
 
   useEffect(() => {
     setLastWeek();
   }, [setLastWeek]);
 
-  const setLastMonth = () => {
-    const today = new Date();
-    const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-    const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
-    
-    setDateFrom(lastMonthStart.toISOString().split('T')[0]);
-    setDateTo(lastMonthEnd.toISOString().split('T')[0]);
-  };
+  const fetchSuggestedReports = useCallback(async (allowSeed = true): Promise<void> => {
+    setSuggestionsLoading(true);
 
-  const downloadReport = async (
-    endpoint: string,
-    filename: string,
-    params?: Record<string, string>
-  ) => {
-    const errorContextId = 'reports-download-report-error';
-    setDownloading(endpoint);
     try {
-      const queryParams = new URLSearchParams({
-        dateFrom,
-        dateTo,
-        ...params,
-      });
-      
-      const response = await fetch(`${endpoint}?${queryParams}`);
-      
+      const response = await fetch('/api/reports/suggestions');
+      const payload = (await response.json().catch(() => null)) as
+        | { error?: string; suggestions?: Array<{ id: string; title: string; body: string; created_at: string; user?: { full_name: string | null } | null }> }
+        | null;
+
       if (!response.ok) {
-        const error = await response.json();
-        console.error('Failed to generate report:', error, { errorContextId, endpoint, filename });
+        throw new Error(payload?.error || 'Failed to load report suggestions');
+      }
+
+      const mappedSuggestions: UserSuggestedReport[] = (payload?.suggestions || []).map((suggestion) => ({
+        id: suggestion.id,
+        title: suggestion.title,
+        description: suggestion.body,
+        suggestedBy: suggestion.user?.full_name || null,
+        createdAt: suggestion.created_at,
+      }));
+
+      if (allowSeed && mappedSuggestions.length === 0 && !hasSeededDefaultSuggestionsRef.current) {
+        hasSeededDefaultSuggestionsRef.current = true;
+
+        await Promise.all(
+          DEFAULT_USER_SUGGESTIONS.map(async (defaultSuggestion) => {
+            await fetch('/api/reports/suggestions', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                title: defaultSuggestion.title,
+                body: defaultSuggestion.description,
+              }),
+            });
+          })
+        );
+
+        await fetchSuggestedReports(false);
+        return;
+      }
+
+      setUserSuggestedReports(mappedSuggestions);
+    } catch (error) {
+      console.error('Failed to fetch report suggestions:', error);
+      toast.error('Failed to load report suggestions', {
+        description: 'Please refresh and try again.',
+      });
+    } finally {
+      setSuggestionsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!canViewReports || reportsPermissionLoading) return;
+    void fetchSuggestedReports();
+  }, [canViewReports, reportsPermissionLoading, fetchSuggestedReports]);
+
+  useEffect(() => {
+    if (reportTabParam === 'inspections') {
+      void setReportTabParam('daily-checks');
+    }
+  }, [reportTabParam, setReportTabParam]);
+
+  useEffect(() => {
+    if (isReportsFilterTab(tabParam)) {
+      void setTabParam('overview');
+      void setReportTabParam(tabParam);
+      return;
+    }
+
+    if (tabParam === 'inspections') {
+      void setTabParam('overview');
+      void setReportTabParam('daily-checks');
+    }
+  }, [tabParam, setTabParam, setReportTabParam]);
+
+  async function downloadReport(endpoint: string, filename: string): Promise<void> {
+    const errorContextId = 'reports-download-error';
+    setDownloadingEndpoint(endpoint);
+
+    try {
+      const queryParams = new URLSearchParams({ dateFrom, dateTo });
+      const response = await fetch(`${endpoint}?${queryParams.toString()}`);
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
         toast.error('Failed to generate report', {
           id: errorContextId,
-          description: error.error || 'Please try again or contact support.',
+          description: payload?.error || 'Please try again or contact support.',
         });
         return;
       }
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
       window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      document.body.removeChild(anchor);
     } catch (error) {
-      console.error('Error downloading report:', error, { errorContextId, endpoint, filename });
+      console.error('Error downloading report:', error, { errorContextId, endpoint });
       toast.error('Failed to download report', {
         id: errorContextId,
-        description: 'Please try again or contact support if the problem persists.',
+        description: 'Please try again or contact support if the issue persists.',
       });
     } finally {
-      setDownloading(null);
+      setDownloadingEndpoint(null);
     }
-  };
+  }
 
-  const downloadBulkInspectionPDFs = async () => {
-    const errorContextId = 'reports-bulk-inspections-download-error';
-    // Create abort controller for potential cancellation
+  async function downloadBulkInspectionPDFs(): Promise<void> {
+    const errorContextId = 'reports-bulk-inspection-download-error';
     abortControllerRef.current = new AbortController();
-    
     setBulkProgress({
       isDownloading: true,
       current: 0,
       total: 0,
       currentPart: 1,
       totalParts: 1,
-      status: 'Fetching inspections...',
+      status: 'Generating daily check PDFs...',
     });
 
     try {
       const response = await fetch('/api/reports/inspections/bulk-pdf', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dateFrom, dateTo }),
         signal: abortControllerRef.current.signal,
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        console.error('Failed to generate bulk PDFs:', error, { errorContextId });
-        toast.error('Failed to generate bulk PDFs', {
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+        toast.error('Failed to generate daily check PDFs', {
           id: errorContextId,
-          description: error.error || 'Please try again or contact support.',
+          description: payload?.error || 'Please try again or contact support.',
         });
-        setBulkProgress(prev => ({ ...prev, isDownloading: false, status: '' }));
+        setBulkProgress(resetBulkProgress());
         return;
       }
 
       if (!response.body) {
-        console.error('Bulk PDF stream missing response body', { errorContextId });
-        toast.error('Failed to generate bulk PDFs', {
+        toast.error('Failed to generate daily check PDFs', {
           id: errorContextId,
-          description: 'No response received from server.',
+          description: 'No stream received from server.',
         });
-        setBulkProgress(prev => ({ ...prev, isDownloading: false, status: '' }));
+        setBulkProgress(resetBulkProgress());
         return;
       }
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
-      let shouldExit = false;
+      let completed = false;
 
-      while (true) {
+      while (!completed) {
         const { done, value } = await reader.read();
-        
-        if (done) {
-          // Flush decoder and process any remaining buffered data
-          buffer += decoder.decode(new Uint8Array(), { stream: false });
-          
-          // Process the final buffered line if it exists (only for non-complete messages)
-          if (buffer.trim()) {
-            try {
-              const data = JSON.parse(buffer);
-
-              if (data.error) {
-                console.error('Error during bulk download (final buffer):', data.error, { errorContextId });
-                toast.error('Error during bulk download', {
-                  id: errorContextId,
-                  description: data.error,
-                });
-                setBulkProgress(prev => ({ ...prev, isDownloading: false, status: '' }));
-                abortControllerRef.current?.abort();
-                break;
-              }
-
-              // Only handle complete message here if it wasn't already handled in the loop
-              if (data.type === 'complete') {
-                // Convert base64 to blob and download
-                const binaryString = atob(data.data);
-                const bytes = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                  bytes[i] = binaryString.charCodeAt(i);
-                }
-                const blob = new Blob([bytes], { type: data.contentType });
-                
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = data.fileName;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-
-                setBulkProgress({
-                  isDownloading: false,
-                  current: 0,
-                  total: 0,
-                  currentPart: 1,
-                  totalParts: 1,
-                  status: '',
-                });
-              }
-            } catch (parseError) {
-              console.error('Error parsing final buffer:', parseError, 'Buffer:', buffer, { errorContextId });
-            }
-          }
-          break;
-        }
-
-        // Append new data to buffer
-        buffer += decoder.decode(value, { stream: true });
-        
-        // Split by newlines and process complete lines
+        buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
         const lines = buffer.split('\n');
-        
-        // Keep the last incomplete line in the buffer
         buffer = lines.pop() || '';
 
         for (const line of lines) {
-          if (!line.trim()) continue;
-          
-          try {
-            const data = JSON.parse(line);
+          if (!line.trim()) {
+            continue;
+          }
 
-            if (data.error) {
-              console.error('Error during bulk download (stream):', data.error, { errorContextId });
-              toast.error('Error during bulk download', {
-                id: errorContextId,
-                description: data.error,
-              });
-              setBulkProgress(prev => ({ ...prev, isDownloading: false, status: '' }));
-              abortControllerRef.current?.abort();
-              shouldExit = true;
-              break;
-            }
+          const data = JSON.parse(line) as {
+            type?: 'init' | 'progress' | 'complete';
+            total?: number;
+            numParts?: number;
+            current?: number;
+            currentPart?: number;
+            totalParts?: number;
+            fileName?: string;
+            contentType?: string;
+            data?: string;
+            error?: string;
+          };
 
-            if (data.type === 'init') {
-              setBulkProgress(prev => ({
-                ...prev,
-                total: data.total,
-                totalParts: data.numParts,
-              }));
-            }
+          if (data.error) {
+            toast.error('Failed during bulk PDF generation', {
+              id: errorContextId,
+              description: data.error,
+            });
+            setBulkProgress(resetBulkProgress());
+            completed = true;
+            break;
+          }
 
-            if (data.type === 'progress') {
-              setBulkProgress(prev => ({
-                ...prev,
-                current: data.current,
-                total: data.total,
-                currentPart: data.currentPart,
-                totalParts: data.totalParts,
-              }));
-            }
+          if (data.type === 'init') {
+            setBulkProgress((prev) => ({
+              ...prev,
+              total: data.total || 0,
+              totalParts: data.numParts || 1,
+            }));
+          }
 
-            if (data.type === 'complete') {
-              // Convert base64 to blob and download
-              const binaryString = atob(data.data);
-              const bytes = new Uint8Array(binaryString.length);
-              for (let i = 0; i < binaryString.length; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
-              }
-              const blob = new Blob([bytes], { type: data.contentType });
-              
-              const url = window.URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = data.fileName;
-              document.body.appendChild(a);
-              a.click();
-              window.URL.revokeObjectURL(url);
-              document.body.removeChild(a);
+          if (data.type === 'progress') {
+            setBulkProgress((prev) => ({
+              ...prev,
+              current: data.current || 0,
+              total: data.total || prev.total,
+              currentPart: data.currentPart || prev.currentPart,
+              totalParts: data.totalParts || prev.totalParts,
+            }));
+          }
 
-              setBulkProgress({
-                isDownloading: false,
-                current: 0,
-                total: 0,
-                currentPart: 1,
-                totalParts: 1,
-                status: '',
-              });
-              
-              shouldExit = true;
-              break;
-            }
-          } catch (parseError) {
-            console.error('Error parsing stream data:', parseError, 'Line:', line, { errorContextId });
+          if (data.type === 'complete' && data.data && data.fileName && data.contentType) {
+            downloadBase64File(data.fileName, data.data, data.contentType);
+            setBulkProgress(resetBulkProgress());
+            completed = true;
+            break;
           }
         }
 
-        // Check if we should exit the outer loop
-        if (shouldExit) {
+        if (done) {
           break;
         }
       }
     } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        console.log('Download cancelled');
-      } else {
-        console.error('Error downloading bulk PDFs:', error, { errorContextId });
-        toast.error('Failed to download bulk PDFs', {
+      if (!(error instanceof Error && error.name === 'AbortError')) {
+        console.error('Error downloading bulk daily check PDFs:', error, { errorContextId });
+        toast.error('Failed to download bulk daily check PDFs', {
           id: errorContextId,
-          description: 'Please try again or contact support if the problem persists.',
+          description: 'Please try again or contact support if the issue persists.',
         });
       }
-      setBulkProgress({
-        isDownloading: false,
-        current: 0,
-        total: 0,
-        currentPart: 1,
-        totalParts: 1,
-        status: '',
-      });
+      setBulkProgress(resetBulkProgress());
     }
-  };
+  }
+
+  async function addSuggestedReport() {
+    const trimmedTitle = suggestedReportTitle.trim();
+    const trimmedDescription = suggestedReportDescription.trim();
+
+    if (!trimmedTitle || !trimmedDescription) {
+      toast.error('Please enter a report name and description before adding your suggestion.');
+      return;
+    }
+
+    setSuggestionSubmitting(true);
+
+    try {
+      const response = await fetch('/api/reports/suggestions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: trimmedTitle,
+          body: trimmedDescription,
+        }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Failed to add suggestion');
+      }
+
+      setSuggestedReportTitle('');
+      setSuggestedReportDescription('');
+      toast.success('Report suggestion added.');
+      await fetchSuggestedReports(false);
+    } catch (error) {
+      console.error('Failed to add report suggestion:', error);
+      toast.error('Failed to add report suggestion', {
+        description: error instanceof Error ? error.message : 'Please try again.',
+      });
+    } finally {
+      setSuggestionSubmitting(false);
+    }
+  }
 
   const isInitialLoading = reportsPermissionLoading || !dateFrom || !dateTo;
+  const activePageTab: ReportsPageTab = isReportsPageTab(tabParam) ? tabParam : 'overview';
+  const activeFilterTab: ReportsFilterTab = isReportsFilterTab(reportTabParam)
+    ? reportTabParam
+    : reportTabParam === 'inspections'
+      ? 'daily-checks'
+      : isReportsFilterTab(tabParam)
+      ? tabParam
+      : tabParam === 'inspections'
+        ? 'daily-checks'
+      : 'timesheets';
 
   if (isInitialLoading) {
     return <PageLoader message="Preparing reports..." />;
@@ -356,295 +603,258 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-6xl">
-      {/* Header */}
-      <div className="bg-slate-900 rounded-lg p-6 border border-border">
-        <h1 className="text-3xl font-bold text-white mb-2">Reports</h1>
-        <p className="text-muted-foreground">
-          Generate and export reports for your business operations
-        </p>
+    <div className="max-w-6xl space-y-6">
+      <div className="rounded-lg border border-border bg-white p-6 dark:bg-slate-900">
+        <div className="flex items-start gap-3">
+          <div className="rounded-lg bg-avs-yellow/15 p-2 text-avs-yellow">
+            <FileText className="h-5 w-5" />
+          </div>
+          <div className="space-y-1">
+            <h1 className="text-3xl font-bold text-foreground">Reports</h1>
+            <p className="text-sm text-muted-foreground">
+              Generate operational reports aligned to your current module and team permissions.
+            </p>
+          </div>
+        </div>
       </div>
 
-      {/* Date Range - Clean style */}
-      <Card className="bg-slate-50 dark:bg-slate-800/50 border-border">
-        <CardHeader className="border-b border-slate-700 bg-slate-900/50">
-          <CardTitle className="text-white flex items-center gap-2">
-            <Calendar className="h-5 w-5" style={{ color: '#F1D64A' }} />
-            Report Date Range
-          </CardTitle>
-          <CardDescription className="text-muted-foreground">
-            Select the date range for generating reports (default: last week)
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label className="text-muted-foreground font-medium">Date From</Label>
-              <Input 
-                type="date" 
-                className="border-border text-white" 
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label className="text-muted-foreground font-medium">Date To</Label>
-              <Input 
-                type="date" 
-                className="border-border text-white"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-              />
-            </div>
-          </div>
-          
-          <div className="flex gap-2 mt-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={setLastWeek}
-              className="text-muted-foreground border-slate-600 hover:bg-slate-800"
-            >
-              Last Week
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={setLastMonth}
-              className="text-muted-foreground border-slate-600 hover:bg-slate-800"
-            >
-              Last Month
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Tabs Navigation */}
-      <Tabs defaultValue="timesheets" value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full max-w-2xl grid-cols-3 h-auto p-0 bg-slate-100 dark:bg-slate-800 rounded-lg">
-          <TabsTrigger 
-            value="timesheets" 
-            className="flex flex-col items-center gap-1 py-3 rounded-md transition-all duration-200 active:scale-95 border-0"
-            style={activeTab === 'timesheets' ? {
-              backgroundColor: 'hsl(210 90% 50%)',
-              color: 'white',
-              boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
-            } : {}}
-          >
-            <FileText className="h-5 w-5" />
-            <span className="text-sm font-medium">Timesheets</span>
+      <Tabs
+        value={activePageTab}
+        onValueChange={(value) => {
+          if (isReportsPageTab(value)) {
+            void setTabParam(value);
+          }
+        }}
+        className="space-y-6"
+      >
+        <TabsList>
+          <TabsTrigger value="overview" className="gap-2">
+            <FileText className="h-4 w-4" />
+            Overview
           </TabsTrigger>
-          <TabsTrigger 
-            value="inspections" 
-            className="flex flex-col items-center gap-1 py-3 rounded-md transition-all duration-200 active:scale-95 border-0"
-            style={activeTab === 'inspections' ? {
-              backgroundColor: 'hsl(30 95% 55%)',
-              color: 'rgb(15 23 42)',
-              boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
-            } : {}}
-          >
-            <Clipboard className="h-5 w-5" style={activeTab === 'inspections' ? { color: 'rgb(15 23 42)' } : {}} />
-            <span className="text-sm font-medium" style={activeTab === 'inspections' ? { color: 'rgb(15 23 42)' } : {}}>Inspections</span>
-          </TabsTrigger>
-          <TabsTrigger 
-            value="future" 
-            className="flex flex-col items-center gap-1 py-3 rounded-md transition-all duration-200 active:scale-95 border-0"
-            style={activeTab === 'future' ? {
-              backgroundColor: '#F1D64A',
-              color: 'rgb(15 23 42)',
-              boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
-            } : {}}
-          >
-            <Package className="h-5 w-5" style={activeTab === 'future' ? { color: 'rgb(15 23 42)' } : {}} />
-            <span className="text-sm font-medium" style={activeTab === 'future' ? { color: 'rgb(15 23 42)' } : {}}>More Reports</span>
+          <TabsTrigger value="settings" className="gap-2">
+            <Settings className="h-4 w-4" />
+            Settings
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="timesheets" className="space-y-4">
-          <div className="grid gap-4">
-            <Card className="border-border hover:shadow-lg hover:border-timesheet/50 transition-all duration-200">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-white mb-2">
-                      Weekly Timesheet Summary
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      Export timesheet summary with daily breakdown and totals
-                    </p>
-                  </div>
-                  <Button
-                    size="lg"
-                    className="bg-timesheet hover:bg-timesheet-dark text-white ml-4 transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
-                    onClick={() => downloadReport('/api/reports/timesheets/summary', `Timesheet_Summary_${dateFrom}_to_${dateTo}.xlsx`)}
-                    disabled={downloading === '/api/reports/timesheets/summary'}
-                  >
-                    {downloading === '/api/reports/timesheets/summary' ? (
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                    ) : (
-                      <>
-                        <Download className="h-5 w-5 mr-2" />
-                        Download
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-border hover:shadow-lg hover:border-timesheet/50 transition-all duration-200">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-white mb-2">
-                      Payroll Export
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      Export approved hours for payroll processing
-                    </p>
-                  </div>
-                  <Button
-                    size="lg"
-                    className="bg-timesheet hover:bg-timesheet-dark text-white ml-4 transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
-                    onClick={() => downloadReport('/api/reports/timesheets/payroll', `Payroll_Export_${dateFrom}_to_${dateTo}.xlsx`)}
-                    disabled={downloading === '/api/reports/timesheets/payroll'}
-                  >
-                    {downloading === '/api/reports/timesheets/payroll' ? (
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                    ) : (
-                      <>
-                        <Download className="h-5 w-5 mr-2" />
-                        Download
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+        <TabsContent value="overview" className="mt-0 space-y-4">
+          <div className="flex justify-end">
+            <Tabs
+              value={activeFilterTab}
+              onValueChange={(value) => {
+                if (isReportsFilterTab(value)) {
+                  void setReportTabParam(value);
+                  if (activePageTab !== 'overview') {
+                    void setTabParam('overview');
+                  }
+                }
+              }}
+            >
+              <TabsList>
+                <TabsTrigger value="timesheets" className="gap-2">
+                  <FileText className="h-4 w-4" />
+                  Timesheets
+                </TabsTrigger>
+                <TabsTrigger value="daily-checks" className="gap-2">
+                  <ClipboardList className="h-4 w-4" />
+                  Daily Checks
+                </TabsTrigger>
+                <TabsTrigger value="absence-leave" className="gap-2">
+                  <PlaneTakeoff className="h-4 w-4" />
+                  Absence & Leave
+                </TabsTrigger>
+                <TabsTrigger value="future" className="gap-2">
+                  <Package className="h-4 w-4" />
+                  More Reports
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
-        </TabsContent>
 
-        <TabsContent value="inspections" className="space-y-4">
-          <div className="grid gap-4">
-            <Card className="border-border hover:shadow-lg hover:border-inspection/50 transition-all duration-200">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-white mb-2">
-                      Compliance Summary
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      Vehicle safety compliance with statistics and trends
-                    </p>
-                  </div>
-                  <Button
-                    size="lg"
-                    className="bg-inspection hover:bg-inspection-dark text-white ml-4 transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
-                    onClick={() => downloadReport('/api/reports/inspections/compliance', `Inspection_Compliance_${dateFrom}_to_${dateTo}.xlsx`)}
-                    disabled={downloading === '/api/reports/inspections/compliance'}
-                  >
-                    {downloading === '/api/reports/inspections/compliance' ? (
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                    ) : (
-                      <>
-                        <Download className="h-5 w-5 mr-2" />
-                        Download
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+          {activeFilterTab === 'timesheets' &&
+            (
+              <div className="space-y-4">
+                <ReportDateRangeCard
+                  dateFrom={dateFrom}
+                  dateTo={dateTo}
+                  onDateFromChange={setDateFrom}
+                  onDateToChange={setDateTo}
+                  onSetLastWeek={setLastWeek}
+                  onSetLastMonth={setLastMonth}
+                  onSetThisMonth={setThisMonth}
+                />
+                {TIMESHEET_REPORTS.map((report) => (
+                  <ReportActionCard
+                    key={report.endpoint}
+                    report={report}
+                    dateFrom={dateFrom}
+                    dateTo={dateTo}
+                    downloadingEndpoint={downloadingEndpoint}
+                    onDownload={downloadReport}
+                  />
+                ))}
+              </div>
+            )}
 
-            <Card className="border-border hover:shadow-lg hover:border-inspection/50 transition-all duration-200">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-white mb-2">
-                      Defects Log
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      All failed items requiring immediate attention
-                    </p>
-                  </div>
-                  <Button
-                    size="lg"
-                    className="bg-inspection hover:bg-inspection-dark text-white ml-4 transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
-                    onClick={() => downloadReport('/api/reports/inspections/defects', `Defects_Log_${dateFrom}_to_${dateTo}.xlsx`)}
-                    disabled={downloading === '/api/reports/inspections/defects'}
-                  >
-                    {downloading === '/api/reports/inspections/defects' ? (
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                    ) : (
-                      <>
-                        <Download className="h-5 w-5 mr-2" />
-                        Download
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+          {activeFilterTab === 'daily-checks' && (
+            <div className="space-y-4">
+              <ReportDateRangeCard
+                dateFrom={dateFrom}
+                dateTo={dateTo}
+                onDateFromChange={setDateFrom}
+                onDateToChange={setDateTo}
+                onSetLastWeek={setLastWeek}
+                onSetLastMonth={setLastMonth}
+                onSetThisMonth={setThisMonth}
+              />
+              {DAILY_CHECK_REPORTS.map((report) => (
+                <ReportActionCard
+                  key={report.endpoint}
+                  report={report}
+                  dateFrom={dateFrom}
+                  dateTo={dateTo}
+                  downloadingEndpoint={downloadingEndpoint}
+                  onDownload={downloadReport}
+                />
+              ))}
 
-            <Card className="border-border hover:shadow-lg hover:border-inspection/50 transition-all duration-200">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
+              <Card className="border-border transition-colors hover:border-avs-yellow/40">
+                <CardContent className="flex flex-col gap-4 p-6 md:flex-row md:items-start md:justify-between">
+                  <div className="space-y-2">
+                    <h3 className="flex items-center gap-2 text-lg font-semibold text-foreground">
                       <FileArchive className="h-5 w-5" />
-                      Bulk Inspection PDFs
+                      Bulk Daily Check PDFs
                     </h3>
-                    <p className="text-sm text-slate-400 mb-3">
-                      Download all inspection reports as individual PDFs (merged or zipped)
+                    <p className="text-sm text-muted-foreground">
+                      Download all van, plant, and HGV daily checks in range as one PDF or a ZIP split by size.
                     </p>
                     {bulkProgress.isDownloading && (
-                      <div className="space-y-2">
+                      <div className="space-y-2 pt-1">
                         <Progress value={bulkProgress.total > 0 ? (bulkProgress.current / bulkProgress.total) * 100 : 0} />
                         <p className="text-xs text-muted-foreground">
-                          {bulkProgress.total > 0 ? (
-                            <>
-                              Processing {bulkProgress.current} of {bulkProgress.total} inspections
-                              {bulkProgress.totalParts > 1 && ` (Part ${bulkProgress.currentPart}/${bulkProgress.totalParts})`}
-                            </>
-                          ) : (
-                            'Initializing...'
-                          )}
+                          {bulkProgress.total > 0
+                            ? `Processing ${bulkProgress.current} of ${bulkProgress.total} daily checks${
+                                bulkProgress.totalParts > 1
+                                  ? ` (Part ${bulkProgress.currentPart}/${bulkProgress.totalParts})`
+                                  : ''
+                              }`
+                            : bulkProgress.status}
                         </p>
                       </div>
                     )}
                   </div>
+
                   <Button
-                    size="lg"
-                    className="bg-inspection hover:bg-inspection-dark text-white ml-4 transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
                     onClick={downloadBulkInspectionPDFs}
                     disabled={bulkProgress.isDownloading}
+                    className="bg-inspection hover:bg-inspection-dark text-white md:ml-4"
                   >
                     {bulkProgress.isDownloading ? (
-                      <Loader2 className="h-5 w-5 animate-spin" />
+                      <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <>
-                        <Download className="h-5 w-5 mr-2" />
-                        Download
-                      </>
+                      <Download className="mr-2 h-4 w-4" />
                     )}
+                    Download
                   </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {activeFilterTab === 'absence-leave' &&
+            (
+              <div className="space-y-4">
+                <ReportDateRangeCard
+                  dateFrom={dateFrom}
+                  dateTo={dateTo}
+                  onDateFromChange={setDateFrom}
+                  onDateToChange={setDateTo}
+                  onSetLastWeek={setLastWeek}
+                  onSetLastMonth={setLastMonth}
+                  onSetThisMonth={setThisMonth}
+                />
+                {ABSENCE_REPORTS.map((report) => (
+                  <ReportActionCard
+                    key={report.endpoint}
+                    report={report}
+                    dateFrom={dateFrom}
+                    dateTo={dateTo}
+                    downloadingEndpoint={downloadingEndpoint}
+                    onDownload={downloadReport}
+                  />
+                ))}
+              </div>
+            )}
+
+          {activeFilterTab === 'future' && (
+            <div className="space-y-4">
+              <Card className="border-border">
+                <CardHeader>
+                  <CardTitle className="text-foreground">Suggest a Report</CardTitle>
+                  <CardDescription>
+                    Add your own report ideas for admins and management to review.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="suggest-report-title">Report Name</Label>
+                    <Input
+                      id="suggest-report-title"
+                      value={suggestedReportTitle}
+                      onChange={(event) => setSuggestedReportTitle(event.target.value)}
+                      placeholder="e.g. Team Absence Trend by Month"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="suggest-report-description">Description</Label>
+                    <Input
+                      id="suggest-report-description"
+                      value={suggestedReportDescription}
+                      onChange={(event) => setSuggestedReportDescription(event.target.value)}
+                      placeholder="Briefly describe what this report should show"
+                    />
+                  </div>
+
+                  <Button type="button" onClick={addSuggestedReport} disabled={suggestionSubmitting}>
+                    {suggestionSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Add Suggestion
+                  </Button>
+
+                  {suggestionsLoading && (
+                    <p className="text-sm text-muted-foreground">Loading report suggestions...</p>
+                  )}
+
+                  {!suggestionsLoading && userSuggestedReports.length > 0 && (
+                    <div className="space-y-3 border-t border-border pt-4">
+                      <p className="text-sm font-medium text-foreground">Suggested Reports</p>
+                      {userSuggestedReports.map((suggestion) => (
+                        <div key={suggestion.id} className="rounded-md border border-border p-4">
+                          <h3 className="font-medium text-foreground">{suggestion.title}</h3>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Suggested by {suggestion.suggestedBy || 'Unknown user'} on{' '}
+                            {new Date(suggestion.createdAt).toLocaleDateString('en-GB')}
+                          </p>
+                          <p className="mt-2 text-sm text-muted-foreground">{suggestion.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {!suggestionsLoading && userSuggestedReports.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No report suggestions yet.</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </TabsContent>
 
-        <TabsContent value="future" className="space-y-4">
-          <Card className="bg-slate-50 dark:bg-slate-900/50 border-border">
-            <CardContent className="py-12 text-center">
-              <Package className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="text-lg font-semibold text-white mb-2">
-                More Reports Coming Soon
-              </h3>
-              <p className="text-muted-foreground">
-                Additional report types will be added here as new features are developed
-              </p>
+        <TabsContent value="settings" className="mt-0">
+          <Card className="border-border">
+            <CardContent className="py-10">
+              <p className="text-sm text-muted-foreground">No settings for this module yet.</p>
             </CardContent>
           </Card>
         </TabsContent>

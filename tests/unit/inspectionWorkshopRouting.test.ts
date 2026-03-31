@@ -185,7 +185,7 @@ describe('Inspection Workshop Routing', () => {
       }
     });
 
-    it('should prioritize category with most keyword matches', () => {
+    it('should prioritise category with most keyword matches', () => {
       // Comment with multiple keywords for one category
       const result = inferWorkshopSubcategoryFromComment(
         'Front and rear tyres worn, wheels need alignment, possible puncture'

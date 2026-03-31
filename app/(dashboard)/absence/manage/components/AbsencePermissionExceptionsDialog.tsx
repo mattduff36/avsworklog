@@ -50,18 +50,17 @@ interface DirectoryEntry {
 }
 
 const GROUP_COLOR_CLASS: Record<AbsenceSecondaryPermissionHeaderGroup['id'], string> = {
-  'see-bookings': 'bg-yellow-300/90 text-slate-900',
-  'add-edit-bookings': 'bg-amber-300/90 text-slate-900',
-  'see-allowances': 'bg-lime-300/90 text-slate-900',
-  'add-edit-allowances': 'bg-green-300/90 text-slate-900',
-  'see-manage-overview': 'bg-indigo-300/90 text-slate-900',
-  'see-manage-reasons': 'bg-purple-300/90 text-slate-900',
-  'see-manage-work-shifts': 'bg-cyan-300/90 text-slate-900',
-  'edit-manage-work-shifts': 'bg-blue-300/90 text-slate-900',
+  bookings: 'bg-yellow-300/90 text-slate-900',
+  allowances: 'bg-green-300/90 text-slate-900',
+  'records-admin': 'bg-indigo-300/90 text-slate-900',
+  reasons: 'bg-purple-300/90 text-slate-900',
+  'work-shifts': 'bg-cyan-300/90 text-slate-900',
   'authorise-bookings': 'bg-sky-300/90 text-slate-900',
 };
 
 const SUBHEADER_CLASS = 'bg-slate-800/80 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground';
+
+type TriStateValue = 'none' | 'view' | 'edit';
 
 export function AbsencePermissionExceptionsDialog({ open, onOpenChange }: AbsencePermissionExceptionsDialogProps) {
   const [matrix, setMatrix] = useState<AbsenceSecondaryExceptionMatrixResponse | null>(null);
@@ -71,6 +70,7 @@ export function AbsencePermissionExceptionsDialog({ open, onOpenChange }: Absenc
   const [selectedUserId, setSelectedUserId] = useState('');
   const [addingUser, setAddingUser] = useState(false);
   const [savingCellKey, setSavingCellKey] = useState<string | null>(null);
+  const [resettingRowId, setResettingRowId] = useState<string | null>(null);
   const [removingRowId, setRemovingRowId] = useState<string | null>(null);
 
   const loadMatrix = useCallback(async () => {
@@ -132,15 +132,17 @@ export function AbsencePermissionExceptionsDialog({ open, onOpenChange }: Absenc
     }
   }
 
-  async function handleToggleCell(row: AbsenceSecondaryExceptionUserRow, key: AbsenceSecondaryPermissionKey) {
-    const nextValue = !row.effective[key];
-    const cellKey = `${row.profile_id}:${key}`;
+  async function handleUpdateCell(
+    row: AbsenceSecondaryExceptionUserRow,
+    updates: Partial<Record<AbsenceSecondaryPermissionKey, boolean | null>>,
+    cellKey: string
+  ) {
     setSavingCellKey(cellKey);
     try {
       const response = await fetch(`/api/absence/permissions/secondary/exceptions/${row.profile_id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ updates: { [key]: nextValue } }),
+        body: JSON.stringify({ updates }),
       });
       const payload = (await response.json()) as AbsenceSecondaryExceptionMatrixResponse & { error?: string };
       if (!response.ok) throw new Error(payload.error || 'Failed to update exception cell');
@@ -152,22 +154,68 @@ export function AbsencePermissionExceptionsDialog({ open, onOpenChange }: Absenc
     }
   }
 
-  async function handleResetCell(row: AbsenceSecondaryExceptionUserRow, key: AbsenceSecondaryPermissionKey) {
-    const cellKey = `${row.profile_id}:${key}`;
-    setSavingCellKey(cellKey);
+  function resolveTriState(
+    row: AbsenceSecondaryExceptionUserRow,
+    viewKey: AbsenceSecondaryPermissionKey,
+    editKey: AbsenceSecondaryPermissionKey
+  ): TriStateValue {
+    const canView = Boolean(row.effective[viewKey]);
+    const canEdit = Boolean(row.effective[editKey]);
+    if (!canView && !canEdit) return 'none';
+    if (canView && !canEdit) return 'view';
+    return 'edit';
+  }
+
+  function getNextTriState(state: TriStateValue): TriStateValue {
+    if (state === 'none') return 'view';
+    if (state === 'view') return 'edit';
+    return 'none';
+  }
+
+  async function handleToggleBinaryCell(row: AbsenceSecondaryExceptionUserRow, key: AbsenceSecondaryPermissionKey, cellKey: string) {
+    await handleUpdateCell(row, { [key]: !row.effective[key] }, cellKey);
+  }
+
+  async function handleCycleTriStateCell(
+    row: AbsenceSecondaryExceptionUserRow,
+    viewKey: AbsenceSecondaryPermissionKey,
+    editKey: AbsenceSecondaryPermissionKey,
+    cellKey: string
+  ) {
+    const current = resolveTriState(row, viewKey, editKey);
+    const next = getNextTriState(current);
+    const updates: Partial<Record<AbsenceSecondaryPermissionKey, boolean>> =
+      next === 'none'
+        ? { [viewKey]: false, [editKey]: false }
+        : next === 'view'
+          ? { [viewKey]: true, [editKey]: false }
+          : { [viewKey]: true, [editKey]: true };
+    await handleUpdateCell(row, updates, cellKey);
+  }
+
+  async function handleResetRow(row: AbsenceSecondaryExceptionUserRow, orderedKeys: AbsenceSecondaryPermissionKey[]) {
+    setResettingRowId(row.profile_id);
     try {
+      const updates = orderedKeys.reduce(
+        (acc, key) => {
+          acc[key] = null;
+          return acc;
+        },
+        {} as Partial<Record<AbsenceSecondaryPermissionKey, boolean | null>>
+      );
       const response = await fetch(`/api/absence/permissions/secondary/exceptions/${row.profile_id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ updates: { [key]: null } }),
+        body: JSON.stringify({ updates }),
       });
       const payload = (await response.json()) as AbsenceSecondaryExceptionMatrixResponse & { error?: string };
-      if (!response.ok) throw new Error(payload.error || 'Failed to reset cell override');
+      if (!response.ok) throw new Error(payload.error || 'Failed to reset row to defaults');
       setMatrix(payload);
+      toast.success('Row reset to defaults');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to reset cell override');
+      toast.error(error instanceof Error ? error.message : 'Failed to reset row to defaults');
     } finally {
-      setSavingCellKey(null);
+      setResettingRowId(null);
     }
   }
 
@@ -190,10 +238,17 @@ export function AbsencePermissionExceptionsDialog({ open, onOpenChange }: Absenc
 
   const rows = matrix?.rows || [];
   const orderedKeys = matrix?.headers.orderedKeys || [];
+  const groups = matrix?.headers.groups || [];
+  const flattenedColumns = groups.flatMap((group) =>
+    group.columns.map((column) => ({
+      groupId: group.id,
+      column,
+    }))
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-border max-w-[96vw] w-[1400px] max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="border-border max-w-[96vw] w-fit max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-foreground">Absence Secondary Permission Exceptions</DialogTitle>
           <DialogDescription className="text-slate-400/90">
@@ -245,42 +300,42 @@ export function AbsencePermissionExceptionsDialog({ open, onOpenChange }: Absenc
               No user exceptions yet. Add a user to create their override row.
             </div>
           ) : (
-            <table className="w-full text-sm table-fixed min-w-max">
+            <table className="text-sm min-w-max">
               <colgroup>
-                <col style={{ width: 260 }} />
-                {orderedKeys.map((key) => (
-                  <col key={key} style={{ width: 46 }} />
+                <col style={{ width: 220 }} />
+                {flattenedColumns.map(({ column }) => (
+                  <col key={column.id} style={{ width: column.mode === 'tri-state' ? 60 : 44 }} />
                 ))}
-                <col style={{ width: 88 }} />
+                <col style={{ width: 58 }} />
               </colgroup>
               <thead>
                 <tr>
                   <th
                     rowSpan={2}
-                    className="sticky left-0 z-20 bg-slate-900 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground border-b border-slate-700"
+                    className="sticky left-0 z-20 bg-slate-900 px-2 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground border-b border-slate-700"
                   >
                     User
                   </th>
-                  {(matrix?.headers.groups || []).map((group) => (
+                  {groups.map((group) => (
                     <th
                       key={group.id}
                       colSpan={group.columns.length}
-                      className={cn('border-b border-slate-700 px-2 py-2 text-center text-xs font-semibold', GROUP_COLOR_CLASS[group.id])}
+                      className={cn('border-b border-slate-700 px-1 py-1.5 text-center text-xs font-semibold', GROUP_COLOR_CLASS[group.id])}
                     >
                       <div>{group.title}</div>
                     </th>
                   ))}
                   <th
                     rowSpan={2}
-                    className="border-b border-slate-700 bg-slate-900 px-2 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                    className="border-b border-slate-700 bg-slate-900 px-1 py-1.5 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground"
                   >
                     Actions
                   </th>
                 </tr>
                 <tr>
-                  {(matrix?.headers.groups || []).flatMap((group) =>
+                  {groups.flatMap((group) =>
                     group.columns.map((column) => (
-                      <th key={column.key} className={cn('border-b border-slate-700 px-1 py-1 text-center', SUBHEADER_CLASS)}>
+                      <th key={column.id} className={cn('border-b border-slate-700 px-0.5 py-1 text-center', SUBHEADER_CLASS)}>
                         {column.label}
                       </th>
                     ))
@@ -290,8 +345,25 @@ export function AbsencePermissionExceptionsDialog({ open, onOpenChange }: Absenc
               <tbody>
                 {rows.map((row) => (
                   <tr key={row.profile_id} className="border-b border-slate-800/70">
-                    <td className="sticky left-0 z-10 bg-slate-900 px-3 py-2 align-top">
-                      <div className="font-medium text-white">{row.full_name}</div>
+                    <td className="sticky left-0 z-10 bg-slate-900 px-2 py-1.5 align-top">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="font-medium text-white">{row.full_name}</div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleResetRow(row, orderedKeys)}
+                          disabled={resettingRowId === row.profile_id || orderedKeys.every((key) => row.overrides[key] === null)}
+                          className="h-6 px-1.5 text-emerald-300 hover:text-emerald-200 hover:bg-emerald-500/10"
+                          title="Reset all cells in this row to defaults"
+                        >
+                          {resettingRowId === row.profile_id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <RotateCcw className="h-3.5 w-3.5" />
+                          )}
+                        </Button>
+                      </div>
                       <div className="mt-1 flex flex-wrap items-center gap-1">
                         {row.employee_id ? (
                           <Badge variant="outline" className="border-slate-600 text-muted-foreground text-[10px] px-1.5 py-0">
@@ -311,59 +383,77 @@ export function AbsencePermissionExceptionsDialog({ open, onOpenChange }: Absenc
                       </div>
                     </td>
 
-                    {orderedKeys.map((key) => {
-                      const cellKey = `${row.profile_id}:${key}`;
-                      const isSaving = savingCellKey === cellKey;
-                      const hasOverride = row.overrides[key] !== null;
+                    {flattenedColumns.map(({ column }) => {
+                      const cellKey = `${row.profile_id}:${column.id}`;
+                      const isSaving = savingCellKey === cellKey || resettingRowId === row.profile_id;
+                      const isTriState = column.mode === 'tri-state' && column.viewKey && column.editKey;
+
+                      if (isTriState) {
+                        const viewKey = column.viewKey;
+                        const editKey = column.editKey;
+                        const state = resolveTriState(row, viewKey, editKey);
+                        const differsFromDefault =
+                          row.defaults[viewKey] !== row.effective[viewKey] || row.defaults[editKey] !== row.effective[editKey];
+                        const label = state === 'none' ? 'None' : state === 'view' ? 'View' : 'Edit';
+                        return (
+                          <td key={column.id} className="px-0.5 py-0.5 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                type="button"
+                                disabled={isSaving}
+                                onClick={() => handleCycleTriStateCell(row, viewKey, editKey, cellKey)}
+                                className={cn(
+                                  'h-6 w-10 rounded border text-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                                  state === 'none' && 'border-slate-600 bg-slate-900 text-slate-300 hover:bg-slate-800',
+                                  state === 'view' && 'border-cyan-500/45 bg-cyan-500/20 text-cyan-100 hover:bg-cyan-500/30',
+                                  state === 'edit' && 'border-green-500/45 bg-green-500/20 text-green-100 hover:bg-green-500/30',
+                                  differsFromDefault && 'border-red-400 ring-1 ring-red-400/70',
+                                  isSaving && 'opacity-70 cursor-wait'
+                                )}
+                                title={differsFromDefault ? 'Differs from default' : 'Matches default'}
+                              >
+                                {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin mx-auto" /> : label}
+                              </button>
+                            </div>
+                          </td>
+                        );
+                      }
+
+                      const key = column.key as AbsenceSecondaryPermissionKey;
                       const isEnabled = row.effective[key];
                       const differsFromDefault = row.defaults[key] !== row.effective[key];
                       return (
-                        <td key={key} className="px-1 py-1 text-center">
+                        <td key={column.id} className="px-0.5 py-0.5 text-center">
                           <div className="flex items-center justify-center gap-1">
                             <button
                               type="button"
                               disabled={isSaving}
-                              onClick={() => handleToggleCell(row, key)}
+                              onClick={() => handleToggleBinaryCell(row, key, cellKey)}
                               className={cn(
-                                'h-7 w-7 rounded border text-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                                'h-6 w-6 rounded border text-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
                                 isEnabled
                                   ? 'border-green-500/40 bg-green-500/25 text-green-200 hover:bg-green-500/35'
                                   : 'border-slate-600 bg-slate-900 text-slate-300 hover:bg-slate-800',
-                                hasOverride && 'ring-1 ring-sky-500/70',
+                                differsFromDefault && 'border-red-400 ring-1 ring-red-400/70',
                                 isSaving && 'opacity-70 cursor-wait'
                               )}
-                              title={
-                                hasOverride
-                                  ? differsFromDefault
-                                    ? 'Overridden from default'
-                                    : 'Explicit override matches default'
-                                  : 'Using default'
-                              }
+                              title={differsFromDefault ? 'Differs from default' : 'Matches default'}
                             >
                               {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin mx-auto" /> : isEnabled ? 'Y' : 'N'}
-                            </button>
-                            <button
-                              type="button"
-                              disabled={isSaving || row.overrides[key] === null}
-                              onClick={() => handleResetCell(row, key)}
-                              className="h-6 w-6 rounded border border-slate-700 bg-slate-900/70 text-slate-400 hover:text-slate-200 disabled:opacity-35 disabled:cursor-not-allowed"
-                              title="Reset this cell to default"
-                            >
-                              <RotateCcw className="h-3 w-3 mx-auto" />
                             </button>
                           </div>
                         </td>
                       );
                     })}
 
-                    <td className="px-2 py-1 text-center">
+                    <td className="px-1 py-0.5 text-center">
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
                         onClick={() => handleRemoveRow(row.profile_id)}
                         disabled={removingRowId === row.profile_id}
-                        className="h-8 px-2 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                        className="h-7 px-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10"
                       >
                         {removingRowId === row.profile_id ? (
                           <Loader2 className="h-4 w-4 animate-spin" />

@@ -70,6 +70,8 @@ describe('module guard alignment checks', () => {
       'app/api/reports/timesheets/summary/route.ts',
       'app/api/reports/timesheets/payroll/route.ts',
       'app/api/reports/stats/route.ts',
+      'app/api/reports/absence-leave/bookings/route.ts',
+      'app/api/reports/suggestions/route.ts',
       'app/api/reports/inspections/compliance/route.ts',
       'app/api/reports/inspections/defects/route.ts',
       'app/api/reports/inspections/bulk-pdf/route.ts',

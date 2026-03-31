@@ -142,7 +142,15 @@ function getOldestOpenFinancialYearStartYear(
   return null;
 }
 
-export function ManageOverviewAdminActions() {
+interface ManageOverviewAdminActionsProps {
+  canRunGlobalActions?: boolean;
+  isTeamScoped?: boolean;
+}
+
+export function ManageOverviewAdminActions({
+  canRunGlobalActions = true,
+  isTeamScoped = false,
+}: ManageOverviewAdminActionsProps) {
   const supabase = createClient();
   const router = useRouter();
   const { isAdmin } = useAuth();
@@ -356,6 +364,7 @@ export function ManageOverviewAdminActions() {
   const actionTileWidthCh = 22;
   const actionTileClass =
     'h-[54px] justify-center rounded-lg border-4 border-slate-600 bg-slate-800 dark:bg-slate-900 px-3 text-white shadow-md transition-all duration-200 hover:scale-105 hover:border-slate-500 hover:bg-slate-800 active:scale-95 animate-tile-pop disabled:opacity-60';
+  const isGlobalActionBlocked = !canRunGlobalActions;
 
   function toggleShutdownRole(roleId: string) {
     setShutdownRoleFilters((prev) => (prev.includes(roleId) ? prev.filter((role) => role !== roleId) : [...prev, roleId]));
@@ -703,6 +712,11 @@ export function ManageOverviewAdminActions() {
                 Undo Close unavailable: {generationStatus.undoCloseBlockedReason || 'This closed year cannot be reopened right now.'}
               </p>
             ) : null}
+            {isTeamScoped ? (
+              <p className="mt-1 text-xs text-amber-300">
+                Team-scoped access active. Global admin actions are disabled.
+              </p>
+            ) : null}
           </div>
         </div>
         <div className="inline-grid grid-cols-3 gap-2 self-start">
@@ -720,7 +734,7 @@ export function ManageOverviewAdminActions() {
                 variant="outline"
                 className={`${actionTileClass} ${isAdmin ? 'col-start-2 row-start-1' : ''}`}
                 style={{ width: `${actionTileWidthCh}ch` }}
-                disabled={closeTargetFinancialYearStartYear === null}
+                disabled={isGlobalActionBlocked || closeTargetFinancialYearStartYear === null}
               >
                 <span className="flex w-full items-center justify-center gap-2 text-center text-sm font-semibold">
                   <Lock className="h-4 w-4 text-absence" />
@@ -732,6 +746,7 @@ export function ManageOverviewAdminActions() {
                 variant="outline"
                 className={`${actionTileClass} ${isAdmin ? 'col-start-3 row-start-1' : ''}`}
                 style={{ width: `${actionTileWidthCh}ch` }}
+                disabled={isGlobalActionBlocked}
               >
                 <span className="flex w-full items-center justify-center gap-2 text-center text-sm font-semibold">
                   <Sparkles className="h-4 w-4 text-absence" />
@@ -755,7 +770,7 @@ export function ManageOverviewAdminActions() {
                 <Button
                   onClick={() => setShowUndoCloseYearDialog(true)}
                   variant="outline"
-                  disabled={!generationStatus?.latestClosedFinancialYearLabel}
+                  disabled={isGlobalActionBlocked || !generationStatus?.latestClosedFinancialYearLabel}
                   className={`${actionTileClass} col-start-2 row-start-2`}
                   style={{ width: `${actionTileWidthCh}ch` }}
                 >
@@ -770,6 +785,7 @@ export function ManageOverviewAdminActions() {
                 variant="outline"
                 className={`${actionTileClass} ${isAdmin ? 'col-start-3 row-start-2' : ''}`}
                 style={{ width: `${actionTileWidthCh}ch` }}
+                disabled={isGlobalActionBlocked}
               >
                 <span className="flex w-full items-center justify-center gap-2 text-center text-sm font-semibold text-foreground">
                   <Users className="h-4 w-4 text-absence" />

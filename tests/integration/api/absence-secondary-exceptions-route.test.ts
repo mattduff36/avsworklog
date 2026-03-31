@@ -129,14 +129,14 @@ describe('absence secondary exceptions API routes', () => {
     const patchResponse = await patchMatrixCell(
       new NextRequest('http://localhost/api/absence/permissions/secondary/exceptions/user-abc', {
         method: 'PATCH',
-        body: JSON.stringify({ updates: { see_bookings_all: true, see_manage_work_shifts: true } }),
+        body: JSON.stringify({ updates: { see_bookings_all: true, see_manage_work_shifts_team: true } }),
       }),
       { params: Promise.resolve({ profileId: 'user-abc' }) }
     );
     expect(patchResponse.status).toBe(200);
     expect(upsertAbsenceSecondaryException).toHaveBeenCalledWith({
       profile_id: 'user-abc',
-      updates: { see_bookings_all: true, see_manage_work_shifts: true },
+      updates: { see_bookings_all: true, see_manage_work_shifts_team: true },
       actor_id: 'admin-1',
     });
 

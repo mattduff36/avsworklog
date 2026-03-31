@@ -13,9 +13,15 @@ export interface AbsenceSecondaryFlags {
   can_view_allowances: boolean;
   can_add_edit_allowances: boolean;
   can_view_manage_overview: boolean;
+  can_view_manage_overview_all: boolean;
+  can_view_manage_overview_team: boolean;
   can_view_manage_reasons: boolean;
   can_view_manage_work_shifts: boolean;
+  can_view_manage_work_shifts_all: boolean;
+  can_view_manage_work_shifts_team: boolean;
   can_edit_manage_work_shifts: boolean;
+  can_edit_manage_work_shifts_all: boolean;
+  can_edit_manage_work_shifts_team: boolean;
   can_authorise_bookings: boolean;
 }
 

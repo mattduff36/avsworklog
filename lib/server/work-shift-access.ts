@@ -9,6 +9,8 @@ export interface WorkShiftAccessContext {
   isAdmin: boolean;
   canView: boolean;
   canEdit: boolean;
+  canViewAll: boolean;
+  canEditAll: boolean;
   teamId: string | null;
 }
 
@@ -60,12 +62,18 @@ export async function getWorkShiftAccessContext(): Promise<
 
   const isAdmin =
     effectiveRole.is_actual_super_admin || effectiveRole.is_super_admin || effectiveRole.role_name === 'admin';
+  const canViewAll = isAdmin || secondary.effective.see_manage_work_shifts_all;
+  const canEditAll = isAdmin || secondary.effective.edit_manage_work_shifts_all;
+  const canViewTeam = isAdmin || secondary.effective.see_manage_work_shifts_team;
+  const canEditTeam = isAdmin || secondary.effective.edit_manage_work_shifts_team;
 
   const context: WorkShiftAccessContext = {
     userId: user.id,
     isAdmin,
-    canView: isAdmin || secondary.effective.see_manage_work_shifts,
-    canEdit: isAdmin || secondary.effective.edit_manage_work_shifts,
+    canView: canViewAll || canViewTeam || canEditAll || canEditTeam,
+    canEdit: canEditAll || canEditTeam,
+    canViewAll,
+    canEditAll,
     teamId: secondary.team_id || null,
   };
 
@@ -86,9 +94,12 @@ export async function canAccessProfileForScopedWorkShift(
     };
   },
   context: WorkShiftAccessContext,
-  profileId: string
+  profileId: string,
+  requiredScope: 'view' | 'edit' = 'view'
 ): Promise<boolean> {
   if (context.isAdmin) return true;
+  if (requiredScope === 'edit' && context.canEditAll) return true;
+  if (requiredScope === 'view' && (context.canViewAll || context.canEditAll)) return true;
   if (!context.teamId) return false;
 
   const { data, error } = await adminClient

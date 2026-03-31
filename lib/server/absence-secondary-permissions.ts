@@ -45,10 +45,13 @@ interface ExceptionRow {
   see_allowances_team?: boolean | null;
   add_edit_allowances_all?: boolean | null;
   add_edit_allowances_team?: boolean | null;
-  see_manage_overview?: boolean | null;
+  see_manage_overview_all?: boolean | null;
+  see_manage_overview_team?: boolean | null;
   see_manage_reasons?: boolean | null;
-  see_manage_work_shifts?: boolean | null;
-  edit_manage_work_shifts?: boolean | null;
+  see_manage_work_shifts_all?: boolean | null;
+  see_manage_work_shifts_team?: boolean | null;
+  edit_manage_work_shifts_all?: boolean | null;
+  edit_manage_work_shifts_team?: boolean | null;
   authorise_bookings_all?: boolean | null;
   authorise_bookings_team?: boolean | null;
   authorise_bookings_own?: boolean | null;
@@ -179,7 +182,7 @@ export async function getActorAbsenceSecondaryPermissions(
     })
       .from('absence_secondary_permission_exceptions')
       .select(
-        'profile_id, see_bookings_all, see_bookings_team, see_bookings_own, add_edit_bookings_all, add_edit_bookings_team, add_edit_bookings_own, see_allowances_all, see_allowances_team, add_edit_allowances_all, add_edit_allowances_team, see_manage_overview, see_manage_reasons, see_manage_work_shifts, edit_manage_work_shifts, authorise_bookings_all, authorise_bookings_team, authorise_bookings_own'
+        'profile_id, see_bookings_all, see_bookings_team, see_bookings_own, add_edit_bookings_all, add_edit_bookings_team, add_edit_bookings_own, see_allowances_all, see_allowances_team, add_edit_allowances_all, add_edit_allowances_team, see_manage_overview_all, see_manage_overview_team, see_manage_reasons, see_manage_work_shifts_all, see_manage_work_shifts_team, edit_manage_work_shifts_all, edit_manage_work_shifts_team, authorise_bookings_all, authorise_bookings_team, authorise_bookings_own'
       )
       .eq('profile_id', profileId)
       .maybeSingle(),
@@ -230,7 +233,7 @@ export async function getAbsenceSecondaryExceptionMatrix(): Promise<AbsenceSecon
   })
     .from('absence_secondary_permission_exceptions')
     .select(
-      'profile_id, see_bookings_all, see_bookings_team, see_bookings_own, add_edit_bookings_all, add_edit_bookings_team, add_edit_bookings_own, see_allowances_all, see_allowances_team, add_edit_allowances_all, add_edit_allowances_team, see_manage_overview, see_manage_reasons, see_manage_work_shifts, edit_manage_work_shifts, authorise_bookings_all, authorise_bookings_team, authorise_bookings_own, created_at, updated_at'
+      'profile_id, see_bookings_all, see_bookings_team, see_bookings_own, add_edit_bookings_all, add_edit_bookings_team, add_edit_bookings_own, see_allowances_all, see_allowances_team, add_edit_allowances_all, add_edit_allowances_team, see_manage_overview_all, see_manage_overview_team, see_manage_reasons, see_manage_work_shifts_all, see_manage_work_shifts_team, edit_manage_work_shifts_all, edit_manage_work_shifts_team, authorise_bookings_all, authorise_bookings_team, authorise_bookings_own, created_at, updated_at'
     )
     .order('updated_at', { ascending: false });
 

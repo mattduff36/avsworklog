@@ -24,10 +24,13 @@ describe('absence secondary permissions', () => {
     expect(defaults.add_edit_allowances_all).toBe(false);
     expect(defaults.add_edit_allowances_team).toBe(false);
 
-    expect(defaults.see_manage_overview).toBe(false);
+    expect(defaults.see_manage_overview_all).toBe(false);
+    expect(defaults.see_manage_overview_team).toBe(false);
     expect(defaults.see_manage_reasons).toBe(false);
-    expect(defaults.see_manage_work_shifts).toBe(true);
-    expect(defaults.edit_manage_work_shifts).toBe(true);
+    expect(defaults.see_manage_work_shifts_all).toBe(false);
+    expect(defaults.see_manage_work_shifts_team).toBe(true);
+    expect(defaults.edit_manage_work_shifts_all).toBe(false);
+    expect(defaults.edit_manage_work_shifts_team).toBe(true);
 
     expect(defaults.authorise_bookings_all).toBe(false);
     expect(defaults.authorise_bookings_team).toBe(true);
@@ -47,10 +50,13 @@ describe('absence secondary permissions', () => {
 
     expect(defaults.see_allowances_all).toBe(false);
     expect(defaults.see_allowances_team).toBe(false);
-    expect(defaults.see_manage_overview).toBe(false);
+    expect(defaults.see_manage_overview_all).toBe(false);
+    expect(defaults.see_manage_overview_team).toBe(false);
     expect(defaults.see_manage_reasons).toBe(false);
-    expect(defaults.see_manage_work_shifts).toBe(true);
-    expect(defaults.edit_manage_work_shifts).toBe(false);
+    expect(defaults.see_manage_work_shifts_all).toBe(false);
+    expect(defaults.see_manage_work_shifts_team).toBe(true);
+    expect(defaults.edit_manage_work_shifts_all).toBe(false);
+    expect(defaults.edit_manage_work_shifts_team).toBe(false);
 
     expect(defaults.authorise_bookings_all).toBe(false);
     expect(defaults.authorise_bookings_team).toBe(true);

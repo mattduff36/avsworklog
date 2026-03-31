@@ -54,7 +54,7 @@ It enforces the phase-1 product rule: **manual activation only**.
   - `components/DeploymentVersionChecker.tsx`
 - **Mitigation:**
   - detect dirty editing contexts and defer/warn where practical.
-  - prioritize high-risk forms first.
+  - prioritise high-risk forms first.
 - **Exit criteria:** no silent reload loss in covered high-risk flows.
 
 ## R4 - Inconsistent Mode Behavior Across Modules

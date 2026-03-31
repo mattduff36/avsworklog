@@ -25,12 +25,13 @@ export async function POST(request: NextRequest) {
 
     const admin = createAdminClient();
     let profileIds = body.profileIds || [];
+    const hasGlobalEditScope = access.context.isAdmin || access.context.canEditAll;
 
     if ((body.mode || 'selected') === 'all') {
-      if (!access.context.isAdmin && !access.context.teamId) {
+      if (!hasGlobalEditScope && !access.context.teamId) {
         profileIds = [];
       } else {
-        const profilesQuery = access.context.isAdmin
+        const profilesQuery = hasGlobalEditScope
           ? admin.from('profiles').select('id')
           : admin.from('profiles').select('id').eq('team_id', access.context.teamId as string);
         const { data, error } = await profilesQuery;
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
 
         profileIds = ((data || []) as Array<{ id: string }>).map((row) => row.id);
       }
-    } else if (!access.context.isAdmin) {
+    } else if (!hasGlobalEditScope) {
       if (!access.context.teamId) {
         return NextResponse.json({ error: 'Forbidden: No team scope available' }, { status: 403 });
       }

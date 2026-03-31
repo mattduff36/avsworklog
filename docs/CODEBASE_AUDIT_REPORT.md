@@ -875,10 +875,10 @@ The codebase is **functionally sound** with good TypeScript usage and clear comp
 
 **Recommended Next Steps:**
 1. ✅ **Review this report** with the team
-2. ✅ **Prioritize Phase 1** fixes (critical for maintainability)
+2. ✅ **Prioritise Phase 1** fixes (critical for maintainability)
 3. ✅ **Create coding guidelines** document based on decisions made
 4. ✅ **Set up ESLint rules** to enforce patterns automatically
-5. ✅ **Implement fixes** in prioritized order
+5. ✅ **Implement fixes** in prioritised order
 6. ✅ **Document patterns** for future development sessions
 
 **Questions to Decide:**
@@ -886,7 +886,7 @@ The codebase is **functionally sound** with good TypeScript usage and clear comp
 2. Which loading pattern (skeleton vs text) do you prefer?
 3. Should offline banner be in layout or per-page?
 4. Do you want to enforce import ordering via ESLint?
-5. Should we prioritize accessibility improvements?
+5. Should we prioritise accessibility improvements?
 
 ---
 

@@ -95,9 +95,16 @@ export default function AdminAbsencePage() {
   const canAddEditAllowances = Boolean(absenceSecondarySnapshot?.flags.can_add_edit_allowances || isAdminTier);
   const canAuthoriseBookings = Boolean(absenceSecondarySnapshot?.flags.can_authorise_bookings || isAdminTier);
   const canViewOverviewTab = Boolean(absenceSecondarySnapshot?.flags.can_view_manage_overview || isAdminTier);
+  const canViewOverviewAllScope = Boolean(absenceSecondarySnapshot?.flags.can_view_manage_overview_all || isAdminTier);
+  const canViewOverviewTeamScope = Boolean(
+    !canViewOverviewAllScope && absenceSecondarySnapshot?.flags.can_view_manage_overview_team
+  );
   const canViewReasonsTab = Boolean(absenceSecondarySnapshot?.flags.can_view_manage_reasons || isAdminTier);
   const canViewWorkShiftsTab = Boolean(absenceSecondarySnapshot?.flags.can_view_manage_work_shifts || isAdminTier);
+  const canViewWorkShiftsAllScope = Boolean(absenceSecondarySnapshot?.flags.can_view_manage_work_shifts_all || isAdminTier);
   const canEditWorkShifts = Boolean(absenceSecondarySnapshot?.flags.can_edit_manage_work_shifts || isAdminTier);
+  const canEditWorkShiftsAllScope = Boolean(absenceSecondarySnapshot?.flags.can_edit_manage_work_shifts_all || isAdminTier);
+  const canRunGlobalOverviewActions = Boolean(isAdminTier || canViewOverviewAllScope);
   const canOpenManagePage =
     canViewBookings ||
     canViewAllowances ||
@@ -171,9 +178,22 @@ export default function AdminAbsencePage() {
     isAdminTier,
   ]);
 
+  const overviewScopedAbsences = useMemo(() => {
+    return scopedAbsences.filter((absence) => {
+      if (isAdminTier || canViewOverviewAllScope) return true;
+      if (!canViewOverviewTeamScope) return false;
+      const targetTeamId = absence.profiles.team_id || null;
+      return Boolean(
+        absenceSecondarySnapshot?.team_id &&
+          targetTeamId &&
+          absenceSecondarySnapshot.team_id === targetTeamId
+      );
+    });
+  }, [scopedAbsences, isAdminTier, canViewOverviewAllScope, canViewOverviewTeamScope, absenceSecondarySnapshot?.team_id]);
+
   const filteredAbsences = useMemo(() => {
     const term = listSearch.trim().toLowerCase();
-    const filtered = scopedAbsences.filter((absence) => {
+    const filtered = overviewScopedAbsences.filter((absence) => {
       if (!term) return true;
       return (
         absence.profiles.full_name.toLowerCase().includes(term) ||
@@ -216,14 +236,14 @@ export default function AdminAbsencePage() {
       }
     });
   }, [
-    scopedAbsences,
+    overviewScopedAbsences,
     listSearch,
     sortField,
     sortDirection,
   ]);
   const pendingCount = useMemo(
-    () => scopedAbsences.filter((absence) => absence.status === 'pending').length,
-    [scopedAbsences]
+    () => overviewScopedAbsences.filter((absence) => absence.status === 'pending').length,
+    [overviewScopedAbsences]
   );
 
   const totalPages = Math.max(1, Math.ceil(filteredAbsences.length / PAGE_SIZE));
@@ -930,7 +950,10 @@ export default function AdminAbsencePage() {
           <TabsContent value="overview" className="space-y-6 mt-0">
             {(isAdmin || isManager) && (
               <Card className="border-border">
-                <ManageOverviewAdminActions />
+                <ManageOverviewAdminActions
+                  canRunGlobalActions={canRunGlobalOverviewActions}
+                  isTeamScoped={!canRunGlobalOverviewActions && canViewOverviewTeamScope}
+                />
               </Card>
             )}
 
@@ -1371,7 +1394,7 @@ export default function AdminAbsencePage() {
           <TabsContent value="work-shifts" className="space-y-6 mt-0">
             <WorkShiftsContent
               isReadOnly={!canEditWorkShifts}
-              scopeTeamOnly={!isAdminTier}
+              scopeTeamOnly={!canViewWorkShiftsAllScope && !canEditWorkShiftsAllScope}
               actorTeamId={absenceSecondarySnapshot?.team_id || null}
             />
           </TabsContent>

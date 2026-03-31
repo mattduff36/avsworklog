@@ -123,7 +123,7 @@ The following ESLint issues exist across the codebase but were not touched to mi
 
 **Recommendation**:
 - Create a phased plan to address these systematically
-- Prioritize by file/module (e.g., tackle all `lib/` files first)
+- Prioritise by file/module (e.g., tackle all `lib/` files first)
 - Consider adding ESLint `--max-warnings=0` to CI once resolved
 
 ---
