@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowUpDown, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { ArrowUpDown, CheckCircle2, XCircle, Clock, Package } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { AbsenceWithRelations } from '@/types/absence';
 import { useAbsenceSummaryForEmployee } from '@/lib/hooks/useAbsence';
@@ -33,6 +33,7 @@ interface AbsencesApprovalTableProps {
   absences: AbsenceWithRelations[];
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
+  onProcess: (id: string) => void;
   columnVisibility: AbsenceColumnVisibility;
 }
 
@@ -43,6 +44,7 @@ export function AbsencesApprovalTable({
   absences,
   onApprove,
   onReject,
+  onProcess,
   columnVisibility,
 }: AbsencesApprovalTableProps) {
   const [sortField, setSortField] = useState<SortField>('date');
@@ -97,6 +99,15 @@ export function AbsencesApprovalTable({
         <Badge variant="success" className="bg-green-500/10 text-green-600 border-green-500/20">
           <CheckCircle2 className="h-3 w-3 mr-1" />
           Approved
+        </Badge>
+      );
+    }
+
+    if (status === 'processed') {
+      return (
+        <Badge variant="default" className="bg-blue-500/10 text-blue-400 border-blue-500/20">
+          <Package className="h-3 w-3 mr-1" />
+          Processed
         </Badge>
       );
     }
@@ -292,7 +303,19 @@ export function AbsencesApprovalTable({
                         className="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all h-8 px-2"
                       >
                         <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                        Payroll Received
+                        Approve
+                      </Button>
+                    </div>
+                  ) : absence.status === 'approved' ? (
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onProcess(absence.id)}
+                        className="border-avs-yellow/50 text-avs-yellow hover:bg-avs-yellow/20 hover:text-avs-yellow hover:border-avs-yellow active:bg-avs-yellow/30 active:text-avs-yellow active:scale-95 transition-all h-8 px-2"
+                      >
+                        <Package className="h-3.5 w-3.5 mr-1" />
+                        Process
                       </Button>
                     </div>
                   ) : (

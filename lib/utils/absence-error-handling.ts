@@ -1,5 +1,6 @@
 const EXPECTED_ABSENCE_VALIDATION_MESSAGES = [
   'This absence conflicts with an existing approved/pending booking',
+  'This absence conflicts with an existing approved/processed/pending booking',
   'Annual leave request exceeds available allowance',
   'This half-day conflicts with an existing multi-day or different-day booking',
   'This half-day conflicts with an existing full-day booking',

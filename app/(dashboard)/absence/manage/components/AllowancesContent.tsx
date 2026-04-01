@@ -473,7 +473,7 @@ export function AllowancesContent({
         }
         const summary = summaryByProfile.get(absence.profile_id)!;
         const duration = absence.duration_days || 0;
-        if (absence.status === 'approved') {
+        if (absence.status === 'approved' || absence.status === 'processed') {
           summary.byReason[absence.reason_id] = (summary.byReason[absence.reason_id] || 0) + duration;
           if (absence.reason_id === annualReason.id) {
             if (absence.date <= todayStr) {

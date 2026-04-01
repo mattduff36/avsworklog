@@ -720,7 +720,7 @@ export function AbsenceCalendarAdmin() {
     }
 
     const isProtectedConfirmedBooking =
-      absence.status === 'approved' &&
+      (absence.status === 'approved' || absence.status === 'processed') &&
       (absence.is_bank_holiday || absence.auto_generated || Boolean(absence.bulk_batch_id));
 
     if (isProtectedConfirmedBooking) {
@@ -830,6 +830,7 @@ export function AbsenceCalendarAdmin() {
                   <SelectItem value="all">All statuses</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="processed">Processed</SelectItem>
                   <SelectItem value="rejected">Rejected</SelectItem>
                 </SelectContent>
               </Select>
@@ -1147,6 +1148,8 @@ export function AbsenceCalendarAdmin() {
                             className={
                               event.status === 'approved'
                                 ? 'border-green-500/30 text-green-400 bg-green-500/10'
+                                : event.status === 'processed'
+                                ? 'border-blue-500/30 text-blue-400 bg-blue-500/10'
                                 : event.status === 'pending'
                                 ? 'border-amber-500/30 text-amber-400 bg-amber-500/10'
                                 : event.status === 'rejected'

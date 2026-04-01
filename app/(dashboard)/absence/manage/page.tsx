@@ -714,7 +714,7 @@ export default function AdminAbsencePage() {
     }
 
     const isProtectedConfirmedBooking =
-      absence.status === 'approved' &&
+      (absence.status === 'approved' || absence.status === 'processed') &&
       (absence.is_bank_holiday || absence.auto_generated || Boolean(absence.bulk_batch_id));
 
     if (isProtectedConfirmedBooking) {
@@ -1072,6 +1072,7 @@ export default function AdminAbsencePage() {
                         <SelectItem value="all">All statuses</SelectItem>
                         <SelectItem value="pending">Pending</SelectItem>
                         <SelectItem value="approved">Approved</SelectItem>
+                        <SelectItem value="processed">Processed</SelectItem>
                         <SelectItem value="rejected">Rejected</SelectItem>
                         <SelectItem value="cancelled">Cancelled</SelectItem>
                       </SelectContent>
@@ -1145,6 +1146,8 @@ export default function AdminAbsencePage() {
                             <TableCell className={
                               absence.status === 'pending'
                                 ? 'text-amber-300'
+                                : absence.status === 'processed'
+                                ? 'text-blue-300'
                                 : absence.status === 'rejected'
                                 ? 'text-red-400'
                                 : 'text-white'
@@ -1209,7 +1212,7 @@ export default function AdminAbsencePage() {
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
                                 )}
-                                {canAuthoriseBookings && absence.status === 'pending' && absence.record_source !== 'archived' && (
+                                {canAuthoriseBookings && (absence.status === 'pending' || absence.status === 'approved') && absence.record_source !== 'archived' && (
                                   <Link href="/approvals?tab=absences">
                                     <Button
                                       variant="outline"
@@ -1246,6 +1249,8 @@ export default function AdminAbsencePage() {
                               <h3 className={`font-semibold ${
                                 absence.status === 'pending'
                                   ? 'text-amber-300'
+                                  : absence.status === 'processed'
+                                  ? 'text-blue-300'
                                   : absence.status === 'rejected'
                                   ? 'text-red-400'
                                   : 'text-white'
@@ -1305,7 +1310,7 @@ export default function AdminAbsencePage() {
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             )}
-                            {canAuthoriseBookings && absence.status === 'pending' && absence.record_source !== 'archived' && (
+                            {canAuthoriseBookings && (absence.status === 'pending' || absence.status === 'approved') && absence.record_source !== 'archived' && (
                               <Link href="/approvals?tab=absences">
                                 <Button
                                   variant="outline"

@@ -27,7 +27,7 @@ interface AbsenceValidationShape {
   duration_days: number;
   is_half_day: boolean;
   half_day_session: 'AM' | 'PM' | null;
-  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  status: 'pending' | 'approved' | 'processed' | 'rejected' | 'cancelled';
   notes: string | null;
 }
 
@@ -158,7 +158,7 @@ async function assertNoAbsenceConflictBeforeSave(
     return;
   }
 
-  if (nextStatus !== 'approved' && nextStatus !== 'pending') {
+  if (nextStatus !== 'approved' && nextStatus !== 'processed' && nextStatus !== 'pending') {
     return;
   }
 
@@ -173,7 +173,7 @@ async function assertNoAbsenceConflictBeforeSave(
     .from('absences')
     .select('date, end_date, is_half_day, half_day_session')
     .eq('profile_id', profileId)
-    .in('status', ['approved', 'pending'])
+    .in('status', ['approved', 'processed', 'pending'])
     .lte('date', endDate);
 
   if (excludeAbsenceId) {
@@ -197,7 +197,7 @@ async function assertNoAbsenceConflictBeforeSave(
   });
 
   if (!isHalfDay && overlappingRows.length > 0) {
-    throw new Error('This absence conflicts with an existing approved/pending booking');
+    throw new Error('This absence conflicts with an existing approved/processed/pending booking');
   }
 
   if (!isHalfDay) {
@@ -251,7 +251,7 @@ async function assertAnnualLeaveAllowanceAvailable(
   absence: AbsenceValidationShape,
   excludeAbsenceId?: string
 ): Promise<void> {
-  if (!['pending', 'approved'].includes(absence.status)) {
+  if (!['pending', 'approved', 'processed'].includes(absence.status)) {
     return;
   }
 
@@ -291,7 +291,7 @@ async function assertAnnualLeaveAllowanceAvailable(
     .select('duration_days')
     .eq('profile_id', absence.profile_id)
     .eq('reason_id', annualLeaveReasonId)
-    .in('status', ['approved', 'pending'])
+    .in('status', ['approved', 'processed', 'pending'])
     .gte('date', financialYear.start.toISOString().split('T')[0])
     .lte('date', financialYear.end.toISOString().split('T')[0]);
 
@@ -486,7 +486,7 @@ export function useAbsenceSummaryForUserFinancialYear(financialYear?: Pick<Finan
       
       // Calculate approved and pending for Annual Leave only
       const approved_taken = typedAbsences
-        .filter((a) => a.status === 'approved' && a.reason_id === annualLeaveReason.id)
+        .filter((a) => (a.status === 'approved' || a.status === 'processed') && a.reason_id === annualLeaveReason.id)
         .reduce((sum: number, a) => sum + (a.duration_days || 0), 0);
       
       const pending_total = typedAbsences
@@ -627,7 +627,7 @@ export function useUpdateAbsence() {
       const updateKeys = Object.keys(updates);
       const hasOnlyOverrideUpdate = updateKeys.length > 0 && updateKeys.every((key) => key === 'allow_timesheet_work_on_leave');
       const isProtectedConfirmedBooking =
-        existingAbsence.status === 'approved' &&
+        (existingAbsence.status === 'approved' || existingAbsence.status === 'processed') &&
         (existingAbsence.is_bank_holiday || existingAbsence.auto_generated || Boolean(existingAbsence.bulk_batch_id));
       const finalReasonId = resolveUpdatedField('reason_id', existingAbsence.reason_id);
       const finalAllowTimesheetWorkOnLeave = resolveUpdatedField(
@@ -922,9 +922,47 @@ export function useApproveAbsence() {
           approved_at: new Date().toISOString(),
         })
         .eq('id', id)
+        .eq('status', 'pending')
         .select()
         .single();
       
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['absences'] });
+      queryClient.invalidateQueries({ queryKey: ['absence-summary'] });
+    },
+  });
+}
+
+/**
+ * Process an approved absence (admin/manager only)
+ */
+export function useProcessAbsence() {
+  const queryClient = useQueryClient();
+  const supabase = createClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await assertAbsenceFinancialYearOpen(supabase, id);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase
+        .from('absences')
+        .update({
+          status: 'processed',
+          processed_by: user.id,
+          processed_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .eq('status', 'approved')
+        .select()
+        .single();
+
       if (error) throw error;
       return data;
     },
@@ -962,6 +1000,7 @@ export function useRejectAbsence() {
         .from('absences')
         .update(updates)
         .eq('id', id)
+        .eq('status', 'pending')
         .select()
         .single();
       
@@ -1036,7 +1075,7 @@ export function useAbsenceSummaryForEmployee(profileId: string) {
       
       // Calculate approved and pending for Annual Leave only
       const approved_taken = typedAbsences
-        .filter((a) => a.status === 'approved' && a.reason_id === annualLeaveReason.id)
+        .filter((a) => (a.status === 'approved' || a.status === 'processed') && a.reason_id === annualLeaveReason.id)
         .reduce((sum: number, a) => sum + (a.duration_days || 0), 0);
       
       const pending_total = typedAbsences

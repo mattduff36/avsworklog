@@ -43,7 +43,7 @@ export interface ProfileAbsenceSummaryItem {
   id: string;
   date: string;
   end_date: string | null;
-  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  status: 'pending' | 'approved' | 'processed' | 'rejected' | 'cancelled';
   reason_name: string;
 }
 

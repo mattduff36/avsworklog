@@ -30,6 +30,7 @@ import { AbsenceStatusFilter, TimesheetStatusFilter, StatusFilter } from '@/type
 import {
   useAllAbsences,
   useApproveAbsence,
+  useProcessAbsence,
   useRejectAbsence,
   useAbsenceSummaryForEmployee,
   useAbsenceRealtimeQueryInvalidation,
@@ -189,6 +190,7 @@ function ApprovalsContent() {
   const allAbsenceFilters = useMemo(() => ({ includeArchived: false }), []);
   const { data: absences, isLoading: absencesLoading } = useAllAbsences(allAbsenceFilters);
   const approveAbsence = useApproveAbsence();
+  const processAbsence = useProcessAbsence();
   const rejectAbsence = useRejectAbsence();
   useAbsenceRealtimeQueryInvalidation();
   const canAuthoriseBookings = Boolean(
@@ -443,7 +445,7 @@ function ApprovalsContent() {
         .from('absences')
         .select('profile_id, date, end_date, is_half_day, half_day_session, allow_timesheet_work_on_leave, absence_reasons(name,color,is_paid)')
         .in('profile_id', userIds)
-        .eq('status', 'approved')
+        .in('status', ['approved', 'processed'])
         .lte('date', maxEndIso);
 
       if (absencesError) throw absencesError;
@@ -588,6 +590,7 @@ function ApprovalsContent() {
   const getFilterLabel = (filter: StatusFilter, tab: ApprovalsTab = activeTab): string => {
     if (tab === 'absences') {
       if (filter === 'approved') return 'Approved';
+      if (filter === 'processed') return 'Processed';
       if (filter === 'pending') return 'Pending';
       if (filter === 'rejected') return 'Rejected';
       if (filter === 'all') return 'All';
@@ -615,7 +618,7 @@ function ApprovalsContent() {
   const getFilterOptions = (): StatusFilter[] =>
     activeTab === 'timesheets'
       ? ['pending', 'approved', 'rejected', 'processed', 'adjusted', 'all']
-      : ['pending', 'approved', 'rejected', 'all'];
+      : ['pending', 'approved', 'processed', 'rejected', 'all'];
 
   const handleFilterChange = (filter: StatusFilter) => {
     if (activeTab === 'timesheets') {
@@ -1017,7 +1020,7 @@ function ApprovalsContent() {
                                     e.stopPropagation();
                                     handleOpenProcessModal(timesheet.id);
                                   }}
-                                  className="border-avs-yellow/50 text-avs-yellow hover:bg-avs-yellow hover:text-slate-900 hover:border-avs-yellow active:bg-avs-yellow-hover active:scale-95 transition-all"
+                                  className="border-avs-yellow/50 text-avs-yellow hover:bg-avs-yellow/20 hover:text-avs-yellow hover:border-avs-yellow active:bg-avs-yellow/30 active:text-avs-yellow active:scale-95 transition-all"
                                 >
                                   <Package className="h-4 w-4 mr-1" />
                                   Manager Approved
@@ -1139,6 +1142,14 @@ function ApprovalsContent() {
                           toast.error('Failed to reject absence', { id: errorContextId });
                         }
                       }}
+                      onProcess={async (id) => {
+                        try { await processAbsence.mutateAsync(id); }
+                        catch (e) {
+                          const errorContextId = 'approvals-table-absence-process-error';
+                          console.error('Error processing absence:', e, { errorContextId });
+                          toast.error('Failed to process absence', { id: errorContextId });
+                        }
+                      }}
                       columnVisibility={absenceColumnVisibility}
                     />
                   </div>
@@ -1151,6 +1162,7 @@ function ApprovalsContent() {
                       key={absence.id}
                       absence={absence}
                       onApprove={approveAbsence}
+                      onProcess={processAbsence}
                       onReject={rejectAbsence}
                     />
                   ))}
@@ -1178,19 +1190,22 @@ function ApprovalsContent() {
 function AbsenceApprovalCard({ 
   absence, 
   onApprove, 
+  onProcess,
   onReject 
 }: { 
   absence: AbsenceWithRelations;
   onApprove: ReturnType<typeof useApproveAbsence>;
+  onProcess: ReturnType<typeof useProcessAbsence>;
   onReject: ReturnType<typeof useRejectAbsence>;
 }) {
   const [rejecting, setRejecting] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const { data: summary } = useAbsenceSummaryForEmployee(absence.profile_id);
-  const canActionAbsence = absence.status === 'pending';
+  const canApproveOrReject = absence.status === 'pending';
+  const canProcessAbsence = absence.status === 'approved';
   
   async function handleApprove() {
-    if (!canActionAbsence) return;
+    if (!canApproveOrReject) return;
 
     // Check allowance for Annual Leave
     if (isAnnualLeaveReason(absence.absence_reasons.name)) {
@@ -1218,9 +1233,21 @@ function AbsenceApprovalCard({
       toast.error('Failed to approve absence', { id: errorContextId });
     }
   }
+
+  async function handleProcess() {
+    if (!canProcessAbsence) return;
+
+    try {
+      await onProcess.mutateAsync(absence.id);
+    } catch (error) {
+      const errorContextId = 'approvals-absence-process-error';
+      console.error('Error processing absence:', error, { errorContextId });
+      toast.error('Failed to process absence', { id: errorContextId });
+    }
+  }
   
   async function handleReject() {
-    if (!canActionAbsence) return;
+    if (!canApproveOrReject) return;
 
     if (!rejectionReason.trim()) {
       toast.error('Rejection reason required', {
@@ -1260,6 +1287,15 @@ function AbsenceApprovalCard({
         <Badge variant="destructive">
           <XCircle className="h-3 w-3 mr-1" />
           Rejected
+        </Badge>
+      );
+    }
+
+    if (absence.status === 'processed') {
+      return (
+        <Badge variant="default" className="bg-blue-500/10 text-blue-400 border-blue-500/20">
+          <Package className="h-3 w-3 mr-1" />
+          Processed
         </Badge>
       );
     }
@@ -1353,7 +1389,7 @@ function AbsenceApprovalCard({
             </div>
           )}
 
-          {canActionAbsence && rejecting ? (
+          {canApproveOrReject && rejecting ? (
             <div className="space-y-3">
               <div>
                 <Label htmlFor="rejectionReason">Rejection Reason *</Label>
@@ -1389,7 +1425,7 @@ function AbsenceApprovalCard({
                 </Button>
               </div>
             </div>
-          ) : canActionAbsence ? (
+          ) : canApproveOrReject ? (
             <div className="flex items-center justify-between">
               <div className="text-sm text-muted-foreground">
                 Submitted {formatDate(absence.created_at)}
@@ -1411,9 +1447,24 @@ function AbsenceApprovalCard({
                   className="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all"
                 >
                   <CheckCircle2 className="h-4 w-4 mr-1" />
-                  Payroll Received
+                  Approve
                 </Button>
               </div>
+            </div>
+          ) : canProcessAbsence ? (
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                Submitted {formatDate(absence.created_at)}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleProcess}
+                className="border-avs-yellow/50 text-avs-yellow hover:bg-avs-yellow/20 hover:text-avs-yellow hover:border-avs-yellow active:bg-avs-yellow/30 active:text-avs-yellow active:scale-95 transition-all"
+              >
+                <Package className="h-4 w-4 mr-1" />
+                Process
+              </Button>
             </div>
           ) : (
             <div className="flex items-center justify-between">

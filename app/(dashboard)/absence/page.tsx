@@ -141,6 +141,7 @@ function isExpectedAbsenceSubmissionError(message: string): boolean {
   return (
     normalized.includes('annual leave request exceeds available allowance') ||
     normalized.includes('conflicts with an existing approved/pending booking') ||
+    normalized.includes('conflicts with an existing approved/processed/pending booking') ||
     normalized.includes('half-day conflicts') ||
     normalized.includes('half-day is already booked') ||
     normalized.includes('financial year is closed for employee bookings') ||
@@ -1261,7 +1262,7 @@ export default function AbsencePage() {
                   {paginatedBookings.map(absence => {
                     const canCancel = 
                       (absence.status === 'pending' && new Date(absence.date) >= new Date()) ||
-                      (absence.status === 'approved' && new Date(absence.date) >= new Date());
+                      ((absence.status === 'approved' || absence.status === 'processed') && new Date(absence.date) >= new Date());
                     
                     return (
                       <div
@@ -1279,6 +1280,8 @@ export default function AbsencePage() {
                                 className={
                                   absence.status === 'approved'
                                     ? 'border-green-500/30 text-green-400 bg-green-500/10'
+                                    : absence.status === 'processed'
+                                    ? 'border-blue-500/30 text-blue-400 bg-blue-500/10'
                                     : absence.status === 'pending'
                                     ? 'border-amber-500/30 text-amber-400 bg-amber-500/10'
                                     : absence.status === 'rejected'
@@ -1429,6 +1432,8 @@ export default function AbsencePage() {
                             className={
                               absence.status === 'approved'
                                 ? 'border-green-500/30 text-green-400 bg-green-500/10'
+                                : absence.status === 'processed'
+                                ? 'border-blue-500/30 text-blue-400 bg-blue-500/10'
                                 : absence.status === 'pending'
                                 ? 'border-amber-500/30 text-amber-400 bg-amber-500/10'
                                 : 'border-slate-600 text-muted-foreground'
@@ -1493,7 +1498,7 @@ export default function AbsencePage() {
           <DialogHeader>
             <DialogTitle className="text-foreground">Cancel Absence</DialogTitle>
             <DialogDescription className="text-slate-400/90">
-              Are you sure you want to cancel this {cancelTargetStatus === 'approved' ? 'approved' : 'pending'} absence?
+              Are you sure you want to cancel this {cancelTargetStatus === 'processed' ? 'processed' : cancelTargetStatus === 'approved' ? 'approved' : 'pending'} absence?
             </DialogDescription>
           </DialogHeader>
           <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3">

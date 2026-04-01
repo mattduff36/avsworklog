@@ -111,7 +111,7 @@ async function fetchApprovedActiveAbsences(
       employee:profiles!absences_profile_id_fkey(full_name, employee_id, team_id),
       approver:profiles!absences_approved_by_fkey(full_name)
     `)
-    .eq('status', 'approved')
+    .in('status', ['approved', 'processed'])
     .lte('date', dateTo)
     .order('date', { ascending: false });
 
@@ -147,7 +147,7 @@ async function fetchApprovedArchivedAbsences(
       employee:profiles!absences_archive_profile_id_fkey(full_name, employee_id, team_id),
       approver:profiles!absences_archive_approved_by_fkey(full_name)
     `)
-    .eq('status', 'approved')
+    .in('status', ['approved', 'processed'])
     .lte('date', dateTo)
     .order('date', { ascending: false });
 

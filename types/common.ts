@@ -19,7 +19,7 @@ export interface Employee {
  */
 export type TimesheetStatusFilter = 'all' | 'draft' | 'pending' | 'approved' | 'rejected' | 'processed' | 'adjusted';
 export type InspectionStatusFilter = 'all' | 'draft' | 'submitted';
-export type AbsenceStatusFilter = 'all' | 'pending' | 'approved' | 'rejected';
+export type AbsenceStatusFilter = 'all' | 'pending' | 'approved' | 'processed' | 'rejected';
 export type StatusFilter = TimesheetStatusFilter | InspectionStatusFilter | AbsenceStatusFilter;
 
 /**

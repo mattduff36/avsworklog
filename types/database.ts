@@ -1910,10 +1910,12 @@ export interface Database {
           is_half_day: boolean
           half_day_session: 'AM' | 'PM' | null
           notes: string | null
-          status: 'pending' | 'approved' | 'rejected' | 'cancelled'
+          status: 'pending' | 'approved' | 'processed' | 'rejected' | 'cancelled'
           created_by: string | null
           approved_by: string | null
           approved_at: string | null
+          processed_by: string | null
+          processed_at: string | null
           is_bank_holiday: boolean
           auto_generated: boolean
           generation_source: string | null
@@ -1933,10 +1935,12 @@ export interface Database {
           is_half_day?: boolean
           half_day_session?: 'AM' | 'PM' | null
           notes?: string | null
-          status?: 'pending' | 'approved' | 'rejected' | 'cancelled'
+          status?: 'pending' | 'approved' | 'processed' | 'rejected' | 'cancelled'
           created_by?: string | null
           approved_by?: string | null
           approved_at?: string | null
+          processed_by?: string | null
+          processed_at?: string | null
           is_bank_holiday?: boolean
           auto_generated?: boolean
           generation_source?: string | null
@@ -1956,10 +1960,12 @@ export interface Database {
           is_half_day?: boolean
           half_day_session?: 'AM' | 'PM' | null
           notes?: string | null
-          status?: 'pending' | 'approved' | 'rejected' | 'cancelled'
+          status?: 'pending' | 'approved' | 'processed' | 'rejected' | 'cancelled'
           created_by?: string | null
           approved_by?: string | null
           approved_at?: string | null
+          processed_by?: string | null
+          processed_at?: string | null
           is_bank_holiday?: boolean
           auto_generated?: boolean
           generation_source?: string | null
@@ -2034,10 +2040,12 @@ export interface Database {
           is_half_day: boolean
           half_day_session: 'AM' | 'PM' | null
           notes: string | null
-          status: 'pending' | 'approved' | 'rejected' | 'cancelled'
+          status: 'pending' | 'approved' | 'processed' | 'rejected' | 'cancelled'
           created_by: string | null
           approved_by: string | null
           approved_at: string | null
+          processed_by: string | null
+          processed_at: string | null
           is_bank_holiday: boolean
           auto_generated: boolean
           generation_source: string | null
@@ -2060,10 +2068,12 @@ export interface Database {
           is_half_day?: boolean
           half_day_session?: 'AM' | 'PM' | null
           notes?: string | null
-          status: 'pending' | 'approved' | 'rejected' | 'cancelled'
+          status: 'pending' | 'approved' | 'processed' | 'rejected' | 'cancelled'
           created_by?: string | null
           approved_by?: string | null
           approved_at?: string | null
+          processed_by?: string | null
+          processed_at?: string | null
           is_bank_holiday?: boolean
           auto_generated?: boolean
           generation_source?: string | null
@@ -2086,10 +2096,12 @@ export interface Database {
           is_half_day?: boolean
           half_day_session?: 'AM' | 'PM' | null
           notes?: string | null
-          status?: 'pending' | 'approved' | 'rejected' | 'cancelled'
+          status?: 'pending' | 'approved' | 'processed' | 'rejected' | 'cancelled'
           created_by?: string | null
           approved_by?: string | null
           approved_at?: string | null
+          processed_by?: string | null
+          processed_at?: string | null
           is_bank_holiday?: boolean
           auto_generated?: boolean
           generation_source?: string | null

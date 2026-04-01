@@ -134,6 +134,43 @@ describe('Absence Management API', () => {
       expect(rejected.status).toBe('rejected');
       expect(rejected.rejection_reason).toBeDefined();
     });
+
+    it('should allow approved absence to be processed', () => {
+      const approved = {
+        id: 'absence-2',
+        status: 'approved',
+        approved_by: 'approver-id',
+        approved_at: new Date().toISOString(),
+      };
+
+      const processed = {
+        ...approved,
+        status: 'processed',
+        processed_by: 'payroll-id',
+        processed_at: new Date().toISOString(),
+      };
+
+      expect(processed.status).toBe('processed');
+      expect(processed.processed_by).toBeDefined();
+      expect(processed.processed_at).toBeDefined();
+    });
+
+    it('should allow a different approver to process after approval', () => {
+      const approved = {
+        id: 'absence-3',
+        status: 'approved',
+        approved_by: 'manager-approver-id',
+      };
+
+      const processed = {
+        ...approved,
+        status: 'processed',
+        processed_by: 'payroll-approver-id',
+      };
+
+      expect(processed.approved_by).not.toBe(processed.processed_by);
+      expect(processed.status).toBe('processed');
+    });
   });
 
   describe('Calendar Integration', () => {

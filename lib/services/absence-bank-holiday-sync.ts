@@ -103,7 +103,7 @@ export interface BulkAbsenceConflictDetail {
   fullName: string;
   employeeId: string | null;
   reasonName: string | null;
-  status: 'approved' | 'pending' | string;
+  status: 'approved' | 'processed' | 'pending' | string;
   conflictStartDate: string;
   conflictEndDate: string;
 }
@@ -362,7 +362,7 @@ export async function generateFinancialYearCarryovers(
         .from('absences')
         .select('profile_id, duration_days')
         .eq('reason_id', annualLeaveReasonId)
-        .eq('status', 'approved')
+        .in('status', ['approved', 'processed'])
         .gte('date', sourceStartIso)
         .lte('date', sourceEndIso),
       supabase
@@ -1216,14 +1216,14 @@ export async function bookBulkAbsence(
         .select('profile_id, duration_days, status')
         .eq('reason_id', annualLeaveReason.id)
         .in('profile_id', profileIds)
-        .in('status', ['approved', 'pending'])
+        .in('status', ['approved', 'processed', 'pending'])
         .gte('date', fyStartIso)
         .lte('date', fyEndIso),
       options.supabase
         .from('absences')
         .select('profile_id, date, end_date, status, absence_reasons(name)')
         .in('profile_id', profileIds)
-        .in('status', ['approved', 'pending'])
+        .in('status', ['approved', 'processed', 'pending'])
         .lte('date', endDate),
     ]);
 

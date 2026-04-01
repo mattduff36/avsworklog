@@ -226,7 +226,7 @@ export function CivilsTimesheet({
           .from('absences')
           .select('date, end_date, is_half_day, half_day_session, allow_timesheet_work_on_leave, absence_reasons(name,color,is_paid)')
           .eq('profile_id', selectedEmployeeId)
-          .eq('status', 'approved')
+          .in('status', ['approved', 'processed'])
           .lte('date', endIso);
 
         if (absenceResult.error) throw absenceResult.error;

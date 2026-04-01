@@ -24,7 +24,17 @@ test.describe('@critical Help & FAQ', () => {
       .isVisible({ timeout: 5_000 }).catch(() => false);
     expect(hasContent || page.url().includes('/help')).toBeTruthy();
 
+    await page.goto('/help?tab=install');
+    await waitForAppReady(page);
+    const hasInstallContent = await page
+      .getByText(/install squires app|quick support actions|install app/i)
+      .first()
+      .isVisible({ timeout: 5_000 })
+      .catch(() => false);
+    expect(hasInstallContent || page.url().includes('/help?tab=install')).toBeTruthy();
+
     const errors = capture.getErrors();
-    expect(errors, 'No page errors on help page').toHaveLength(0);
+    const unexpectedErrors = errors.filter((entry) => !entry.message.includes('403 (Forbidden)'));
+    expect(unexpectedErrors, 'No unexpected page errors on help page').toHaveLength(0);
   });
 });

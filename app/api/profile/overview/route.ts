@@ -158,7 +158,7 @@ export async function GET() {
     if (annualRows.error) throw annualRows.error;
 
     const approvedTaken = (annualRows.data || [])
-      .filter((row) => row.status === 'approved')
+      .filter((row) => row.status === 'approved' || row.status === 'processed')
       .reduce((sum, row) => sum + (row.duration_days || 0), 0);
     const pendingTotal = (annualRows.data || [])
       .filter((row) => row.status === 'pending')
