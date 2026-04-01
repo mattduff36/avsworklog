@@ -23,6 +23,11 @@ interface FieldResponseInput {
   response_json?: Record<string, unknown> | null;
 }
 
+interface AttachmentStatusRow {
+  id: string;
+  status: string | null;
+}
+
 function normalizeValue(value: unknown): string {
   if (value === null || value === undefined) return '';
   return String(value).trim();
@@ -123,6 +128,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     if (attachmentError || !attachment) {
       return NextResponse.json({ error: 'Attachment not found' }, { status: 404 });
+    }
+
+    const typedAttachment = attachment as AttachmentStatusRow;
+    if (typedAttachment.status === 'completed') {
+      return NextResponse.json(
+        { error: 'Attachment is completed and cannot be modified.' },
+        { status: 409 },
+      );
     }
 
     const { data: snapshotRows, error: snapshotError } = await db
