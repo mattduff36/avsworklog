@@ -23,7 +23,7 @@ import {
   MonitorSmartphone,
   UserCircle2,
 } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { NotificationPanel } from '@/components/messages/NotificationPanel';
 import { TabletModeToggleActions } from '@/components/layout/TabletModeToggleActions';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
@@ -149,7 +149,7 @@ export function Navbar() {
   const expandedWidthRef = useRef(0);
   const desktopMenuTriggerRef = useRef<HTMLButtonElement>(null);
   const desktopMenuRef = useRef<HTMLDivElement>(null);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   // useAuth now provides effective role flags (respecting View As cookie)
   const effectiveIsManager = isManager;
@@ -291,80 +291,121 @@ export function Navbar() {
     return () => observer.disconnect();
   }, []);
 
-  // Fetch notification count (only when user is authenticated)
-  useEffect(() => {
-    // Don't fetch if not logged in or user ID is not available
-    if (!user?.id) return;
-
-    async function fetchNotificationCount() {
-      try {
-        // Double-check user is still authenticated before making request
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
-        if (!currentUser?.id) {
-          setUnreadCount(0);
-          return;
-        }
-
-        const response = await fetch('/api/messages/notifications');
-        
-        // Handle 401 gracefully - user may have just logged out
-        if (response.status === 401) {
-          setUnreadCount(0);
-          return;
-        }
-
-        // Handle other HTTP errors
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        if (data.success) {
-          setUnreadCount(data.unread_count || 0);
-        }
-      } catch (error) {
-        // Improved error logging with context
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        const errorDetails = {
-          message: errorMessage,
-          type: error instanceof TypeError ? 'Network' : 'Application',
-          endpoint: '/api/messages/notifications',
-          userId: user?.id || 'unknown',
-          timestamp: new Date().toISOString()
-        };
-
-        // Only log unexpected errors, not network failures or auth errors
-        // Skip: "Failed to fetch" (dev server down), "Network request failed" (offline), "401" (logged out)
-        const isExpectedError = error instanceof Error && (
-          error.message.includes('401') ||
-          error.message.includes('Failed to fetch') ||
-          error.message.includes('Network request failed')
-        );
-        
-        if (!isExpectedError) {
-          console.warn('Error fetching notifications:', errorMessage, errorDetails);
-        }
-        
-        // Set count to 0 on error to prevent showing stale data
-        setUnreadCount(0);
-      }
+  const fetchNotificationCount = useCallback(async () => {
+    if (!user?.id) {
+      setUnreadCount(0);
+      return;
     }
 
-    fetchNotificationCount();
+    try {
+      // Double-check user is still authenticated before making request
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser?.id) {
+        setUnreadCount(0);
+        return;
+      }
 
-    // Refresh badge when a notification is dismissed (e.g. from ReminderModal)
+      const response = await fetch('/api/messages/notifications');
+
+      // Handle 401 gracefully - user may have just logged out
+      if (response.status === 401) {
+        setUnreadCount(0);
+        return;
+      }
+
+      // Handle other HTTP errors
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        setUnreadCount(data.unread_count || 0);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorDetails = {
+        message: errorMessage,
+        type: error instanceof TypeError ? 'Network' : 'Application',
+        endpoint: '/api/messages/notifications',
+        userId: user?.id || 'unknown',
+        timestamp: new Date().toISOString()
+      };
+
+      const isExpectedError = error instanceof Error && (
+        error.message.includes('401') ||
+        error.message.includes('Failed to fetch') ||
+        error.message.includes('Network request failed')
+      );
+
+      if (!isExpectedError) {
+        console.warn('Error fetching notifications:', errorMessage, errorDetails);
+      }
+
+      setUnreadCount(0);
+    }
+  }, [supabase, user?.id]);
+
+  // Fetch and refresh notification count.
+  useEffect(() => {
+    if (!user?.id) {
+      setUnreadCount(0);
+      return;
+    }
+
+    void fetchNotificationCount();
+
     const handleNotificationDismissed = () => {
-      fetchNotificationCount();
+      void fetchNotificationCount();
     };
+    const handleWindowFocus = () => {
+      void fetchNotificationCount();
+    };
+
     window.addEventListener('notification-dismissed', handleNotificationDismissed);
-    
-    // Poll every 60 seconds for new notifications (badge updates when received)
-    const interval = setInterval(fetchNotificationCount, 60000);
+    window.addEventListener('focus', handleWindowFocus);
+
+    // Keep the badge responsive even when no other state updates occur.
+    const interval = setInterval(() => {
+      void fetchNotificationCount();
+    }, 15000);
+
     return () => {
       clearInterval(interval);
       window.removeEventListener('notification-dismissed', handleNotificationDismissed);
+      window.removeEventListener('focus', handleWindowFocus);
     };
-  }, [user?.id, supabase]);
+  }, [user?.id, fetchNotificationCount]);
+
+  // Realtime updates for this user's notification rows.
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const filter = `user_id=eq.${user.id}`;
+    const channel = supabase
+      .channel(`navbar_notifications_${user.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'message_recipients',
+        filter,
+      }, () => {
+        void fetchNotificationCount();
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'message_recipients',
+        filter,
+      }, () => {
+        void fetchNotificationCount();
+      })
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [user?.id, supabase, fetchNotificationCount]);
 
   const handleSignOut = async () => {
     try {
@@ -462,6 +503,7 @@ export function Navbar() {
   const hasMobileManagementLinks = mobileManagerLinks.length > 0 || adminLinks.length > 0;
   const hasMobileDeveloperLinks = isActualSuperAdmin && !isViewingAs;
   const showInstallAppLink = !isStandaloneApp;
+  const unreadBadgeLabel = unreadCount > 99 ? '99+' : unreadCount;
 
   return (
     <>
@@ -555,14 +597,18 @@ export function Navbar() {
                     const nextOpen = !desktopMenuOpen;
                     if (nextOpen) {
                       requestAnimationFrame(() => updateDesktopMenuPosition());
+                      void fetchNotificationCount();
                     }
                     setDesktopMenuOpen(nextOpen);
                   }}
                 >
                   <Menu className="w-4 h-4" />
                   {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 h-5 min-w-5 px-1 bg-red-600 text-white text-[11px] font-bold rounded-full flex items-center justify-center">
-                      {unreadCount > 9 ? '9+' : unreadCount}
+                    <span
+                      data-testid="desktop-burger-notification-badge"
+                      className="absolute -top-1 -right-1 h-5 min-w-5 px-1 bg-red-600 text-white text-[11px] font-bold rounded-full flex items-center justify-center"
+                    >
+                      {unreadBadgeLabel}
                     </span>
                   )}
                 </Button>
@@ -595,10 +641,19 @@ export function Navbar() {
                       onClick={() => {
                         setDesktopMenuOpen(false);
                         setNotificationPanelOpen(true);
+                        void fetchNotificationCount();
                       }}
                     >
                       <Bell className="w-4 h-4" />
                       Notifications
+                      {unreadCount > 0 && (
+                        <span
+                          data-testid="desktop-menu-notification-link-badge"
+                          className="ml-auto min-w-[1.25rem] h-5 px-1 rounded-full bg-red-500 text-white text-[11px] leading-none flex items-center justify-center font-semibold"
+                        >
+                          {unreadBadgeLabel}
+                        </span>
+                      )}
                     </button>
 
                     <Link
@@ -641,13 +696,27 @@ export function Navbar() {
 
               {/* Mobile menu button */}
               <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="md:hidden p-2 rounded-md text-muted-foreground hover:bg-slate-800/50 hover:text-white"
+                onClick={() => {
+                  const nextOpen = !mobileMenuOpen;
+                  if (nextOpen) {
+                    void fetchNotificationCount();
+                  }
+                  setMobileMenuOpen(nextOpen);
+                }}
+                className="md:hidden relative p-2 rounded-md text-muted-foreground hover:bg-slate-800/50 hover:text-white"
               >
                 {mobileMenuOpen ? (
                   <X className="w-6 h-6" />
                 ) : (
                   <Menu className="w-6 h-6" />
+                )}
+                {!mobileMenuOpen && unreadCount > 0 && (
+                  <span
+                    data-testid="mobile-burger-notification-badge"
+                    className="absolute -top-0.5 -right-0.5 min-w-[1.1rem] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] leading-none flex items-center justify-center font-semibold"
+                  >
+                    {unreadBadgeLabel}
+                  </span>
                 )}
               </button>
             </div>
@@ -740,14 +809,18 @@ export function Navbar() {
                     onClick={() => {
                       setMobileMenuOpen(false);
                       setNotificationPanelOpen(true);
+                      void fetchNotificationCount();
                     }}
                     className="flex w-full items-center px-3 py-2 text-lg font-medium rounded-md text-muted-foreground hover:bg-slate-800/50 hover:text-white"
                   >
                     <Bell className="w-6 h-6 mr-3 text-avs-yellow" />
                     Notifications
                     {unreadCount > 0 && (
-                      <span className="ml-auto min-w-[1.25rem] h-5 px-1 rounded-full bg-red-500 text-white text-[11px] leading-none flex items-center justify-center font-semibold">
-                        {unreadCount > 99 ? '99+' : unreadCount}
+                      <span
+                        data-testid="mobile-menu-notification-link-badge"
+                        className="ml-auto min-w-[1.25rem] h-5 px-1 rounded-full bg-red-500 text-white text-[11px] leading-none flex items-center justify-center font-semibold"
+                      >
+                        {unreadBadgeLabel}
                       </span>
                     )}
                   </button>
@@ -831,14 +904,7 @@ export function Navbar() {
             onClose={() => {
               setNotificationPanelOpen(false);
               // Refresh unread count after closing
-              fetch('/api/messages/notifications')
-                .then(res => res.json())
-                .then(data => {
-                  if (data.success) {
-                    setUnreadCount(data.unread_count || 0);
-                  }
-                })
-                .catch(console.error);
+              void fetchNotificationCount();
             }}
           />
         )}

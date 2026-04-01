@@ -196,8 +196,10 @@ export async function PATCH(
     }
 
     // Create update history entry if status changed or note provided
-    const statusChanged = status && status !== currentReport.status;
-    if (statusChanged || note) {
+    const statusChanged = Boolean(status && status !== currentReport.status);
+    const trimmedNote = note?.trim() || '';
+    const hasResponseNote = trimmedNote.length > 0;
+    if (statusChanged || hasResponseNote) {
       const { error: historyError } = await supabase
         .from('error_report_updates')
         .insert({
@@ -205,7 +207,7 @@ export async function PATCH(
           created_by: user.id,
           old_status: currentReport.status,
           new_status: status || currentReport.status,
-          note: note || undefined,
+          note: trimmedNote || undefined,
         });
 
       if (historyError) {
@@ -213,22 +215,26 @@ export async function PATCH(
       }
     }
 
-    // Send in-app notification to the reporter when status changes
-    if (statusChanged && currentReport.created_by) {
+    // Send in-app notification to both the reporter and responder.
+    // This lets the responder verify the exact user-facing notification copy.
+    if ((statusChanged || hasResponseNote) && currentReport.created_by) {
       try {
         const adminSupabase = createAdminClient();
         const oldLabel = ERROR_REPORT_STATUS_LABELS[currentReport.status as keyof typeof ERROR_REPORT_STATUS_LABELS] || currentReport.status;
         const newLabel = ERROR_REPORT_STATUS_LABELS[status as keyof typeof ERROR_REPORT_STATUS_LABELS] || status;
         const reportTitle = currentReport.title?.substring(0, 60) || 'Your error report';
 
-        const subject = `Error Report Updated to ${newLabel}`;
+        const subject = statusChanged
+          ? `Error Report Updated to ${newLabel}`
+          : 'Error Report Response Added';
         const bodyParts = [
           `Your error report "${reportTitle}" has been updated.`,
           '',
-          `Status: ${oldLabel} → ${newLabel}`,
-          '',
         ];
-        if (note) bodyParts.push(`Admin note: ${note}`, '');
+        if (statusChanged) {
+          bodyParts.push(`Status: ${oldLabel} -> ${newLabel}`, '');
+        }
+        if (hasResponseNote) bodyParts.push(`Admin note: ${trimmedNote}`, '');
         bodyParts.push('---', 'Tip: You can view your reports on the Help page.');
 
         const { data: message, error: msgError } = await adminSupabase
@@ -245,17 +251,22 @@ export async function PATCH(
 
         if (msgError) throw msgError;
 
-        const { error: recipientError } = await adminSupabase
-          .from('message_recipients')
-          .insert({
-            message_id: message.id,
-            user_id: currentReport.created_by,
-            status: 'PENDING',
-          });
+        const recipientIds = Array.from(new Set([currentReport.created_by, user.id].filter(Boolean)));
+        if (recipientIds.length > 0) {
+          const { error: recipientError } = await adminSupabase
+            .from('message_recipients')
+            .insert(
+              recipientIds.map((recipientId) => ({
+                message_id: message.id,
+                user_id: recipientId,
+                status: 'PENDING' as const,
+              }))
+            );
 
-        if (recipientError) throw recipientError;
+          if (recipientError) throw recipientError;
+        }
       } catch (notifyError) {
-        console.error('Failed to send status-change notification to reporter:', notifyError);
+        console.error('Failed to send status-change notification to reporter/responder:', notifyError);
       }
     }
 

@@ -27,6 +27,7 @@ import { fetchCurrentWorkShift, fetchEmployeeWorkShift } from '@/lib/client/work
 import type { WorkShiftPattern } from '@/types/work-shifts';
 import {
   type ApprovedAbsenceForTimesheet,
+  isWorkWindowOvernight,
   type TimesheetEntryLike,
   type TimesheetOffDayState,
   getTimesheetEntryDateFromWeekEnding,
@@ -796,6 +797,7 @@ export function CivilsTimesheet({
             newEntries[dayIndex].daily_total = 0;
           } else if (
             workWindow &&
+            !isWorkWindowOvernight(workWindow) &&
             (toMinutes(entry.time_finished) < toMinutes(entry.time_started))
           ) {
             setTimeErrors(prev => ({
@@ -901,6 +903,7 @@ export function CivilsTimesheet({
       if (!entry.time_started || !entry.time_finished) return false;
       if (!isTimeWithinWorkWindow(entry.time_started, offDay.workWindow)) return true;
       if (!isTimeWithinWorkWindow(entry.time_finished, offDay.workWindow)) return true;
+      if (isWorkWindowOvernight(offDay.workWindow)) return false;
       return toMinutes(entry.time_finished) < toMinutes(entry.time_started);
     });
 
@@ -1013,6 +1016,7 @@ export function CivilsTimesheet({
         if (!entry.time_started || !entry.time_finished) return false;
         if (!isTimeWithinWorkWindow(entry.time_started, offDay.workWindow)) return true;
         if (!isTimeWithinWorkWindow(entry.time_finished, offDay.workWindow)) return true;
+        if (isWorkWindowOvernight(offDay.workWindow)) return false;
         return toMinutes(entry.time_finished) < toMinutes(entry.time_started);
       });
 

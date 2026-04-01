@@ -1,16 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { GET } from '@/app/api/management/suggestions/[id]/route';
+import { GET, PATCH } from '@/app/api/management/suggestions/[id]/route';
 
-const { mockCreateClient, mockCanAccess, mockLogServerError } = vi.hoisted(() => ({
+const { mockCreateClient, mockCreateAdminClient, mockCanAccess, mockLogServerError } = vi.hoisted(() => ({
   mockCreateClient: vi.fn(),
+  mockCreateAdminClient: vi.fn(),
   mockCanAccess: vi.fn(),
   mockLogServerError: vi.fn(),
 }));
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: mockCreateClient,
+}));
+
+vi.mock('@/lib/supabase/admin', () => ({
+  createAdminClient: mockCreateAdminClient,
 }));
 
 vi.mock('@/lib/utils/rbac', () => ({
@@ -119,5 +124,79 @@ describe('GET /api/management/suggestions/[id]', () => {
     );
 
     expect(response.status).toBe(404);
+  });
+
+  it('sends notification to submitter and responder when suggestion is updated', async () => {
+    const existingSuggestion = {
+      id: 'suggestion-1',
+      created_by: 'user-1',
+      title: 'Improve dashboard filters',
+      status: 'new',
+    };
+    const updatedSuggestion = {
+      ...existingSuggestion,
+      status: 'under_review',
+      admin_notes: 'Starting this this week',
+    };
+
+    const suggestionsSingle = vi.fn().mockResolvedValue({ data: existingSuggestion, error: null });
+    const suggestionsEqForSelect = vi.fn(() => ({ single: suggestionsSingle }));
+    const suggestionsSelect = vi.fn(() => ({ eq: suggestionsEqForSelect }));
+
+    const suggestionsUpdateSingle = vi.fn().mockResolvedValue({ data: updatedSuggestion, error: null });
+    const suggestionsUpdateSelect = vi.fn(() => ({ single: suggestionsUpdateSingle }));
+    const suggestionsUpdateEq = vi.fn(() => ({ select: suggestionsUpdateSelect }));
+    const suggestionsUpdate = vi.fn(() => ({ eq: suggestionsUpdateEq }));
+
+    const suggestionUpdatesInsert = vi.fn().mockResolvedValue({ error: null });
+
+    const messageInsertSingle = vi.fn().mockResolvedValue({ data: { id: 'msg-1' }, error: null });
+    const messageInsertSelect = vi.fn(() => ({ single: messageInsertSingle }));
+    const messageInsert = vi.fn(() => ({ select: messageInsertSelect }));
+    const messageRecipientsInsert = vi.fn().mockResolvedValue({ error: null });
+
+    mockCreateClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'manager-1' } },
+          error: null,
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'suggestions') return { select: suggestionsSelect, update: suggestionsUpdate };
+        if (table === 'suggestion_updates') return { insert: suggestionUpdatesInsert };
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    } as unknown as SupabaseClient);
+
+    mockCreateAdminClient.mockReturnValue({
+      from: vi.fn((table: string) => {
+        if (table === 'messages') return { insert: messageInsert };
+        if (table === 'message_recipients') return { insert: messageRecipientsInsert };
+        throw new Error(`Unexpected admin table: ${table}`);
+      }),
+    });
+
+    const response = await PATCH(
+      new NextRequest('http://localhost/api/management/suggestions/suggestion-1', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          status: 'under_review',
+          note: 'We are reviewing this now.',
+        }),
+      }),
+      { params: Promise.resolve({ id: 'suggestion-1' }) }
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.success).toBe(true);
+    expect(suggestionUpdatesInsert).toHaveBeenCalledTimes(1);
+    expect(messageInsert).toHaveBeenCalledTimes(1);
+    expect(messageRecipientsInsert).toHaveBeenCalledWith([
+      { message_id: 'msg-1', user_id: 'user-1', status: 'PENDING' },
+      { message_id: 'msg-1', user_id: 'manager-1', status: 'PENDING' },
+    ]);
   });
 });

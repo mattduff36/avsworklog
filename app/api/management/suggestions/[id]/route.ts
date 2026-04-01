@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { SUGGESTION_STATUS_LABELS } from '@/types/faq';
 import type { UpdateSuggestionRequest, Suggestion, SuggestionUpdateWithUser } from '@/types/faq';
 
 interface RouteParams {
@@ -132,7 +134,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     // Note: suggestions table added by migration - types will update after migration runs
     const { data: currentSuggestion, error: fetchError } = await supabase
       .from('suggestions')
-      .select('status')
+      .select('status, created_by, title')
       .eq('id', id)
       .single();
 
@@ -164,8 +166,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       throw updateError;
     }
 
+    const statusChanged = Boolean(body.status && body.status !== currentSuggestion?.status);
+    const trimmedNote = body.note?.trim() || '';
+    const hasResponseNote = trimmedNote.length > 0;
+
     // Create update record if status changed or note provided
-    if (body.status !== currentSuggestion?.status || body.note) {
+    if (statusChanged || hasResponseNote) {
       await supabase
         .from('suggestion_updates')
         .insert({
@@ -173,8 +179,67 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           created_by: user.id,
           old_status: currentSuggestion?.status,
           new_status: body.status || currentSuggestion?.status,
-          note: body.note || null,
+          note: trimmedNote || null,
         });
+    }
+
+    // Send in-app notification to both the suggestion author and responder.
+    // This lets the responder verify the exact user-facing notification copy.
+    if ((statusChanged || hasResponseNote) && currentSuggestion?.created_by) {
+      try {
+        const adminSupabase = createAdminClient();
+        const oldStatus = currentSuggestion.status as keyof typeof SUGGESTION_STATUS_LABELS;
+        const nextStatus = (body.status || currentSuggestion.status) as keyof typeof SUGGESTION_STATUS_LABELS;
+        const oldLabel = SUGGESTION_STATUS_LABELS[oldStatus] || currentSuggestion.status;
+        const newLabel = SUGGESTION_STATUS_LABELS[nextStatus] || (body.status || currentSuggestion.status);
+        const suggestionTitle = currentSuggestion.title?.substring(0, 80) || 'Your suggestion';
+        const subject = statusChanged
+          ? `Suggestion Updated to ${newLabel}`
+          : 'Suggestion Response Added';
+
+        const bodyParts = [
+          `Suggestion: "${suggestionTitle}"`,
+          '',
+        ];
+        if (statusChanged) {
+          bodyParts.push(`Status: ${oldLabel} -> ${newLabel}`, '');
+        }
+        if (hasResponseNote) {
+          bodyParts.push(`Update note: ${trimmedNote}`, '');
+        }
+        bodyParts.push('---', 'Tip: You can review your suggestion status on the Help page.');
+
+        const { data: message, error: messageError } = await adminSupabase
+          .from('messages')
+          .insert({
+            type: 'NOTIFICATION',
+            priority: 'HIGH',
+            subject,
+            body: bodyParts.join('\n'),
+            sender_id: user.id,
+          })
+          .select('id')
+          .single();
+
+        if (messageError) throw messageError;
+
+        const recipientIds = Array.from(new Set([currentSuggestion.created_by, user.id].filter(Boolean)));
+        if (recipientIds.length > 0) {
+          const { error: recipientError } = await adminSupabase
+            .from('message_recipients')
+            .insert(
+              recipientIds.map((recipientId) => ({
+                message_id: message.id,
+                user_id: recipientId,
+                status: 'PENDING' as const,
+              }))
+            );
+
+          if (recipientError) throw recipientError;
+        }
+      } catch (notifyError) {
+        console.error('Failed to send suggestion update notification:', notifyError);
+      }
     }
 
     return NextResponse.json({

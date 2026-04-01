@@ -104,12 +104,24 @@ function toMinutes(time: string): number | null {
   return hours * 60 + minutes;
 }
 
+export function isWorkWindowOvernight(window: TimesheetWorkWindow | null): boolean {
+  if (!window) return false;
+  const min = toMinutes(window.start);
+  const max = toMinutes(window.end);
+  if (min === null || max === null) return false;
+  return max < min;
+}
+
 export function isTimeWithinWorkWindow(time: string, window: TimesheetWorkWindow | null): boolean {
   if (!window || !time) return true;
   const minutes = toMinutes(time);
   const min = toMinutes(window.start);
   const max = toMinutes(window.end);
   if (minutes === null || min === null || max === null) return false;
+  if (max < min) {
+    // Overnight window, e.g. 17:00 -> 05:00.
+    return minutes >= min || minutes <= max;
+  }
   return minutes >= min && minutes <= max;
 }
 
@@ -141,8 +153,14 @@ function computeWorkedHours(entry: TimesheetEntryLike, offDay: TimesheetOffDaySt
   const startMinutes = toMinutes(entry.time_started);
   const finishMinutes = toMinutes(entry.time_finished);
 
-  // Overnight hours are not allowed when half-day window constraints are active.
-  if (offDay.workWindow && startMinutes !== null && finishMinutes !== null && finishMinutes < startMinutes) {
+  // Keep half-day leave windows as same-day ranges unless the window itself wraps overnight.
+  if (
+    offDay.workWindow &&
+    !isWorkWindowOvernight(offDay.workWindow) &&
+    startMinutes !== null &&
+    finishMinutes !== null &&
+    finishMinutes < startMinutes
+  ) {
     return 0;
   }
 

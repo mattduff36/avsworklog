@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { GET } from '@/app/api/management/error-reports/[id]/route';
+import { GET, PATCH } from '@/app/api/management/error-reports/[id]/route';
 
-const { mockCreateClient, mockCanAccess, mockLogServerError } = vi.hoisted(() => ({
+const { mockCreateClient, mockCreateAdminClient, mockCanAccess, mockLogServerError } = vi.hoisted(() => ({
   mockCreateClient: vi.fn(),
+  mockCreateAdminClient: vi.fn(),
   mockCanAccess: vi.fn(),
   mockLogServerError: vi.fn(),
 }));
@@ -14,7 +15,7 @@ vi.mock('@/lib/supabase/server', () => ({
 }));
 
 vi.mock('@/lib/supabase/admin', () => ({
-  createAdminClient: vi.fn(),
+  createAdminClient: mockCreateAdminClient,
 }));
 
 vi.mock('@/lib/utils/rbac', () => ({
@@ -128,5 +129,81 @@ describe('GET /api/management/error-reports/[id]', () => {
     );
 
     expect(response.status).toBe(404);
+  });
+
+  it('sends notification to reporter and responder when error report is updated', async () => {
+    const currentReport = {
+      id: 'report-1',
+      created_by: 'user-1',
+      title: 'Broken page',
+      description: 'desc',
+      status: 'new',
+      admin_notes: null,
+    };
+    const updatedReport = {
+      ...currentReport,
+      status: 'investigating',
+      admin_notes: 'Investigating this now',
+    };
+
+    const reportFetchSingle = vi.fn().mockResolvedValue({ data: currentReport, error: null });
+    const reportFetchEq = vi.fn(() => ({ single: reportFetchSingle }));
+    const reportSelect = vi.fn(() => ({ eq: reportFetchEq }));
+
+    const reportUpdateSingle = vi.fn().mockResolvedValue({ data: updatedReport, error: null });
+    const reportUpdateSelect = vi.fn(() => ({ single: reportUpdateSingle }));
+    const reportUpdateEq = vi.fn(() => ({ select: reportUpdateSelect }));
+    const reportUpdate = vi.fn(() => ({ eq: reportUpdateEq }));
+
+    const historyInsert = vi.fn().mockResolvedValue({ error: null });
+
+    const messageInsertSingle = vi.fn().mockResolvedValue({ data: { id: 'msg-1' }, error: null });
+    const messageInsertSelect = vi.fn(() => ({ single: messageInsertSingle }));
+    const messageInsert = vi.fn(() => ({ select: messageInsertSelect }));
+    const messageRecipientsInsert = vi.fn().mockResolvedValue({ error: null });
+
+    mockCreateClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'admin-1' } },
+          error: null,
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'error_reports') return { select: reportSelect, update: reportUpdate };
+        if (table === 'error_report_updates') return { insert: historyInsert };
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    } as unknown as SupabaseClient);
+
+    mockCreateAdminClient.mockReturnValue({
+      from: vi.fn((table: string) => {
+        if (table === 'messages') return { insert: messageInsert };
+        if (table === 'message_recipients') return { insert: messageRecipientsInsert };
+        throw new Error(`Unexpected admin table: ${table}`);
+      }),
+    });
+
+    const response = await PATCH(
+      new NextRequest('http://localhost/api/management/error-reports/report-1', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          status: 'investigating',
+          note: 'Looking into this now.',
+        }),
+      }),
+      { params: Promise.resolve({ id: 'report-1' }) }
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.success).toBe(true);
+    expect(historyInsert).toHaveBeenCalledTimes(1);
+    expect(messageInsert).toHaveBeenCalledTimes(1);
+    expect(messageRecipientsInsert).toHaveBeenCalledWith([
+      { message_id: 'msg-1', user_id: 'user-1', status: 'PENDING' },
+      { message_id: 'msg-1', user_id: 'admin-1', status: 'PENDING' },
+    ]);
   });
 });

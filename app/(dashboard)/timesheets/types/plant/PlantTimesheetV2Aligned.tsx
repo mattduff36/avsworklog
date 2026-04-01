@@ -40,6 +40,7 @@ import {
 import { getRecentTextValues, recordRecentTextValue } from '@/lib/utils/recentTextValues';
 import {
   type ApprovedAbsenceForTimesheet,
+  isWorkWindowOvernight,
   type TimesheetEntryLike,
   type TimesheetOffDayState,
   getTimesheetWeekIsoBounds,
@@ -615,12 +616,15 @@ export function PlantTimesheetV2({
         return;
       }
 
-      if (toMinutes(entry.time_finished) < toMinutes(entry.time_started)) {
-        nextErrors[index] = 'Finish time must be after start time';
+      const workWindow = offDayMap.get(index + 1)?.workWindow;
+      if (
+        workWindow &&
+        !isWorkWindowOvernight(workWindow) &&
+        toMinutes(entry.time_finished) < toMinutes(entry.time_started)
+      ) {
+        nextErrors[index] = 'Finish time must be after start time for half-day leave bookings';
         return;
       }
-
-      const workWindow = offDayMap.get(index + 1)?.workWindow;
       if (!workWindow) return;
 
       if (

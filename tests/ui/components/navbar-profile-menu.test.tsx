@@ -33,6 +33,14 @@ vi.mock('@/lib/supabase/client', () => ({
     auth: {
       getUser: vi.fn(async () => ({ data: { user: { id: 'user-1' } } })),
     },
+    channel: vi.fn(() => {
+      const channel = {
+        on: vi.fn(() => channel),
+        subscribe: vi.fn(() => ({ id: 'test-channel' })),
+      };
+      return channel;
+    }),
+    removeChannel: vi.fn(async () => {}),
   }),
 }));
 
@@ -127,6 +135,7 @@ describe('Navbar desktop burger menu', () => {
 
     await waitFor(() => {
       expect(screen.getByTitle('Menu')).toBeInTheDocument();
+      expect(screen.getByTestId('desktop-burger-notification-badge')).toBeInTheDocument();
     });
 
     const menuButton = screen.getByTitle('Menu');
@@ -136,6 +145,7 @@ describe('Navbar desktop burger menu', () => {
     await waitFor(() => {
       expect(screen.getByText('Profile')).toBeTruthy();
       expect(screen.getByText('Notifications')).toBeTruthy();
+      expect(screen.getByTestId('desktop-menu-notification-link-badge')).toBeInTheDocument();
       expect(screen.getByText('Help')).toBeTruthy();
       expect(screen.getByText('Sign Out')).toBeTruthy();
     });
@@ -156,11 +166,15 @@ describe('Navbar desktop burger menu', () => {
     const { container } = render(<Navbar />);
     const mobileMenuButton = container.querySelector('button.md\\:hidden');
     expect(mobileMenuButton).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByTestId('mobile-burger-notification-badge')).toBeInTheDocument();
+    });
 
     fireEvent.click(mobileMenuButton as HTMLButtonElement);
 
     await waitFor(() => {
       expect(screen.getByText('Active Now')).toBeInTheDocument();
+      expect(screen.getByTestId('mobile-menu-notification-link-badge')).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByText('Active Now'));

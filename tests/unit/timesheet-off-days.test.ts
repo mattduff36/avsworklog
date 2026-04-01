@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   getTimesheetEntryDateFromWeekEnding,
+  isTimeWithinWorkWindow,
   normalizeTimesheetEntriesForOffDays,
   PAID_LEAVE_DAILY_HOURS,
   resolveTimesheetOffDayStates,
@@ -149,6 +150,16 @@ describe('timesheet off-day resolver', () => {
     expect(tuesday?.isLeaveLocked).toBe(true);
     expect(tuesday?.leaveLabels.map((row) => row.label)).toEqual(['Annual Leave (AM)', 'Training (PM)']);
     expect(tuesday?.paidLeaveHours).toBe(9);
+  });
+
+  it('supports overnight work windows when validating time bounds', () => {
+    const overnightWindow = { start: '17:00', end: '05:00' };
+
+    expect(isTimeWithinWorkWindow('17:00', overnightWindow)).toBe(true);
+    expect(isTimeWithinWorkWindow('23:45', overnightWindow)).toBe(true);
+    expect(isTimeWithinWorkWindow('00:15', overnightWindow)).toBe(true);
+    expect(isTimeWithinWorkWindow('05:00', overnightWindow)).toBe(true);
+    expect(isTimeWithinWorkWindow('12:00', overnightWindow)).toBe(false);
   });
 });
 
@@ -322,5 +333,41 @@ describe('timesheet off-day normalization', () => {
     expect(normalized[5].time_started).toBe('09:00');
     expect(normalized[5].time_finished).toBe('13:00');
     expect(normalized[5].remarks).toBe('Overtime Saturday');
+  });
+
+  it('retains overnight worked hours when partial leave uses an overnight window', () => {
+    const entries = buildEntries();
+    entries[1] = {
+      ...entries[1],
+      time_started: '17:00',
+      time_finished: '05:00',
+      job_number: '1234-AB',
+    };
+
+    const normalized = normalizeTimesheetEntriesForOffDays(entries, [
+      {
+        day_of_week: 2,
+        date: '2026-03-24',
+        isExpectedShiftDay: true,
+        isOnApprovedLeave: true,
+        isLeaveLocked: false,
+        isPartialLeave: true,
+        hasAmLeave: false,
+        hasPmLeave: false,
+        workWindow: { start: '17:00', end: '05:00' },
+        paidLeaveHours: 0,
+        leaveLabels: [],
+        displayRemarks: '',
+        leaveReasonName: null,
+        leaveReasonColor: null,
+        isAnnualLeave: false,
+      },
+    ], {
+      enforceLeaveOverwrite: true,
+      applyNonShiftDefaults: true,
+    });
+
+    expect(normalized[1].daily_total).toBe(11.5);
+    expect(normalized[1].did_not_work).toBe(false);
   });
 });

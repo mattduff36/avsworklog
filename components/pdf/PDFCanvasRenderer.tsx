@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Loader2, AlertCircle } from 'lucide-react';
 import type { PDFDocumentProxy, PDFDocumentLoadingTask } from 'pdfjs-dist';
+import { isExpectedPdfRenderError } from '@/lib/pdf/render-errors';
 
 type PdfjsLib = {
   GlobalWorkerOptions: { workerSrc: string };
@@ -94,6 +95,7 @@ export function PDFCanvasRenderer({ url, className }: PDFCanvasRendererProps) {
   const [pageCount, setPageCount] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const renderIdRef = useRef(0);
+  const activeRenderTaskRef = useRef<{ cancel: () => void } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -130,6 +132,8 @@ export function PDFCanvasRenderer({ url, className }: PDFCanvasRendererProps) {
 
   useEffect(() => {
     return () => {
+      activeRenderTaskRef.current?.cancel();
+      activeRenderTaskRef.current = null;
       pdfDoc?.destroy();
     };
   }, [pdfDoc]);
@@ -138,6 +142,9 @@ export function PDFCanvasRenderer({ url, className }: PDFCanvasRendererProps) {
 
   const renderPages = useCallback(async () => {
     if (!pdfDoc || !containerRef.current) return;
+
+    activeRenderTaskRef.current?.cancel();
+    activeRenderTaskRef.current = null;
 
     const id = ++renderIdRef.current;
     const container = containerRef.current;
@@ -149,33 +156,48 @@ export function PDFCanvasRenderer({ url, className }: PDFCanvasRendererProps) {
 
     const dpr = window.devicePixelRatio || 1;
 
-    for (let num = 1; num <= pdfDoc.numPages; num++) {
-      if (renderIdRef.current !== id) return;
+    try {
+      for (let num = 1; num <= pdfDoc.numPages; num++) {
+        if (renderIdRef.current !== id) return;
 
-      const page = await pdfDoc.getPage(num);
-      const unscaledViewport = page.getViewport({ scale: 1 });
-      const scale = containerWidth / unscaledViewport.width;
-      const viewport = page.getViewport({ scale: scale * dpr });
+        const page = await pdfDoc.getPage(num);
+        const unscaledViewport = page.getViewport({ scale: 1 });
+        const scale = containerWidth / unscaledViewport.width;
+        const viewport = page.getViewport({ scale: scale * dpr });
 
-      const canvas = document.createElement('canvas');
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      canvas.style.width = `${containerWidth}px`;
-      canvas.style.height = `${(viewport.height / dpr).toFixed(0)}px`;
-      canvas.className = 'block';
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        canvas.style.width = `${containerWidth}px`;
+        canvas.style.height = `${(viewport.height / dpr).toFixed(0)}px`;
+        canvas.className = 'block';
 
-      const ctx = canvas.getContext('2d');
-      if (!ctx) continue;
-      await page.render({ canvasContext: ctx, viewport }).promise;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) continue;
 
-      if (renderIdRef.current !== id) return;
-      container.appendChild(canvas);
+        const renderTask = page.render({ canvasContext: ctx, viewport });
+        activeRenderTaskRef.current = renderTask;
+        await renderTask.promise;
+
+        if (activeRenderTaskRef.current === renderTask) {
+          activeRenderTaskRef.current = null;
+        }
+
+        if (renderIdRef.current !== id) return;
+        container.appendChild(canvas);
+      }
+    } catch (error) {
+      if (isExpectedPdfRenderError(error)) return;
+      console.error('Failed to render PDF page:', error);
+      setError('Failed to render PDF');
+    } finally {
+      activeRenderTaskRef.current = null;
     }
   }, [pdfDoc]);
 
   useEffect(() => {
     if (loading || !pdfDoc) return;
-    renderPages();
+    void renderPages();
   }, [loading, pdfDoc, renderPages]);
 
   useEffect(() => {
@@ -192,7 +214,7 @@ export function PDFCanvasRenderer({ url, className }: PDFCanvasRendererProps) {
         // which only changes height — re-rendering here would destroy
         // all canvases and jump the scroll position to the top).
         if (Math.abs(newWidth - lastWidthRef.current) < 2) return;
-        renderPages();
+        void renderPages();
       }, 200);
     };
 
