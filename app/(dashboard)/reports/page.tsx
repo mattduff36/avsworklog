@@ -35,6 +35,7 @@ interface BulkDownloadProgress {
 interface ReportCardConfig {
   title: string;
   description: string;
+  dateUsageNote?: string;
   endpoint: string;
   filenamePrefix: string;
   buttonClassName: string;
@@ -109,6 +110,14 @@ const ABSENCE_REPORTS: ReportCardConfig[] = [
     description: 'Approved active and archived bookings that overlap the selected date range.',
     endpoint: '/api/reports/absence-leave/bookings',
     filenamePrefix: 'Absence_Leave_Bookings',
+    buttonClassName: 'bg-absence hover:bg-absence-dark text-white',
+  },
+  {
+    title: 'Absence Allowance Snapshot',
+    description: 'Employee annual leave allowance and booking totals at a single snapshot date.',
+    dateUsageNote: 'This report uses START DATE only. END DATE is ignored.',
+    endpoint: '/api/reports/absence-leave/allowance-totals',
+    filenamePrefix: 'Absence_Allowance_Snapshot',
     buttonClassName: 'bg-absence hover:bg-absence-dark text-white',
   },
 ];
@@ -193,6 +202,7 @@ function ReportActionCard({ report, dateFrom, dateTo, downloadingEndpoint, onDow
         <div className="space-y-2">
           <h3 className="text-lg font-semibold text-foreground">{report.title}</h3>
           <p className="text-sm text-muted-foreground">{report.description}</p>
+          {report.dateUsageNote ? <p className="text-xs font-medium text-foreground">{report.dateUsageNote}</p> : null}
         </div>
 
         <Button
