@@ -2,10 +2,11 @@
 
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
-import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-
-const WORKSHOP_WIDESCREEN_STORAGE_KEY = 'workshop-tasks-widescreen-view';
+import {
+  APP_WIDESCREEN_CHANGED_EVENT,
+  readAppWidescreenPreference,
+} from '@/lib/config/layout-preferences';
 
 interface DashboardContentProps {
   children: React.ReactNode;
@@ -14,7 +15,6 @@ interface DashboardContentProps {
 export function DashboardContent({ children }: DashboardContentProps) {
   const { isManager, isActualSuperAdmin } = useAuth();
   const { tabletModeEnabled } = useTabletMode();
-  const pathname = usePathname();
   const [isPWA] = useState(() => {
     if (typeof window === 'undefined') {
       return false;
@@ -28,44 +28,43 @@ export function DashboardContent({ children }: DashboardContentProps) {
 
     return isStandalone || isIOSStandalone;
   });
-  const [workshopWidescreenEnabled, setWorkshopWidescreenEnabled] = useState(false);
+  const [appWidescreenEnabled, setAppWidescreenEnabled] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const syncPreference = () => {
-      try {
-        setWorkshopWidescreenEnabled(localStorage.getItem(WORKSHOP_WIDESCREEN_STORAGE_KEY) === 'true');
-      } catch {
-        setWorkshopWidescreenEnabled(false);
-      }
+      setAppWidescreenEnabled(readAppWidescreenPreference());
     };
 
     syncPreference();
     window.addEventListener('storage', syncPreference);
-    window.addEventListener('workshop-widescreen-changed', syncPreference);
+    window.addEventListener(APP_WIDESCREEN_CHANGED_EVENT, syncPreference);
 
     return () => {
       window.removeEventListener('storage', syncPreference);
-      window.removeEventListener('workshop-widescreen-changed', syncPreference);
+      window.removeEventListener(APP_WIDESCREEN_CHANGED_EVENT, syncPreference);
     };
   }, []);
 
-  const isWorkshopWidescreen =
-    pathname?.startsWith('/workshop-tasks') &&
-    workshopWidescreenEnabled;
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    document.body.classList.toggle('app-widescreen-enabled', appWidescreenEnabled);
+    return () => document.body.classList.remove('app-widescreen-enabled');
+  }, [appWidescreenEnabled]);
+
   const shouldApplySidebarOffset = !tabletModeEnabled && (isManager || isActualSuperAdmin);
 
   return (
     <div className={`transition-all duration-300 ${shouldApplySidebarOffset ? 'md:pl-16' : ''}`}>
       <main
         className={`relative z-10 py-8 md:pb-8 ${
-          isWorkshopWidescreen
+          appWidescreenEnabled
             ? 'max-w-none mx-0'
             : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'
         } ${isPWA ? 'pb-24' : 'pb-8'}`}
         style={
-          isWorkshopWidescreen
+          appWidescreenEnabled
             ? {
                 paddingLeft: shouldApplySidebarOffset ? '64px' : '65px',
                 paddingRight: '65px',

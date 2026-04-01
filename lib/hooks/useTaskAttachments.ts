@@ -1,16 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { Database } from '@/types/database';
+import type {
+  AttachmentSchemaResponse,
+  AttachmentSchemaSnapshot,
+} from '@/types/workshop-attachments-v2';
 
 type TaskAttachment = Database['public']['Tables']['workshop_task_attachments']['Row'];
 type AttachmentTemplate = Database['public']['Tables']['workshop_attachment_templates']['Row'];
-type AttachmentQuestion = Database['public']['Tables']['workshop_attachment_questions']['Row'];
-type AttachmentResponse = Database['public']['Tables']['workshop_attachment_responses']['Row'];
 
 export type TaskAttachmentWithDetails = TaskAttachment & {
   workshop_attachment_templates: AttachmentTemplate | null;
-  questions: AttachmentQuestion[];
-  responses: AttachmentResponse[];
+  schema_snapshot?: AttachmentSchemaSnapshot | null;
+  field_responses?: AttachmentSchemaResponse[];
 };
 
 interface UseTaskAttachmentsOptions {
@@ -24,7 +25,7 @@ interface UseTaskAttachmentsReturn {
   error: Error | null;
   refetch: () => Promise<void>;
   addAttachment: (templateId: string) => Promise<TaskAttachmentWithDetails | null>;
-  saveResponses: (attachmentId: string, responses: { question_id: string; response_value: string | null }[], markComplete?: boolean) => Promise<boolean>;
+  saveSchemaResponses: (attachmentId: string, responses: AttachmentSchemaResponse[], markComplete?: boolean) => Promise<boolean>;
 }
 
 export function useTaskAttachments({ 
@@ -34,7 +35,6 @@ export function useTaskAttachments({
   const [attachments, setAttachments] = useState<TaskAttachmentWithDetails[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
-  const supabase = createClient();
 
   const fetchAttachments = useCallback(async () => {
     if (!enabled || !taskId) {
@@ -46,61 +46,16 @@ export function useTaskAttachments({
       setLoading(true);
       setError(null);
 
-      // Fetch attachments with templates
-      const { data: attachmentsData, error: attachmentsError } = await supabase
-        .from('workshop_task_attachments')
-        .select(`
-          *,
-          workshop_attachment_templates (*)
-        `)
-        .eq('task_id', taskId)
-        .order('created_at', { ascending: true });
+      const response = await fetch(`/api/workshop-tasks/attachments/task/${taskId}`, {
+        method: 'GET',
+      });
 
-      if (attachmentsError) {
-        throw attachmentsError;
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch task attachments');
       }
 
-      if (!attachmentsData || attachmentsData.length === 0) {
-        setAttachments([]);
-        return;
-      }
-      const typedAttachmentsData = attachmentsData as TaskAttachmentWithDetails[];
-
-      // Get all template IDs and attachment IDs
-      const templateIds = [...new Set(typedAttachmentsData.map((a: TaskAttachmentWithDetails) => a.template_id))];
-      const attachmentIds = typedAttachmentsData.map((a: TaskAttachmentWithDetails) => a.id);
-
-      // Fetch questions for all templates
-      const { data: questionsData, error: questionsError } = await supabase
-        .from('workshop_attachment_questions')
-        .select('*')
-        .in('template_id', templateIds)
-        .order('sort_order', { ascending: true });
-
-      if (questionsError) {
-        throw questionsError;
-      }
-
-      // Fetch responses for all attachments
-      const { data: responsesData, error: responsesError } = await supabase
-        .from('workshop_attachment_responses')
-        .select('*')
-        .in('attachment_id', attachmentIds);
-
-      if (responsesError) {
-        throw responsesError;
-      }
-      const typedQuestions = (questionsData || []) as AttachmentQuestion[];
-      const typedResponses = (responsesData || []) as AttachmentResponse[];
-
-      // Combine data
-      const combinedAttachments: TaskAttachmentWithDetails[] = typedAttachmentsData.map((attachment: TaskAttachmentWithDetails) => ({
-        ...attachment,
-        questions: typedQuestions.filter((q: AttachmentQuestion) => q.template_id === attachment.template_id),
-        responses: typedResponses.filter((r: AttachmentResponse) => r.attachment_id === attachment.id),
-      }));
-
-      setAttachments(combinedAttachments);
+      setAttachments((data.attachments || []) as TaskAttachmentWithDetails[]);
     } catch (err) {
       const errorObj = err instanceof Error ? err : new Error('Failed to fetch attachments');
       setError(errorObj);
@@ -108,7 +63,6 @@ export function useTaskAttachments({
     } finally {
       setLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId, enabled]);
 
   const addAttachment = useCallback(async (templateId: string): Promise<TaskAttachmentWithDetails | null> => {
@@ -139,13 +93,13 @@ export function useTaskAttachments({
     }
   }, [taskId, fetchAttachments]);
 
-  const saveResponses = useCallback(async (
-    attachmentId: string, 
-    responses: { question_id: string; response_value: string | null }[],
-    markComplete: boolean = false
+  const saveSchemaResponses = useCallback(async (
+    attachmentId: string,
+    responses: AttachmentSchemaResponse[],
+    markComplete: boolean = false,
   ): Promise<boolean> => {
     try {
-      const response = await fetch(`/api/workshop-tasks/attachments/${attachmentId}/responses`, {
+      const response = await fetch(`/api/workshop-tasks/attachments/${attachmentId}/schema`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ responses, mark_complete: markComplete }),
@@ -154,15 +108,13 @@ export function useTaskAttachments({
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to save responses');
+        throw new Error(data.error || 'Failed to save schema responses');
       }
 
-      // Refetch to get updated list
       await fetchAttachments();
-      
       return true;
     } catch (err) {
-      console.error('Error saving responses:', err);
+      console.error('Error saving schema responses:', err);
       throw err;
     }
   }, [fetchAttachments]);
@@ -177,6 +129,6 @@ export function useTaskAttachments({
     error,
     refetch: fetchAttachments,
     addAttachment,
-    saveResponses,
+    saveSchemaResponses,
   };
 }

@@ -9,10 +9,9 @@ import { createClient } from '@/lib/supabase/client';
 import { useAttachmentTemplates } from '@/lib/hooks/useAttachmentTemplates';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageLoader } from '@/components/ui/page-loader';
-import { Settings, Plus, CheckCircle2, Clock, AlertTriangle, Wrench, Pause } from 'lucide-react';
+import { Settings, Plus, CheckCircle2, Clock, AlertTriangle, Wrench, Pause, Loader2 } from 'lucide-react';
 import { ErrorDetailsResponse } from '@/types/error-details';
 import { WorkshopTasksOverviewTab } from './components/WorkshopTasksOverviewTab';
 import { WorkshopTaskStatusDialogs } from './components/WorkshopTaskStatusDialogs';
@@ -25,15 +24,45 @@ import { useWorkshopTaskCrudActions } from './hooks/useWorkshopTaskCrudActions';
 import type { Action, Category, Subcategory, Vehicle } from './types';
 import { useTaskInspectionPhotos } from '@/lib/hooks/useTaskInspectionPhotos';
 
-const TaskCommentsDrawer = dynamic(() => import('@/components/workshop-tasks/TaskCommentsDrawer').then(m => ({ default: m.TaskCommentsDrawer })), { ssr: false });
-const WorkshopTaskModal = dynamic(() => import('@/components/workshop-tasks/WorkshopTaskModal').then(m => ({ default: m.WorkshopTaskModal })), { ssr: false });
-const SubcategoryDialog = dynamic(() => import('@/components/workshop-tasks/SubcategoryDialog').then(m => ({ default: m.SubcategoryDialog })), { ssr: false });
-const CategoryManagementPanel = dynamic(() => import('@/components/workshop-tasks/CategoryManagementPanel').then(m => ({ default: m.CategoryManagementPanel })), { ssr: false });
-const AttachmentManagementPanel = dynamic(() => import('@/components/workshop-tasks/AttachmentManagementPanel').then(m => ({ default: m.AttachmentManagementPanel })), { ssr: false });
-const MarkTaskCompleteDialog = dynamic(() => import('@/components/workshop-tasks/MarkTaskCompleteDialog').then(m => ({ default: m.MarkTaskCompleteDialog })), { ssr: false });
-const ErrorDetailsModal = dynamic(() => import('@/components/ui/error-details-modal').then(m => ({ default: m.ErrorDetailsModal })), { ssr: false });
+function ModalChunkLoader({ message }: { message: string }) {
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/55 backdrop-blur-[1px]">
+      <div className="flex items-center gap-3 rounded-lg border border-border bg-background px-4 py-3 shadow-xl">
+        <Loader2 className="h-5 w-5 animate-spin text-workshop" />
+        <span className="text-sm text-foreground">{message}</span>
+      </div>
+    </div>
+  );
+}
 
-const WORKSHOP_WIDESCREEN_STORAGE_KEY = 'workshop-tasks-widescreen-view';
+const TaskCommentsDrawer = dynamic(
+  () => import('@/components/workshop-tasks/TaskCommentsDrawer').then(m => ({ default: m.TaskCommentsDrawer })),
+  { ssr: false, loading: () => <ModalChunkLoader message="Loading comments..." /> },
+);
+const WorkshopTaskModal = dynamic(
+  () => import('@/components/workshop-tasks/WorkshopTaskModal').then(m => ({ default: m.WorkshopTaskModal })),
+  { ssr: false, loading: () => <ModalChunkLoader message="Loading task details..." /> },
+);
+const SubcategoryDialog = dynamic(
+  () => import('@/components/workshop-tasks/SubcategoryDialog').then(m => ({ default: m.SubcategoryDialog })),
+  { ssr: false, loading: () => <ModalChunkLoader message="Loading subcategory dialog..." /> },
+);
+const CategoryManagementPanel = dynamic(
+  () => import('@/components/workshop-tasks/CategoryManagementPanel').then(m => ({ default: m.CategoryManagementPanel })),
+  { ssr: false, loading: () => <PageLoader message="Loading category settings..." /> },
+);
+const AttachmentManagementPanel = dynamic(
+  () => import('@/components/workshop-tasks/AttachmentManagementPanel').then(m => ({ default: m.AttachmentManagementPanel })),
+  { ssr: false, loading: () => <PageLoader message="Loading attachment settings..." /> },
+);
+const MarkTaskCompleteDialog = dynamic(
+  () => import('@/components/workshop-tasks/MarkTaskCompleteDialog').then(m => ({ default: m.MarkTaskCompleteDialog })),
+  { ssr: false, loading: () => <ModalChunkLoader message="Loading completion dialog..." /> },
+);
+const ErrorDetailsModal = dynamic(
+  () => import('@/components/ui/error-details-modal').then(m => ({ default: m.ErrorDetailsModal })),
+  { ssr: false, loading: () => <ModalChunkLoader message="Loading details..." /> },
+);
 
 export default function WorkshopTasksPage() {
   const router = useRouter();
@@ -64,7 +93,6 @@ export default function WorkshopTasksPage() {
   const [showInProgress, setShowInProgress] = useState(true);
   const [showOnHold, setShowOnHold] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
-  const [widescreenView, setWidescreenView] = useState(false);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
@@ -139,13 +167,11 @@ export default function WorkshopTasksPage() {
   const validAssetTabs: ReadonlyArray<'all' | 'van' | 'plant' | 'hgv'> = ['all', 'van', 'plant', 'hgv'];
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    try {
-      setWidescreenView(localStorage.getItem(WORKSHOP_WIDESCREEN_STORAGE_KEY) === 'true');
-    } catch {
-      // Ignore localStorage access failures
-    }
+    if (typeof document === 'undefined') return;
+    document.body.classList.add('workshop-module-buttons');
+    return () => {
+      document.body.classList.remove('workshop-module-buttons');
+    };
   }, []);
 
   const { activeTab, assetTab } = useMemo(() => {
@@ -199,24 +225,11 @@ export default function WorkshopTasksPage() {
     }
   }
 
-  function handleWidescreenToggle(checked: boolean) {
-    setWidescreenView(checked);
-
-    try {
-      localStorage.setItem(WORKSHOP_WIDESCREEN_STORAGE_KEY, checked ? 'true' : 'false');
-      window.dispatchEvent(new Event('workshop-widescreen-changed'));
-    } catch {
-      // Ignore localStorage access failures
-    }
-  }
-
   if (permissionLoading) return <PageLoader message="Checking permissions..." />;
   if (!hasPermission) return null;
 
   return (
-    <div
-      className={`space-y-6 ${widescreenView && !tabletModeEnabled ? 'w-full max-w-none' : 'mx-auto max-w-6xl'}`}
-    >
+    <div className="space-y-6">
       <div className={`bg-white dark:bg-slate-900 rounded-lg border border-border ${tabletModeEnabled ? 'p-5 md:p-6' : 'p-6'}`}>
         <div className="flex items-center justify-between">
           <div>
@@ -286,31 +299,6 @@ export default function WorkshopTasksPage() {
           <TabsContent value="settings" className="space-y-6 mt-0">
             <Card className="border-border">
               <CardHeader>
-                <CardTitle className="text-white">Layout Preferences</CardTitle>
-                <CardDescription className="text-muted-foreground">
-                  Control how wide the workshop tasks page appears on larger desktop screens.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col gap-4 rounded-lg border border-border bg-slate-900/40 p-4 md:flex-row md:items-center md:justify-between">
-                  <div className="space-y-1">
-                    <p className="font-medium text-foreground">Widescreen View</p>
-                    <p className="text-sm text-muted-foreground">
-                      Expand the workshop page close to the full viewport width. This is only applied when you enable it.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-muted-foreground">
-                      {widescreenView ? 'Enabled' : 'Default width'}
-                    </span>
-                    <Switch checked={widescreenView} onCheckedChange={handleWidescreenToggle} />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-border">
-              <CardHeader>
                 <CardTitle className="text-white">Category Taxonomy</CardTitle>
                 <CardDescription className="text-muted-foreground">
                   Manage categories for vans, HGVs, or plant machinery
@@ -342,13 +330,19 @@ export default function WorkshopTasksPage() {
       </Tabs>
 
       <WorkshopTaskFormDialogs showAddModal={showAddModal} onShowAddModalChange={setShowAddModal} assetTab={assetTab} selectedVehicleId={selectedVehicleId} onSelectedVehicleIdChange={setSelectedVehicleId} vehicles={vehicles} getAssetDisplay={getAssetDisplay} selectedCategoryId={selectedCategoryId} onSelectedCategoryIdChange={crud.handleCategoryChange} activeCategories={activeCategories} categoryHasSubcategories={categoryHasSubcategories} selectedSubcategoryId={selectedSubcategoryId} onSelectedSubcategoryIdChange={setSelectedSubcategoryId} filteredSubcategories={filteredSubcategories} meterReadingType={meterReadingType} newMeterReading={newMeterReading} onNewMeterReadingChange={setNewMeterReading} currentMeterReading={currentMeterReading} workshopComments={workshopComments} onWorkshopCommentsChange={setWorkshopComments} attachmentTemplates={attachmentTemplates} selectedAttachmentTemplateIds={selectedAttachmentTemplateIds} onSelectedAttachmentTemplateIdsChange={setSelectedAttachmentTemplateIds} submitting={submitting} onResetAddForm={crud.resetAddForm} onFetchCurrentMeterReading={fetcher.fetchCurrentMeterReading} onCreateTask={crud.handleAddTask} showEditModal={showEditModal} onShowEditModalChange={setShowEditModal} editingTask={editingTask} editVehicleId={editVehicleId} onEditVehicleIdChange={crud.handleEditVehicleChange} recentVehicleIds={recentVehicleIds} editCategoryId={editCategoryId} onEditCategoryIdChange={(value) => { setEditCategoryId(value); setEditSubcategoryId(''); }} categories={categories} plantCategories={plantCategories} hgvCategories={hgvCategories} editSubcategoryId={editSubcategoryId} onEditSubcategoryIdChange={setEditSubcategoryId} subcategories={subcategories} plantSubcategories={plantSubcategories} hgvSubcategories={hgvSubcategories} initialEditCategoryId={initialEditCategoryId} initialEditHadSubcategory={initialEditHadSubcategory} editMileage={editMileage} onEditMileageChange={setEditMileage} editCurrentMileage={editCurrentMileage} editComments={editComments} onEditCommentsChange={setEditComments} isSaveEditDisabled={crud.isSaveEditDisabled} onSaveEdit={crud.handleSaveEdit} onResetEditForm={crud.resetEditForm} />
-      <MarkTaskCompleteDialog open={showCompleteModal} onOpenChange={setShowCompleteModal} task={completingTask} onConfirm={lifecycle.confirmMarkComplete} isSubmitting={completingTask ? updatingStatus.has(completingTask.id) : false} />
+      {(showCompleteModal || !!completingTask) && (
+        <MarkTaskCompleteDialog open={showCompleteModal} onOpenChange={setShowCompleteModal} task={completingTask} onConfirm={lifecycle.confirmMarkComplete} isSubmitting={completingTask ? updatingStatus.has(completingTask.id) : false} />
+      )}
       <WorkshopTaskStatusDialogs showStatusModal={showStatusModal} onShowStatusModalChange={setShowStatusModal} loggedComment={loggedComment} onLoggedCommentChange={setLoggedComment} onCancelStatusModal={() => { setShowStatusModal(false); setSelectedTask(null); setLoggedComment(''); }} onConfirmMarkInProgress={lifecycle.confirmMarkInProgress} showOnHoldModal={showOnHoldModal} onShowOnHoldModalChange={setShowOnHoldModal} onHoldComment={onHoldComment} onOnHoldCommentChange={setOnHoldComment} onCancelOnHoldModal={() => { setShowOnHoldModal(false); setOnHoldingTask(null); setOnHoldComment(''); }} onConfirmMarkOnHold={lifecycle.confirmMarkOnHold} onHoldingTask={onHoldingTask} showResumeModal={showResumeModal} onShowResumeModalChange={setShowResumeModal} resumeComment={resumeComment} onResumeCommentChange={setResumeComment} onCancelResumeModal={() => { setShowResumeModal(false); setResumingTask(null); setResumeComment(''); }} onConfirmResumeTask={lifecycle.confirmResumeTask} resumingTask={resumingTask} updatingStatus={updatingStatus} />
       <WorkshopTaskAdminDialogs showSettings={showSettings} showCategoryModal={showCategoryModal} onShowCategoryModalChange={setShowCategoryModal} editingCategory={editingCategory} categoryName={categoryName} onCategoryNameChange={setCategoryName} submittingCategory={submittingCategory} onSaveCategory={crud.handleSaveCategory} onResetCategoryForm={() => { setShowCategoryModal(false); setEditingCategory(null); setCategoryName(''); }} showDeleteConfirm={showDeleteConfirm} onShowDeleteConfirmChange={setShowDeleteConfirm} taskToDelete={taskToDelete} getVehicleReg={getVehicleReg} deleting={deleting} onConfirmDeleteTask={crud.confirmDeleteTask} onResetDeleteTask={() => { setShowDeleteConfirm(false); setTaskToDelete(null); }} />
       {commentsTask && <TaskCommentsDrawer open={showCommentsDrawer} onOpenChange={setShowCommentsDrawer} taskId={commentsTask.id} taskTitle={getVehicleReg(commentsTask)} />}
-      <WorkshopTaskModal open={showTaskModal} onOpenChange={setShowTaskModal} task={modalTask} inspectionPhotos={modalTask ? taskInspectionPhotos[modalTask.id] || [] : []} onEdit={(task) => { setShowTaskModal(false); crud.handleEditTask(task as Action); }} onDelete={(task) => { setShowTaskModal(false); crud.handleDeleteTask(task as Action); }} onMarkInProgress={(task) => { setShowTaskModal(false); setSelectedTask(task as Action); setLoggedComment(''); setShowStatusModal(true); }} onMarkComplete={(task) => { setShowTaskModal(false); setCompletingTask(task as Action); setShowCompleteModal(true); }} onMarkOnHold={(task) => { setShowTaskModal(false); setOnHoldingTask(task as Action); setOnHoldComment(''); setShowOnHoldModal(true); }} onResume={(task) => { setShowTaskModal(false); setResumingTask(task as Action); setResumeComment(''); setShowResumeModal(true); }} isUpdating={modalTask ? updatingStatus.has(modalTask.id) : false} />
+      {(showTaskModal || !!modalTask) && (
+        <WorkshopTaskModal open={showTaskModal} onOpenChange={setShowTaskModal} task={modalTask} inspectionPhotos={modalTask ? taskInspectionPhotos[modalTask.id] || [] : []} onEdit={(task) => { setShowTaskModal(false); crud.handleEditTask(task as Action); }} onDelete={(task) => { setShowTaskModal(false); crud.handleDeleteTask(task as Action); }} onMarkInProgress={(task) => { setShowTaskModal(false); setSelectedTask(task as Action); setLoggedComment(''); setShowStatusModal(true); }} onMarkComplete={(task) => { setShowTaskModal(false); setCompletingTask(task as Action); setShowCompleteModal(true); }} onMarkOnHold={(task) => { setShowTaskModal(false); setOnHoldingTask(task as Action); setOnHoldComment(''); setShowOnHoldModal(true); }} onResume={(task) => { setShowTaskModal(false); setResumingTask(task as Action); setResumeComment(''); setShowResumeModal(true); }} isUpdating={modalTask ? updatingStatus.has(modalTask.id) : false} />
+      )}
       {selectedCategoryForSubcategory && <SubcategoryDialog open={showSubcategoryModal} onOpenChange={setShowSubcategoryModal} mode={subcategoryMode} categoryId={selectedCategoryForSubcategory.id} categoryName={selectedCategoryForSubcategory.name} subcategory={editingSubcategory} onSuccess={fetcher.fetchSubcategories} />}
-      <ErrorDetailsModal open={showErrorDetailsModal} onClose={() => { setShowErrorDetailsModal(false); setErrorDetails(null); }} data={errorDetails} loading={errorDetailsLoading} />
+      {showErrorDetailsModal && (
+        <ErrorDetailsModal open={showErrorDetailsModal} onClose={() => { setShowErrorDetailsModal(false); setErrorDetails(null); }} data={errorDetails} loading={errorDetailsLoading} />
+      )}
     </div>
   );
 }

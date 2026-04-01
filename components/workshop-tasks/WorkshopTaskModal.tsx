@@ -183,7 +183,7 @@ export function WorkshopTaskModal({
             {/* Header with asset */}
             <div className="flex items-center gap-3">
               {getTaskTypeIcon()}
-              <DialogTitle className="text-2xl font-bold text-white">
+              <DialogTitle className="text-2xl font-bold text-foreground">
                 {getVehicleDisplay()}
               </DialogTitle>
             </div>
@@ -210,9 +210,9 @@ export function WorkshopTaskModal({
 
             {/* Task Description */}
             {inspectionDetails && (
-              <Card className="bg-slate-800/50 border-border">
+              <Card className="bg-background/70 border-border">
                 <CardContent className="pt-4">
-                  <p className="text-sm font-medium text-white mb-2">Reported Defect</p>
+                  <p className="text-sm font-medium text-foreground mb-2">Reported Defect</p>
                   <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                     {inspectionDetails}
                   </p>
@@ -220,10 +220,10 @@ export function WorkshopTaskModal({
               </Card>
             )}
             {workshopNotes && (
-              <Card className="bg-slate-800/50 border-border">
+              <Card className="bg-background/70 border-border">
                 <CardContent className="pt-4">
                   {inspectionDetails && (
-                    <p className="text-sm font-medium text-white mb-2">Workshop Notes</p>
+                    <p className="text-sm font-medium text-foreground mb-2">Workshop Notes</p>
                   )}
                   <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                     {workshopNotes}
@@ -232,7 +232,7 @@ export function WorkshopTaskModal({
               </Card>
             )}
             {task.action_type === 'inspection_defect' && inspectionPhotos.length > 0 && (
-              <Card className="bg-slate-800/50 border-border">
+              <Card className="bg-background/70 border-border">
                 <CardContent className="pt-4">
                   <InspectionPhotoGallery
                     photos={inspectionPhotos}
@@ -317,8 +317,8 @@ export function WorkshopTaskModal({
                     onClick={() => onEdit(task)}
                     disabled={isUpdating}
                     size="sm"
-                    variant="ghost"
-                    className={`text-muted-foreground hover:text-foreground hover:bg-accent ${taskActionButtonClass}`}
+                    variant="outline"
+                    className={`border-foreground/40 text-foreground hover:text-foreground hover:bg-accent ${taskActionButtonClass}`}
                   >
                     <Edit className="h-4 w-4 mr-2" />
                     Edit
@@ -327,8 +327,8 @@ export function WorkshopTaskModal({
                     onClick={() => onDelete(task)}
                     disabled={isUpdating}
                     size="sm"
-                    variant="ghost"
-                    className={`text-red-400 hover:text-red-300 hover:bg-accent ${taskActionButtonClass}`}
+                    variant="outline"
+                    className={`border-red-400/60 text-red-400 hover:text-red-300 hover:bg-red-500/10 ${taskActionButtonClass}`}
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
                     Delete
@@ -341,7 +341,7 @@ export function WorkshopTaskModal({
 
         {/* Attachments Section */}
         <div className="mt-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Attachments</h3>
+          <h3 className="text-lg font-semibold text-foreground mb-4">Attachments</h3>
           <TaskAttachmentsSection
             taskId={task.id}
             taskStatus={task.status}
@@ -350,12 +350,12 @@ export function WorkshopTaskModal({
 
         {/* Timeline Section */}
         <div className="mt-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Activity Timeline</h3>
+          <h3 className="text-lg font-semibold text-foreground mb-4">Activity Timeline</h3>
           
           {loading ? (
             <div className="space-y-3">
               {[...Array(3)].map((_, i) => (
-                <Skeleton key={i} className="h-20 w-full bg-slate-800" />
+                <Skeleton key={i} className="h-20 w-full bg-muted" />
               ))}
             </div>
           ) : (

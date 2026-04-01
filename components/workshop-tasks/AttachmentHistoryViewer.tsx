@@ -3,18 +3,18 @@
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
-import { AttachmentFormModal } from './AttachmentFormModal';
-import type { Database } from '@/types/database';
-
-type AttachmentQuestion = Database['public']['Tables']['workshop_attachment_questions']['Row'];
-type AttachmentResponse = Database['public']['Tables']['workshop_attachment_responses']['Row'];
+import { AttachmentHybridFormModal } from './AttachmentHybridFormModal';
+import type {
+  AttachmentSchemaResponse,
+  AttachmentSchemaSnapshot,
+} from '@/types/workshop-attachments-v2';
 
 interface AttachmentDetails {
   id: string;
   status: 'pending' | 'completed';
   templateName: string;
-  questions: AttachmentQuestion[];
-  responses: AttachmentResponse[];
+  snapshot: AttachmentSchemaSnapshot;
+  responses: AttachmentSchemaResponse[];
 }
 
 interface AttachmentHistoryViewerProps {
@@ -44,13 +44,16 @@ export function AttachmentHistoryViewer({ children }: AttachmentHistoryViewerPro
       }
       const data = await response.json();
       const attachment = data.attachment;
+      if (!attachment.schema_snapshot?.snapshot_json?.sections?.length) {
+        throw new Error('Attachment has no V2 schema snapshot');
+      }
 
       setDetails({
         id: attachment.id,
         status: attachment.status,
         templateName: attachment.workshop_attachment_templates?.name || 'Attachment',
-        questions: attachment.questions || [],
-        responses: attachment.responses || [],
+        snapshot: attachment.schema_snapshot,
+        responses: attachment.field_responses || [],
       });
       setModalOpen(true);
     } catch (err) {
@@ -66,15 +69,16 @@ export function AttachmentHistoryViewer({ children }: AttachmentHistoryViewerPro
       {children({ openAttachment, loadingAttachmentId: loadingId })}
 
       {details && (
-        <AttachmentFormModal
+        <AttachmentHybridFormModal
           open={modalOpen}
           onOpenChange={setModalOpen}
           templateName={details.templateName}
-          questions={details.questions}
+          snapshot={details.snapshot}
           existingResponses={details.responses}
+          onSave={async () => {}}
           readOnly
-          attachmentId={details.id}
           isCompleted={details.status === 'completed'}
+          attachmentId={details.id}
         />
       )}
     </>

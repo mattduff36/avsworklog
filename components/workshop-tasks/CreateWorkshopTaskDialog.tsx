@@ -57,6 +57,16 @@ interface CreateWorkshopTaskDialogProps {
   onSuccess?: () => void;
 }
 
+function normalizeTemplateAppliesTo(rawValues?: string[] | null): string[] {
+  const normalizedValues = (rawValues || [])
+    .map((value) => value.trim().toLowerCase())
+    .map((value) => (value === 'vehicle' ? 'van' : value))
+    .filter(Boolean);
+
+  if (normalizedValues.length === 0) return ['van', 'hgv', 'plant'];
+  return Array.from(new Set(normalizedValues));
+}
+
 export function CreateWorkshopTaskDialog({
   open,
   onOpenChange,
@@ -297,6 +307,11 @@ export function CreateWorkshopTaskDialog({
   // Get selected vehicle's asset type
   const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId);
   const selectedAssetType = selectedVehicle?.asset_type || 'van';
+  const filteredAttachmentTemplates = useMemo(() => (
+    attachmentTemplates.filter((template) =>
+      normalizeTemplateAppliesTo(template.applies_to).includes(selectedAssetType),
+    )
+  ), [attachmentTemplates, selectedAssetType]);
   const isSelectedHgv = selectedAssetType === 'hgv';
   const meterFieldLabel = meterReadingType === 'hours' ? 'Current Hours' : isSelectedHgv ? 'Current KM' : 'Current Mileage';
   const meterInputDescriptor = meterReadingType === 'hours' ? 'hours' : isSelectedHgv ? 'KM' : 'mileage';
@@ -413,17 +428,15 @@ export function CreateWorkshopTaskDialog({
         const attachmentErrors: string[] = [];
         
         for (const templateId of selectedTemplateIds) {
-          const { error: attachmentError } = await supabase
-            .from('workshop_task_attachments')
-            .insert({
-              task_id: newTask.id,
-              template_id: templateId,
-              status: 'pending',
-              created_by: user.id,
-            });
+          const attachmentResponse = await fetch(`/api/workshop-tasks/attachments/task/${newTask.id}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ template_id: templateId }),
+          });
 
-          if (attachmentError) {
-            console.error('Error creating attachment:', attachmentError);
+          if (!attachmentResponse.ok) {
+            const attachmentError = await attachmentResponse.json().catch(() => ({}));
+            console.error('Error creating attachment with V2 snapshot:', attachmentError);
             attachmentErrors.push(templateId);
           }
         }
@@ -530,6 +543,15 @@ export function CreateWorkshopTaskDialog({
       selectedTemplateIds.length > 0,
     [selectedVehicleId, selectedCategoryId, selectedSubcategoryId, workshopComments, newMeterReading, selectedTemplateIds]
   );
+
+  useEffect(() => {
+    if (selectedTemplateIds.length === 0) return;
+    const visibleTemplateIds = new Set(filteredAttachmentTemplates.map((template) => template.id));
+    const nextSelectedTemplateIds = selectedTemplateIds.filter((id) => visibleTemplateIds.has(id));
+    if (nextSelectedTemplateIds.length !== selectedTemplateIds.length) {
+      setSelectedTemplateIds(nextSelectedTemplateIds);
+    }
+  }, [filteredAttachmentTemplates, selectedTemplateIds]);
 
   return (
     <Dialog
@@ -722,7 +744,12 @@ export function CreateWorkshopTaskDialog({
                 Add service checklists or documentation to complete later
               </p>
               <div className="space-y-2 max-h-32 overflow-y-auto p-2 border rounded-md bg-muted/30">
-                {attachmentTemplates.map((template) => (
+                {filteredAttachmentTemplates.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    No templates are available for this {selectedAssetType.toUpperCase()} asset.
+                  </p>
+                )}
+                {filteredAttachmentTemplates.map((template) => (
                   <div key={template.id} className="flex items-center space-x-2">
                     <Checkbox
                       id={`template-${template.id}`}

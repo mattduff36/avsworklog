@@ -16,33 +16,38 @@ describe('Workshop Attachment PDF', () => {
         attachmentStatus: 'completed' as const,
         completedAt: new Date().toISOString(),
         createdAt: new Date().toISOString(),
-        questions: [
+        v2Sections: [
           {
-            id: 'q1',
-            question_text: 'Oil level checked',
-            question_type: 'checkbox',
-            is_required: true,
-            sort_order: 1,
+            section_key: 'section_1',
+            title: 'Checklist',
+            description: null,
+            fields: [
+              {
+                field_key: 'oil_level_checked',
+                label: 'Oil level checked',
+                field_type: 'yes_no',
+                is_required: true,
+                response_value: 'yes',
+                response_json: null,
+              },
+              {
+                field_key: 'section_comments',
+                label: 'Section Comments',
+                field_type: 'long_text',
+                is_required: false,
+                response_value: 'All items in good condition',
+                response_json: null,
+              },
+            ],
           },
-          {
-            id: 'q2',
-            question_text: 'Notes',
-            question_type: 'long_text',
-            is_required: false,
-            sort_order: 2,
-          },
-        ],
-        responses: [
-          { question_id: 'q1', response_value: 'true' },
-          { question_id: 'q2', response_value: 'All items in good condition' },
         ],
         assetName: '878 (Trailer woodford tilt bed)',
         assetType: 'plant' as const,
       };
 
       expect(pdfProps.templateName).toBe('Service Checklist');
-      expect(pdfProps.questions).toHaveLength(2);
-      expect(pdfProps.responses).toHaveLength(2);
+      expect(pdfProps.v2Sections).toHaveLength(1);
+      expect(pdfProps.v2Sections[0].fields).toHaveLength(2);
       expect(pdfProps.attachmentStatus).toBe('completed');
     });
 
@@ -56,48 +61,43 @@ describe('Workshop Attachment PDF', () => {
         attachmentStatus: 'pending' as const,
         completedAt: null,
         createdAt: new Date().toISOString(),
-        questions: [
+        v2Sections: [
           {
-            id: 'q1',
-            question_text: 'Engine condition',
-            question_type: 'text',
-            is_required: true,
-            sort_order: 1,
+            section_key: 'section_1',
+            title: 'Checks',
+            description: null,
+            fields: [
+              {
+                field_key: 'engine_condition',
+                label: 'Engine condition',
+                field_type: 'text',
+                is_required: true,
+                response_value: null,
+                response_json: null,
+              },
+            ],
           },
         ],
-        responses: [],
         assetName: null,
         assetType: null,
       };
 
-      expect(pdfProps.responses).toHaveLength(0);
+      expect(pdfProps.v2Sections[0].fields[0].response_value).toBeNull();
       expect(pdfProps.templateDescription).toBeNull();
       expect(pdfProps.completedAt).toBeNull();
       expect(pdfProps.assetName).toBeNull();
     });
 
     it('should calculate completion percentage correctly', () => {
-      const questions = [
-        { id: 'q1', question_text: 'Item 1', question_type: 'checkbox', is_required: true, sort_order: 1 },
-        { id: 'q2', question_text: 'Item 2', question_type: 'checkbox', is_required: true, sort_order: 2 },
-        { id: 'q3', question_text: 'Item 3', question_type: 'text', is_required: false, sort_order: 3 },
-      ];
-      const responses = [
-        { question_id: 'q1', response_value: 'true' },
-        { question_id: 'q2', response_value: 'false' },
+      const fields = [
+        { field_type: 'yes_no', response_value: 'yes' },
+        { field_type: 'yes_no', response_value: '' },
+        { field_type: 'text', response_value: '' },
       ];
 
-      const responsesMap = new Map(responses.map(r => [r.question_id, r.response_value]));
-      const answeredCount = questions.filter(q => {
-        const val = responsesMap.get(q.id);
-        if (!val) return false;
-        if (q.question_type === 'checkbox') return val === 'true';
-        return val.trim() !== '';
-      }).length;
-
-      // Only q1 is truly answered (checked), q2 is unchecked, q3 has no response
+      const answeredCount = fields.filter((field) => field.response_value.trim() !== '').length;
       expect(answeredCount).toBe(1);
-      expect(Math.round((answeredCount / questions.length) * 100)).toBe(33);
+      expect(Math.round((answeredCount / fields.length) * 100)).toBe(33);
     });
   });
 
@@ -143,12 +143,22 @@ describe('Workshop Attachment PDF', () => {
         },
       };
 
-      const questions = [
-        { id: 'q1', question_text: 'Checked', question_type: 'checkbox', is_required: true, sort_order: 1 },
-      ];
-
-      const responses = [
-        { question_id: 'q1', response_value: 'true' },
+      const v2Sections = [
+        {
+          section_key: 'section_1',
+          title: 'Checklist',
+          description: null,
+          fields: [
+            {
+              field_key: 'checked',
+              label: 'Checked',
+              field_type: 'yes_no',
+              is_required: true,
+              response_value: 'yes',
+              response_json: null,
+            },
+          ],
+        },
       ];
 
       const task = {
@@ -159,8 +169,8 @@ describe('Workshop Attachment PDF', () => {
       };
 
       expect(attachment.workshop_attachment_templates?.name).toBe('Service Checklist');
-      expect(questions).toHaveLength(1);
-      expect(responses).toHaveLength(1);
+      expect(v2Sections).toHaveLength(1);
+      expect(v2Sections[0].fields).toHaveLength(1);
       expect(task.workshop_task_categories?.name).toBe('Service (Plant)');
     });
   });

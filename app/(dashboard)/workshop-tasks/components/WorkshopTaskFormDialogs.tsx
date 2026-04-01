@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,6 +19,17 @@ import type { Action, AssetTab, Category, Subcategory, Vehicle } from '../types'
 interface AttachmentTemplate {
   id: string;
   name: string;
+  applies_to?: string[] | null;
+}
+
+function normalizeTemplateAppliesTo(rawValues?: string[] | null): string[] {
+  const normalizedValues = (rawValues || [])
+    .map((value) => value.trim().toLowerCase())
+    .map((value) => (value === 'vehicle' ? 'van' : value))
+    .filter(Boolean);
+
+  if (normalizedValues.length === 0) return ['van', 'hgv', 'plant'];
+  return Array.from(new Set(normalizedValues));
 }
 
 interface WorkshopTaskFormDialogsProps {
@@ -156,6 +167,18 @@ export function WorkshopTaskFormDialogs({
       editMileage.trim()
   );
   const selectedAddVehicle = vehicles.find((vehicle) => vehicle.id === selectedVehicleId);
+  const selectedAddAssetType =
+    selectedAddVehicle?.asset_type === 'van' || selectedAddVehicle?.asset_type === 'plant' || selectedAddVehicle?.asset_type === 'hgv'
+      ? selectedAddVehicle.asset_type
+      : assetTab === 'all'
+        ? null
+        : assetTab;
+  const filteredAttachmentTemplates = useMemo(() => {
+    if (!selectedAddAssetType) return [];
+    return attachmentTemplates.filter((template) =>
+      normalizeTemplateAppliesTo(template.applies_to).includes(selectedAddAssetType),
+    );
+  }, [attachmentTemplates, selectedAddAssetType]);
   const addUsesKm = meterReadingType === 'mileage' && selectedAddVehicle?.asset_type === 'hgv';
   const addMeterLabel = meterReadingType === 'hours' ? 'Current Hours' : addUsesKm ? 'Current KM' : 'Current Mileage';
   const addMeterPlaceholder = meterReadingType === 'hours' ? 'hours' : addUsesKm ? 'KM' : 'mileage';
@@ -185,6 +208,15 @@ export function WorkshopTaskFormDialogs({
 
     onShowEditModalChange(open);
   }
+
+  useEffect(() => {
+    if (selectedAttachmentTemplateIds.length === 0) return;
+    const visibleTemplateIds = new Set(filteredAttachmentTemplates.map((template) => template.id));
+    const nextSelectedTemplateIds = selectedAttachmentTemplateIds.filter((id) => visibleTemplateIds.has(id));
+    if (nextSelectedTemplateIds.length !== selectedAttachmentTemplateIds.length) {
+      onSelectedAttachmentTemplateIdsChange(nextSelectedTemplateIds);
+    }
+  }, [filteredAttachmentTemplates, onSelectedAttachmentTemplateIdsChange, selectedAttachmentTemplateIds]);
 
   return (
     <>
@@ -333,7 +365,17 @@ export function WorkshopTaskFormDialogs({
                   Add service checklists or documentation to complete later
                 </p>
                 <div className={`space-y-2 max-h-40 overflow-y-auto p-2 border border-border rounded-md bg-muted/30 ${tabletModeEnabled ? 'p-3' : ''}`}>
-                  {attachmentTemplates.map((template) => (
+                  {!selectedAddAssetType && (
+                    <p className="text-xs text-muted-foreground">
+                      Select an asset first to see relevant attachments.
+                    </p>
+                  )}
+                  {selectedAddAssetType && filteredAttachmentTemplates.length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      No templates are available for this {selectedAddAssetType.toUpperCase()} asset.
+                    </p>
+                  )}
+                  {filteredAttachmentTemplates.map((template) => (
                     <div key={template.id} className={`flex items-center ${tabletModeEnabled ? 'space-x-3 py-1' : 'space-x-2'}`}>
                       <input
                         type="checkbox"

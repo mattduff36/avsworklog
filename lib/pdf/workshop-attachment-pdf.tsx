@@ -1,127 +1,180 @@
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { Document, Image, Page, StyleSheet, Text, View } from '@react-pdf/renderer';
 import { format } from 'date-fns';
+
+const BRAND_YELLOW = '#f2cc0c';
+const BRAND_YELLOW_LIGHT = '#fff6cc';
+const BRAND_TEXT = '#111827';
 
 const styles = StyleSheet.create({
   page: {
     padding: 40,
-    fontSize: 10,
+    fontSize: 9.5,
     fontFamily: 'Helvetica',
   },
   header: {
-    marginBottom: 20,
-    borderBottom: '2pt solid #1e3a5f',
-    paddingBottom: 15,
+    marginBottom: 18,
+    borderBottom: `2pt solid ${BRAND_YELLOW}`,
+    paddingBottom: 12,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  headerTextWrap: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  logo: {
+    width: 120,
+    height: 64,
+    objectFit: 'contain',
   },
   companyName: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
-    color: '#1e293b',
-    marginBottom: 3,
+    color: BRAND_TEXT,
+    marginBottom: 2,
   },
   title: {
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: 'bold',
-    color: '#1e3a5f',
-    marginBottom: 5,
+    color: BRAND_TEXT,
+    marginBottom: 4,
   },
   subtitle: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#64748b',
     marginBottom: 3,
   },
   section: {
-    marginTop: 15,
-    marginBottom: 10,
+    marginTop: 10,
+    marginBottom: 8,
   },
   sectionTitle: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#ffffff',
-    backgroundColor: '#1e3a5f',
-    padding: 8,
-    borderRadius: 3,
+    marginBottom: 6,
+    color: BRAND_TEXT,
+    backgroundColor: BRAND_YELLOW,
+    padding: 6,
+    borderRadius: 2,
   },
   infoRow: {
     flexDirection: 'row',
-    marginBottom: 5,
-    paddingVertical: 2,
+    marginBottom: 4,
+    paddingVertical: 1,
   },
   label: {
     fontWeight: 'bold',
-    width: 130,
+    width: 140,
     color: '#64748b',
-    fontSize: 10,
+    fontSize: 9,
   },
   value: {
     flex: 1,
     color: '#1e293b',
-    fontSize: 10,
+    fontSize: 9.5,
   },
-  questionCard: {
-    marginBottom: 8,
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     padding: 10,
-    border: '1pt solid #e2e8f0',
-    borderRadius: 4,
-    backgroundColor: '#f8fafc',
+    backgroundColor: BRAND_YELLOW_LIGHT,
+    border: `1pt solid ${BRAND_YELLOW}`,
+    borderRadius: 3,
+    marginBottom: 10,
   },
-  questionCardCompleted: {
-    marginBottom: 8,
-    padding: 10,
-    border: '1pt solid #bbf7d0',
-    borderRadius: 4,
-    backgroundColor: '#f0fdf4',
+  statItem: {
+    alignItems: 'center',
   },
-  questionText: {
+  statValue: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: BRAND_TEXT,
+  },
+  statLabel: {
+    fontSize: 8,
+    color: '#64748b',
+  },
+  checklistSectionTitle: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: '#1e293b',
+    color: '#0f172a',
     marginBottom: 4,
   },
-  responseText: {
-    fontSize: 10,
-    color: '#334155',
-    paddingLeft: 8,
-    borderLeft: '2pt solid #3b82f6',
-    paddingVertical: 2,
+  checklistSectionDescription: {
+    fontSize: 8.5,
+    color: '#64748b',
+    marginBottom: 5,
   },
-  noResponse: {
-    fontSize: 9,
+  checklistTableHeader: {
+    flexDirection: 'row',
+    border: '1pt solid #d1d5db',
+    borderBottom: '0pt solid transparent',
+    backgroundColor: BRAND_YELLOW_LIGHT,
+  },
+  checklistTableHeaderCellLabel: {
+    width: '46%',
+    borderRight: '1pt solid #d1d5db',
+    padding: 5,
+    fontSize: 8.5,
+    fontWeight: 'bold',
+    color: '#334155',
+  },
+  checklistTableHeaderCellValue: {
+    width: '54%',
+    padding: 5,
+    fontSize: 8.5,
+    fontWeight: 'bold',
+    color: '#334155',
+  },
+  checklistRow: {
+    flexDirection: 'row',
+    border: '1pt solid #e2e8f0',
+    borderTop: '0pt solid transparent',
+  },
+  checklistLabelCell: {
+    width: '46%',
+    borderRight: '1pt solid #e2e8f0',
+    padding: 5,
+    fontSize: 8.5,
+    color: '#1f2937',
+    lineHeight: 1.35,
+  },
+  checklistValueCell: {
+    width: '54%',
+    padding: 5,
+    fontSize: 8.5,
+    color: '#0f172a',
+    lineHeight: 1.35,
+  },
+  requiredMarker: {
+    color: '#dc2626',
+  },
+  emptyValue: {
     color: '#94a3b8',
     fontStyle: 'italic',
-    paddingLeft: 8,
   },
-  checkboxRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+  signatureMeta: {
+    fontSize: 8.5,
+    color: '#0f172a',
   },
-  checkboxChecked: {
-    width: 14,
-    height: 14,
-    border: '1.5pt solid #16a34a',
-    borderRadius: 2,
-    backgroundColor: '#16a34a',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkboxUnchecked: {
-    width: 14,
-    height: 14,
-    border: '1.5pt solid #94a3b8',
-    borderRadius: 2,
-    backgroundColor: '#ffffff',
-  },
-  checkMark: {
-    fontSize: 9,
-    color: '#ffffff',
-    fontWeight: 'bold',
+  signatureImage: {
+    marginTop: 4,
+    width: 150,
+    height: 45,
+    objectFit: 'contain',
+    border: '1pt solid #e2e8f0',
+    padding: 2,
   },
   statusBadge: {
-    padding: '3pt 8pt',
+    alignSelf: 'flex-start',
+    marginTop: 6,
+    padding: '2pt 7pt',
     borderRadius: 4,
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: 'bold',
   },
   statusCompleted: {
@@ -129,30 +182,15 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   statusPending: {
-    backgroundColor: '#f59e0b',
-    color: '#ffffff',
+    backgroundColor: BRAND_YELLOW,
+    color: BRAND_TEXT,
   },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 12,
-    backgroundColor: '#f1f5f9',
-    border: '1pt solid #e2e8f0',
-    borderRadius: 4,
-    marginBottom: 15,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1e3a5f',
-    marginBottom: 2,
-  },
-  statLabel: {
+  valueBadge: {
+    alignSelf: 'flex-start',
+    borderRadius: 3,
+    padding: '2pt 6pt',
     fontSize: 8,
-    color: '#64748b',
+    fontWeight: 'bold',
   },
   footer: {
     position: 'absolute',
@@ -165,23 +203,22 @@ const styles = StyleSheet.create({
     borderTop: '1pt solid #e2e8f0',
     paddingTop: 10,
   },
-  requiredMarker: {
-    color: '#ef4444',
-    fontSize: 10,
-  },
 });
 
-interface QuestionData {
-  id: string;
-  question_text: string;
-  question_type: string;
+export interface V2PdfFieldData {
+  field_key: string;
+  label: string;
+  field_type: 'marking_code' | 'text' | 'long_text' | 'number' | 'date' | 'yes_no' | 'signature';
   is_required: boolean;
-  sort_order: number;
+  response_value: string | null;
+  response_json: Record<string, unknown> | null;
 }
 
-interface ResponseData {
-  question_id: string;
-  response_value: string | null;
+export interface V2PdfSectionData {
+  section_key: string;
+  title: string;
+  description: string | null;
+  fields: V2PdfFieldData[];
 }
 
 interface WorkshopAttachmentPDFProps {
@@ -193,10 +230,101 @@ interface WorkshopAttachmentPDFProps {
   attachmentStatus: 'pending' | 'completed';
   completedAt: string | null;
   createdAt: string;
-  questions: QuestionData[];
-  responses: ResponseData[];
+  v2Sections: V2PdfSectionData[];
   assetName: string | null;
-  assetType: 'van' | 'plant' | null;
+  assetType: 'van' | 'plant' | 'hgv' | null;
+  logoSrc?: string | null;
+}
+
+function normalizeValue(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  return String(value).trim();
+}
+
+function isSignatureComplete(responseJson: Record<string, unknown> | null | undefined): boolean {
+  if (!responseJson) return false;
+  const dataUrl = normalizeValue(responseJson.data_url);
+  const signedBy = normalizeValue(responseJson.signed_by_name);
+  const signedAt = normalizeValue(responseJson.signed_at);
+  return dataUrl.length > 0 && signedBy.length > 0 && signedAt.length > 0;
+}
+
+function formatDateSafe(value: string): string {
+  try {
+    return format(new Date(value), 'PPP');
+  } catch {
+    return value;
+  }
+}
+
+function formatDateTimeSafe(value: string): string {
+  try {
+    return format(new Date(value), 'PPP p');
+  } catch {
+    return value;
+  }
+}
+
+function getMarkingCodeLabel(value: string): string {
+  const lookup = new Map([
+    ['serviceable', 'Pass'],
+    ['attention', 'Fail'],
+    ['not_checked', 'N/A'],
+    ['not_applicable', 'N/A'],
+    ['monitor', 'Monitor'],
+  ]);
+  return lookup.get(value) || value;
+}
+
+function getYesNoLabel(value: string): string {
+  const lookup = new Map([
+    ['yes', 'Yes'],
+    ['no', 'No'],
+    ['na', 'N/A'],
+  ]);
+  return lookup.get(value) || value;
+}
+
+function isV2FieldAnswered(field: V2PdfFieldData): boolean {
+  if (field.field_type === 'signature') return isSignatureComplete(field.response_json);
+  return normalizeValue(field.response_value).length > 0;
+}
+
+function displayValue(field: V2PdfFieldData): string {
+  const value = normalizeValue(field.response_value);
+  if (!value) return '';
+  if (field.field_type === 'marking_code') return getMarkingCodeLabel(value);
+  if (field.field_type === 'yes_no') return getYesNoLabel(value);
+  if (field.field_type === 'date') return formatDateSafe(value);
+  return value;
+}
+
+interface BadgeAppearance {
+  label: string;
+  backgroundColor: string;
+  textColor: string;
+}
+
+function getBadgeAppearance(field: V2PdfFieldData): BadgeAppearance | null {
+  const value = normalizeValue(field.response_value).toLowerCase();
+  if (!value) return null;
+
+  if (field.field_type === 'marking_code') {
+    if (value === 'serviceable') return { label: 'Pass', backgroundColor: '#16a34a', textColor: '#ffffff' };
+    if (value === 'monitor') return { label: 'Monitor', backgroundColor: '#f59e0b', textColor: BRAND_TEXT };
+    if (value === 'attention') return { label: 'Fail', backgroundColor: '#dc2626', textColor: '#ffffff' };
+    if (value === 'not_checked') return { label: 'N/A', backgroundColor: '#9ca3af', textColor: BRAND_TEXT };
+    if (value === 'not_applicable') return { label: 'N/A', backgroundColor: '#9ca3af', textColor: BRAND_TEXT };
+    return { label: getMarkingCodeLabel(value), backgroundColor: '#9ca3af', textColor: BRAND_TEXT };
+  }
+
+  if (field.field_type === 'yes_no') {
+    if (value === 'yes') return { label: 'Yes', backgroundColor: '#16a34a', textColor: '#ffffff' };
+    if (value === 'no') return { label: 'No', backgroundColor: '#dc2626', textColor: '#ffffff' };
+    if (value === 'na') return { label: 'N/A', backgroundColor: '#9ca3af', textColor: BRAND_TEXT };
+  }
+
+  return null;
 }
 
 export function WorkshopAttachmentPDF({
@@ -208,63 +336,35 @@ export function WorkshopAttachmentPDF({
   attachmentStatus,
   completedAt,
   createdAt,
-  questions,
-  responses,
+  v2Sections,
   assetName,
   assetType,
+  logoSrc = null,
 }: WorkshopAttachmentPDFProps) {
-  const responsesMap = new Map(responses.map(r => [r.question_id, r.response_value]));
-
-  const answeredCount = questions.filter(q => {
-    const val = responsesMap.get(q.id);
-    if (!val) return false;
-    if (q.question_type === 'checkbox') return val === 'true';
-    return val.trim() !== '';
-  }).length;
-
-  // Sort so completed/answered items appear first, preserving relative order within each group
-  const sortedQuestions = [...questions].sort((a, b) => {
-    const aDone = isItemCompleted(a);
-    const bDone = isItemCompleted(b);
-    if (aDone === bDone) return 0;
-    return aDone ? -1 : 1;
-  });
-
-  function isItemCompleted(q: QuestionData): boolean {
-    const val = responsesMap.get(q.id);
-    if (!val) return false;
-    if (q.question_type === 'checkbox') return val === 'true';
-    return val.trim() !== '';
-  }
-
-  function formatResponseValue(question: QuestionData, value: string | null): string {
-    if (!value || value.trim() === '') return '';
-    if (question.question_type === 'date') {
-      try {
-        return format(new Date(value), 'PPP');
-      } catch {
-        return value;
-      }
-    }
-    return value;
-  }
+  const itemCount = v2Sections.reduce((count, section) => count + section.fields.length, 0);
+  const displayedAnsweredCount = v2Sections.reduce((count, section) => (
+    count + section.fields.filter((field) => isV2FieldAnswered(field)).length
+  ), 0);
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.companyName}>A&V SQUIRES Plant Co. Ltd.</Text>
-          <Text style={styles.title}>{templateName}</Text>
-          {templateDescription && (
-            <Text style={styles.subtitle}>{templateDescription}</Text>
-          )}
-          <Text style={styles.subtitle}>
-            Workshop Task Attachment Report
-          </Text>
+          <View style={styles.headerRow}>
+            <View style={styles.headerTextWrap}>
+              <Text style={styles.companyName}>A&V SQUIRES Plant Co. Ltd.</Text>
+              <Text style={styles.title}>{templateName}</Text>
+              {templateDescription && (
+                <Text style={styles.subtitle}>{templateDescription}</Text>
+              )}
+              <Text style={styles.subtitle}>
+                Workshop Task Attachment Report
+              </Text>
+            </View>
+            {logoSrc ? <Image src={logoSrc} style={styles.logo} /> : null}
+          </View>
         </View>
 
-        {/* Document Information */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Details</Text>
           <View style={styles.infoRow}>
@@ -285,7 +385,9 @@ export function WorkshopAttachmentPDF({
           </View>
           {assetName && (
             <View style={styles.infoRow}>
-              <Text style={styles.label}>{assetType === 'plant' ? 'Plant:' : 'Van:'}</Text>
+              <Text style={styles.label}>
+                {assetType === 'plant' ? 'Plant:' : assetType === 'hgv' ? 'HGV:' : 'Van:'}
+              </Text>
               <Text style={styles.value}>{assetName}</Text>
             </View>
           )}
@@ -298,90 +400,102 @@ export function WorkshopAttachmentPDF({
           <View style={styles.infoRow}>
             <Text style={styles.label}>Created:</Text>
             <Text style={styles.value}>
-              {format(new Date(createdAt), 'PPP')}
+              {formatDateSafe(createdAt)}
             </Text>
           </View>
           {completedAt && (
             <View style={styles.infoRow}>
               <Text style={styles.label}>Completed:</Text>
               <Text style={styles.value}>
-                {format(new Date(completedAt), 'PPP p')}
+                {formatDateTimeSafe(completedAt)}
               </Text>
             </View>
           )}
         </View>
 
-        {/* Summary Stats */}
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{questions.length}</Text>
+            <Text style={styles.statValue}>{itemCount}</Text>
             <Text style={styles.statLabel}>Total Items</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{answeredCount}</Text>
+            <Text style={styles.statValue}>{displayedAnsweredCount}</Text>
             <Text style={styles.statLabel}>Answered</Text>
           </View>
           <View style={styles.statItem}>
             <Text style={styles.statValue}>
-              {questions.length > 0 ? Math.round((answeredCount / questions.length) * 100) : 100}%
+              {itemCount > 0 ? Math.round((displayedAnsweredCount / itemCount) * 100) : 100}%
             </Text>
             <Text style={styles.statLabel}>Completion</Text>
           </View>
         </View>
 
-        {/* Questions & Responses – completed/answered items first */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Checklist Items</Text>
-          {sortedQuestions.map((question) => {
-            const responseValue = responsesMap.get(question.id);
-            const hasResponse = responseValue && responseValue.trim() !== '';
-            const isCheckbox = question.question_type === 'checkbox';
-            const isChecked = responseValue === 'true';
+          {v2Sections.map((section) => (
+            <View key={section.section_key} style={{ marginBottom: 10 }}>
+              <Text style={styles.checklistSectionTitle}>{section.title}</Text>
+              {section.description && (
+                <Text style={styles.checklistSectionDescription}>{section.description}</Text>
+              )}
 
-            return (
-              <View
-                key={question.id}
-                style={isCheckbox && isChecked ? styles.questionCardCompleted : styles.questionCard}
-                wrap={false}
-              >
-                {isCheckbox ? (
-                  <View style={styles.checkboxRow}>
-                    <View style={isChecked ? styles.checkboxChecked : styles.checkboxUnchecked}>
-                      {isChecked && <Text style={styles.checkMark}>✓</Text>}
-                    </View>
-                    <Text style={styles.questionText}>
-                      {question.question_text}
-                      {question.is_required && (
-                        <Text style={styles.requiredMarker}> *</Text>
-                      )}
-                    </Text>
-                  </View>
-                ) : (
-                  <>
-                    <Text style={styles.questionText}>
-                      {question.question_text}
-                      {question.is_required && (
-                        <Text style={styles.requiredMarker}> *</Text>
-                      )}
-                    </Text>
-                    {hasResponse ? (
-                      <Text style={styles.responseText}>
-                        {formatResponseValue(question, responseValue ?? null)}
-                      </Text>
-                    ) : (
-                      <Text style={styles.noResponse}>No response</Text>
-                    )}
-                  </>
-                )}
+              <View style={styles.checklistTableHeader}>
+                <Text style={styles.checklistTableHeaderCellLabel}>Checklist Item</Text>
+                <Text style={styles.checklistTableHeaderCellValue}>Result / Response</Text>
               </View>
-            );
-          })}
+
+              {section.fields.map((field) => {
+                const renderedValue = displayValue(field);
+                const badge = getBadgeAppearance(field);
+                const hasValue = renderedValue.length > 0;
+                const signatureName = normalizeValue(field.response_json?.signed_by_name);
+                const signatureAt = normalizeValue(field.response_json?.signed_at);
+                const signatureDataUrl = normalizeValue(field.response_json?.data_url);
+
+                return (
+                  <View key={`${section.section_key}::${field.field_key}`} style={styles.checklistRow} wrap={false}>
+                    <Text style={styles.checklistLabelCell}>
+                      {field.label}
+                      {field.is_required && <Text style={styles.requiredMarker}> *</Text>}
+                    </Text>
+
+                    <View style={styles.checklistValueCell}>
+                      {field.field_type === 'signature' ? (
+                        <>
+                          <Text style={styles.signatureMeta}>
+                            {isSignatureComplete(field.response_json)
+                              ? `Signed by ${signatureName} on ${formatDateTimeSafe(signatureAt)}`
+                              : 'No signature captured'}
+                          </Text>
+                          {signatureDataUrl && (
+                            <Image src={signatureDataUrl} style={styles.signatureImage} />
+                          )}
+                        </>
+                      ) : hasValue ? (
+                        badge ? (
+                          <Text style={{ ...styles.valueBadge, backgroundColor: badge.backgroundColor, color: badge.textColor }}>
+                            {badge.label}
+                          </Text>
+                        ) : (
+                          <Text>{renderedValue}</Text>
+                        )
+                      ) : (
+                        <Text style={styles.emptyValue}>No response</Text>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          ))}
         </View>
 
-        {/* Footer */}
+        <Text style={attachmentStatus === 'completed' ? { ...styles.statusBadge, ...styles.statusCompleted } : { ...styles.statusBadge, ...styles.statusPending }}>
+          {attachmentStatus === 'completed' ? 'Attachment Completed' : 'Attachment In Progress'}
+        </Text>
+
         <View style={styles.footer}>
           <Text>
-            Generated by AVS Worklog System • {format(new Date(), 'PPP p')}
+            Generated by SquireApp • {format(new Date(), 'PPP p')}
           </Text>
         </View>
       </Page>

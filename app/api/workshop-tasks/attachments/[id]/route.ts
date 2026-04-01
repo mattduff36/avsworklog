@@ -9,7 +9,7 @@ interface RouteParams {
 
 /**
  * GET /api/workshop-tasks/attachments/[id]
- * Get a single attachment with template, questions, and responses
+ * Get a single attachment with template and V2 schema responses.
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
@@ -45,33 +45,31 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       throw attachmentError;
     }
 
-    // Get questions for the template
-    const { data: questions, error: questionsError } = await db
-      .from('workshop_attachment_questions')
+    const { data: schemaSnapshots, error: snapshotsError } = await db
+      .from('workshop_attachment_schema_snapshots')
       .select('*')
-      .eq('template_id', attachment.template_id)
-      .order('sort_order', { ascending: true });
+      .eq('attachment_id', id)
+      .limit(1);
 
-    if (questionsError) {
-      throw questionsError;
+    if (snapshotsError) {
+      throw snapshotsError;
     }
 
-    // Get responses for this attachment
-    const { data: responses, error: responsesError } = await db
-      .from('workshop_attachment_responses')
+    const { data: fieldResponses, error: fieldResponsesError } = await db
+      .from('workshop_attachment_field_responses')
       .select('*')
       .eq('attachment_id', id);
 
-    if (responsesError) {
-      throw responsesError;
+    if (fieldResponsesError) {
+      throw fieldResponsesError;
     }
 
     return NextResponse.json({
       success: true,
       attachment: {
         ...attachment,
-        questions: questions || [],
-        responses: responses || [],
+        schema_snapshot: schemaSnapshots && schemaSnapshots.length > 0 ? schemaSnapshots[0] : null,
+        field_responses: fieldResponses || [],
       },
     });
   } catch (error) {

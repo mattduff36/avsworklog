@@ -650,6 +650,25 @@ button.bg-primary * {
   opacity: 0;
 }
 
+/* Workshop tasks module: ensure all module action buttons have a visible border */
+body.workshop-module-buttons [data-slot="button"] {
+  border-width: 1px !important;
+  border-style: solid !important;
+  border-color: hsl(var(--border) / 0.55) !important;
+}
+
+/* Global widescreen preference: relax common max-width wrappers on dashboard pages */
+body.app-widescreen-enabled main > .max-w-3xl,
+body.app-widescreen-enabled main > .max-w-4xl,
+body.app-widescreen-enabled main > .max-w-5xl,
+body.app-widescreen-enabled main > .max-w-6xl,
+body.app-widescreen-enabled main > .max-w-7xl {
+  max-width: 100% !important;
+  width: 100%;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
 /* Validation highlight - subtle pulse glow for required fields */
 @keyframes validation-glow {
   0%, 100% {

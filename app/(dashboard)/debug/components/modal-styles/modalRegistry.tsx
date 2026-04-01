@@ -222,10 +222,10 @@ const placeholderEntries: ModalShowcaseEntry[] = [
   }),
   createPlaceholderEntry({
     id: 'attachment-form-modal',
-    label: 'AttachmentFormModal',
+    label: 'AttachmentHybridFormModal',
     feature: 'Workshop Tasks',
     kind: 'dialog',
-    sourcePath: 'components/workshop-tasks/AttachmentFormModal.tsx',
+    sourcePath: 'components/workshop-tasks/AttachmentHybridFormModal.tsx',
   }),
   createPlaceholderEntry({
     id: 'task-comments-drawer',

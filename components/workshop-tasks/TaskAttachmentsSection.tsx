@@ -6,12 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { FileText, Plus, Check, Clock, ChevronRight } from 'lucide-react';
+import { FileText, Plus, Check, Clock, ChevronRight, Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTaskAttachments, TaskAttachmentWithDetails } from '@/lib/hooks/useTaskAttachments';
 import { useAttachmentTemplates } from '@/lib/hooks/useAttachmentTemplates';
-import { AttachmentFormModal } from './AttachmentFormModal';
+import { AttachmentHybridFormModal } from './AttachmentHybridFormModal';
 import { formatDate } from '@/lib/utils/date';
+import type { AttachmentSchemaResponse } from '@/types/workshop-attachments-v2';
 
 interface TaskAttachmentsSectionProps {
   taskId: string;
@@ -20,13 +21,14 @@ interface TaskAttachmentsSectionProps {
 }
 
 export function TaskAttachmentsSection({ taskId, taskStatus, onUpdate }: TaskAttachmentsSectionProps) {
-  const { attachments, loading, addAttachment, saveResponses, refetch } = useTaskAttachments({ taskId });
+  const { attachments, loading, addAttachment, saveSchemaResponses, refetch } = useTaskAttachments({ taskId });
   const { templates } = useAttachmentTemplates();
   
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [adding, setAdding] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [activeAttachment, setActiveAttachment] = useState<TaskAttachmentWithDetails | null>(null);
+  const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<string | null>(null);
 
   const isTaskCompleted = taskStatus === 'completed';
 
@@ -54,36 +56,90 @@ export function TaskAttachmentsSection({ taskId, taskStatus, onUpdate }: TaskAtt
   };
 
   const handleOpenForm = (attachment: TaskAttachmentWithDetails) => {
+    if (!attachment.schema_snapshot?.snapshot_json?.sections?.length) {
+      toast.error('This attachment is missing a V2 schema snapshot.');
+      return;
+    }
     setActiveAttachment(attachment);
     setShowForm(true);
   };
 
-  const handleSaveResponses = async (
-    responses: { question_id: string; response_value: string | null }[],
-    markComplete: boolean
+  const handleSaveSchemaResponses = async (
+    responses: AttachmentSchemaResponse[],
+    markComplete: boolean,
   ) => {
     if (!activeAttachment) return;
-
-    await saveResponses(activeAttachment.id, responses, markComplete);
+    await saveSchemaResponses(activeAttachment.id, responses, markComplete);
     await refetch();
     onUpdate?.();
   };
 
-  const getCompletionProgress = (attachment: TaskAttachmentWithDetails) => {
-    const totalQuestions = attachment.questions.length;
-    if (totalQuestions === 0) return { completed: 0, total: 0, percentage: 100 };
+  const handleDownloadPdf = async (attachment: TaskAttachmentWithDetails) => {
+    setDownloadingAttachmentId(attachment.id);
+    try {
+      const response = await fetch(`/api/workshop-tasks/attachments/${attachment.id}/pdf`);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to generate PDF');
+      }
 
-    const completedQuestions = attachment.questions.filter(q => {
-      const response = attachment.responses.find(r => r.question_id === q.id);
-      if (!response?.response_value) return false;
-      if (q.question_type === 'checkbox') return response.response_value === 'true';
-      return response.response_value.trim() !== '';
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const templateName = attachment.workshop_attachment_templates?.name || 'attachment';
+      a.href = url;
+      a.download = `${templateName.replace(/[^a-z0-9]/gi, '_')}_attachment.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('PDF downloaded');
+    } catch (error) {
+      console.error('Error downloading attachment PDF:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to download PDF');
+    } finally {
+      setDownloadingAttachmentId(null);
+    }
+  };
+
+  const getSchemaCompletionProgress = (attachment: TaskAttachmentWithDetails) => {
+    const snapshot = attachment.schema_snapshot?.snapshot_json;
+    const fieldResponses = attachment.field_responses || [];
+
+    if (!snapshot?.sections || snapshot.sections.length === 0) {
+      return null;
+    }
+
+    const fields = snapshot.sections.flatMap((section) => section.fields.map((field) => ({
+      section_key: section.section_key,
+      field,
+    })));
+    const total = fields.length;
+    if (total === 0) return { completed: 0, total: 0, percentage: 100 };
+
+    const map = new Map(
+      fieldResponses.map((response) => [
+        `${response.section_key}::${response.field_key}`,
+        response,
+      ]),
+    );
+
+    const completed = fields.filter(({ section_key, field }) => {
+      const response = map.get(`${section_key}::${field.field_key}`);
+      if (!response) return false;
+      if (field.field_type === 'signature') {
+        const responseJson = response.response_json || {};
+        const signedAt = typeof responseJson.signed_at === 'string' ? responseJson.signed_at.trim() : '';
+        return Boolean(responseJson.data_url) && Boolean(responseJson.signed_by_name) && signedAt.length > 0;
+      }
+      const responseValue = (response.response_value || '').trim();
+      return responseValue.length > 0;
     }).length;
 
     return {
-      completed: completedQuestions,
-      total: totalQuestions,
-      percentage: Math.round((completedQuestions / totalQuestions) * 100),
+      completed,
+      total,
+      percentage: Math.round((completed / total) * 100),
     };
   };
 
@@ -97,12 +153,13 @@ export function TaskAttachmentsSection({ taskId, taskStatus, onUpdate }: TaskAtt
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 rounded-xl border border-workshop/20 bg-workshop/5 p-3">
       {/* Existing Attachments */}
       {attachments.length > 0 && (
         <div className="space-y-2">
           {attachments.map((attachment) => {
-            const progress = getCompletionProgress(attachment);
+            const schemaProgress = getSchemaCompletionProgress(attachment);
+            const progress = schemaProgress || { completed: 0, total: 0, percentage: 0 };
             const templateName = attachment.workshop_attachment_templates?.name || 'Unknown Template';
 
             return (
@@ -110,8 +167,8 @@ export function TaskAttachmentsSection({ taskId, taskStatus, onUpdate }: TaskAtt
                 key={attachment.id}
                 className={`cursor-pointer hover:border-workshop/50 transition-colors ${
                   attachment.status === 'completed'
-                    ? 'bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-800'
-                    : 'bg-muted/30'
+                    ? 'bg-green-50/70 dark:bg-green-950/20 border-green-300 dark:border-green-800 shadow-sm'
+                    : 'bg-background/90 border-workshop/20 shadow-sm hover:shadow-md'
                 }`}
                 onClick={() => handleOpenForm(attachment)}
               >
@@ -137,6 +194,23 @@ export function TaskAttachmentsSection({ taskId, taskStatus, onUpdate }: TaskAtt
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void handleDownloadPdf(attachment);
+                        }}
+                        disabled={downloadingAttachmentId === attachment.id}
+                        className="h-8 px-2"
+                      >
+                        {downloadingAttachmentId === attachment.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Download className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
                       {attachment.status === 'completed' ? (
                         <Badge className="bg-green-600 text-white">
                           <Check className="h-3 w-3 mr-1" />
@@ -160,7 +234,7 @@ export function TaskAttachmentsSection({ taskId, taskStatus, onUpdate }: TaskAtt
 
       {/* Add Attachment */}
       {!isTaskCompleted && availableTemplates.length > 0 && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 rounded-lg border border-workshop/25 bg-background/90 p-2 shadow-sm">
           <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
             <SelectTrigger className="flex-1">
               <SelectValue placeholder="Select an attachment template" />
@@ -199,16 +273,18 @@ export function TaskAttachmentsSection({ taskId, taskStatus, onUpdate }: TaskAtt
       )}
 
       {/* Attachment Form Modal */}
-      {activeAttachment && (
-        <AttachmentFormModal
-          open={showForm}
-          onOpenChange={setShowForm}
-          templateName={activeAttachment.workshop_attachment_templates?.name || 'Attachment'}
-          questions={activeAttachment.questions}
-          existingResponses={activeAttachment.responses}
-          onSave={handleSaveResponses}
-          readOnly={isTaskCompleted}
-        />
+      {activeAttachment && activeAttachment.schema_snapshot?.snapshot_json?.sections?.length && (
+            <AttachmentHybridFormModal
+              open={showForm}
+              onOpenChange={setShowForm}
+              templateName={activeAttachment.workshop_attachment_templates?.name || 'Attachment'}
+              snapshot={activeAttachment.schema_snapshot}
+              existingResponses={activeAttachment.field_responses || []}
+              onSave={handleSaveSchemaResponses}
+              readOnly={isTaskCompleted}
+              isCompleted={activeAttachment.status === 'completed'}
+              attachmentId={activeAttachment.id}
+            />
       )}
     </div>
   );

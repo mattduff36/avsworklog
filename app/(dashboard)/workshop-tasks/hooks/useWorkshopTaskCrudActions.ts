@@ -242,17 +242,15 @@ export function useWorkshopTaskCrudActions({
         const attachmentErrors: string[] = [];
 
         for (const templateId of selectedAttachmentTemplateIds) {
-          const { error: attachmentError } = await supabase
-            .from('workshop_task_attachments')
-            .insert({
-              task_id: newTask.id,
-              template_id: templateId,
-              status: 'pending',
-              created_by: userId,
-            });
+          const attachmentResponse = await fetch(`/api/workshop-tasks/attachments/task/${newTask.id}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ template_id: templateId }),
+          });
 
-          if (attachmentError) {
-            console.error('Error creating attachment:', attachmentError);
+          if (!attachmentResponse.ok) {
+            const attachmentError = await attachmentResponse.json().catch(() => ({}));
+            console.error('Error creating attachment with V2 snapshot:', attachmentError);
             attachmentErrors.push(templateId);
           }
         }

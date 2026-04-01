@@ -246,4 +246,44 @@ describe('Workshop task dialog tablet safeguards', () => {
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create Task' })).toBeInTheDocument();
   });
+
+  it('shows only templates relevant to the selected asset type', async () => {
+    const props = createBaseProps();
+    props.assetTab = 'van';
+    props.attachmentTemplates = [
+      { id: 'van-template', name: 'Van Checklist', applies_to: ['van'] },
+      { id: 'hgv-template', name: 'HGV Checklist', applies_to: ['hgv'] },
+      { id: 'plant-template', name: 'Plant Checklist', applies_to: ['plant'] },
+    ];
+
+    render(
+      <TabletModeProvider>
+        <WorkshopTaskFormDialogs {...props} />
+      </TabletModeProvider>
+    );
+
+    expect(screen.getByText('Van Checklist')).toBeInTheDocument();
+    expect(screen.queryByText('HGV Checklist')).not.toBeInTheDocument();
+    expect(screen.queryByText('Plant Checklist')).not.toBeInTheDocument();
+  });
+
+  it('prunes selected templates that do not match the selected asset type', async () => {
+    const props = createBaseProps();
+    props.assetTab = 'van';
+    props.attachmentTemplates = [
+      { id: 'van-template', name: 'Van Checklist', applies_to: ['van'] },
+      { id: 'hgv-template', name: 'HGV Checklist', applies_to: ['hgv'] },
+    ];
+    props.selectedAttachmentTemplateIds = ['van-template', 'hgv-template'];
+
+    render(
+      <TabletModeProvider>
+        <WorkshopTaskFormDialogs {...props} />
+      </TabletModeProvider>
+    );
+
+    await waitFor(() => {
+      expect(props.onSelectedAttachmentTemplateIdsChange).toHaveBeenCalledWith(['van-template']);
+    });
+  });
 });

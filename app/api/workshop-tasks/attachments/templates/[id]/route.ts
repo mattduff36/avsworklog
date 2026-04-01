@@ -9,7 +9,7 @@ interface RouteParams {
 
 /**
  * GET /api/workshop-tasks/attachments/templates/[id]
- * Get a single attachment template with its questions
+ * Get a single attachment template.
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
@@ -37,21 +37,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       throw templateError;
     }
 
-    // Get questions
-    const { data: questions, error: questionsError } = await db
-      .from('workshop_attachment_questions')
-      .select('*')
-      .eq('template_id', id)
-      .order('sort_order', { ascending: true });
-
-    if (questionsError) {
-      throw questionsError;
-    }
-
     return NextResponse.json({
       success: true,
       template,
-      questions: questions || [],
     });
   } catch (error) {
     const { id } = await params;

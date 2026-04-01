@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { renderToStream } from '@react-pdf/renderer';
-import { WorkshopAttachmentPDF } from '@/lib/pdf/workshop-attachment-pdf';
+import { WorkshopAttachmentPDF, type V2PdfSectionData } from '@/lib/pdf/workshop-attachment-pdf';
+import { loadSquiresLogoDataUrl } from '@/lib/pdf/squires-logo';
 import { logServerError } from '@/lib/utils/server-error-logger';
 
 interface RouteParams {
@@ -23,19 +24,6 @@ interface AttachmentRow {
   } | null;
 }
 
-interface QuestionRow {
-  id: string;
-  question_text: string;
-  question_type: string;
-  is_required: boolean;
-  sort_order: number;
-}
-
-interface ResponseRow {
-  question_id: string;
-  response_value: string | null;
-}
-
 interface TaskRow {
   id: string;
   title: string;
@@ -43,7 +31,86 @@ interface TaskRow {
   workshop_comments: string | null;
   van_id: string | null;
   plant_id: string | null;
+  hgv_id: string | null;
   workshop_task_categories: { name: string } | null;
+}
+
+interface SchemaSnapshotRow {
+  snapshot_json: {
+    sections?: Array<{
+      section_key?: string;
+      title?: string;
+      description?: string | null;
+      sort_order?: number;
+      fields?: Array<{
+        field_key?: string;
+        label?: string;
+        field_type?: string;
+        is_required?: boolean;
+        sort_order?: number;
+      }>;
+    }>;
+  } | null;
+}
+
+interface FieldResponseRow {
+  section_key: string;
+  field_key: string;
+  response_value: string | null;
+  response_json: Record<string, unknown> | null;
+}
+
+function normalizeFieldType(
+  fieldType: string | undefined
+): 'marking_code' | 'text' | 'long_text' | 'number' | 'date' | 'yes_no' | 'signature' {
+  if (fieldType === 'marking_code') return 'marking_code';
+  if (fieldType === 'long_text') return 'long_text';
+  if (fieldType === 'number') return 'number';
+  if (fieldType === 'date') return 'date';
+  if (fieldType === 'yes_no') return 'yes_no';
+  if (fieldType === 'signature') return 'signature';
+  return 'text';
+}
+
+function mapSnapshotToV2PdfSections(
+  snapshot: SchemaSnapshotRow | null,
+  fieldResponses: FieldResponseRow[],
+): V2PdfSectionData[] {
+  const snapshotSections = snapshot?.snapshot_json?.sections || [];
+  if (!Array.isArray(snapshotSections) || snapshotSections.length === 0) return [];
+
+  const responseMap = new Map(
+    fieldResponses.map((response) => [`${response.section_key}::${response.field_key}`, response] as const),
+  );
+
+  return snapshotSections
+    .slice()
+    .sort((left, right) => Number(left.sort_order || 0) - Number(right.sort_order || 0))
+    .map((section, sectionIndex) => {
+      const sectionKey = section.section_key || `section_${sectionIndex + 1}`;
+      const fields = (section.fields || [])
+        .slice()
+        .sort((left, right) => Number(left.sort_order || 0) - Number(right.sort_order || 0))
+        .map((field, fieldIndex) => {
+          const fieldKey = field.field_key || `field_${fieldIndex + 1}`;
+          const response = responseMap.get(`${sectionKey}::${fieldKey}`);
+          return {
+            field_key: fieldKey,
+            label: field.label || `Field ${fieldIndex + 1}`,
+            field_type: normalizeFieldType(field.field_type),
+            is_required: Boolean(field.is_required),
+            response_value: response?.response_value || null,
+            response_json: response?.response_json || null,
+          };
+        });
+      return {
+        section_key: sectionKey,
+        title: section.title || `Section ${sectionIndex + 1}`,
+        description: section.description || null,
+        fields,
+      };
+    })
+    .filter((section) => section.fields.length > 0);
 }
 
 /**
@@ -84,26 +151,33 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const attachment = rawAttachment as unknown as AttachmentRow;
 
-    // Fetch questions for the template
-    const { data: rawQuestions, error: questionsError } = await supabase
-      .from('workshop_attachment_questions')
-      .select('id, question_text, question_type, is_required, sort_order')
-      .eq('template_id', attachment.template_id)
-      .order('sort_order', { ascending: true });
+    const { data: rawSnapshot, error: snapshotError } = await supabase
+      .from('workshop_attachment_schema_snapshots')
+      .select('snapshot_json')
+      .eq('attachment_id', attachmentId)
+      .limit(1);
 
-    if (questionsError) throw questionsError;
+    if (snapshotError) throw snapshotError;
 
-    const questions = (rawQuestions || []) as unknown as QuestionRow[];
+    const snapshot = (rawSnapshot && rawSnapshot.length > 0)
+      ? (rawSnapshot[0] as unknown as SchemaSnapshotRow)
+      : null;
 
-    // Fetch responses for this attachment
-    const { data: rawResponses, error: responsesError } = await supabase
-      .from('workshop_attachment_responses')
-      .select('question_id, response_value')
+    const { data: rawFieldResponses, error: fieldResponsesError } = await supabase
+      .from('workshop_attachment_field_responses')
+      .select('section_key, field_key, response_value, response_json')
       .eq('attachment_id', attachmentId);
 
-    if (responsesError) throw responsesError;
+    if (fieldResponsesError) throw fieldResponsesError;
 
-    const responses = (rawResponses || []) as unknown as ResponseRow[];
+    const fieldResponses = (rawFieldResponses || []) as unknown as FieldResponseRow[];
+    const v2Sections = mapSnapshotToV2PdfSections(snapshot, fieldResponses);
+    if (v2Sections.length === 0) {
+      return NextResponse.json(
+        { error: 'Attachment has no V2 schema data to render' },
+        { status: 400 },
+      );
+    }
 
     // Fetch the parent task to get category and description
     const { data: rawTask, error: taskError } = await supabase
@@ -115,6 +189,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         workshop_comments,
         van_id,
         plant_id,
+        hgv_id,
         workshop_task_categories (
           name
         )
@@ -130,7 +205,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // Try to get asset name for context
     let assetName: string | null = null;
-    let assetType: 'van' | 'plant' | null = null;
+    let assetType: 'van' | 'plant' | 'hgv' | null = null;
 
     if (task?.van_id) {
       const { data: vehicle } = await supabase
@@ -155,9 +230,21 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         assetName = `${p.plant_id}${p.nickname ? ` (${p.nickname})` : ''}${p.serial_number ? ` (SN: ${p.serial_number})` : ''}`;
         assetType = 'plant';
       }
+    } else if (task?.hgv_id) {
+      const { data: hgv } = await supabase
+        .from('hgvs')
+        .select('reg_number, nickname')
+        .eq('id', task.hgv_id)
+        .single();
+      if (hgv) {
+        const typedHgv = hgv as { reg_number: string | null; nickname: string | null };
+        assetName = typedHgv.reg_number || typedHgv.nickname || null;
+        assetType = 'hgv';
+      }
     }
 
     const templateName = attachment.workshop_attachment_templates?.name || 'Attachment';
+    const logoSrc = await loadSquiresLogoDataUrl();
 
     // Generate PDF
     const pdfDocument = WorkshopAttachmentPDF({
@@ -169,10 +256,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       attachmentStatus: attachment.status,
       completedAt: attachment.completed_at,
       createdAt: attachment.created_at,
-      questions,
-      responses,
+      v2Sections,
       assetName,
       assetType,
+      logoSrc,
     });
 
     // Convert stream to buffer (same pattern as timesheets/[id]/pdf)

@@ -347,7 +347,6 @@ export async function POST(request: NextRequest) {
           const attachmentIds = attachmentsToDelete?.map(a => a.id) || [];
 
           if (attachmentIds.length > 0) {
-            await adminSupabase.from('workshop_attachment_responses').delete().in('attachment_id', attachmentIds);
             const { error: e } = await adminSupabase.from('workshop_task_attachments').delete().in('id', attachmentIds);
             if (e) throw e;
           }
@@ -698,16 +697,6 @@ export async function DELETE(request: NextRequest) {
 
         if (taskAttachments && taskAttachments.length > 0) {
           const attachmentIds = taskAttachments.map(a => a.id);
-
-          // Delete responses first (references attachments)
-          const { error: deleteResponsesError } = await adminSupabase
-            .from('workshop_attachment_responses')
-            .delete()
-            .in('attachment_id', attachmentIds);
-
-          if (deleteResponsesError) {
-            throw deleteResponsesError;
-          }
 
           // Delete attachments
           const { error: deleteAttachmentsError } = await adminSupabase
