@@ -9,6 +9,37 @@ export function getWeekEnding(date: Date = new Date()): Date {
   return endOfWeek(date, { weekStartsOn: 1 }); // Week starts on Monday
 }
 
+export interface WeekEndingSundayOption {
+  isoDate: string;
+  label: string;
+}
+
+/**
+ * Build a constrained list of week-ending Sundays around the current week.
+ * Defaults to: past 3 + current + future 2 Sundays.
+ */
+export function getWeekEndingSundayOptions(
+  anchorDate: Date = new Date(),
+  options: {
+    pastCount?: number;
+    futureCount?: number;
+  } = {}
+): WeekEndingSundayOption[] {
+  const pastCount = options.pastCount ?? 3;
+  const futureCount = options.futureCount ?? 2;
+  const currentSunday = getWeekEnding(anchorDate);
+
+  return Array.from({ length: pastCount + futureCount + 1 }, (_, index) => {
+    const weekOffset = index - pastCount;
+    const sundayDate = addDays(currentSunday, weekOffset * 7);
+    const isoDate = formatDateISO(sundayDate);
+    return {
+      isoDate,
+      label: `Sunday ${format(sundayDate, 'd MMM yyyy')}`,
+    };
+  });
+}
+
 /**
  * Get the Monday (week starting) date for a given date
  */

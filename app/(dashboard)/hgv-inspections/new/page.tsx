@@ -20,7 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -39,6 +39,7 @@ import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { InspectionPhotoTiles } from '@/components/inspections/InspectionPhotoTiles';
 import { useInspectionPhotos } from '@/lib/hooks/useInspectionPhotos';
 import { getInspectionPhotoKey } from '@/lib/inspection-photos';
+import { getReadingDigitGrowthWarning } from '@/lib/utils/readingDigitGrowthWarning';
 
 const PhotoUpload = dynamic(() => import('@/components/forms/PhotoUpload'), { ssr: false });
 const SignaturePad = dynamic(() => import('@/components/forms/SignaturePad'), { ssr: false });
@@ -82,6 +83,9 @@ function NewHgvInspectionContent() {
   const [hgvId, setHgvId] = useState('');
   const [inspectionDate, setInspectionDate] = useState('');
   const [currentMileage, setCurrentMileage] = useState('');
+  const [digitGrowthWarning, setDigitGrowthWarning] = useState<string | null>(null);
+  const [digitGrowthConfirmed, setDigitGrowthConfirmed] = useState(false);
+  const [showDigitGrowthWarningDialog, setShowDigitGrowthWarningDialog] = useState(false);
 
   const [checklistStarted, setChecklistStarted] = useState(false);
   const [inspectionStartMs, setInspectionStartMs] = useState<number | null>(null);
@@ -120,6 +124,33 @@ function NewHgvInspectionContent() {
       setInformWorkshop(false);
     }
   }, [hasOptionalInspectorComment, informWorkshop]);
+
+  const resolveDigitGrowthWarning = useCallback(
+    (rawMileage: string, previousMileage: number | null | undefined): string | null => {
+      if (!rawMileage || rawMileage.trim() === '') return null;
+      const mileageValue = parseInt(rawMileage, 10);
+      if (Number.isNaN(mileageValue) || mileageValue < 0) return null;
+      return (
+        getReadingDigitGrowthWarning({
+          enteredReading: mileageValue,
+          previousReading: previousMileage,
+          unitName: 'KM',
+        }).warning || null
+      );
+    },
+    []
+  );
+
+  useEffect(() => {
+    const selectedHgv = hgvs.find((candidate) => candidate.id === hgvId);
+    const warningMessage = resolveDigitGrowthWarning(currentMileage, selectedHgv?.current_mileage ?? null);
+    setDigitGrowthWarning(warningMessage);
+    if (!warningMessage) {
+      setDigitGrowthConfirmed(true);
+      return;
+    }
+    setDigitGrowthConfirmed(false);
+  }, [currentMileage, hgvId, hgvs, resolveDigitGrowthWarning]);
 
   const getPhotosForItem = useCallback(
     (itemNumber: number, dayOfWeek: number) =>
@@ -756,6 +787,16 @@ function NewHgvInspectionContent() {
       return 'Please enter a valid current KM';
     }
 
+    const selectedHgv = hgvs.find((candidate) => candidate.id === hgvId);
+    const warningMessage = resolveDigitGrowthWarning(currentMileage, selectedHgv?.current_mileage ?? null);
+    if (warningMessage) {
+      setDigitGrowthWarning(warningMessage);
+      if (!digitGrowthConfirmed) {
+        setShowDigitGrowthWarningDialog(true);
+        return 'Please confirm the current KM is correct before submitting';
+      }
+    }
+
     if (!checklistStarted) {
       return 'Click Start Daily Check before completing the checklist';
     }
@@ -805,6 +846,13 @@ function NewHgvInspectionContent() {
 
     const mileageValue = parseInt(currentMileage, 10);
     if (Number.isNaN(mileageValue) || mileageValue < 0) {
+      scroll(document.getElementById('currentMileage'));
+      return;
+    }
+
+    const selectedHgv = hgvs.find((candidate) => candidate.id === hgvId);
+    const warningMessage = resolveDigitGrowthWarning(currentMileage, selectedHgv?.current_mileage ?? null);
+    if (warningMessage && !digitGrowthConfirmed) {
       scroll(document.getElementById('currentMileage'));
       return;
     }
@@ -1199,6 +1247,7 @@ function NewHgvInspectionContent() {
                 disabled={checklistStarted}
                 onValueChange={(value) => {
                   setHgvId(value);
+                  setShowDigitGrowthWarningDialog(false);
                   if (user?.id) {
                     const updatedRecent = recordRecentVehicleId(user.id, value, 3, 'hgvs');
                     setRecentHgvIds(updatedRecent);
@@ -1283,14 +1332,44 @@ function NewHgvInspectionContent() {
                 min="0"
                 step="1"
                 value={currentMileage}
-                onChange={(e) => setCurrentMileage(e.target.value)}
+                onChange={(e) => {
+                  setCurrentMileage(e.target.value);
+                  setShowDigitGrowthWarningDialog(false);
+                }}
                 placeholder={(() => {
                   const selectedHgv = hgvs.find((hgv) => hgv.id === hgvId);
                   return selectedHgv?.current_mileage != null ? `e.g. ${selectedHgv.current_mileage}` : 'e.g. 245000';
                 })()}
-                className="h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground"
+                className={`h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground ${
+                  digitGrowthWarning && !digitGrowthConfirmed ? 'border-amber-500' : ''
+                }`}
                 required
               />
+              {digitGrowthWarning && !digitGrowthConfirmed && (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm text-amber-400">{digitGrowthWarning}</p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowDigitGrowthWarningDialog(true)}
+                        className="mt-2 border-amber-500/50 text-amber-400 hover:bg-amber-500/10"
+                      >
+                        Confirm KM is Correct
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {digitGrowthWarning && digitGrowthConfirmed && (
+                <p className="text-xs text-green-400 flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3" />
+                  KM confirmed
+                </p>
+              )}
             </div>
 
             {!checklistStarted ? (
@@ -1617,6 +1696,45 @@ function NewHgvInspectionContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={showDigitGrowthWarningDialog} onOpenChange={setShowDigitGrowthWarningDialog}>
+        <DialogContent className="border-border text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white text-xl">Confirm KM Entry</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Your KM reading needs confirmation before submission.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4 space-y-4">
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+              <p className="text-sm text-amber-200">{digitGrowthWarning}</p>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Enter only the FULL KM reading and ignore any fractional part.
+            </p>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowDigitGrowthWarningDialog(false)}
+              className="border-slate-600 text-white hover:bg-slate-800"
+            >
+              Edit KM
+            </Button>
+            <Button
+              onClick={() => {
+                setDigitGrowthConfirmed(true);
+                setShowDigitGrowthWarningDialog(false);
+              }}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              Confirm KM is Correct
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showSignatureDialog} onOpenChange={setShowSignatureDialog}>
         <DialogContent className="border-border text-white max-w-lg">

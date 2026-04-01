@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { BackButton } from '@/components/ui/back-button';
 import { AlertCircle, Save, Send, User } from 'lucide-react';
 import { DAY_NAMES } from '@/types/timesheet';
-import { formatHours } from '@/lib/utils/time-calculations';
+import { formatHours, roundTimeToNearestQuarterHour } from '@/lib/utils/time-calculations';
 import { SignaturePad } from '@/components/forms/SignaturePad';
 import { Database } from '@/types/database';
 import { Employee } from '@/types/common';
@@ -34,6 +34,13 @@ interface PlantTimesheetV2Props {
   existingId: string | null;
   userId?: string;
 }
+
+const QUARTER_HOUR_TIME_FIELDS: ReadonlySet<keyof PlantEntryDraft> = new Set([
+  'time_started',
+  'time_finished',
+  'machine_start_time',
+  'machine_finish_time',
+]);
 
 function formatDerivedHours(value: number | null): string {
   if (value === null) return '';
@@ -209,11 +216,16 @@ export function PlantTimesheetV2({
   }, [initialExistingId, user, profile, authLoading, supabase, router]);
 
   const updateEntryField = (dayIndex: number, field: keyof PlantEntryDraft, value: string | boolean) => {
+    const normalizedValue =
+      typeof value === 'string' && QUARTER_HOUR_TIME_FIELDS.has(field)
+        ? roundTimeToNearestQuarterHour(value)
+        : value;
+
     setEntries((current) => {
       const next = [...current];
       const updated = recalculateEntry({
         ...next[dayIndex],
-        [field]: value,
+        [field]: normalizedValue,
       } as PlantEntryDraft);
       next[dayIndex] = updated;
       return next;
@@ -569,6 +581,7 @@ export function PlantTimesheetV2({
                       <TableCell>
                         <Input
                           type="time"
+                          step="900"
                           value={entry.time_started}
                           onChange={(event) => updateEntryField(index, 'time_started', event.target.value)}
                           disabled={disableFields}
@@ -578,6 +591,7 @@ export function PlantTimesheetV2({
                       <TableCell>
                         <Input
                           type="time"
+                          step="900"
                           value={entry.time_finished}
                           onChange={(event) => updateEntryField(index, 'time_finished', event.target.value)}
                           disabled={disableFields}
@@ -615,6 +629,7 @@ export function PlantTimesheetV2({
                       <TableCell>
                         <Input
                           type="time"
+                          step="900"
                           value={entry.machine_start_time}
                           onChange={(event) => updateEntryField(index, 'machine_start_time', event.target.value)}
                           disabled={disableFields}
@@ -624,6 +639,7 @@ export function PlantTimesheetV2({
                       <TableCell>
                         <Input
                           type="time"
+                          step="900"
                           value={entry.machine_finish_time}
                           onChange={(event) => updateEntryField(index, 'machine_finish_time', event.target.value)}
                           disabled={disableFields}

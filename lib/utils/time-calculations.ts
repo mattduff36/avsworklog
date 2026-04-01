@@ -55,6 +55,32 @@ export function isValidTime(time: string): boolean {
 }
 
 /**
+ * Normalize a time value to the nearest 15-minute increment.
+ * If input is not a recognizable HH:mm value, returns it unchanged.
+ */
+export function roundTimeToNearestQuarterHour(time: string): string {
+  if (!time) return time;
+
+  const match = time.match(/^(\d{1,2}):([0-5]\d)(?::[0-5]\d)?$/);
+  if (!match) return time;
+
+  const rawHours = Number(match[1]);
+  const rawMinutes = Number(match[2]);
+  if (Number.isNaN(rawHours) || Number.isNaN(rawMinutes)) return time;
+  if (rawHours < 0 || rawHours > 23) return time;
+
+  const totalMinutes = rawHours * 60 + rawMinutes;
+  const roundedTotal = Math.round(totalMinutes / 15) * 15;
+  const minutesInDay = 24 * 60;
+  const normalizedTotal = ((roundedTotal % minutesInDay) + minutesInDay) % minutesInDay;
+
+  const hours = Math.floor(normalizedTotal / 60);
+  const minutes = normalizedTotal % 60;
+
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+/**
  * Calculate total hours from an array of daily totals
  */
 export function calculateWeeklyTotal(dailyTotals: (number | null)[]): number {

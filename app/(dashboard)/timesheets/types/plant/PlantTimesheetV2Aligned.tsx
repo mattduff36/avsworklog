@@ -27,7 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageLoader } from '@/components/ui/page-loader';
 import { AlertCircle, ArrowLeft, Check, Home, Save, User, Wrench, XCircle } from 'lucide-react';
 import { DAY_NAMES } from '@/types/timesheet';
-import { formatHours } from '@/lib/utils/time-calculations';
+import { formatHours, roundTimeToNearestQuarterHour } from '@/lib/utils/time-calculations';
 import { SignaturePad } from '@/components/forms/SignaturePad';
 import { Database } from '@/types/database';
 import { Employee } from '@/types/common';
@@ -81,6 +81,12 @@ const NO_MACHINE_SENTINEL = '__no_machine__';
 const HIRER_RECENT_SCOPE = 'timesheet_plant_hirer';
 const SITE_ADDRESS_RECENT_SCOPE = 'timesheet_plant_site_address';
 const JOB_NUMBER_REGEX = /^\d{4}-[A-Z]{2}$/;
+const QUARTER_HOUR_TIME_FIELDS: ReadonlySet<keyof PlantEntryDraft> = new Set([
+  'time_started',
+  'time_finished',
+  'machine_start_time',
+  'machine_finish_time',
+]);
 
 const createBlankPlantWeekEntries = (): PlantEntryDraft[] =>
   Array.from({ length: 7 }, (_, index) => createBlankEntry(index + 1));
@@ -652,12 +658,17 @@ export function PlantTimesheetV2({
     offDayMap.get(dayIndex + 1);
 
   const updateEntryField = (dayIndex: number, field: keyof PlantEntryDraft, value: string | boolean) => {
+    const normalizedValue =
+      typeof value === 'string' && QUARTER_HOUR_TIME_FIELDS.has(field)
+        ? roundTimeToNearestQuarterHour(value)
+        : value;
+
     setEntries((current) => {
       const next = [...current];
       const offDayState = getOffDayForIndex(dayIndex);
       const updated = recalculateEntry({
         ...next[dayIndex],
-        [field]: value,
+        [field]: normalizedValue,
       } as PlantEntryDraft, getRecalculateOptionsForOffDay(offDayState));
       next[dayIndex] = updated;
       return next;

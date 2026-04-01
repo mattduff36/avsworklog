@@ -1,16 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Calendar, AlertCircle, CheckCircle2, User } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { getWeekEnding, formatDateISO } from '@/lib/utils/date';
+import { getWeekEnding, formatDateISO, getWeekEndingSundayOptions } from '@/lib/utils/date';
 import { Employee } from '@/types/common';
 
 interface WeekSelectorProps {
@@ -23,6 +22,21 @@ interface WeekSelectorProps {
   onSelectedEmployeeChange?: (employeeId: string) => void;
 }
 
+interface ExistingTimesheetSummary {
+  id: string;
+  status: string;
+}
+
+function isEditableExistingStatus(status: string): boolean {
+  return status === 'draft' || status === 'rejected';
+}
+
+function formatStatusLabel(status: string): string {
+  return status
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 export function WeekSelector({
   targetUserId,
   onWeekSelected,
@@ -32,20 +46,26 @@ export function WeekSelector({
   selectedEmployeeId = '',
   onSelectedEmployeeChange,
 }: WeekSelectorProps) {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const [selectedDate, setSelectedDate] = useState(initialWeek || '');
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState('');
   const [existingTimesheet, setExistingTimesheet] = useState<{ id: string; status: string } | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [existingWeekMap, setExistingWeekMap] = useState<Record<string, ExistingTimesheetSummary>>({});
+  const weekOptions = useMemo(() => getWeekEndingSundayOptions(), []);
+  const weekEndingDates = useMemo(() => weekOptions.map((option) => option.isoDate), [weekOptions]);
 
   // Auto-suggest next Sunday as default
   useEffect(() => {
-    if (!initialWeek && !selectedDate) {
+    if (weekOptions.length === 0) return;
+
+    if (!initialWeek && (!selectedDate || !weekEndingDates.includes(selectedDate))) {
       const defaultWeek = formatDateISO(getWeekEnding());
-      setSelectedDate(defaultWeek);
+      const fallbackWeek = weekEndingDates.includes(defaultWeek) ? defaultWeek : weekOptions[0].isoDate;
+      setSelectedDate(fallbackWeek);
     }
-  }, [initialWeek, selectedDate]);
+  }, [initialWeek, selectedDate, weekEndingDates, weekOptions]);
 
   // Switching the target employee must clear stale validation state
   // from a previously checked employee/week combination.
@@ -53,7 +73,70 @@ export function WeekSelector({
     setError('');
     setExistingTimesheet(null);
     setShowSuccess(false);
+    setExistingWeekMap({});
   }, [targetUserId]);
+
+  useEffect(() => {
+    if (!targetUserId || weekEndingDates.length === 0) return;
+
+    let cancelled = false;
+
+    const loadExistingWeeks = async () => {
+      try {
+        const { data, error: queryError } = await supabase
+          .from('timesheets')
+          .select('id, week_ending, status')
+          .eq('user_id', targetUserId)
+          .in('week_ending', weekEndingDates);
+
+        if (queryError) throw queryError;
+        if (cancelled) return;
+
+        const nextWeekMap: Record<string, ExistingTimesheetSummary> = {};
+        for (const row of (data || []) as Array<{ id: string; week_ending: string; status: string }>) {
+          nextWeekMap[row.week_ending] = { id: row.id, status: row.status };
+        }
+
+        setExistingWeekMap(nextWeekMap);
+        setSelectedDate((current) => {
+          if (!current) return current;
+          const selectedWeek = nextWeekMap[current];
+          if (!selectedWeek || isEditableExistingStatus(selectedWeek.status)) return current;
+
+          const fallback = weekEndingDates.find((weekEnding) => {
+            const existing = nextWeekMap[weekEnding];
+            return !existing || isEditableExistingStatus(existing.status);
+          });
+          return fallback || current;
+        });
+      } catch (fetchError) {
+        console.error('Error preloading existing timesheet weeks:', fetchError);
+      }
+    };
+
+    void loadExistingWeeks();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, targetUserId, weekEndingDates]);
+
+  const selectedWeekSummary = selectedDate ? existingWeekMap[selectedDate] || null : null;
+  const isSelectedWeekLocked = Boolean(
+    selectedWeekSummary && !isEditableExistingStatus(selectedWeekSummary.status)
+  );
+  const weekOptionsWithStatus = useMemo(
+    () =>
+      weekOptions.map((option) => {
+        const existing = existingWeekMap[option.isoDate];
+        return {
+          ...option,
+          status: existing?.status || null,
+          disabled: Boolean(existing && !isEditableExistingStatus(existing.status)),
+        };
+      }),
+    [weekOptions, existingWeekMap]
+  );
 
   // Check if a date is a Sunday
   const isSunday = (dateString: string): boolean => {
@@ -84,6 +167,14 @@ export function WeekSelector({
 
     if (!targetUserId) {
       setError('Please select an employee first');
+      return;
+    }
+
+    if (isSelectedWeekLocked && selectedWeekSummary) {
+      setExistingTimesheet(selectedWeekSummary);
+      setError(
+        `You already have a ${selectedWeekSummary.status} timesheet for this week. You cannot create another timesheet for the same week.`
+      );
       return;
     }
 
@@ -181,17 +272,32 @@ export function WeekSelector({
 
           <div className="space-y-2">
             <Label htmlFor="week-ending" className="text-foreground text-lg">
-              Week Ending Date (Must be Sunday)
+              Week Ending Date (Sunday)
             </Label>
-            <Input
-              id="week-ending"
-              type="date"
-              value={selectedDate}
-              onChange={(e) => handleDateChange(e.target.value)}
-              className="h-16 text-3xl text-center bg-white dark:bg-slate-900 border-border text-foreground"
-            />
+            <Select value={selectedDate} onValueChange={handleDateChange}>
+              <SelectTrigger
+                id="week-ending"
+                aria-label="Week Ending Date (Sunday)"
+                className="h-16 text-2xl bg-white dark:bg-slate-900 border-border text-foreground"
+              >
+                <SelectValue placeholder="Select week ending Sunday" />
+              </SelectTrigger>
+              <SelectContent>
+                {weekOptionsWithStatus.map((option) => (
+                  <SelectItem
+                    key={option.isoDate}
+                    value={option.isoDate}
+                    disabled={option.disabled}
+                  >
+                    {option.status
+                      ? `${option.label} (${formatStatusLabel(option.status)})`
+                      : option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <p className="text-base text-muted-foreground dark:text-muted-foreground">
-              Timesheets must end on Sunday. The selected date should be the last day of your work week.
+              Choose from the last 3, current, and next 2 Sunday week-ending dates.
             </p>
           </div>
 

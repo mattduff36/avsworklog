@@ -23,6 +23,7 @@ import { BackButton } from '@/components/ui/back-button';
 import { formatDateISO, formatDate, getWeekEnding } from '@/lib/utils/date';
 import { INSPECTION_ITEMS, InspectionStatus, getChecklistForCategory } from '@/types/inspection';
 import { checkMileageSanity, formatMileage, type MileageSanityResult } from '@/lib/utils/mileageSanity';
+import { getReadingDigitGrowthWarning } from '@/lib/utils/readingDigitGrowthWarning';
 import { Database } from '@/types/database';
 import { Employee } from '@/types/common';
 import { toast } from 'sonner';
@@ -194,6 +195,7 @@ function NewInspectionContent() {
   const [baselineMileage, setBaselineMileage] = useState<number | null>(null);
   const [, setBaselineMileageSource] = useState<string>('none');
   const [mileageWarning, setMileageWarning] = useState<MileageSanityResult | null>(null);
+  const [digitGrowthWarning, setDigitGrowthWarning] = useState<string | null>(null);
   const [mileageConfirmed, setMileageConfirmed] = useState(false);
   const [showMileageWarningDialog, setShowMileageWarningDialog] = useState(false);
   
@@ -647,16 +649,31 @@ function NewInspectionContent() {
     // Reset confirmation when mileage changes
     setMileageConfirmed(false);
     setMileageWarning(null);
+    setDigitGrowthWarning(null);
     
     // Check sanity if we have a value
-    if (value && !isNaN(parseInt(value))) {
-      const mileageValue = parseInt(value);
+    if (value && !Number.isNaN(parseInt(value, 10))) {
+      const mileageValue = parseInt(value, 10);
       const sanityResult = checkMileageSanity(mileageValue, baselineMileage);
+      const digitGrowthResult = getReadingDigitGrowthWarning({
+        enteredReading: mileageValue,
+        previousReading: baselineMileage,
+        unitName: 'miles',
+      });
       
       if (sanityResult.warning) {
         setMileageWarning(sanityResult);
       } else {
         setMileageWarning(null);
+      }
+
+      if (digitGrowthResult.warning) {
+        setDigitGrowthWarning(digitGrowthResult.warning);
+      } else {
+        setDigitGrowthWarning(null);
+      }
+
+      if (!sanityResult.warning && !digitGrowthResult.warning) {
         setMileageConfirmed(true); // Auto-confirm if no warning
       }
     }
@@ -667,6 +684,8 @@ function NewInspectionContent() {
     setMileageConfirmed(true);
     setShowMileageWarningDialog(false);
   };
+
+  const activeMileageWarningMessage = digitGrowthWarning || mileageWarning?.warning || null;
 
   const getParsedMileage = (): number | null => {
     if (!currentMileage || currentMileage.trim() === '') return null;
@@ -902,7 +921,21 @@ function NewInspectionContent() {
     }
 
     // Check mileage warning confirmation
-    if (mileageWarning?.warning && !mileageConfirmed) {
+    const submitSanityResult = checkMileageSanity(mileageValue, baselineMileage);
+    const submitDigitGrowthResult = getReadingDigitGrowthWarning({
+      enteredReading: mileageValue,
+      previousReading: baselineMileage,
+      unitName: 'miles',
+    });
+    const warningMessageForSubmit =
+      submitDigitGrowthResult.warning || submitSanityResult.warning || activeMileageWarningMessage;
+    if (submitDigitGrowthResult.warning) {
+      setDigitGrowthWarning(submitDigitGrowthResult.warning);
+    }
+    if (submitSanityResult.warning) {
+      setMileageWarning(submitSanityResult);
+    }
+    if (warningMessageForSubmit && !mileageConfirmed) {
       setError('Please confirm the mileage is correct before submitting');
       setShowMileageWarningDialog(true);
       setShowConfirmSubmitDialog(false);
@@ -1661,6 +1694,7 @@ function NewInspectionContent() {
                     // Reset mileage confirmation when vehicle changes
                     setMileageConfirmed(false);
                     setMileageWarning(null);
+                    setDigitGrowthWarning(null);
                   }
                 }}
                 onOpenChange={(open) => {
@@ -1772,16 +1806,16 @@ function NewInspectionContent() {
               min="0"
               step="1"
               className={`h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground ${
-                mileageWarning?.warning && !mileageConfirmed ? 'border-amber-500' : ''
+                activeMileageWarningMessage && !mileageConfirmed ? 'border-amber-500' : ''
               }`}
               required
             />
-            {mileageWarning?.warning && !mileageConfirmed && (
+            {activeMileageWarningMessage && !mileageConfirmed && (
               <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
-                    <p className="text-sm text-amber-400">{mileageWarning.warning}</p>
+                    <p className="text-sm text-amber-400">{activeMileageWarningMessage}</p>
                     <Button
                       type="button"
                       variant="outline"
@@ -1795,7 +1829,7 @@ function NewInspectionContent() {
                 </div>
               </div>
             )}
-            {mileageWarning?.warning && mileageConfirmed && (
+            {activeMileageWarningMessage && mileageConfirmed && (
               <p className="text-xs text-green-400 flex items-center gap-1">
                 <CheckCircle2 className="h-3 w-3" />
                 Mileage confirmed
@@ -2476,13 +2510,13 @@ function NewInspectionContent() {
           <div className="py-4 space-y-4">
             <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
               <p className="text-sm text-amber-200">
-                {mileageWarning?.warning}
+                {activeMileageWarningMessage}
               </p>
             </div>
             
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">
-                <strong>Entered mileage:</strong> {currentMileage ? parseInt(currentMileage).toLocaleString() : '0'} miles
+                <strong>Entered mileage:</strong> {currentMileage ? parseInt(currentMileage, 10).toLocaleString() : '0'} miles
               </p>
               {baselineMileage !== null && (
                 <p className="text-sm text-muted-foreground">

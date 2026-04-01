@@ -110,6 +110,19 @@ describe('PlantTimesheetV2 calculations', () => {
     expect(errors).toEqual({});
   });
 
+  it('does not require machine start/finish from derived operator total alone', () => {
+    const recalculated = recalculateEntry(
+      createEntry({
+        time_started: '15:00',
+        time_finished: '04:00',
+        operator_travel_hours: '2',
+      })
+    );
+
+    const errors = buildValidationErrors([recalculated]);
+    expect(errors).toEqual({});
+  });
+
   it('marks entries complete using civils parity rules', () => {
     const leaveState = { isOnApprovedLeave: true } as unknown as Parameters<typeof isPlantEntryComplete>[1];
     expect(isPlantEntryComplete(createEntry({ time_started: '08:00', time_finished: '16:00' }))).toBe(true);

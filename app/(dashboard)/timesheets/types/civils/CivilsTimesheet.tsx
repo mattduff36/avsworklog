@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { ArrowLeft, Save, Check, AlertCircle, XCircle, Home, User, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 // Removed: getWeekEnding, formatDateISO - no longer needed (week comes from props)
-import { calculateHours, formatHours } from '@/lib/utils/time-calculations';
+import { calculateHours, formatHours, roundTimeToNearestQuarterHour } from '@/lib/utils/time-calculations';
 import { DAY_NAMES } from '@/types/timesheet';
 import { Database } from '@/types/database';
 import { SignaturePad } from '@/components/forms/SignaturePad';
@@ -675,18 +675,7 @@ export function CivilsTimesheet({
 
   // Validate and round time to nearest 15-minute interval
   const roundToQuarterHour = (timeString: string): string => {
-    if (!timeString) return timeString;
-    
-    const [hours, minutes] = timeString.split(':').map(Number);
-    const roundedMinutes = Math.round(minutes / 15) * 15;
-    
-    // Handle 60 minutes (round to next hour)
-    if (roundedMinutes === 60) {
-      const newHours = (hours + 1) % 24;
-      return `${String(newHours).padStart(2, '0')}:00`;
-    }
-    
-    return `${String(hours).padStart(2, '0')}:${String(roundedMinutes).padStart(2, '0')}`;
+    return roundTimeToNearestQuarterHour(timeString);
   };
 
   // Calculate hours when times change

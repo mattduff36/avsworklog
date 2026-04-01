@@ -40,6 +40,7 @@ import { InspectionPhotoTiles } from '@/components/inspections/InspectionPhotoTi
 import { useInspectionPhotos } from '@/lib/hooks/useInspectionPhotos';
 import { getInspectionPhotoKey } from '@/lib/inspection-photos';
 import { getRecentVehicleIds, recordRecentVehicleId, splitVehiclesByRecent } from '@/lib/utils/recentVehicles';
+import { getReadingDigitGrowthWarning } from '@/lib/utils/readingDigitGrowthWarning';
 
 // Dynamic imports for heavy components
 const PhotoUpload = dynamic(() => import('@/components/forms/PhotoUpload'), { ssr: false });
@@ -107,6 +108,9 @@ function NewPlantInspectionContent() {
   
   // Current hours state (single value, like vehicle mileage)
   const [currentHours, setCurrentHours] = useState('');
+  const [digitGrowthWarning, setDigitGrowthWarning] = useState<string | null>(null);
+  const [digitGrowthConfirmed, setDigitGrowthConfirmed] = useState(false);
+  const [showDigitGrowthWarningDialog, setShowDigitGrowthWarningDialog] = useState(false);
   // Track original current_mileage for backward compatibility with old drafts
   const [originalCurrentMileage, setOriginalCurrentMileage] = useState<number | null | undefined>(undefined);
   
@@ -250,6 +254,39 @@ function NewPlantInspectionContent() {
     if (Number.isNaN(hoursValue) || hoursValue < 0) return null;
     return hoursValue;
   }, [currentHours]);
+
+  const resolveDigitGrowthWarning = useCallback(
+    (rawHours: string, previousHours: number | null | undefined): string | null => {
+      if (!rawHours || rawHours.trim() === '') return null;
+      const hoursValue = parseInt(rawHours, 10);
+      if (Number.isNaN(hoursValue) || hoursValue < 0) return null;
+      return (
+        getReadingDigitGrowthWarning({
+          enteredReading: hoursValue,
+          previousReading: previousHours,
+          unitName: 'hours',
+        }).warning || null
+      );
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (isHiredPlant) {
+      setDigitGrowthWarning(null);
+      setDigitGrowthConfirmed(true);
+      return;
+    }
+
+    const selectedPlant = plants.find((plant) => plant.id === selectedPlantId);
+    const warningMessage = resolveDigitGrowthWarning(currentHours, selectedPlant?.current_hours ?? null);
+    setDigitGrowthWarning(warningMessage);
+    if (!warningMessage) {
+      setDigitGrowthConfirmed(true);
+      return;
+    }
+    setDigitGrowthConfirmed(false);
+  }, [currentHours, isHiredPlant, plants, resolveDigitGrowthWarning, selectedPlantId]);
 
   const mergeIntoExistingDraft = useCallback(async (
     inspectionId: string,
@@ -866,6 +903,21 @@ function NewPlantInspectionContent() {
       return;
     }
 
+    if (!isHiredPlant && hoursValue !== null) {
+      const selectedPlant = plants.find((plant) => plant.id === selectedPlantId);
+      const warningMessage = resolveDigitGrowthWarning(currentHours, selectedPlant?.current_hours ?? null);
+      if (warningMessage) {
+        setDigitGrowthWarning(warningMessage);
+        if (!digitGrowthConfirmed) {
+          setError('Please confirm the current hours reading before submitting');
+          setShowDigitGrowthWarningDialog(true);
+          setShowConfirmSubmitDialog(false);
+          scrollToTarget(document.getElementById('currentHours'));
+          return;
+        }
+      }
+    }
+
     // Validate: every checklist item must have a status selected
     const missingItems: string[] = [];
     currentChecklist.forEach((item, index) => {
@@ -1418,6 +1470,7 @@ function NewPlantInspectionContent() {
                 value={isHiredPlant ? HIRED_PLANT_SENTINEL : selectedPlantId} 
                 disabled={checklistStarted}
                 onValueChange={(value) => {
+                  setShowDigitGrowthWarningDialog(false);
                   if (value === HIRED_PLANT_SENTINEL) {
                     setIsHiredPlant(true);
                     setSelectedPlantId('');
@@ -1566,16 +1619,46 @@ function NewPlantInspectionContent() {
               id="currentHours"
               type="number"
               value={currentHours}
-              onChange={(e) => setCurrentHours(e.target.value)}
+              onChange={(e) => {
+                setCurrentHours(e.target.value);
+                setShowDigitGrowthWarningDialog(false);
+              }}
               placeholder={(() => {
                 const sel = plants.find(p => p.id === selectedPlantId);
                 return sel?.current_hours != null ? `e.g. ${sel.current_hours}` : 'e.g. 45000';
               })()}
               min="0"
               step="1"
-              className="h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground"
+              className={`h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground ${
+                digitGrowthWarning && !digitGrowthConfirmed ? 'border-amber-500' : ''
+              }`}
               required={!(existingInspectionId && originalCurrentMileage === null)}
             />
+            {digitGrowthWarning && !digitGrowthConfirmed && (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm text-amber-400">{digitGrowthWarning}</p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowDigitGrowthWarningDialog(true)}
+                      className="mt-2 border-amber-500/50 text-amber-400 hover:bg-amber-500/10"
+                    >
+                      Confirm Hours is Correct
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+            {digitGrowthWarning && digitGrowthConfirmed && (
+              <p className="text-xs text-green-400 flex items-center gap-1">
+                <CheckCircle2 className="h-3 w-3" />
+                Hours confirmed
+              </p>
+            )}
             {existingInspectionId && originalCurrentMileage === null && (
               <p className="text-xs text-muted-foreground">
                 Optional for this draft (created before current hours was required)
@@ -1979,6 +2062,43 @@ function NewPlantInspectionContent() {
             >
               <Send className="h-4 w-4 mr-2" />
               Submit Daily Check
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDigitGrowthWarningDialog} onOpenChange={setShowDigitGrowthWarningDialog}>
+        <DialogContent className="border-border text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white text-xl">Confirm Hours Entry</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Your hours reading needs confirmation before submission.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+              <p className="text-sm text-amber-200">{digitGrowthWarning}</p>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Enter only the FULL hours reading and ignore any fractional part.
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowDigitGrowthWarningDialog(false)}
+              className="border-slate-600 text-white hover:bg-slate-800"
+            >
+              Edit Hours
+            </Button>
+            <Button
+              onClick={() => {
+                setDigitGrowthConfirmed(true);
+                setShowDigitGrowthWarningDialog(false);
+              }}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              Confirm Hours is Correct
             </Button>
           </DialogFooter>
         </DialogContent>

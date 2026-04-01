@@ -86,9 +86,18 @@ export function hasPlantData(entry: PlantEntryDraft): boolean {
     entry.machine_start_time,
     entry.machine_finish_time,
     entry.machine_standing_hours,
-    entry.machine_operator_hours,
     entry.maintenance_breakdown_hours,
     entry.remarks,
+  ].some((value) => value.trim().length > 0);
+}
+
+function hasManualAdditionalPlantData(entry: PlantEntryDraft): boolean {
+  return [
+    entry.machine_travel_hours,
+    entry.machine_start_time,
+    entry.machine_finish_time,
+    entry.machine_standing_hours,
+    entry.maintenance_breakdown_hours,
   ].some((value) => value.trim().length > 0);
 }
 
@@ -133,8 +142,10 @@ export function buildValidationErrors(entries: PlantEntryDraft[]): Record<number
     const missing: string[] = [];
     if (!entry.time_started) missing.push('Operator start time');
     if (!entry.time_finished) missing.push('Operator finish time');
-    if (!entry.machine_start_time) missing.push('Machine start time');
-    if (!entry.machine_finish_time) missing.push('Machine finish time');
+    if (hasManualAdditionalPlantData(entry)) {
+      if (!entry.machine_start_time) missing.push('Machine start time');
+      if (!entry.machine_finish_time) missing.push('Machine finish time');
+    }
 
     if (missing.length > 0) {
       next[index] = `${DAY_NAMES[index]}: ${missing.join(', ')} required when row has plant data.`;
