@@ -16,8 +16,10 @@ if (!connectionString) {
   process.exit(1);
 }
 
+const resolvedConnectionString = connectionString;
+
 async function runMigration() {
-  const url = new URL(connectionString);
+  const url = new URL(resolvedConnectionString);
   const client = new Client({
     host: url.hostname,
     port: parseInt(url.port, 10) || 5432,
