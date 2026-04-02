@@ -11,6 +11,7 @@ const connectionString = process.env.POSTGRES_URL_NON_POOLING || process.env.POS
 const migrationFiles = [
   'supabase/migrations/20260401_workshop_attachments_schema_v2.sql',
   'supabase/migrations/20260401_seed_hgv_6_week_template_v2.sql',
+  'supabase/migrations/20260402_publish_hgv_6_week_template_full_v2.sql',
 ];
 
 if (!connectionString) {
