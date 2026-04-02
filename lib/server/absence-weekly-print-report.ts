@@ -189,7 +189,7 @@ async function fetchAbsenceRows(
       ${reasonJoin},
       ${employeeJoin}
     `)
-    .neq('status', 'cancelled')
+    .in('status', ['approved', 'processed'])
     // Push overlap lower-bound filtering to SQL to avoid pulling old historical rows.
     .or(`date.gte.${dateFrom},end_date.gte.${dateFrom}`)
     .lte('date', dateTo)
