@@ -673,7 +673,7 @@ export default function ViewInspectionPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {(isManager || isAdmin || isSuperAdmin) && (
+            {canViewAllInspections && (
               <Button 
                 variant="outline" 
                 size="sm"
