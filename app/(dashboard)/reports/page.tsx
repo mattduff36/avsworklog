@@ -121,6 +121,7 @@ const ABSENCE_REPORTS: ReportCardConfig[] = [
     buttonClassName: 'bg-absence hover:bg-absence-dark text-white',
   },
 ];
+const ABSENCE_WEEKLY_PRINT_PDF_ENDPOINT = '/api/reports/absence-leave/weekly-print-pdf';
 
 const DEFAULT_USER_SUGGESTIONS: Array<Pick<UserSuggestedReport, 'title' | 'description'>> = [
   {
@@ -794,6 +795,40 @@ export default function ReportsPage() {
                     onDownload={downloadReport}
                   />
                 ))}
+
+                <Card className="border-border transition-colors hover:border-avs-yellow/40">
+                  <CardContent className="flex flex-col gap-4 p-6 md:flex-row md:items-start md:justify-between">
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-semibold text-foreground">Absence Weekly Print Sheet</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Weekly printable day-by-day report with national holiday flags and employees off with reasons.
+                      </p>
+                      <p className="text-xs font-medium text-foreground">
+                        Uses selected date range and auto-splits into weekly pages.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col gap-2 md:ml-4 md:items-end">
+                      <Button
+                        onClick={() =>
+                          downloadReport(
+                            ABSENCE_WEEKLY_PRINT_PDF_ENDPOINT,
+                            `Absence_Weekly_Print_${dateFrom}_to_${dateTo}.pdf`
+                          )
+                        }
+                        disabled={downloadingEndpoint === ABSENCE_WEEKLY_PRINT_PDF_ENDPOINT}
+                        className="bg-absence hover:bg-absence-dark text-white"
+                      >
+                        {downloadingEndpoint === ABSENCE_WEEKLY_PRINT_PDF_ENDPOINT ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Download className="mr-2 h-4 w-4" />
+                        )}
+                        Download
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             )}
 

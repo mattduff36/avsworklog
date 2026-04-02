@@ -7,6 +7,7 @@
  * - /api/reports/inspections/bulk-pdf
  * - /api/reports/absence-leave/bookings
  * - /api/reports/absence-leave/allowance-totals
+ * - /api/reports/absence-leave/weekly-print-pdf
  * - /api/reports/stats
  *
  * Auth enforcement and no 500 errors.
@@ -45,6 +46,11 @@ describe('Reports Inspections — Auth Guards', () => {
     expect([401, 403]).toContain(res.status);
   });
 
+  it('GET /api/reports/absence-leave/weekly-print-pdf returns 401 without auth', async () => {
+    const res = await fetch(`${BASE_URL}/api/reports/absence-leave/weekly-print-pdf?dateFrom=2026-01-01&dateTo=2026-01-31`);
+    expect([401, 403]).toContain(res.status);
+  });
+
   it('GET /api/reports/suggestions returns 401 without auth', async () => {
     const res = await fetch(`${BASE_URL}/api/reports/suggestions`);
     expect([401, 403]).toContain(res.status);
@@ -62,6 +68,7 @@ describe('Reports Inspections — No 500 Errors', () => {
     { method: 'GET', path: '/api/reports/inspections/defects' },
     { method: 'GET', path: '/api/reports/absence-leave/bookings?dateFrom=2026-01-01&dateTo=2026-01-31' },
     { method: 'GET', path: '/api/reports/absence-leave/allowance-totals?dateFrom=2026-01-01&dateTo=2026-01-31' },
+    { method: 'GET', path: '/api/reports/absence-leave/weekly-print-pdf?dateFrom=2026-01-01&dateTo=2026-01-31' },
     { method: 'GET', path: '/api/reports/suggestions' },
     { method: 'GET', path: '/api/reports/stats' },
   ];
