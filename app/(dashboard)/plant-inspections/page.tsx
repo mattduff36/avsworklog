@@ -83,9 +83,10 @@ interface WorkshopTaskSummaryRow {
 }
 
 function PlantInspectionsContent() {
-  const { user, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
-  const isElevatedUser = isManager || isAdmin || isSuperAdmin;
-  const pageSize = isElevatedUser ? 20 : 10;
+  const { user, isManager, isAdmin, isSuperAdmin, isSupervisor, loading: authLoading } = useAuth();
+  const canViewAllInspections = isManager || isAdmin || isSuperAdmin || isSupervisor;
+  const canManageInspections = isManager || isAdmin || isSuperAdmin;
+  const pageSize = canViewAllInspections ? 20 : 10;
   usePermissionCheck('plant-inspections');
   const router = useRouter();
   const { tabletModeEnabled } = useTabletMode();
@@ -161,11 +162,11 @@ function PlantInspectionsContent() {
       }
     };
 
-    if (user && isElevatedUser) {
+    if (user && canViewAllInspections) {
       fetchEmployees();
     }
     fetchPlants();
-  }, [user, isElevatedUser, supabase]);
+  }, [user, canViewAllInspections, supabase]);
 
   const fetchInspections = useCallback(async () => {
     if (!user || authLoading) return;
@@ -190,7 +191,7 @@ function PlantInspectionsContent() {
         .order('inspection_date', { ascending: false });
 
       // Filter based on user role and selection
-      if (!isElevatedUser) {
+      if (!canViewAllInspections) {
         query = query.eq('user_id', user.id);
       } else {
         const employeeFilter = selectedEmployeeId || 'all';
@@ -289,7 +290,7 @@ function PlantInspectionsContent() {
     } finally {
       setLoading(false);
     }
-  }, [user, authLoading, isElevatedUser, selectedEmployeeId, plantFilter, supabase]);
+  }, [user, authLoading, canViewAllInspections, selectedEmployeeId, plantFilter, supabase]);
 
   useEffect(() => {
     setDisplayCount(pageSize);
@@ -467,7 +468,7 @@ function PlantInspectionsContent() {
         </div>
         
         {/* Manager: Employee Filter */}
-        {isElevatedUser && employees.length > 0 && (
+        {canViewAllInspections && employees.length > 0 && (
           <div className="pt-4 border-t border-border">
             <div className={`flex items-center gap-3 ${tabletModeEnabled ? 'max-w-none flex-wrap' : 'max-w-md'}`}>
               <Label htmlFor="employee-filter" className="text-white text-sm flex items-center gap-2 whitespace-nowrap">
@@ -495,7 +496,7 @@ function PlantInspectionsContent() {
       </div>
 
       {/* Filters - Only show for managers */}
-      {isElevatedUser && (
+      {canViewAllInspections && (
         <Card className="border-border">
           <CardContent className="pt-6">
             <div className={`grid grid-cols-1 gap-6 ${tabletModeEnabled ? 'md:grid-cols-1' : 'md:grid-cols-2'}`}>
@@ -576,7 +577,7 @@ function PlantInspectionsContent() {
               Refreshing plant checks...
             </div>
           )}
-          {isElevatedUser && (
+          {canViewAllInspections && (
             <div className="hidden md:flex items-center justify-end gap-2">
               {viewMode === 'table' && (
                 <DropdownMenu>
@@ -645,21 +646,21 @@ function PlantInspectionsContent() {
             </div>
           )}
 
-          {isElevatedUser && viewMode === 'table' && (
+          {canViewAllInspections && viewMode === 'table' && (
             <div className="hidden md:block">
               <PlantInspectionsListTable
                 inspections={inspections.slice(0, displayCount)}
                 columnVisibility={columnVisibility}
                 downloadingId={downloading}
                 deleting={deleting}
-                showDeleteActions={isElevatedUser}
+                showDeleteActions={canManageInspections}
                 onDownloadPDF={handleDownloadPDF}
                 onOpenDeleteDialog={openDeleteDialog}
               />
             </div>
           )}
 
-          <div className={isElevatedUser && viewMode === 'table' ? 'md:hidden grid gap-4' : 'grid gap-4'}>
+          <div className={canViewAllInspections && viewMode === 'table' ? 'md:hidden grid gap-4' : 'grid gap-4'}>
             {inspections.slice(0, displayCount).map((inspection) => {
               const inspectionStatus = inspection.status as string;
               return (
@@ -691,7 +692,7 @@ function PlantInspectionsContent() {
                         )}
                       </CardTitle>
                       <CardDescription className="text-muted-foreground">
-                        {isElevatedUser && (inspection as { profile?: { full_name?: string } | null }).profile?.full_name && (
+                        {canViewAllInspections && (inspection as { profile?: { full_name?: string } | null }).profile?.full_name && (
                           <span className="font-medium text-white">
                             {(inspection as { profile?: { full_name?: string } | null }).profile?.full_name}
                             {' • '}
@@ -716,7 +717,7 @@ function PlantInspectionsContent() {
                   </div>
                   <div className="flex items-center gap-2">
                     {getStatusBadge(inspection.status)}
-                    {isElevatedUser && (
+                    {canManageInspections && (
                       <Button
                         onClick={(e) => openDeleteDialog(e, inspection)}
                         variant="ghost"

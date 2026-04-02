@@ -80,13 +80,14 @@ export async function GET(
       return NextResponse.json({ error: 'Inspection items not found' }, { status: 404 });
     }
 
-    // Check authorization - user must be owner, manager, or admin
+    // Check authorization - user must be owner, manager/admin, or supervisor
     const profile = await getProfileWithRole(user.id);
 
     const isOwner = (inspection as { user_id?: string | null }).user_id === user.id;
     const isManager = profile?.role?.is_manager_admin || false;
+    const isSupervisor = (profile?.role?.name || '').trim().toLowerCase() === 'supervisor';
 
-    if (!isOwner && !isManager) {
+    if (!isOwner && !isManager && !isSupervisor) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 

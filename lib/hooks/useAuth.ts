@@ -452,6 +452,7 @@ export function useAuth() {
     // These flags reflect the EFFECTIVE role (overridden when viewing-as)
     isAdmin: roleForFlags?.role_class === 'admin' || roleForFlags?.name === 'admin',
     isManager: roleForFlags?.role_class === 'manager' || false,
+    isSupervisor: (roleForFlags?.name || '').trim().toLowerCase() === 'supervisor',
     isEmployee: roleForFlags?.role_class === 'employee' || false,
     isSuperAdmin: isViewingAs ? (roleForFlags?.is_super_admin || false) : isActualSuperAdmin,
     // Always reflects the real user, unaffected by view-as

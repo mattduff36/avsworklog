@@ -90,4 +90,26 @@ describe('module guard alignment checks', () => {
     expect(source).toContain('handleSuperAdminBypass');
     expect(source).toContain('Bypass');
   });
+
+  it('treats supervisor as inspection viewer on list pages', () => {
+    const vanSource = readSource('app/(dashboard)/van-inspections/page.tsx');
+    const plantSource = readSource('app/(dashboard)/plant-inspections/page.tsx');
+    const hgvSource = readSource('app/(dashboard)/hgv-inspections/page.tsx');
+
+    [vanSource, plantSource, hgvSource].forEach((source) => {
+      expect(source).toContain('isSupervisor');
+      expect(source).toContain('canViewAllInspections');
+      expect(source).toContain('canManageInspections = isManager || isAdmin || isSuperAdmin');
+    });
+  });
+
+  it('keeps supervisor read-only on inspection list actions', () => {
+    const vanSource = readSource('app/(dashboard)/van-inspections/page.tsx');
+    const plantSource = readSource('app/(dashboard)/plant-inspections/page.tsx');
+    const hgvSource = readSource('app/(dashboard)/hgv-inspections/page.tsx');
+
+    [vanSource, plantSource, hgvSource].forEach((source) => {
+      expect(source).toContain('showDeleteActions={canManageInspections}');
+    });
+  });
 });

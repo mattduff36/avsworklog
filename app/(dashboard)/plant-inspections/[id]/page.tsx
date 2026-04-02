@@ -59,7 +59,8 @@ interface InspectionItemWithDay extends InspectionItem {
 export default function ViewPlantInspectionPage() {
   const router = useRouter();
   const params = useParams();
-  const { user, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
+  const { user, isManager, isAdmin, isSuperAdmin, isSupervisor, loading: authLoading } = useAuth();
+  const canViewAllInspections = isManager || isAdmin || isSuperAdmin || isSupervisor;
   const supabase = createClient();
   
   const [inspection, setInspection] = useState<PlantInspectionWithDetails | null>(null);
@@ -101,7 +102,7 @@ export default function ViewPlantInspectionPage() {
 
       if (inspectionError) throw inspectionError;
       
-      if (!isManager && !isAdmin && !isSuperAdmin && inspectionData && inspectionData.user_id !== user?.id) {
+      if (!canViewAllInspections && inspectionData && inspectionData.user_id !== user?.id) {
         setError('You do not have permission to view this inspection');
         setLoading(false);
         return;
@@ -154,7 +155,7 @@ export default function ViewPlantInspectionPage() {
     } finally {
       setLoading(false);
     }
-  }, [supabase, isManager, isAdmin, isSuperAdmin, user]);
+  }, [supabase, canViewAllInspections, user]);
 
   useEffect(() => {
     if (params.id && !authLoading) {

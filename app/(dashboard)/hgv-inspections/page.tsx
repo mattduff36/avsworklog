@@ -64,9 +64,10 @@ interface WorkshopTaskSummaryRow {
 }
 
 function HgvInspectionsContent() {
-  const { user, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
-  const isElevatedUser = isManager || isAdmin || isSuperAdmin;
-  const pageSize = isElevatedUser ? 20 : 10;
+  const { user, isManager, isAdmin, isSuperAdmin, isSupervisor, loading: authLoading } = useAuth();
+  const canViewAllInspections = isManager || isAdmin || isSuperAdmin || isSupervisor;
+  const canManageInspections = isManager || isAdmin || isSuperAdmin;
+  const pageSize = canViewAllInspections ? 20 : 10;
   usePermissionCheck('hgv-inspections');
   const router = useRouter();
   const { tabletModeEnabled } = useTabletMode();
@@ -106,7 +107,7 @@ function HgvInspectionsContent() {
       .order('reg_number');
     setHgvs(hgvData || []);
 
-    if (isElevatedUser) {
+    if (canViewAllInspections) {
       const profileData = await fetchUserDirectory({ module: 'hgv-inspections' });
       setEmployees(
         profileData.map((employee) => ({
@@ -117,7 +118,7 @@ function HgvInspectionsContent() {
         })) as Employee[]
       );
     }
-  }, [isElevatedUser, supabase]);
+  }, [canViewAllInspections, supabase]);
 
   const fetchInspections = useCallback(async () => {
     if (!user || authLoading) return;
@@ -134,7 +135,7 @@ function HgvInspectionsContent() {
         .eq('status', 'submitted')
         .order('inspection_date', { ascending: false });
 
-      if (!isElevatedUser) {
+      if (!canViewAllInspections) {
         query = query.eq('user_id', user.id);
       } else if ((selectedEmployeeId || 'all') !== 'all') {
         query = query.eq('user_id', selectedEmployeeId as string);
@@ -199,7 +200,7 @@ function HgvInspectionsContent() {
     } finally {
       setLoading(false);
     }
-  }, [authLoading, hgvFilter, isElevatedUser, selectedEmployeeId, supabase, user]);
+  }, [authLoading, hgvFilter, canViewAllInspections, selectedEmployeeId, supabase, user]);
 
   useEffect(() => {
     setDisplayCount(pageSize);
@@ -309,7 +310,7 @@ function HgvInspectionsContent() {
           </Link>
         </div>
 
-        {isElevatedUser && employees.length > 0 && (
+        {canViewAllInspections && employees.length > 0 && (
           <div className="pt-4 border-t border-border">
             <div className={`flex items-center gap-3 ${tabletModeEnabled ? 'max-w-none flex-wrap' : 'max-w-md'}`}>
             <Label className="text-white text-sm flex items-center gap-2 whitespace-nowrap">
@@ -336,7 +337,7 @@ function HgvInspectionsContent() {
         )}
       </div>
 
-      {isElevatedUser && (
+      {canViewAllInspections && (
         <Card className="border-border">
           <CardContent className="pt-6">
             <div className={`flex items-center gap-3 ${tabletModeEnabled ? 'flex-wrap' : ''}`}>
@@ -391,7 +392,7 @@ function HgvInspectionsContent() {
             </div>
           )}
 
-          {isElevatedUser && (
+          {canViewAllInspections && (
             <div className="hidden md:flex items-center justify-end gap-2">
               {viewMode === 'table' && (
                 <DropdownMenu>
@@ -460,21 +461,21 @@ function HgvInspectionsContent() {
             </div>
           )}
 
-          {isElevatedUser && viewMode === 'table' && (
+          {canViewAllInspections && viewMode === 'table' && (
             <div className="hidden md:block">
               <HgvInspectionsListTable
                 inspections={inspections.slice(0, displayCount)}
                 columnVisibility={columnVisibility}
                 downloadingId={downloading}
                 deletingId={deleting}
-                showDeleteActions={isElevatedUser}
+                showDeleteActions={canManageInspections}
                 onDownloadPDF={handleDownloadPDF}
                 onDeleteInspection={handleDelete}
               />
             </div>
           )}
 
-          <div className={isElevatedUser && viewMode === 'table' ? 'md:hidden grid gap-4' : 'grid gap-4'}>
+          <div className={canViewAllInspections && viewMode === 'table' ? 'md:hidden grid gap-4' : 'grid gap-4'}>
             {inspections.slice(0, displayCount).map((inspection) => (
             <Card
               key={inspection.id}
@@ -491,14 +492,14 @@ function HgvInspectionsContent() {
                         {inspection.hgv?.nickname ? ` - ${inspection.hgv.nickname}` : ''}
                       </CardTitle>
                       <CardDescription className="text-muted-foreground">
-                        {isElevatedUser && inspection.profile?.full_name ? `${inspection.profile.full_name} • ` : ''}
+                        {canViewAllInspections && inspection.profile?.full_name ? `${inspection.profile.full_name} • ` : ''}
                         {formatDate(inspection.inspection_date)}
                       </CardDescription>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge className="border-inspection/40 bg-inspection/10 text-inspection">Submitted</Badge>
-                    {isElevatedUser && (
+                    {canManageInspections && (
                       <Button
                         variant="ghost"
                         size="sm"

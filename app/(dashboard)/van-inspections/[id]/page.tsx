@@ -36,7 +36,8 @@ interface InspectionItemWithDay extends InspectionItem {
 export default function ViewInspectionPage() {
   const router = useRouter();
   const params = useParams();
-  const { user, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
+  const { user, isManager, isAdmin, isSuperAdmin, isSupervisor, loading: authLoading } = useAuth();
+  const canViewAllInspections = isManager || isAdmin || isSuperAdmin || isSupervisor;
   const supabase = createClient();
   
   const [inspection, setInspection] = useState<InspectionWithDetails | null>(null);
@@ -71,7 +72,7 @@ export default function ViewInspectionPage() {
       if (inspectionError) throw inspectionError;
       
       // Check if user has access
-      if (!isManager && !isAdmin && !isSuperAdmin && inspectionData && inspectionData.user_id !== user?.id) {
+      if (!canViewAllInspections && inspectionData && inspectionData.user_id !== user?.id) {
         setError('You do not have permission to view this inspection');
         setLoading(false);
         return;
@@ -95,8 +96,17 @@ export default function ViewInspectionPage() {
       const defectItems = typedItems.filter((item: InspectionItemWithDay) => item.status === 'attention');
       setOriginalDefectItems(defectItems);
       
-      // Enable editing only for draft inspections
-      if (inspectionData && inspectionData.status === 'draft') {
+      // Drafts are editable by owners and manager/admin roles.
+      if (
+        inspectionData &&
+        inspectionData.status === 'draft' &&
+        (
+          inspectionData.user_id === user?.id ||
+          isManager ||
+          isAdmin ||
+          isSuperAdmin
+        )
+      ) {
         setEditing(true);
       }
     } catch (err) {
@@ -108,7 +118,7 @@ export default function ViewInspectionPage() {
     } finally {
       setLoading(false);
     }
-  }, [supabase, isManager, isAdmin, isSuperAdmin, user?.id]);
+  }, [supabase, canViewAllInspections, user?.id, isManager, isAdmin, isSuperAdmin]);
 
   useEffect(() => {
     if (params.id && !authLoading) {

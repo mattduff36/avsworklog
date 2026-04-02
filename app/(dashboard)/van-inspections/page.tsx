@@ -78,9 +78,10 @@ interface WorkshopTaskSummaryRow {
 }
 
 function InspectionsContent() {
-  const { user, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
-  const isElevatedUser = isManager || isAdmin || isSuperAdmin;
-  const pageSize = isElevatedUser ? 20 : 10;
+  const { user, isManager, isAdmin, isSuperAdmin, isSupervisor, loading: authLoading } = useAuth();
+  const canViewAllInspections = isManager || isAdmin || isSuperAdmin || isSupervisor;
+  const canManageInspections = isManager || isAdmin || isSuperAdmin;
+  const pageSize = canViewAllInspections ? 20 : 10;
   usePermissionCheck('inspections');
   const router = useRouter();
   const { tabletModeEnabled } = useTabletMode();
@@ -121,7 +122,7 @@ function InspectionsContent() {
 
   // Fetch employees and vehicles
   useEffect(() => {
-    if (user && isElevatedUser) {
+    if (user && canViewAllInspections) {
       const fetchEmployees = async () => {
         try {
           const data = await fetchUserDirectory({ module: 'inspections', limit: 200 });
@@ -176,7 +177,7 @@ function InspectionsContent() {
     if (user?.id) {
       setRecentVehicleIds(getRecentVehicleIds(user.id));
     }
-  }, [user, isElevatedUser, supabase]);
+  }, [user, canViewAllInspections, supabase]);
 
   const fetchInspections = useCallback(async () => {
     if (!user || authLoading) return;
@@ -199,7 +200,7 @@ function InspectionsContent() {
         .range(0, displayCount);
 
       // Filter based on user role and selection
-      if (!isElevatedUser) {
+      if (!canViewAllInspections) {
         // Regular employees only see their own
         query = query.eq('user_id', user.id);
       } else {
@@ -308,7 +309,7 @@ function InspectionsContent() {
     } finally {
       setLoading(false);
     }
-  }, [user, authLoading, isElevatedUser, selectedEmployeeId, statusFilter, vehicleFilter, supabase, displayCount]);
+  }, [user, authLoading, canViewAllInspections, selectedEmployeeId, statusFilter, vehicleFilter, supabase, displayCount]);
 
   useEffect(() => {
     setDisplayCount(pageSize);
@@ -523,7 +524,7 @@ function InspectionsContent() {
         </div>
         
         {/* Manager: Employee Filter */}
-        {isElevatedUser && employees.length > 0 && (
+        {canViewAllInspections && employees.length > 0 && (
           <div className="pt-4 border-t border-border">
             <div className={`flex items-center gap-3 ${tabletModeEnabled ? 'max-w-none flex-wrap' : 'max-w-md'}`}>
               <Label htmlFor="employee-filter" className="text-white text-sm flex items-center gap-2 whitespace-nowrap">
@@ -551,7 +552,7 @@ function InspectionsContent() {
       </div>
 
       {/* Filters - Only show for managers */}
-      {isElevatedUser && (
+      {canViewAllInspections && (
         <Card className="border-border">
           <CardContent className="pt-6">
             <div className={`grid grid-cols-1 gap-6 ${tabletModeEnabled ? 'md:grid-cols-1' : 'md:grid-cols-2'}`}>
@@ -663,7 +664,7 @@ function InspectionsContent() {
             </div>
           )}
 
-          {isElevatedUser && (
+          {canViewAllInspections && (
             <div className="hidden md:flex items-center justify-end gap-2">
               {viewMode === 'table' && (
                 <DropdownMenu>
@@ -732,21 +733,21 @@ function InspectionsContent() {
             </div>
           )}
 
-          {isElevatedUser && viewMode === 'table' && (
+          {canViewAllInspections && viewMode === 'table' && (
             <div className="hidden md:block">
               <VanInspectionsListTable
                 inspections={inspections}
                 columnVisibility={columnVisibility}
                 downloadingId={downloading}
                 deleting={deleting}
-                showDeleteActions={isElevatedUser}
+                showDeleteActions={canManageInspections}
                 onDownloadPDF={handleDownloadPDF}
                 onOpenDeleteDialog={openDeleteDialog}
               />
             </div>
           )}
 
-          <div className={isElevatedUser && viewMode === 'table' ? 'md:hidden grid gap-4' : 'grid gap-4'}>
+          <div className={canViewAllInspections && viewMode === 'table' ? 'md:hidden grid gap-4' : 'grid gap-4'}>
             {inspections.map((inspection) => {
               const inspectionStatus = inspection.status as string;
               return (
@@ -771,7 +772,7 @@ function InspectionsContent() {
                         {inspection.vans?.reg_number || 'Unknown Van'}
                       </CardTitle>
                       <CardDescription className="text-muted-foreground">
-                        {isElevatedUser && (inspection as { profile?: { full_name?: string } | null }).profile?.full_name && (
+                        {canViewAllInspections && (inspection as { profile?: { full_name?: string } | null }).profile?.full_name && (
                           <span className="font-medium text-white">
                             {(inspection as { profile?: { full_name?: string } | null }).profile?.full_name}
                             {' • '}
@@ -787,7 +788,7 @@ function InspectionsContent() {
                   </div>
                   <div className="flex items-center gap-2">
                     {getStatusBadge(inspection.status)}
-                    {isElevatedUser && (
+                    {canManageInspections && (
                       <Button
                         onClick={(e) => openDeleteDialog(e, inspection)}
                         variant="ghost"

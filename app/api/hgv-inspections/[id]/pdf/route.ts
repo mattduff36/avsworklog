@@ -68,8 +68,9 @@ export async function GET(
     const profile = await getProfileWithRole(user.id);
     const isOwner = inspection.user_id === user.id;
     const isManager = profile?.role?.is_manager_admin || false;
+    const isSupervisor = (profile?.role?.name || '').trim().toLowerCase() === 'supervisor';
 
-    if (!isOwner && !isManager) {
+    if (!isOwner && !isManager && !isSupervisor) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
