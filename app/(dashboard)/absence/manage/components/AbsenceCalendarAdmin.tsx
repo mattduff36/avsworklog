@@ -1066,7 +1066,7 @@ export function AbsenceCalendarAdmin() {
       </Card>
 
       <Dialog open={showDayModal} onOpenChange={setShowDayModal}>
-        <DialogContent className="border-border max-w-3xl">
+        <DialogContent className="border-border max-w-6xl">
           <DialogHeader>
             <DialogTitle className="text-foreground">
               {selectedDate && format(selectedDate, 'EEEE, MMMM d, yyyy')}
@@ -1076,7 +1076,7 @@ export function AbsenceCalendarAdmin() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="rounded-lg border border-[hsl(var(--absence-primary)/0.25)] bg-[hsl(var(--absence-primary)/0.06)] p-4 space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+          <div className="rounded-lg border border-[hsl(var(--absence-primary)/0.25)] bg-[hsl(var(--absence-primary)/0.06)] p-3 md:p-4 space-y-3 max-h-[70vh] overflow-y-auto pr-1">
             {selectedDate && (() => {
               const dayAbsences = calendarEvents
                 .filter((event) => selectedDate >= event.start && selectedDate <= event.end)
@@ -1094,15 +1094,15 @@ export function AbsenceCalendarAdmin() {
               return (
                 <div className="space-y-3">
                   <h4 className="text-sm font-semibold text-foreground">Absences on this day:</h4>
-                  {dayAbsences.map((event) => (
-                    <div
-                      key={event.id}
-                      className="p-3 rounded bg-slate-800/50 border border-border"
-                      style={{ borderLeftWidth: '3px', borderLeftColor: event.reasonColor }}
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="min-w-0 flex-1">
-                          <div className="font-medium text-foreground flex items-center gap-2">
+                  <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-3">
+                    {dayAbsences.map((event) => (
+                      <div
+                        key={event.id}
+                        className="rounded bg-slate-800/50 border border-border p-2.5"
+                        style={{ borderLeftWidth: '3px', borderLeftColor: event.reasonColor }}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="font-medium text-foreground flex items-center gap-2 text-sm leading-tight">
                             <span className="h-2.5 w-2.5 rounded-full flex-shrink-0 ring-1 ring-white/10" style={{ backgroundColor: event.reasonColor }} />
                             {event.reasonName}
                             {event.isBankHoliday && (
@@ -1111,38 +1111,6 @@ export function AbsenceCalendarAdmin() {
                               </Badge>
                             )}
                           </div>
-                          <p className="text-sm text-muted-foreground">
-                            {event.employeeName}
-                            {event.employeeId ? ` (${event.employeeId})` : ''}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Date: {event.endDate && event.date !== event.endDate ? `${event.date} - ${event.endDate}` : event.date}
-                            {event.isHalfDay && ` (${event.halfDaySession})`}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Status: <span className="capitalize">{event.status}</span>
-                          </p>
-
-                          {detailVisibility.requestedDate && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Requested: {formatShortDate(event.createdAt)}
-                            </p>
-                          )}
-                          {detailVisibility.approvedDate && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Approved: {formatShortDate(event.approvedAt)}
-                            </p>
-                          )}
-                          {detailVisibility.remainingAllowance && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Remaining allowance:{' '}
-                              <RemainingAllowanceBadge days={remainingAllowanceByProfile.get(event.profileId) ?? null} />
-                            </p>
-                          )}
-
-                          {event.notes && <p className="text-xs text-muted-foreground mt-1">{event.notes}</p>}
-                        </div>
-                        <div className="flex min-h-[132px] w-24 flex-col items-end justify-between">
                           <Badge
                             variant="outline"
                             className={
@@ -1159,49 +1127,76 @@ export function AbsenceCalendarAdmin() {
                           >
                             {event.status}
                           </Badge>
-                          <div className="flex w-full flex-col items-stretch gap-2">
-                            {(() => {
-                              const target = (absences || []).find((absence) => absence.id === event.id) || null;
-                              const nextEditMode = target ? getAbsenceEditMode(target) : null;
-                              const canEditTarget = Boolean(nextEditMode && !isSelectedFinancialYearClosed);
+                        </div>
+                        <div className="mt-1.5 space-y-1">
+                          <p className="text-xs text-muted-foreground">
+                            {event.employeeName}
+                            {event.employeeId ? ` (${event.employeeId})` : ''}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Date: {event.endDate && event.date !== event.endDate ? `${event.date} - ${event.endDate}` : event.date}
+                            {event.isHalfDay && ` (${event.halfDaySession})`}
+                          </p>
+                          {detailVisibility.requestedDate && (
+                            <p className="text-xs text-muted-foreground">
+                              Requested: {formatShortDate(event.createdAt)}
+                            </p>
+                          )}
+                          {detailVisibility.approvedDate && (
+                            <p className="text-xs text-muted-foreground">
+                              Approved: {formatShortDate(event.approvedAt)}
+                            </p>
+                          )}
+                          {detailVisibility.remainingAllowance && (
+                            <p className="text-xs text-muted-foreground">
+                              Remaining allowance:{' '}
+                              <RemainingAllowanceBadge days={remainingAllowanceByProfile.get(event.profileId) ?? null} />
+                            </p>
+                          )}
+                          {event.notes && <p className="text-xs text-muted-foreground leading-snug">{event.notes}</p>}
+                        </div>
+                        <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
+                          {(() => {
+                            const target = (absences || []).find((absence) => absence.id === event.id) || null;
+                            const nextEditMode = target ? getAbsenceEditMode(target) : null;
+                            const canEditTarget = Boolean(nextEditMode && !isSelectedFinancialYearClosed);
 
-                              return (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (target && canEditTarget && nextEditMode) {
-                                      setEditMode(nextEditMode);
-                                      setEditTarget(target);
-                                    }
-                                  }}
-                                  disabled={!canEditTarget}
-                                  className="w-full border-absence/30 text-absence hover:bg-absence/10 hover:text-absence h-7 px-2 text-xs"
-                                >
-                                  <Pencil className="h-3 w-3 mr-1" />
-                                  Edit
-                                </Button>
-                              );
-                            })()}
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDeleteTargetId(event.id);
-                              }}
+                            return (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (target && canEditTarget && nextEditMode) {
+                                    setEditMode(nextEditMode);
+                                    setEditTarget(target);
+                                  }
+                                }}
+                                disabled={!canEditTarget}
+                                className="border-absence/30 text-absence hover:bg-absence/10 hover:text-absence h-7 px-2 text-xs"
+                              >
+                                <Pencil className="h-3 w-3 mr-1" />
+                                Edit
+                              </Button>
+                            );
+                          })()}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteTargetId(event.id);
+                            }}
                             disabled={isSelectedFinancialYearClosed}
-                              className="w-full border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300 h-7 px-2 text-xs"
-                            >
-                              <Trash2 className="h-3 w-3 mr-1" />
-                              Delete
-                            </Button>
-                          </div>
+                            className="border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300 h-7 px-2 text-xs"
+                          >
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Delete
+                          </Button>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               );
             })()}

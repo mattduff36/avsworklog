@@ -1380,7 +1380,7 @@ export default function AbsencePage() {
       
       {/* Day Click Modal */}
       <Dialog open={showDayModal} onOpenChange={setShowDayModal}>
-        <DialogContent className="border-border max-w-3xl">
+        <DialogContent className="border-border max-w-6xl">
           <DialogHeader>
             <DialogTitle className="text-foreground">
               {selectedDate && format(selectedDate, 'EEEE, MMMM d, yyyy')}
@@ -1390,7 +1390,7 @@ export default function AbsencePage() {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4">
+          <div className="max-h-[70vh] overflow-y-auto pr-1">
             {selectedDate && (() => {
               const dayAbsences = (isManager || isAdmin ? calendarAbsences : userAbsences || []).filter(a => {
                 const absenceStart = parseIsoDateAsLocalMidnight(a.date);
@@ -1402,49 +1402,55 @@ export default function AbsencePage() {
                 return (
                   <div className="space-y-3">
                     <h4 className="text-sm font-semibold text-foreground">Absences on this day:</h4>
-                    {dayAbsences.map(absence => {
-                      const reasonColor = getReasonColor(absence.absence_reasons.name, absence.absence_reasons.color);
-                      return (
-                      <div key={absence.id} className="p-3 rounded bg-slate-800/50 border border-border" style={{ borderLeftWidth: '3px', borderLeftColor: reasonColor }}>
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <p className="font-medium text-foreground flex items-center gap-2">
-                              <span className="h-2.5 w-2.5 rounded-full flex-shrink-0 ring-1 ring-white/10" style={{ backgroundColor: reasonColor }} />
-                              {absence.absence_reasons.name}
+                    <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-3">
+                      {dayAbsences.map(absence => {
+                        const reasonColor = getReasonColor(absence.absence_reasons.name, absence.absence_reasons.color);
+                        return (
+                          <div
+                            key={absence.id}
+                            className="rounded bg-slate-800/50 border border-border p-2.5"
+                            style={{ borderLeftWidth: '3px', borderLeftColor: reasonColor }}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="font-medium text-foreground flex items-center gap-2 text-sm leading-tight">
+                                <span className="h-2.5 w-2.5 rounded-full flex-shrink-0 ring-1 ring-white/10" style={{ backgroundColor: reasonColor }} />
+                                {absence.absence_reasons.name}
+                              </p>
+                              <Badge
+                                variant="outline"
+                                className={
+                                  absence.status === 'approved'
+                                    ? 'border-green-500/30 text-green-400 bg-green-500/10'
+                                    : absence.status === 'processed'
+                                    ? 'border-blue-500/30 text-blue-400 bg-blue-500/10'
+                                    : absence.status === 'pending'
+                                    ? 'border-amber-500/30 text-amber-400 bg-amber-500/10'
+                                    : 'border-slate-600 text-muted-foreground'
+                                }
+                              >
+                                {absence.status}
+                              </Badge>
+                            </div>
+                            <div className="mt-1.5 space-y-1">
                               {absence.is_bank_holiday && (
                                 <Badge variant="outline" className="border-amber-500/40 text-amber-300 bg-amber-500/10">
                                   Bank Holiday
                                 </Badge>
                               )}
-                            </p>
-                            {(isManager || isAdmin) && absence.profiles && (
-                              <p className="text-sm text-muted-foreground">{absence.profiles.full_name}</p>
-                            )}
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Status: <span className="capitalize">{absence.status}</span>
-                            </p>
-                            {absence.notes && (
-                              <p className="text-xs text-muted-foreground mt-1">{absence.notes}</p>
-                            )}
+                              {(isManager || isAdmin) && absence.profiles && (
+                                <p className="text-xs text-muted-foreground">{absence.profiles.full_name}</p>
+                              )}
+                              <p className="text-xs text-muted-foreground">
+                                Status: <span className="capitalize">{absence.status}</span>
+                              </p>
+                              {absence.notes && (
+                                <p className="text-xs text-muted-foreground leading-snug">{absence.notes}</p>
+                              )}
+                            </div>
                           </div>
-                          <Badge
-                            variant="outline"
-                            className={
-                              absence.status === 'approved'
-                                ? 'border-green-500/30 text-green-400 bg-green-500/10'
-                                : absence.status === 'processed'
-                                ? 'border-blue-500/30 text-blue-400 bg-blue-500/10'
-                                : absence.status === 'pending'
-                                ? 'border-amber-500/30 text-amber-400 bg-amber-500/10'
-                                : 'border-slate-600 text-muted-foreground'
-                            }
-                          >
-                            {absence.status}
-                          </Badge>
-                        </div>
-                      </div>
-                    );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
                 );
               } else {

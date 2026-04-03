@@ -15,7 +15,6 @@ import {
   Activity,
   Menu, 
   X, 
-  LogOut,
   Bell,
   Bug,
   HelpCircle,
@@ -616,35 +615,38 @@ export function Navbar() {
                   <div
                     ref={desktopMenuRef}
                     role="menu"
-                    className="fixed z-[80] w-56 max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-md border border-border bg-slate-900 p-1 shadow-2xl"
+                    className="fixed z-[80] w-64 max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-md border border-border/50 bg-slate-900/95 p-2 shadow-2xl backdrop-blur-xl"
                     style={{
                       left: `${desktopMenuPosition.left}px`,
                       top: `${desktopMenuPosition.top}px`,
                       maxHeight: `${desktopMenuPosition.maxHeight}px`,
                     }}
                   >
-                    <div className="px-2 py-1.5 text-sm font-semibold text-slate-300">Quick Menu</div>
-                    <div className="-mx-1 my-1 h-px bg-muted" />
-
                     <Link
                       href="/profile"
-                      className="relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-slate-200 outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+                      className={`flex items-center px-3 py-2 text-lg font-medium rounded-md ${
+                        isLinkActive('/profile')
+                          ? 'bg-avs-yellow text-slate-900'
+                          : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
+                      }`}
                       onClick={() => setDesktopMenuOpen(false)}
                     >
-                      <UserCircle2 className="w-4 h-4" />
+                      <UserCircle2
+                        className={`w-6 h-6 mr-3 ${isLinkActive('/profile') ? 'text-slate-900' : 'text-avs-yellow'}`}
+                      />
                       Profile
                     </Link>
 
                     <button
                       type="button"
-                      className="relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-slate-200 outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+                      className="flex w-full items-center px-3 py-2 text-lg font-medium rounded-md text-muted-foreground hover:bg-slate-800/50 hover:text-white"
                       onClick={() => {
                         setDesktopMenuOpen(false);
                         setNotificationPanelOpen(true);
                         void fetchNotificationCount();
                       }}
                     >
-                      <Bell className="w-4 h-4" />
+                      <Bell className="w-6 h-6 mr-3 text-avs-yellow" />
                       Notifications
                       {unreadCount > 0 && (
                         <span
@@ -658,38 +660,43 @@ export function Navbar() {
 
                     <Link
                       href="/help"
-                      className="relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-slate-200 outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+                      className={`flex items-center px-3 py-2 text-lg font-medium rounded-md ${
+                        isLinkActive('/help')
+                          ? 'bg-avs-yellow text-slate-900'
+                          : 'text-muted-foreground hover:bg-slate-800/50 hover:text-white'
+                      }`}
                       onClick={() => setDesktopMenuOpen(false)}
                     >
-                      <HelpCircle className="w-4 h-4" />
+                      <HelpCircle
+                        className={`w-6 h-6 mr-3 ${isLinkActive('/help') ? 'text-slate-900' : 'text-avs-yellow'}`}
+                      />
                       Help
                     </Link>
 
                     <button
                       type="button"
-                      className="relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-slate-200 outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+                      className="flex w-full items-center px-3 py-2 text-lg font-medium rounded-md text-muted-foreground hover:bg-slate-800/50 hover:text-white"
                       onClick={() => {
                         setDesktopMenuOpen(false);
                         toggleTabletMode();
                       }}
                     >
-                      <MonitorSmartphone className="w-4 h-4" />
+                      <MonitorSmartphone className="w-6 h-6 mr-3 text-avs-yellow" />
                       {tabletModeEnabled ? 'Disable Tablet Mode' : 'Enable Tablet Mode'}
                     </button>
 
-                    <div className="-mx-1 my-1 h-px bg-muted" />
-
-                    <button
-                      type="button"
-                      className="relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-slate-200 outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
-                      onClick={() => {
-                        setDesktopMenuOpen(false);
-                        void handleSignOut();
-                      }}
-                    >
-                      <LogOut className="w-4 h-4" />
-                      Sign Out
-                    </button>
+                    <div className="mt-3 pt-3 border-t border-border/50">
+                      <Button
+                        variant="destructive"
+                        className="w-full justify-center bg-red-600 text-lg text-white hover:bg-red-500"
+                        onClick={() => {
+                          setDesktopMenuOpen(false);
+                          void handleSignOut();
+                        }}
+                      >
+                        Sign Out
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>

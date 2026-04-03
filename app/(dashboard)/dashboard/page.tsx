@@ -271,7 +271,8 @@ export default function DashboardPage() {
 
   const visibleManagerTiles = getFilteredNavByPermissions(managerNavItems, userPermissions, effectiveIsAdmin);
   const visibleAdminTiles = getFilteredNavByPermissions(adminNavItems, userPermissions, effectiveIsAdmin);
-  const visibleManagementTiles = [...visibleManagerTiles, ...visibleAdminTiles];
+  const renderedManagerTiles = visibleManagerTiles.filter(link => link.href !== '/absence/manage');
+  const renderedManagementTiles = [...renderedManagerTiles, ...visibleAdminTiles];
   const totalPendingApprovalsCount = pendingApprovals.reduce((sum, a) => sum + a.count, 0);
 
   const visibleActionsSummary = actionsSummary.filter((item) => {
@@ -435,14 +436,14 @@ export default function DashboardPage() {
       </div>
 
       {/* Manager/Admin Quick Access - Smaller Tiles */}
-      {visibleManagementTiles.length > 0 && (
+      {renderedManagementTiles.length > 0 && (
         <div>
           <h3 className="text-lg font-semibold text-white mb-3">
             Management Tools
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {/* Manager Links - Using shared navigation config */}
-            {visibleManagerTiles.filter(link => link.href !== '/absence/manage').map((link, index) => {
+            {renderedManagerTiles.map((link, index) => {
               const Icon = link.icon;
               const canHaveBadge = hasManagementTileBadge(link.href);
               const badgeCount = getManagementTileBadgeCount(link.href);
@@ -476,7 +477,7 @@ export default function DashboardPage() {
             {/* Admin Links - Using shared navigation config */}
             {visibleAdminTiles.map((link, index) => {
               const Icon = link.icon;
-              const animationIndex = visibleManagerTiles.length + index;
+              const animationIndex = renderedManagerTiles.length + index;
               const canHaveBadge = hasManagementTileBadge(link.href);
               const badgeCount = getManagementTileBadgeCount(link.href);
               
@@ -509,7 +510,7 @@ export default function DashboardPage() {
             {/* SuperAdmin Only - Debug Link (only when viewing as actual role) */}
             {(isActualSuperAdmin || profile?.role?.is_super_admin) && !isViewingAs && (() => {
               const Icon = Bug;
-              const animationIndex = visibleManagementTiles.length;
+              const animationIndex = renderedManagementTiles.length;
               
               return (
                 <Link key="/debug" href="/debug">

@@ -1,8 +1,9 @@
 'use client';
 
-import { Fragment, useState, useEffect, useMemo, useCallback } from 'react';
+import { Fragment, useState, useEffect, useMemo, useCallback, useLayoutEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { createPortal } from 'react-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PageLoader } from '@/components/ui/page-loader';
@@ -29,7 +30,6 @@ import {
 } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   UserPlus,
   Search,
@@ -56,6 +56,10 @@ import { WORK_SHIFT_DAY_LABELS, WORK_SHIFT_DAY_ORDER } from '@/types/work-shifts
 import { getRoleSortPriority } from '@/lib/config/roles-core';
 import { calculateNewUserRemainingLeaveDefault, roundToNearestHalfDay } from '@/lib/utils/absence-onboarding';
 import { formatDateTime } from '@/lib/utils/date';
+import {
+  computeQuickEditFloatingPosition,
+  type FloatingPositionResult,
+} from '@/lib/ui/quick-edit-floating-position';
 
 const RoleManagement = dynamic(() => import('@/components/admin/RoleManagement').then(m => ({ default: m.RoleManagement })), { 
   ssr: false,
@@ -144,6 +148,12 @@ interface OnboardingContextPayload {
     endDate: string;
     notes: string | null;
   }>;
+}
+
+interface QuickEditTarget {
+  userId: string;
+  field: 'role' | 'team';
+  triggerElement: HTMLElement;
 }
 
 function summarizeWorkShiftPattern(pattern: WorkShiftPattern): string {
@@ -305,12 +315,17 @@ export default function UsersAdminPage() {
   const [bulkAbsenceOptions, setBulkAbsenceOptions] = useState<BulkAbsenceBatchOption[]>([]);
   const [onboardingFinancialYearLabel, setOnboardingFinancialYearLabel] = useState('');
   const [onboardingContextLoading, setOnboardingContextLoading] = useState(false);
-  const [quickEditTarget, setQuickEditTarget] = useState<{
-    userId: string;
-    field: 'role' | 'team';
-  } | null>(null);
+  const [quickEditTarget, setQuickEditTarget] = useState<QuickEditTarget | null>(null);
   const [quickEditValue, setQuickEditValue] = useState('');
   const [quickEditSaving, setQuickEditSaving] = useState(false);
+  const [quickEditPosition, setQuickEditPosition] = useState<FloatingPositionResult | null>(null);
+  const [quickEditPanelReady, setQuickEditPanelReady] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const quickEditPanelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const activeUsers = useMemo(
     () => users.filter((user) => !isDeletedUserProfile(user)),
@@ -663,8 +678,118 @@ export default function UsersAdminPage() {
     setFilteredUsers(sorted);
   }, [searchQuery, roleFilter, teamFilter, managerFilter, usersForCurrentStatus, teamNameById, getUserRolePriority]);
 
-  function openQuickEdit(user: ProfileWithEmail, field: 'role' | 'team') {
-    setQuickEditTarget({ userId: user.id, field });
+  const quickEditUser = useMemo(
+    () => (quickEditTarget ? users.find((user) => user.id === quickEditTarget.userId) || null : null),
+    [quickEditTarget, users]
+  );
+
+  const closeQuickEdit = useCallback(() => {
+    setQuickEditTarget(null);
+    setQuickEditValue('');
+    setQuickEditPosition(null);
+    setQuickEditPanelReady(false);
+  }, []);
+
+  const updateQuickEditPosition = useCallback(() => {
+    if (!quickEditTarget || !quickEditPanelRef.current) return;
+    if (!document.body.contains(quickEditTarget.triggerElement)) {
+      closeQuickEdit();
+      return;
+    }
+
+    const triggerRect = quickEditTarget.triggerElement.getBoundingClientRect();
+    const panelRect = quickEditPanelRef.current.getBoundingClientRect();
+    const nextPosition = computeQuickEditFloatingPosition({
+      triggerRect: {
+        top: triggerRect.top,
+        left: triggerRect.left,
+        right: triggerRect.right,
+        bottom: triggerRect.bottom,
+        width: triggerRect.width,
+        height: triggerRect.height,
+      },
+      panelSize: {
+        width: panelRect.width,
+        height: panelRect.height,
+      },
+      viewport: {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        // Fixed-position panel is viewport-based; scroll values are still measured for completeness.
+        scrollX: window.scrollX,
+        scrollY: window.scrollY,
+      },
+    });
+
+    setQuickEditPosition(nextPosition);
+    setQuickEditPanelReady(true);
+  }, [closeQuickEdit, quickEditTarget]);
+
+  useLayoutEffect(() => {
+    if (!quickEditTarget || !quickEditUser) return;
+    setQuickEditPanelReady(false);
+    updateQuickEditPosition();
+  }, [quickEditTarget, quickEditUser, updateQuickEditPosition]);
+
+  useEffect(() => {
+    if (!quickEditTarget) return;
+
+    const handleViewportChange = () => {
+      updateQuickEditPosition();
+    };
+
+    window.addEventListener('resize', handleViewportChange);
+    window.addEventListener('scroll', handleViewportChange, true);
+
+    return () => {
+      window.removeEventListener('resize', handleViewportChange);
+      window.removeEventListener('scroll', handleViewportChange, true);
+    };
+  }, [quickEditTarget, updateQuickEditPosition]);
+
+  useEffect(() => {
+    if (!quickEditTarget || !quickEditPanelRef.current || typeof ResizeObserver === 'undefined') return;
+
+    const observer = new ResizeObserver(() => {
+      updateQuickEditPosition();
+    });
+    observer.observe(quickEditPanelRef.current);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [quickEditTarget, updateQuickEditPosition]);
+
+  useEffect(() => {
+    if (!quickEditTarget) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const targetNode = event.target as Node | null;
+      if (!targetNode) return;
+      if (targetNode instanceof Element && targetNode.closest('.quick-edit-select-content')) return;
+
+      if (quickEditPanelRef.current?.contains(targetNode)) return;
+      if (quickEditTarget.triggerElement.contains(targetNode)) return;
+      closeQuickEdit();
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeQuickEdit();
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [closeQuickEdit, quickEditTarget]);
+
+  function openQuickEdit(user: ProfileWithEmail, field: 'role' | 'team', triggerElement: HTMLElement) {
+    setQuickEditPosition(null);
+    setQuickEditPanelReady(false);
+    setQuickEditTarget({ userId: user.id, field, triggerElement });
     setQuickEditValue(field === 'role' ? (user.role_id || '') : (user.team_id || ''));
     setFormError('');
   }
@@ -701,8 +826,7 @@ export default function UsersAdminPage() {
       const usersWithEmails = await fetchUsersWithEmails();
       setUsers(usersWithEmails);
       setFilteredUsers(usersWithEmails);
-      setQuickEditTarget(null);
-      setQuickEditValue('');
+      closeQuickEdit();
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Failed to update user');
     } finally {
@@ -1260,8 +1384,8 @@ export default function UsersAdminPage() {
                     : 'No active users yet.'}
               </div>
             ) : (
-              <div className="border border-slate-700 rounded-lg overflow-hidden">
-                <Table>
+              <div className="border border-slate-700 rounded-lg overflow-x-auto overflow-y-hidden">
+                <Table className="min-w-[980px]">
                   <TableHeader>
                     <TableRow className="border-slate-700 hover:bg-slate-800/50">
                       <TableHead className="text-muted-foreground">Name</TableHead>
@@ -1310,150 +1434,43 @@ export default function UsersAdminPage() {
                         </TableCell>
                         <TableCell className="text-muted-foreground">{user.employee_id || '-'}</TableCell>
                         <TableCell>
-                          <Popover
-                            open={quickEditTarget?.userId === user.id && quickEditTarget.field === 'role'}
-                            onOpenChange={(open) => {
-                              if (!open) {
-                                setQuickEditTarget(null);
-                                setQuickEditValue('');
-                              }
-                            }}
+                          <button
+                            type="button"
+                            disabled={!canQuickEditAssignments}
+                            onClick={(event) => canQuickEditAssignments && openQuickEdit(user, 'role', event.currentTarget)}
+                            className="disabled:cursor-default enabled:cursor-pointer"
                           >
-                            <PopoverTrigger asChild>
-                              <button
-                                type="button"
-                                disabled={!canQuickEditAssignments}
-                                onClick={() => canQuickEditAssignments && openQuickEdit(user, 'role')}
-                                className="disabled:cursor-default enabled:cursor-pointer"
-                              >
-                                <Badge
-                                  variant={
-                                    user.email === 'admin@mpdee.co.uk'
+                            <Badge
+                              variant={
+                                user.email === 'admin@mpdee.co.uk'
+                                  ? 'destructive'
+                                  : isSupervisorRole(user.role)
+                                    ? 'outline'
+                                    : user.role?.role_class === 'admin'
                                       ? 'destructive'
-                                      : isSupervisorRole(user.role)
-                                        ? 'outline'
-                                        : user.role?.role_class === 'admin'
-                                          ? 'destructive'
-                                          : user.role?.role_class === 'manager'
-                                            ? 'warning'
-                                            : 'secondary'
-                                  }
-                                  className={
-                                    isSupervisorRole(user.role)
-                                      ? 'border-sky-400/50 bg-sky-500/20 text-sky-200 hover:bg-sky-500/30'
-                                      : undefined
-                                  }
-                                >
-                                  {user.email === 'admin@mpdee.co.uk' ? 'SuperAdmin' : (user.role?.display_name || 'No Role')}
-                                </Badge>
-                              </button>
-                            </PopoverTrigger>
-                            <PopoverContent align="start" className="border-border bg-slate-900 text-white">
-                              <div className="space-y-3">
-                                <div>
-                                  <p className="text-sm font-medium">Change Job Role</p>
-                                  <p className="text-xs text-muted-foreground">{user.full_name || user.email}</p>
-                                </div>
-                                <Select value={quickEditValue} onValueChange={setQuickEditValue}>
-                                  <SelectTrigger className="bg-input border-border text-white data-[placeholder]:[&>span]:!text-muted-foreground">
-                                    <SelectValue placeholder="Select role" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {getRoleOptionsForUser(user).map((role) => (
-                                      <SelectItem key={role.id} value={role.id}>
-                                        {role.display_name}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <div className="flex justify-end gap-2">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => {
-                                      setQuickEditTarget(null);
-                                      setQuickEditValue('');
-                                    }}
-                                    className="border-slate-600 text-white hover:bg-slate-800"
-                                  >
-                                    Cancel
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    onClick={() => handleQuickEditSave(user)}
-                                    disabled={quickEditSaving}
-                                    className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900"
-                                  >
-                                    {quickEditSaving ? 'Saving...' : 'Save'}
-                                  </Button>
-                                </div>
-                              </div>
-                            </PopoverContent>
-                          </Popover>
+                                      : user.role?.role_class === 'manager'
+                                        ? 'warning'
+                                        : 'secondary'
+                              }
+                              className={
+                                isSupervisorRole(user.role)
+                                  ? 'border-sky-400/50 bg-sky-500/20 text-sky-200 hover:bg-sky-500/30'
+                                  : undefined
+                              }
+                            >
+                              {user.email === 'admin@mpdee.co.uk' ? 'SuperAdmin' : (user.role?.display_name || 'No Role')}
+                            </Badge>
+                          </button>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          <Popover
-                            open={quickEditTarget?.userId === user.id && quickEditTarget.field === 'team'}
-                            onOpenChange={(open) => {
-                              if (!open) {
-                                setQuickEditTarget(null);
-                                setQuickEditValue('');
-                              }
-                            }}
+                          <button
+                            type="button"
+                            disabled={!canQuickEditAssignments}
+                            onClick={(event) => canQuickEditAssignments && openQuickEdit(user, 'team', event.currentTarget)}
+                            className="text-left disabled:cursor-default enabled:cursor-pointer"
                           >
-                            <PopoverTrigger asChild>
-                              <button
-                                type="button"
-                                disabled={!canQuickEditAssignments}
-                                onClick={() => canQuickEditAssignments && openQuickEdit(user, 'team')}
-                                className="text-left disabled:cursor-default enabled:cursor-pointer"
-                              >
-                                {user.team_id ? (teamNameById.get(user.team_id) || user.team_id) : 'Unassigned'}
-                              </button>
-                            </PopoverTrigger>
-                            <PopoverContent align="start" className="border-border bg-slate-900 text-white">
-                              <div className="space-y-3">
-                                <div>
-                                  <p className="text-sm font-medium">Change Team</p>
-                                  <p className="text-xs text-muted-foreground">{user.full_name || user.email}</p>
-                                </div>
-                                <Select value={quickEditValue || 'none'} onValueChange={(value) => setQuickEditValue(value === 'none' ? '' : value)}>
-                                  <SelectTrigger className="bg-input border-border text-white data-[placeholder]:[&>span]:!text-muted-foreground">
-                                    <SelectValue placeholder="Select team" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="none">No team</SelectItem>
-                                    {teamOptions.map((team) => (
-                                      <SelectItem key={team.id} value={team.id}>
-                                        {team.name}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <div className="flex justify-end gap-2">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => {
-                                      setQuickEditTarget(null);
-                                      setQuickEditValue('');
-                                    }}
-                                    className="border-slate-600 text-white hover:bg-slate-800"
-                                  >
-                                    Cancel
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    onClick={() => handleQuickEditSave(user)}
-                                    disabled={quickEditSaving}
-                                    className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900"
-                                  >
-                                    {quickEditSaving ? 'Saving...' : 'Save'}
-                                  </Button>
-                                </div>
-                              </div>
-                            </PopoverContent>
-                          </Popover>
+                            {user.team_id ? (teamNameById.get(user.team_id) || user.team_id) : 'Unassigned'}
+                          </button>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {getDisplayedManagers(user.line_manager_id, user.secondary_manager_id)}
@@ -1524,6 +1541,81 @@ export default function UsersAdminPage() {
           </div>
         </CardContent>
       </Card>
+
+      {isMounted && quickEditTarget && quickEditUser && createPortal(
+        <div
+          ref={quickEditPanelRef}
+          role="dialog"
+          aria-modal="false"
+          data-testid="quick-edit-floating-panel"
+          className="z-[100] w-72 max-w-[calc(100vw-1rem)] overflow-y-auto overflow-x-hidden rounded-md border border-border bg-slate-900 p-4 text-white shadow-md outline-none"
+          style={{
+            position: 'fixed',
+            top: quickEditPosition?.top ?? 8,
+            left: quickEditPosition?.left ?? 8,
+            maxHeight: quickEditPosition?.maxHeight ?? 320,
+            visibility: quickEditPanelReady ? 'visible' : 'hidden',
+          }}
+        >
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-medium">
+                {quickEditTarget.field === 'role' ? 'Change Job Role' : 'Change Team'}
+              </p>
+              <p className="text-xs text-muted-foreground">{quickEditUser.full_name || quickEditUser.email}</p>
+            </div>
+
+            {quickEditTarget.field === 'role' ? (
+              <Select value={quickEditValue} onValueChange={setQuickEditValue}>
+                <SelectTrigger className="bg-input border-border text-white data-[placeholder]:[&>span]:!text-muted-foreground">
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent className="quick-edit-select-content">
+                  {getRoleOptionsForUser(quickEditUser).map((role) => (
+                    <SelectItem key={role.id} value={role.id}>
+                      {role.display_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Select value={quickEditValue || 'none'} onValueChange={(value) => setQuickEditValue(value === 'none' ? '' : value)}>
+                <SelectTrigger className="bg-input border-border text-white data-[placeholder]:[&>span]:!text-muted-foreground">
+                  <SelectValue placeholder="Select team" />
+                </SelectTrigger>
+                <SelectContent className="quick-edit-select-content">
+                  <SelectItem value="none">No team</SelectItem>
+                  {teamOptions.map((team) => (
+                    <SelectItem key={team.id} value={team.id}>
+                      {team.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={closeQuickEdit}
+                className="border-slate-600 text-white hover:bg-slate-800"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => handleQuickEditSave(quickEditUser)}
+                disabled={quickEditSaving}
+                className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900"
+              >
+                {quickEditSaving ? 'Saving...' : 'Save'}
+              </Button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* Add User Dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
