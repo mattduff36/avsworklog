@@ -620,7 +620,12 @@ export default function AdminAbsencePage() {
           [selectedProfileId]: payload.pattern,
         }));
       } catch (error) {
-        console.error('Error loading selected employee work shift:', error);
+        const message = getErrorMessage(error, 'Failed to load selected employee work shift');
+        if (shouldLogAbsenceManageError(error)) {
+          console.error('Error loading selected employee work shift:', error);
+        } else {
+          console.warn('Skipping selected employee work shift load:', message);
+        }
       }
     }
 

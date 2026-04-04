@@ -77,6 +77,160 @@ export interface Database {
           created_at?: string
         }
       }
+      account_switch_settings: {
+        Row: {
+          profile_id: string
+          quick_switch_enabled: boolean
+          pin_hash: string | null
+          pin_failed_attempts: number
+          pin_locked_until: string | null
+          pin_last_changed_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          profile_id: string
+          quick_switch_enabled?: boolean
+          pin_hash?: string | null
+          pin_failed_attempts?: number
+          pin_locked_until?: string | null
+          pin_last_changed_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          profile_id?: string
+          quick_switch_enabled?: boolean
+          pin_hash?: string | null
+          pin_failed_attempts?: number
+          pin_locked_until?: string | null
+          pin_last_changed_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      account_switch_audit_events: {
+        Row: {
+          id: string
+          profile_id: string
+          actor_profile_id: string | null
+          event_type: string
+          metadata: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          profile_id: string
+          actor_profile_id?: string | null
+          event_type: string
+          metadata?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          profile_id?: string
+          actor_profile_id?: string | null
+          event_type?: string
+          metadata?: Json
+          created_at?: string
+        }
+      }
+      account_switch_devices: {
+        Row: {
+          id: string
+          profile_id: string
+          device_id_hash: string
+          device_label: string | null
+          trusted_at: string
+          last_seen_at: string
+          revoked_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          profile_id: string
+          device_id_hash: string
+          device_label?: string | null
+          trusted_at?: string
+          last_seen_at?: string
+          revoked_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          profile_id?: string
+          device_id_hash?: string
+          device_label?: string | null
+          trusted_at?: string
+          last_seen_at?: string
+          revoked_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      account_switch_device_credentials: {
+        Row: {
+          profile_id: string
+          device_id: string
+          pin_hash: string
+          pin_failed_attempts: number
+          pin_locked_until: string | null
+          pin_last_changed_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          profile_id: string
+          device_id: string
+          pin_hash: string
+          pin_failed_attempts?: number
+          pin_locked_until?: string | null
+          pin_last_changed_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          profile_id?: string
+          device_id?: string
+          pin_hash?: string
+          pin_failed_attempts?: number
+          pin_locked_until?: string | null
+          pin_last_changed_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      account_switch_device_sessions: {
+        Row: {
+          profile_id: string
+          device_id: string
+          session_registered_at: string
+          last_switch_at: string | null
+          session_hint: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          profile_id: string
+          device_id: string
+          session_registered_at?: string
+          last_switch_at?: string | null
+          session_hint?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          profile_id?: string
+          device_id?: string
+          session_registered_at?: string
+          last_switch_at?: string | null
+          session_hint?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
       roles: {
         Row: {
           id: string

@@ -11,6 +11,7 @@ import { ProfileModuleSummaries } from '@/components/profile/ProfileModuleSummar
 import { ProfileQuickLinks } from '@/components/profile/ProfileQuickLinks';
 import { ProfileSettingsCard } from '@/components/profile/ProfileSettingsCard';
 import { ProfileHelpShortcuts } from '@/components/profile/ProfileHelpShortcuts';
+import { AccountSwitcherSettingsCard } from '@/components/account-switch/AccountSwitcherSettingsCard';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   NOTIFICATION_MODULES,
@@ -399,6 +400,8 @@ export default function ProfilePage() {
         savingPreferenceModules={savingPreferenceModules}
         onTogglePreference={handleTogglePreference}
       />
+
+      <AccountSwitcherSettingsCard />
 
       <ProfileHelpShortcuts />
     </div>

@@ -1,10 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { Database } from '@/types/database';
-import { getViewAsSelection } from '@/lib/utils/view-as-cookie';
+import { clearViewAsSelection, getViewAsSelection } from '@/lib/utils/view-as-cookie';
+import { isAccountSwitchTransitionActive } from '@/lib/account-switch/transition';
 
 type Profile = Database['public']['Tables']['profiles']['Row'] & {
   email?: string | null;
@@ -75,6 +76,7 @@ const isAuthSessionError = (err: unknown): boolean => {
 };
 
 export function useAuth() {
+  const previousUserIdRef = useRef<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -109,6 +111,10 @@ export function useAuth() {
 
     try {
       const handleExpiredSession = async () => {
+        if (isAccountSwitchTransitionActive()) {
+          console.warn('Profile fetch session-expired signal ignored during account switch transition');
+          return;
+        }
         console.warn('Profile fetch skipped (session expired)');
         setUser(null);
         setProfile(null);
@@ -164,6 +170,10 @@ export function useAuth() {
       if (isNetworkFetchError(error)) {
         console.warn('Profile fetch failed (network issue)');
       } else if (isAuthSessionError(error)) {
+        if (isAccountSwitchTransitionActive()) {
+          console.warn('Profile fetch auth error ignored during account switch transition');
+          return;
+        }
         console.warn('Profile fetch skipped (session expired)');
         setUser(null);
         setProfile(null);
@@ -180,6 +190,8 @@ export function useAuth() {
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
+      const nextUserId = session?.user?.id ?? null;
+      previousUserIdRef.current = nextUserId;
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchProfile(session.user.id);
@@ -192,6 +204,15 @@ export function useAuth() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
+      const nextUserId = session?.user?.id ?? null;
+      const previousUserId = previousUserIdRef.current;
+
+      if (previousUserId && nextUserId && previousUserId !== nextUserId) {
+        clearViewAsSelection();
+        localStorage.removeItem(`role_cache_${previousUserId}`);
+      }
+
+      previousUserIdRef.current = nextUserId;
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchProfile(session.user.id);
@@ -214,6 +235,12 @@ export function useAuth() {
     const currentRoleId = profile.role?.name || '';
 
     if (cachedRoleId && cachedRoleId !== currentRoleId) {
+      if (isAccountSwitchTransitionActive()) {
+        // Intentional user transition can change role cache keys abruptly.
+        localStorage.setItem(storageKey, currentRoleId);
+        return;
+      }
+
       // Role changed! Force logout and show message
       console.log('Role change detected - forcing re-login');
       localStorage.removeItem(storageKey);
@@ -288,6 +315,11 @@ export function useAuth() {
           const currentRoleId = (data.role as { name?: string } | null)?.name || '';
 
           if (cachedRoleId && cachedRoleId !== currentRoleId) {
+            if (isAccountSwitchTransitionActive()) {
+              localStorage.setItem(storageKey, currentRoleId);
+              return;
+            }
+
             // Role changed! Force logout
             console.log('Role change detected via periodic check - forcing re-login');
             localStorage.removeItem(storageKey);
@@ -309,6 +341,10 @@ export function useAuth() {
       } catch (error) {
         // Avoid escalating transient network issues (common on mobile)
         if (isAuthSessionError(error)) {
+          if (isAccountSwitchTransitionActive()) {
+            console.warn('Role check auth error ignored during account switch transition');
+            return;
+          }
           console.warn('Role change check skipped (session expired)');
           setUser(null);
           setProfile(null);
@@ -410,6 +446,8 @@ export function useAuth() {
       if (user) {
         localStorage.removeItem(`role_cache_${user.id}`);
       }
+
+      clearViewAsSelection();
       
       setUser(null);
       setProfile(null);

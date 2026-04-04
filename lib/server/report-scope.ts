@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getUsersWithModuleAccess } from '@/lib/server/team-permissions';
+import { hasWorkshopInspectionFullVisibilityOverride } from '@/lib/utils/inspection-visibility';
 import { getEffectiveRole, type EffectiveRoleInfo } from '@/lib/utils/view-as';
 import { hasAccountsTimesheetFullVisibilityOverride } from '@/lib/utils/timesheet-visibility';
 import type { ModuleName } from '@/types/roles';
@@ -9,6 +10,14 @@ export interface ReportScopeContext {
   isAdminTier: boolean;
   isManagerLike: boolean;
   shouldScopeToTeam: boolean;
+}
+
+function isInspectionModule(moduleName: ModuleName): boolean {
+  return (
+    moduleName === 'inspections' ||
+    moduleName === 'plant-inspections' ||
+    moduleName === 'hgv-inspections'
+  );
 }
 
 function isAdminTierRole(effectiveRole: EffectiveRoleInfo): boolean {
@@ -42,6 +51,14 @@ export async function getScopedProfileIdsForModule(
   moduleName: ModuleName,
   context: ReportScopeContext
 ): Promise<Set<string> | null> {
+  const hasWorkshopInspectionVisibilityOverride =
+    isInspectionModule(moduleName) &&
+    hasWorkshopInspectionFullVisibilityOverride(context.effectiveRole.team_name);
+
+  if (hasWorkshopInspectionVisibilityOverride) {
+    return null;
+  }
+
   if (context.isAdminTier) {
     return null;
   }

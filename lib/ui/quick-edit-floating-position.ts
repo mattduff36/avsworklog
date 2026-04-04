@@ -45,7 +45,7 @@ export function computeQuickEditFloatingPosition({
   const viewportWidth = Math.max(0, viewport.width);
   const viewportHeight = Math.max(0, viewport.height);
 
-  const constrainedMaxHeight = Math.max(120, viewportHeight - edgePadding * 2);
+  const constrainedMaxHeight = Math.max(0, viewportHeight - edgePadding * 2);
   const constrainedHeight = Math.min(panelSize.height, constrainedMaxHeight);
   const constrainedWidth = Math.min(panelSize.width, Math.max(120, viewportWidth - edgePadding * 2));
 
@@ -69,11 +69,12 @@ export function computeQuickEditFloatingPosition({
 
   const top = Math.min(Math.max(preferredTop, minTop), maxTop);
   const left = Math.min(Math.max(preferredLeft, minLeft), maxLeft);
+  const maxHeight = Math.max(0, viewportHeight - top - edgePadding);
 
   return {
     top,
     left,
-    maxHeight: constrainedMaxHeight,
+    maxHeight,
     verticalPlacement,
     horizontalPlacement,
   };

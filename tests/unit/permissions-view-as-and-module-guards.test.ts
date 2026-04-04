@@ -112,4 +112,16 @@ describe('module guard alignment checks', () => {
       expect(source).toContain('showDeleteActions={canManageInspections}');
     });
   });
+
+  it('shows account lock/switch entry points in navbar menu variants', () => {
+    const source = readSource('components/layout/Navbar.tsx');
+    expect(source).toContain('Lock / Switch');
+    expect(source).toContain('Lock Account');
+    expect(source).toContain("buildLockPathWithReturnTo");
+  });
+
+  it('shows account switcher settings in profile hub', () => {
+    const source = readSource('app/(dashboard)/profile/page.tsx');
+    expect(source).toContain('AccountSwitcherSettingsCard');
+  });
 });

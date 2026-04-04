@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { logger } from '@/lib/utils/logger';
-import { userHasPermission } from '@/lib/utils/permissions';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import type {
   VehicleMaintenanceWithStatus,
   MaintenanceCategory,
@@ -71,17 +72,19 @@ export async function GET() {
         { status: 401 }
       );
     }
-    
-    const hasPermission = await userHasPermission(user.id, 'maintenance');
+
+    const hasPermission = await canEffectiveRoleAccessModule('maintenance');
     if (!hasPermission) {
       return NextResponse.json(
         { error: 'Forbidden' },
         { status: 403 }
       );
     }
+
+    const admin = createAdminClient();
     
     // Get all maintenance categories (for threshold values)
-    const { data: categories, error: categoriesError } = await supabase
+    const { data: categories, error: categoriesError } = await admin
       .from('maintenance_categories')
       .select('*')
       .eq('is_active', true)
@@ -115,7 +118,7 @@ export async function GET() {
     // ---------------------------------------------------------------
 
     const [vansResult, hgvsResult, plantResult] = await Promise.all([
-      supabase
+      admin
         .from('vans')
         .select(`
           id,
@@ -132,7 +135,7 @@ export async function GET() {
         .eq('status', 'active')
         .order('inspection_date', { foreignTable: 'van_inspections', ascending: false })
         .limit(1, { foreignTable: 'van_inspections' }),
-      supabase
+      admin
         .from('hgvs')
         .select(`
           id,
@@ -149,7 +152,7 @@ export async function GET() {
         .eq('status', 'active')
         .order('inspection_date', { foreignTable: 'hgv_inspections', ascending: false })
         .limit(1, { foreignTable: 'hgv_inspections' }),
-      supabase
+      admin
         .from('plant')
         .select(`
           id,
@@ -397,6 +400,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
+      );
+    }
+
+    const canManageMaintenance = await canEffectiveRoleAccessModule('maintenance');
+    if (!canManageMaintenance) {
+      return NextResponse.json(
+        { error: 'Forbidden' },
+        { status: 403 }
       );
     }
     

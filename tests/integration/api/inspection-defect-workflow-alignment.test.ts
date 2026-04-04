@@ -10,8 +10,13 @@ vi.mock('@supabase/supabase-js', () => ({
   createClient: vi.fn(),
 }));
 
+vi.mock('@/lib/server/inspection-route-access', () => ({
+  getInspectionRouteActorAccess: vi.fn(),
+}));
+
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { createClient as createSupabaseJsClient } from '@supabase/supabase-js';
+import { getInspectionRouteActorAccess } from '@/lib/server/inspection-route-access';
 import { POST as plantSyncPost } from '@/app/api/plant-inspections/sync-defect-tasks/route';
 import { POST as hgvSyncPost } from '@/app/api/hgv-inspections/sync-defect-tasks/route';
 import { GET as plantLockedDefectsGet } from '@/app/api/plant-inspections/locked-defects/route';
@@ -31,10 +36,18 @@ function mockAuthenticatedUser() {
 describe('Inspection defect workflow alignment', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getInspectionRouteActorAccess).mockResolvedValue({
+      access: { userId: 'user-1', canManageOthers: true },
+      errorResponse: null,
+    });
   });
 
   it('plant sync keeps oldest task and skips creating duplicate for same signature', async () => {
     mockAuthenticatedUser();
+    vi.mocked(getInspectionRouteActorAccess).mockResolvedValue({
+      access: { userId: 'user-1', canManageOthers: false },
+      errorResponse: null,
+    });
 
     const actionUpdates: Array<{ id: string; payload: Record<string, unknown> }> = [];
     const activeTasks = [
@@ -66,7 +79,14 @@ describe('Inspection defect workflow alignment', () => {
           return {
             select: () => ({
               eq: () => ({
-                single: async () => ({ data: { is_hired_plant: false }, error: null }),
+                single: async () => ({
+                  data: {
+                    user_id: 'user-1',
+                    plant_id: 'plant-1',
+                    is_hired_plant: false,
+                  },
+                  error: null,
+                }),
               }),
             }),
           };
@@ -90,6 +110,32 @@ describe('Inspection defect workflow alignment', () => {
                   eq: () => ({
                     single: async () => ({ data: { id: 'repair-plant' }, error: null }),
                   }),
+                }),
+              }),
+            }),
+          };
+        }
+
+        if (table === 'hgv_inspections') {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: { user_id: 'user-1', hgv_id: 'hgv-1' },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+
+        if (table === 'hgv_inspections') {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: { user_id: 'user-1', hgv_id: 'hgv-1' },
+                  error: null,
                 }),
               }),
             }),
@@ -221,6 +267,19 @@ describe('Inspection defect workflow alignment', () => {
           };
         }
 
+        if (table === 'hgv_inspections') {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: { user_id: 'user-1', hgv_id: 'hgv-1' },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+
         if (table === 'actions') {
           return {
             select: () => {
@@ -329,6 +388,19 @@ describe('Inspection defect workflow alignment', () => {
                   eq: () => ({
                     single: async () => ({ data: { id: 'repair-hgv' }, error: null }),
                   }),
+                }),
+              }),
+            }),
+          };
+        }
+
+        if (table === 'hgv_inspections') {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: { user_id: 'user-1', hgv_id: 'hgv-1' },
+                  error: null,
                 }),
               }),
             }),

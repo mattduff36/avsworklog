@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
@@ -34,6 +34,53 @@ type Action = Database['public']['Tables']['actions']['Row'] & {
   } | null;
 };
 
+function getUnknownErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+
+  if (typeof error === 'string' && error.trim().length > 0) {
+    return error;
+  }
+
+  if (error && typeof error === 'object' && 'message' in error) {
+    const message = String((error as { message?: unknown }).message || '').trim();
+    if (message.length > 0) {
+      return message;
+    }
+  }
+
+  return fallback;
+}
+
+async function getApiFailureMessage(response: Response, fallback: string): Promise<string> {
+  try {
+    const payload = await response.json();
+    if (payload && typeof payload === 'object') {
+      const errorValue = 'error' in payload ? payload.error : undefined;
+      const detailsValue = 'details' in payload ? payload.details : undefined;
+      const errorText = typeof errorValue === 'string' ? errorValue.trim() : '';
+      const detailsText = typeof detailsValue === 'string' ? detailsValue.trim() : '';
+
+      if (errorText && detailsText && errorText !== detailsText) {
+        return `${errorText}: ${detailsText}`;
+      }
+
+      if (errorText) {
+        return errorText;
+      }
+
+      if (detailsText) {
+        return detailsText;
+      }
+    }
+  } catch {
+    // Ignore response parsing errors and use fallback.
+  }
+
+  return `${fallback} (status ${response.status})`;
+}
+
 export default function ActionsPage() {
   const router = useRouter();
   const { user } = useAuth();
@@ -42,7 +89,7 @@ export default function ActionsPage() {
   const { hasPermission: canViewErrorReports } = usePermissionCheck('error-reports', false);
   const { hasPermission: canViewMaintenance } = usePermissionCheck('maintenance', false);
   const { hasPermission: canViewWorkshopTasks } = usePermissionCheck('workshop-tasks', false);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   
   const [actions, setActions] = useState<Action[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,44 +125,29 @@ export default function ActionsPage() {
         setError('You appear to be offline.');
         return;
       }
-      const { data, error } = await supabase
-        .from('actions')
-        .select(`
-          *,
-          vans (
-            reg_number
-          ),
-          hgvs (
-            reg_number
-          ),
-          inspection_items (
-            item_description,
-            status
-          ),
-          plant (
-            plant_id,
-            nickname
-          )
-        `)
-        .order('created_at', { ascending: false });
+      const response = await fetch('/api/actions', { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(await getApiFailureMessage(response, 'Failed to load actions'));
+      }
 
-      if (error) throw error;
-      setActions(data || []);
+      const payload = (await response.json()) as { actions?: Action[] };
+      setActions(payload.actions || []);
     } catch (err) {
-      console.error('Error fetching actions:', err);
-      setError('Failed to load actions');
+      const message = getUnknownErrorMessage(err, 'Failed to load actions');
+      console.error('Error fetching actions:', message);
+      setError(message);
     } finally {
       setLoading(false);
     }
-  }, [supabase]);
+  }, []);
 
   const fetchMaintenanceCounts = useCallback(async () => {
     try {
       setMaintenanceCountsLoading(true);
       // Fetch vehicle maintenance data from API
-      const response = await fetch('/api/maintenance');
+      const response = await fetch('/api/maintenance', { cache: 'no-store' });
       if (!response.ok) {
-        throw new Error('Failed to fetch maintenance data');
+        throw new Error(await getApiFailureMessage(response, 'Failed to fetch maintenance data'));
       }
       
       const data = await response.json();
@@ -173,7 +205,8 @@ export default function ActionsPage() {
       setMaintenanceOverdue(vehicleOverdue + plantOverdue);
       setMaintenanceDueSoon(vehicleDueSoon + plantDueSoon);
     } catch (err) {
-      console.error('Error fetching maintenance counts:', err);
+      const message = getUnknownErrorMessage(err, 'Failed to fetch maintenance data');
+      console.error('Error fetching maintenance counts:', message);
     } finally {
       setMaintenanceCountsLoading(false);
     }

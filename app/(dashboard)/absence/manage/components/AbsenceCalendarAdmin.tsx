@@ -35,7 +35,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useAllAbsenceReasons, useAllAbsences, useDeleteAbsence } from '@/lib/hooks/useAbsence';
+import { useAllAbsenceReasons, useAllAbsences, useDeleteAbsence, useUpdateAbsence } from '@/lib/hooks/useAbsence';
 import { fetchCarryoverMapForFinancialYear, getEffectiveAllowance } from '@/lib/utils/absence-carryover';
 import { filterEmployeesBySelectedTeam } from '@/lib/utils/absence-admin';
 import { getCurrentFinancialYear, getFinancialYearMonths } from '@/lib/utils/date';
@@ -96,6 +96,7 @@ type CalendarEvent = {
   createdAt: string;
   approvedAt: string | null;
   isBankHoliday: boolean;
+  allowTimesheetWorkOnLeave: boolean;
   start: Date;
   end: Date;
 };
@@ -313,8 +314,10 @@ export function AbsenceCalendarAdmin() {
   const { data: absences, isLoading } = useAllAbsences({});
   const { data: reasons, isLoading: reasonsLoading } = useAllAbsenceReasons();
   const deleteAbsence = useDeleteAbsence();
+  const updateAbsence = useUpdateAbsence();
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+  const [overrideSubmittingId, setOverrideSubmittingId] = useState<string | null>(null);
   const [editTarget, setEditTarget] = useState<AbsenceWithRelations | null>(null);
   const [editMode, setEditMode] = useState<AbsenceEditDialogMode>('full');
   const actorProfileId = profile?.id || '';
@@ -415,6 +418,24 @@ export function AbsenceCalendarAdmin() {
     }
   }
 
+  async function handleTimesheetOverrideToggle(absence: AbsenceWithRelations, checked: boolean) {
+    setOverrideSubmittingId(absence.id);
+    try {
+      await updateAbsence.mutateAsync({
+        id: absence.id,
+        updates: {
+          allow_timesheet_work_on_leave: checked,
+        },
+      });
+      toast.success(checked ? 'Timesheet override enabled' : 'Timesheet override disabled');
+    } catch (error) {
+      console.error('Error updating timesheet override:', error);
+      toast.error(getErrorMessage(error) || 'Failed to update timesheet override');
+    } finally {
+      setOverrideSubmittingId((current) => (current === absence.id ? null : current));
+    }
+  }
+
   const monthStart = useMemo(() => startOfMonth(currentMonth), [currentMonth]);
   const monthEnd = useMemo(() => endOfMonth(currentMonth), [currentMonth]);
   const gridStart = useMemo(() => startOfWeek(monthStart, { weekStartsOn: 1 }), [monthStart]);
@@ -490,6 +511,7 @@ export function AbsenceCalendarAdmin() {
         createdAt: absence.created_at,
         approvedAt: absence.approved_at,
         isBankHoliday: Boolean(absence.is_bank_holiday),
+        allowTimesheetWorkOnLeave: Boolean(absence.allow_timesheet_work_on_leave),
         start,
         end,
       } as CalendarEvent;
@@ -1095,107 +1117,150 @@ export function AbsenceCalendarAdmin() {
                 <div className="space-y-3">
                   <h4 className="text-sm font-semibold text-foreground">Absences on this day:</h4>
                   <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-3">
-                    {dayAbsences.map((event) => (
-                      <div
-                        key={event.id}
-                        className="rounded bg-slate-800/50 border border-border p-2.5"
-                        style={{ borderLeftWidth: '3px', borderLeftColor: event.reasonColor }}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="font-medium text-foreground flex items-center gap-2 text-sm leading-tight">
-                            <span className="h-2.5 w-2.5 rounded-full flex-shrink-0 ring-1 ring-white/10" style={{ backgroundColor: event.reasonColor }} />
-                            {event.reasonName}
-                            {event.isBankHoliday && (
-                              <Badge variant="outline" className="border-amber-500/40 text-amber-300 bg-amber-500/10">
-                                Bank Holiday
+                    {dayAbsences.map((event) => {
+                      const target = (absences || []).find((absence) => absence.id === event.id) || null;
+                      const nextEditMode = target ? getAbsenceEditMode(target) : null;
+                      const canEditTarget = Boolean(nextEditMode && !isSelectedFinancialYearClosed);
+                      const isAnnualLeaveTarget = Boolean(target && isAnnualLeaveAbsence(target));
+                      const canToggleOverride =
+                        Boolean(target) &&
+                        isAnnualLeaveTarget &&
+                        canEditAbsenceByScope(target) &&
+                        !isSelectedFinancialYearClosed;
+                      const showStatusBadge = event.status !== 'approved' && event.status !== 'pending';
+                      const isOverrideSaving = overrideSubmittingId === event.id;
+                      const overrideEnabled = Boolean(
+                        target?.allow_timesheet_work_on_leave ?? event.allowTimesheetWorkOnLeave
+                      );
+                      const overrideLabel = !isAnnualLeaveTarget
+                        ? 'N/A'
+                        : isOverrideSaving
+                        ? 'Saving...'
+                        : overrideEnabled
+                        ? 'On'
+                        : 'Off';
+                      const overrideButtonClassName = !isAnnualLeaveTarget
+                        ? 'border-border text-muted-foreground hover:bg-transparent hover:text-muted-foreground h-7 px-2 text-xs'
+                        : overrideEnabled
+                        ? 'border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10 hover:text-emerald-200 h-7 px-2 text-xs'
+                        : 'border-slate-600 text-slate-300 hover:bg-slate-700/40 hover:text-slate-100 h-7 px-2 text-xs';
+
+                      return (
+                        <div
+                          key={event.id}
+                          className="rounded bg-slate-800/50 border border-border p-2.5"
+                          style={{ borderLeftWidth: '3px', borderLeftColor: event.reasonColor }}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="font-medium text-foreground flex items-center gap-2 text-sm leading-tight">
+                              <span className="h-2.5 w-2.5 rounded-full flex-shrink-0 ring-1 ring-white/10" style={{ backgroundColor: event.reasonColor }} />
+                              {event.reasonName}
+                              {event.isBankHoliday && (
+                                <Badge variant="outline" className="border-amber-500/40 text-amber-300 bg-amber-500/10">
+                                  Bank Holiday
+                                </Badge>
+                              )}
+                            </div>
+                            {showStatusBadge && (
+                              <Badge
+                                variant="outline"
+                                className={
+                                  event.status === 'processed'
+                                    ? 'border-blue-500/30 text-blue-400 bg-blue-500/10'
+                                    : event.status === 'rejected'
+                                    ? 'border-red-500/30 text-red-400 bg-red-500/10'
+                                    : 'border-slate-600 text-muted-foreground'
+                                }
+                              >
+                                {event.status}
                               </Badge>
                             )}
                           </div>
-                          <Badge
-                            variant="outline"
-                            className={
-                              event.status === 'approved'
-                                ? 'border-green-500/30 text-green-400 bg-green-500/10'
-                                : event.status === 'processed'
-                                ? 'border-blue-500/30 text-blue-400 bg-blue-500/10'
-                                : event.status === 'pending'
-                                ? 'border-amber-500/30 text-amber-400 bg-amber-500/10'
-                                : event.status === 'rejected'
-                                ? 'border-red-500/30 text-red-400 bg-red-500/10'
-                                : 'border-slate-600 text-muted-foreground'
-                            }
-                          >
-                            {event.status}
-                          </Badge>
-                        </div>
-                        <div className="mt-1.5 space-y-1">
-                          <p className="text-xs text-muted-foreground">
-                            {event.employeeName}
-                            {event.employeeId ? ` (${event.employeeId})` : ''}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Date: {event.endDate && event.date !== event.endDate ? `${event.date} - ${event.endDate}` : event.date}
-                            {event.isHalfDay && ` (${event.halfDaySession})`}
-                          </p>
-                          {detailVisibility.requestedDate && (
+                          <div className="mt-1.5 space-y-1">
                             <p className="text-xs text-muted-foreground">
-                              Requested: {formatShortDate(event.createdAt)}
+                              {event.employeeName}
+                              {event.employeeId ? ` (${event.employeeId})` : ''}
                             </p>
-                          )}
-                          {detailVisibility.approvedDate && (
                             <p className="text-xs text-muted-foreground">
-                              Approved: {formatShortDate(event.approvedAt)}
+                              Date: {event.endDate && event.date !== event.endDate ? `${event.date} - ${event.endDate}` : event.date}
+                              {event.isHalfDay && ` (${event.halfDaySession})`}
                             </p>
-                          )}
-                          {detailVisibility.remainingAllowance && (
-                            <p className="text-xs text-muted-foreground">
-                              Remaining allowance:{' '}
-                              <RemainingAllowanceBadge days={remainingAllowanceByProfile.get(event.profileId) ?? null} />
-                            </p>
-                          )}
-                          {event.notes && <p className="text-xs text-muted-foreground leading-snug">{event.notes}</p>}
+                            {detailVisibility.requestedDate && (
+                              <p className="text-xs text-muted-foreground">
+                                Requested: {formatShortDate(event.createdAt)}
+                              </p>
+                            )}
+                            {detailVisibility.approvedDate && (
+                              <p className="text-xs text-muted-foreground">
+                                Approved:{' '}
+                                {event.status === 'pending' ? (
+                                  <Badge
+                                    variant="outline"
+                                    className="ml-1 border-amber-500/30 text-amber-400 bg-amber-500/10 align-middle"
+                                  >
+                                    Pending
+                                  </Badge>
+                                ) : (
+                                  formatShortDate(event.approvedAt)
+                                )}
+                              </p>
+                            )}
+                            {detailVisibility.remainingAllowance && (
+                              <p className="text-xs text-muted-foreground">
+                                Remaining allowance:{' '}
+                                <RemainingAllowanceBadge days={remainingAllowanceByProfile.get(event.profileId) ?? null} />
+                              </p>
+                            )}
+                            {event.notes && <p className="text-xs text-muted-foreground leading-snug">{event.notes}</p>}
+                          </div>
+                          <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (target && canToggleOverride && !isOverrideSaving) {
+                                  void handleTimesheetOverrideToggle(target, !overrideEnabled);
+                                }
+                              }}
+                              disabled={!canToggleOverride || isOverrideSaving}
+                              className={overrideButtonClassName}
+                            >
+                              {`Timesheet override: ${overrideLabel}`}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (target && canEditTarget && nextEditMode) {
+                                  setEditMode(nextEditMode);
+                                  setEditTarget(target);
+                                }
+                              }}
+                              disabled={!canEditTarget}
+                              className="border-absence/30 text-absence hover:bg-absence/10 hover:text-absence h-7 px-2 text-xs"
+                            >
+                              <Pencil className="h-3 w-3 mr-1" />
+                              Edit
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteTargetId(event.id);
+                              }}
+                              disabled={isSelectedFinancialYearClosed}
+                              className="border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300 h-7 px-2 text-xs"
+                            >
+                              <Trash2 className="h-3 w-3 mr-1" />
+                              Delete
+                            </Button>
+                          </div>
                         </div>
-                        <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
-                          {(() => {
-                            const target = (absences || []).find((absence) => absence.id === event.id) || null;
-                            const nextEditMode = target ? getAbsenceEditMode(target) : null;
-                            const canEditTarget = Boolean(nextEditMode && !isSelectedFinancialYearClosed);
-
-                            return (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (target && canEditTarget && nextEditMode) {
-                                    setEditMode(nextEditMode);
-                                    setEditTarget(target);
-                                  }
-                                }}
-                                disabled={!canEditTarget}
-                                className="border-absence/30 text-absence hover:bg-absence/10 hover:text-absence h-7 px-2 text-xs"
-                              >
-                                <Pencil className="h-3 w-3 mr-1" />
-                                Edit
-                              </Button>
-                            );
-                          })()}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeleteTargetId(event.id);
-                            }}
-                            disabled={isSelectedFinancialYearClosed}
-                            className="border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300 h-7 px-2 text-xs"
-                          >
-                            <Trash2 className="h-3 w-3 mr-1" />
-                            Delete
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               );

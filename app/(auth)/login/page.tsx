@@ -4,6 +4,11 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { createClient } from '@/lib/supabase/client';
+import {
+  getAccountSwitchDeviceLabel,
+  getOrCreateAccountSwitchDeviceId,
+} from '@/lib/account-switch/device';
+import { setAccountLockedClientState } from '@/lib/account-switch/lock-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -41,6 +46,35 @@ export default function LoginPage() {
       if (error) {
         setError(error.message);
       } else {
+        // Successful credential login should always unlock the device state.
+        setAccountLockedClientState(false);
+
+        const deviceId = getOrCreateAccountSwitchDeviceId();
+        if (deviceId) {
+          await Promise.allSettled([
+            fetch('/api/account-switch/device/register', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                deviceId,
+                deviceLabel: getAccountSwitchDeviceLabel(),
+              }),
+            }),
+            fetch('/api/account-switch/password-fallback', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                deviceId,
+                currentPassword: password,
+              }),
+            }),
+          ]);
+        }
+
         // Store remember me preference
         localStorage.setItem('rememberMe', rememberMe ? 'true' : 'false');
         

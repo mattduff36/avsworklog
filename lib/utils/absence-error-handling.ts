@@ -11,6 +11,14 @@ const EXPECTED_ABSENCE_VALIDATION_MESSAGES = [
   'This financial year is closed for employee bookings. Please contact your manager.',
 ];
 
+const EXPECTED_ABSENCE_ACCESS_MESSAGES = [
+  'Forbidden: Work shifts access required',
+  'Forbidden: Work shifts edit access required',
+  'Forbidden: Out of scope for this team',
+  'Unauthorized',
+  'JWT expired',
+];
+
 function extractErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
@@ -54,6 +62,19 @@ export function isExpectedAbsenceValidationError(error: unknown): boolean {
   return EXPECTED_ABSENCE_VALIDATION_MESSAGES.some((value) => message.includes(value));
 }
 
+export function isExpectedAbsenceAccessError(error: unknown): boolean {
+  const message = extractErrorMessage(error);
+  if (!message) {
+    return false;
+  }
+
+  return EXPECTED_ABSENCE_ACCESS_MESSAGES.some((value) => message.includes(value));
+}
+
 export function shouldLogAbsenceManageError(error: unknown): boolean {
-  return !isExpectedAbsenceValidationError(error) && !isNetworkFetchError(error);
+  return (
+    !isExpectedAbsenceValidationError(error) &&
+    !isExpectedAbsenceAccessError(error) &&
+    !isNetworkFetchError(error)
+  );
 }

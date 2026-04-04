@@ -91,7 +91,12 @@ export function AbsenceEditDialog({
           setWorkShiftPattern(payload.pattern);
         }
       } catch (error) {
-        console.error('Error loading employee work shift for absence edit:', error);
+        const message = getErrorMessage(error, 'Failed to load employee work shift');
+        if (shouldLogAbsenceManageError(error)) {
+          console.error('Error loading employee work shift for absence edit:', error);
+        } else {
+          console.warn('Skipping employee work shift load for absence edit:', message);
+        }
         if (!cancelled) {
           setWorkShiftPattern(undefined);
         }

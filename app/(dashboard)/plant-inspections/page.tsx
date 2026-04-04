@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import { PlantInspection } from '@/types/inspection';
 import { Employee, InspectionStatusFilter } from '@/types/common';
 import { useQueryState } from 'nuqs';
+import { hasWorkshopInspectionFullVisibilityOverride } from '@/lib/utils/inspection-visibility';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -83,8 +84,21 @@ interface WorkshopTaskSummaryRow {
 }
 
 function PlantInspectionsContent() {
-  const { user, isManager, isAdmin, isSuperAdmin, isSupervisor, loading: authLoading } = useAuth();
-  const canViewAllInspections = isManager || isAdmin || isSuperAdmin || isSupervisor;
+  const {
+    user,
+    profile,
+    effectiveRole,
+    isManager,
+    isAdmin,
+    isSuperAdmin,
+    isSupervisor,
+    loading: authLoading,
+  } = useAuth();
+  const hasWorkshopReadAllOverride = hasWorkshopInspectionFullVisibilityOverride(
+    effectiveRole?.team_name ?? profile?.team?.name
+  );
+  const canViewAllInspections =
+    isManager || isAdmin || isSuperAdmin || isSupervisor || hasWorkshopReadAllOverride;
   const canManageInspections = isManager || isAdmin || isSuperAdmin;
   const pageSize = canViewAllInspections ? 20 : 10;
   usePermissionCheck('plant-inspections');

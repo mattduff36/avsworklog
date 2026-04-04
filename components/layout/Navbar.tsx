@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import {
@@ -21,6 +21,7 @@ import {
   Download,
   MonitorSmartphone,
   UserCircle2,
+  Users,
 } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { NotificationPanel } from '@/components/messages/NotificationPanel';
@@ -31,6 +32,13 @@ import { SidebarNav } from './SidebarNav';
 import { createClient } from '@/lib/supabase/client';
 import { usePermissionSnapshot } from '@/lib/hooks/usePermissionSnapshot';
 import { usePendingAbsenceCount, useRamsAssignmentSummary } from '@/lib/hooks/useNavMetrics';
+import { isAccountSwitcherEnabled } from '@/lib/account-switch/feature-flag';
+import {
+  getAccountSwitchDeviceLabel,
+  getOrCreateAccountSwitchDeviceId,
+} from '@/lib/account-switch/device';
+import { listSavedAccountShortcuts } from '@/lib/account-switch/storage';
+import { buildLockPathWithReturnTo, setAccountLockedClientState } from '@/lib/account-switch/lock-state';
 import { 
   dashboardNavItem, 
   getFilteredEmployeeNav, 
@@ -128,6 +136,7 @@ function checkStandaloneMode(): boolean {
 }
 
 export function Navbar() {
+  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { user, profile, signOut, isAdmin, isManager, isActualSuperAdmin, isViewingAs } = useAuth();
@@ -139,6 +148,7 @@ export function Navbar() {
   const [isMounted, setIsMounted] = useState(false); // Track client hydration
   const [isCompact, setIsCompact] = useState(false);
   const [desktopMenuOpen, setDesktopMenuOpen] = useState(false);
+  const [accountLockLabel, setAccountLockLabel] = useState('Lock Account');
   const [activeNowDialogOpen, setActiveNowDialogOpen] = useState(false);
   const [desktopMenuPosition, setDesktopMenuPosition] = useState({ left: 0, top: 0, maxHeight: 320 });
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
@@ -149,6 +159,7 @@ export function Navbar() {
   const desktopMenuTriggerRef = useRef<HTMLButtonElement>(null);
   const desktopMenuRef = useRef<HTMLDivElement>(null);
   const supabase = useMemo(() => createClient(), []);
+  const accountSwitcherEnabled = useMemo(() => isAccountSwitcherEnabled(), []);
 
   // useAuth now provides effective role flags (respecting View As cookie)
   const effectiveIsManager = isManager;
@@ -174,6 +185,27 @@ export function Navbar() {
     setDesktopMenuOpen(false);
     setActiveNowDialogOpen(false);
   }, [tabletModeEnabled]);
+
+  const refreshAccountLockLabel = useCallback(() => {
+    if (!accountSwitcherEnabled || !isMounted) return;
+    const switchableShortcuts = listSavedAccountShortcuts().filter(
+      (shortcut) => shortcut.profileId !== profile?.id
+    );
+    setAccountLockLabel(switchableShortcuts.length > 0 ? 'Lock / Switch' : 'Lock Account');
+  }, [accountSwitcherEnabled, isMounted, profile?.id]);
+
+  useEffect(() => {
+    if (!accountSwitcherEnabled || !isMounted) return;
+
+    refreshAccountLockLabel();
+    window.addEventListener('storage', refreshAccountLockLabel);
+    window.addEventListener('focus', refreshAccountLockLabel);
+
+    return () => {
+      window.removeEventListener('storage', refreshAccountLockLabel);
+      window.removeEventListener('focus', refreshAccountLockLabel);
+    };
+  }, [accountSwitcherEnabled, isMounted, refreshAccountLockLabel]);
 
   useEffect(() => {
     setIsStandaloneApp(checkStandaloneMode());
@@ -424,6 +456,32 @@ export function Navbar() {
     }
   };
 
+  const handleLockAccount = useCallback(() => {
+    if (!accountSwitcherEnabled) return;
+    const queryString = searchParams?.toString();
+    const currentPath = pathname || '/dashboard';
+    const returnTo = queryString ? `${currentPath}?${queryString}` : currentPath;
+    const deviceId = getOrCreateAccountSwitchDeviceId();
+
+    if (deviceId) {
+      void fetch('/api/account-switch/device/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          deviceId,
+          deviceLabel: getAccountSwitchDeviceLabel(),
+        }),
+      });
+    }
+
+    setAccountLockedClientState(true);
+    setMobileMenuOpen(false);
+    setDesktopMenuOpen(false);
+    router.push(buildLockPathWithReturnTo(returnTo));
+  }, [accountSwitcherEnabled, pathname, router, searchParams]);
+
   const handleInstallApp = async () => {
     setMobileMenuOpen(false);
 
@@ -526,8 +584,21 @@ export function Navbar() {
                   SQUIRES
                 </div>
               </Link>
-              <div className="ml-auto hidden md:flex items-center">
-                <TabletModeToggleActions />
+              <div className="ml-auto flex items-center gap-2">
+                {accountSwitcherEnabled ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground hover:text-white hover:bg-slate-800/50"
+                    onClick={handleLockAccount}
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    {accountLockLabel}
+                  </Button>
+                ) : null}
+                <div className="hidden md:flex items-center">
+                  <TabletModeToggleActions />
+                </div>
               </div>
             </div>
           ) : (
@@ -636,6 +707,20 @@ export function Navbar() {
                       />
                       Profile
                     </Link>
+
+                    {accountSwitcherEnabled ? (
+                      <button
+                        type="button"
+                        className="flex w-full items-center px-3 py-2 text-lg font-medium rounded-md text-muted-foreground hover:bg-slate-800/50 hover:text-white"
+                        onClick={() => {
+                          setDesktopMenuOpen(false);
+                          handleLockAccount();
+                        }}
+                      >
+                        <Users className="w-6 h-6 mr-3 text-avs-yellow" />
+                        {accountLockLabel}
+                      </button>
+                    ) : null}
 
                     <button
                       type="button"
@@ -810,6 +895,20 @@ export function Navbar() {
                     />
                     Profile
                   </Link>
+
+                  {accountSwitcherEnabled ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        handleLockAccount();
+                      }}
+                      className="flex w-full items-center px-3 py-2 text-lg font-medium rounded-md text-muted-foreground hover:bg-slate-800/50 hover:text-white"
+                    >
+                      <Users className="w-6 h-6 mr-3 text-avs-yellow" />
+                      {accountLockLabel}
+                    </button>
+                  ) : null}
 
                   <button
                     type="button"

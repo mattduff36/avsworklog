@@ -15,6 +15,7 @@ import { fetchCarryoverMapForFinancialYear, getEffectiveAllowance } from '@/lib/
 import { getCurrentFinancialYear, getFinancialYear } from '@/lib/utils/date';
 import { calculateDurationDays } from '@/lib/utils/date';
 import { isClosedFinancialYearDate } from '@/lib/services/absence-archive';
+import { getErrorMessage, shouldLogAbsenceManageError } from '@/lib/utils/absence-error-handling';
 import { ANNUAL_LEAVE_MIN_REMAINING_DAYS } from '@/lib/utils/annual-leave';
 
 const ANNUAL_LEAVE_REASON_NAME = 'annual leave';
@@ -136,7 +137,12 @@ async function resolveAbsenceDuration(
       }
     );
   } catch (error) {
-    console.error('Error resolving work shift duration, falling back to provided duration:', error);
+    const message = getErrorMessage(error, 'Failed to resolve work shift duration');
+    if (shouldLogAbsenceManageError(error)) {
+      console.error('Error resolving work shift duration, falling back to provided duration:', error);
+    } else {
+      console.warn('Skipping work shift duration resolution, using provided duration:', message);
+    }
   }
 
   return resolvedAbsence;

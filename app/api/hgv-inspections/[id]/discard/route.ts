@@ -1,26 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { canEffectiveRoleAccessModule, isEffectiveRoleManagerOrHigher } from '@/lib/utils/rbac';
+import { getInspectionRouteActorAccess } from '@/lib/server/inspection-route-access';
 
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const canAccessInspections = await canEffectiveRoleAccessModule('hgv-inspections');
-    if (!canAccessInspections) {
-      return NextResponse.json(
-        { error: 'Forbidden: HGV inspections access required' },
-        { status: 403 }
-      );
+    const { access, errorResponse } = await getInspectionRouteActorAccess('hgv-inspections');
+    if (errorResponse || !access) {
+      return errorResponse ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const inspectionId = (await params).id;
@@ -43,8 +32,7 @@ export async function DELETE(
       );
     }
 
-    const isManagerOrHigher = await isEffectiveRoleManagerOrHigher();
-    if (inspection.user_id !== user.id && !isManagerOrHigher) {
+    if (inspection.user_id !== access.userId && !access.canManageOthers) {
       return NextResponse.json(
         { error: 'Forbidden: cannot discard another user draft' },
         { status: 403 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { Database } from '@/types/database';
+import { getInspectionRouteActorAccess } from '@/lib/server/inspection-route-access';
 
 type ActionInsert = Database['public']['Tables']['actions']['Insert'];
 type ActionUpdate = Database['public']['Tables']['actions']['Update'];
@@ -34,12 +34,9 @@ type ActionUpdate = Database['public']['Tables']['actions']['Update'];
  */
 export async function POST(request: NextRequest) {
   try {
-    // Verify user is authenticated
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { access, errorResponse } = await getInspectionRouteActorAccess('inspections');
+    if (errorResponse || !access) {
+      return errorResponse ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Parse request body
@@ -50,6 +47,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Missing required fields: inspectionId, vehicleId, createdBy, defects' },
         { status: 400 }
+      );
+    }
+
+    if (createdBy !== access.userId) {
+      return NextResponse.json(
+        { error: 'Forbidden: createdBy must match authenticated user' },
+        { status: 403 }
       );
     }
 
@@ -64,6 +68,30 @@ export async function POST(request: NextRequest) {
         },
       }
     );
+
+    const { data: inspectionOwner, error: inspectionLookupError } = await supabaseAdmin
+      .from('van_inspections')
+      .select('user_id, van_id')
+      .eq('id', inspectionId)
+      .maybeSingle();
+
+    if (inspectionLookupError || !inspectionOwner) {
+      return NextResponse.json({ error: 'Inspection not found' }, { status: 404 });
+    }
+
+    if (inspectionOwner.van_id !== vehicleId) {
+      return NextResponse.json(
+        { error: 'vehicleId does not match inspection vehicle' },
+        { status: 400 }
+      );
+    }
+
+    if (inspectionOwner.user_id !== access.userId && !access.canManageOthers) {
+      return NextResponse.json(
+        { error: 'Forbidden: cannot modify another user inspection tasks' },
+        { status: 403 }
+      );
+    }
 
     // Get vehicle registration for task titles
     const { data: vehicle } = await supabaseAdmin

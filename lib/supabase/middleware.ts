@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { ACCOUNT_SWITCH_LOCK_COOKIE_NAME } from '@/lib/account-switch/lock-state'
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -64,6 +65,18 @@ export async function updateSession(request: NextRequest) {
     return redirectResponse
   }
 
+  // Root entry: avoid compiling "/" route and redirect directly.
+  if (request.nextUrl.pathname === '/') {
+    const url = request.nextUrl.clone()
+    url.pathname = user ? '/dashboard' : '/login'
+    // Target depends on auth state, so this must stay non-cacheable/per-request.
+    const rootRedirect = NextResponse.redirect(url, 307)
+    supabaseResponse.cookies.getAll().forEach(cookie => {
+      rootRedirect.cookies.set(cookie.name, cookie.value, cookie)
+    })
+    return rootRedirect
+  }
+
   // PUBLIC routes - ONLY these routes are accessible without authentication
   // All other routes require authentication (safer default)
   const publicPaths = [
@@ -74,6 +87,22 @@ export async function updateSession(request: NextRequest) {
   
   const isPublicPath = publicPaths.some(path => request.nextUrl.pathname.startsWith(path))
   const isApiRoute = request.nextUrl.pathname.startsWith('/api/')
+  const isLockRoute = request.nextUrl.pathname.startsWith('/lock')
+  const isAccountLocked = request.cookies.get(ACCOUNT_SWITCH_LOCK_COOKIE_NAME)?.value === '1'
+
+  if (user && isAccountLocked && !isLockRoute && !isApiRoute) {
+    const returnTo = `${request.nextUrl.pathname}${request.nextUrl.search}`
+    const url = request.nextUrl.clone()
+    url.pathname = '/lock'
+    url.search = ''
+    url.searchParams.set('returnTo', returnTo)
+
+    const lockRedirect = NextResponse.redirect(url, 307)
+    supabaseResponse.cookies.getAll().forEach(cookie => {
+      lockRedirect.cookies.set(cookie.name, cookie.value, cookie)
+    })
+    return lockRedirect
+  }
 
   // If not a public path and no user
   if (!isPublicPath && !user) {

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { createClient as createSupabaseClient, type SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '@/types/database';
 import { buildInspectionDefectSignature, extractInspectionDefectSignature } from '@/lib/utils/inspectionDefectSignature';
 import { ACTIVE_INSPECTION_DEFECT_STATUSES } from '@/lib/utils/inspectionDefectTaskStatuses';
+import { getInspectionRouteActorAccess } from '@/lib/server/inspection-route-access';
 
 type ActionInsert = Database['public']['Tables']['actions']['Insert'];
 type ActionUpdate = Database['public']['Tables']['actions']['Update'];
@@ -235,11 +235,9 @@ async function closeDuplicateTask(
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { access, errorResponse } = await getInspectionRouteActorAccess('plant-inspections');
+    if (errorResponse || !access) {
+      return errorResponse ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await request.json();
@@ -257,6 +255,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (createdBy !== access.userId) {
+      return NextResponse.json(
+        { error: 'Forbidden: createdBy must match authenticated user' },
+        { status: 403 }
+      );
+    }
+
     const supabaseAdmin = createSupabaseClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -266,9 +271,27 @@ export async function POST(request: NextRequest) {
     // Guard: no workshop tasks for hired plant inspections
     const { data: inspectionRecord } = await supabaseAdmin
       .from('plant_inspections')
-      .select('is_hired_plant')
+      .select('user_id, is_hired_plant, plant_id')
       .eq('id', inspectionId)
       .single();
+
+    if (!inspectionRecord) {
+      return NextResponse.json({ error: 'Inspection not found' }, { status: 404 });
+    }
+
+    if (inspectionRecord.plant_id && inspectionRecord.plant_id !== plantId) {
+      return NextResponse.json(
+        { error: 'plantId does not match inspection plant' },
+        { status: 400 }
+      );
+    }
+
+    if (inspectionRecord.user_id !== access.userId && !access.canManageOthers) {
+      return NextResponse.json(
+        { error: 'Forbidden: cannot modify another user inspection tasks' },
+        { status: 403 }
+      );
+    }
 
     if (inspectionRecord?.is_hired_plant) {
       return NextResponse.json({

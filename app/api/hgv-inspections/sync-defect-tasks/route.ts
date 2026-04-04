@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { createClient as createSupabaseClient, type SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '@/types/database';
 import { buildInspectionDefectSignature, extractInspectionDefectSignature } from '@/lib/utils/inspectionDefectSignature';
 import { ACTIVE_INSPECTION_DEFECT_STATUSES } from '@/lib/utils/inspectionDefectTaskStatuses';
+import { getInspectionRouteActorAccess } from '@/lib/server/inspection-route-access';
 
 type ActionInsert = Database['public']['Tables']['actions']['Insert'];
 type ActionUpdate = Database['public']['Tables']['actions']['Update'];
@@ -224,11 +224,9 @@ async function closeDuplicateTask(
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { access, errorResponse } = await getInspectionRouteActorAccess('hgv-inspections');
+    if (errorResponse || !access) {
+      return errorResponse ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await request.json();
@@ -246,11 +244,42 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (createdBy !== access.userId) {
+      return NextResponse.json(
+        { error: 'Forbidden: createdBy must match authenticated user' },
+        { status: 403 }
+      );
+    }
+
     const supabaseAdmin = createSupabaseClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
+
+    const { data: inspectionOwner, error: inspectionLookupError } = await supabaseAdmin
+      .from('hgv_inspections')
+      .select('user_id, hgv_id')
+      .eq('id', inspectionId)
+      .maybeSingle();
+
+    if (inspectionLookupError || !inspectionOwner) {
+      return NextResponse.json({ error: 'Inspection not found' }, { status: 404 });
+    }
+
+    if (inspectionOwner.hgv_id !== hgvId) {
+      return NextResponse.json(
+        { error: 'hgvId does not match inspection vehicle' },
+        { status: 400 }
+      );
+    }
+
+    if (inspectionOwner.user_id !== access.userId && !access.canManageOthers) {
+      return NextResponse.json(
+        { error: 'Forbidden: cannot modify another user inspection tasks' },
+        { status: 403 }
+      );
+    }
 
     const { data: hgv } = await supabaseAdmin
       .from('hgvs')
@@ -464,7 +493,8 @@ export async function POST(request: NextRequest) {
       duplicates,
       message: `Sync complete: ${created} created, ${updated} updated, ${skipped} skipped, ${dedupedClosed} duplicates auto-closed${duplicates.length > 0 ? `, ${duplicates.length} duplicate groups found` : ''}`,
     });
-  } catch {
+  } catch (error) {
+    console.error('Error in hgv sync-defect-tasks:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
