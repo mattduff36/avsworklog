@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
 import { PageLoader } from '@/components/ui/page-loader';
 import { getRecentVehicleIds, splitVehiclesByRecent } from '@/lib/utils/recentVehicles';
+import { isUuid } from '@/lib/utils/uuid';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -117,6 +118,8 @@ function InspectionsContent() {
     defaultValue: 'all',
     shallow: false,
   });
+  const normalizedVehicleFilter =
+    vehicleFilter !== 'all' && !isUuid(vehicleFilter) ? 'all' : vehicleFilter;
   const [downloading, setDownloading] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [inspectionToDelete, setInspectionToDelete] = useState<{ id: string; vehicleReg: string; date: string } | null>(null);
@@ -135,6 +138,12 @@ function InspectionsContent() {
   const supabase = createClient();
 
   // Fetch employees and vehicles
+  useEffect(() => {
+    if (vehicleFilter !== normalizedVehicleFilter) {
+      setVehicleFilter(normalizedVehicleFilter);
+    }
+  }, [normalizedVehicleFilter, setVehicleFilter, vehicleFilter]);
+
   useEffect(() => {
     if (user && canViewAllInspections) {
       const fetchEmployees = async () => {
@@ -234,7 +243,7 @@ function InspectionsContent() {
       // 'all' doesn't filter by status
 
       // Apply van filter
-      const currentVehicleFilter = vehicleFilter || 'all';
+      const currentVehicleFilter = normalizedVehicleFilter || 'all';
       if (currentVehicleFilter !== 'all') {
         query = query.eq('van_id', currentVehicleFilter);
       }
@@ -323,7 +332,7 @@ function InspectionsContent() {
     } finally {
       setLoading(false);
     }
-  }, [user, authLoading, canViewAllInspections, selectedEmployeeId, statusFilter, vehicleFilter, supabase, displayCount]);
+  }, [user, authLoading, canViewAllInspections, selectedEmployeeId, statusFilter, normalizedVehicleFilter, supabase, displayCount]);
 
   useEffect(() => {
     setDisplayCount(pageSize);
@@ -595,7 +604,7 @@ function InspectionsContent() {
               <div className="flex items-center gap-3">
                 <Truck className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-slate-400 mr-2 whitespace-nowrap">Filter by van:</span>
-                <Select value={vehicleFilter} onValueChange={setVehicleFilter}>
+                <Select value={normalizedVehicleFilter} onValueChange={setVehicleFilter}>
                 <SelectTrigger className={`${tabletModeEnabled ? 'min-h-11 text-base' : 'h-9'} border-border text-white bg-slate-900/50`}>
                     <SelectValue placeholder="All vans" />
                   </SelectTrigger>
