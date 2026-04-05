@@ -196,43 +196,60 @@ export type QuoteCommercialStatus = 'open' | 'closed';
 export type QuoteStatus =
   | 'draft'
   | 'pending_internal_approval'
+  | 'approved'
   | 'changes_requested'
   | 'sent'
+  | 'won'
+  | 'lost'
+  | 'ready_to_invoice'
   | 'po_received'
   | 'in_progress'
   | 'completed_part'
   | 'completed_full'
   | 'partially_invoiced'
-  | 'invoiced';
+  | 'invoiced'
+  | 'closed';
 
 export const QUOTE_STATUS_CONFIG: Record<QuoteStatus, { label: string; color: string }> = {
   draft: { label: 'Draft', color: 'border-slate-500/30 text-slate-400 bg-slate-500/10' },
   pending_internal_approval: { label: 'Pending Approval', color: 'border-amber-500/30 text-amber-400 bg-amber-500/10' },
+  approved: { label: 'Approved', color: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' },
   changes_requested: { label: 'Changes Requested', color: 'border-orange-500/30 text-orange-400 bg-orange-500/10' },
   sent: { label: 'Sent', color: 'border-blue-500/30 text-blue-400 bg-blue-500/10' },
+  won: { label: 'Won', color: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' },
+  lost: { label: 'Lost', color: 'border-rose-500/30 text-rose-400 bg-rose-500/10' },
+  ready_to_invoice: { label: 'Ready To Invoice', color: 'border-violet-500/30 text-violet-400 bg-violet-500/10' },
   po_received: { label: 'Accepted', color: 'border-sky-500/30 text-sky-400 bg-sky-500/10' },
   in_progress: { label: 'In Progress', color: 'border-cyan-500/30 text-cyan-400 bg-cyan-500/10' },
   completed_part: { label: 'Completed In Part', color: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10' },
   completed_full: { label: 'Completed In Full', color: 'border-lime-500/30 text-lime-400 bg-lime-500/10' },
   partially_invoiced: { label: 'Partially Invoiced', color: 'border-fuchsia-500/30 text-fuchsia-400 bg-fuchsia-500/10' },
   invoiced: { label: 'Invoiced', color: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' },
+  closed: { label: 'Closed', color: 'border-slate-500/30 text-slate-400 bg-slate-500/10' },
 };
 
 export const ACTIVE_QUOTE_STATUS_ORDER: QuoteStatus[] = [
   'draft',
   'pending_internal_approval',
+  'approved',
   'changes_requested',
   'sent',
+  'won',
+  'ready_to_invoice',
   'po_received',
   'in_progress',
   'completed_part',
   'completed_full',
   'partially_invoiced',
   'invoiced',
+  'closed',
 ];
 
 export const ACCEPTED_QUOTE_STATUSES = new Set<QuoteStatus>([
   'po_received',
+  'approved',
+  'won',
+  'ready_to_invoice',
   'in_progress',
   'completed_part',
   'completed_full',

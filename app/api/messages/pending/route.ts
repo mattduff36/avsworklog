@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
 import type { GetPendingMessagesResponse } from '@/types/messages';
 
 interface SenderShape {
@@ -42,13 +43,13 @@ function pickSender(sender: PendingMessageShape['sender']): SenderShape | null {
  */
 export async function GET() {
   try {
-    const supabase = await createClient();
-
-    // Check authentication
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
+    const current = await getCurrentAuthenticatedProfile();
+    if (!current) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const supabase = await createClient();
+    const userId = current.profile.id;
 
     // Fetch pending Toolbox Talks (PENDING status, not soft-deleted)
     const { data: toolboxTalks, error: toolboxError } = await supabase
@@ -73,7 +74,7 @@ export async function GET() {
           )
         )
       `)
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('status', 'PENDING')
       .eq('messages.type', 'TOOLBOX_TALK')
       .is('messages.deleted_at', null)
@@ -106,7 +107,7 @@ export async function GET() {
           )
         )
       `)
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('status', 'PENDING')
       .eq('messages.type', 'REMINDER')
       .is('messages.deleted_at', null)

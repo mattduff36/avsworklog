@@ -182,7 +182,7 @@ function resolvePlantTemplate(
       item_number: item.item_number,
       item_description: item.item_description,
       day_of_week: getItemDayOfWeek(item),
-      status: item.status,
+      status: item.status === 'defect' ? 'attention' : item.status,
       comments: item.comments || null,
     })),
     dailyHours,
@@ -211,7 +211,7 @@ function resolveHgvTemplate(inspection: HgvInspectionWithRelations, items: Inspe
       item_number: item.item_number,
       item_description: item.item_description,
       day_of_week: getItemDayOfWeek(item),
-      status: item.status,
+      status: item.status === 'defect' ? 'attention' : item.status,
       comments: item.comments || null,
     })),
   });

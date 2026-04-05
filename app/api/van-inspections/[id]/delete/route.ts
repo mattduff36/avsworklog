@@ -1,34 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { getInspectionRouteActorAccess } from '@/lib/server/inspection-route-access';
 import { logServerError } from '@/lib/utils/server-error-logger';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { access, errorResponse } = await getInspectionRouteActorAccess('inspections');
+    if (errorResponse || !access) {
+      return errorResponse ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const canDeleteInspections = await canEffectiveRoleAccessModule('inspections');
-    if (!canDeleteInspections) {
+    if (!access.canManageOthers) {
       return NextResponse.json(
-        { error: 'Forbidden: Inspections access required' },
+        { error: 'Forbidden: inspection management access required' },
         { status: 403 }
       );
     }
 
     const inspectionId = (await params).id;
+    const admin = createAdminClient();
 
     // Delete inspection (cascade will delete items)
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await admin
       .from('van_inspections')
       .delete()
       .eq('id', inspectionId);

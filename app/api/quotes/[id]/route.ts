@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { ACTIVE_QUOTE_STATUS_ORDER } from '@/app/(dashboard)/quotes/types';
+import { ACTIVE_QUOTE_STATUS_ORDER, type QuoteStatus } from '@/app/(dashboard)/quotes/types';
+import type { Database } from '@/types/database';
 import {
   appendQuoteTimelineEvent,
   buildVersionLabel,
@@ -121,7 +122,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     if (action === 'submit_for_approval') {
       const updates = {
-        status: 'pending_internal_approval',
+        status: 'pending_internal_approval' as QuoteStatus,
         updated_by: user.id,
         return_comments: null,
       };
@@ -457,7 +458,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
       delete (insertPayload as { customer?: unknown }).customer;
 
-      const { error: insertError } = await supabase.from('quotes').insert(insertPayload);
+      const { error: insertError } = await supabase
+        .from('quotes')
+        .insert(insertPayload as Database['public']['Tables']['quotes']['Insert']);
       if (insertError) throw insertError;
 
       if (!isDuplicate) {

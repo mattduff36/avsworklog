@@ -48,8 +48,6 @@ function createUpdateChain() {
   const single = vi.fn().mockResolvedValue({
     data: {
       quick_switch_enabled: true,
-      pin_hash: 'hashed-pin',
-      pin_last_changed_at: '2026-01-01T00:00:00.000Z',
     },
     error: null,
   });

@@ -28,7 +28,9 @@ export async function POST(request: NextRequest) {
   const disabledResponse = getAccountSwitcherDisabledResponse();
   if (disabledResponse) return disabledResponse;
 
-  const { access, errorResponse } = await getAccountSwitchActorAccess();
+  const { access, errorResponse } = await getAccountSwitchActorAccess(
+    '/api/account-switch/pin/setup'
+  );
   if (!access || errorResponse) {
     return errorResponse ?? buildAccountSwitchErrorResponse('UNAUTHORIZED', 'Unauthorized', 401);
   }
@@ -105,10 +107,6 @@ export async function POST(request: NextRequest) {
       .from('account_switch_settings')
       .update({
         quick_switch_enabled: enableQuickSwitch,
-        pin_hash: pinHash,
-        pin_failed_attempts: 0,
-        pin_locked_until: null,
-        pin_last_changed_at: new Date().toISOString(),
       })
       .eq('profile_id', access.userId)
       .select('*')
@@ -138,7 +136,7 @@ export async function POST(request: NextRequest) {
       settings: {
         quick_switch_enabled: data.quick_switch_enabled,
         pin_configured: true,
-        pin_last_changed_at: data.pin_last_changed_at,
+        pin_last_changed_at: new Date().toISOString(),
         device_registered: true,
       },
     });

@@ -97,6 +97,13 @@ const editCategorySchema = createCategorySchema.partial().extend({
 
 type CategoryFormData = z.infer<typeof createCategorySchema>;
 
+function normalizeAppliesTo(values?: string[] | null): Array<'van' | 'plant' | 'hgv'> {
+  const normalized = (values || []).filter(
+    (value): value is 'van' | 'plant' | 'hgv' => value === 'van' || value === 'plant' || value === 'hgv',
+  );
+  return normalized.length > 0 ? normalized : ['van'];
+}
+
 // ============================================================================
 // Component
 // ============================================================================
@@ -155,7 +162,7 @@ export function CategoryDialog({
         alert_threshold_days: category.alert_threshold_days || undefined,
         alert_threshold_miles: category.alert_threshold_miles || undefined,
         alert_threshold_hours: category.alert_threshold_hours || undefined,
-        applies_to: category.applies_to || ['van'],
+        applies_to: normalizeAppliesTo(category.applies_to),
         is_active: category.is_active,
         responsibility: category.responsibility || 'workshop',
         show_on_overview: category.show_on_overview !== false,

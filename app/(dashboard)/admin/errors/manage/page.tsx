@@ -386,7 +386,7 @@ export default function ErrorReportsManagePage() {
                       User Agent: {selectedReport.user_agent}
                     </div>
                   )}
-                  {selectedReport.additional_context && (
+                  {Boolean(selectedReport.additional_context) && (
                     <div className="text-xs">
                       <span className="text-muted-foreground">Additional Context:</span>
                       <pre className="mt-1 p-2 bg-slate-200 dark:bg-slate-700 rounded text-xs overflow-x-auto">

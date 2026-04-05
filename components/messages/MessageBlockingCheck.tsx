@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
+import { usePathname, useRouter } from 'next/navigation';
 import { BlockingMessageModal } from './BlockingMessageModal';
 import { ReminderModal } from './ReminderModal';
 import { Loader2 } from 'lucide-react';
@@ -25,6 +24,15 @@ interface PendingReminder {
   created_at: string;
 }
 
+interface AuthSessionCheckResponse {
+  authenticated: boolean;
+  profile?: {
+    must_change_password?: boolean | null;
+  } | null;
+}
+
+const MESSAGE_BOOTSTRAP_TIMEOUT_MS = 4000;
+
 /**
  * MessageBlockingCheck Component
  * 
@@ -35,35 +43,54 @@ interface PendingReminder {
  */
 export function MessageBlockingCheck() {
   const router = useRouter();
-  const supabase = createClient();
+  const pathname = usePathname();
+  const isDashboardPath = pathname?.startsWith('/dashboard') ?? false;
   
-  const [checking, setChecking] = useState(true);
+  const [checking, setChecking] = useState(false);
   const [pendingToolboxTalks, setPendingToolboxTalks] = useState<PendingToolboxTalk[]>([]);
   const [currentToolboxTalkIndex, setCurrentToolboxTalkIndex] = useState(0);
   const [pendingReminders, setPendingReminders] = useState<PendingReminder[]>([]);
   const [showReminder, setShowReminder] = useState(false);
 
   useEffect(() => {
-    checkPendingMessages();
+    if (!isDashboardPath) {
+      setChecking(false);
+      return;
+    }
+
+    setChecking(true);
+    void checkPendingMessages();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isDashboardPath, pathname]);
+
+  useEffect(() => {
+    if (!checking || !isDashboardPath) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setChecking(false);
+    }, MESSAGE_BOOTSTRAP_TIMEOUT_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [checking, isDashboardPath, pathname]);
 
   async function checkPendingMessages() {
     try {
       // First check if user needs to change password (this takes precedence)
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const sessionResponse = await fetch('/api/auth/session', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
+
+      if (!sessionResponse.ok) {
         setChecking(false);
         return;
       }
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('must_change_password')
-        .eq('id', user.id)
-        .single();
+      const session = (await sessionResponse.json()) as AuthSessionCheckResponse;
 
-      if (profile?.must_change_password) {
+      if (session.profile?.must_change_password) {
         // Password change takes priority - redirect handled by existing system
         router.push('/change-password');
         return;

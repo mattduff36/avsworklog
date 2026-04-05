@@ -31,7 +31,7 @@ interface VehicleData {
   taco_calibration_due_date?: string | null;
   next_service_hours?: number | null;
   vehicle?: {
-    asset_type?: 'van' | 'hgv' | 'plant' | 'tool' | null;
+    asset_type?: 'van' | 'vehicle' | 'hgv' | 'plant' | 'tool' | null;
   } | null;
 }
 

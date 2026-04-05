@@ -1,9 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
+import { canAccessScopedInspection, getInspectionVisibilityFlags } from '@/lib/utils/inspection-access';
 import { BackButton } from '@/components/ui/back-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -42,12 +45,39 @@ interface HgvInspectionDetails {
 
 export default function ViewHgvInspectionPage() {
   const params = useParams();
-  const supabase = createClient();
-  const { user, isManager, isAdmin, isSuperAdmin, isSupervisor, loading: authLoading } = useAuth();
-  const canViewAllInspections = isManager || isAdmin || isSuperAdmin || isSupervisor;
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
+  if (typeof window !== 'undefined' && !supabaseRef.current) {
+    supabaseRef.current = createClient();
+  }
+  const supabase = supabaseRef.current as ReturnType<typeof createClient>;
+  const {
+    user,
+    profile,
+    effectiveRole,
+    isManager,
+    isAdmin,
+    isSuperAdmin,
+    isSupervisor,
+    loading: authLoading,
+  } = useAuth();
+  const {
+    hasPermission: canAccessInspectionModule,
+    loading: permissionLoading,
+  } = usePermissionCheck('hgv-inspections');
+  const {
+    hasOrgWideInspectionVisibility,
+    canViewCrossUserInspections,
+  } = getInspectionVisibilityFlags({
+    teamName: effectiveRole?.team_name ?? profile?.team?.name,
+    isManager,
+    isAdmin,
+    isSuperAdmin,
+    isSupervisor,
+  });
 
   const [inspection, setInspection] = useState<HgvInspectionDetails | null>(null);
   const [items, setItems] = useState<InspectionItemWithDay[]>([]);
+  const [scopedEmployeeIds, setScopedEmployeeIds] = useState<string[]>([]);
   const [defectsWithWorkshop, setDefectsWithWorkshop] = useState<EnrichedDefectItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -55,6 +85,36 @@ export default function ViewHgvInspectionPage() {
   const { photoMap, refresh: refreshInspectionPhotos } = useInspectionPhotos(inspection?.id, {
     enabled: Boolean(inspection?.id),
   });
+
+  useEffect(() => {
+    if (!user || permissionLoading || !canAccessInspectionModule || hasOrgWideInspectionVisibility) {
+      setScopedEmployeeIds(user ? [user.id] : []);
+      return;
+    }
+
+    if (!canViewCrossUserInspections) {
+      setScopedEmployeeIds([user.id]);
+      return;
+    }
+
+    const fetchScopedEmployees = async () => {
+      try {
+        const employees = await fetchUserDirectory({ module: 'hgv-inspections', limit: 200 });
+        setScopedEmployeeIds(Array.from(new Set([user.id, ...employees.map((employee) => employee.id)])));
+      } catch (error) {
+        console.error('Error fetching scoped HGV inspection employees:', error);
+        setScopedEmployeeIds([user.id]);
+      }
+    };
+
+    void fetchScopedEmployees();
+  }, [
+    user,
+    permissionLoading,
+    canAccessInspectionModule,
+    hasOrgWideInspectionVisibility,
+    canViewCrossUserInspections,
+  ]);
 
   const fetchInspection = useCallback(async (id: string) => {
     setLoading(true);
@@ -76,7 +136,15 @@ export default function ViewHgvInspectionPage() {
 
       if (inspectionError || !inspectionData) throw inspectionError || new Error('Daily check not found');
 
-      if (!canViewAllInspections && inspectionData.user_id !== user?.id) {
+      if (
+        !canAccessScopedInspection({
+          ownerUserId: inspectionData.user_id,
+          currentUserId: user?.id,
+          canViewCrossUserInspections,
+          hasOrgWideInspectionVisibility,
+          scopedUserIds: scopedEmployeeIds,
+        })
+      ) {
         setError('You do not have permission to view this inspection');
         setLoading(false);
         return;
@@ -112,12 +180,18 @@ export default function ViewHgvInspectionPage() {
     } finally {
       setLoading(false);
     }
-  }, [canViewAllInspections, supabase, user?.id]);
+  }, [
+    supabase,
+    user?.id,
+    canViewCrossUserInspections,
+    hasOrgWideInspectionVisibility,
+    scopedEmployeeIds,
+  ]);
 
   useEffect(() => {
-    if (!params.id || authLoading) return;
+    if (!params.id || authLoading || permissionLoading || !canAccessInspectionModule) return;
     fetchInspection(params.id as string);
-  }, [authLoading, fetchInspection, params.id]);
+  }, [authLoading, permissionLoading, canAccessInspectionModule, fetchInspection, params.id]);
 
   const getStatusIcon = (status: InspectionStatus) => {
     if (status === 'ok') return <CheckCircle2 className="h-5 w-5 text-green-400" />;
@@ -125,7 +199,7 @@ export default function ViewHgvInspectionPage() {
     return <span className="text-xs font-extrabold tracking-wide text-slate-300">N/A</span>;
   };
 
-  if (authLoading || loading) {
+  if (authLoading || permissionLoading || loading) {
     return <PageLoader message="Loading inspection..." />;
   }
 

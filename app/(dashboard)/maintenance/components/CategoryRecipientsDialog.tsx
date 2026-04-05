@@ -18,6 +18,7 @@ import { Loader2, Save, Users, X, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { createClient } from '@/lib/supabase/client';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
+import { isAdminRole } from '@/lib/utils/role-access';
 import { toast } from 'sonner';
 import type { MaintenanceCategory } from '@/types/maintenance';
 
@@ -180,7 +181,7 @@ export function CategoryRecipientsDialog({
       .filter(
         (p) =>
           p.hasModuleAccess !== false &&
-          (p.role?.is_manager_admin || p.role?.name === 'admin' || p.role?.name === 'manager')
+          (p.role?.is_manager_admin || isAdminRole(p.role) || p.role?.name === 'manager')
       )
       .map(p => p.id);
     setSelectedUserIds(new Set([...selectedUserIds, ...managerIds]));
@@ -245,8 +246,8 @@ export function CategoryRecipientsDialog({
   
   // Sort to show managers first, then by name
   const sortedProfiles = [...filteredProfiles].sort((a, b) => {
-    const aIsManager = a.role?.is_manager_admin || a.role?.name === 'admin' || a.role?.name === 'manager';
-    const bIsManager = b.role?.is_manager_admin || b.role?.name === 'admin' || b.role?.name === 'manager';
+    const aIsManager = a.role?.is_manager_admin || isAdminRole(a.role) || a.role?.name === 'manager';
+    const bIsManager = b.role?.is_manager_admin || isAdminRole(b.role) || b.role?.name === 'manager';
     
     if (aIsManager && !bIsManager) return -1;
     if (!aIsManager && bIsManager) return 1;
@@ -341,9 +342,10 @@ export function CategoryRecipientsDialog({
                   </p>
                 ) : (
                   sortedProfiles.map((profile) => {
-                    const isManager = profile.role?.is_manager_admin || 
-                                     profile.role?.name === 'admin' || 
-                                     profile.role?.name === 'manager';
+                    const isManager =
+                      profile.role?.is_manager_admin ||
+                      isAdminRole(profile.role) ||
+                      profile.role?.name === 'manager';
                     const isSelected = selectedUserIds.has(profile.id);
                     
                     return (

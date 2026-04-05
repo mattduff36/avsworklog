@@ -30,6 +30,7 @@ import { DAY_NAMES } from '@/types/timesheet';
 import { formatHours, roundTimeToNearestQuarterHour } from '@/lib/utils/time-calculations';
 import { SignaturePad } from '@/components/forms/SignaturePad';
 import { Database } from '@/types/database';
+import { isAdminRole } from '@/lib/utils/role-access';
 import { Employee } from '@/types/common';
 import { toast } from 'sonner';
 import {
@@ -430,7 +431,7 @@ export function PlantTimesheetV2({
           profile?.role?.is_super_admin ||
           false;
         const currentIsManager = profile?.role?.is_manager_admin || false;
-        const currentIsAdmin = profile?.role?.name === 'admin';
+        const currentIsAdmin = isAdminRole(profile?.role);
         const currentHasElevatedPermissions = currentIsSuperAdmin || currentIsManager || currentIsAdmin;
 
         if (!currentHasElevatedPermissions && timesheetData.user_id !== user.id) {

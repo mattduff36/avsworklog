@@ -81,3 +81,6 @@ node_modules/
 
 # Audit reports (screenshots and generated artifacts)
 /reports/
+
+# Supabase CLI temp cache
+/supabase/.temp/

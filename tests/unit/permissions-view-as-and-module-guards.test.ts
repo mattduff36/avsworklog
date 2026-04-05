@@ -12,6 +12,8 @@ describe('shouldGrantFullAccessSnapshot', () => {
   it('does not grant full access while actual superadmin is viewing as another role', () => {
     expect(
       shouldGrantFullAccessSnapshot({
+        role_name: 'employee',
+        role_class: 'employee',
         is_super_admin: false,
         is_actual_super_admin: true,
         is_viewing_as: true,
@@ -22,6 +24,8 @@ describe('shouldGrantFullAccessSnapshot', () => {
   it('grants full access for actual superadmin outside view-as mode', () => {
     expect(
       shouldGrantFullAccessSnapshot({
+        role_name: 'employee',
+        role_class: 'employee',
         is_super_admin: false,
         is_actual_super_admin: true,
         is_viewing_as: false,
@@ -32,9 +36,23 @@ describe('shouldGrantFullAccessSnapshot', () => {
   it('grants full access for effective superadmin roles', () => {
     expect(
       shouldGrantFullAccessSnapshot({
+        role_name: 'super-admin',
+        role_class: 'admin',
         is_super_admin: true,
         is_actual_super_admin: true,
         is_viewing_as: true,
+      })
+    ).toBe(true);
+  });
+
+  it('grants full access for admin-class roles even when the name is custom', () => {
+    expect(
+      shouldGrantFullAccessSnapshot({
+        role_name: 'regional-admin',
+        role_class: 'admin',
+        is_super_admin: false,
+        is_actual_super_admin: false,
+        is_viewing_as: false,
       })
     ).toBe(true);
   });
@@ -116,7 +134,7 @@ describe('module guard alignment checks', () => {
   it('shows account lock/switch entry points in navbar menu variants', () => {
     const source = readSource('components/layout/Navbar.tsx');
     expect(source).toContain('Lock / Switch');
-    expect(source).toContain('Lock Account');
+    expect(source).toContain('accountLockLabel');
     expect(source).toContain("buildLockPathWithReturnTo");
   });
 

@@ -43,6 +43,21 @@ interface ErrorClassificationSnapshot {
   reason: string;
 }
 
+interface ErrorLogRow {
+  id: string;
+  timestamp: string;
+  error_message: string;
+  error_stack: string | null;
+  error_type: string;
+  user_id: string | null;
+  user_email: string | null;
+  page_url: string;
+  user_agent: string;
+  component_name: string | null;
+  additional_data: unknown;
+  created_at: string;
+}
+
 interface UserActionSnapshot {
   actionType: string;
   label: string | null;
@@ -216,17 +231,23 @@ export function ErrorLogsDebugPanel({ supabase }: ErrorLogsDebugPanelProps) {
       }
 
       if (errorData) {
-        const uniqueUserIds = [...new Set(errorData.map((e: { user_id: string | null }) => e.user_id).filter(Boolean))];
+        const uniqueUserIds = [
+          ...new Set(
+            errorData
+              .map((e: { user_id: string | null }) => e.user_id)
+              .filter((userId): userId is string => Boolean(userId)),
+          ),
+        ];
         const { data: profilesData } = await supabase.from('profiles').select('id, full_name').in('id', uniqueUserIds);
 
         const userIdToName = new Map(profilesData?.map((p: { id: string; full_name: string }) => [p.id, p.full_name]) || []);
 
-        const enrichedErrorData = errorData.map((log: ErrorLogEntry) => ({
+        const enrichedErrorData = (errorData as ErrorLogRow[]).map((log) => ({
           ...log,
           user_name: log.user_id ? userIdToName.get(log.user_id) || null : null,
-        }));
+        })) as ErrorLogEntry[];
 
-        const typedErrorData = enrichedErrorData as ErrorLogEntry[];
+        const typedErrorData = enrichedErrorData;
         setErrorLogs(typedErrorData);
 
         if (typedErrorData.length > 0) {

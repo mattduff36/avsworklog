@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type { GetReportsResponse, MessageReportData } from '@/types/messages';
+import type { MessageType } from '@/types/messages';
 
 interface ProfileShape {
   id?: string;
@@ -82,10 +83,10 @@ export async function GET(request: NextRequest) {
     
     // Type filter: default to TOOLBOX_TALK and REMINDER only (exclude NOTIFICATION)
     if (type && ['TOOLBOX_TALK', 'REMINDER'].includes(type)) {
-      messagesQuery = messagesQuery.eq('type', type);
+      messagesQuery = messagesQuery.eq('type', type as MessageType);
     } else if (!type || type === 'all') {
       // When no specific type or 'all', only show toolbox-related messages
-      messagesQuery = messagesQuery.in('type', ['TOOLBOX_TALK', 'REMINDER']);
+      messagesQuery = messagesQuery.in('type', ['TOOLBOX_TALK', 'REMINDER'] as MessageType[]);
     }
 
     const { data: messages, error: messagesError } = await messagesQuery;

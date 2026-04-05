@@ -16,7 +16,9 @@ export async function GET(request: NextRequest) {
   const disabledResponse = getAccountSwitcherDisabledResponse();
   if (disabledResponse) return disabledResponse;
 
-  const { access, errorResponse } = await getAccountSwitchActorAccess();
+  const { access, errorResponse } = await getAccountSwitchActorAccess(
+    '/api/account-switch/settings'
+  );
   if (!access || errorResponse) {
     return errorResponse ?? buildAccountSwitchErrorResponse('UNAUTHORIZED', 'Unauthorized', 401);
   }
@@ -26,9 +28,10 @@ export async function GET(request: NextRequest) {
       new URL(request.url).searchParams.get('deviceId')
     );
     const settings = await ensureAccountSwitchSettings(access.userId);
-    let pinFailedAttempts = settings.pin_failed_attempts;
-    let pinLockedUntil = settings.pin_locked_until;
-    let pinConfigured = Boolean(settings.pin_hash);
+    let pinFailedAttempts = 0;
+    let pinLockedUntil: string | null = null;
+    let pinConfigured = false;
+    let pinLastChangedAt: string | null = null;
     let deviceRegistered = false;
 
     if (deviceId) {
@@ -43,10 +46,12 @@ export async function GET(request: NextRequest) {
         pinConfigured = Boolean(deviceCredential.credential.pin_hash);
         pinFailedAttempts = deviceCredential.credential.pin_failed_attempts;
         pinLockedUntil = deviceCredential.credential.pin_locked_until;
+        pinLastChangedAt = deviceCredential.credential.pin_last_changed_at;
       } else {
         pinConfigured = false;
         pinFailedAttempts = 0;
         pinLockedUntil = null;
+        pinLastChangedAt = null;
       }
     }
 
@@ -62,7 +67,7 @@ export async function GET(request: NextRequest) {
         pin_failed_attempts: pinFailedAttempts,
         pin_locked_until: pinLockedUntil,
         pin_is_locked: isLocked,
-        pin_last_changed_at: settings.pin_last_changed_at,
+        pin_last_changed_at: pinLastChangedAt,
         device_registered: deviceRegistered,
       },
     });

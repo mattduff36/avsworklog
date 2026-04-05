@@ -1,33 +1,26 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { createClient } from '@/lib/supabase/client';
 import {
   getAccountSwitchDeviceLabel,
   getOrCreateAccountSwitchDeviceId,
 } from '@/lib/account-switch/device';
-import { setAccountLockedClientState } from '@/lib/account-switch/lock-state';
+import { clearLegacyAccountSwitchClientState } from '@/lib/app-auth/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Card,
-  CardContent,
-} from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Lock } from 'lucide-react';
 
 export default function LoginPage() {
-  const router = useRouter();
   const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(true); // Default to true for better UX
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Load remember me preference on mount
   useEffect(() => {
     const savedPreference = localStorage.getItem('rememberMe');
     if (savedPreference !== null) {
@@ -41,67 +34,28 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const { error } = await signIn(email, password);
-      
+      const deviceId = getOrCreateAccountSwitchDeviceId();
+      const { data, error } = await signIn(email, password, {
+        rememberMe,
+        deviceId,
+        deviceLabel: getAccountSwitchDeviceLabel(),
+      });
+
       if (error) {
         setError(error.message);
-      } else {
-        // Successful credential login should always unlock the device state.
-        setAccountLockedClientState(false);
-
-        const deviceId = getOrCreateAccountSwitchDeviceId();
-        if (deviceId) {
-          await Promise.allSettled([
-            fetch('/api/account-switch/device/register', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                deviceId,
-                deviceLabel: getAccountSwitchDeviceLabel(),
-              }),
-            }),
-            fetch('/api/account-switch/password-fallback', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                deviceId,
-                currentPassword: password,
-              }),
-            }),
-          ]);
-        }
-
-        // Store remember me preference
-        localStorage.setItem('rememberMe', rememberMe ? 'true' : 'false');
-        
-        // Check if user needs to change password
-        const supabase = createClient();
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        if (user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('must_change_password')
-            .eq('id', user.id)
-            .single();
-
-          if (profile?.must_change_password) {
-            // Redirect to password change page
-            router.push('/change-password');
-            router.refresh();
-            return;
-          }
-        }
-        
-        router.push('/dashboard');
-        router.refresh();
+        return;
       }
+
+      clearLegacyAccountSwitchClientState();
+
+      localStorage.setItem('rememberMe', rememberMe ? 'true' : 'false');
+
+      if (data?.profile?.must_change_password) {
+        window.location.replace('/change-password');
+        return;
+      }
+
+      window.location.replace('/dashboard');
     } catch {
       setError('An unexpected error occurred');
     } finally {

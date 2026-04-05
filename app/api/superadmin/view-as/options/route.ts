@@ -1,17 +1,15 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
 
 export async function GET() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
+  const current = await getCurrentAuthenticatedProfile();
+  if (!current) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const userId = current.profile.id;
+  const userEmail = current.profile.email;
 
   const admin = createAdminClient();
   const { data: profile, error: profileError } = await admin
@@ -22,7 +20,7 @@ export async function GET() {
         is_super_admin
       )
     `)
-    .eq('id', user.id)
+    .eq('id', userId)
     .single();
 
   if (profileError || !profile) {
@@ -37,7 +35,7 @@ export async function GET() {
   const isActualSuperAdmin =
     typedProfile.super_admin === true ||
     typedProfile.role?.is_super_admin === true ||
-    user.email === 'admin@mpdee.co.uk';
+    userEmail === 'admin@mpdee.co.uk';
 
   if (!isActualSuperAdmin) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

@@ -169,7 +169,7 @@ export async function GET(
     const historyAuthorIds = [...new Set(
       statusHistory
         .map((event) => event?.author_id)
-        .filter(Boolean)
+        .filter((authorId): authorId is string => Boolean(authorId))
     )];
 
     let statusAuthorMap = new Map<string, { id: string; full_name: string }>();

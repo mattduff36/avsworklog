@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
 import type { GetNotificationsResponse, NotificationItem } from '@/types/messages';
 
 interface SenderShape {
@@ -74,15 +75,13 @@ function pickSender(sender: MessageShape['sender']): SenderShape | null {
  */
 export async function GET() {
   try {
-    const supabase = await createClient();
-
-    // Check authentication
-    const { data: { user }, error: userError } = await withRetry(
-      () => supabase.auth.getUser()
-    );
-    if (userError || !user) {
+    const current = await getCurrentAuthenticatedProfile();
+    if (!current) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const supabase = await createClient();
+    const userId = current.profile.id;
 
     // Calculate 60 days ago
     const sixtyDaysAgo = new Date();
@@ -114,7 +113,7 @@ export async function GET() {
             )
           )
         `)
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .gte('messages.created_at', sixtyDaysAgo.toISOString())
         .is('cleared_from_inbox_at', null)
         .is('messages.deleted_at', null)

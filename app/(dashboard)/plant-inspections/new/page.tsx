@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { createClient } from '@/lib/supabase/client';
 import {
@@ -91,9 +92,14 @@ function NewPlantInspectionContent() {
   const searchParams = useSearchParams();
   const draftId = searchParams.get('id');
   const { user, isManager, isAdmin, isSuperAdmin } = useAuth();
+  const { loading: permissionLoading } = usePermissionCheck('plant-inspections');
   const isElevatedUser = isManager || isAdmin || isSuperAdmin;
   const { tabletModeEnabled } = useTabletMode();
-  const supabase = createClient();
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
+  if (typeof window !== 'undefined' && !supabaseRef.current) {
+    supabaseRef.current = createClient();
+  }
+  const supabase = supabaseRef.current as ReturnType<typeof createClient>;
   
   const [plants, setPlants] = useState<Array<{ 
     id: string; 
@@ -168,6 +174,10 @@ function NewPlantInspectionContent() {
   const [hiredPlantIdSerial, setHiredPlantIdSerial] = useState('');
   const [hiredPlantDescription, setHiredPlantDescription] = useState('');
   const [hiredPlantHiringCompany, setHiredPlantHiringCompany] = useState('');
+
+  if (permissionLoading) {
+    return <PageLoader message="Loading plant inspection form..." />;
+  }
 
   useEffect(() => {
     if (!hasOptionalInspectorComment && informWorkshop) {
@@ -572,6 +582,11 @@ function NewPlantInspectionContent() {
       isDraftHydratedRef.current = false;
       setLoading(true);
       setError('');
+      const currentUserId = user?.id;
+      if (!currentUserId) {
+        setError('You must be logged in to edit an inspection');
+        return;
+      }
 
       const { data: profileData } = await supabase
         .from('profiles')
@@ -582,7 +597,7 @@ function NewPlantInspectionContent() {
             is_manager_admin
           )
         `)
-        .eq('id', user?.id)
+        .eq('id', currentUserId)
         .single();
 
       const userIsManager = (profileData as ProfileWithRole)?.role?.is_manager_admin || false;

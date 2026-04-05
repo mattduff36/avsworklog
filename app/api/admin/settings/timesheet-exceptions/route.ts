@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getEffectiveRole } from '@/lib/utils/view-as';
+import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import {
   addTimesheetTypeExceptionRow,
@@ -10,9 +11,10 @@ import {
 function isActorAdmin(effectiveRole: {
   is_actual_super_admin: boolean;
   is_super_admin: boolean;
+  role_class?: 'admin' | 'manager' | 'employee' | null;
   role_name: string | null;
 }): boolean {
-  return effectiveRole.is_actual_super_admin || effectiveRole.is_super_admin || effectiveRole.role_name === 'admin';
+  return hasEffectiveRoleFullAccess(effectiveRole);
 }
 
 export async function GET() {

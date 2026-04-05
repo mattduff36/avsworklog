@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { type SupabaseClient, User } from '@supabase/supabase-js';
+import { broadcastAuthStateChange, clearLegacyAccountSwitchClientState, subscribeToAuthStateChange } from '@/lib/app-auth/client';
 import { createClient } from '@/lib/supabase/client';
 import { Database } from '@/types/database';
+import { isAdminRole } from '@/lib/utils/role-access';
 import { clearViewAsSelection, getViewAsSelection } from '@/lib/utils/view-as-cookie';
-import { isAccountSwitchTransitionActive } from '@/lib/account-switch/transition';
 
 type Profile = Database['public']['Tables']['profiles']['Row'] & {
   email?: string | null;
@@ -34,6 +35,31 @@ interface EffectiveRole {
   team_name?: string | null;
 }
 
+interface AuthSessionResponse {
+  authenticated: boolean;
+  locked: boolean;
+  user: {
+    id: string;
+    email: string | null;
+  } | null;
+  profile: Profile | null;
+}
+
+type OrgTeamsQueryClient = {
+  from: (relation: 'org_teams') => {
+    select: (columns: 'id, name') => {
+      eq: (column: 'id', value: string) => {
+        single: () => Promise<{
+          data: { id: string; name: string } | null;
+          error: { message?: string } | null;
+        }>;
+      };
+    };
+  };
+};
+
+type BrowserSupabaseClient = SupabaseClient<Database>;
+
 const extractErrorMessage = (err: unknown): string => {
   if (!err) return '';
   if (err instanceof Error) return err.message || '';
@@ -44,167 +70,59 @@ const extractErrorMessage = (err: unknown): string => {
   return '';
 };
 
-const isNetworkFetchError = (err: unknown): boolean => {
-  if (!err) return false;
-  if (err instanceof TypeError) {
-    return (
-      err.message.includes('Failed to fetch') ||
-      err.message.includes('NetworkError') ||
-      err.message.toLowerCase().includes('network')
-    );
+function buildSyntheticUser(payload: AuthSessionResponse): User | null {
+  if (!payload.user?.id) {
+    return null;
   }
 
-  const msg = extractErrorMessage(err);
-  return (
-    msg.includes('Failed to fetch') ||
-    msg.includes('NetworkError') ||
-    msg.toLowerCase().includes('network')
-  );
-};
-
-const isAuthSessionError = (err: unknown): boolean => {
-  const msg = extractErrorMessage(err).toLowerCase();
-  if (!msg) return false;
-
-  return (
-    msg.includes('jwt expired') ||
-    msg.includes('auth session missing') ||
-    msg.includes('invalid jwt') ||
-    msg.includes('refresh token') ||
-    msg.includes('session from session_id claim in jwt does not exist')
-  );
-};
+  return {
+    id: payload.user.id,
+    email: payload.user.email || undefined,
+    app_metadata: {
+      provider: 'app_session',
+      providers: ['app_session'],
+    },
+    user_metadata: {},
+    aud: 'authenticated',
+    created_at: new Date().toISOString(),
+  } as User;
+}
 
 export function useAuth() {
   const previousUserIdRef = useRef<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [locked, setLocked] = useState(false);
   const [effectiveRole, setEffectiveRole] = useState<EffectiveRole | null>(null);
-  const supabase = useMemo(() => createClient(), []);
-
-  const fetchProfile = useCallback(async (userId: string) => {
-    const profileSelect = `
-      id,
-      full_name,
-      phone_number,
-      avatar_url,
-      employee_id,
-      role_id,
-      super_admin,
-      team_id,
-      team:org_teams!profiles_team_id_fkey(
-        id,
-        name
-      ),
-      must_change_password,
-      created_at,
-      updated_at,
-      role:roles(
-        name,
-        display_name,
-        role_class,
-        is_manager_admin,
-        is_super_admin
-      )
-    `;
-
-    try {
-      const handleExpiredSession = async () => {
-        if (isAccountSwitchTransitionActive()) {
-          console.warn('Profile fetch session-expired signal ignored during account switch transition');
-          return;
-        }
-        console.warn('Profile fetch skipped (session expired)');
-        setUser(null);
-        setProfile(null);
-        await supabase.auth.signOut();
-      };
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .select(profileSelect)
-        .eq('id', userId)
-        .single();
-
-      if (error) {
-        // If profile doesn't exist, it might be created by trigger
-        // Wait a moment and try again
-        if (error.code === 'PGRST116') {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          const { data: retryData, error: retryError } = await supabase
-            .from('profiles')
-            .select(profileSelect)
-            .eq('id', userId)
-            .single();
-          
-          if (retryError) {
-            if (isAuthSessionError(retryError)) {
-              await handleExpiredSession();
-              return;
-            }
-            // Not actionable in most cases (profile creation trigger timing) + avoid console.error interception
-            console.warn('Profile not found after retry:', retryError);
-            // Only clear profile if we didn't already have one
-            setProfile(prev => prev ?? null);
-          } else {
-            setProfile(retryData as Profile);
-          }
-        } else {
-          // If offline / flaky network, don't wipe the existing profile and don't escalate to console.error.
-          if (isNetworkFetchError(error)) {
-            console.warn('Profile fetch failed (network issue)');
-            return;
-          }
-          if (isAuthSessionError(error)) {
-            await handleExpiredSession();
-            return;
-          }
-          console.error('Error fetching profile:', error);
-          setProfile(prev => prev ?? null);
-        }
-      } else {
-        setProfile(data as Profile);
-      }
-    } catch (error) {
-      if (isNetworkFetchError(error)) {
-        console.warn('Profile fetch failed (network issue)');
-      } else if (isAuthSessionError(error)) {
-        if (isAccountSwitchTransitionActive()) {
-          console.warn('Profile fetch auth error ignored during account switch transition');
-          return;
-        }
-        console.warn('Profile fetch skipped (session expired)');
-        setUser(null);
-        setProfile(null);
-        await supabase.auth.signOut();
-      } else {
-        console.error('Error fetching profile:', error);
-        setProfile(prev => prev ?? null);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [supabase]);
+  const [supabase, setSupabase] = useState<BrowserSupabaseClient | null>(null);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
-      const nextUserId = session?.user?.id ?? null;
-      previousUserIdRef.current = nextUserId;
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      } else {
-        setLoading(false);
-      }
-    });
+    if (typeof window === 'undefined') {
+      return;
+    }
+    setSupabase(createClient());
+  }, []);
 
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
-      const nextUserId = session?.user?.id ?? null;
+  const loadAuthSession = useCallback(async (options?: { silent?: boolean }) => {
+    try {
+      const response = await fetch('/api/auth/session', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
+
+      if (!response.ok) {
+        setUser(null);
+        setProfile(null);
+        setLocked(false);
+        return;
+      }
+
+      const payload = (await response.json()) as AuthSessionResponse;
+      const nextUser = buildSyntheticUser(payload);
+      const nextUserId = nextUser?.id ?? null;
       const previousUserId = previousUserIdRef.current;
 
       if (previousUserId && nextUserId && previousUserId !== nextUserId) {
@@ -213,41 +131,57 @@ export function useAuth() {
       }
 
       previousUserIdRef.current = nextUserId;
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      } else {
-        setProfile(null);
-        setLoading(false);
+      setUser(nextUser);
+      setProfile(payload.profile ? ({ ...payload.profile } as Profile) : null);
+      setLocked(payload.locked === true);
+    } catch (error) {
+      if (!options?.silent) {
+        const errorMessage = extractErrorMessage(error);
+        if (errorMessage) {
+          console.warn('Failed to load auth session:', errorMessage);
+        }
       }
+      setUser(null);
+      setProfile(null);
+      setLocked(false);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    clearLegacyAccountSwitchClientState();
+    void loadAuthSession();
+
+    const unsubscribe = subscribeToAuthStateChange(() => {
+      void loadAuthSession({ silent: true });
     });
 
-    return () => subscription.unsubscribe();
-  }, [fetchProfile, supabase]);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        void loadAuthSession({ silent: true });
+      }
+    };
 
-  // Auto-detect role changes and force re-login
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      unsubscribe();
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [loadAuthSession]);
+
   useEffect(() => {
     if (!user || !profile) return;
 
-    // Store current role_id in localStorage
     const storageKey = `role_cache_${user.id}`;
     const cachedRoleId = localStorage.getItem(storageKey);
     const currentRoleId = profile.role?.name || '';
 
     if (cachedRoleId && cachedRoleId !== currentRoleId) {
-      if (isAccountSwitchTransitionActive()) {
-        // Intentional user transition can change role cache keys abruptly.
-        localStorage.setItem(storageKey, currentRoleId);
-        return;
-      }
-
-      // Role changed! Force logout and show message
-      console.log('Role change detected - forcing re-login');
       localStorage.removeItem(storageKey);
-      
-      // Show user-friendly message
+
       if (typeof window !== 'undefined') {
-        // Dynamic import to avoid SSR issues
         import('sonner').then(({ toast }) => {
           toast.info('Account Updated', {
             description: 'Your account permissions have been updated. Please log in again to continue.',
@@ -256,120 +190,42 @@ export function useAuth() {
         });
       }
 
-      // Force logout
-      supabase.auth.signOut().then(() => {
+      fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      }).finally(() => {
+        broadcastAuthStateChange('signed_out');
         window.location.href = '/login';
       });
     } else if (!cachedRoleId) {
-      // First time or after logout - store current role
       localStorage.setItem(storageKey, currentRoleId);
     }
-  }, [user, profile, supabase]);
+  }, [profile, user]);
 
-  // Realtime subscription for profile changes (immediate detection)
   useEffect(() => {
     if (!user) return;
 
-    const channel = supabase
-      .channel(`profile_changes_${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'profiles',
-          filter: `id=eq.${user.id}`,
-        },
-        () => {
-          console.log('Profile updated in database - checking for role changes...');
-          // Force re-fetch to get latest data
-          fetchProfile(user.id);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user, fetchProfile, supabase]);
-
-  // Periodic check as a low-frequency backup when realtime misses updates.
-  useEffect(() => {
-    if (!user) return;
-
-    const interval = setInterval(async () => {
-      try {
-        const { data } = await supabase
-          .from('profiles')
-          .select(`
-            role:roles(
-              name
-            )
-          `)
-          .eq('id', user.id)
-          .single();
-
-        if (data && data.role) {
-          const storageKey = `role_cache_${user.id}`;
-          const cachedRoleId = localStorage.getItem(storageKey);
-          const currentRoleId = (data.role as { name?: string } | null)?.name || '';
-
-          if (cachedRoleId && cachedRoleId !== currentRoleId) {
-            if (isAccountSwitchTransitionActive()) {
-              localStorage.setItem(storageKey, currentRoleId);
-              return;
-            }
-
-            // Role changed! Force logout
-            console.log('Role change detected via periodic check - forcing re-login');
-            localStorage.removeItem(storageKey);
-
-            if (typeof window !== 'undefined') {
-              // Dynamic import to avoid SSR issues
-              import('sonner').then(({ toast }) => {
-                toast.info('Account Updated', {
-                  description: 'Your account permissions have been updated. Please log in again to continue.',
-                  duration: 5000,
-                });
-              });
-            }
-
-            await supabase.auth.signOut();
-            window.location.href = '/login';
-          }
-        }
-      } catch (error) {
-        // Avoid escalating transient network issues (common on mobile)
-        if (isAuthSessionError(error)) {
-          if (isAccountSwitchTransitionActive()) {
-            console.warn('Role check auth error ignored during account switch transition');
-            return;
-          }
-          console.warn('Role change check skipped (session expired)');
-          setUser(null);
-          setProfile(null);
-          await supabase.auth.signOut();
-        } else if (!isNetworkFetchError(error)) {
-          console.error('Error checking for role changes:', error);
-        } else {
-          console.warn('Role change check skipped (network issue)');
-        }
-      }
+    const interval = setInterval(() => {
+      void loadAuthSession({ silent: true });
     }, 5 * 60 * 1000);
 
     return () => clearInterval(interval);
-  }, [user, supabase]);
+  }, [loadAuthSession, user]);
 
-  // Fetch effective role/team when view-as cookies are set and user is actual super admin
   useEffect(() => {
     const { roleId: viewAsRoleId, teamId: viewAsTeamId } = getViewAsSelection();
     const isActualSuper =
       profile?.super_admin === true || profile?.role?.is_super_admin === true;
 
-    if ((!viewAsRoleId && !viewAsTeamId) || !isActualSuper) {
+    if ((!viewAsRoleId && !viewAsTeamId) || !isActualSuper || !supabase) {
       setEffectiveRole(null);
       return;
     }
+
+    const currentSupabase = supabase;
 
     async function fetchEffectiveRole() {
       try {
@@ -387,7 +243,7 @@ export function useAuth() {
             : null;
 
         if (viewAsRoleId) {
-          const { data, error } = await supabase
+          const { data, error } = await currentSupabase
             .from('roles')
             .select('name, display_name, role_class, is_manager_admin, is_super_admin')
             .eq('id', viewAsRoleId)
@@ -402,7 +258,8 @@ export function useAuth() {
         }
 
         if (viewAsTeamId) {
-          const { data: teamData, error: teamError } = await supabase
+          const orgTeamsClient = currentSupabase as unknown as OrgTeamsQueryClient;
+          const { data: teamData, error: teamError } = await orgTeamsClient
             .from('org_teams')
             .select('id, name')
             .eq('id', viewAsTeamId)
@@ -428,37 +285,84 @@ export function useAuth() {
         setEffectiveRole(null);
       }
     }
-    fetchEffectiveRole();
+
+    void fetchEffectiveRole();
   }, [profile, supabase]);
 
-  const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+  const signIn = async (
+    email: string,
+    password: string,
+    options?: { rememberMe?: boolean; deviceId?: string | null; deviceLabel?: string | null }
+  ) => {
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email,
+        password,
+        rememberMe: options?.rememberMe === true,
+        deviceId: options?.deviceId || null,
+        deviceLabel: options?.deviceLabel || null,
+      }),
     });
-    return { data, error };
+
+    const payload = (await response.json().catch(() => ({}))) as {
+      error?: string;
+      user?: { id: string; email: string | null };
+      profile?: { id: string; must_change_password?: boolean | null };
+    };
+
+    if (!response.ok) {
+      return {
+        data: null,
+        error: { message: payload.error || 'Login failed' },
+      };
+    }
+
+    broadcastAuthStateChange('signed_in');
+    await loadAuthSession({ silent: true });
+    return {
+      data: payload,
+      error: null,
+    };
   };
 
-  const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (!error) {
-      // Clear role cache
-      if (user) {
-        localStorage.removeItem(`role_cache_${user.id}`);
-      }
+  const signOut = async (options?: { deviceId?: string | null }) => {
+    const response = await fetch('/api/auth/logout', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        deviceId: options?.deviceId || null,
+      }),
+    });
 
-      clearViewAsSelection();
-      
-      setUser(null);
-      setProfile(null);
-      
-      // Clear remember me preference on logout
-      localStorage.removeItem('rememberMe');
+    const payload = (await response.json().catch(() => ({}))) as { error?: string };
+    if (!response.ok) {
+      return { error: { message: payload.error || 'Logout failed' } };
     }
-    return { error };
+
+    if (user) {
+      localStorage.removeItem(`role_cache_${user.id}`);
+    }
+
+    clearViewAsSelection();
+    localStorage.removeItem('rememberMe');
+    setUser(null);
+    setProfile(null);
+    setLocked(false);
+    broadcastAuthStateChange('signed_out');
+    return { error: null };
   };
 
   const signUp = async (email: string, password: string, fullName: string, employeeId?: string) => {
+    if (!supabase) {
+      return { data: null, error: { message: 'Unable to initialize authentication client' } };
+    }
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -472,11 +376,8 @@ export function useAuth() {
     return { data, error };
   };
 
-  // Actual (real) super admin flag – never affected by view-as
   const isActualSuperAdmin =
     profile?.super_admin === true || profile?.role?.is_super_admin === true;
-
-  // When viewing as another role, derive flags from the effective role
   const isViewingAs = isActualSuperAdmin && effectiveRole !== null;
   const roleForFlags = isViewingAs ? effectiveRole : profile?.role ?? null;
 
@@ -484,19 +385,19 @@ export function useAuth() {
     user,
     profile,
     loading,
+    locked,
     signIn,
     signOut,
     signUp,
-    // These flags reflect the EFFECTIVE role (overridden when viewing-as)
-    isAdmin: roleForFlags?.role_class === 'admin' || roleForFlags?.name === 'admin',
+    isAdmin: isAdminRole(roleForFlags),
     isManager: roleForFlags?.role_class === 'manager' || false,
     isSupervisor: (roleForFlags?.name || '').trim().toLowerCase() === 'supervisor',
     isEmployee: roleForFlags?.role_class === 'employee' || false,
     isSuperAdmin: isViewingAs ? (roleForFlags?.is_super_admin || false) : isActualSuperAdmin,
-    // Always reflects the real user, unaffected by view-as
     isActualSuperAdmin,
     isViewingAs,
     effectiveRole,
+    refreshSession: () => loadAuthSession({ silent: true }),
   };
 }
 

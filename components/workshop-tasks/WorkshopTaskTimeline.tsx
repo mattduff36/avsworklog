@@ -32,7 +32,7 @@ type WorkshopTaskTimelineTask = {
   actioned_signed_at?: string | null;
   status_history?: unknown[] | null;
   profiles_created?: {
-    full_name: string;
+    full_name: string | null;
   } | null;
   profiles?: {
     full_name: string | null;

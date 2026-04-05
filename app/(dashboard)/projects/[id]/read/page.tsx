@@ -20,19 +20,32 @@ interface RAMSDocument {
   description: string | null;
   file_name: string;
   file_path: string;
-  file_type: 'pdf' | 'docx';
+  file_type: string;
   created_at: string;
 }
 
 interface Assignment {
   id: string;
-  status: 'pending' | 'read' | 'signed';
+  status: string;
   signed_at: string | null;
   signature_data: string | null;
   action_taken: string | null;
 }
 
 type ActionType = 'downloaded' | 'opened' | 'emailed' | null;
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  if (error && typeof error === 'object' && 'message' in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === 'string' && message.length > 0) {
+      return message;
+    }
+  }
+  return fallback;
+}
 
 function ReadRAMSContent() {
   const params = useParams();
@@ -73,8 +86,7 @@ function ReadRAMSContent() {
         .single();
 
       if (docError || !doc) {
-        const errorMessage = docError instanceof Error ? docError.message : 
-                           docError?.message || 'Document not found';
+        const errorMessage = getErrorMessage(docError, 'Document not found');
         console.error('Error fetching document:', {
           message: errorMessage,
           documentId,
@@ -183,8 +195,7 @@ function ReadRAMSContent() {
           .eq('id', assignment.id);
 
         if (updateError) {
-          const errorMessage = updateError instanceof Error ? updateError.message : 
-                             updateError?.message || 'Unknown error';
+          const errorMessage = getErrorMessage(updateError, 'Unknown error');
           console.error('Error recording RAMS action:', {
             message: errorMessage,
             assignmentId: assignment.id,

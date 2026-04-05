@@ -1,29 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { getInspectionRouteActorAccess } from '@/lib/server/inspection-route-access';
 
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { access, errorResponse } = await getInspectionRouteActorAccess('hgv-inspections');
+    if (errorResponse || !access) {
+      return errorResponse ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const canDeleteInspections = await canEffectiveRoleAccessModule('hgv-inspections');
-    if (!canDeleteInspections) {
+    if (!access.canManageOthers) {
       return NextResponse.json(
-        { error: 'Forbidden: HGV inspections access required' },
+        { error: 'Forbidden: HGV inspection management access required' },
         { status: 403 }
       );
     }
 
     const inspectionId = (await params).id;
-    const { data: inspectionToDelete, error: lookupError } = await supabase
+    const admin = createAdminClient();
+    const { data: inspectionToDelete, error: lookupError } = await admin
       .from('hgv_inspections')
       .select('id, hgv_id')
       .eq('id', inspectionId)
@@ -36,7 +34,7 @@ export async function DELETE(
       );
     }
 
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await admin
       .from('hgv_inspections')
       .delete()
       .eq('id', inspectionId);
@@ -51,7 +49,7 @@ export async function DELETE(
     const hgvId = inspectionToDelete.hgv_id;
     if (hgvId) {
       try {
-        const { data: latestInspection, error: latestInspectionError } = await supabase
+        const { data: latestInspection, error: latestInspectionError } = await admin
           .from('hgv_inspections')
           .select('current_mileage')
           .eq('hgv_id', hgvId)
@@ -66,7 +64,7 @@ export async function DELETE(
 
         const latestMileage = latestInspection?.current_mileage ?? null;
 
-        const { error: updateHgvError } = await supabase
+        const { error: updateHgvError } = await admin
           .from('hgvs')
           .update({ current_mileage: latestMileage })
           .eq('id', hgvId);
@@ -75,7 +73,7 @@ export async function DELETE(
           throw updateHgvError;
         }
 
-        const { data: maintenanceRecord, error: maintenanceLookupError } = await supabase
+        const { data: maintenanceRecord, error: maintenanceLookupError } = await admin
           .from('vehicle_maintenance')
           .select('id')
           .eq('hgv_id', hgvId)
@@ -88,7 +86,7 @@ export async function DELETE(
         }
 
         if (maintenanceRecord?.id) {
-          const { error: updateMaintenanceError } = await supabase
+          const { error: updateMaintenanceError } = await admin
             .from('vehicle_maintenance')
             .update({
               current_mileage: latestMileage,
@@ -100,7 +98,7 @@ export async function DELETE(
             throw updateMaintenanceError;
           }
         } else if (latestMileage !== null) {
-          const { error: insertMaintenanceError } = await supabase
+          const { error: insertMaintenanceError } = await admin
             .from('vehicle_maintenance')
             .insert({
               hgv_id: hgvId,

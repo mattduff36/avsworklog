@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { hasRoleFullAccess } from '@/lib/utils/role-access';
 import {
   ALL_MODULES,
   createEmptyModulePermissionRecord,
@@ -57,8 +58,8 @@ export function buildTeamPermissionRecord(
   return permissionRecord;
 }
 
-export function isFullAccessRole(role: Pick<RoleRow, 'name' | 'is_super_admin'>): boolean {
-  return role.is_super_admin || role.name === 'admin';
+export function isFullAccessRole(role: Pick<RoleRow, 'name' | 'role_class' | 'is_super_admin'>): boolean {
+  return hasRoleFullAccess(role);
 }
 
 export function getAdjacentTierRole(
@@ -76,7 +77,7 @@ export function getAdjacentTierRole(
 }
 
 export function resolveModulesForRoleRank(params: {
-  role: Pick<RoleRow, 'name' | 'is_super_admin' | 'hierarchy_rank'>;
+  role: Pick<RoleRow, 'name' | 'role_class' | 'is_super_admin' | 'hierarchy_rank'>;
   modules: PermissionModuleMatrixColumn[];
   enabledByModule: Map<ModuleName, boolean>;
 }): Set<ModuleName> {

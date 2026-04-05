@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { fetchUserDirectory, type DirectoryUser } from '@/lib/client/user-directory';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -71,8 +72,13 @@ function NewHgvInspectionContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const draftId = searchParams.get('id');
-  const supabase = createClient();
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
+  if (typeof window !== 'undefined' && !supabaseRef.current) {
+    supabaseRef.current = createClient();
+  }
+  const supabase = supabaseRef.current as ReturnType<typeof createClient>;
   const { user, isManager, isAdmin, isSuperAdmin } = useAuth();
+  const { loading: permissionLoading } = usePermissionCheck('hgv-inspections');
   const isElevatedUser = isManager || isAdmin || isSuperAdmin;
   const { tabletModeEnabled } = useTabletMode();
 
@@ -118,6 +124,10 @@ function NewHgvInspectionContent() {
     enabled: Boolean(existingInspectionId),
   });
   const isDraftHydratedRef = useRef(!draftId);
+
+  if (permissionLoading) {
+    return <PageLoader message="Loading HGV inspection form..." />;
+  }
 
   useEffect(() => {
     if (!hasOptionalInspectorComment && informWorkshop) {

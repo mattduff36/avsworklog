@@ -13,6 +13,8 @@ import {
 } from '@/components/ui/dialog';
 import { 
   Activity,
+  ArrowLeft,
+  Delete,
   Menu, 
   X, 
   Bell,
@@ -35,10 +37,11 @@ import { usePendingAbsenceCount, useRamsAssignmentSummary } from '@/lib/hooks/us
 import { isAccountSwitcherEnabled } from '@/lib/account-switch/feature-flag';
 import {
   getAccountSwitchDeviceLabel,
+  getAccountSwitchDeviceId,
   getOrCreateAccountSwitchDeviceId,
 } from '@/lib/account-switch/device';
-import { listSavedAccountShortcuts } from '@/lib/account-switch/storage';
-import { buildLockPathWithReturnTo, setAccountLockedClientState } from '@/lib/account-switch/lock-state';
+import { buildLockPathWithReturnTo } from '@/lib/account-switch/lock-state';
+import { toast } from 'sonner';
 import { 
   dashboardNavItem, 
   getFilteredEmployeeNav, 
@@ -135,6 +138,11 @@ function checkStandaloneMode(): boolean {
   return isStandaloneDisplayMode || isIOSStandalone;
 }
 
+const PIN_LENGTH = 4;
+const PIN_KEYPAD_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const;
+const PIN_KEY_BUTTON_CLASS =
+  'h-14 rounded-xl text-xl font-semibold bg-slate-950 text-white hover:bg-slate-900 md:h-16 md:text-2xl';
+
 export function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
@@ -148,18 +156,25 @@ export function Navbar() {
   const [isMounted, setIsMounted] = useState(false); // Track client hydration
   const [isCompact, setIsCompact] = useState(false);
   const [desktopMenuOpen, setDesktopMenuOpen] = useState(false);
-  const [accountLockLabel, setAccountLockLabel] = useState('Lock Account');
+  const [accountLockLabel] = useState('Lock / Switch');
   const [activeNowDialogOpen, setActiveNowDialogOpen] = useState(false);
   const [desktopMenuPosition, setDesktopMenuPosition] = useState({ left: 0, top: 0, maxHeight: 320 });
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isStandaloneApp, setIsStandaloneApp] = useState(false);
+  const [showPinSetupDialog, setShowPinSetupDialog] = useState(false);
+  const [pinSetupStep, setPinSetupStep] = useState<'enter' | 'confirm'>('enter');
+  const [pinEntry, setPinEntry] = useState('');
+  const [pendingPin, setPendingPin] = useState('');
+  const [pinSetupSubmitting, setPinSetupSubmitting] = useState(false);
+  const [pendingLockPath, setPendingLockPath] = useState<string | null>(null);
   const navRef = useRef<HTMLDivElement>(null);
   const isCompactRef = useRef(false);
   const expandedWidthRef = useRef(0);
   const desktopMenuTriggerRef = useRef<HTMLButtonElement>(null);
   const desktopMenuRef = useRef<HTMLDivElement>(null);
-  const supabase = useMemo(() => createClient(), []);
+  const [supabase, setSupabase] = useState<ReturnType<typeof createClient> | null>(null);
   const accountSwitcherEnabled = useMemo(() => isAccountSwitcherEnabled(), []);
+  const canSubmitPinSetup = pinEntry.length === PIN_LENGTH && !pinSetupSubmitting;
 
   // useAuth now provides effective role flags (respecting View As cookie)
   const effectiveIsManager = isManager;
@@ -178,6 +193,14 @@ export function Navbar() {
   }, []);
 
   useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    setSupabase(createClient());
+  }, []);
+
+  useEffect(() => {
     if (!tabletModeEnabled) return;
     setMobileMenuOpen(false);
     setSidebarOpen(false);
@@ -185,27 +208,6 @@ export function Navbar() {
     setDesktopMenuOpen(false);
     setActiveNowDialogOpen(false);
   }, [tabletModeEnabled]);
-
-  const refreshAccountLockLabel = useCallback(() => {
-    if (!accountSwitcherEnabled || !isMounted) return;
-    const switchableShortcuts = listSavedAccountShortcuts().filter(
-      (shortcut) => shortcut.profileId !== profile?.id
-    );
-    setAccountLockLabel(switchableShortcuts.length > 0 ? 'Lock / Switch' : 'Lock Account');
-  }, [accountSwitcherEnabled, isMounted, profile?.id]);
-
-  useEffect(() => {
-    if (!accountSwitcherEnabled || !isMounted) return;
-
-    refreshAccountLockLabel();
-    window.addEventListener('storage', refreshAccountLockLabel);
-    window.addEventListener('focus', refreshAccountLockLabel);
-
-    return () => {
-      window.removeEventListener('storage', refreshAccountLockLabel);
-      window.removeEventListener('focus', refreshAccountLockLabel);
-    };
-  }, [accountSwitcherEnabled, isMounted, refreshAccountLockLabel]);
 
   useEffect(() => {
     setIsStandaloneApp(checkStandaloneMode());
@@ -329,13 +331,6 @@ export function Navbar() {
     }
 
     try {
-      // Double-check user is still authenticated before making request
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (!currentUser?.id) {
-        setUnreadCount(0);
-        return;
-      }
-
       const response = await fetch('/api/messages/notifications');
 
       // Handle 401 gracefully - user may have just logged out
@@ -375,7 +370,7 @@ export function Navbar() {
 
       setUnreadCount(0);
     }
-  }, [supabase, user?.id]);
+  }, [user?.id]);
 
   // Fetch and refresh notification count.
   useEffect(() => {
@@ -410,7 +405,7 @@ export function Navbar() {
 
   // Realtime updates for this user's notification rows.
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id || !supabase) return;
 
     const filter = `user_id=eq.${user.id}`;
     const channel = supabase
@@ -440,11 +435,15 @@ export function Navbar() {
 
   const handleSignOut = async () => {
     try {
+      const existingDeviceId = getAccountSwitchDeviceId();
+
       // Close mobile menu if open
       setMobileMenuOpen(false);
       
       // Sign out and wait for completion
-      await signOut();
+      await signOut({
+        deviceId: accountSwitcherEnabled ? existingDeviceId : null,
+      });
       
       // Force a hard redirect to ensure all state is cleared (especially important for admin accounts)
       // This ensures the sign out works on first click
@@ -456,30 +455,165 @@ export function Navbar() {
     }
   };
 
-  const handleLockAccount = useCallback(() => {
-    if (!accountSwitcherEnabled) return;
-    const queryString = searchParams?.toString();
-    const currentPath = pathname || '/dashboard';
-    const returnTo = queryString ? `${currentPath}?${queryString}` : currentPath;
-    const deviceId = getOrCreateAccountSwitchDeviceId();
+  function resetPinSetupDialogState() {
+    setPinSetupStep('enter');
+    setPinEntry('');
+    setPendingPin('');
+    setPinSetupSubmitting(false);
+  }
 
-    if (deviceId) {
-      void fetch('/api/account-switch/device/register', {
+  function handlePinSetupDigitPress(digit: string) {
+    if (pinSetupSubmitting) return;
+    setPinEntry((previousPin) => {
+      if (previousPin.length >= PIN_LENGTH) {
+        return previousPin;
+      }
+      return `${previousPin}${digit}`;
+    });
+  }
+
+  function handlePinSetupBackspace() {
+    if (pinSetupSubmitting) return;
+    setPinEntry((previousPin) => previousPin.slice(0, -1));
+  }
+
+  function handlePinSetupClear() {
+    if (pinSetupSubmitting) return;
+    setPinEntry('');
+  }
+
+  const handlePinSetupSubmit = useCallback(async (pinOverride?: string) => {
+    const pin = pinOverride ?? pinEntry;
+    if (pin.length !== PIN_LENGTH || pinSetupSubmitting) return;
+
+    if (pinSetupStep === 'enter') {
+      setPendingPin(pin);
+      setPinEntry('');
+      setPinSetupStep('confirm');
+      return;
+    }
+
+    if (pin !== pendingPin) {
+      toast.error('PIN confirmation does not match. Try again.');
+      setPinEntry('');
+      setPendingPin('');
+      setPinSetupStep('enter');
+      return;
+    }
+
+    const deviceId = getOrCreateAccountSwitchDeviceId();
+    if (!deviceId) {
+      toast.error('Unable to determine this device. Please try again.');
+      return;
+    }
+
+    setPinSetupSubmitting(true);
+    try {
+      const response = await fetch('/api/account-switch/pin/setup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          pin,
+          enableQuickSwitch: true,
           deviceId,
           deviceLabel: getAccountSwitchDeviceLabel(),
         }),
       });
-    }
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Failed to configure PIN');
+      }
 
-    setAccountLockedClientState(true);
+      toast.success('PIN set successfully.');
+      const nextLockPath = pendingLockPath;
+      setShowPinSetupDialog(false);
+      resetPinSetupDialogState();
+      setPendingLockPath(null);
+
+      const lockResponse = await fetch('/api/auth/lock', {
+        method: 'POST',
+      });
+      if (!lockResponse.ok) {
+        const lockPayload = await lockResponse.json().catch(() => ({}));
+        throw new Error(lockPayload?.error || 'Failed to lock account');
+      }
+
+      router.push(nextLockPath || buildLockPathWithReturnTo('/dashboard'));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to configure PIN');
+      setPinEntry('');
+      setPendingPin('');
+      setPinSetupStep('enter');
+    } finally {
+      setPinSetupSubmitting(false);
+    }
+  }, [pendingLockPath, pendingPin, pinEntry, pinSetupStep, pinSetupSubmitting, router]);
+
+  useEffect(() => {
+    if (!showPinSetupDialog) return;
+    if (pinEntry.length !== PIN_LENGTH) return;
+    if (pinSetupSubmitting) return;
+    void handlePinSetupSubmit(pinEntry);
+  }, [handlePinSetupSubmit, pinEntry, pinSetupSubmitting, showPinSetupDialog]);
+
+  const handleLockAccount = useCallback(async () => {
+    if (!accountSwitcherEnabled) return;
+    const queryString = searchParams?.toString();
+    const currentPath = pathname || '/dashboard';
+    const returnTo = queryString ? `${currentPath}?${queryString}` : currentPath;
+    const deviceId = getOrCreateAccountSwitchDeviceId();
+    let pinConfigured = true;
+
     setMobileMenuOpen(false);
     setDesktopMenuOpen(false);
-    router.push(buildLockPathWithReturnTo(returnTo));
+
+    if (deviceId) {
+      try {
+        await fetch('/api/account-switch/device/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            deviceId,
+            deviceLabel: getAccountSwitchDeviceLabel(),
+          }),
+        });
+
+        const settingsResponse = await fetch(
+          `/api/account-switch/settings?deviceId=${encodeURIComponent(deviceId)}`,
+          { cache: 'no-store' }
+        );
+        if (settingsResponse.ok) {
+          const settingsPayload = (await settingsResponse.json()) as {
+            settings?: { pin_configured?: boolean };
+          };
+          pinConfigured = Boolean(settingsPayload.settings?.pin_configured);
+        }
+      } catch {
+        pinConfigured = true;
+      }
+    }
+
+    const lockPath = buildLockPathWithReturnTo(returnTo);
+    if (pinConfigured) {
+      const lockResponse = await fetch('/api/auth/lock', {
+        method: 'POST',
+      });
+      if (!lockResponse.ok) {
+        const lockPayload = await lockResponse.json().catch(() => ({}));
+        toast.error(lockPayload?.error || 'Failed to lock account');
+        return;
+      }
+      router.push(lockPath);
+      return;
+    }
+
+    setPendingLockPath(`${lockPath}&setupPin=1`);
+    resetPinSetupDialogState();
+    setShowPinSetupDialog(true);
   }, [accountSwitcherEnabled, pathname, router, searchParams]);
 
   const handleInstallApp = async () => {
@@ -1030,6 +1164,123 @@ export function Navbar() {
             </DialogContent>
           </Dialog>
         )}
+
+        <Dialog
+          open={showPinSetupDialog}
+          onOpenChange={(open) => {
+            if (pinSetupSubmitting) return;
+            setShowPinSetupDialog(open);
+            if (!open) {
+              resetPinSetupDialogState();
+              setPendingLockPath(null);
+            }
+          }}
+        >
+          <DialogContent className="w-[min(100vw-1.5rem,34rem)] border-border bg-slate-900 text-white">
+            <DialogHeader>
+              <DialogTitle>
+                {pinSetupStep === 'enter' ? 'Set your 4-digit PIN' : 'Confirm your 4-digit PIN'}
+              </DialogTitle>
+              <DialogDescription className="text-slate-400">
+                Set and confirm your PIN before locking this profile.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="rounded-md border border-border/60 bg-slate-800/40 p-4 md:p-5 space-y-4 md:space-y-5">
+              {pinSetupStep === 'confirm' ? (
+                <div className="flex items-center justify-between">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      if (pinSetupSubmitting) return;
+                      setPinSetupStep('enter');
+                      setPinEntry('');
+                      setPendingPin('');
+                    }}
+                    disabled={pinSetupSubmitting}
+                    className="h-10 px-3 text-slate-300 hover:text-white"
+                  >
+                    <ArrowLeft className="mr-1 h-4 w-4" />
+                    Back
+                  </Button>
+                  <span className="text-sm text-slate-400">PIN keypad</span>
+                </div>
+              ) : null}
+
+              <div className="flex justify-center gap-2.5 py-1.5">
+                {Array.from({ length: PIN_LENGTH }).map((_, index) => {
+                  const isFilled = index < pinEntry.length;
+                  return (
+                    <span
+                      key={`lock-setup-pin-slot-${index}`}
+                      className={`h-3 w-3 rounded-full border ${
+                        isFilled ? 'border-avs-yellow bg-avs-yellow' : 'border-slate-600 bg-transparent'
+                      }`}
+                    />
+                  );
+                })}
+              </div>
+
+              <div className="grid grid-cols-3 gap-2.5 md:gap-3">
+                {PIN_KEYPAD_KEYS.map((digit) => (
+                  <Button
+                    key={digit}
+                    type="button"
+                    variant="secondary"
+                    onClick={() => handlePinSetupDigitPress(digit)}
+                    disabled={pinSetupSubmitting}
+                    className={PIN_KEY_BUTTON_CLASS}
+                  >
+                    {digit}
+                  </Button>
+                ))}
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handlePinSetupClear}
+                  disabled={pinSetupSubmitting || pinEntry.length === 0}
+                  className="h-14 rounded-xl md:h-16"
+                >
+                  Clear
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => handlePinSetupDigitPress('0')}
+                  disabled={pinSetupSubmitting}
+                  className={PIN_KEY_BUTTON_CLASS}
+                >
+                  0
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handlePinSetupBackspace}
+                  disabled={pinSetupSubmitting || pinEntry.length === 0}
+                  className="h-14 rounded-xl md:h-16"
+                >
+                  <Delete className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <Button
+                type="button"
+                onClick={() => void handlePinSetupSubmit()}
+                disabled={!canSubmitPinSetup}
+                className="w-full h-12 text-base font-semibold bg-avs-yellow text-slate-900 hover:bg-avs-yellow-hover disabled:opacity-60"
+              >
+                {pinSetupSubmitting
+                  ? 'Saving...'
+                  : pinSetupStep === 'enter'
+                    ? 'Continue'
+                    : 'Save PIN and lock'}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </nav>
     </>
   );

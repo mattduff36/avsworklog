@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { getActorAbsenceSecondaryPermissions } from '@/lib/server/absence-secondary-permissions';
@@ -60,8 +61,7 @@ export async function getWorkShiftAccessContext(): Promise<
       : {}),
   });
 
-  const isAdmin =
-    effectiveRole.is_actual_super_admin || effectiveRole.is_super_admin || effectiveRole.role_name === 'admin';
+  const isAdmin = hasEffectiveRoleFullAccess(effectiveRole);
   const canViewAll = isAdmin || secondary.effective.see_manage_work_shifts_all;
   const canEditAll = isAdmin || secondary.effective.edit_manage_work_shifts_all;
   const canViewTeam = isAdmin || secondary.effective.see_manage_work_shifts_team;

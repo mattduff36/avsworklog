@@ -1,28 +1,24 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Delete, Lock, Plus } from 'lucide-react';
+import { Lock, Plus } from 'lucide-react';
+import { toast } from 'sonner';
+import { broadcastAuthStateChange, clearLegacyAccountSwitchClientState } from '@/lib/app-auth/client';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { createClient } from '@/lib/supabase/client';
+import { isAccountSwitcherEnabled } from '@/lib/account-switch/feature-flag';
 import {
   getAccountSwitchDeviceLabel,
   getOrCreateAccountSwitchDeviceId,
 } from '@/lib/account-switch/device';
-import {
-  decryptSavedAccountSession,
-  listSavedAccountShortcuts,
-  mapSessionForStorage,
-  markSavedAccountShortcutUsed,
-  removeSavedAccountShortcut,
-  saveAccountShortcut,
-} from '@/lib/account-switch/storage';
-import { switchActiveSession } from '@/lib/account-switch/session';
-import { isAccountSwitcherEnabled } from '@/lib/account-switch/feature-flag';
-import { setAccountLockedClientState } from '@/lib/account-switch/lock-state';
-import type { SavedAccountShortcut } from '@/lib/account-switch/types';
 import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 type LockPageMode = 'checking' | 'set-pin-enter' | 'set-pin-confirm' | 'locked';
 
@@ -30,7 +26,6 @@ interface AccountSwitchSettingsResponse {
   code?: string;
   settings?: {
     pin_configured?: boolean;
-    device_registered?: boolean;
   };
   error?: string;
   details?: {
@@ -38,14 +33,23 @@ interface AccountSwitchSettingsResponse {
   };
 }
 
+interface DeviceProfileSummary {
+  profile_id: string;
+  full_name: string | null;
+  role_name: string | null;
+  avatar_url?: string | null;
+  email?: string | null;
+}
+
+interface DeviceProfilesResponse {
+  profiles?: DeviceProfileSummary[];
+  error?: string;
+}
+
 const PIN_LENGTH = 4;
 const PIN_KEYPAD_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const;
 const PIN_KEY_BUTTON_CLASS =
   'h-14 rounded-xl text-xl font-semibold bg-slate-950 text-white hover:bg-slate-900 md:h-16 md:text-2xl';
-
-function getShortcutDisplayName(shortcut: SavedAccountShortcut): string {
-  return shortcut.fullName || shortcut.email || 'Account';
-}
 
 function getInitials(name: string | null | undefined): string {
   if (!name) return 'U';
@@ -58,32 +62,20 @@ function getInitials(name: string | null | undefined): string {
 export default function LockPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { profile, signOut, loading: authLoading } = useAuth();
-  const suppressErrorToastsRef = useRef(false);
+  const { profile, loading: authLoading, locked } = useAuth();
   const [deviceId] = useState(() => getOrCreateAccountSwitchDeviceId());
   const [mode, setMode] = useState<LockPageMode>('checking');
-  const [shortcuts, setShortcuts] = useState<SavedAccountShortcut[]>([]);
-  const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
-  const [enteredPin, setEnteredPin] = useState('');
+  const [profiles, setProfiles] = useState<DeviceProfileSummary[]>([]);
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
+  const [pinEntry, setPinEntry] = useState('');
   const [pendingPin, setPendingPin] = useState('');
-  const [checking, setChecking] = useState(true);
-  const [settingPin, setSettingPin] = useState(false);
-  const [registering, setRegistering] = useState(false);
-  const [unlocking, setUnlocking] = useState(false);
+  const [pinModalOpen, setPinModalOpen] = useState(false);
+  const [loadingState, setLoadingState] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [pinLockedUntil, setPinLockedUntil] = useState<string | null>(null);
   const isFeatureEnabled = useMemo(() => isAccountSwitcherEnabled(), []);
 
   const currentProfileId = profile?.id || null;
-  const currentShortcut = useMemo(
-    () => shortcuts.find((shortcut) => shortcut.profileId === currentProfileId) || null,
-    [shortcuts, currentProfileId]
-  );
-  const switchableShortcuts = useMemo(
-    () => shortcuts.filter((shortcut) => shortcut.profileId !== currentProfileId),
-    [shortcuts, currentProfileId]
-  );
-  const isProcessing = checking || settingPin || registering || unlocking;
-
   const returnTo = useMemo(() => {
     const candidate = searchParams?.get('returnTo') || '/dashboard';
     if (!candidate.startsWith('/') || candidate.startsWith('/lock')) {
@@ -92,567 +84,465 @@ export default function LockPage() {
     return candidate;
   }, [searchParams]);
 
-  function syncActiveProfileSelection(shortcutsList: SavedAccountShortcut[]): void {
-    setActiveProfileId((previousProfileId) => {
-      if (!previousProfileId) {
-        return null;
-      }
+  const selectedProfile = useMemo(
+    () => profiles.find((item) => item.profile_id === selectedProfileId) || null,
+    [profiles, selectedProfileId]
+  );
+  const highlightedProfileId = selectedProfileId || currentProfileId;
 
-      if (currentProfileId && previousProfileId === currentProfileId) {
-        return currentProfileId;
-      }
+  const keypadDisabled = loadingState || submitting;
 
-      const isSavedProfileStillAvailable = shortcutsList.some(
-        (shortcut) => shortcut.profileId === previousProfileId
-      );
-      return isSavedProfileStillAvailable ? previousProfileId : null;
-    });
-  }
-
-  async function registerCurrentAccountShortcut(pin: string, showSuccessToast: boolean): Promise<void> {
-    if (!currentProfileId) return;
-
-    setRegistering(true);
-    try {
-      const response = await fetch('/api/account-switch/session/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          pin,
-          deviceId,
-        }),
-      });
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.error || 'Failed to register account');
-      }
-
-      const supabase = createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session || !payload.profile?.profileId) {
-        throw new Error('No active session available to save');
-      }
-
-      const mappedSession = mapSessionForStorage(session, payload.profile.profileId);
-      await saveAccountShortcut({
-        profile: payload.profile,
-        session: mappedSession,
-        pin,
-      });
-
-      const nextShortcuts = listSavedAccountShortcuts();
-      setShortcuts(nextShortcuts);
-      syncActiveProfileSelection(nextShortcuts);
-      if (showSuccessToast) {
-        toast.success('Current account saved on this device');
-      }
-    } finally {
-      setRegistering(false);
+  const reloadProfiles = useCallback(async (): Promise<void> => {
+    const response = await fetch(
+      `/api/account-switch/device-profiles?deviceId=${encodeURIComponent(deviceId)}`,
+      { cache: 'no-store' }
+    );
+    const payload = (await response.json()) as DeviceProfilesResponse;
+    if (!response.ok) {
+      throw new Error(payload.error || 'Failed to load device profiles');
     }
-  }
+    setProfiles(payload.profiles || []);
+  }, [deviceId]);
 
   useEffect(() => {
     if (authLoading) return;
-
-    if (!currentProfileId) {
-      setAccountLockedClientState(false);
-      router.replace('/login');
-      return;
-    }
 
     if (!isFeatureEnabled) {
       router.replace('/dashboard');
       return;
     }
 
-    setAccountLockedClientState(true);
-    setChecking(true);
-    setMode('checking');
-    setEnteredPin('');
-    setPendingPin('');
-    setActiveProfileId(null);
-    setPinLockedUntil(null);
+    if (!currentProfileId) {
+      router.replace('/login');
+      return;
+    }
 
-    const storedShortcuts = listSavedAccountShortcuts();
-    setShortcuts(storedShortcuts);
+    clearLegacyAccountSwitchClientState();
+    setLoadingState(true);
+    setMode('checking');
+    setPinModalOpen(false);
+    setSelectedProfileId(null);
+    setPinEntry('');
+    setPendingPin('');
+    setPinLockedUntil(null);
 
     void (async () => {
       try {
-        if (deviceId) {
-          await fetch('/api/account-switch/device/register', {
+        await fetch('/api/account-switch/device/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            deviceId,
+            deviceLabel: getAccountSwitchDeviceLabel(),
+          }),
+        });
+
+        const settingsResponse = await fetch(
+          `/api/account-switch/settings?deviceId=${encodeURIComponent(deviceId)}`,
+          { cache: 'no-store' }
+        );
+        const settingsPayload = (await settingsResponse.json()) as AccountSwitchSettingsResponse;
+        if (!settingsResponse.ok) {
+          throw new Error(settingsPayload.error || 'Failed to load account switch settings');
+        }
+
+        await reloadProfiles();
+
+        if (settingsPayload.settings?.pin_configured) {
+          setMode('locked');
+        } else {
+          setMode('set-pin-enter');
+          setSelectedProfileId(currentProfileId);
+          setPinModalOpen(true);
+          toast.info('Set a 4-digit PIN before using the lock screen on this device.');
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Failed to load lock screen');
+      } finally {
+        setLoadingState(false);
+      }
+    })();
+  }, [authLoading, currentProfileId, deviceId, isFeatureEnabled, reloadProfiles, router]);
+
+  useEffect(() => {
+    if (!pinModalOpen) return;
+    if (pinEntry.length !== PIN_LENGTH) return;
+    if (submitting || loadingState) return;
+
+    void (async () => {
+      if (mode === 'set-pin-enter') {
+        setPendingPin(pinEntry);
+        setPinEntry('');
+        setMode('set-pin-confirm');
+        return;
+      }
+
+      if (mode === 'set-pin-confirm') {
+        if (pinEntry !== pendingPin) {
+          toast.error('PIN confirmation does not match. Try again.');
+          setPendingPin('');
+          setPinEntry('');
+          setMode('set-pin-enter');
+          return;
+        }
+
+        setSubmitting(true);
+        try {
+          const setupResponse = await fetch('/api/account-switch/pin/setup', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
+              pin: pinEntry,
+              enableQuickSwitch: true,
               deviceId,
               deviceLabel: getAccountSwitchDeviceLabel(),
             }),
           });
+          const setupPayload = (await setupResponse.json()) as { error?: string };
+          if (!setupResponse.ok) {
+            throw new Error(setupPayload.error || 'Failed to set PIN');
+          }
+
+          if (!locked) {
+            const lockResponse = await fetch('/api/auth/lock', {
+              method: 'POST',
+            });
+            const lockPayload = (await lockResponse.json().catch(() => ({}))) as { error?: string };
+            if (!lockResponse.ok) {
+              throw new Error(lockPayload.error || 'Failed to lock account');
+            }
+          }
+
+          await reloadProfiles();
+          setMode('locked');
+          setPinModalOpen(false);
+          setPinEntry('');
+          setPendingPin('');
+          setSelectedProfileId(null);
+          toast.success('PIN set. Select a profile to unlock.');
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : 'Failed to configure PIN');
+          setPinEntry('');
+          setPendingPin('');
+          setMode('set-pin-enter');
+        } finally {
+          setSubmitting(false);
+        }
+        return;
+      }
+
+      if (!selectedProfileId) {
+        setPinEntry('');
+        return;
+      }
+
+      setSubmitting(true);
+      try {
+        const unlockResponse = await fetch('/api/account-switch/unlock', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            targetProfileId: selectedProfileId,
+            pin: pinEntry,
+            deviceId,
+          }),
+        });
+        const unlockPayload = (await unlockResponse.json()) as AccountSwitchSettingsResponse;
+        if (!unlockResponse.ok) {
+          if (unlockPayload.code === 'PIN_LOCKED') {
+            setPinLockedUntil(unlockPayload.details?.pin_locked_until || null);
+          }
+          throw new Error(unlockPayload.error || 'Incorrect PIN');
         }
 
-        const response = await fetch(
-          `/api/account-switch/settings?deviceId=${encodeURIComponent(deviceId)}`,
-          { cache: 'no-store' }
-        );
-        const payload = (await response.json()) as AccountSwitchSettingsResponse;
-        if (!response.ok) {
-          throw new Error(payload.error || 'Failed to load account switch settings');
-        }
-        const hasPin = Boolean(payload.settings?.pin_configured);
-        setMode(hasPin ? 'locked' : 'set-pin-enter');
+        broadcastAuthStateChange('pin_unlock');
+        window.location.replace(selectedProfileId === currentProfileId ? returnTo : '/dashboard');
       } catch (error) {
-        if (!suppressErrorToastsRef.current)
-          toast.error(error instanceof Error ? error.message : 'Failed to load account switch settings');
-        setMode('set-pin-enter');
+        toast.error(error instanceof Error ? error.message : 'Failed to unlock account');
+        setPinEntry('');
       } finally {
-        setChecking(false);
+        setSubmitting(false);
       }
     })();
-  }, [authLoading, deviceId, isFeatureEnabled, router, currentProfileId]);
+  }, [currentProfileId, deviceId, loadingState, locked, mode, pendingPin, pinEntry, pinModalOpen, reloadProfiles, returnTo, selectedProfileId, submitting]);
+
+  const handleDigitPress = useCallback((digit: string): void => {
+    if (keypadDisabled) return;
+    setPinEntry((currentValue) => {
+      if (currentValue.length >= PIN_LENGTH) {
+        return currentValue;
+      }
+      return `${currentValue}${digit}`;
+    });
+  }, [keypadDisabled]);
+
+  const handleBackspace = useCallback((): void => {
+    if (keypadDisabled) return;
+    setPinEntry((currentValue) => currentValue.slice(0, -1));
+  }, [keypadDisabled]);
+
+  const handleClear = useCallback((): void => {
+    if (keypadDisabled) return;
+    setPinEntry('');
+  }, [keypadDisabled]);
+
+  function openProfile(profileId: string): void {
+    setSelectedProfileId(profileId);
+    setPinEntry('');
+    setPendingPin('');
+    setPinLockedUntil(null);
+    setPinModalOpen(true);
+  }
+
+  function handleSignInAsAnotherUser(): void {
+    router.push('/login');
+  }
 
   useEffect(() => {
-    if (mode === 'checking') return;
-    if (!activeProfileId) return;
-    if (enteredPin.length !== PIN_LENGTH) return;
-    if (isProcessing) return;
-    void handlePinSubmit(enteredPin);
-  }, [activeProfileId, enteredPin, isProcessing, mode]);
-
-  async function handleSetupPin(pin: string): Promise<void> {
-    setSettingPin(true);
-    try {
-      const response = await fetch('/api/account-switch/pin/setup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          pin,
-          enableQuickSwitch: true,
-          deviceId,
-          deviceLabel: getAccountSwitchDeviceLabel(),
-        }),
-      });
-      const payload = await response.json();
-      if (!response.ok) {
-        const errorMessage =
-          typeof payload?.error === 'string' ? payload.error : 'Failed to configure PIN';
-
-        if (
-          response.status === 400 &&
-          /existing PIN|password is required to change/i.test(errorMessage)
-        ) {
-          setMode('locked');
-          setEnteredPin('');
-          setPendingPin('');
-          toast.info('PIN already configured for this account. Enter your PIN to continue.');
-          return;
-        }
-
-        throw new Error(errorMessage);
-      }
-
-      await registerCurrentAccountShortcut(pin, false);
-      setMode('locked');
-      setEnteredPin('');
-      setPendingPin('');
-      toast.success('PIN set. Account locked.');
-    } catch (error) {
-      if (!suppressErrorToastsRef.current)
-        toast.error(error instanceof Error ? error.message : 'Failed to configure PIN');
-      setMode('set-pin-enter');
-      setEnteredPin('');
-      setPendingPin('');
-    } finally {
-      setSettingPin(false);
-    }
-  }
-
-  async function unlockCurrentAccount(pin: string): Promise<void> {
-    if (!currentProfileId) return;
-    setUnlocking(true);
-    try {
-      const verifyResponse = await fetch('/api/account-switch/pin/verify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ pin, deviceId }),
-      });
-      const verifyPayload = (await verifyResponse.json()) as AccountSwitchSettingsResponse;
-      if (!verifyResponse.ok) {
-        if (verifyPayload.code === 'PIN_LOCKED') {
-          setPinLockedUntil(verifyPayload.details?.pin_locked_until || null);
-        }
-        throw new Error(verifyPayload.error || 'Incorrect PIN');
-      }
-      setPinLockedUntil(null);
-
-      if (!currentShortcut) {
-        await registerCurrentAccountShortcut(pin, false);
-      }
-
-      setAccountLockedClientState(false);
-      window.location.href = returnTo;
-    } catch (error) {
-      if (!suppressErrorToastsRef.current)
-        toast.error(error instanceof Error ? error.message : 'Failed to unlock account');
-      setEnteredPin('');
-    } finally {
-      setUnlocking(false);
-    }
-  }
-
-  async function switchToSavedAccount(shortcut: SavedAccountShortcut, pin: string): Promise<void> {
-    setUnlocking(true);
-    try {
-      const verifyResponse = await fetch('/api/account-switch/session/switch', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          targetProfileId: shortcut.profileId,
-          pin,
-          deviceId,
-        }),
-      });
-      const verifyPayload = (await verifyResponse.json()) as AccountSwitchSettingsResponse;
-      if (!verifyResponse.ok) {
-        if (verifyPayload.code === 'PIN_LOCKED') {
-          setPinLockedUntil(verifyPayload.details?.pin_locked_until || null);
-        }
-        throw new Error(verifyPayload.error || 'Failed to verify PIN');
-      }
-      setPinLockedUntil(null);
-
-      const decryptedSession = await decryptSavedAccountSession(shortcut, pin);
-      if (!decryptedSession) {
-        throw new Error('Unable to decrypt saved session with this PIN');
-      }
-
-      const switchResult = await switchActiveSession(decryptedSession);
-      if (!switchResult.success) {
-        throw new Error(switchResult.errorMessage || 'Failed to switch account');
-      }
-
-      markSavedAccountShortcutUsed(shortcut.profileId);
-      setAccountLockedClientState(false);
-      window.location.href = '/dashboard';
-    } catch (error) {
-      if (!suppressErrorToastsRef.current)
-        toast.error(error instanceof Error ? error.message : 'Failed to switch account');
-      setEnteredPin('');
-    } finally {
-      setUnlocking(false);
-    }
-  }
-
-  async function handlePinSubmit(pinOverride?: string): Promise<void> {
-    const pin = pinOverride ?? enteredPin;
-    if (pin.length !== PIN_LENGTH || isProcessing) return;
-
-    if (mode === 'set-pin-enter') {
-      setPendingPin(pin);
-      setEnteredPin('');
-      setMode('set-pin-confirm');
+    if (!pinModalOpen) {
       return;
     }
 
-    if (mode === 'set-pin-confirm') {
-      if (pin !== pendingPin) {
-        toast.error('PIN confirmation does not match. Try again.');
-        setEnteredPin('');
-        setPendingPin('');
-        setMode('set-pin-enter');
-        return;
-      }
-      await handleSetupPin(pin);
-      return;
-    }
-
-    if (mode === 'locked') {
-      if (!activeProfileId) {
-        toast.error('Select an account to continue');
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.altKey || event.ctrlKey || event.metaKey) {
         return;
       }
 
-      if (activeProfileId === currentProfileId) {
-        await unlockCurrentAccount(pin);
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT')
+      ) {
         return;
       }
-      const targetShortcut = shortcuts.find((shortcut) => shortcut.profileId === activeProfileId);
-      if (!targetShortcut) {
-        toast.error('Select an account to switch');
+
+      if (/^\d$/.test(event.key)) {
+        event.preventDefault();
+        handleDigitPress(event.key);
         return;
       }
-      await switchToSavedAccount(targetShortcut, pin);
-    }
-  }
 
-  function handleDigitPress(digit: string): void {
-    if (isProcessing) return;
-
-    setEnteredPin((previousPin) => {
-      if (previousPin.length >= PIN_LENGTH) {
-        return previousPin;
+      if (event.key === 'Backspace') {
+        event.preventDefault();
+        handleBackspace();
+        return;
       }
-      return `${previousPin}${digit}`;
-    });
-  }
 
-  function handlePinBackspace(): void {
-    if (isProcessing) return;
-    setEnteredPin((previousPin) => previousPin.slice(0, -1));
-  }
+      if (event.key === 'Delete') {
+        event.preventDefault();
+        handleClear();
+      }
+    };
 
-  function handlePinClear(): void {
-    if (isProcessing) return;
-    setEnteredPin('');
-    setPinLockedUntil(null);
-  }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleBackspace, handleClear, handleDigitPress, pinModalOpen]);
 
-  function handleSelectProfile(profileId: string): void {
-    if (isProcessing) return;
-    setActiveProfileId(profileId);
-    setEnteredPin('');
-    setPinLockedUntil(null);
+  if (mode === 'checking' || loadingState) {
+    return <div className="min-h-screen bg-slate-950" />;
   }
-
-  async function handleSignInAsAnotherUser(): Promise<void> {
-    suppressErrorToastsRef.current = true;
-    toast.dismiss();
-    setAccountLockedClientState(false);
-    try {
-      await signOut();
-    } finally {
-      window.location.replace('/login');
-    }
-  }
-
-  function handleRemoveShortcut(profileId: string): void {
-    const nextShortcuts = removeSavedAccountShortcut(profileId);
-    setShortcuts(nextShortcuts);
-    syncActiveProfileSelection(nextShortcuts);
-    void fetch('/api/account-switch/session/shortcut-removed', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ targetProfileId: profileId }),
-    });
-  }
-
-  const lockedProfileName = profile?.full_name || profile?.email || 'Current user';
-  const lockedProfileAvatar = profile?.avatar_url || null;
-  const profileTiles = [
-    ...(currentProfileId
-      ? [
-          {
-            profileId: currentProfileId,
-            displayName: lockedProfileName,
-            avatarUrl: lockedProfileAvatar,
-            email: profile?.email || null,
-            isCurrentProfile: true,
-          },
-        ]
-      : []),
-    ...switchableShortcuts.map((shortcut) => ({
-      profileId: shortcut.profileId,
-      displayName: getShortcutDisplayName(shortcut),
-      avatarUrl: shortcut.avatarUrl || null,
-      email: shortcut.email || null,
-      isCurrentProfile: false,
-    })),
-  ];
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-black to-slate-900 px-4 py-10 md:py-14">
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:72px_72px]" />
-      <div className="relative mx-auto w-full max-w-5xl">
-        <div className="text-center">
-          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-avs-yellow text-slate-900 shadow-xl shadow-avs-yellow/25">
-            <Lock className="h-8 w-8" />
-          </div>
-          <h1 className="text-4xl font-bold tracking-tight text-white md:text-5xl">SQUIRESAPP</h1>
-          <p className="mt-3 text-sm text-slate-300 md:text-base">
-            {mode === 'set-pin-enter' || mode === 'set-pin-confirm'
-              ? 'Set and confirm a 4-digit PIN for this profile.'
-              : 'Select a profile and enter your PIN to continue.'}
-          </p>
-        </div>
+    <div className="relative min-h-screen overflow-hidden bg-[#060913] text-white">
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:56px_56px]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(241,214,74,0.08),transparent_30%),radial-gradient(circle_at_bottom,rgba(59,130,246,0.08),transparent_28%)]" />
 
-        <div className="mx-auto mt-10 flex max-w-4xl flex-wrap items-start justify-center gap-8 md:gap-10">
-          {profileTiles.map((tile) => {
-            const isSelected = activeProfileId === tile.profileId;
-            return (
-              <div key={tile.profileId} className="group relative w-[130px] text-center transition md:w-[160px]">
-                {!tile.isCurrentProfile ? (
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      handleRemoveShortcut(tile.profileId);
-                    }}
-                    disabled={isProcessing}
-                    className="absolute right-1 top-1 z-10 rounded-full border border-slate-600/80 bg-black/70 px-2 py-0.5 text-[10px] font-medium text-slate-200 opacity-0 transition group-hover:opacity-100"
-                  >
-                    Remove
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={() => handleSelectProfile(tile.profileId)}
-                  disabled={isProcessing}
-                  className="w-full"
-                >
-                <div
-                  className={`relative mx-auto flex h-[120px] w-[120px] items-center justify-center overflow-hidden rounded-md border transition md:h-[145px] md:w-[145px] ${
-                    isSelected
-                      ? 'border-avs-yellow bg-avs-yellow/15 shadow-lg shadow-avs-yellow/20'
-                      : 'border-slate-700/70 bg-slate-900/75 group-hover:border-slate-500'
-                  }`}
-                >
-                  {tile.avatarUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={tile.avatarUrl} alt={tile.displayName} className="h-full w-full object-cover" />
-                  ) : (
-                    <span className="text-3xl font-semibold text-white">{getInitials(tile.displayName)}</span>
-                  )}
-                </div>
-                <p className="mt-3 text-sm font-medium text-slate-100 md:text-base">{tile.displayName}</p>
-                {tile.email ? (
-                  <p className="mt-0.5 truncate text-xs text-slate-400">{tile.email}</p>
-                ) : null}
-                  {isSelected ? (
-                    <p className="mt-1 text-xs text-avs-yellow">Selected</p>
-                  ) : (
-                    <p className="mt-1 text-xs text-slate-500">Tap to select</p>
-                  )}
-                </button>
-              </div>
-            );
-          })}
-
-          <button
-            type="button"
-            onClick={() => void handleSignInAsAnotherUser()}
-            disabled={isProcessing}
-            className="group w-[130px] text-center transition md:w-[160px]"
-          >
-            <div className="mx-auto flex h-[120px] w-[120px] items-center justify-center rounded-md border border-slate-700/70 bg-slate-900/75 transition group-hover:border-slate-500 md:h-[145px] md:w-[145px]">
-              <Plus className="h-10 w-10 text-slate-300 group-hover:text-white" />
+      <div className="relative flex min-h-screen items-center justify-center px-4 py-10">
+        <div className="w-full max-w-5xl space-y-10">
+          <div className="text-center space-y-4">
+            <div className="inline-flex items-center justify-center rounded-3xl bg-avs-yellow p-5 shadow-[0_20px_60px_rgba(241,214,74,0.18)]">
+              <Lock className="h-10 w-10 text-slate-950" strokeWidth={2.5} />
             </div>
-            <p className="mt-3 text-sm font-medium text-slate-200 md:text-base">Sign in as another user</p>
-          </button>
-        </div>
-
-        {mode !== 'checking' && !activeProfileId ? (
-          <div className="mt-8 text-center text-sm text-slate-400">
-            <p>Select a profile to enter PIN.</p>
-          </div>
-        ) : null}
-
-        {mode !== 'checking' && activeProfileId ? (
-          <div className="mx-auto mt-12 w-full max-w-md rounded-2xl border border-slate-800/80 bg-black/35 p-5 backdrop-blur">
-            <div className="mb-4 text-center">
-              <p className="text-sm font-medium text-slate-200">
-                {mode === 'set-pin-enter'
-                  ? 'Create your 4-digit PIN'
-                  : mode === 'set-pin-confirm'
-                    ? 'Confirm your 4-digit PIN'
-                    : 'Enter your 4-digit PIN'}
+            <div className="space-y-2">
+              <h1 className="text-5xl font-black tracking-tight text-white sm:text-6xl">
+                SQUIRESAPP
+              </h1>
+              <p className="text-base text-slate-300 sm:text-xl">
+                Select a profile and enter your PIN to continue.
               </p>
             </div>
-            <div className="flex justify-center gap-2.5 py-1">
+          </div>
+
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {profiles.map((deviceProfile) => {
+              const isSelected = highlightedProfileId === deviceProfile.profile_id;
+
+              return (
+                <button
+                  key={deviceProfile.profile_id}
+                  type="button"
+                  onClick={() => openProfile(deviceProfile.profile_id)}
+                  className={`group text-left transition-transform duration-200 hover:-translate-y-1 ${
+                    submitting ? 'pointer-events-none opacity-70' : ''
+                  }`}
+                >
+                  <div
+                    className={`rounded-3xl border p-4 shadow-[0_12px_40px_rgba(2,6,23,0.35)] backdrop-blur-sm transition-colors ${
+                      isSelected
+                        ? 'border-avs-yellow bg-[#0f1324]'
+                        : 'border-slate-700/70 bg-[#101427]/90 hover:border-slate-500'
+                    }`}
+                  >
+                    <div className="flex aspect-[0.92] items-center justify-center rounded-2xl border border-slate-700/70 bg-[#151935] p-4">
+                      {deviceProfile.avatar_url ? (
+                        <div className="relative h-full w-full overflow-hidden rounded-xl">
+                          <img
+                            src={deviceProfile.avatar_url}
+                            alt={deviceProfile.full_name || 'Profile avatar'}
+                            className="h-full w-full object-contain"
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex h-24 w-24 items-center justify-center rounded-full bg-slate-800 text-5xl font-semibold text-white">
+                          {getInitials(deviceProfile.full_name)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="px-3 pt-4 text-center">
+                    <p className="text-2xl font-semibold tracking-tight text-white">
+                      {deviceProfile.full_name || 'Account'}
+                    </p>
+                    {deviceProfile.email ? (
+                      <p className="mt-1 text-sm text-slate-300">{deviceProfile.email}</p>
+                    ) : null}
+                    <p className="mt-1 text-sm text-slate-300">
+                      {deviceProfile.role_name || 'No role'}
+                    </p>
+                    <p className={`mt-2 text-sm font-medium ${isSelected ? 'text-avs-yellow' : 'text-sky-300'}`}>
+                      {isSelected ? 'Selected' : 'Tap to select'}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+
+            <button
+              type="button"
+              onClick={handleSignInAsAnotherUser}
+              className="group text-left transition-transform duration-200 hover:-translate-y-1"
+            >
+              <div className="rounded-3xl border border-slate-700/70 bg-[#101427]/90 p-4 shadow-[0_12px_40px_rgba(2,6,23,0.35)] backdrop-blur-sm transition-colors hover:border-slate-500">
+                <div className="flex aspect-[0.92] items-center justify-center rounded-2xl border border-slate-700/70 bg-[#151935]">
+                  <Plus className="h-14 w-14 text-slate-200" strokeWidth={1.6} />
+                </div>
+              </div>
+
+              <div className="px-3 pt-4 text-center">
+                <p className="text-2xl font-semibold tracking-tight text-white">
+                  Sign in as another
+                </p>
+                <p className="text-2xl font-semibold tracking-tight text-white">
+                  user
+                </p>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <Dialog
+        open={pinModalOpen}
+        onOpenChange={(open) => {
+          if (mode !== 'locked') {
+            setPinModalOpen(true);
+            return;
+          }
+          if (!submitting) {
+            setPinModalOpen(open);
+            if (!open) {
+              setSelectedProfileId(null);
+              setPinEntry('');
+            }
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {mode === 'set-pin-enter' && 'Create Device PIN'}
+              {mode === 'set-pin-confirm' && 'Confirm Device PIN'}
+              {mode === 'locked' && `Unlock ${selectedProfile?.full_name || 'Account'}`}
+            </DialogTitle>
+            <DialogDescription>
+              {mode === 'set-pin-enter' && 'Enter a 4-digit PIN for this device.'}
+              {mode === 'set-pin-confirm' && 'Re-enter the PIN to confirm it.'}
+              {mode === 'locked' && 'Enter the 4-digit PIN for the selected profile.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-center gap-2">
               {Array.from({ length: PIN_LENGTH }).map((_, index) => (
-                <span
-                  key={`lock-pin-slot-${index}`}
-                  className={`h-3 w-3 rounded-full border ${
-                    index < enteredPin.length
-                      ? 'border-avs-yellow bg-avs-yellow'
-                      : 'border-slate-600 bg-transparent'
+                <div
+                  key={index}
+                  className={`h-3 w-3 rounded-full ${
+                    index < pinEntry.length ? 'bg-avs-yellow' : 'bg-slate-600'
                   }`}
                 />
               ))}
             </div>
 
-            <div className="mt-4 grid grid-cols-3 gap-2.5 md:gap-3">
+            {pinLockedUntil ? (
+              <div className="rounded-lg border border-red-800 bg-red-950/40 px-4 py-3 text-sm text-red-200">
+                PIN locked until {new Date(pinLockedUntil).toLocaleTimeString()}.
+              </div>
+            ) : null}
+
+            <div className="grid grid-cols-3 gap-3">
               {PIN_KEYPAD_KEYS.map((digit) => (
                 <Button
                   key={digit}
                   type="button"
-                  variant="secondary"
-                  onClick={() => handleDigitPress(digit)}
-                  disabled={isProcessing}
                   className={PIN_KEY_BUTTON_CLASS}
+                  onClick={() => handleDigitPress(digit)}
+                  disabled={keypadDisabled}
                 >
                   {digit}
                 </Button>
               ))}
               <Button
                 type="button"
-                variant="outline"
-                onClick={handlePinClear}
-                disabled={isProcessing || enteredPin.length === 0}
-                className="h-14 rounded-xl border-slate-700 bg-slate-900/40 hover:bg-slate-800/70 md:h-16"
+                variant="secondary"
+                className="h-14 rounded-xl md:h-16"
+                onClick={handleClear}
+                disabled={keypadDisabled}
               >
                 Clear
               </Button>
               <Button
                 type="button"
-                variant="secondary"
-                onClick={() => handleDigitPress('0')}
-                disabled={isProcessing}
                 className={PIN_KEY_BUTTON_CLASS}
+                onClick={() => handleDigitPress('0')}
+                disabled={keypadDisabled}
               >
                 0
               </Button>
               <Button
                 type="button"
-                variant="outline"
-                onClick={handlePinBackspace}
-                disabled={isProcessing || enteredPin.length === 0}
-                className="h-14 rounded-xl border-slate-700 bg-slate-900/40 hover:bg-slate-800/70 md:h-16"
+                variant="secondary"
+                className="h-14 rounded-xl md:h-16"
+                onClick={handleBackspace}
+                disabled={keypadDisabled}
               >
-                <Delete className="h-4 w-4" />
+                Back
               </Button>
             </div>
-
-            {pinLockedUntil ? (
-              <div className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-100">
-                <p>
-                  PIN locked until{' '}
-                  <span className="font-medium">
-                    {new Date(pinLockedUntil).toLocaleString()}
-                  </span>
-                  .
-                </p>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => void handleSignInAsAnotherUser()}
-                  className="mt-2 h-8 px-2 text-xs text-amber-100 hover:bg-amber-500/20 hover:text-white"
-                >
-                  Sign in with password instead
-                </Button>
-              </div>
-            ) : null}
           </div>
-        ) : null}
-
-        {mode === 'locked' && switchableShortcuts.length > 0 ? (
-          <div className="mt-6 text-center text-xs text-slate-500">
-            <p>Saved profiles shown here can be switched instantly with PIN.</p>
-          </div>
-        ) : null}
-      </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useState, useEffect, useCallback, Suspense, useRef } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useInspectionRealtime } from '@/lib/hooks/useRealtime';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { createClient } from '@/lib/supabase/client';
+import { isUuid } from '@/lib/utils/uuid';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,7 +21,7 @@ import { toast } from 'sonner';
 import { PlantInspection } from '@/types/inspection';
 import { Employee, InspectionStatusFilter } from '@/types/common';
 import { useQueryState } from 'nuqs';
-import { hasWorkshopInspectionFullVisibilityOverride } from '@/lib/utils/inspection-visibility';
+import { getInspectionVisibilityFlags } from '@/lib/utils/inspection-access';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -54,6 +55,7 @@ interface InspectionWithPlant extends PlantInspection {
     serial_number: string | null;
     van_categories: { name: string } | null;
   } | null;
+  profile: { full_name: string } | null;
   has_reported_defect?: boolean;
   has_inform_workshop_task?: boolean;
 }
@@ -94,19 +96,29 @@ function PlantInspectionsContent() {
     isSupervisor,
     loading: authLoading,
   } = useAuth();
-  const hasWorkshopReadAllOverride = hasWorkshopInspectionFullVisibilityOverride(
-    effectiveRole?.team_name ?? profile?.team?.name
-  );
-  const canViewAllInspections =
-    isManager || isAdmin || isSuperAdmin || isSupervisor || hasWorkshopReadAllOverride;
-  const canManageInspections = isManager || isAdmin || isSuperAdmin;
-  const pageSize = canViewAllInspections ? 20 : 10;
-  usePermissionCheck('plant-inspections');
+  const {
+    hasPermission: canAccessInspectionModule,
+    loading: permissionLoading,
+  } = usePermissionCheck('plant-inspections');
+  const {
+    hasOrgWideInspectionVisibility,
+    hasTeamInspectionVisibility,
+    canViewCrossUserInspections,
+    canManageInspections,
+  } = getInspectionVisibilityFlags({
+    teamName: effectiveRole?.team_name ?? profile?.team?.name,
+    isManager,
+    isAdmin,
+    isSuperAdmin,
+    isSupervisor,
+  });
+  const pageSize = canViewCrossUserInspections ? 20 : 10;
   const router = useRouter();
   const { tabletModeEnabled } = useTabletMode();
   const [inspections, setInspections] = useState<InspectionWithPlant[]>([]);
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [scopedEmployeeIds, setScopedEmployeeIds] = useState<string[]>([]);
   const [plants, setPlants] = useState<Plant[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useQueryState('employee', { 
     defaultValue: 'all',
@@ -134,25 +146,13 @@ function PlantInspectionsContent() {
   const [columnVisibility, setColumnVisibility] = useState<PlantInspectionsColumnVisibility>(
     DEFAULT_PLANT_INSPECTIONS_COLUMN_VISIBILITY
   );
-  const supabase = createClient();
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
+  if (typeof window !== 'undefined' && !supabaseRef.current) {
+    supabaseRef.current = createClient();
+  }
+  const supabase = supabaseRef.current as ReturnType<typeof createClient>;
 
   useEffect(() => {
-    const fetchEmployees = async () => {
-      try {
-        const data = await fetchUserDirectory({ module: 'plant-inspections' });
-        setEmployees(
-          data.map((employee) => ({
-            id: employee.id,
-            full_name: employee.full_name || 'Unknown User',
-            employee_id: employee.employee_id,
-            has_module_access: employee.has_module_access,
-          }))
-        );
-      } catch (err) {
-        console.error('Error fetching employees:', err);
-      }
-    };
-
     const fetchPlants = async () => {
       try {
         const { data, error } = await supabase
@@ -176,41 +176,61 @@ function PlantInspectionsContent() {
       }
     };
 
-    if (user && canViewAllInspections) {
-      fetchEmployees();
+    if (
+      user &&
+      canAccessInspectionModule &&
+      !permissionLoading &&
+      canViewCrossUserInspections
+    ) {
+      const fetchEmployees = async () => {
+        try {
+          const data = await fetchUserDirectory({ module: 'plant-inspections' });
+          setScopedEmployeeIds(Array.from(new Set([user.id, ...data.map((employee) => employee.id)])));
+          setEmployees(
+            data.map((employee) => ({
+              id: employee.id,
+              full_name: employee.full_name || 'Unknown User',
+              employee_id: employee.employee_id,
+              has_module_access: employee.has_module_access,
+            }))
+          );
+        } catch (err) {
+          console.error('Error fetching employees:', err);
+        }
+      };
+
+      void fetchEmployees();
+    } else if (user) {
+      setEmployees([]);
+      setScopedEmployeeIds([user.id]);
     }
     fetchPlants();
-  }, [user, canViewAllInspections, supabase]);
+  }, [user, canAccessInspectionModule, permissionLoading, canViewCrossUserInspections, supabase]);
 
   const fetchInspections = useCallback(async () => {
-    if (!user || authLoading) return;
+    if (!user || authLoading || permissionLoading || !canAccessInspectionModule) return;
     setLoading(true);
 
     try {
       let query = supabase
         .from('plant_inspections')
-        .select(`
-          *,
-          plant (
-            plant_id,
-            nickname,
-            serial_number,
-            van_categories (
-              name
-            )
-          ),
-          profile:profiles!plant_inspections_user_id_fkey(full_name)
-        `)
+        .select('*')
         .eq('status', 'submitted')
         .order('inspection_date', { ascending: false });
 
       // Filter based on user role and selection
-      if (!canViewAllInspections) {
+      if (!canViewCrossUserInspections) {
         query = query.eq('user_id', user.id);
       } else {
         const employeeFilter = selectedEmployeeId || 'all';
         if (employeeFilter !== 'all') {
-          query = query.eq('user_id', employeeFilter);
+          if (!hasOrgWideInspectionVisibility && !scopedEmployeeIds.includes(employeeFilter)) {
+            query = query.eq('user_id', user.id);
+          } else {
+            query = query.eq('user_id', employeeFilter);
+          }
+        } else if (hasTeamInspectionVisibility) {
+          query = query.in('user_id', scopedEmployeeIds.length > 0 ? scopedEmployeeIds : [user.id]);
         }
       }
 
@@ -225,7 +245,79 @@ function PlantInspectionsContent() {
       const { data, error } = await query;
 
       if (error) throw error;
-      const rows = (data || []) as InspectionWithPlant[];
+      const rows = ((data || []) as Array<Omit<InspectionWithPlant, 'plant' | 'profile'>>).map((row) => ({
+        ...row,
+        plant: null,
+        profile: null,
+      }));
+      const validPlantIds = Array.from(new Set(rows.map((row) => row.plant_id).filter(isUuid)));
+      const validUserIds = Array.from(new Set(rows.map((row) => row.user_id).filter(isUuid)));
+      let plantMap = new Map<string, {
+        plant_id: string;
+        nickname: string | null;
+        serial_number: string | null;
+        van_categories: { name: string } | null;
+      }>();
+      let profileMap = new Map<string, { full_name: string }>();
+
+      if (validPlantIds.length > 0) {
+        const { data: plants, error: plantsError } = await supabase
+          .from('plant')
+          .select(`
+            id,
+            plant_id,
+            nickname,
+            serial_number,
+            van_categories (
+              name
+            )
+          `)
+          .in('id', validPlantIds);
+
+        if (plantsError) {
+          console.warn('Unable to load plant inspection asset details:', plantsError);
+        } else {
+          plantMap = new Map(
+            ((plants || []) as Array<{
+              id: string;
+              plant_id: string;
+              nickname: string | null;
+              serial_number: string | null;
+              van_categories: { name: string } | null;
+            }>)
+              .filter((plant) => Boolean(plant.id))
+              .map((plant) => [
+                plant.id,
+                {
+                  plant_id: plant.plant_id,
+                  nickname: plant.nickname ?? null,
+                  serial_number: plant.serial_number ?? null,
+                  van_categories: plant.van_categories ?? null,
+                },
+              ])
+          );
+        }
+      }
+
+      if (validUserIds.length > 0) {
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', validUserIds);
+
+        if (profilesError) {
+          console.warn('Unable to load plant inspection owner names:', profilesError);
+        } else {
+          profileMap = new Map(
+            ((profiles || []) as Array<{ id: string; full_name: string | null }>)
+              .filter((profile): profile is { id: string; full_name: string } =>
+                Boolean(profile.id && profile.full_name)
+              )
+              .map((profile) => [profile.id, { full_name: profile.full_name }])
+          );
+        }
+      }
+
       const inspectionIds = rows.map((row) => row.id).filter((id): id is string => Boolean(id));
       let defectInspectionIds = new Set<string>();
       let workshopTaskInspectionIds = new Set<string>();
@@ -267,6 +359,8 @@ function PlantInspectionsContent() {
       setInspections(
         rows.map((row) => ({
           ...row,
+          plant: row.plant_id && isUuid(row.plant_id) ? plantMap.get(row.plant_id) ?? null : null,
+          profile: profileMap.get(row.user_id) ?? null,
           has_reported_defect: defectInspectionIds.has(row.id),
           has_inform_workshop_task: workshopTaskInspectionIds.has(row.id),
         }))
@@ -304,7 +398,19 @@ function PlantInspectionsContent() {
     } finally {
       setLoading(false);
     }
-  }, [user, authLoading, canViewAllInspections, selectedEmployeeId, plantFilter, supabase]);
+  }, [
+    user,
+    authLoading,
+    permissionLoading,
+    canAccessInspectionModule,
+    canViewCrossUserInspections,
+    hasOrgWideInspectionVisibility,
+    hasTeamInspectionVisibility,
+    scopedEmployeeIds,
+    selectedEmployeeId,
+    plantFilter,
+    supabase,
+  ]);
 
   useEffect(() => {
     setDisplayCount(pageSize);
@@ -459,7 +565,7 @@ function PlantInspectionsContent() {
     }
   };
 
-  const showInitialLoading = loading && inspections.length === 0;
+  const showInitialLoading = (permissionLoading || loading) && inspections.length === 0;
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -482,7 +588,7 @@ function PlantInspectionsContent() {
         </div>
         
         {/* Manager: Employee Filter */}
-        {canViewAllInspections && employees.length > 0 && (
+        {canViewCrossUserInspections && employees.length > 0 && (
           <div className="pt-4 border-t border-border">
             <div className={`flex items-center gap-3 ${tabletModeEnabled ? 'max-w-none flex-wrap' : 'max-w-md'}`}>
               <Label htmlFor="employee-filter" className="text-white text-sm flex items-center gap-2 whitespace-nowrap">
@@ -510,7 +616,7 @@ function PlantInspectionsContent() {
       </div>
 
       {/* Filters - Only show for managers */}
-      {canViewAllInspections && (
+      {canViewCrossUserInspections && (
         <Card className="border-border">
           <CardContent className="pt-6">
             <div className={`grid grid-cols-1 gap-6 ${tabletModeEnabled ? 'md:grid-cols-1' : 'md:grid-cols-2'}`}>
@@ -591,7 +697,7 @@ function PlantInspectionsContent() {
               Refreshing plant checks...
             </div>
           )}
-          {canViewAllInspections && (
+          {canViewCrossUserInspections && (
             <div className="hidden md:flex items-center justify-end gap-2">
               {viewMode === 'table' && (
                 <DropdownMenu>
@@ -660,7 +766,7 @@ function PlantInspectionsContent() {
             </div>
           )}
 
-          {canViewAllInspections && viewMode === 'table' && (
+          {canViewCrossUserInspections && viewMode === 'table' && (
             <div className="hidden md:block">
               <PlantInspectionsListTable
                 inspections={inspections.slice(0, displayCount)}
@@ -674,7 +780,7 @@ function PlantInspectionsContent() {
             </div>
           )}
 
-          <div className={canViewAllInspections && viewMode === 'table' ? 'md:hidden grid gap-4' : 'grid gap-4'}>
+          <div className={canViewCrossUserInspections && viewMode === 'table' ? 'md:hidden grid gap-4' : 'grid gap-4'}>
             {inspections.slice(0, displayCount).map((inspection) => {
               const inspectionStatus = inspection.status as string;
               return (
@@ -706,7 +812,7 @@ function PlantInspectionsContent() {
                         )}
                       </CardTitle>
                       <CardDescription className="text-muted-foreground">
-                        {canViewAllInspections && (inspection as { profile?: { full_name?: string } | null }).profile?.full_name && (
+                        {canViewCrossUserInspections && (inspection as { profile?: { full_name?: string } | null }).profile?.full_name && (
                           <span className="font-medium text-white">
                             {(inspection as { profile?: { full_name?: string } | null }).profile?.full_name}
                             {' • '}

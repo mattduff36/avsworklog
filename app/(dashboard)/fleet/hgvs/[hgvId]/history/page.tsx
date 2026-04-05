@@ -56,7 +56,7 @@ type VehicleData = {
   ves_make: string | null;
   ves_colour: string | null;
   ves_fuel_type: string | null;
-  ves_year_of_manufacture: string | null;
+  ves_year_of_manufacture: string | number | null;
   ves_engine_capacity: number | null;
   ves_tax_status: string | null;
   ves_mot_status: string | null;
@@ -76,22 +76,22 @@ type VehicleData = {
 
 type MaintenanceHistoryEntry = {
   id: string;
-  created_at: string;
+  created_at: string | null;
   updated_by: string | null;
   updated_by_name: string | null;
   field_name: string;
   old_value: string | null;
   new_value: string | null;
-  comment: string;
+  comment: string | null;
 };
 
 type WorkshopTask = {
   id: string;
-  action_type: string;
+  action_type: 'inspection_defect' | 'workshop_vehicle_task' | 'manager_action' | string;
   title: string;
   description: string | null;
-  status: string;
-  priority: string;
+  status: 'pending' | 'in_progress' | 'logged' | 'on_hold' | 'completed' | string;
+  priority: 'low' | 'medium' | 'high' | 'urgent' | string;
   workshop_comments: string | null;
   logged_at: string | null;
   logged_by: string | null;
@@ -107,7 +107,7 @@ type WorkshopTask = {
     comment?: string;
   }> | null;
   created_at: string;
-  created_by: string;
+  created_by: string | null;
   workshop_task_categories: {
     id: string;
     name: string;
@@ -126,14 +126,14 @@ type WorkshopTask = {
       ui_color: string | null;
     };
   } | null;
-  profiles_created: {
-    full_name: string;
+  profiles_created?: {
+    full_name: string | null;
   } | null;
-  profiles_logged: {
-    full_name: string;
+  profiles_logged?: {
+    full_name: string | null;
   } | null;
-  profiles_actioned: {
-    full_name: string;
+  profiles_actioned?: {
+    full_name: string | null;
   } | null;
 };
 
@@ -408,7 +408,7 @@ export default function HgvHistoryPage({
         .single();
 
       if (vehicleError) throw vehicleError;
-      setVehicle(vehicleInfo);
+      setVehicle((vehicleInfo as Vehicle) ?? null);
 
       // Fetch vehicle maintenance data (VES/MOT data)
       const { data: maintenanceData, error: maintenanceError } = await supabase
@@ -438,7 +438,7 @@ export default function HgvHistoryPage({
         .single();
 
       if (!maintenanceError) {
-        setVehicleData(maintenanceData);
+        setVehicleData((maintenanceData as VehicleData) ?? null);
       }
     } catch (error) {
       console.error('Error fetching vehicle:', error);
@@ -496,7 +496,7 @@ export default function HgvHistoryPage({
         });
         throw error;
       }
-      setMaintenanceHistory(data || []);
+      setMaintenanceHistory(((data || []) as MaintenanceHistoryEntry[]));
     } catch (error) {
       console.error('Error fetching maintenance history:', error instanceof Error ? error.message : error);
     }
@@ -558,10 +558,11 @@ export default function HgvHistoryPage({
       }
       
       // Manually fetch profile names for created_by, logged_by, actioned_by
-      let tasksWithProfiles = data || [];
-      if (data && data.length > 0) {
+      const baseTasks = ((data || []) as unknown as WorkshopTask[]);
+      let tasksWithProfiles = baseTasks;
+      if (baseTasks.length > 0) {
         const userIds = new Set<string>();
-        data.forEach((task: WorkshopTask) => {
+        baseTasks.forEach((task) => {
           if (task.created_by) userIds.add(task.created_by);
           if (task.logged_by) userIds.add(task.logged_by);
           if (task.actioned_by) userIds.add(task.actioned_by);
@@ -575,7 +576,7 @@ export default function HgvHistoryPage({
           
           const profileMap = new Map((profiles || []).map((p: { id: string; full_name: string }) => [p.id, p.full_name]));
           
-          tasksWithProfiles = data.map((task: WorkshopTask) => ({
+          tasksWithProfiles = baseTasks.map((task) => ({
             ...task,
             profiles_created: task.created_by ? { full_name: profileMap.get(task.created_by) || null } : null,
             profiles_logged: task.logged_by ? { full_name: profileMap.get(task.logged_by) || null } : null,

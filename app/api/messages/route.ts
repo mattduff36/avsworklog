@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { sendToolboxTalkEmail } from '@/lib/utils/email';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
-import type { CreateMessageInput, CreateMessageResponse } from '@/types/messages';
+import type { CreateMessageInput, CreateMessageResponse, MessagePriority, MessageType } from '@/types/messages';
 import { normalizeRoleInternalName } from '@/lib/utils/role-name';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
@@ -150,7 +150,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Set priority based on type
-    const priority = type === 'TOOLBOX_TALK' ? 'HIGH' : 'LOW';
+    const priority: MessagePriority = type === 'TOOLBOX_TALK' ? 'HIGH' : 'LOW';
 
     // Handle PDF upload if present
     let pdfFilePath: string | null = null;
@@ -192,7 +192,7 @@ export async function POST(request: NextRequest) {
     const { data: message, error: messageError } = await supabase
       .from('messages')
       .insert({
-        type,
+        type: type as MessageType,
         subject,
         body: messageBody,
         priority,

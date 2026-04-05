@@ -6,6 +6,7 @@ import type {
   UpdateNotificationPreferenceRequest,
   UpdateNotificationPreferenceResponse,
   NotificationModuleKey,
+  NotificationPreference,
 } from '@/types/notifications';
 
 /**
@@ -82,7 +83,10 @@ export async function PUT(request: NextRequest) {
     }
 
     // Build upsert data
-    const upsertData: Record<string, unknown> = {
+    const upsertData: Partial<NotificationPreference> & {
+      user_id: string;
+      module_key: NotificationModuleKey;
+    } = {
       user_id: user.id,
       module_key,
     };

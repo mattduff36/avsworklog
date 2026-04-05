@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
+import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { ALL_MODULES, createEmptyModulePermissionRecord } from '@/types/roles';
 import { getPermissionMapForUser } from '@/lib/server/team-permissions';
@@ -223,22 +225,19 @@ async function getMaintenanceAttentionCount() {
 }
 
 export async function GET() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
+  const current = await getCurrentAuthenticatedProfile();
+  if (!current) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const userId = current.profile.id;
+  const supabase = await createClient();
   const admin = createAdminClient();
   const effectiveRole = await getEffectiveRole();
   const permissions =
-    effectiveRole.is_actual_super_admin || effectiveRole.role_name === 'admin' || effectiveRole.is_super_admin
+    hasEffectiveRoleFullAccess(effectiveRole)
       ? createFullAccessPermissionMap()
-      : await getPermissionMapForUser(user.id, effectiveRole.role_id, admin, effectiveRole.team_id);
+      : await getPermissionMapForUser(userId, effectiveRole.role_id, admin, effectiveRole.team_id);
 
   const canViewApprovals = permissions.approvals;
   const canViewActions = permissions.actions;

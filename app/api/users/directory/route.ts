@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { hasWorkshopInspectionFullVisibilityOverride } from '@/lib/utils/inspection-visibility';
+import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { getUsersWithModuleAccess } from '@/lib/server/team-permissions';
 import { ALL_MODULES, type ModuleName } from '@/types/roles';
@@ -24,31 +26,41 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const moduleName = request.nextUrl.searchParams.get('module');
+  if (moduleName && !ALL_MODULES.includes(moduleName as ModuleName)) {
+    return NextResponse.json({ error: 'Valid module query parameter is required' }, { status: 400 });
+  }
+
   const effectiveRole = await getEffectiveRole();
+  const isInspectionDirectoryRequest =
+    moduleName === 'inspections' ||
+    moduleName === 'plant-inspections' ||
+    moduleName === 'hgv-inspections';
+  const hasWorkshopInspectionAccess =
+    isInspectionDirectoryRequest &&
+    hasWorkshopInspectionFullVisibilityOverride(effectiveRole.team_name);
   const canViewDirectory = Boolean(
     effectiveRole.user_id &&
       (
-        effectiveRole.is_actual_super_admin ||
-        effectiveRole.is_super_admin ||
-        effectiveRole.role_name === 'admin' ||
+        hasEffectiveRoleFullAccess(effectiveRole) ||
         effectiveRole.is_manager_admin ||
-        effectiveRole.role_name === 'supervisor'
+        effectiveRole.role_name === 'supervisor' ||
+        hasWorkshopInspectionAccess
       )
   );
   if (!canViewDirectory) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
-  const isAdminOrSuper =
-    effectiveRole.is_actual_super_admin ||
-    effectiveRole.is_super_admin ||
-    effectiveRole.role_name === 'admin';
-  const shouldScopeToTeam =
-    (effectiveRole.is_manager_admin || effectiveRole.role_name === 'supervisor') && !isAdminOrSuper;
+  const isAdminOrSuper = hasEffectiveRoleFullAccess(effectiveRole);
+  const shouldScopeToTeam = hasWorkshopInspectionAccess
+    ? true
+    : (effectiveRole.is_manager_admin || effectiveRole.role_name === 'supervisor') &&
+      !isAdminOrSuper &&
+      !isInspectionDirectoryRequest;
 
   const includeRole = isTruthy(request.nextUrl.searchParams.get('includeRole'));
   const includeAllowance = isTruthy(request.nextUrl.searchParams.get('includeAllowance'));
   const includeDeleted = isTruthy(request.nextUrl.searchParams.get('includeDeleted'));
-  const moduleName = request.nextUrl.searchParams.get('module');
   const ids = request.nextUrl.searchParams
     .get('ids')
     ?.split(',')
@@ -56,10 +68,6 @@ export async function GET(request: NextRequest) {
     .filter(Boolean) || [];
   const limit = Math.min(Math.max(Number.parseInt(request.nextUrl.searchParams.get('limit') || '200', 10) || 200, 1), 500);
   const offset = Math.max(Number.parseInt(request.nextUrl.searchParams.get('offset') || '0', 10) || 0, 0);
-
-  if (moduleName && !ALL_MODULES.includes(moduleName as ModuleName)) {
-    return NextResponse.json({ error: 'Valid module query parameter is required' }, { status: 400 });
-  }
 
   const fields = ['id', 'full_name', 'employee_id', 'team:org_teams!profiles_team_id_fkey(id, name)'];
 

@@ -1,18 +1,25 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
 import { getEffectiveRole } from '@/lib/utils/view-as';
+import { isAdminRole } from '@/lib/utils/role-access';
 import { ALL_MODULES } from '@/types/roles';
 import { getPermissionMapForUser, isMissingTeamPermissionSchemaError } from '@/lib/server/team-permissions';
 
 interface EffectiveRoleSnapshot {
+  role_name: string | null;
+  role_class: 'admin' | 'manager' | 'employee' | null;
   is_super_admin: boolean;
   is_actual_super_admin: boolean;
   is_viewing_as: boolean;
 }
 
 export function shouldGrantFullAccessSnapshot(effectiveRole: EffectiveRoleSnapshot): boolean {
-  return effectiveRole.is_super_admin || (effectiveRole.is_actual_super_admin && !effectiveRole.is_viewing_as);
+  return (
+    effectiveRole.is_super_admin ||
+    isAdminRole({ name: effectiveRole.role_name, role_class: effectiveRole.role_class }) ||
+    (effectiveRole.is_actual_super_admin && !effectiveRole.is_viewing_as)
+  );
 }
 
 function isTransientPermissionError(error: unknown): boolean {
@@ -37,13 +44,8 @@ async function withRetry<T>(operation: () => Promise<T>, retries = 1): Promise<T
 }
 
 export async function GET() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
+  const current = await getCurrentAuthenticatedProfile();
+  if (!current) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -67,7 +69,7 @@ export async function GET() {
     }
 
     const permissions = await withRetry(() => getPermissionMapForUser(
-      user.id,
+      current.profile.id,
       effectiveRole.role_id,
       createAdminClient(),
       effectiveRole.team_id

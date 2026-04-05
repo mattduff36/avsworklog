@@ -4,6 +4,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
+import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
 
 export interface ServerErrorLog {
   error_message: string;
@@ -100,14 +101,14 @@ export async function logServerError({
     const errorObj = typeof error === 'string' ? new Error(error) : error;
     const supabase = await createClient();
 
-    // If user info not provided, try to get it from session
+    // If user info not provided, try to get it from the app session
     let finalUserId = userId;
     let finalUserEmail = userEmail;
     
     if (!finalUserId || !finalUserEmail) {
-      const { data: { user } } = await supabase.auth.getUser();
-      finalUserId = finalUserId || user?.id || null;
-      finalUserEmail = finalUserEmail || user?.email || null;
+      const current = await getCurrentAuthenticatedProfile({ allowLocked: true });
+      finalUserId = finalUserId || current?.profile.id || null;
+      finalUserEmail = finalUserEmail || current?.profile.email || null;
     }
 
     // Extract request context

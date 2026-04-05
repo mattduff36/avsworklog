@@ -188,7 +188,20 @@ export default function DashboardPage() {
       };
     }
     const response = await fetch('/api/dashboard/summary', { cache: 'no-store' });
-    const payload = await response.json();
+    const rawPayload = await response.text();
+    const payload = rawPayload ? JSON.parse(rawPayload) as {
+      error?: string;
+      metrics?: {
+        approvals?: { timesheets?: number; absences?: number };
+        actions?: { workshop?: number; maintenance?: number; suggestions?: number; errors?: number };
+        badges?: {
+          suggestions_new?: number;
+          error_reports_new?: number;
+          quotes_pending_internal_approval?: number;
+          error_logs?: number;
+        };
+      };
+    } : {};
 
     if (!response.ok) {
       throw new Error(payload.error || 'Failed to load dashboard summary');

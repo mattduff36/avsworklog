@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getEffectiveRole } from '@/lib/utils/view-as';
+import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type { GetRolesResponse, CreateRoleRequest, RoleWithUserCount, RoleMatrixRow, ModuleName, RoleClass } from '@/types/roles';
 import { createEmptyModulePermissionRecord } from '@/types/roles';
@@ -23,8 +24,7 @@ export async function GET(request: NextRequest) {
     }
 
     const effectiveRole = await getEffectiveRole();
-    const isAdminOrSuper =
-      effectiveRole.is_actual_super_admin || effectiveRole.is_super_admin || effectiveRole.role_name === 'admin';
+    const isAdminOrSuper = hasEffectiveRoleFullAccess(effectiveRole);
     const isManager = effectiveRole.is_manager_admin && !isAdminOrSuper;
     if (!isAdminOrSuper && !isManager) {
       return NextResponse.json({ error: 'Forbidden - Admin or Manager access required' }, { status: 403 });
@@ -133,8 +133,7 @@ export async function POST(request: NextRequest) {
     }
 
     const effectiveRole = await getEffectiveRole();
-    const isAdminOrSuper =
-      effectiveRole.is_actual_super_admin || effectiveRole.is_super_admin || effectiveRole.role_name === 'admin';
+    const isAdminOrSuper = hasEffectiveRoleFullAccess(effectiveRole);
     const isManager = effectiveRole.is_manager_admin && !isAdminOrSuper;
     if (!isAdminOrSuper && !isManager) {
       return NextResponse.json({ error: 'Forbidden - Admin or Manager access required' }, { status: 403 });
@@ -225,7 +224,7 @@ export async function POST(request: NextRequest) {
         hierarchy_rank: requestedHierarchyRank,
         is_super_admin: false, // Cannot create super admin via API
         is_manager_admin: managerFlagFromRoleClass(requestedRoleClass),
-        timesheet_type: body.timesheet_type || 'civils',
+        timesheet_type: body.timesheet_type === 'plant' ? 'plant' : 'civils',
       })
       .select()
       .single();

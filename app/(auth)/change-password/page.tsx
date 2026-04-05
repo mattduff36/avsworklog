@@ -7,12 +7,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, CheckCircle2, AlertCircle, Eye, EyeOff, KeyRound } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
 import { validatePasswordStrength, getPasswordRequirements } from '@/lib/utils/password';
+
+interface AuthSessionResponse {
+  authenticated: boolean;
+  locked: boolean;
+  profile?: {
+    full_name?: string | null;
+    must_change_password?: boolean | null;
+  } | null;
+}
 
 export default function ChangePasswordPage() {
   const router = useRouter();
-  const supabase = createClient();
 
   // State
   const [loading, setLoading] = useState(true);
@@ -29,21 +36,20 @@ export default function ChangePasswordPage() {
   useEffect(function () {
     async function checkUser() {
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const response = await fetch('/api/auth/session', {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+          },
+        });
 
-        if (!user) {
+        if (!response.ok) {
           router.replace('/login');
           return;
         }
 
-        // Get profile to check must_change_password flag
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('must_change_password, full_name')
-          .eq('id', user.id)
-          .single();
+        const session = (await response.json()) as AuthSessionResponse;
+        const profile = session.profile;
 
         if (!profile) {
           router.replace('/login');
@@ -65,8 +71,8 @@ export default function ChangePasswordPage() {
       }
     }
 
-    checkUser();
-  }, [supabase, router]);
+    void checkUser();
+  }, [router]);
 
   // Handle password change
   async function handlePasswordChange(e: React.FormEvent) {
@@ -94,27 +100,20 @@ export default function ChangePasswordPage() {
     try {
       setSubmitting(true);
 
-      // Update password
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: newPassword,
+      const response = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          password: newPassword,
+        }),
       });
 
-      if (updateError) throw updateError;
-
-      // Get current user
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) throw new Error('User not found');
-
-      // Clear must_change_password flag
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ must_change_password: false })
-        .eq('id', user.id);
-
-      if (profileError) throw profileError;
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(payload?.error || 'Failed to change password');
+      }
 
       setSuccess(true);
 

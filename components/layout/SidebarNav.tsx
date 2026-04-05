@@ -143,6 +143,14 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
     if (tabletModeEnabled) return;
 
     async function fetchViewAsOptions() {
+      if (!isActualSuperAdmin) {
+        queueMicrotask(() => {
+          setAllRoles([]);
+          setAllTeams([]);
+        });
+        return;
+      }
+
       try {
         const response = await fetch('/api/superadmin/view-as/options', { cache: 'no-store' });
         const data = await response.json();
@@ -179,7 +187,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
         localStorage.removeItem('viewAsRole');
       }
     }
-  }, [effectiveRole?.name, effectiveRole?.is_super_admin, isViewingAs, isManager, isAdmin, tabletModeEnabled]);
+  }, [effectiveRole?.name, effectiveRole?.is_super_admin, isViewingAs, isManager, isAdmin, isActualSuperAdmin, tabletModeEnabled]);
 
   useEffect(
     () => () => {

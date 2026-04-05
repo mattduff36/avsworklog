@@ -37,7 +37,7 @@ interface AddVehicleDialogProps {
 interface Category {
   id: string;
   name: string;
-  applies_to?: ('van' | 'plant')[];
+  applies_to?: string[];
 }
 
 type AssetType = 'van' | 'plant';
@@ -77,7 +77,7 @@ export function AddVehicleDialog({
       
       // ✅ Filter categories based on asset type
       // Consistent with SELECT dropdown: undefined applies_to defaults to ['van']
-      const filtered = (data || []).filter((cat: { applies_to?: ('van' | 'plant')[] }) => {
+      const filtered = (data || []).filter((cat: { applies_to?: string[] }) => {
         const appliesTo = cat.applies_to || ['van']; // ✅ Default to ['van']
         return appliesTo.includes(assetType);
       });

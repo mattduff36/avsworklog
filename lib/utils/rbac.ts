@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getEffectiveRole } from '@/lib/utils/view-as';
+import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
 import type { ModuleName } from '@/types/roles';
 import { getPermissionSetForUser } from '@/lib/server/team-permissions';
 
@@ -16,7 +17,7 @@ export async function canEffectiveRoleAccessModule(moduleName: ModuleName): Prom
     return false;
   }
 
-  if (effectiveRole.is_actual_super_admin || effectiveRole.is_super_admin || effectiveRole.role_name === 'admin') {
+  if (hasEffectiveRoleFullAccess(effectiveRole)) {
     return true;
   }
 
@@ -36,7 +37,7 @@ export async function canEffectiveRoleAssignRole(targetRoleId: string): Promise<
     return false;
   }
 
-  if (effectiveRole.is_actual_super_admin || effectiveRole.is_super_admin || effectiveRole.role_name === 'admin') {
+  if (hasEffectiveRoleFullAccess(effectiveRole)) {
     return true;
   }
 
@@ -60,7 +61,7 @@ export async function isEffectiveRoleAdminOrSuper(): Promise<boolean> {
     return false;
   }
 
-  return effectiveRole.is_actual_super_admin || effectiveRole.is_super_admin || effectiveRole.role_name === 'admin';
+  return hasEffectiveRoleFullAccess(effectiveRole);
 }
 
 export async function isEffectiveRoleManagerOrHigher(): Promise<boolean> {
@@ -70,10 +71,7 @@ export async function isEffectiveRoleManagerOrHigher(): Promise<boolean> {
   }
 
   return (
-    effectiveRole.is_actual_super_admin ||
-    effectiveRole.is_super_admin ||
-    effectiveRole.role_name === 'admin' ||
-    effectiveRole.is_manager_admin
+    hasEffectiveRoleFullAccess(effectiveRole) || effectiveRole.is_manager_admin
   );
 }
 
@@ -91,7 +89,7 @@ export async function getAssignableRolesForEffectiveActor(): Promise<RoleRecord[
     .order('is_manager_admin', { ascending: false })
     .order('display_name', { ascending: true });
 
-  if (!(effectiveRole.is_actual_super_admin || effectiveRole.is_super_admin || effectiveRole.role_name === 'admin')) {
+  if (!hasEffectiveRoleFullAccess(effectiveRole)) {
     if (effectiveRole.is_manager_admin) {
       query = query.eq('role_class', 'employee').eq('is_super_admin', false);
     } else {

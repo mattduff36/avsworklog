@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -137,9 +138,14 @@ function NewInspectionContent() {
   const searchParams = useSearchParams();
   const draftId = searchParams.get('id'); // Get draft ID from URL if editing
   const { user, isManager, isAdmin, isSuperAdmin } = useAuth();
+  const { loading: permissionLoading } = usePermissionCheck('inspections');
   const isElevatedUser = isManager || isAdmin || isSuperAdmin;
   const { tabletModeEnabled } = useTabletMode();
-  const supabase = createClient();
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
+  if (typeof window !== 'undefined' && !supabaseRef.current) {
+    supabaseRef.current = createClient();
+  }
+  const supabase = supabaseRef.current as ReturnType<typeof createClient>;
   
   const [vehicles, setVehicles] = useState<Array<{ 
     id: string; 
@@ -213,6 +219,10 @@ function NewInspectionContent() {
   const [informWorkshop, setInformWorkshop] = useState(false);
   const [, setCreatingWorkshopTask] = useState(false);
   const hasOptionalInspectorComment = inspectorComments.trim().length > 0;
+
+  if (permissionLoading) {
+    return <PageLoader message="Loading van inspection form..." />;
+  }
 
   useEffect(() => {
     if (!hasOptionalInspectorComment && informWorkshop) {
@@ -412,6 +422,11 @@ function NewInspectionContent() {
     try {
       setLoading(true);
       setError('');
+      const currentUserId = user?.id;
+      if (!currentUserId) {
+        setError('You must be logged in to edit an inspection');
+        return;
+      }
 
       const { data: profileData } = await supabase
         .from('profiles')
@@ -422,7 +437,7 @@ function NewInspectionContent() {
             is_manager_admin
           )
         `)
-        .eq('id', user?.id)
+        .eq('id', currentUserId)
         .single();
 
       const userIsManager = (profileData as ProfileWithRole)?.role?.is_manager_admin || false;
@@ -454,7 +469,7 @@ function NewInspectionContent() {
       }
 
       let checklist = INSPECTION_ITEMS;
-      const inspectionData = inspection as InspectionWithRelations;
+      const inspectionData = inspection as unknown as InspectionWithRelations;
       if (inspectionData.vans?.van_categories?.name || inspectionData.vans?.vehicle_type) {
         const categoryName = inspectionData.vans?.van_categories?.name || inspectionData.vans?.vehicle_type;
         checklist = getChecklistForCategory(categoryName);
@@ -749,7 +764,7 @@ function NewInspectionContent() {
       } else {
         // Build map of defective items: key = "itemNumber-itemDescription"
         const defectsMap = new Map<string, PreviousDefect>();
-        const items = (lastInspection as InspectionWithRelations).inspection_items || [];
+        const items = ((lastInspection as unknown as InspectionWithRelations).inspection_items || []);
         
         items.forEach((item: InspectionItem) => {
           if (item.status === 'attention') {
@@ -1454,7 +1469,12 @@ function NewInspectionContent() {
             const { data: previousInspectionItems } = await supabase
               .from('inspection_items')
               .select('id, item_number, item_description')
-              .in('id', pendingActions.map((action: { inspection_item_id: string | null }) => action.inspection_item_id).filter(Boolean));
+              .in(
+                'id',
+                pendingActions
+                  .map((action: { inspection_item_id: string | null }) => action.inspection_item_id)
+                  .filter((inspectionItemId): inspectionItemId is string => Boolean(inspectionItemId)),
+              );
 
             // For each resolved item, find matching action and complete it
             for (const [key, resolutionComment] of resolvedItems.entries()) {

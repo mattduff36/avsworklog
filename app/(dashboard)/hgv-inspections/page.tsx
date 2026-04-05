@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQueryState } from 'nuqs';
@@ -16,10 +16,11 @@ import { createClient } from '@/lib/supabase/client';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
+import { getInspectionVisibilityFlags } from '@/lib/utils/inspection-access';
 import { formatDate } from '@/lib/utils/date';
+import { isUuid } from '@/lib/utils/uuid';
 import type { Employee } from '@/types/common';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
-import { hasWorkshopInspectionFullVisibilityOverride } from '@/lib/utils/inspection-visibility';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -75,21 +76,35 @@ function HgvInspectionsContent() {
     isSupervisor,
     loading: authLoading,
   } = useAuth();
-  const hasWorkshopReadAllOverride = hasWorkshopInspectionFullVisibilityOverride(
-    effectiveRole?.team_name ?? profile?.team?.name
-  );
-  const canViewAllInspections =
-    isManager || isAdmin || isSuperAdmin || isSupervisor || hasWorkshopReadAllOverride;
-  const canManageInspections = isManager || isAdmin || isSuperAdmin;
-  const pageSize = canViewAllInspections ? 20 : 10;
-  usePermissionCheck('hgv-inspections');
+  const {
+    hasPermission: canAccessInspectionModule,
+    loading: permissionLoading,
+  } = usePermissionCheck('hgv-inspections');
+  const {
+    hasOrgWideInspectionVisibility,
+    hasTeamInspectionVisibility,
+    canViewCrossUserInspections,
+    canManageInspections,
+  } = getInspectionVisibilityFlags({
+    teamName: effectiveRole?.team_name ?? profile?.team?.name,
+    isManager,
+    isAdmin,
+    isSuperAdmin,
+    isSupervisor,
+  });
+  const pageSize = canViewCrossUserInspections ? 20 : 10;
   const router = useRouter();
   const { tabletModeEnabled } = useTabletMode();
-  const supabase = createClient();
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
+  if (typeof window !== 'undefined' && !supabaseRef.current) {
+    supabaseRef.current = createClient();
+  }
+  const supabase = supabaseRef.current as ReturnType<typeof createClient>;
 
   const [inspections, setInspections] = useState<HgvInspectionWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [scopedEmployeeIds, setScopedEmployeeIds] = useState<string[]>([]);
   const [hgvs, setHgvs] = useState<HgvSummary[]>([]);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -121,8 +136,14 @@ function HgvInspectionsContent() {
       .order('reg_number');
     setHgvs(hgvData || []);
 
-    if (canViewAllInspections) {
+    if (
+      user &&
+      canAccessInspectionModule &&
+      !permissionLoading &&
+      canViewCrossUserInspections
+    ) {
       const profileData = await fetchUserDirectory({ module: 'hgv-inspections' });
+      setScopedEmployeeIds(Array.from(new Set([user.id, ...profileData.map((employee) => employee.id)])));
       setEmployees(
         profileData.map((employee) => ({
           id: employee.id,
@@ -131,28 +152,34 @@ function HgvInspectionsContent() {
           has_module_access: employee.has_module_access,
         })) as Employee[]
       );
+    } else if (user) {
+      setEmployees([]);
+      setScopedEmployeeIds([user.id]);
     }
-  }, [canViewAllInspections, supabase]);
+  }, [canAccessInspectionModule, permissionLoading, canViewCrossUserInspections, supabase, user]);
 
   const fetchInspections = useCallback(async () => {
-    if (!user || authLoading) return;
+    if (!user || authLoading || permissionLoading || !canAccessInspectionModule) return;
     setLoading(true);
 
     try {
       let query = supabase
         .from('hgv_inspections')
-        .select(`
-          *,
-          hgv:hgvs!hgv_inspections_hgv_id_fkey(reg_number, nickname),
-          profile:profiles!hgv_inspections_user_id_fkey(full_name)
-        `)
+        .select('*')
         .eq('status', 'submitted')
         .order('inspection_date', { ascending: false });
 
-      if (!canViewAllInspections) {
+      if (!canViewCrossUserInspections) {
         query = query.eq('user_id', user.id);
       } else if ((selectedEmployeeId || 'all') !== 'all') {
-        query = query.eq('user_id', selectedEmployeeId as string);
+        const employeeFilter = selectedEmployeeId as string;
+        if (!hasOrgWideInspectionVisibility && !scopedEmployeeIds.includes(employeeFilter)) {
+          query = query.eq('user_id', user.id);
+        } else {
+          query = query.eq('user_id', employeeFilter);
+        }
+      } else if (hasTeamInspectionVisibility) {
+        query = query.in('user_id', scopedEmployeeIds.length > 0 ? scopedEmployeeIds : [user.id]);
       }
 
       if ((hgvFilter || 'all') !== 'all') {
@@ -161,7 +188,52 @@ function HgvInspectionsContent() {
 
       const { data, error } = await query;
       if (error) throw error;
-      const rows = (data || []) as HgvInspectionWithRelations[];
+      const rows = ((data || []) as Array<Omit<HgvInspectionWithRelations, 'hgv' | 'profile'>>).map((row) => ({
+        ...row,
+        hgv: null,
+        profile: null,
+      }));
+      const validHgvIds = Array.from(new Set(rows.map((row) => row.hgv_id).filter(isUuid)));
+      const validUserIds = Array.from(new Set(rows.map((row) => row.user_id).filter(isUuid)));
+      let hgvMap = new Map<string, { reg_number: string; nickname: string | null }>();
+      let profileMap = new Map<string, { full_name: string }>();
+
+      if (validHgvIds.length > 0) {
+        const { data: hgvs, error: hgvsError } = await supabase
+          .from('hgvs')
+          .select('id, reg_number, nickname')
+          .in('id', validHgvIds);
+
+        if (hgvsError) {
+          console.warn('Unable to load HGV inspection vehicle details:', hgvsError);
+        } else {
+          hgvMap = new Map(
+            ((hgvs || []) as Array<{ id: string; reg_number: string; nickname: string | null }>)
+              .filter((hgv) => Boolean(hgv.id))
+              .map((hgv) => [hgv.id, { reg_number: hgv.reg_number, nickname: hgv.nickname ?? null }])
+          );
+        }
+      }
+
+      if (validUserIds.length > 0) {
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', validUserIds);
+
+        if (profilesError) {
+          console.warn('Unable to load HGV inspection owner names:', profilesError);
+        } else {
+          profileMap = new Map(
+            ((profiles || []) as Array<{ id: string; full_name: string | null }>)
+              .filter((profile): profile is { id: string; full_name: string } =>
+                Boolean(profile.id && profile.full_name)
+              )
+              .map((profile) => [profile.id, { full_name: profile.full_name }])
+          );
+        }
+      }
+
       const inspectionIds = rows.map((row) => row.id).filter((id): id is string => Boolean(id));
       let defectInspectionIds = new Set<string>();
       let workshopTaskInspectionIds = new Set<string>();
@@ -203,6 +275,8 @@ function HgvInspectionsContent() {
       setInspections(
         rows.map((row) => ({
           ...row,
+          hgv: row.hgv_id && isUuid(row.hgv_id) ? hgvMap.get(row.hgv_id) ?? null : null,
+          profile: profileMap.get(row.user_id) ?? null,
           has_reported_defect: defectInspectionIds.has(row.id),
           has_inform_workshop_task: workshopTaskInspectionIds.has(row.id),
         }))
@@ -214,7 +288,19 @@ function HgvInspectionsContent() {
     } finally {
       setLoading(false);
     }
-  }, [authLoading, hgvFilter, canViewAllInspections, selectedEmployeeId, supabase, user]);
+  }, [
+    authLoading,
+    permissionLoading,
+    canAccessInspectionModule,
+    hgvFilter,
+    canViewCrossUserInspections,
+    hasOrgWideInspectionVisibility,
+    hasTeamInspectionVisibility,
+    scopedEmployeeIds,
+    selectedEmployeeId,
+    supabase,
+    user,
+  ]);
 
   useEffect(() => {
     setDisplayCount(pageSize);
@@ -289,7 +375,7 @@ function HgvInspectionsContent() {
     }
   };
 
-  const showInitialLoading = loading && inspections.length === 0;
+  const showInitialLoading = (permissionLoading || loading) && inspections.length === 0;
 
   const getInspectionIcon = (inspection: HgvInspectionWithRelations) => {
     const iconColorClass = inspection.has_inform_workshop_task
@@ -324,7 +410,7 @@ function HgvInspectionsContent() {
           </Link>
         </div>
 
-        {canViewAllInspections && employees.length > 0 && (
+        {canViewCrossUserInspections && employees.length > 0 && (
           <div className="pt-4 border-t border-border">
             <div className={`flex items-center gap-3 ${tabletModeEnabled ? 'max-w-none flex-wrap' : 'max-w-md'}`}>
             <Label className="text-white text-sm flex items-center gap-2 whitespace-nowrap">
@@ -351,7 +437,7 @@ function HgvInspectionsContent() {
         )}
       </div>
 
-      {canViewAllInspections && (
+      {canViewCrossUserInspections && (
         <Card className="border-border">
           <CardContent className="pt-6">
             <div className={`flex items-center gap-3 ${tabletModeEnabled ? 'flex-wrap' : ''}`}>
@@ -406,7 +492,7 @@ function HgvInspectionsContent() {
             </div>
           )}
 
-          {canViewAllInspections && (
+          {canViewCrossUserInspections && (
             <div className="hidden md:flex items-center justify-end gap-2">
               {viewMode === 'table' && (
                 <DropdownMenu>
@@ -475,7 +561,7 @@ function HgvInspectionsContent() {
             </div>
           )}
 
-          {canViewAllInspections && viewMode === 'table' && (
+          {canViewCrossUserInspections && viewMode === 'table' && (
             <div className="hidden md:block">
               <HgvInspectionsListTable
                 inspections={inspections.slice(0, displayCount)}
@@ -489,7 +575,7 @@ function HgvInspectionsContent() {
             </div>
           )}
 
-          <div className={canViewAllInspections && viewMode === 'table' ? 'md:hidden grid gap-4' : 'grid gap-4'}>
+          <div className={canViewCrossUserInspections && viewMode === 'table' ? 'md:hidden grid gap-4' : 'grid gap-4'}>
             {inspections.slice(0, displayCount).map((inspection) => (
             <Card
               key={inspection.id}
@@ -506,7 +592,7 @@ function HgvInspectionsContent() {
                         {inspection.hgv?.nickname ? ` - ${inspection.hgv.nickname}` : ''}
                       </CardTitle>
                       <CardDescription className="text-muted-foreground">
-                        {canViewAllInspections && inspection.profile?.full_name ? `${inspection.profile.full_name} • ` : ''}
+                        {canViewCrossUserInspections && inspection.profile?.full_name ? `${inspection.profile.full_name} • ` : ''}
                         {formatDate(inspection.inspection_date)}
                       </CardDescription>
                     </div>

@@ -17,13 +17,14 @@ import { getRecentVehicleIds, recordRecentVehicleId, splitVehiclesByRecent } fro
 import { useAttachmentTemplates } from '@/lib/hooks/useAttachmentTemplates';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { triggerShakeAnimation } from '@/lib/utils/animations';
+import type { Database } from '@/types/database';
 
 type Vehicle = {
   id: string;
   reg_number: string | null;
   plant_id: string | null;
   nickname: string | null;
-  serial_number: string | null;
+  serial_number?: string | null;
   asset_type: 'van' | 'plant' | 'hgv' | 'tool';
 };
 
@@ -33,7 +34,7 @@ type Category = {
   slug: string | null;
   is_active: boolean;
   sort_order: number;
-  applies_to: 'van' | 'plant' | 'hgv';
+  applies_to: string | string[];
 };
 
 type Subcategory = {
@@ -44,9 +45,11 @@ type Subcategory = {
   is_active: boolean;
   sort_order: number;
   workshop_task_categories?: {
-    applies_to: 'van' | 'plant' | 'hgv';
+    applies_to: string | string[];
   };
 };
+
+type ActionInsert = Database['public']['Tables']['actions']['Insert'];
 
 interface CreateWorkshopTaskDialogProps {
   open: boolean;
@@ -57,8 +60,9 @@ interface CreateWorkshopTaskDialogProps {
   onSuccess?: () => void;
 }
 
-function normalizeTemplateAppliesTo(rawValues?: string[] | null): string[] {
-  const normalizedValues = (rawValues || [])
+function normalizeTemplateAppliesTo(rawValues?: string | string[] | null): string[] {
+  const values = Array.isArray(rawValues) ? rawValues : rawValues ? [rawValues] : [];
+  const normalizedValues = values
     .map((value) => value.trim().toLowerCase())
     .map((value) => (value === 'vehicle' ? 'van' : value))
     .filter(Boolean);
@@ -173,7 +177,8 @@ export function CreateWorkshopTaskDialog({
         throw error;
       }
 
-      setCurrentMeterReading(isPlant ? (data?.current_hours || null) : (data?.current_mileage || null));
+      const readingData = (data || {}) as { current_hours?: number | null; current_mileage?: number | null };
+      setCurrentMeterReading(isPlant ? (readingData.current_hours || null) : (readingData.current_mileage || null));
     } catch (err) {
       console.error('Error fetching current meter reading:', err);
       setCurrentMeterReading(null);
@@ -237,7 +242,7 @@ export function CreateWorkshopTaskDialog({
             }))
           ];
 
-          setVehicles(combinedVehicles);
+          setVehicles(combinedVehicles as Vehicle[]);
         } catch (err) {
           console.error('Error fetching vans:', err);
         }
@@ -254,7 +259,7 @@ export function CreateWorkshopTaskDialog({
 
           if (error) throw error;
           
-          setCategories(data || []);
+          setCategories((data || []) as Category[]);
         } catch (err) {
           console.error('Error fetching categories:', err);
         }
@@ -278,7 +283,7 @@ export function CreateWorkshopTaskDialog({
             .order('name');
 
           if (error) throw error;
-          setSubcategories(data || []);
+          setSubcategories((data || []) as Subcategory[]);
         } catch (err) {
           console.error('Error fetching subcategories:', err);
         }
@@ -318,14 +323,16 @@ export function CreateWorkshopTaskDialog({
   const meterUnit = meterReadingType === 'hours' ? 'hours' : isSelectedHgv ? 'km' : 'miles';
 
   // Filter categories by selected vehicle's asset type
-  const filteredCategories = categories.filter(cat => cat.applies_to === selectedAssetType);
+  const filteredCategories = categories.filter((cat) =>
+    normalizeTemplateAppliesTo(cat.applies_to).includes(selectedAssetType),
+  );
 
   // Filter subcategories by selected category and asset type
   const filteredSubcategories = selectedCategoryId
     ? subcategories.filter(sub => {
         if (sub.category_id !== selectedCategoryId) return false;
         if (sub.workshop_task_categories) {
-          return sub.workshop_task_categories.applies_to === selectedAssetType;
+          return normalizeTemplateAppliesTo(sub.workshop_task_categories.applies_to).includes(selectedAssetType);
         }
         return true;
       })
@@ -388,7 +395,7 @@ export function CreateWorkshopTaskDialog({
         : `Workshop Task - ${assetIdLabel}`;
 
       // Create the workshop task with correct asset reference
-      const taskData: Record<string, unknown> = {
+      const taskData: ActionInsert = {
         action_type: 'workshop_vehicle_task',
         workshop_comments: workshopComments,
         title: taskTitle,

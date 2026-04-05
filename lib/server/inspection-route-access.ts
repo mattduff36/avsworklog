@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { hasWorkshopInspectionFullVisibilityOverride } from '@/lib/utils/inspection-visibility';
+import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import type { ModuleName } from '@/types/roles';
@@ -35,8 +36,9 @@ export async function getInspectionRouteActorAccess(
   }
 
   const effectiveRole = await getEffectiveRole();
+  const hasFullAccessRole = hasEffectiveRoleFullAccess(effectiveRole);
   const canManageOthers =
-    effectiveRole.is_manager_admin &&
+    (hasFullAccessRole || effectiveRole.is_manager_admin) &&
     !hasWorkshopInspectionFullVisibilityOverride(effectiveRole.team_name);
 
   return {

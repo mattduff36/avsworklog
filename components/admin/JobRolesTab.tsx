@@ -37,6 +37,7 @@ import type { RoleMatrixRow } from '@/types/roles';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { getRoleSortPriority, isCoreRoleName } from '@/lib/config/roles-core';
+import { isAdminRole } from '@/lib/utils/role-access';
 
 type RoleType = 'admin' | 'manager' | 'employee';
 
@@ -126,7 +127,7 @@ export function JobRolesTab() {
       name: role.name,
       display_name: role.display_name,
       description: role.description || '',
-      role_type: role.role_class || (role.name === 'admin' ? 'admin' : (role.is_manager_admin ? 'manager' : 'employee')),
+      role_type: role.role_class || (isAdminRole(role) ? 'admin' : (role.is_manager_admin ? 'manager' : 'employee')),
       hierarchy_rank: role.hierarchy_rank != null ? String(role.hierarchy_rank) : '',
     });
     setFormError('');
@@ -330,14 +331,14 @@ export function JobRolesTab() {
                           {role.description || '—'}
                         </TableCell>
                         <TableCell className="text-center text-slate-300">
-                          {role.name === 'admin' ? 'Bypass' : role.hierarchy_rank ?? '—'}
+                          {isAdminRole(role) ? 'Bypass' : role.hierarchy_rank ?? '—'}
                         </TableCell>
                         <TableCell className="text-center">
                           {isCoreRoleName(role.name) ? (
                             <Badge variant="default">Primary</Badge>
                           ) : role.is_super_admin ? (
                             <Badge variant="destructive">Super Admin</Badge>
-                          ) : role.name === 'admin' ? (
+                          ) : isAdminRole(role) ? (
                             <Badge variant="destructive">Admin</Badge>
                           ) : role.name === 'supervisor' ? (
                             <Badge variant="outline" className="text-cyan-300 border-cyan-500/50 bg-cyan-500/10">Supervisor</Badge>

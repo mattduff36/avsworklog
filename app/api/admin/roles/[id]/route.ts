@@ -54,6 +54,7 @@ export async function GET(
       success: true,
       role: {
         ...role,
+        permissions: [],
         user_count: count || 0,
       },
     };

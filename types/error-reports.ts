@@ -12,7 +12,7 @@ export interface ErrorReport {
   error_code: string | null;
   page_url: string | null;
   user_agent: string | null;
-  additional_context: Record<string, unknown> | null;
+  additional_context: unknown;
   status: ErrorReportStatus;
   admin_notes: string | null;
   resolved_at: string | null;
@@ -55,7 +55,7 @@ export interface CreateErrorReportRequest {
   error_code?: string;
   page_url?: string;
   user_agent?: string;
-  additional_context?: Record<string, unknown>;
+  additional_context?: unknown;
 }
 
 export interface CreateErrorReportResponse {

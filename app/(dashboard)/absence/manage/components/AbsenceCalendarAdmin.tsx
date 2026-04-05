@@ -1121,12 +1121,12 @@ export function AbsenceCalendarAdmin() {
                       const target = (absences || []).find((absence) => absence.id === event.id) || null;
                       const nextEditMode = target ? getAbsenceEditMode(target) : null;
                       const canEditTarget = Boolean(nextEditMode && !isSelectedFinancialYearClosed);
-                      const isAnnualLeaveTarget = Boolean(target && isAnnualLeaveAbsence(target));
-                      const canToggleOverride =
-                        Boolean(target) &&
-                        isAnnualLeaveTarget &&
-                        canEditAbsenceByScope(target) &&
-                        !isSelectedFinancialYearClosed;
+                      const isAnnualLeaveTarget = target ? isAnnualLeaveAbsence(target) : false;
+                      const canToggleOverride = target
+                        ? isAnnualLeaveTarget &&
+                          canEditAbsenceByScope(target) &&
+                          !isSelectedFinancialYearClosed
+                        : false;
                       const showStatusBadge = event.status !== 'approved' && event.status !== 'pending';
                       const isOverrideSaving = overrideSubmittingId === event.id;
                       const overrideEnabled = Boolean(

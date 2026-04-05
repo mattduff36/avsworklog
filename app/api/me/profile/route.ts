@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { PROFILE_HUB_PRD_EPIC_ID } from '@/lib/profile/epic';
 import { canEditOwnBasicProfileFields } from '@/lib/profile/permissions';
+import { applyValidationCookieIfNeeded } from '@/lib/server/app-auth/response';
+import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
 
 function isValidAvatarUrl(value: string): boolean {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -52,25 +53,20 @@ async function getCurrentUserProfile(userId: string, email: string | null) {
 }
 
 export async function GET() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
+  const current = await getCurrentAuthenticatedProfile();
+  if (!current) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    const profile = await getCurrentUserProfile(user.id, user.email || null);
-
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       prd_epic_id: PROFILE_HUB_PRD_EPIC_ID,
-      profile,
-      can_edit_basic_fields: canEditOwnBasicProfileFields(profile),
+      profile: current.profile,
+      can_edit_basic_fields: canEditOwnBasicProfileFields(current.profile),
     });
+    applyValidationCookieIfNeeded(response, current.validation);
+    return response;
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to load profile' },
@@ -80,13 +76,8 @@ export async function GET() {
 }
 
 export async function PUT(request: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
+  const current = await getCurrentAuthenticatedProfile();
+  if (!current) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -97,7 +88,7 @@ export async function PUT(request: NextRequest) {
       avatar_url?: string | null;
     };
 
-    const currentProfile = await getCurrentUserProfile(user.id, user.email || null);
+    const currentProfile = current.profile;
     const canEditBasics = canEditOwnBasicProfileFields(currentProfile);
     const nextValues: Record<string, string | null> = {};
 
@@ -145,18 +136,20 @@ export async function PUT(request: NextRequest) {
     const { error: updateError } = await admin
       .from('profiles')
       .update(nextValues)
-      .eq('id', user.id);
+      .eq('id', current.profile.id);
 
     if (updateError) throw updateError;
 
-    const profile = await getCurrentUserProfile(user.id, user.email || null);
+    const profile = await getCurrentUserProfile(current.profile.id, current.profile.email || null);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       prd_epic_id: PROFILE_HUB_PRD_EPIC_ID,
       profile,
       can_edit_basic_fields: canEditOwnBasicProfileFields(profile),
     });
+    applyValidationCookieIfNeeded(response, current.validation);
+    return response;
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to update profile' },

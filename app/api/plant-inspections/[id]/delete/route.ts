@@ -1,35 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { getInspectionRouteActorAccess } from '@/lib/server/inspection-route-access';
 import { logServerError } from '@/lib/utils/server-error-logger';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { access, errorResponse } = await getInspectionRouteActorAccess('plant-inspections');
+    if (errorResponse || !access) {
+      return errorResponse ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const canDeleteInspections = await canEffectiveRoleAccessModule('plant-inspections');
-    if (!canDeleteInspections) {
+    if (!access.canManageOthers) {
       return NextResponse.json(
-        { error: 'Forbidden: Plant inspections access required' },
+        { error: 'Forbidden: plant inspection management access required' },
         { status: 403 }
       );
     }
 
     const inspectionId = (await params).id;
+    const admin = createAdminClient();
 
     // Delete plant inspection (cascade will delete items and daily hours)
     // Include both owned plant (plant_id not null) and hired plant inspections
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await admin
       .from('plant_inspections')
       .delete()
       .eq('id', inspectionId);

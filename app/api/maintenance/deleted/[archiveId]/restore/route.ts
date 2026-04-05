@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import type { Database } from '@/types/database';
 
 // PUT - Restore an archived vehicle back to active status
 export async function PUT(
@@ -64,7 +65,10 @@ export async function PUT(
       }
     } else {
       // Vehicle doesn't exist, recreate it from archived data
-      const vehicleData = archivedVehicle.vehicle_data as Record<string, unknown>;
+      const vehicleData =
+        archivedVehicle.vehicle_data && typeof archivedVehicle.vehicle_data === 'object' && !Array.isArray(archivedVehicle.vehicle_data)
+          ? (archivedVehicle.vehicle_data as Record<string, unknown>)
+          : {};
       
       const { error: insertError } = await supabase
         .from('vans')
@@ -75,7 +79,7 @@ export async function PUT(
           status: 'active',
           nickname: vehicleData?.nickname || null,
           created_at: vehicleData?.created_at || new Date().toISOString(),
-        });
+        } as Database['public']['Tables']['vans']['Insert']);
 
       if (insertError) {
         console.error('Failed to recreate vehicle:', insertError);
@@ -88,14 +92,14 @@ export async function PUT(
           ? archivedVehicle.maintenance_data[0] 
           : archivedVehicle.maintenance_data;
         
-        if (maintenanceData) {
+        if (maintenanceData && typeof maintenanceData === 'object') {
           const { error: maintenanceError } = await supabase
             .from('vehicle_maintenance')
             .upsert({
-              ...maintenanceData,
+              ...(maintenanceData as Record<string, unknown>),
               van_id: archivedVehicle.van_id,
               updated_at: new Date().toISOString(),
-            }, {
+            } as Database['public']['Tables']['vehicle_maintenance']['Insert'], {
               onConflict: 'van_id'
             });
 

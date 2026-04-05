@@ -13,7 +13,12 @@ export type AccountSwitchAuditEventType =
   | 'device_registered'
   | 'device_revoked'
   | 'password_fallback_success'
-  | 'password_fallback_failed';
+  | 'password_fallback_failed'
+  | 'app_session_created'
+  | 'app_session_locked'
+  | 'app_session_unlocked'
+  | 'app_session_revoked'
+  | 'device_pin_cleared';
 
 export async function createAccountSwitchAuditEvent({
   profileId,

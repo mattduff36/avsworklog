@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { ACCEPTED_QUOTE_STATUSES, ACTIVE_QUOTE_STATUS_ORDER } from '@/app/(dashboard)/quotes/types';
+import { ACCEPTED_QUOTE_STATUSES, ACTIVE_QUOTE_STATUS_ORDER, type QuoteStatus } from '@/app/(dashboard)/quotes/types';
+import type { Database } from '@/types/database';
 import {
   appendQuoteTimelineEvent,
   calculateQuoteTotals,
@@ -360,13 +361,15 @@ export async function POST(request: NextRequest) {
       start_alert_days: normalizedStartAlertDays,
       subtotal: totals.subtotal,
       total: totals.total,
-      status: quoteData.status || 'draft',
+      status: (quoteData.status || 'draft') as QuoteStatus,
       commercial_status: 'open',
       created_by: user.id,
       updated_by: user.id,
     };
 
-    const { error: insertError } = await supabase.from('quotes').insert(insertPayload);
+    const { error: insertError } = await supabase
+      .from('quotes')
+      .insert(insertPayload as Database['public']['Tables']['quotes']['Insert']);
     if (insertError) throw insertError;
 
     if (items.length > 0) {

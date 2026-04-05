@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizeTrackedPath, shouldTrackPageVisit } from '@/lib/profile/quick-links';
 import { PROFILE_HUB_PRD_EPIC_ID } from '@/lib/profile/epic';
+import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
 
 const MIN_SECONDS_BETWEEN_DUPLICATE_TRACKS = 45;
 
@@ -11,15 +11,12 @@ interface PageVisitBody {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
+  const current = await getCurrentAuthenticatedProfile();
+  if (!current) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const userId = current.profile.id;
 
   try {
     const body = (await request.json()) as PageVisitBody;
@@ -42,7 +39,7 @@ export async function POST(request: NextRequest) {
     const { data: recentDuplicate, error: duplicateError } = await admin
       .from('user_page_visits')
       .select('visited_at')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('path', path)
       .order('visited_at', { ascending: false })
       .limit(1)
@@ -63,7 +60,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { error: insertError } = await admin.from('user_page_visits').insert({
-      user_id: user.id,
+      user_id: userId,
       path,
     });
 

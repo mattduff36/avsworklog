@@ -11,7 +11,7 @@ export interface MaintenanceCategory {
   alert_threshold_days: number | null;
   alert_threshold_miles: number | null;
   alert_threshold_hours: number | null;
-  applies_to: ('van' | 'plant' | 'hgv')[];
+  applies_to: string[];
   is_active: boolean;
   sort_order: number;
   created_at: string;
@@ -74,7 +74,7 @@ export interface VehicleMaintenance {
   last_dvla_sync: string | null;
   dvla_sync_status: 'never' | 'success' | 'error' | 'pending' | null;
   dvla_sync_error: string | null;
-  dvla_raw_data: Record<string, unknown> | null;
+  dvla_raw_data: unknown | null;
   
   // VES API Vehicle Data
   ves_make: string | null;
@@ -99,7 +99,7 @@ export interface VehicleMaintenance {
   mot_api_sync_status: 'never' | 'success' | 'error' | 'pending' | null;
   mot_api_sync_error: string | null;
   last_mot_api_sync: string | null;
-  mot_raw_data: Record<string, unknown> | null;
+  mot_raw_data: unknown | null;
   
   // MOT History API Data - Vehicle details
   mot_make: string | null;
@@ -180,7 +180,7 @@ export interface VehicleMaintenanceWithStatus extends VehicleMaintenance {
     category_id: string | null;
     status: string;
     nickname?: string | null;
-    asset_type?: 'van' | 'hgv' | 'plant' | 'tool';
+    asset_type?: 'van' | 'vehicle' | 'hgv' | 'plant' | 'tool';
     plant_id?: string | null;
     serial_number?: string | null;
     year?: number | null;
@@ -240,7 +240,7 @@ export interface CreateCategoryRequest {
   alert_threshold_days?: number;
   alert_threshold_miles?: number;
   alert_threshold_hours?: number;
-  applies_to?: ('van' | 'plant' | 'hgv')[];
+  applies_to?: string[];
   sort_order?: number;
   responsibility?: CategoryResponsibility;
   show_on_overview?: boolean;
@@ -255,7 +255,7 @@ export interface UpdateCategoryRequest {
   alert_threshold_days?: number;
   alert_threshold_miles?: number;
   alert_threshold_hours?: number;
-  applies_to?: ('van' | 'plant' | 'hgv')[];
+  applies_to?: string[];
   is_active?: boolean;
   sort_order?: number;
   responsibility?: CategoryResponsibility;

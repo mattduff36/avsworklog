@@ -18,6 +18,7 @@ import Link from 'next/link';
 import { calculateHours, formatHours, roundTimeToNearestQuarterHour } from '@/lib/utils/time-calculations';
 import { DAY_NAMES } from '@/types/timesheet';
 import { Database } from '@/types/database';
+import { isAdminRole } from '@/lib/utils/role-access';
 import { SignaturePad } from '@/components/forms/SignaturePad';
 import { fetchUKBankHolidays } from '@/lib/utils/bank-holidays';
 import { Employee } from '@/types/common';
@@ -593,7 +594,7 @@ export function CivilsTimesheet({
       // Calculate permissions dynamically from current profile state (not stale closure values)
       const currentIsSuperAdmin = (profile as { super_admin?: boolean; role?: { is_super_admin?: boolean } } | null)?.super_admin || profile?.role?.is_super_admin || false;
       const currentIsManager = profile?.role?.is_manager_admin || false;
-      const currentIsAdmin = profile?.role?.name === 'admin';
+      const currentIsAdmin = isAdminRole(profile?.role);
       const currentHasElevatedPermissions = currentIsSuperAdmin || currentIsManager || currentIsAdmin;
       
       if (!currentHasElevatedPermissions && timesheetData.user_id !== user.id) {

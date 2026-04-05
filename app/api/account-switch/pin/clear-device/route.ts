@@ -3,12 +3,16 @@ import { ACCOUNT_SWITCHER_PRD_EPIC_ID } from '@/lib/account-switch/epic';
 import { getAccountSwitchActorAccess } from '@/lib/server/account-switch-auth';
 import { createAccountSwitchAuditEvent } from '@/lib/server/account-switch-audit';
 import {
+  clearAccountSwitchDevicePin,
+  parseAccountSwitchDeviceId,
+} from '@/lib/server/account-switch-device';
+import {
   buildAccountSwitchErrorResponse,
   getAccountSwitcherDisabledResponse,
 } from '@/lib/server/account-switch-route-helpers';
 
-interface ShortcutRemovedBody {
-  targetProfileId?: string;
+interface ClearDevicePinBody {
+  deviceId?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -21,29 +25,38 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = (await request.json()) as ShortcutRemovedBody;
-    const targetProfileId = body.targetProfileId?.trim() || '';
-    if (!targetProfileId) {
+    const body = (await request.json()) as ClearDevicePinBody;
+    const deviceId = parseAccountSwitchDeviceId(body.deviceId);
+    if (!deviceId) {
       return buildAccountSwitchErrorResponse(
-        'TARGET_PROFILE_REQUIRED',
-        'targetProfileId is required',
+        'DEVICE_ID_REQUIRED',
+        'A valid deviceId is required',
         400
       );
     }
 
-    await createAccountSwitchAuditEvent({
-      profileId: targetProfileId,
-      actorProfileId: access.userId,
-      eventType: 'shortcut_removed',
+    const pinCleared = await clearAccountSwitchDevicePin({
+      profileId: access.userId,
+      rawDeviceId: deviceId,
     });
+
+    if (pinCleared) {
+      await createAccountSwitchAuditEvent({
+        profileId: access.userId,
+        actorProfileId: access.userId,
+        eventType: 'device_pin_cleared',
+        metadata: {},
+      });
+    }
 
     return NextResponse.json({
       success: true,
       prd_epic_id: ACCOUNT_SWITCHER_PRD_EPIC_ID,
+      pin_cleared: pinCleared,
     });
   } catch (error) {
     return buildAccountSwitchErrorResponse(
-      'SHORTCUT_REMOVE_AUDIT_FAILED',
+      'CLEAR_DEVICE_PIN_FAILED',
       error instanceof Error ? error.message : 'Internal server error',
       500
     );

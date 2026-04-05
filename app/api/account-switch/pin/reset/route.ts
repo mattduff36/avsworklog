@@ -93,11 +93,7 @@ export async function POST(request: NextRequest) {
     const { error } = await supabaseAdmin
       .from('account_switch_settings')
       .update({
-        pin_hash: pinHash,
         quick_switch_enabled: true,
-        pin_failed_attempts: 0,
-        pin_locked_until: null,
-        pin_last_changed_at: new Date().toISOString(),
       })
       .eq('profile_id', access.userId);
 

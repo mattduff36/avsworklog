@@ -10,8 +10,8 @@
  */
 
 import { cookies } from 'next/headers';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
 import { VIEW_AS_ROLE_COOKIE_NAME, VIEW_AS_TEAM_COOKIE_NAME } from '@/lib/utils/view-as-cookie';
 
 export interface EffectiveRoleInfo {
@@ -59,12 +59,13 @@ export async function getEffectiveRole(): Promise<EffectiveRoleInfo> {
   };
 
   try {
-    // Authenticate via session
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const current = await getCurrentAuthenticatedProfile();
+    if (!current) {
       return none;
     }
+
+    const userId = current.profile.id;
+    const userEmail = current.profile.email;
 
     // Fetch actual profile + role using admin client to bypass RLS
     const admin = createAdminClient();
@@ -84,7 +85,7 @@ export async function getEffectiveRole(): Promise<EffectiveRoleInfo> {
           is_super_admin
         )
       `)
-      .eq('id', user.id)
+      .eq('id', userId)
       .single();
 
     if (profileError || !profile) {
@@ -122,7 +123,7 @@ export async function getEffectiveRole(): Promise<EffectiveRoleInfo> {
     const isActualSuperAdmin =
       typedProfile.super_admin === true ||
       actualRole?.is_super_admin === true ||
-      user.email === 'admin@mpdee.co.uk';
+      userEmail === 'admin@mpdee.co.uk';
 
     // Build baseline result from actual role
     const result: EffectiveRoleInfo = {
@@ -134,7 +135,7 @@ export async function getEffectiveRole(): Promise<EffectiveRoleInfo> {
       is_super_admin: isActualSuperAdmin,
       is_viewing_as: false,
       is_actual_super_admin: isActualSuperAdmin,
-      user_id: user.id,
+      user_id: userId,
       team_id: actualTeamId ?? actualTeam?.id ?? null,
       team_name: actualTeam?.name ?? null,
     };
@@ -194,7 +195,7 @@ export async function getEffectiveRole(): Promise<EffectiveRoleInfo> {
       is_super_admin: effectiveRole?.is_super_admin ?? false,
       is_viewing_as: isViewingAs,
       is_actual_super_admin: true,
-      user_id: user.id,
+      user_id: userId,
       team_id: effectiveTeamId,
       team_name: effectiveTeamName,
     };

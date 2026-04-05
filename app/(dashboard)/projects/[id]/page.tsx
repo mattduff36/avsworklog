@@ -50,7 +50,7 @@ interface RAMSDocument {
 interface Assignment {
   id: string;
   employee_id: string;
-  status: 'pending' | 'read' | 'signed';
+  status: string;
   assigned_at: string;
   read_at: string | null;
   signed_at: string | null;

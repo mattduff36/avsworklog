@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { getActorAbsenceSecondaryPermissions } from '@/lib/server/absence-secondary-permissions';
+import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import {
   bookBulkAbsence,
@@ -65,8 +66,7 @@ async function requireAbsenceAccess() {
         }
       : {}),
   });
-  const isAdmin =
-    effectiveRole.is_actual_super_admin || effectiveRole.is_super_admin || effectiveRole.role_name === 'admin';
+  const isAdmin = hasEffectiveRoleFullAccess(effectiveRole);
   const canRunGlobalActions = isAdmin || secondary.effective.see_manage_overview_all;
   if (!canRunGlobalActions) {
     return {

@@ -1,8 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
-import { createClient } from '@/lib/supabase/client';
+import { subscribeToAuthStateChange } from '@/lib/app-auth/client';
 
 const TABLET_MODE_STORAGE_KEY_PREFIX = 'tablet_mode:';
 const TABLET_MODE_ON_VALUE = 'on';
@@ -22,6 +21,13 @@ interface TabletModeContextValue {
 
 interface TabletModeProviderProps {
   children: React.ReactNode;
+}
+
+interface AuthSessionResponse {
+  authenticated: boolean;
+  user: {
+    id: string;
+  } | null;
 }
 
 const TabletModeContext = createContext<TabletModeContextValue | undefined>(undefined);
@@ -55,7 +61,6 @@ function safeLocalStorageSet(key: string, value: string): void {
 }
 
 export function TabletModeProvider({ children }: TabletModeProviderProps) {
-  const supabase = useMemo(() => createClient(), []);
   const [tabletModeEnabled, setTabletModeEnabled] = useState(false);
   const [tabletModeInfoOpen, setTabletModeInfoOpen] = useState(false);
   const [storageUserId, setStorageUserId] = useState<string | null>(null);
@@ -81,23 +86,36 @@ export function TabletModeProvider({ children }: TabletModeProviderProps) {
     }
 
     async function loadInitialUser() {
-      const { data } = await supabase.auth.getUser();
-      applyUserStorageState(data.user?.id ?? null);
+      try {
+        const response = await fetch('/api/auth/session', {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+          },
+        });
+
+        if (!response.ok) {
+          applyUserStorageState(null);
+          return;
+        }
+
+        const data = (await response.json()) as AuthSessionResponse;
+        applyUserStorageState(data.authenticated ? data.user?.id ?? null : null);
+      } catch {
+        applyUserStorageState(null);
+      }
     }
 
     void loadInitialUser();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
-      applyUserStorageState(session?.user?.id ?? null);
+    const unsubscribe = subscribeToAuthStateChange(() => {
+      void loadInitialUser();
     });
 
     return () => {
       mounted = false;
-      subscription.unsubscribe();
+      unsubscribe();
     };
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
     if (!hydratedStorage || !storageUserId) return;

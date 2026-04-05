@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getUsersWithModuleAccess } from '@/lib/server/team-permissions';
 import { hasWorkshopInspectionFullVisibilityOverride } from '@/lib/utils/inspection-visibility';
+import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
 import { getEffectiveRole, type EffectiveRoleInfo } from '@/lib/utils/view-as';
 import { hasAccountsTimesheetFullVisibilityOverride } from '@/lib/utils/timesheet-visibility';
 import type { ModuleName } from '@/types/roles';
@@ -21,9 +22,7 @@ function isInspectionModule(moduleName: ModuleName): boolean {
 }
 
 function isAdminTierRole(effectiveRole: EffectiveRoleInfo): boolean {
-  return Boolean(
-    effectiveRole.is_actual_super_admin || effectiveRole.is_super_admin || effectiveRole.role_name === 'admin'
-  );
+  return hasEffectiveRoleFullAccess(effectiveRole);
 }
 
 function isManagerLikeRole(effectiveRole: EffectiveRoleInfo): boolean {

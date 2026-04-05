@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect } from 'react';
-import { errorLogger } from '@/lib/utils/error-logger';
 
 /**
  * Initialize the global error logger
@@ -9,13 +8,17 @@ import { errorLogger } from '@/lib/utils/error-logger';
  */
 export function ErrorLoggerInit() {
   useEffect(() => {
-    // Make error logger available globally for easy access
-    if (typeof window !== 'undefined') {
+    let mounted = true;
+
+    void import('@/lib/utils/error-logger').then(({ errorLogger }) => {
+      if (!mounted || typeof window === 'undefined') return;
       (window as unknown as Record<string, unknown>).errorLogger = errorLogger;
-    }
-    
-    // Log initialization
-    console.log('✅ Error logger initialized');
+      console.log('✅ Error logger initialized');
+    });
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   return null;

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import {
   isMissingTeamManagerSchemaError,
@@ -69,8 +70,7 @@ async function assertAdminUsersAccess() {
   }
 
   const effectiveRole = await getEffectiveRole();
-  const actorIsAdmin =
-    effectiveRole.role_name === 'admin' || effectiveRole.is_super_admin;
+  const actorIsAdmin = hasEffectiveRoleFullAccess(effectiveRole);
   if (!actorIsAdmin) {
     return NextResponse.json({ error: 'Forbidden: only admins can modify teams' }, { status: 403 });
   }

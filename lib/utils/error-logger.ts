@@ -6,6 +6,7 @@
 
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
+import type { Database } from '@/types/database';
 
 export interface ErrorHandlingMetadata {
   wasHandled: boolean;
@@ -536,6 +537,9 @@ class ErrorLogger {
   }
 
   public static getInstance(): ErrorLogger {
+    if (typeof window === 'undefined') {
+      throw new Error('ErrorLogger can only be instantiated in the browser');
+    }
     if (!ErrorLogger.instance) {
       ErrorLogger.instance = new ErrorLogger();
     }
@@ -631,7 +635,7 @@ class ErrorLogger {
 
       const { error } = await this.supabase
         .from('error_logs')
-        .insert(batch);
+        .insert(batch as Database['public']['Tables']['error_logs']['Insert'][]);
 
       if (error) {
         // Put items back in queue if insert failed
@@ -706,8 +710,39 @@ class ErrorLogger {
   }
 }
 
-// Export singleton instance
-export const errorLogger = ErrorLogger.getInstance();
+type ErrorLoggerArgs = {
+  error: Error | string;
+  componentName?: string | null;
+  additionalData?: Record<string, unknown> | null;
+};
+
+type ErrorLoggerFacade = {
+  logError: (args: ErrorLoggerArgs) => Promise<void>;
+  clearAllLogs: () => Promise<{ success: boolean; error?: string }>;
+};
+
+function getBrowserErrorLogger(): ErrorLogger | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  return ErrorLogger.getInstance();
+}
+
+// Export a server-safe facade so accidental SSR imports do not instantiate the browser client.
+export const errorLogger: ErrorLoggerFacade = {
+  async logError(args) {
+    const logger = getBrowserErrorLogger();
+    if (!logger) return;
+    await logger.logError(args);
+  },
+  async clearAllLogs() {
+    const logger = getBrowserErrorLogger();
+    if (!logger) {
+      return { success: false, error: 'Error logger is only available in the browser' };
+    }
+    return logger.clearAllLogs();
+  },
+};
 
 /**
  * React Error Boundary compatible error handler

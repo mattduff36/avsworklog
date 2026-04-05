@@ -3,6 +3,7 @@ import { createClient as createServerClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { removeLatestGeneratedFinancialYear } from '@/lib/services/absence-bank-holiday-sync';
 import { getActorAbsenceSecondaryPermissions } from '@/lib/server/absence-secondary-permissions';
+import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
@@ -46,8 +47,7 @@ export async function POST(request: Request) {
           }
         : {}),
     });
-    const isAdmin =
-      effectiveRole.is_actual_super_admin || effectiveRole.is_super_admin || effectiveRole.role_name === 'admin';
+    const isAdmin = hasEffectiveRoleFullAccess(effectiveRole);
     if (!isAdmin && !secondary.effective.see_manage_overview_all) {
       return NextResponse.json(
         { error: 'Forbidden: Records & Admin ALL scope required' },

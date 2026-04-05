@@ -56,13 +56,13 @@ type WorkshopTaskData = {
     };
   } | null;
   profiles_created?: {
-    full_name: string;
+    full_name: string | null;
   } | null;
   profiles_logged?: {
-    full_name: string;
+    full_name: string | null;
   } | null;
   profiles_actioned?: {
-    full_name: string;
+    full_name: string | null;
   } | null;
 };
 

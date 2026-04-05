@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type MouseEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -140,10 +140,10 @@ export function AuditLogDebugPanel({ supabase }: AuditLogDebugPanelProps) {
       .join(' ');
   };
 
-  const getTeamName = (teamId: string | null): string => {
+  const getTeamName = useCallback((teamId: string | null): string => {
     if (!teamId) return 'Unassigned';
     return teamNameById[teamId] || teamId;
-  };
+  }, [teamNameById]);
 
   const hasChangeDetails = (changes: AuditLogEntry['changes']): boolean => {
     return Boolean(changes && Object.keys(changes).length > 0);
@@ -212,7 +212,7 @@ export function AuditLogDebugPanel({ supabase }: AuditLogDebugPanelProps) {
       .sort((a, b) => a.label.localeCompare(b.label));
 
     return { teams, hasUnassigned };
-  }, [auditLogs, teamNameById]);
+  }, [auditLogs, getTeamName]);
 
   const tableOptions = useMemo(() => {
     return Array.from(new Set(auditLogs.map((log) => log.table_name))).sort((a, b) =>
@@ -287,7 +287,7 @@ export function AuditLogDebugPanel({ supabase }: AuditLogDebugPanelProps) {
     selectedTeamId,
     selectedTimeWindow,
     selectedUserId,
-    teamNameById,
+    getTeamName,
   ]);
 
   const clearFilters = () => {

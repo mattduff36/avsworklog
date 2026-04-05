@@ -27,6 +27,39 @@ export interface AccountSwitchDeviceCredentialRow {
   updated_at: string;
 }
 
+export interface AccountSwitchDeviceProfileSummary {
+  device_id: string;
+  profile_id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  email: string | null;
+  role_name: string | null;
+  last_authenticated_at: string | null;
+  last_locked_at: string | null;
+  pin_last_changed_at: string | null;
+  pin_failed_attempts: number;
+  pin_locked_until: string | null;
+}
+
+interface AccountSwitchDeviceListRow {
+  id: string;
+  profile_id: string;
+  last_authenticated_at?: string | null;
+  last_locked_at?: string | null;
+}
+
+interface AccountSwitchProfileRow {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  role_id?: string | null;
+}
+
+interface AccountSwitchRoleRow {
+  id: string;
+  name: string | null;
+}
+
 export function normalizeAccountSwitchDeviceId(rawDeviceId: string): string {
   const trimmed = rawDeviceId.trim();
   if (trimmed.length < DEVICE_ID_MIN_LENGTH || trimmed.length > DEVICE_ID_MAX_LENGTH) {
@@ -107,38 +140,6 @@ export async function upsertAccountSwitchDevice({
   }
 
   return data as AccountSwitchDeviceRow;
-}
-
-export async function touchAccountSwitchDeviceSession({
-  profileId,
-  rawDeviceId,
-  sessionHint,
-  markSwitch,
-}: {
-  profileId: string;
-  rawDeviceId: string;
-  sessionHint?: string | null;
-  markSwitch?: boolean;
-}): Promise<void> {
-  const device = await upsertAccountSwitchDevice({ profileId, rawDeviceId });
-  const supabaseAdmin = createAdminClient();
-  const nowIso = new Date().toISOString();
-  const { error } = await supabaseAdmin.from('account_switch_device_sessions').upsert(
-    {
-      profile_id: profileId,
-      device_id: device.id,
-      session_registered_at: nowIso,
-      last_switch_at: markSwitch ? nowIso : null,
-      session_hint: sessionHint || null,
-    },
-    {
-      onConflict: 'profile_id,device_id',
-    }
-  );
-
-  if (error) {
-    throw new Error(error.message);
-  }
 }
 
 export async function getAccountSwitchDeviceCredential({
@@ -254,4 +255,139 @@ export async function clearAccountSwitchDeviceCredentialLock({
     pinFailedAttempts: 0,
     pinLockedUntil: null,
   });
+}
+
+export async function clearAccountSwitchDevicePin({
+  profileId,
+  rawDeviceId,
+}: {
+  profileId: string;
+  rawDeviceId: string;
+}): Promise<boolean> {
+  const device = await getAccountSwitchDevice(profileId, rawDeviceId);
+  if (!device) {
+    return false;
+  }
+
+  const supabaseAdmin = createAdminClient();
+  const { error } = await supabaseAdmin
+    .from('account_switch_device_credentials')
+    .delete()
+    .eq('profile_id', profileId)
+    .eq('device_id', device.id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return true;
+}
+
+export async function listAccountSwitchDeviceProfiles(
+  rawDeviceId: string
+): Promise<AccountSwitchDeviceProfileSummary[]> {
+  const supabaseAdmin = createAdminClient();
+  const deviceIdHash = hashAccountSwitchDeviceId(rawDeviceId);
+
+  const deviceResult = await supabaseAdmin
+    .from('account_switch_devices')
+    .select('id, profile_id')
+    .eq('device_id_hash', deviceIdHash)
+    .is('revoked_at', null);
+
+  if (deviceResult.error) {
+    throw new Error(deviceResult.error.message);
+  }
+
+  const normalizedDeviceRows = (deviceResult.data as AccountSwitchDeviceListRow[] | null) || [];
+  const deviceIds = normalizedDeviceRows.map((row) => row.id).filter(Boolean);
+  if (deviceIds.length === 0) {
+    return [];
+  }
+
+  const profileIds = Array.from(new Set(normalizedDeviceRows.map((row) => row.profile_id).filter(Boolean)));
+  const { data: profileRows, error: profileError } = await supabaseAdmin
+    .from('profiles')
+    .select('id, full_name, avatar_url, role_id')
+    .in('id', profileIds);
+
+  if (profileError) {
+    throw new Error(profileError.message);
+  }
+
+  const normalizedProfileRows = (profileRows as AccountSwitchProfileRow[] | null) || [];
+  const roleIds = Array.from(
+    new Set(normalizedProfileRows.map((row) => row.role_id).filter((value): value is string => Boolean(value)))
+  );
+  const roleById = new Map<string, AccountSwitchRoleRow>();
+
+  if (roleIds.length > 0) {
+    const { data: roleRows, error: roleError } = await supabaseAdmin
+      .from('roles')
+      .select('id, name')
+      .in('id', roleIds);
+
+    if (roleError) {
+      throw new Error(roleError.message);
+    }
+
+    ((roleRows as AccountSwitchRoleRow[] | null) || []).forEach((role) => {
+      roleById.set(role.id, role);
+    });
+  }
+
+  const profileById = new Map<string, AccountSwitchProfileRow>();
+  normalizedProfileRows.forEach((profile) => {
+    profileById.set(profile.id, profile);
+  });
+
+  const { data: credentialRows, error: credentialError } = await supabaseAdmin
+    .from('account_switch_device_credentials')
+    .select(`
+      device_id,
+      profile_id,
+      pin_last_changed_at,
+      pin_failed_attempts,
+      pin_locked_until
+    `)
+    .in('device_id', deviceIds);
+
+  if (credentialError) {
+    throw new Error(credentialError.message);
+  }
+
+  const credentialByDeviceId = new Map(
+    (credentialRows || []).map((row) => [row.device_id, row])
+  );
+
+  return normalizedDeviceRows
+    .reduce<AccountSwitchDeviceProfileSummary[]>((acc, deviceRow) => {
+      const credential = credentialByDeviceId.get(deviceRow.id);
+      if (!credential) {
+        return acc;
+      }
+
+      const profileValue = profileById.get(deviceRow.profile_id) || null;
+      const roleValue = profileValue?.role_id ? roleById.get(profileValue.role_id) || null : null;
+
+      acc.push({
+        device_id: deviceRow.id,
+        profile_id: deviceRow.profile_id,
+        full_name: profileValue?.full_name || null,
+        avatar_url: profileValue?.avatar_url || null,
+        email: null,
+        role_name: roleValue?.name || null,
+        last_authenticated_at: null,
+        last_locked_at: null,
+        pin_last_changed_at: credential.pin_last_changed_at || null,
+        pin_failed_attempts: credential.pin_failed_attempts || 0,
+        pin_locked_until: credential.pin_locked_until || null,
+      });
+      return acc;
+    }, [])
+    .sort((left, right) => {
+      const leftTime = left.last_authenticated_at ? new Date(left.last_authenticated_at).getTime() : 0;
+      const rightTime = right.last_authenticated_at ? new Date(right.last_authenticated_at).getTime() : 0;
+      return rightTime - leftTime;
+    });
 }

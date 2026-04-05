@@ -17,6 +17,7 @@ import { calculateDurationDays } from '@/lib/utils/date';
 import { isClosedFinancialYearDate } from '@/lib/services/absence-archive';
 import { getErrorMessage, shouldLogAbsenceManageError } from '@/lib/utils/absence-error-handling';
 import { ANNUAL_LEAVE_MIN_REMAINING_DAYS } from '@/lib/utils/annual-leave';
+import { isAdminRole } from '@/lib/utils/role-access';
 
 const ANNUAL_LEAVE_REASON_NAME = 'annual leave';
 
@@ -73,7 +74,7 @@ async function assertAbsenceFinancialYearOpen(
 
   const { data: actorProfile, error: actorProfileError } = await supabase
     .from('profiles')
-    .select('super_admin, role:roles(name, is_manager_admin, is_super_admin)')
+    .select('super_admin, role:roles(name, role_class, is_manager_admin, is_super_admin)')
     .eq('id', authData.user.id)
     .single();
 
@@ -81,13 +82,18 @@ async function assertAbsenceFinancialYearOpen(
 
   const typedActorProfile = actorProfile as {
     super_admin?: boolean | null;
-    role?: { name?: string | null; is_manager_admin?: boolean | null; is_super_admin?: boolean | null } | null;
+    role?: {
+      name?: string | null;
+      role_class?: 'admin' | 'manager' | 'employee' | null;
+      is_manager_admin?: boolean | null;
+      is_super_admin?: boolean | null;
+    } | null;
   } | null;
   const actorRole = typedActorProfile?.role || null;
   const actorIsManagerOrHigher = Boolean(
     typedActorProfile?.super_admin ||
       actorRole?.is_super_admin ||
-      actorRole?.name === 'admin' ||
+      isAdminRole(actorRole) ||
       actorRole?.is_manager_admin
   );
   const targetFinancialYearStartYear = getFinancialYear(new Date(`${data.date}T00:00:00`)).start.getFullYear();
@@ -525,20 +531,25 @@ export function useCreateAbsence() {
 
       const { data: actorProfile, error: actorProfileError } = await supabase
         .from('profiles')
-        .select('super_admin, role:roles(name, is_manager_admin, is_super_admin)')
+        .select('super_admin, role:roles(name, role_class, is_manager_admin, is_super_admin)')
         .eq('id', user.id)
         .single();
       if (actorProfileError) throw actorProfileError;
 
       const typedActorProfile = actorProfile as {
         super_admin?: boolean | null;
-        role?: { name?: string | null; is_manager_admin?: boolean | null; is_super_admin?: boolean | null } | null;
+        role?: {
+          name?: string | null;
+          role_class?: 'admin' | 'manager' | 'employee' | null;
+          is_manager_admin?: boolean | null;
+          is_super_admin?: boolean | null;
+        } | null;
       } | null;
       const actorRole = typedActorProfile?.role || null;
       const actorIsManagerOrHigher = Boolean(
         typedActorProfile?.super_admin ||
           actorRole?.is_super_admin ||
-          actorRole?.name === 'admin' ||
+          isAdminRole(actorRole) ||
           actorRole?.is_manager_admin
       );
       const requestFinancialYearStartYear = getFinancialYear(new Date(`${absence.date}T00:00:00`)).start.getFullYear();
@@ -843,7 +854,7 @@ export function useAllAbsences(filters?: {
             query = query.eq('reason_id', filters.reasonId);
           }
           if (hasFilterValue(filters?.status)) {
-            query = query.eq('status', filters.status);
+            query = query.eq('status', filters.status as 'pending' | 'approved' | 'processed' | 'rejected' | 'cancelled');
           }
 
           const { data, error } = await query

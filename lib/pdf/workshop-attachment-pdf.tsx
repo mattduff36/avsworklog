@@ -361,7 +361,10 @@ export function WorkshopAttachmentPDF({
                 Workshop Task Attachment Report
               </Text>
             </View>
-            {logoSrc ? <Image src={logoSrc} style={styles.logo} /> : null}
+            {logoSrc ? (
+              // eslint-disable-next-line jsx-a11y/alt-text
+              <Image src={logoSrc} style={styles.logo} />
+            ) : null}
           </View>
         </View>
 
@@ -466,9 +469,10 @@ export function WorkshopAttachmentPDF({
                               ? `Signed by ${signatureName} on ${formatDateTimeSafe(signatureAt)}`
                               : 'No signature captured'}
                           </Text>
-                          {signatureDataUrl && (
+                          {signatureDataUrl ? (
+                            // eslint-disable-next-line jsx-a11y/alt-text
                             <Image src={signatureDataUrl} style={styles.signatureImage} />
-                          )}
+                          ) : null}
                         </>
                       ) : hasValue ? (
                         badge ? (

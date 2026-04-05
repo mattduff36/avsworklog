@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
@@ -24,8 +25,7 @@ export async function PUT(
 
     const canAccessUserAdmin = await canEffectiveRoleAccessModule('admin-users');
     const effectiveRole = await getEffectiveRole();
-    const actorIsAdmin =
-      effectiveRole.is_actual_super_admin || effectiveRole.is_super_admin || effectiveRole.role_name === 'admin';
+    const actorIsAdmin = hasEffectiveRoleFullAccess(effectiveRole);
     if (!canAccessUserAdmin || !actorIsAdmin) {
       return NextResponse.json({ error: 'Forbidden - admin access required' }, { status: 403 });
     }

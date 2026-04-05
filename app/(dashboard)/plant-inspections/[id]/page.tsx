@@ -1,8 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
+import { canAccessScopedInspection, getInspectionVisibilityFlags } from '@/lib/utils/inspection-access';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -59,12 +62,39 @@ interface InspectionItemWithDay extends InspectionItem {
 export default function ViewPlantInspectionPage() {
   const router = useRouter();
   const params = useParams();
-  const { user, isManager, isAdmin, isSuperAdmin, isSupervisor, loading: authLoading } = useAuth();
-  const canViewAllInspections = isManager || isAdmin || isSuperAdmin || isSupervisor;
-  const supabase = createClient();
+  const {
+    user,
+    profile,
+    effectiveRole,
+    isManager,
+    isAdmin,
+    isSuperAdmin,
+    isSupervisor,
+    loading: authLoading,
+  } = useAuth();
+  const {
+    hasPermission: canAccessInspectionModule,
+    loading: permissionLoading,
+  } = usePermissionCheck('plant-inspections');
+  const {
+    hasOrgWideInspectionVisibility,
+    canViewCrossUserInspections,
+  } = getInspectionVisibilityFlags({
+    teamName: effectiveRole?.team_name ?? profile?.team?.name,
+    isManager,
+    isAdmin,
+    isSuperAdmin,
+    isSupervisor,
+  });
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
+  if (typeof window !== 'undefined' && !supabaseRef.current) {
+    supabaseRef.current = createClient();
+  }
+  const supabase = supabaseRef.current as ReturnType<typeof createClient>;
   
   const [inspection, setInspection] = useState<PlantInspectionWithDetails | null>(null);
   const [items, setItems] = useState<InspectionItemWithDay[]>([]);
+  const [scopedEmployeeIds, setScopedEmployeeIds] = useState<string[]>([]);
   const [dailyHours, setDailyHours] = useState<DailyHour[]>([]);
   const [originalDefectItems, setOriginalDefectItems] = useState<InspectionItemWithDay[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,6 +110,36 @@ export default function ViewPlantInspectionPage() {
   const [editableDailyHours, setEditableDailyHours] = useState<Record<number, number | null>>({
     1: null, 2: null, 3: null, 4: null, 5: null, 6: null, 7: null
   });
+
+  useEffect(() => {
+    if (!user || permissionLoading || !canAccessInspectionModule || hasOrgWideInspectionVisibility) {
+      setScopedEmployeeIds(user ? [user.id] : []);
+      return;
+    }
+
+    if (!canViewCrossUserInspections) {
+      setScopedEmployeeIds([user.id]);
+      return;
+    }
+
+    const fetchScopedEmployees = async () => {
+      try {
+        const employees = await fetchUserDirectory({ module: 'plant-inspections', limit: 200 });
+        setScopedEmployeeIds(Array.from(new Set([user.id, ...employees.map((employee) => employee.id)])));
+      } catch (error) {
+        console.error('Error fetching scoped plant inspection employees:', error);
+        setScopedEmployeeIds([user.id]);
+      }
+    };
+
+    void fetchScopedEmployees();
+  }, [
+    user,
+    permissionLoading,
+    canAccessInspectionModule,
+    hasOrgWideInspectionVisibility,
+    canViewCrossUserInspections,
+  ]);
 
   const fetchInspection = useCallback(async (id: string) => {
     try {
@@ -102,7 +162,16 @@ export default function ViewPlantInspectionPage() {
 
       if (inspectionError) throw inspectionError;
       
-      if (!canViewAllInspections && inspectionData && inspectionData.user_id !== user?.id) {
+      if (
+        inspectionData &&
+        !canAccessScopedInspection({
+          ownerUserId: inspectionData.user_id,
+          currentUserId: user?.id,
+          canViewCrossUserInspections,
+          hasOrgWideInspectionVisibility,
+          scopedUserIds: scopedEmployeeIds,
+        })
+      ) {
         setError('You do not have permission to view this inspection');
         setLoading(false);
         return;
@@ -155,13 +224,19 @@ export default function ViewPlantInspectionPage() {
     } finally {
       setLoading(false);
     }
-  }, [supabase, canViewAllInspections, user]);
+  }, [
+    supabase,
+    user,
+    canViewCrossUserInspections,
+    hasOrgWideInspectionVisibility,
+    scopedEmployeeIds,
+  ]);
 
   useEffect(() => {
-    if (params.id && !authLoading) {
+    if (params.id && !authLoading && !permissionLoading && canAccessInspectionModule) {
       fetchInspection(params.id as string);
     }
-  }, [params.id, authLoading, fetchInspection]);
+  }, [params.id, authLoading, permissionLoading, canAccessInspectionModule, fetchInspection]);
 
   const handleHoursChange = (dayOfWeek: number, hours: string) => {
     const hoursNum = hours === '' ? null : parseInt(hours);
@@ -427,7 +502,7 @@ export default function ViewPlantInspectionPage() {
     }
   };
 
-  if (authLoading || loading) {
+  if (authLoading || permissionLoading || loading) {
     return <PageLoader message="Loading inspection..." />;
   }
 
@@ -511,32 +586,30 @@ export default function ViewPlantInspectionPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {canViewAllInspections && (
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={(e) => {
-                  e.preventDefault();
-                  const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-                  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                  const pdfUrl = `/api/plant-inspections/${inspection.id}/pdf`;
-                  const plantId = inspection.is_hired_plant
-                    ? (inspection.hired_plant_id_serial || 'Hired')
-                    : (inspection.plant?.plant_id || 'Unknown');
-                  
-                  if (isStandalone || isMobile) {
-                    router.push(`/pdf-viewer?url=${encodeURIComponent(pdfUrl)}&title=${encodeURIComponent(`PlantInspection-${plantId}`)}&return=${encodeURIComponent(`/plant-inspections/${inspection.id}`)}`);
-                  } else {
-                    window.open(pdfUrl, '_blank');
-                  }
-                }}
-                className="border-border text-white hover:bg-slate-800"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Download PDF</span>
-                <span className="sm:hidden">PDF</span>
-              </Button>
-            )}
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={(e) => {
+                e.preventDefault();
+                const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                const pdfUrl = `/api/plant-inspections/${inspection.id}/pdf`;
+                const plantId = inspection.is_hired_plant
+                  ? (inspection.hired_plant_id_serial || 'Hired')
+                  : (inspection.plant?.plant_id || 'Unknown');
+                
+                if (isStandalone || isMobile) {
+                  router.push(`/pdf-viewer?url=${encodeURIComponent(pdfUrl)}&title=${encodeURIComponent(`PlantInspection-${plantId}`)}&return=${encodeURIComponent(`/plant-inspections/${inspection.id}`)}`);
+                } else {
+                  window.open(pdfUrl, '_blank');
+                }
+              }}
+              className="border-border text-white hover:bg-slate-800"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Download PDF</span>
+              <span className="sm:hidden">PDF</span>
+            </Button>
             {getStatusBadge(inspection.status)}
           </div>
         </div>

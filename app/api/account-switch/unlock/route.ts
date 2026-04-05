@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ACCOUNT_SWITCHER_PRD_EPIC_ID } from '@/lib/account-switch/epic';
-import { getAccountSwitchActorAccess } from '@/lib/server/account-switch-auth';
 import { createAccountSwitchAuditEvent } from '@/lib/server/account-switch-audit';
 import {
   clearAccountSwitchDeviceCredentialLock,
   getAccountSwitchDeviceCredential,
   parseAccountSwitchDeviceId,
-  touchAccountSwitchDeviceSession,
   updateAccountSwitchDeviceCredentialState,
 } from '@/lib/server/account-switch-device';
 import {
@@ -15,13 +12,20 @@ import {
   isPinLockActive,
   verifyQuickSwitchPin,
 } from '@/lib/server/account-switch-pin';
-import { createAdminClient } from '@/lib/supabase/admin';
 import {
   buildAccountSwitchErrorResponse,
   getAccountSwitcherDisabledResponse,
 } from '@/lib/server/account-switch-route-helpers';
+import { clearLegacyLockCookie, clearLegacySupabaseCookies } from '@/lib/server/app-auth/response';
+import { setAppSessionCookieInResponse } from '@/lib/server/app-auth/cookies';
+import {
+  getCurrentAuthenticatedProfile,
+  issueAppSession,
+  revokeAppSession,
+} from '@/lib/server/app-auth/session';
+import { getAppAuthProfile } from '@/lib/server/app-auth/profile';
 
-interface SwitchSessionBody {
+interface UnlockBody {
   targetProfileId?: string;
   pin?: string;
   deviceId?: string;
@@ -31,13 +35,17 @@ export async function POST(request: NextRequest) {
   const disabledResponse = getAccountSwitcherDisabledResponse();
   if (disabledResponse) return disabledResponse;
 
-  const { access, errorResponse } = await getAccountSwitchActorAccess();
-  if (!access || errorResponse) {
-    return errorResponse ?? buildAccountSwitchErrorResponse('UNAUTHORIZED', 'Unauthorized', 401);
+  const current = await getCurrentAuthenticatedProfile({ allowLocked: true });
+  if (!current) {
+    return buildAccountSwitchErrorResponse('UNAUTHORIZED', 'Unauthorized', 401);
+  }
+  const currentSession = current.validation.session;
+  if (!currentSession) {
+    return buildAccountSwitchErrorResponse('UNAUTHORIZED', 'Unauthorized', 401);
   }
 
   try {
-    const body = (await request.json()) as SwitchSessionBody;
+    const body = (await request.json()) as UnlockBody;
     const targetProfileId = body.targetProfileId?.trim() || '';
     const pin = body.pin?.trim() || '';
     const deviceId = parseAccountSwitchDeviceId(body.deviceId);
@@ -69,7 +77,7 @@ export async function POST(request: NextRequest) {
     if (!targetDeviceCredential?.credential) {
       return buildAccountSwitchErrorResponse(
         'PIN_NOT_CONFIGURED',
-        'Switch PIN is not configured for this account on this device',
+        'PIN is not configured for this account on this device',
         400
       );
     }
@@ -86,7 +94,6 @@ export async function POST(request: NextRequest) {
     }
 
     const isValidPin = verifyQuickSwitchPin(pin, targetDeviceCredential.credential.pin_hash);
-
     if (!isValidPin) {
       const failedAttempts = targetDeviceCredential.credential.pin_failed_attempts + 1;
       const hasLockedPin = failedAttempts >= ACCOUNT_SWITCH_MAX_PIN_ATTEMPTS;
@@ -101,12 +108,13 @@ export async function POST(request: NextRequest) {
 
       await createAccountSwitchAuditEvent({
         profileId: targetProfileId,
-        actorProfileId: access.userId,
+        actorProfileId: current.profile.id,
         eventType: hasLockedPin ? 'pin_locked' : 'session_switch_failed',
         metadata: {
           failed_attempts: failedAttempts,
           lock_until: pinLockedUntil,
           device_id: targetDeviceCredential.device.id,
+          actor_profile_id: current.profile.id,
         },
       });
 
@@ -126,57 +134,31 @@ export async function POST(request: NextRequest) {
       rawDeviceId: deviceId,
     });
 
-    await touchAccountSwitchDeviceSession({
+    const nextSession = await issueAppSession({
       profileId: targetProfileId,
+      source: 'pin_unlock',
+      rememberMe: currentSession.remember_me,
       rawDeviceId: deviceId,
-      markSwitch: true,
+      actorProfileId: current.profile.id,
     });
 
-    const supabaseAdmin = createAdminClient();
-    const { data: profileData, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select(`
-        id,
-        full_name,
-        avatar_url,
-        role:roles(
-          name
-        )
-      `)
-      .eq('id', targetProfileId)
-      .single();
+    await revokeAppSession(currentSession.id, 'replaced_by_pin_unlock', nextSession.row.id);
 
-    if (profileError || !profileData) {
-      return buildAccountSwitchErrorResponse(
-        'TARGET_PROFILE_NOT_FOUND',
-        profileError?.message || 'Target profile not found',
-        404
-      );
-    }
-
-    const roleValue = Array.isArray(profileData.role) ? profileData.role[0] || null : profileData.role || null;
-
-    await createAccountSwitchAuditEvent({
-      profileId: targetProfileId,
-      actorProfileId: access.userId,
-      eventType: 'session_switch_success',
-      metadata: {
-        from_profile_id: access.userId,
-        device_id: targetDeviceCredential.device.id,
-      },
-    });
-
-    return NextResponse.json({
+    const targetProfile = await getAppAuthProfile(targetProfileId, null);
+    const response = NextResponse.json({
       success: true,
-      prd_epic_id: ACCOUNT_SWITCHER_PRD_EPIC_ID,
-      switch_authorized_at: new Date().toISOString(),
       profile: {
-        profileId: profileData.id,
-        fullName: profileData.full_name || null,
-        avatarUrl: profileData.avatar_url || null,
-        roleName: roleValue?.name || null,
+        profileId: targetProfile.id,
+        fullName: targetProfile.full_name || null,
+        avatarUrl: targetProfile.avatar_url || null,
+        roleName: targetProfile.role?.name || null,
       },
     });
+
+    clearLegacySupabaseCookies(request, response);
+    clearLegacyLockCookie(response);
+    setAppSessionCookieInResponse(response, nextSession.cookieValue, nextSession.cookieExpiresAt);
+    return response;
   } catch (error) {
     return buildAccountSwitchErrorResponse(
       'SESSION_SWITCH_FAILED',

@@ -20,13 +20,16 @@ export async function POST(request: NextRequest) {
   const disabledResponse = getAccountSwitcherDisabledResponse();
   if (disabledResponse) return disabledResponse;
 
-  const { access, errorResponse } = await getAccountSwitchActorAccess();
+  const { access, errorResponse } = await getAccountSwitchActorAccess(
+    '/api/account-switch/device/register'
+  );
   if (!access || errorResponse) {
     return errorResponse ?? buildAccountSwitchErrorResponse('UNAUTHORIZED', 'Unauthorized', 401);
   }
 
   try {
-    const body = (await request.json()) as RegisterDeviceBody;
+    const rawBody = await request.text();
+    const body = rawBody ? (JSON.parse(rawBody) as RegisterDeviceBody) : {};
     const deviceId = parseAccountSwitchDeviceId(body.deviceId);
     if (!deviceId) {
       return buildAccountSwitchErrorResponse(
@@ -62,6 +65,14 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+    if (error instanceof SyntaxError) {
+      return buildAccountSwitchErrorResponse(
+        'INVALID_JSON',
+        'Request body must be valid JSON',
+        400
+      );
+    }
+
     return buildAccountSwitchErrorResponse(
       'DEVICE_REGISTER_FAILED',
       error instanceof Error ? error.message : 'Internal server error',

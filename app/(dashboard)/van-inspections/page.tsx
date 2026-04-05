@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useState, useEffect, useCallback, Suspense, useRef } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useInspectionRealtime } from '@/lib/hooks/useRealtime';
@@ -22,7 +22,7 @@ import { toast } from 'sonner';
 import { VanInspection } from '@/types/inspection';
 import { Employee, InspectionStatusFilter } from '@/types/common';
 import { useQueryState } from 'nuqs';
-import { hasWorkshopInspectionFullVisibilityOverride } from '@/lib/utils/inspection-visibility';
+import { getInspectionVisibilityFlags } from '@/lib/utils/inspection-access';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -53,7 +53,8 @@ interface InspectionWithVehicle extends VanInspection {
   vans: {
     reg_number: string;
     van_categories: { name: string } | null;
-  };
+  } | null;
+  profile: { full_name: string } | null;
   has_reported_defect?: boolean;
   has_inform_workshop_task?: boolean;
 }
@@ -90,19 +91,29 @@ function InspectionsContent() {
     isSupervisor,
     loading: authLoading,
   } = useAuth();
-  const hasWorkshopReadAllOverride = hasWorkshopInspectionFullVisibilityOverride(
-    effectiveRole?.team_name ?? profile?.team?.name
-  );
-  const canViewAllInspections =
-    isManager || isAdmin || isSuperAdmin || isSupervisor || hasWorkshopReadAllOverride;
-  const canManageInspections = isManager || isAdmin || isSuperAdmin;
-  const pageSize = canViewAllInspections ? 20 : 10;
-  usePermissionCheck('inspections');
+  const {
+    hasPermission: canAccessInspectionModule,
+    loading: permissionLoading,
+  } = usePermissionCheck('inspections');
+  const {
+    hasOrgWideInspectionVisibility,
+    hasTeamInspectionVisibility,
+    canViewCrossUserInspections,
+    canManageInspections,
+  } = getInspectionVisibilityFlags({
+    teamName: effectiveRole?.team_name ?? profile?.team?.name,
+    isManager,
+    isAdmin,
+    isSuperAdmin,
+    isSupervisor,
+  });
+  const pageSize = canViewCrossUserInspections ? 20 : 10;
   const router = useRouter();
   const { tabletModeEnabled } = useTabletMode();
   const [inspections, setInspections] = useState<InspectionWithVehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [scopedEmployeeIds, setScopedEmployeeIds] = useState<string[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [recentVehicleIds, setRecentVehicleIds] = useState<string[]>([]);
   // Use URL search params to persist filter selection across navigations
@@ -135,7 +146,11 @@ function InspectionsContent() {
   const [columnVisibility, setColumnVisibility] = useState<VanInspectionsColumnVisibility>(
     DEFAULT_VAN_INSPECTIONS_COLUMN_VISIBILITY
   );
-  const supabase = createClient();
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
+  if (typeof window !== 'undefined' && !supabaseRef.current) {
+    supabaseRef.current = createClient();
+  }
+  const supabase = supabaseRef.current as ReturnType<typeof createClient>;
 
   // Fetch employees and vehicles
   useEffect(() => {
@@ -145,10 +160,16 @@ function InspectionsContent() {
   }, [normalizedVehicleFilter, setVehicleFilter, vehicleFilter]);
 
   useEffect(() => {
-    if (user && canViewAllInspections) {
+    if (
+      user &&
+      canAccessInspectionModule &&
+      !permissionLoading &&
+      canViewCrossUserInspections
+    ) {
       const fetchEmployees = async () => {
         try {
           const data = await fetchUserDirectory({ module: 'inspections', limit: 200 });
+          setScopedEmployeeIds(Array.from(new Set([user.id, ...data.map((employee) => employee.id)])));
           setEmployees(
             data.map((employee) => ({
               id: employee.id,
@@ -169,6 +190,9 @@ function InspectionsContent() {
         }
       };
       fetchEmployees();
+    } else if (user) {
+      setEmployees([]);
+      setScopedEmployeeIds([user.id]);
     }
     const fetchVehicles = async () => {
       try {
@@ -200,45 +224,40 @@ function InspectionsContent() {
     if (user?.id) {
       setRecentVehicleIds(getRecentVehicleIds(user.id));
     }
-  }, [user, canViewAllInspections, supabase]);
+  }, [user, canAccessInspectionModule, permissionLoading, canViewCrossUserInspections, supabase]);
 
   const fetchInspections = useCallback(async () => {
-    if (!user || authLoading) return;
+    if (!user || authLoading || permissionLoading || !canAccessInspectionModule) return;
     setLoading(true);
 
     try {
       let query = supabase
         .from('van_inspections')
-        .select(`
-          *,
-          vans (
-            reg_number,
-            van_categories (
-              name
-            )
-          ),
-          profile:profiles!van_inspections_user_id_fkey(full_name)
-        `)
+        .select('*')
         .order('inspection_date', { ascending: false })
         .range(0, displayCount);
 
       // Filter based on user role and selection
-      if (!canViewAllInspections) {
+      if (!canViewCrossUserInspections) {
         // Regular employees only see their own
         query = query.eq('user_id', user.id);
       } else {
-        // Manager: filter by selected employee or show all
         const employeeFilter = selectedEmployeeId || 'all';
         if (employeeFilter !== 'all') {
-          query = query.eq('user_id', employeeFilter);
+          if (!hasOrgWideInspectionVisibility && !scopedEmployeeIds.includes(employeeFilter)) {
+            query = query.eq('user_id', user.id);
+          } else {
+            query = query.eq('user_id', employeeFilter);
+          }
+        } else if (hasTeamInspectionVisibility) {
+          query = query.in('user_id', scopedEmployeeIds.length > 0 ? scopedEmployeeIds : [user.id]);
         }
-        // If 'all' selected, show all inspections (no filter)
       }
 
       // Apply status filter
       const currentStatusFilter = statusFilter || 'all';
       if (currentStatusFilter !== 'all') {
-        query = query.eq('status', currentStatusFilter);
+        query = query.eq('status', currentStatusFilter as 'draft' | 'submitted');
       }
       // 'all' doesn't filter by status
 
@@ -251,7 +270,64 @@ function InspectionsContent() {
       const { data, error } = await query;
 
       if (error) throw error;
-      const rows = (data || []) as InspectionWithVehicle[];
+      const rows = ((data || []) as Array<Omit<InspectionWithVehicle, 'vans' | 'profile'>>).map((row) => ({
+        ...row,
+        vans: null,
+        profile: null,
+      }));
+      const validVanIds = Array.from(new Set(rows.map((row) => row.van_id).filter(isUuid)));
+      const validUserIds = Array.from(new Set(rows.map((row) => row.user_id).filter(isUuid)));
+      let vehicleMap = new Map<string, { reg_number: string; van_categories: { name: string } | null }>();
+      let profileMap = new Map<string, { full_name: string }>();
+
+      if (validVanIds.length > 0) {
+        const { data: vans, error: vansError } = await supabase
+          .from('vans')
+          .select(`
+            id,
+            reg_number,
+            van_categories (
+              name
+            )
+          `)
+          .in('id', validVanIds);
+
+        if (vansError) {
+          console.warn('Unable to load inspection vehicle details:', vansError);
+        } else {
+          vehicleMap = new Map(
+            ((vans || []) as Array<{ id: string; reg_number: string; van_categories: { name: string } | null }>)
+              .filter((van) => Boolean(van.id))
+              .map((van) => [
+                van.id,
+                {
+                  reg_number: van.reg_number,
+                  van_categories: van.van_categories ?? null,
+                },
+              ])
+          );
+        }
+      }
+
+      if (validUserIds.length > 0) {
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', validUserIds);
+
+        if (profilesError) {
+          console.warn('Unable to load inspection owner names:', profilesError);
+        } else {
+          profileMap = new Map(
+            ((profiles || []) as Array<{ id: string; full_name: string | null }>)
+              .filter((profile): profile is { id: string; full_name: string } =>
+                Boolean(profile.id && profile.full_name)
+              )
+              .map((profile) => [profile.id, { full_name: profile.full_name }])
+          );
+        }
+      }
+
       const inspectionIds = rows.map((row) => row.id).filter((id): id is string => Boolean(id));
       let defectInspectionIds = new Set<string>();
       let workshopTaskInspectionIds = new Set<string>();
@@ -292,6 +368,8 @@ function InspectionsContent() {
 
       const enrichedRows = rows.map((row) => ({
         ...row,
+        vans: row.van_id && isUuid(row.van_id) ? vehicleMap.get(row.van_id) ?? null : null,
+        profile: profileMap.get(row.user_id) ?? null,
         has_reported_defect: defectInspectionIds.has(row.id),
         has_inform_workshop_task: workshopTaskInspectionIds.has(row.id),
       }));
@@ -332,7 +410,21 @@ function InspectionsContent() {
     } finally {
       setLoading(false);
     }
-  }, [user, authLoading, canViewAllInspections, selectedEmployeeId, statusFilter, normalizedVehicleFilter, supabase, displayCount]);
+  }, [
+    user,
+    authLoading,
+    permissionLoading,
+    canAccessInspectionModule,
+    canViewCrossUserInspections,
+    hasOrgWideInspectionVisibility,
+    hasTeamInspectionVisibility,
+    scopedEmployeeIds,
+    selectedEmployeeId,
+    statusFilter,
+    normalizedVehicleFilter,
+    supabase,
+    displayCount,
+  ]);
 
   useEffect(() => {
     setDisplayCount(pageSize);
@@ -524,7 +616,7 @@ function InspectionsContent() {
     }
   };
 
-  const showInitialLoading = loading && inspections.length === 0;
+  const showInitialLoading = (permissionLoading || loading) && inspections.length === 0;
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -547,7 +639,7 @@ function InspectionsContent() {
         </div>
         
         {/* Manager: Employee Filter */}
-        {canViewAllInspections && employees.length > 0 && (
+        {canViewCrossUserInspections && employees.length > 0 && (
           <div className="pt-4 border-t border-border">
             <div className={`flex items-center gap-3 ${tabletModeEnabled ? 'max-w-none flex-wrap' : 'max-w-md'}`}>
               <Label htmlFor="employee-filter" className="text-white text-sm flex items-center gap-2 whitespace-nowrap">
@@ -575,7 +667,7 @@ function InspectionsContent() {
       </div>
 
       {/* Filters - Only show for managers */}
-      {canViewAllInspections && (
+      {canViewCrossUserInspections && (
         <Card className="border-border">
           <CardContent className="pt-6">
             <div className={`grid grid-cols-1 gap-6 ${tabletModeEnabled ? 'md:grid-cols-1' : 'md:grid-cols-2'}`}>
@@ -687,7 +779,7 @@ function InspectionsContent() {
             </div>
           )}
 
-          {canViewAllInspections && (
+          {canViewCrossUserInspections && (
             <div className="hidden md:flex items-center justify-end gap-2">
               {viewMode === 'table' && (
                 <DropdownMenu>
@@ -756,7 +848,7 @@ function InspectionsContent() {
             </div>
           )}
 
-          {canViewAllInspections && viewMode === 'table' && (
+          {canViewCrossUserInspections && viewMode === 'table' && (
             <div className="hidden md:block">
               <VanInspectionsListTable
                 inspections={inspections}
@@ -770,7 +862,7 @@ function InspectionsContent() {
             </div>
           )}
 
-          <div className={canViewAllInspections && viewMode === 'table' ? 'md:hidden grid gap-4' : 'grid gap-4'}>
+          <div className={canViewCrossUserInspections && viewMode === 'table' ? 'md:hidden grid gap-4' : 'grid gap-4'}>
             {inspections.map((inspection) => {
               const inspectionStatus = inspection.status as string;
               return (
@@ -795,7 +887,7 @@ function InspectionsContent() {
                         {inspection.vans?.reg_number || 'Unknown Van'}
                       </CardTitle>
                       <CardDescription className="text-muted-foreground">
-                        {canViewAllInspections && (inspection as { profile?: { full_name?: string } | null }).profile?.full_name && (
+                        {canViewCrossUserInspections && (inspection as { profile?: { full_name?: string } | null }).profile?.full_name && (
                           <span className="font-medium text-white">
                             {(inspection as { profile?: { full_name?: string } | null }).profile?.full_name}
                             {' • '}

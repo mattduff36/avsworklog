@@ -13,8 +13,6 @@
  *   logger.error('Failed to save data', error, 'MyComponent');
  */
 
-import { errorLogger } from './error-logger';
-
 class Logger {
   private isDevelopment = process.env.NODE_ENV === 'development';
 
@@ -50,14 +48,20 @@ class Logger {
 
     // Send to error logging system
     if (typeof window !== 'undefined') {
-      errorLogger.logError({
-        error: error instanceof Error ? error : new Error(message),
-        componentName,
-        additionalData: {
-          message,
-          timestamp: new Date().toISOString(),
-        },
-      });
+      void import('./error-logger')
+        .then(({ errorLogger }) => {
+          errorLogger.logError({
+            error: error instanceof Error ? error : new Error(message),
+            componentName,
+            additionalData: {
+              message,
+              timestamp: new Date().toISOString(),
+            },
+          });
+        })
+        .catch((loggingError) => {
+          console.warn('[Logger] Failed to load browser error logger:', loggingError);
+        });
     }
   }
 
@@ -109,6 +113,3 @@ class Logger {
 
 // Export singleton instance
 export const logger = new Logger();
-
-// Re-export errorLogger for convenience
-export { errorLogger } from './error-logger';

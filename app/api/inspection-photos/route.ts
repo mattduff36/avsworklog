@@ -212,7 +212,7 @@ export async function POST(request: NextRequest) {
 
     acc[task.id] = sortInspectionPhotos(
       exactMatches.length > 0 ? exactMatches : fallbackMatches
-    );
+    ) as InspectionPhotoRow[];
     return acc;
   }, {});
 
