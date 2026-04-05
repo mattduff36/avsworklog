@@ -30,7 +30,7 @@ import { clearViewAsSelection, getViewAsSelection } from '@/lib/utils/view-as-co
 
 type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 
-interface Profile extends ProfileRow {
+type Profile = ProfileRow & {
   email?: string | null;
   super_admin?: boolean | null;
   team_id?: string | null;
@@ -45,7 +45,7 @@ interface Profile extends ProfileRow {
     is_manager_admin: boolean;
     is_super_admin: boolean;
   } | null;
-}
+};
 
 interface EffectiveRole {
   name: string;
