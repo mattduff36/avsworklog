@@ -2,7 +2,8 @@
 
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { createClient } from '@/lib/supabase/client';
+import { createClient, getLastDataTokenFailureStatus } from '@/lib/supabase/client';
+import { createStatusError, getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
 
 interface RamsAssignmentSummary {
   hasAssignments: boolean;
@@ -25,6 +26,11 @@ async function fetchRamsAssignmentSummary(profileId: string): Promise<RamsAssign
         .in('status', ['pending', 'read']),
     ]);
 
+  const authFailureStatus = getLastDataTokenFailureStatus();
+  if (authFailureStatus && isAuthErrorStatus(authFailureStatus)) {
+    throw createStatusError('Failed to load RAMS assignments', authFailureStatus);
+  }
+
   if (totalError) throw totalError;
   if (pendingError) throw pendingError;
 
@@ -35,12 +41,21 @@ async function fetchRamsAssignmentSummary(profileId: string): Promise<RamsAssign
 }
 
 export function useRamsAssignmentSummary(profileId?: string | null) {
-  return useQuery({
+  const query = useQuery({
     queryKey: ['rams-assignment-summary', profileId || null],
     enabled: Boolean(profileId),
     queryFn: () => fetchRamsAssignmentSummary(profileId!),
     staleTime: 60_000,
   });
+
+  const errorStatus = getErrorStatus(query.error) ?? getLastDataTokenFailureStatus();
+  const holdForRecovery = isAuthErrorStatus(errorStatus) && !query.data;
+
+  return {
+    ...query,
+    isLoading: query.isLoading || holdForRecovery,
+    errorStatus,
+  };
 }
 
 async function fetchPendingAbsenceCount(): Promise<number> {

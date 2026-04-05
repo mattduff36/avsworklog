@@ -9,7 +9,7 @@ import { TabletModeToggleActions } from '@/components/layout/TabletModeToggleAct
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   CheckCircle2,
   ChevronRight,
@@ -26,6 +26,7 @@ import type { ModuleName } from '@/types/roles';
 import { managerNavItems, adminNavItems, getFilteredNavByPermissions } from '@/lib/config/navigation';
 import { usePermissionSnapshot } from '@/lib/hooks/usePermissionSnapshot';
 import { useRamsAssignmentSummary } from '@/lib/hooks/useNavMetrics';
+import { getErrorStatus, isAuthErrorStatus, createStatusError } from '@/lib/utils/http-error';
 
 type PendingApprovalCount = {
   type: 'timesheets' | 'inspections' | 'absences' | 'pending' | 'logged' | 'completed' | 'workshop' | 'maintenance' | 'suggestions' | 'errors';
@@ -63,9 +64,19 @@ function getInitials(fullName: string | null | undefined): string {
 }
 
 export default function DashboardPage() {
-  const { profile, isManager, isAdmin, isActualSuperAdmin, isViewingAs, effectiveRole } = useAuth();
+  const {
+    profile,
+    isManager,
+    isAdmin,
+    isActualSuperAdmin,
+    isViewingAs,
+    effectiveRole,
+    recoverFromAuthFailure,
+    forceAuthRedirect,
+  } = useAuth();
   const { tabletModeEnabled } = useTabletMode();
   const formTypes = getEnabledForms();
+  const recoveryAttemptedRef = useRef(false);
 
   const [pendingApprovals, setPendingApprovals] = useState<PendingApprovalCount[]>([]);
   const [actionsSummary, setActionsSummary] = useState<PendingApprovalCount[]>([]);
@@ -75,12 +86,20 @@ export default function DashboardPage() {
   const [pendingQuotesCount, setPendingQuotesCount] = useState(0);
   const [errorLogsCount, setErrorLogsCount] = useState(0);
   const [badgesLoading, setBadgesLoading] = useState(true);
+  const [metricsErrorStatus, setMetricsErrorStatus] = useState<number | null>(null);
   const {
     enabledModuleSet: userPermissions,
     effectiveTeamName,
     isLoading: permissionsLoading,
+    errorStatus: permissionsErrorStatus,
+    refetch: refetchPermissions,
   } = usePermissionSnapshot();
-  const { data: ramsSummary, isLoading: ramsLoading } = useRamsAssignmentSummary(profile?.id);
+  const {
+    data: ramsSummary,
+    isLoading: ramsLoading,
+    errorStatus: ramsErrorStatus,
+    refetch: refetchRamsAssignmentSummary,
+  } = useRamsAssignmentSummary(profile?.id);
   const pendingRAMSCount = ramsSummary?.pendingCount || 0;
   const hasRAMSAssignments = ramsSummary?.hasAssignments || false;
   
@@ -174,7 +193,7 @@ export default function DashboardPage() {
     ];
   }
 
-  async function fetchDashboardMetrics() {
+  const fetchDashboardMetrics = useCallback(async () => {
     if (!navigator.onLine) {
       return {
         pendingApprovals: canViewApprovals ? buildPendingApprovalsSummary(0, 0) : [],
@@ -204,7 +223,7 @@ export default function DashboardPage() {
     } : {};
 
     if (!response.ok) {
-      throw new Error(payload.error || 'Failed to load dashboard summary');
+      throw createStatusError(payload.error || 'Failed to load dashboard summary', response.status);
     }
 
     const timesheetsCount = payload.metrics?.approvals?.timesheets || 0;
@@ -231,56 +250,131 @@ export default function DashboardPage() {
       pendingQuotesCount: payload.metrics?.badges?.quotes_pending_internal_approval || 0,
       errorLogsCount: payload.metrics?.badges?.error_logs || 0,
     };
-  }
+  }, [canViewActions, canViewApprovals]);
+
+  const applyDashboardMetrics = useCallback((metrics: Awaited<ReturnType<typeof fetchDashboardMetrics>>) => {
+    setPendingApprovals(metrics.pendingApprovals);
+    setActionsSummary(metrics.actionsSummary);
+    setNewSuggestionsCount(metrics.newSuggestionsCount);
+    setNewErrorReportsCount(metrics.newErrorReportsCount);
+    setPendingQuotesCount(metrics.pendingQuotesCount);
+    setErrorLogsCount(metrics.errorLogsCount);
+  }, []);
+
+  const loadDashboardMetrics = useCallback(async (): Promise<number | null> => {
+    setLoading(true);
+    setBadgesLoading(true);
+
+    try {
+      const metrics = await fetchDashboardMetrics();
+      applyDashboardMetrics(metrics);
+      setMetricsErrorStatus(null);
+      return null;
+    } catch (error) {
+      const errorStatus = getErrorStatus(error);
+      setMetricsErrorStatus(errorStatus);
+      console.error('Error loading dashboard metrics:', error, {
+        errorContextId: 'dashboard-load-metrics-error',
+      });
+
+      if (!isAuthErrorStatus(errorStatus)) {
+        setPendingApprovals(canViewApprovals ? buildPendingApprovalsSummary(0, 0) : []);
+        setActionsSummary(
+          canViewActions
+            ? buildActionsSummary({ workshopTotal: 0, maintenanceTotal: 0, suggestionsTotal: 0, errorsTotal: 0 })
+            : []
+        );
+        setNewSuggestionsCount(0);
+        setNewErrorReportsCount(0);
+        setPendingQuotesCount(0);
+        setErrorLogsCount(0);
+      }
+
+      return errorStatus;
+    } finally {
+      setLoading(false);
+      setBadgesLoading(false);
+    }
+  }, [applyDashboardMetrics, canViewActions, canViewApprovals, fetchDashboardMetrics]);
 
   useEffect(() => {
-    let active = true;
-
-    async function loadDashboardMetrics() {
-      if (permissionsLoading) return;
-
-      setLoading(true);
-      setBadgesLoading(true);
-      try {
-        const metrics = await fetchDashboardMetrics();
-        if (!active) return;
-
-        setPendingApprovals(metrics.pendingApprovals);
-        setActionsSummary(metrics.actionsSummary);
-        setNewSuggestionsCount(metrics.newSuggestionsCount);
-        setNewErrorReportsCount(metrics.newErrorReportsCount);
-        setPendingQuotesCount(metrics.pendingQuotesCount);
-        setErrorLogsCount(metrics.errorLogsCount);
-      } catch (error) {
-        console.error('Error loading dashboard metrics:', error, {
-          errorContextId: 'dashboard-load-metrics-error',
-        });
-        if (active) {
-          setPendingApprovals(canViewApprovals ? buildPendingApprovalsSummary(0, 0) : []);
-          setActionsSummary(
-            canViewActions
-              ? buildActionsSummary({ workshopTotal: 0, maintenanceTotal: 0, suggestionsTotal: 0, errorsTotal: 0 })
-              : []
-          );
-          setNewSuggestionsCount(0);
-          setNewErrorReportsCount(0);
-          setPendingQuotesCount(0);
-          setErrorLogsCount(0);
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-          setBadgesLoading(false);
-        }
-      }
+    if (permissionsLoading) {
+      return;
     }
 
     void loadDashboardMetrics();
+  }, [loadDashboardMetrics, permissionsLoading, profile?.id]);
+
+  useEffect(() => {
+    recoveryAttemptedRef.current = false;
+  }, [profile?.id]);
+
+  useEffect(() => {
+    const authFailureStatus = [metricsErrorStatus, permissionsErrorStatus, ramsErrorStatus].find((status) =>
+      isAuthErrorStatus(status)
+    );
+
+    if (!authFailureStatus || recoveryAttemptedRef.current || !profile?.id) {
+      return;
+    }
+
+    recoveryAttemptedRef.current = true;
+
+    let cancelled = false;
+
+    void (async () => {
+      const recovered = await recoverFromAuthFailure({
+        reason: 'dashboard-initial-load',
+        statusCode: authFailureStatus,
+      });
+
+      if (!recovered || cancelled) {
+        return;
+      }
+
+      const [permissionsResult, ramsResult] = await Promise.allSettled([
+        refetchPermissions(),
+        refetchRamsAssignmentSummary(),
+      ]);
+
+      if (cancelled) {
+        return;
+      }
+
+      const permissionsRetryStatus =
+        permissionsResult.status === 'fulfilled'
+          ? getErrorStatus(permissionsResult.value.error)
+          : getErrorStatus(permissionsResult.reason);
+
+      const ramsRetryStatus =
+        ramsResult.status === 'fulfilled'
+          ? getErrorStatus(ramsResult.value.error)
+          : getErrorStatus(ramsResult.reason);
+
+      const metricsRetryStatus = await loadDashboardMetrics();
+      const retryFailureStatus = [permissionsRetryStatus, ramsRetryStatus, metricsRetryStatus].find((status) =>
+        isAuthErrorStatus(status)
+      );
+
+      if (retryFailureStatus && !cancelled) {
+        await forceAuthRedirect(retryFailureStatus);
+      }
+    })();
+
     return () => {
-      active = false;
+      cancelled = true;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [permissionsLoading, canViewApprovals, canViewActions, canViewWorkshopTasks, canViewMaintenance, canViewSuggestions, canViewErrorReports, profile?.id]);
+  }, [
+    forceAuthRedirect,
+    metricsErrorStatus,
+    permissionsErrorStatus,
+    profile?.id,
+    recoverFromAuthFailure,
+    ramsErrorStatus,
+    refetchPermissions,
+    refetchRamsAssignmentSummary,
+    loadDashboardMetrics,
+  ]);
 
   const visibleManagerTiles = getFilteredNavByPermissions(managerNavItems, userPermissions, effectiveIsAdmin);
   const visibleAdminTiles = getFilteredNavByPermissions(adminNavItems, userPermissions, effectiveIsAdmin);

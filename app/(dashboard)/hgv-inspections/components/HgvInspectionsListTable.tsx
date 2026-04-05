@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowUpDown, Clock, Download, Trash2 } from 'lucide-react';
+import { ArrowUpDown, Clipboard, Clock, Download, Trash2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -26,7 +26,7 @@ export const DEFAULT_HGV_INSPECTIONS_COLUMN_VISIBILITY: HgvInspectionsColumnVisi
 
 interface HgvInspectionRow {
   id: string;
-  status: 'submitted';
+  status: 'draft' | 'submitted';
   has_reported_defect?: boolean;
   has_inform_workshop_task?: boolean;
   inspection_date: string;
@@ -46,8 +46,17 @@ interface HgvInspectionsListTableProps {
   onDeleteInspection: (event: React.MouseEvent, inspectionId: string) => void;
 }
 
-type SortField = 'employee' | 'hgv' | 'date' | 'submittedAt';
+type SortField = 'employee' | 'hgv' | 'date' | 'status' | 'submittedAt';
 type SortDirection = 'asc' | 'desc';
+
+function getStatusBadge(status: string) {
+  const variants = {
+    draft: { variant: 'secondary' as const, label: 'Draft' },
+    submitted: { variant: 'default' as const, label: 'Submitted' },
+  };
+  const config = variants[status as keyof typeof variants] || variants.draft;
+  return <Badge variant={config.variant}>{config.label}</Badge>;
+}
 
 function getStatusIcon(inspection: HgvInspectionRow) {
   const iconColorClass = inspection.has_inform_workshop_task
@@ -56,7 +65,11 @@ function getStatusIcon(inspection: HgvInspectionRow) {
       ? 'text-red-500'
       : 'text-green-500';
 
-  return <Clock className={`h-4 w-4 ${iconColorClass}`} />;
+  if (inspection.status === 'submitted') {
+    return <Clock className={`h-4 w-4 ${iconColorClass}`} />;
+  }
+
+  return <Clipboard className={`h-4 w-4 ${iconColorClass}`} />;
 }
 
 function formatInspectionRange(startDate: string, endDate: string | null) {
@@ -89,6 +102,8 @@ export function HgvInspectionsListTable({
           return factor * ((a.hgv?.reg_number || '').localeCompare(b.hgv?.reg_number || ''));
         case 'date':
           return factor * (new Date(a.inspection_date).getTime() - new Date(b.inspection_date).getTime());
+        case 'status':
+          return factor * a.status.localeCompare(b.status);
         case 'submittedAt':
           return factor * ((a.submitted_at || '').localeCompare(b.submitted_at || ''));
         default:
@@ -149,8 +164,14 @@ export function HgvInspectionsListTable({
               </div>
             </TableHead>
             {columnVisibility.status && (
-              <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
-                Status
+              <TableHead
+                className="bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
+                onClick={() => handleSort('status')}
+              >
+                <div className="flex items-center gap-2">
+                  Status
+                  <ArrowUpDown className="h-3 w-3" />
+                </div>
               </TableHead>
             )}
             {columnVisibility.submittedAt && (
@@ -199,7 +220,7 @@ export function HgvInspectionsListTable({
                 <TableCell>
                   <div className="flex items-center gap-2">
                     {getStatusIcon(inspection)}
-                    <Badge className="border-inspection/40 bg-inspection/10 text-inspection">Submitted</Badge>
+                    {getStatusBadge(inspection.status)}
                   </div>
                 </TableCell>
               )}

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
 import { Toaster } from "@/components/ui/sonner";
+import { AuthProvider } from "@/lib/providers/auth-provider";
 import { QueryProvider } from "@/lib/providers/query-provider";
 import { NuqsAdapter } from 'nuqs/adapters/next/app';
 import { ErrorLoggerInit } from "@/components/ErrorLoggerInit";
@@ -64,9 +65,11 @@ export default function RootLayout({
         <DeploymentVersionChecker />
         <NuqsAdapter>
           <QueryProvider>
-            {children}
-            <Toaster />
-            <Analytics />
+            <AuthProvider>
+              {children}
+              <Toaster />
+              <Analytics />
+            </AuthProvider>
           </QueryProvider>
         </NuqsAdapter>
       </body>

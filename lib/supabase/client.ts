@@ -4,26 +4,18 @@ import {
   type SupabaseClient,
   type User,
 } from '@supabase/supabase-js'
+import { loadClientAuthSession, type ClientAuthSessionResponse } from '@/lib/app-auth/client-session'
 import { getViewAsRoleId, getViewAsTeamId } from '@/lib/utils/view-as-cookie'
 import { withAuthOverrides } from '@/lib/supabase/with-auth-overrides'
+import { createStatusError, getErrorStatus } from '@/lib/utils/http-error'
 import type { Database } from '@/types/database'
-
-interface AuthSessionResponse {
-  authenticated: boolean;
-  locked: boolean;
-  user: {
-    id: string;
-    email: string | null;
-  } | null;
-  profile?: unknown;
-  data_token_available?: boolean;
-}
 
 type BrowserSupabaseClient = SupabaseClient<Database>
 
 let client: BrowserSupabaseClient | null = null
 let cachedDataToken: { token: string; expiresAt: number } | null = null
 let pendingDataTokenPromise: Promise<string> | null = null
+let lastDataTokenFailureStatus: number | null = null
 
 async function fetchJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const response = await fetch(input, {
@@ -35,14 +27,17 @@ async function fetchJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> 
     },
   })
 
+  const rawPayload = await response.text()
+  const payload = rawPayload ? JSON.parse(rawPayload) as T & { error?: string } : null
+
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`)
+    throw createStatusError(payload?.error || `HTTP ${response.status}`, response.status)
   }
 
-  return response.json() as Promise<T>
+  return payload as T
 }
 
-function buildSyntheticUser(sessionResponse: AuthSessionResponse): User | null {
+function buildSyntheticUser(sessionResponse: ClientAuthSessionResponse): User | null {
   if (!sessionResponse.user?.id) {
     return null
   }
@@ -61,16 +56,13 @@ function buildSyntheticUser(sessionResponse: AuthSessionResponse): User | null {
   } as User
 }
 
-async function getCurrentAuthSessionResponse(): Promise<AuthSessionResponse> {
-  try {
-    return await fetchJson<AuthSessionResponse>('/api/auth/session')
-  } catch {
-    return {
-      authenticated: false,
-      locked: false,
-      user: null,
-      data_token_available: false,
-    }
+async function getCurrentAuthSessionResponse(): Promise<ClientAuthSessionResponse> {
+  const result = await loadClientAuthSession()
+  return result.payload || {
+    authenticated: false,
+    locked: false,
+    user: null,
+    data_token_available: false,
   }
 }
 
@@ -90,9 +82,11 @@ async function getDataToken(): Promise<string> {
         token: response.token,
         expiresAt: response.expires_at,
       }
+      lastDataTokenFailureStatus = null
       return response.token
-    } catch {
+    } catch (error) {
       cachedDataToken = null
+      lastDataTokenFailureStatus = getErrorStatus(error)
       return ''
     } finally {
       pendingDataTokenPromise = null
@@ -102,8 +96,13 @@ async function getDataToken(): Promise<string> {
   return pendingDataTokenPromise
 }
 
-function invalidateCachedDataToken(): void {
+export function invalidateCachedDataToken(): void {
   cachedDataToken = null
+  lastDataTokenFailureStatus = null
+}
+
+export function getLastDataTokenFailureStatus(): number | null {
+  return lastDataTokenFailureStatus
 }
 
 export function createClient(): BrowserSupabaseClient {

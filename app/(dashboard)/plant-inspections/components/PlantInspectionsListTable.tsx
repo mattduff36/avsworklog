@@ -72,7 +72,7 @@ function getStatusBadge(status: string) {
 
 function getStatusIcon(inspection: PlantInspectionRow) {
   const iconColorClass = inspection.has_inform_workshop_task
-    ? 'text-plant-inspection'
+    ? 'text-inspection'
     : inspection.has_reported_defect
       ? 'text-red-500'
       : 'text-green-500';

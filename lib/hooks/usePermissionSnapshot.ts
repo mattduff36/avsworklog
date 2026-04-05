@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { ALL_MODULES, type ModuleName } from '@/types/roles';
+import { createStatusError, getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
 
 interface PermissionSnapshotResponse {
   permissions?: Record<ModuleName, boolean>;
@@ -17,7 +18,7 @@ async function fetchPermissionSnapshot(): Promise<PermissionSnapshotResponse> {
   const data = (await response.json()) as PermissionSnapshotResponse & { error?: string };
 
   if (!response.ok) {
-    throw new Error(data.error || 'Failed to load permissions');
+    throw createStatusError(data.error || 'Failed to load permissions', response.status);
   }
 
   return data;
@@ -48,6 +49,8 @@ export function usePermissionSnapshot() {
   }, [isAdmin, isSuperAdmin, query.data?.enabled_modules]);
 
   const enabledModuleSet = useMemo(() => new Set<ModuleName>(enabledModules), [enabledModules]);
+  const errorStatus = getErrorStatus(query.error);
+  const holdForRecovery = isAuthErrorStatus(errorStatus) && !query.data;
 
   const permissions = useMemo(() => {
     if (isAdmin || isSuperAdmin) {
@@ -66,7 +69,9 @@ export function usePermissionSnapshot() {
     enabledModuleSet,
     effectiveTeamId: query.data?.effective_team_id || effectiveRole?.team_id || null,
     effectiveTeamName: query.data?.effective_team_name || effectiveRole?.team_name || null,
-    isLoading: authLoading || query.isLoading,
+    isLoading: authLoading || query.isLoading || holdForRecovery,
     error: query.error,
+    errorStatus,
+    refetch: query.refetch,
   };
 }
