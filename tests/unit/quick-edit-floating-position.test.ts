@@ -89,4 +89,17 @@ describe('computeQuickEditFloatingPosition', () => {
     expect(result.top).toBeGreaterThanOrEqual(8);
     expect(result.top + result.maxHeight).toBeLessThanOrEqual(500 - 8);
   });
+
+  it('limits maxHeight based on final clamped top for short panels', () => {
+    const result = computeQuickEditFloatingPosition({
+      triggerRect: { top: 360, left: 220, right: 300, bottom: 392, width: 80, height: 32 },
+      panelSize: { width: 320, height: 100 },
+      viewport: { width: 1024, height: 500, scrollX: 0, scrollY: 0 },
+    });
+
+    // Old behavior returned viewport max (484), which can overflow when top > edge padding.
+    expect(result.top).toBe(254);
+    expect(result.maxHeight).toBe(238);
+    expect(result.top + result.maxHeight).toBeLessThanOrEqual(500 - 8);
+  });
 });
