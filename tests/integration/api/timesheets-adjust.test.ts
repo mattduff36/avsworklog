@@ -8,6 +8,9 @@ import type { EffectiveRoleInfo } from '@/lib/utils/view-as';
 
 vi.mock('@/lib/supabase/server');
 vi.mock('@/lib/utils/view-as');
+vi.mock('@/lib/utils/rbac', () => ({
+  canEffectiveRoleAccessModule: vi.fn(),
+}));
 vi.mock('@/lib/utils/email', () => ({
   sendTimesheetAdjustmentEmail: vi.fn().mockResolvedValue({ success: true }),
 }));
@@ -59,8 +62,10 @@ describe('POST /api/timesheets/[id]/adjust', () => {
     vi.clearAllMocks();
     mockFetch({ id: 'mock-email-id' });
     await setupAdminClientMock();
+    const rbac = await import('@/lib/utils/rbac');
     const email = await import('@/lib/utils/email');
     vi.mocked(email.sendTimesheetAdjustmentEmail).mockResolvedValue({ success: true });
+    vi.mocked(rbac.canEffectiveRoleAccessModule).mockResolvedValue(true);
     const logger = await import('@/lib/utils/server-error-logger');
     vi.mocked(logger.logServerError).mockResolvedValue(undefined);
   });

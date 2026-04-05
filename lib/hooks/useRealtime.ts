@@ -67,6 +67,10 @@ export function useInspectionRealtime(callback: RealtimeCallback) {
   useRealtimeSubscription('van_inspections', '*', callback);
 }
 
+export function usePlantInspectionRealtime(callback: RealtimeCallback) {
+  useRealtimeSubscription('plant_inspections', '*', callback);
+}
+
 export function useAbsenceRealtime(callback: RealtimeCallback) {
   useRealtimeSubscription('absences', '*', callback);
 }

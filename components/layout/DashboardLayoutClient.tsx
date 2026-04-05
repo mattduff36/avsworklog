@@ -12,6 +12,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { getAccentFromRoute } from '@/lib/theme/getAccentFromRoute';
 import { TabletModeProvider, useTabletMode } from '@/components/layout/tablet-mode-context';
 
+const PAGE_VISIT_DEBOUNCE_MS = 250;
+const PAGE_VISIT_HEARTBEAT_MS = 60_000;
+
 export function DashboardLayoutClient({
   children,
 }: {
@@ -51,6 +54,19 @@ function DashboardLayoutShell({
       // Avoid noisy console logs for non-critical tracking telemetry.
     });
   }, []);
+
+  const stopHeartbeat = useCallback(() => {
+    if (!heartbeatIntervalRef.current) return;
+    window.clearInterval(heartbeatIntervalRef.current);
+    heartbeatIntervalRef.current = null;
+  }, []);
+
+  const sendHeartbeat = useCallback(() => {
+    if (document.hidden) return;
+    const currentPath = getCurrentTrackedPath();
+    if (!currentPath) return;
+    trackPageVisit(currentPath);
+  }, [getCurrentTrackedPath, trackPageVisit]);
   
   // Determine the accent color based on current route
   const accent = getAccentFromRoute(pathname, searchParams);
@@ -63,7 +79,7 @@ function DashboardLayoutShell({
 
     const timer = window.setTimeout(() => {
       trackPageVisit(nextPath);
-    }, 250);
+    }, PAGE_VISIT_DEBOUNCE_MS);
 
     return () => {
       window.clearTimeout(timer);
@@ -71,23 +87,10 @@ function DashboardLayoutShell({
   }, [getCurrentTrackedPath, trackPageVisit]);
 
   useEffect(() => {
-    const stopHeartbeat = () => {
-      if (!heartbeatIntervalRef.current) return;
-      window.clearInterval(heartbeatIntervalRef.current);
-      heartbeatIntervalRef.current = null;
-    };
-
-    const sendHeartbeat = () => {
-      if (document.hidden) return;
-      const currentPath = getCurrentTrackedPath();
-      if (!currentPath) return;
-      trackPageVisit(currentPath);
-    };
-
     const startHeartbeat = () => {
       stopHeartbeat();
       if (document.hidden) return;
-      heartbeatIntervalRef.current = window.setInterval(sendHeartbeat, 60_000);
+      heartbeatIntervalRef.current = window.setInterval(sendHeartbeat, PAGE_VISIT_HEARTBEAT_MS);
     };
 
     const handleVisibilityChange = () => {
@@ -106,7 +109,7 @@ function DashboardLayoutShell({
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       stopHeartbeat();
     };
-  }, [getCurrentTrackedPath, trackPageVisit]);
+  }, [sendHeartbeat, stopHeartbeat]);
 
   return (
     <div 

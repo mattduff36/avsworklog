@@ -26,7 +26,7 @@ const PlantTable = dynamic(
 // Import existing components
 import { MaintenanceTable } from '@/app/(dashboard)/maintenance/components/MaintenanceTable';
 import { useMaintenance } from '@/lib/hooks/useMaintenance';
-import { createClient } from '@/lib/supabase/client';
+import { useBrowserSupabaseClient } from '@/lib/hooks/useBrowserSupabaseClient';
 import { toast } from 'sonner';
 import { FleetSettingsTab } from './components/FleetSettingsTab';
 import { FleetCategoryDialogs } from './components/FleetCategoryDialogs';
@@ -41,7 +41,7 @@ function FleetContent() {
   const router = useNextRouter();
   const { isManager, isAdmin, loading: authLoading } = useAuth();
   const { hasPermission: canViewFleet, loading: fleetPermissionLoading } = usePermissionCheck('admin-vans', false);
-  const supabase = createClient();
+  const supabase = useBrowserSupabaseClient();
   const { tabletModeEnabled } = useTabletMode();
   
   // Two-level tab state matching Maintenance/Workshop pages
@@ -142,6 +142,7 @@ function FleetContent() {
 
   // Fetch plant assets
   const fetchPlantAssets = async () => {
+    if (!supabase) return;
     setPlantAssetsLoading(true);
     try {
       const { data, error } = await supabase
@@ -176,6 +177,7 @@ function FleetContent() {
 
   // Fetch HGV assets
   const fetchHgvAssets = async () => {
+    if (!supabase) return;
     setHgvAssetsLoading(true);
     try {
       const { data, error } = await supabase
@@ -344,7 +346,7 @@ function FleetContent() {
   };
   
   // Show loading while auth or permissions are being checked
-  if (authLoading || fleetPermissionLoading) {
+  if (!supabase || authLoading || fleetPermissionLoading) {
     return <PageLoader message="Loading fleet..." />;
   }
   

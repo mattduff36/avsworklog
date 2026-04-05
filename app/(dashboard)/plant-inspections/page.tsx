@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, Suspense, useRef } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
-import { useInspectionRealtime } from '@/lib/hooks/useRealtime';
+import { usePlantInspectionRealtime } from '@/lib/hooks/useRealtime';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { createClient } from '@/lib/supabase/client';
 import { isUuid } from '@/lib/utils/uuid';
@@ -449,7 +449,7 @@ function PlantInspectionsContent() {
   }, [fetchInspections]);
 
   // Listen for realtime updates to inspections
-  useInspectionRealtime((payload) => {
+  usePlantInspectionRealtime((payload) => {
     console.log('Realtime plant inspection update:', payload);
     
     if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {

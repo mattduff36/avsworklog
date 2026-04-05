@@ -46,7 +46,7 @@ import {
   CheckCircle2,
   Briefcase,
 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { useBrowserSupabaseClient } from '@/lib/hooks/useBrowserSupabaseClient';
 import { fetchAdminTeamDirectory } from '@/lib/admin/team-directory-client';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
@@ -248,7 +248,7 @@ export default function UsersAdminPage() {
   const searchParams = useSearchParams();
   const { user: currentUser, profile, isAdmin, isSuperAdmin, isActualSuperAdmin, loading: authLoading } = useAuth();
   const { hasPermission: canManageUsers, loading: permissionLoading } = usePermissionCheck('admin-users', false);
-  const supabase = createClient();
+  const supabase = useBrowserSupabaseClient();
   const [activeTab, setActiveTab] = useState<TabType>('users');
   const isAdminActor = isAdmin || isSuperAdmin || isActualSuperAdmin;
   const isManagerActor = !isAdminActor && profile?.role?.is_manager_admin === true;
@@ -450,6 +450,10 @@ export default function UsersAdminPage() {
 
   // Helper function to fetch users with emails
   async function fetchUsersWithEmails() {
+    if (!supabase) {
+      return [] as ProfileWithEmail[];
+    }
+
     // Fetch profiles from database with role information
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
@@ -500,6 +504,10 @@ export default function UsersAdminPage() {
 
   // Fetch available roles
   useEffect(function () {
+    if (!supabase) {
+      return;
+    }
+
     async function fetchRoles() {
       try {
         const { data, error } = await supabase
@@ -535,6 +543,10 @@ export default function UsersAdminPage() {
 
   // Fetch users
   useEffect(function () {
+    if (!supabase) {
+      return;
+    }
+
     async function fetchUsers() {
       try {
         setLoading(true);
@@ -1130,7 +1142,7 @@ export default function UsersAdminPage() {
   }
 
   // Show loading while auth is being checked
-  if (authLoading || permissionLoading) {
+  if (!supabase || authLoading || permissionLoading) {
     return <PageLoader message="Loading user admin..." />;
   }
 

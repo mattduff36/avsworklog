@@ -190,7 +190,7 @@ async function seed() {
 
         if (start <= today && dateAvailable(start)) {
           let end = new Date(start);
-          let daysToBook = Math.min(summerBlockSize, targetPersonalDays - annualDaysBooked);
+          const daysToBook = Math.min(summerBlockSize, targetPersonalDays - annualDaysBooked);
           let weekdaysBooked = 0;
           while (weekdaysBooked < daysToBook) {
             if (isWeekday(end) && !usedDates.has(fmt(end))) {

@@ -5,7 +5,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useTimesheetRealtime } from '@/lib/hooks/useRealtime';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
-import { createClient } from '@/lib/supabase/client';
+import { useBrowserSupabaseClient } from '@/lib/hooks/useBrowserSupabaseClient';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -107,7 +107,7 @@ export default function TimesheetsPage() {
   const [columnVisibility, setColumnVisibility] = useState<TimesheetsListColumnVisibility>(
     DEFAULT_TIMESHEETS_LIST_COLUMN_VISIBILITY
   );
-  const supabase = createClient();
+  const supabase = useBrowserSupabaseClient();
   const actorProfileId = user?.id || '';
   const canAuthoriseBookings = Boolean(absenceSecondarySnapshot?.flags.can_authorise_bookings || isAdminTier);
   const actorTeamId = absenceSecondarySnapshot?.team_id || null;
@@ -248,7 +248,7 @@ export default function TimesheetsPage() {
   );
 
   const fetchTimesheets = useCallback(async () => {
-    if (!user || authLoading) return;
+    if (!supabase || !user || authLoading) return;
     setLoading(true);
     setFetchError(null);
     
@@ -561,7 +561,7 @@ export default function TimesheetsPage() {
     }
   };
 
-  if (permissionLoading || isAbsenceSecondaryContextLoading) {
+  if (!supabase || permissionLoading || isAbsenceSecondaryContextLoading) {
     return <PageLoader message="Loading timesheets..." />;
   }
 

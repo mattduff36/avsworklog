@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
-import { createClient } from '@/lib/supabase/client';
+import { useBrowserSupabaseClient } from '@/lib/hooks/useBrowserSupabaseClient';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -89,7 +89,7 @@ export default function ActionsPage() {
   const { hasPermission: canViewErrorReports } = usePermissionCheck('error-reports', false);
   const { hasPermission: canViewMaintenance } = usePermissionCheck('maintenance', false);
   const { hasPermission: canViewWorkshopTasks } = usePermissionCheck('workshop-tasks', false);
-  const supabase = useMemo(() => createClient(), []);
+  const supabase = useBrowserSupabaseClient();
   
   const [actions, setActions] = useState<Action[]>([]);
   const [loading, setLoading] = useState(true);
@@ -142,6 +142,7 @@ export default function ActionsPage() {
   }, []);
 
   const fetchMaintenanceCounts = useCallback(async () => {
+    if (!supabase) return;
     try {
       setMaintenanceCountsLoading(true);
       // Fetch vehicle maintenance data from API
@@ -213,6 +214,7 @@ export default function ActionsPage() {
   }, [supabase]);
 
   const fetchSuggestionErrorCounts = useCallback(async () => {
+    if (!supabase) return;
     try {
       setFeedbackCountsLoading(true);
       let sNew = 0;
@@ -527,7 +529,7 @@ export default function ActionsPage() {
     }
   };
 
-  if (actionsPermissionLoading || loading) {
+  if (!supabase || actionsPermissionLoading || loading) {
     return <PageLoader message="Loading actions..." />;
   }
 

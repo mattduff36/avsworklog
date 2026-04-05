@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { ComponentProps } from 'react';
 import { TabletModeProvider } from '@/components/layout/tablet-mode-context';
 import { AttachmentHybridFormModal } from '@/components/workshop-tasks/AttachmentHybridFormModal';
 import type { AttachmentSchemaSnapshot } from '@/types/workshop-attachments-v2';
@@ -18,7 +19,7 @@ vi.mock('@/lib/supabase/client', () => ({
 }));
 
 vi.mock('next/image', () => ({
-  default: (props: { alt?: string } & Record<string, unknown>) => <img {...(props as any)} alt={props.alt || 'image'} />,
+  default: (props: ComponentProps<'img'>) => <img {...props} alt={props.alt || 'image'} />,
 }));
 
 vi.mock('@/components/forms/SignaturePad', () => ({

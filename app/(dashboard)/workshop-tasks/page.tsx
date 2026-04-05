@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
-import { createClient } from '@/lib/supabase/client';
+import { useBrowserSupabaseClient } from '@/lib/hooks/useBrowserSupabaseClient';
 import { useAttachmentTemplates } from '@/lib/hooks/useAttachmentTemplates';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -71,7 +71,7 @@ export default function WorkshopTasksPage() {
   const { user, profile, isManager, isAdmin } = useAuth();
   const { tabletModeEnabled } = useTabletMode();
   const showSettings = isAdmin || isManager;
-  const supabase = createClient();
+  const supabase = useBrowserSupabaseClient();
   const { templates: attachmentTemplates } = useAttachmentTemplates();
 
   const [tasks, setTasks] = useState<Action[]>([]);
@@ -225,7 +225,7 @@ export default function WorkshopTasksPage() {
     }
   }
 
-  if (permissionLoading) return <PageLoader message="Checking permissions..." />;
+  if (!supabase || permissionLoading) return <PageLoader message="Checking permissions..." />;
   if (!hasPermission) return null;
 
   return (

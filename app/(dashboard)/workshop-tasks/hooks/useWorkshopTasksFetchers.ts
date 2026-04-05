@@ -51,6 +51,8 @@ export function useWorkshopTasksFetchers({
   setMeterReadingType,
 }: UseWorkshopTasksFetchersParams) {
   const fetchTasks = useCallback(async () => {
+    if (!supabase) return;
+
     try {
       setLoading(true);
 
@@ -279,6 +281,8 @@ export function useWorkshopTasksFetchers({
   }, [setLoading, setTaskAttachmentCounts, setTasks, statusFilter, supabase, vehicleFilter]);
 
   const fetchCategories = useCallback(async () => {
+    if (!supabase) return;
+
     try {
       const { data, error } = await supabase
         .from('workshop_task_categories')
@@ -299,6 +303,8 @@ export function useWorkshopTasksFetchers({
   }, [setCategories, supabase]);
 
   const fetchPlantCategories = useCallback(async () => {
+    if (!supabase) return;
+
     try {
       const { data, error } = await supabase
         .from('workshop_task_categories')
@@ -319,6 +325,8 @@ export function useWorkshopTasksFetchers({
   }, [setPlantCategories, supabase]);
 
   const fetchHgvCategories = useCallback(async () => {
+    if (!supabase) return;
+
     try {
       const { data, error } = await supabase
         .from('workshop_task_categories')
@@ -339,6 +347,8 @@ export function useWorkshopTasksFetchers({
   }, [setHgvCategories, supabase]);
 
   const fetchSubcategories = useCallback(async () => {
+    if (!supabase) return;
+
     try {
       const { data, error } = await supabase
         .from('workshop_task_subcategories')
@@ -367,7 +377,7 @@ export function useWorkshopTasksFetchers({
   }, [setSubcategories, supabase]);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !supabase) return;
 
     const fetchVehiclesInner = async () => {
       try {
@@ -511,6 +521,11 @@ export function useWorkshopTasksFetchers({
   ]);
 
   const fetchCurrentMeterReading = useCallback(async (vehicleId: string) => {
+    if (!supabase) {
+      setCurrentMeterReading(null);
+      return;
+    }
+
     try {
       let isPlant = false;
       let isHgv = false;

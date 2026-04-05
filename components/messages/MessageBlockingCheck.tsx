@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { BlockingMessageModal } from './BlockingMessageModal';
 import { ReminderModal } from './ReminderModal';
@@ -32,6 +32,13 @@ interface AuthSessionCheckResponse {
 }
 
 const MESSAGE_BOOTSTRAP_TIMEOUT_MS = 4000;
+const REMINDER_ADVANCE_DELAY_MS = 300;
+
+interface PendingMessagesResponse {
+  success?: boolean;
+  toolbox_talks?: PendingToolboxTalk[];
+  reminders?: PendingReminder[];
+}
 
 /**
  * MessageBlockingCheck Component
@@ -52,16 +59,81 @@ export function MessageBlockingCheck() {
   const [pendingReminders, setPendingReminders] = useState<PendingReminder[]>([]);
   const [showReminder, setShowReminder] = useState(false);
 
+  const checkPendingMessages = useCallback(async (signal: AbortSignal) => {
+    try {
+      // First check if user needs to change password (this takes precedence)
+      const sessionResponse = await fetch('/api/auth/session', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+        signal,
+      });
+
+      if (!sessionResponse.ok || signal.aborted) {
+        return;
+      }
+
+      const session = (await sessionResponse.json()) as AuthSessionCheckResponse;
+
+      if (signal.aborted) {
+        return;
+      }
+
+      if (session.profile?.must_change_password) {
+        // Password change takes priority - redirect handled by existing system
+        router.push('/change-password');
+        return;
+      }
+
+      // Fetch pending messages
+      const response = await fetch('/api/messages/pending', { signal });
+      if (!response.ok || signal.aborted) {
+        if (!signal.aborted) {
+          console.warn(`Pending messages API returned ${response.status}, skipping`);
+        }
+        return;
+      }
+
+      const data = (await response.json()) as PendingMessagesResponse;
+
+      if (signal.aborted || !data.success) {
+        return;
+      }
+
+      const talks = data.toolbox_talks || [];
+      const reminders = data.reminders || [];
+
+      setPendingToolboxTalks(talks);
+      setCurrentToolboxTalkIndex(0);
+      setPendingReminders(reminders);
+      setShowReminder(talks.length === 0 && reminders.length > 0);
+    } catch (error) {
+      if (signal.aborted) {
+        return;
+      }
+      console.error('Error checking pending messages:', error);
+    } finally {
+      if (!signal.aborted) {
+        setChecking(false);
+      }
+    }
+  }, [router]);
+
   useEffect(() => {
     if (!isDashboardPath) {
       setChecking(false);
       return;
     }
 
+    const abortController = new AbortController();
     setChecking(true);
-    void checkPendingMessages();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDashboardPath, pathname]);
+    void checkPendingMessages(abortController.signal);
+
+    return () => {
+      abortController.abort();
+    };
+  }, [checkPendingMessages, isDashboardPath, pathname]);
 
   useEffect(() => {
     if (!checking || !isDashboardPath) return;
@@ -72,57 +144,6 @@ export function MessageBlockingCheck() {
 
     return () => window.clearTimeout(timeoutId);
   }, [checking, isDashboardPath, pathname]);
-
-  async function checkPendingMessages() {
-    try {
-      // First check if user needs to change password (this takes precedence)
-      const sessionResponse = await fetch('/api/auth/session', {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache',
-        },
-      });
-
-      if (!sessionResponse.ok) {
-        setChecking(false);
-        return;
-      }
-
-      const session = (await sessionResponse.json()) as AuthSessionCheckResponse;
-
-      if (session.profile?.must_change_password) {
-        // Password change takes priority - redirect handled by existing system
-        router.push('/change-password');
-        return;
-      }
-
-      // Fetch pending messages
-      const response = await fetch('/api/messages/pending');
-      if (!response.ok) {
-        console.warn(`Pending messages API returned ${response.status}, skipping`);
-        return;
-      }
-      const data = await response.json();
-
-      if (data.success) {
-        const talks = data.toolbox_talks || [];
-        const reminders = data.reminders || [];
-
-        setPendingToolboxTalks(talks);
-        setPendingReminders(reminders);
-
-        // If there are pending Toolbox Talks, show them first (blocking)
-        // Otherwise, show first Reminder if any (non-blocking)
-        if (talks.length === 0 && reminders.length > 0) {
-          setShowReminder(true);
-        }
-      }
-    } catch (error) {
-      console.error('Error checking pending messages:', error);
-    } finally {
-      setChecking(false);
-    }
-  }
 
   function handleToolboxTalkSigned() {
     // Move to next Toolbox Talk or finish
@@ -141,13 +162,17 @@ export function MessageBlockingCheck() {
 
   function handleReminderDismissed() {
     // Remove the dismissed reminder from the list
-    setPendingReminders(pendingReminders.slice(1));
     setShowReminder(false);
-    
-    // Show next reminder if any
-    if (pendingReminders.length > 1) {
-      setTimeout(() => setShowReminder(true), 300);
-    }
+    setPendingReminders((currentReminders) => {
+      const nextReminders = currentReminders.slice(1);
+
+      // Show next reminder if any
+      if (nextReminders.length > 0) {
+        window.setTimeout(() => setShowReminder(true), REMINDER_ADVANCE_DELAY_MS);
+      }
+
+      return nextReminders;
+    });
   }
 
   // Show loading state briefly while checking

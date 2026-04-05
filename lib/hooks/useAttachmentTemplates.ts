@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useBrowserSupabaseClient } from '@/lib/hooks/useBrowserSupabaseClient';
 import { Database } from '@/types/database';
 
 export type AttachmentTemplate = Database['public']['Tables']['workshop_attachment_templates']['Row'];
@@ -23,10 +23,10 @@ export function useAttachmentTemplates({
   const [templates, setTemplates] = useState<AttachmentTemplate[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
-  const supabase = createClient();
+  const supabase = useBrowserSupabaseClient();
 
   const fetchTemplates = async () => {
-    if (!enabled) {
+    if (!enabled || !supabase) {
       return;
     }
 

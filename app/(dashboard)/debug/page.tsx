@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
+import { useBrowserSupabaseClient } from '@/lib/hooks/useBrowserSupabaseClient';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -25,13 +25,17 @@ export default function DebugPage() {
   const { profile } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const supabase = createClient();
+  const supabase = useBrowserSupabaseClient();
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
   const [activeTab, setActiveTab] = useState<DebugTab>('errors');
 
   useEffect(() => {
+    if (!supabase) {
+      return;
+    }
+
     async function checkAccess() {
       const {
         data: { user: authUser },
@@ -113,7 +117,7 @@ export default function DebugPage() {
     router.replace(`/debug?tab=${value}`, { scroll: false });
   }
 
-  if (loading) {
+  if (!supabase || loading) {
     return <PageLoader message="Loading debug tools..." />;
   }
 

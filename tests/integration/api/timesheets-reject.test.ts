@@ -2,15 +2,46 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { POST } from '@/app/api/timesheets/[id]/reject/route';
-import { createMockTimesheet, createMockManager, createMockProfile } from '../../utils/factories';
+import { createMockTimesheet, createMockManager } from '../../utils/factories';
 import { mockSupabaseAuthUser, mockSupabaseQuery, mockFetch, resetAllMocks } from '../../utils/test-helpers';
 
 vi.mock('@/lib/supabase/server');
+vi.mock('@/lib/supabase/admin', () => ({
+  createAdminClient: vi.fn(),
+}));
+vi.mock('@/lib/utils/rbac', () => ({
+  canEffectiveRoleAccessModule: vi.fn(),
+}));
+vi.mock('@/lib/utils/email', () => ({
+  sendTimesheetRejectionEmail: vi.fn().mockResolvedValue({ success: true }),
+}));
+vi.mock('@/lib/utils/server-error-logger', () => ({
+  logServerError: vi.fn().mockResolvedValue(undefined),
+}));
 
 describe('POST /api/timesheets/[id]/reject', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     resetAllMocks();
     mockFetch({ id: 'mock-email-id' });
+
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+    const { canEffectiveRoleAccessModule } = await import('@/lib/utils/rbac');
+    const { sendTimesheetRejectionEmail } = await import('@/lib/utils/email');
+    const { logServerError } = await import('@/lib/utils/server-error-logger');
+
+    vi.mocked(createAdminClient).mockReturnValue({
+      auth: {
+        admin: {
+          getUserById: vi.fn(async (userId: string) => ({
+            data: { user: { id: userId, email: `${userId}@test.com` } },
+            error: null,
+          })),
+        },
+      },
+    } as never);
+    vi.mocked(canEffectiveRoleAccessModule).mockResolvedValue(true);
+    vi.mocked(sendTimesheetRejectionEmail).mockResolvedValue({ success: true });
+    vi.mocked(logServerError).mockResolvedValue(undefined);
   });
 
   describe('Authentication and Authorization', () => {
@@ -35,23 +66,14 @@ describe('POST /api/timesheets/[id]/reject', () => {
     });
 
     it('should return 403 if user is not a manager or admin', async () => {
-      const employee = createMockProfile();
       const { createClient } = await import('@/lib/supabase/server');
-      
+      const { canEffectiveRoleAccessModule } = await import('@/lib/utils/rbac');
+
+      vi.mocked(canEffectiveRoleAccessModule).mockResolvedValue(false);
       vi.mocked(createClient).mockResolvedValueOnce({
         auth: {
-          getUser: vi.fn().mockResolvedValue(mockSupabaseAuthUser({ id: employee.id })),
-        },
-        from: vi.fn().mockReturnValue({
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              single: vi.fn().mockResolvedValue(mockSupabaseQuery({
-                id: employee.id,
-                roles: { is_manager_admin: false },
-              })),
-            }),
-          }),
-        }),
+          getUser: vi.fn().mockResolvedValue(mockSupabaseAuthUser({ id: 'employee-id' })),
+        }
       } as unknown as SupabaseClient);
 
       const request = new Request('http://localhost/api/timesheets/test-id/reject', {
@@ -63,7 +85,7 @@ describe('POST /api/timesheets/[id]/reject', () => {
       const data = await response.json();
 
       expect(response.status).toBe(403);
-      expect(data.error).toContain('manager');
+      expect(data.error).toContain('Approvals access required');
     });
 
     it('should allow managers to reject timesheets', async () => {

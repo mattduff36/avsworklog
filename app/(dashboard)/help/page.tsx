@@ -36,7 +36,7 @@ import {
   Monitor,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { createClient } from '@/lib/supabase/client';
+import { useBrowserSupabaseClient } from '@/lib/hooks/useBrowserSupabaseClient';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
 import type { FAQArticleWithCategory, FAQCategory, Suggestion } from '@/types/faq';
 import type { ErrorReport } from '@/types/error-reports';
@@ -45,6 +45,7 @@ import { ALL_MODULES } from '@/types/roles';
 import Link from 'next/link';
 import { MODULE_PAGES, getPageLabel, getPageUrl } from '@/lib/config/module-pages';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { PageLoader } from '@/components/ui/page-loader';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -62,7 +63,7 @@ export default function HelpPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { profile, isAdmin, signOut } = useAuth(); // Get user info
-  const supabase = createClient();
+  const supabase = useBrowserSupabaseClient();
   
   // FAQ state
   const [articles, setArticles] = useState<FAQArticleWithCategory[]>([]);
@@ -516,6 +517,10 @@ export default function HelpPage() {
       default: return status;
     }
   };
+
+  if (!supabase) {
+    return <PageLoader message="Loading help..." />;
+  }
 
   return (
     <div className="space-y-6 max-w-5xl">

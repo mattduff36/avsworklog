@@ -40,6 +40,8 @@ const eslintConfig = [
       "public/sw.js",
       "public/sw-custom.js",
       "public/workbox-*.js",
+      "public/pdf.min.mjs",
+      "public/pdf.worker.min.mjs",
     ],
   },
 ];

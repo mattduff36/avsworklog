@@ -23,10 +23,49 @@ interface TestUsers {
   employee: { email: string; password: string; userId: string };
 }
 
+interface ReachableRouteResult {
+  ok: true;
+  response: Response;
+}
+
+interface UnreachableRouteResult {
+  ok: false;
+  message: string;
+}
+
+type RouteResult = ReachableRouteResult | UnreachableRouteResult;
+
 function loadTestUsers(): TestUsers | null {
   const stateFile = resolve(process.cwd(), 'testsuite', '.state', 'test-users.json');
   if (!existsSync(stateFile)) return null;
   return JSON.parse(readFileSync(stateFile, 'utf-8'));
+}
+
+async function fetchRoute(path: string, init?: RequestInit): Promise<RouteResult> {
+  try {
+    const response = await fetch(`${BASE_URL}${path}`, init);
+    return { ok: true, response };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown fetch error';
+    return {
+      ok: false,
+      message: `Could not reach ${BASE_URL}${path}: ${message}`,
+    };
+  }
+}
+
+function expectReachable(result: RouteResult, path: string): Response {
+  if (!result.ok) {
+    throw new Error(result.message);
+  }
+
+  if (result.response.status >= 500) {
+    throw new Error(
+      `${path} returned ${result.response.status}. This indicates an app-health issue, not an access-control regression.`
+    );
+  }
+
+  return result.response;
 }
 
 describe('@permissions API Endpoint Access Control', () => {
@@ -62,7 +101,7 @@ describe('@permissions API Endpoint Access Control', () => {
 
     for (const endpoint of protectedEndpoints) {
       it(`GET ${endpoint} returns 401 without auth`, async () => {
-        const res = await fetch(`${BASE_URL}${endpoint}`);
+        const res = expectReachable(await fetchRoute(endpoint), endpoint);
         expect(res.status).toBe(401);
       });
     }
@@ -75,11 +114,11 @@ describe('@permissions API Endpoint Access Control', () => {
       const { data: session } = await employeeClient.auth.getSession();
       if (!session?.session?.access_token) return;
 
-      const res = await fetch(`${BASE_URL}/api/admin/users`, {
+      const res = expectReachable(await fetchRoute('/api/admin/users', {
         headers: {
           'Authorization': `Bearer ${session.session.access_token}`,
         },
-      });
+      }), '/api/admin/users');
       // Should be 401 or 403
       expect(res.status).toBeGreaterThanOrEqual(401);
       expect(res.status).toBeLessThanOrEqual(403);
@@ -88,7 +127,7 @@ describe('@permissions API Endpoint Access Control', () => {
 
   describe('Public endpoints', () => {
     it('login page is accessible', async () => {
-      const res = await fetch(`${BASE_URL}/login`);
+      const res = expectReachable(await fetchRoute('/login'), '/login');
       expect(res.status).toBe(200);
     });
   });
