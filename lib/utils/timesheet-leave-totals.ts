@@ -57,11 +57,12 @@ function resolveLeaveDays(offDayState: LeaveOffDayStateLike | undefined): number
   if (!offDayState?.isOnApprovedLeave) return 0;
 
   const resolved = offDayState.leaveLabels.reduce((sum, label) => {
+    if (!label.isPaid) return sum;
     if (label.session === 'FULL') return sum + 1;
     return sum + 0.5;
   }, 0);
 
-  if (resolved <= 0) return 1;
+  if (resolved <= 0) return 0;
   return Math.min(1, roundToTwo(resolved));
 }
 
