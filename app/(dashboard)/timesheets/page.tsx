@@ -150,10 +150,17 @@ export default function TimesheetsPage() {
         );
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
+        const normalizedMessage = message.toLowerCase();
         const isNetworkFailure =
-          message.includes('Failed to fetch') || message.includes('NetworkError') || message.toLowerCase().includes('network');
-        if (isNetworkFailure) {
-          console.warn('Unable to load employees (network):', err);
+          message.includes('Failed to fetch') || message.includes('NetworkError') || normalizedMessage.includes('network');
+        const isUnauthorized =
+          normalizedMessage.includes('unauthorized') ||
+          (normalizedMessage.includes('jwt') && normalizedMessage.includes('expired'));
+
+        if (isNetworkFailure || isUnauthorized) {
+          // Keep this non-fatal: employee filters are optional and auth/session races can briefly return 401.
+          setEmployees([]);
+          console.warn('Unable to load employees (non-fatal):', err);
         } else {
           console.error('Error fetching employees:', err);
         }
