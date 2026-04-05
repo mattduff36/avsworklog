@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
 import { getRecentVehicleIds, recordRecentVehicleId, splitVehiclesByRecent } from '@/lib/utils/recentVehicles';
+import { isUuid } from '@/lib/utils/uuid';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -40,6 +41,7 @@ const PhotoUpload = dynamic(() => import('@/components/forms/PhotoUpload'), { ss
 const SignaturePad = dynamic(() => import('@/components/forms/SignaturePad'), { ssr: false });
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const INVALID_VAN_SELECTION_MESSAGE = 'Please select a valid van';
 
 // Type definitions for inspection data
 type InspectionItem = {
@@ -230,6 +232,16 @@ function NewInspectionContent() {
       if (!silent) toast.error('Select a vehicle, employee and week before adding photos', {
         id: 'van-inspections-new-validation-photos-core-fields',
       });
+      return null;
+    }
+    if (!isUuid(vehicleId)) {
+      if (!silent) {
+        setError(INVALID_VAN_SELECTION_MESSAGE);
+        toast.error(INVALID_VAN_SELECTION_MESSAGE, {
+          id: 'van-inspections-new-invalid-vehicle-draft-save',
+          description: 'Please reselect the van before continuing.',
+        });
+      }
       return null;
     }
     if (!weekEnding || weekEnding.trim() === '') {
@@ -573,6 +585,10 @@ function NewInspectionContent() {
       setDuplicateInspection(null);
       return false;
     }
+    if (!isUuid(vehicleIdToCheck)) {
+      setDuplicateInspection(null);
+      return false;
+    }
 
     setDuplicateCheckLoading(true);
     
@@ -624,6 +640,12 @@ function NewInspectionContent() {
 
   // Fetch baseline mileage for sanity checking
   const fetchBaselineMileage = async (selectedVehicleId: string) => {
+    if (!isUuid(selectedVehicleId)) {
+      setBaselineMileage(null);
+      setBaselineMileageSource('none');
+      return;
+    }
+
     try {
       const response = await fetch(`/api/vans/mileage-baseline?vehicleId=${selectedVehicleId}`);
       if (response.ok) {
@@ -696,6 +718,12 @@ function NewInspectionContent() {
 
   // Load previous defects for the selected vehicle
   const loadPreviousDefects = async (selectedVehicleId: string) => {
+    if (!isUuid(selectedVehicleId)) {
+      setPreviousDefects(new Map());
+      setLoggedDefects(new Map());
+      return;
+    }
+
     try {
       // Get the most recent submitted inspection for this vehicle
       const { data: lastInspection, error: inspectionError } = await supabase
@@ -1128,6 +1156,14 @@ function NewInspectionContent() {
 
   const saveInspection = async (status: 'draft' | 'submitted', signatureData?: string) => {
     if (!user || !selectedEmployeeId || !vehicleId) return;
+    if (!isUuid(vehicleId)) {
+      setError(INVALID_VAN_SELECTION_MESSAGE);
+      toast.error(INVALID_VAN_SELECTION_MESSAGE, {
+        id: 'van-inspections-new-invalid-vehicle-save',
+        description: 'Please reselect the van and try again.',
+      });
+      return;
+    }
     
     // Validate week ending is provided
     if (!weekEnding || weekEnding.trim() === '') {
@@ -1673,7 +1709,15 @@ function NewInspectionContent() {
                   if (value === 'add-new') {
                     // Don't set the value, just open the dialog
                     setShowAddVehicleDialog(true);
+                  } else if (!isUuid(value)) {
+                    setVehicleId('');
+                    setError(INVALID_VAN_SELECTION_MESSAGE);
+                    toast.error(INVALID_VAN_SELECTION_MESSAGE, {
+                      id: 'van-inspections-new-invalid-vehicle-selection',
+                      description: 'Please reselect the van and try again.',
+                    });
                   } else {
+                    setError('');
                     setVehicleId(value);
                     // Record as recent vehicle selection
                     if (user?.id) {
