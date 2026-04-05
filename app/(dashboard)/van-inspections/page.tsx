@@ -129,6 +129,8 @@ function InspectionsContent() {
     defaultValue: 'all',
     shallow: false,
   });
+  const normalizedEmployeeFilter =
+    selectedEmployeeId !== 'all' && !isUuid(selectedEmployeeId) ? 'all' : selectedEmployeeId;
   const normalizedVehicleFilter =
     vehicleFilter !== 'all' && !isUuid(vehicleFilter) ? 'all' : vehicleFilter;
   const [downloading, setDownloading] = useState<string | null>(null);
@@ -153,6 +155,12 @@ function InspectionsContent() {
   const supabase = supabaseRef.current as ReturnType<typeof createClient>;
 
   // Fetch employees and vehicles
+  useEffect(() => {
+    if (selectedEmployeeId !== normalizedEmployeeFilter) {
+      setSelectedEmployeeId(normalizedEmployeeFilter);
+    }
+  }, [normalizedEmployeeFilter, selectedEmployeeId, setSelectedEmployeeId]);
+
   useEffect(() => {
     if (vehicleFilter !== normalizedVehicleFilter) {
       setVehicleFilter(normalizedVehicleFilter);
@@ -242,7 +250,7 @@ function InspectionsContent() {
         // Regular employees only see their own
         query = query.eq('user_id', user.id);
       } else {
-        const employeeFilter = selectedEmployeeId || 'all';
+        const employeeFilter = normalizedEmployeeFilter || 'all';
         if (employeeFilter !== 'all') {
           if (!hasOrgWideInspectionVisibility && !scopedEmployeeIds.includes(employeeFilter)) {
             query = query.eq('user_id', user.id);
@@ -419,7 +427,7 @@ function InspectionsContent() {
     hasOrgWideInspectionVisibility,
     hasTeamInspectionVisibility,
     scopedEmployeeIds,
-    selectedEmployeeId,
+    normalizedEmployeeFilter,
     statusFilter,
     normalizedVehicleFilter,
     supabase,
@@ -428,7 +436,7 @@ function InspectionsContent() {
 
   useEffect(() => {
     setDisplayCount(pageSize);
-  }, [pageSize, selectedEmployeeId, statusFilter, vehicleFilter]);
+  }, [pageSize, normalizedEmployeeFilter, statusFilter, normalizedVehicleFilter]);
 
   useEffect(() => {
     try {
@@ -646,7 +654,7 @@ function InspectionsContent() {
                 <User className="h-4 w-4" />
                 View daily checks for:
               </Label>
-              <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+              <Select value={normalizedEmployeeFilter} onValueChange={setSelectedEmployeeId}>
               <SelectTrigger id="employee-filter" className={`${tabletModeEnabled ? 'min-h-11 text-base' : 'h-10'} border-border text-white bg-slate-900/50`}>
                   <SelectValue placeholder="Select employee" />
                 </SelectTrigger>

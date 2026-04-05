@@ -125,9 +125,7 @@ function NewHgvInspectionContent() {
   });
   const isDraftHydratedRef = useRef(!draftId);
 
-  if (permissionLoading) {
-    return <PageLoader message="Loading HGV inspection form..." />;
-  }
+  const showPermissionLoader = permissionLoading;
 
   useEffect(() => {
     if (!hasOptionalInspectorComment && informWorkshop) {
@@ -1169,6 +1167,10 @@ function NewHgvInspectionContent() {
   const completedItems = Object.keys(checkboxStates).length;
   const totalItems = TRUCK_CHECKLIST_ITEMS.length;
   const progressPercent = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+
+  if (showPermissionLoader) {
+    return <PageLoader message="Loading HGV inspection form..." />;
+  }
 
   return (
     <div className={`space-y-4 max-w-6xl ${tabletModeEnabled ? 'pb-36' : 'pb-32 md:pb-6'}`}>

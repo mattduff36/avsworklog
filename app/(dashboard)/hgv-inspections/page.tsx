@@ -127,6 +127,21 @@ function HgvInspectionsContent() {
     defaultValue: 'all',
     shallow: false,
   });
+  const normalizedEmployeeFilter =
+    selectedEmployeeId !== 'all' && !isUuid(selectedEmployeeId) ? 'all' : selectedEmployeeId;
+  const normalizedHgvFilter = hgvFilter === 'all' || isUuid(hgvFilter) ? hgvFilter : 'all';
+
+  useEffect(() => {
+    if (selectedEmployeeId !== normalizedEmployeeFilter) {
+      setSelectedEmployeeId(normalizedEmployeeFilter);
+    }
+  }, [normalizedEmployeeFilter, selectedEmployeeId, setSelectedEmployeeId]);
+
+  useEffect(() => {
+    if (hgvFilter !== normalizedHgvFilter) {
+      setHgvFilter(normalizedHgvFilter);
+    }
+  }, [hgvFilter, normalizedHgvFilter, setHgvFilter]);
 
   const fetchFilters = useCallback(async () => {
     const { data: hgvData } = await supabase
@@ -171,8 +186,8 @@ function HgvInspectionsContent() {
 
       if (!canViewCrossUserInspections) {
         query = query.eq('user_id', user.id);
-      } else if ((selectedEmployeeId || 'all') !== 'all') {
-        const employeeFilter = selectedEmployeeId as string;
+      } else if ((normalizedEmployeeFilter || 'all') !== 'all') {
+        const employeeFilter = normalizedEmployeeFilter as string;
         if (!hasOrgWideInspectionVisibility && !scopedEmployeeIds.includes(employeeFilter)) {
           query = query.eq('user_id', user.id);
         } else {
@@ -182,8 +197,8 @@ function HgvInspectionsContent() {
         query = query.in('user_id', scopedEmployeeIds.length > 0 ? scopedEmployeeIds : [user.id]);
       }
 
-      if ((hgvFilter || 'all') !== 'all') {
-        query = query.eq('hgv_id', hgvFilter as string);
+      if ((normalizedHgvFilter || 'all') !== 'all') {
+        query = query.eq('hgv_id', normalizedHgvFilter as string);
       }
 
       const { data, error } = await query;
@@ -292,19 +307,19 @@ function HgvInspectionsContent() {
     authLoading,
     permissionLoading,
     canAccessInspectionModule,
-    hgvFilter,
+    normalizedHgvFilter,
     canViewCrossUserInspections,
     hasOrgWideInspectionVisibility,
     hasTeamInspectionVisibility,
     scopedEmployeeIds,
-    selectedEmployeeId,
+    normalizedEmployeeFilter,
     supabase,
     user,
   ]);
 
   useEffect(() => {
     setDisplayCount(pageSize);
-  }, [pageSize, selectedEmployeeId, hgvFilter]);
+  }, [pageSize, normalizedEmployeeFilter, normalizedHgvFilter]);
 
   useEffect(() => {
     try {
@@ -417,7 +432,7 @@ function HgvInspectionsContent() {
               <User className="h-4 w-4" />
               View daily checks for:
             </Label>
-            <Select value={selectedEmployeeId || 'all'} onValueChange={setSelectedEmployeeId}>
+            <Select value={normalizedEmployeeFilter || 'all'} onValueChange={setSelectedEmployeeId}>
               <SelectTrigger className={`${tabletModeEnabled ? 'min-h-11 text-base' : 'h-10'} border-border text-white bg-slate-900/50`}>
                 <SelectValue placeholder="All employees" />
               </SelectTrigger>
@@ -443,7 +458,7 @@ function HgvInspectionsContent() {
             <div className={`flex items-center gap-3 ${tabletModeEnabled ? 'flex-wrap' : ''}`}>
               <Filter className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm text-slate-400">Filter by HGV:</span>
-              <Select value={hgvFilter || 'all'} onValueChange={setHgvFilter}>
+              <Select value={normalizedHgvFilter || 'all'} onValueChange={setHgvFilter}>
                 <SelectTrigger className={`${tabletModeEnabled ? 'min-h-11 text-base w-full md:w-[360px]' : 'w-[320px] h-9'} border-border text-white bg-slate-900/50`}>
                   <SelectValue placeholder="All HGVs" />
                 </SelectTrigger>

@@ -16,7 +16,7 @@ if (!connectionString) {
   process.exit(1);
 }
 
-const resolvedConnectionString = connectionString;
+const resolvedConnectionString = connectionString!;
 
 async function runMigration() {
   const url = new URL(resolvedConnectionString);

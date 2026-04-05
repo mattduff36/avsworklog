@@ -132,6 +132,10 @@ function PlantInspectionsContent() {
     defaultValue: 'all',
     shallow: false,
   });
+  const normalizedEmployeeFilter =
+    selectedEmployeeId !== 'all' && !isUuid(selectedEmployeeId) ? 'all' : selectedEmployeeId;
+  const normalizedPlantFilter =
+    plantFilter === 'all' || plantFilter === 'hired' || isUuid(plantFilter) ? plantFilter : 'all';
   const [downloading, setDownloading] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [inspectionToDelete, setInspectionToDelete] = useState<{ id: string; plantId: string; date: string } | null>(null);
@@ -151,6 +155,18 @@ function PlantInspectionsContent() {
     supabaseRef.current = createClient();
   }
   const supabase = supabaseRef.current as ReturnType<typeof createClient>;
+
+  useEffect(() => {
+    if (selectedEmployeeId !== normalizedEmployeeFilter) {
+      setSelectedEmployeeId(normalizedEmployeeFilter);
+    }
+  }, [normalizedEmployeeFilter, selectedEmployeeId, setSelectedEmployeeId]);
+
+  useEffect(() => {
+    if (plantFilter !== normalizedPlantFilter) {
+      setPlantFilter(normalizedPlantFilter);
+    }
+  }, [normalizedPlantFilter, plantFilter, setPlantFilter]);
 
   useEffect(() => {
     const fetchPlants = async () => {
@@ -222,7 +238,7 @@ function PlantInspectionsContent() {
       if (!canViewCrossUserInspections) {
         query = query.eq('user_id', user.id);
       } else {
-        const employeeFilter = selectedEmployeeId || 'all';
+        const employeeFilter = normalizedEmployeeFilter || 'all';
         if (employeeFilter !== 'all') {
           if (!hasOrgWideInspectionVisibility && !scopedEmployeeIds.includes(employeeFilter)) {
             query = query.eq('user_id', user.id);
@@ -235,7 +251,7 @@ function PlantInspectionsContent() {
       }
 
       // Apply plant filter
-      const currentPlantFilter = plantFilter || 'all';
+      const currentPlantFilter = normalizedPlantFilter || 'all';
       if (currentPlantFilter === 'hired') {
         query = query.eq('is_hired_plant', true);
       } else if (currentPlantFilter !== 'all') {
@@ -407,14 +423,14 @@ function PlantInspectionsContent() {
     hasOrgWideInspectionVisibility,
     hasTeamInspectionVisibility,
     scopedEmployeeIds,
-    selectedEmployeeId,
-    plantFilter,
+    normalizedEmployeeFilter,
+    normalizedPlantFilter,
     supabase,
   ]);
 
   useEffect(() => {
     setDisplayCount(pageSize);
-  }, [pageSize, selectedEmployeeId, statusFilter, plantFilter]);
+  }, [pageSize, normalizedEmployeeFilter, statusFilter, normalizedPlantFilter]);
 
   useEffect(() => {
     try {
@@ -595,7 +611,7 @@ function PlantInspectionsContent() {
                 <User className="h-4 w-4" />
                 View daily checks for:
               </Label>
-              <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+              <Select value={normalizedEmployeeFilter} onValueChange={setSelectedEmployeeId}>
               <SelectTrigger id="employee-filter" className={`${tabletModeEnabled ? 'min-h-11 text-base' : 'h-10'} border-border text-white bg-slate-900/50`}>
                   <SelectValue placeholder="Select employee" />
                 </SelectTrigger>
@@ -644,7 +660,7 @@ function PlantInspectionsContent() {
               <div className="flex items-center gap-3">
                 <Wrench className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-slate-400 mr-2 whitespace-nowrap">Filter by plant:</span>
-                <Select value={plantFilter} onValueChange={setPlantFilter}>
+                <Select value={normalizedPlantFilter} onValueChange={setPlantFilter}>
                 <SelectTrigger className={`${tabletModeEnabled ? 'min-h-11 text-base' : 'h-9'} border-border text-white bg-slate-900/50`}>
                     <SelectValue placeholder="All plant" />
                   </SelectTrigger>

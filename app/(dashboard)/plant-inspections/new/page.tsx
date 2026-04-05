@@ -175,9 +175,7 @@ function NewPlantInspectionContent() {
   const [hiredPlantDescription, setHiredPlantDescription] = useState('');
   const [hiredPlantHiringCompany, setHiredPlantHiringCompany] = useState('');
 
-  if (permissionLoading) {
-    return <PageLoader message="Loading plant inspection form..." />;
-  }
+  const showPermissionLoader = permissionLoading;
 
   useEffect(() => {
     if (!hasOptionalInspectorComment && informWorkshop) {
@@ -1390,6 +1388,10 @@ function NewPlantInspectionContent() {
   const totalItems = currentChecklist.length;
   const completedItems = Object.keys(checkboxStates).length;
   const progressPercent = Math.round((completedItems / totalItems) * 100);
+
+  if (showPermissionLoader) {
+    return <PageLoader message="Loading plant inspection form..." />;
+  }
 
   return (
     <div className={`space-y-4 max-w-6xl ${tabletModeEnabled ? 'pb-36' : 'pb-32 md:pb-6'}`}>

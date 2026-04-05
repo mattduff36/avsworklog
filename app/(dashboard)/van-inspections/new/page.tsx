@@ -220,9 +220,7 @@ function NewInspectionContent() {
   const [, setCreatingWorkshopTask] = useState(false);
   const hasOptionalInspectorComment = inspectorComments.trim().length > 0;
 
-  if (permissionLoading) {
-    return <PageLoader message="Loading van inspection form..." />;
-  }
+  const showPermissionLoader = permissionLoading;
 
   useEffect(() => {
     if (!hasOptionalInspectorComment && informWorkshop) {
@@ -1638,6 +1636,10 @@ function NewInspectionContent() {
   const totalItems = currentChecklist.length * (startedDayCount || 7);
   const completedItems = Object.keys(checkboxStates).length;
   const progressPercent = Math.round((completedItems / totalItems) * 100);
+
+  if (showPermissionLoader) {
+    return <PageLoader message="Loading van inspection form..." />;
+  }
 
   return (
     <div className={`space-y-4 max-w-6xl ${tabletModeEnabled ? 'pb-36' : 'pb-32 md:pb-6'}`}>

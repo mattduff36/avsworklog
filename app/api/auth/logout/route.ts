@@ -9,7 +9,7 @@ interface LogoutRequestBody {
 }
 
 export async function POST(request: NextRequest) {
-  let response = NextResponse.json({ success: true });
+  let response: NextResponse = NextResponse.json({ success: true });
 
   try {
     const validation = await validateAppSession({ allowLocked: true });
