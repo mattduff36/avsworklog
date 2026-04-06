@@ -350,8 +350,24 @@ export function PlantTimesheetV2({
         setSelectedEmployeeId((previous) => previous || managerSelectedUserId || user.id);
       } catch (fetchError) {
         if (!cancelled) {
-          console.error('Error fetching employees:', fetchError);
-          setError('Failed to load employee list');
+          const message = fetchError instanceof Error ? fetchError.message : String(fetchError);
+          const normalizedMessage = message.toLowerCase();
+          const isNetworkFailure =
+            message.includes('Failed to fetch') ||
+            message.includes('NetworkError') ||
+            normalizedMessage.includes('network');
+          const isUnauthorized =
+            normalizedMessage.includes('unauthorized') ||
+            (normalizedMessage.includes('jwt') && normalizedMessage.includes('expired'));
+
+          if (isNetworkFailure || isUnauthorized) {
+            // Non-fatal: filters are optional and auth/session refresh can briefly return 401.
+            setEmployees([]);
+            console.warn('Unable to load employees (non-fatal):', fetchError);
+          } else {
+            console.error('Error fetching employees:', fetchError);
+            setError('Failed to load employee list');
+          }
         }
       } finally {
         if (!cancelled) setLoadingEmployees(false);

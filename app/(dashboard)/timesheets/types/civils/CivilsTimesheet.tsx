@@ -464,7 +464,23 @@ export function CivilsTimesheet({
         setSelectedEmployeeId(user.id);
       }
     } catch (err) {
-      console.error('Error fetching employees:', err);
+      const message = err instanceof Error ? err.message : String(err);
+      const normalizedMessage = message.toLowerCase();
+      const isNetworkFailure =
+        message.includes('Failed to fetch') ||
+        message.includes('NetworkError') ||
+        normalizedMessage.includes('network');
+      const isUnauthorized =
+        normalizedMessage.includes('unauthorized') ||
+        (normalizedMessage.includes('jwt') && normalizedMessage.includes('expired'));
+
+      if (isNetworkFailure || isUnauthorized) {
+        // Non-fatal: transient auth/network issues should not be captured as app errors.
+        setEmployees([]);
+        console.warn('Unable to load employees (non-fatal):', err);
+      } else {
+        console.error('Error fetching employees:', err);
+      }
     }
   };
 
