@@ -525,7 +525,7 @@ export default function HelpPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="mx-auto w-full max-w-6xl space-y-6">
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
         <h1 className="text-3xl font-bold text-foreground mb-2">
