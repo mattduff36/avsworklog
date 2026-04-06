@@ -13,7 +13,6 @@ import {
 } from '@/components/ui/dialog';
 import { 
   Activity,
-  ArrowLeft,
   Delete,
   Menu, 
   X, 
@@ -142,7 +141,7 @@ function checkStandaloneMode(): boolean {
 const PIN_LENGTH = 4;
 const PIN_KEYPAD_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const;
 const PIN_KEY_BUTTON_CLASS =
-  'h-14 rounded-xl text-xl font-semibold bg-slate-950 text-white hover:bg-slate-900 md:h-16 md:text-2xl';
+  'h-10 rounded-xl text-lg font-semibold bg-slate-950 text-white hover:bg-slate-900 md:h-12 md:text-xl';
 
 export function Navbar() {
   const router = useRouter();
@@ -1203,28 +1202,6 @@ export function Navbar() {
             </DialogHeader>
 
             <div className="rounded-md border border-border/60 bg-slate-800/40 p-4 md:p-5 space-y-4 md:space-y-5">
-              {pinSetupStep === 'confirm' ? (
-                <div className="flex items-center justify-between">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      if (pinSetupSubmitting) return;
-                      setPinSetupStep('enter');
-                      setPinEntry('');
-                      setPendingPin('');
-                    }}
-                    disabled={pinSetupSubmitting}
-                    className="h-10 px-3 text-slate-300 hover:text-white"
-                  >
-                    <ArrowLeft className="mr-1 h-4 w-4" />
-                    Back
-                  </Button>
-                  <span className="text-sm text-slate-400">PIN keypad</span>
-                </div>
-              ) : null}
-
               <div className="flex justify-center gap-2.5 py-1.5">
                 {Array.from({ length: PIN_LENGTH }).map((_, index) => {
                   const isFilled = index < pinEntry.length;
@@ -1258,7 +1235,7 @@ export function Navbar() {
                   variant="outline"
                   onClick={handlePinSetupClear}
                   disabled={pinSetupSubmitting || pinEntry.length === 0}
-                  className="h-14 rounded-xl md:h-16"
+                  className="h-10 rounded-xl md:h-12"
                 >
                   Clear
                 </Button>
@@ -1276,7 +1253,7 @@ export function Navbar() {
                   variant="outline"
                   onClick={handlePinSetupBackspace}
                   disabled={pinSetupSubmitting || pinEntry.length === 0}
-                  className="h-14 rounded-xl md:h-16"
+                  className="h-10 rounded-xl md:h-12"
                 >
                   <Delete className="h-4 w-4" />
                 </Button>

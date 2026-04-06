@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Lock, Plus } from 'lucide-react';
+import { Delete, Lock, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { broadcastAuthStateChange, clearLegacyAccountSwitchClientState } from '@/lib/app-auth/client';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -50,7 +50,7 @@ interface DeviceProfilesResponse {
 const PIN_LENGTH = 4;
 const PIN_KEYPAD_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const;
 const PIN_KEY_BUTTON_CLASS =
-  'h-14 rounded-xl text-xl font-semibold bg-slate-950 text-white hover:bg-slate-900 md:h-16 md:text-2xl';
+  'h-10 rounded-xl text-lg font-semibold bg-slate-950 text-white hover:bg-slate-900 md:h-12 md:text-xl';
 
 function getInitials(name: string | null | undefined): string {
   if (!name) return 'U';
@@ -90,7 +90,6 @@ export default function LockPage() {
     () => profiles.find((item) => item.profile_id === selectedProfileId) || null,
     [profiles, selectedProfileId]
   );
-  const highlightedProfileId = selectedProfileId || currentProfileId;
 
   const keypadDisabled = loadingState || submitting;
 
@@ -383,80 +382,52 @@ export default function LockPage() {
             </div>
           </div>
 
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {profiles.map((deviceProfile) => {
-              const isSelected = highlightedProfileId === deviceProfile.profile_id;
-
-              return (
-                <button
-                  key={deviceProfile.profile_id}
-                  type="button"
-                  onClick={() => openProfile(deviceProfile.profile_id)}
-                  className={`group text-left transition-transform duration-200 hover:-translate-y-1 ${
-                    submitting ? 'pointer-events-none opacity-70' : ''
-                  }`}
-                >
-                  <div
-                    className={`rounded-3xl border p-4 shadow-[0_12px_40px_rgba(2,6,23,0.35)] backdrop-blur-sm transition-colors ${
-                      isSelected
-                        ? 'border-avs-yellow bg-[#0f1324]'
-                        : 'border-slate-700/70 bg-[#101427]/90 hover:border-slate-500'
-                    }`}
-                  >
-                    <div className="flex aspect-[0.92] items-center justify-center rounded-2xl border border-slate-700/70 bg-[#151935] p-4">
-                      {deviceProfile.avatar_url ? (
-                        <div className="relative h-full w-full overflow-hidden rounded-xl">
-                          <img
-                            src={deviceProfile.avatar_url}
-                            alt={deviceProfile.full_name || 'Profile avatar'}
-                            className="h-full w-full object-contain"
-                          />
-                        </div>
-                      ) : (
-                        <div className="flex h-24 w-24 items-center justify-center rounded-full bg-slate-800 text-5xl font-semibold text-white">
-                          {getInitials(deviceProfile.full_name)}
-                        </div>
-                      )}
-                    </div>
+          <div className="flex flex-wrap items-start justify-center gap-4 sm:gap-6">
+            {profiles.map((deviceProfile) => (
+              <button
+                key={deviceProfile.profile_id}
+                type="button"
+                onClick={() => openProfile(deviceProfile.profile_id)}
+                className={`w-28 sm:w-36 text-center transition-transform duration-200 hover:-translate-y-1 ${
+                  submitting ? 'pointer-events-none opacity-70' : ''
+                }`}
+              >
+                <div className="rounded-2xl border border-slate-700/70 bg-[#101427]/90 p-2 shadow-lg backdrop-blur-sm transition-colors hover:border-slate-500">
+                  <div className="flex aspect-square items-center justify-center rounded-xl border border-slate-700/70 bg-[#151935]">
+                    {deviceProfile.avatar_url ? (
+                      <div className="relative h-full w-full overflow-hidden rounded-xl">
+                        <img
+                          src={deviceProfile.avatar_url}
+                          alt={deviceProfile.full_name || 'Profile avatar'}
+                          className="h-full w-full object-contain"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-800 text-2xl font-semibold text-white">
+                        {getInitials(deviceProfile.full_name)}
+                      </div>
+                    )}
                   </div>
-
-                  <div className="px-3 pt-4 text-center">
-                    <p className="text-2xl font-semibold tracking-tight text-white">
-                      {deviceProfile.full_name || 'Account'}
-                    </p>
-                    {deviceProfile.email ? (
-                      <p className="mt-1 text-sm text-slate-300">{deviceProfile.email}</p>
-                    ) : null}
-                    <p className="mt-1 text-sm text-slate-300">
-                      {deviceProfile.role_name || 'No role'}
-                    </p>
-                    <p className={`mt-2 text-sm font-medium ${isSelected ? 'text-avs-yellow' : 'text-sky-300'}`}>
-                      {isSelected ? 'Selected' : 'Tap to select'}
-                    </p>
-                  </div>
-                </button>
-              );
-            })}
+                </div>
+                <p className="mt-2 text-sm font-semibold tracking-tight text-white truncate">
+                  {deviceProfile.full_name || 'Account'}
+                </p>
+              </button>
+            ))}
 
             <button
               type="button"
               onClick={handleSignInAsAnotherUser}
-              className="group text-left transition-transform duration-200 hover:-translate-y-1"
+              className="w-28 sm:w-36 text-center transition-transform duration-200 hover:-translate-y-1"
             >
-              <div className="rounded-3xl border border-slate-700/70 bg-[#101427]/90 p-4 shadow-[0_12px_40px_rgba(2,6,23,0.35)] backdrop-blur-sm transition-colors hover:border-slate-500">
-                <div className="flex aspect-[0.92] items-center justify-center rounded-2xl border border-slate-700/70 bg-[#151935]">
-                  <Plus className="h-14 w-14 text-slate-200" strokeWidth={1.6} />
+              <div className="rounded-2xl border border-slate-700/70 bg-[#101427]/90 p-2 shadow-lg backdrop-blur-sm transition-colors hover:border-slate-500">
+                <div className="flex aspect-square items-center justify-center rounded-xl border border-slate-700/70 bg-[#151935]">
+                  <Plus className="h-7 w-7 text-slate-200" strokeWidth={1.6} />
                 </div>
               </div>
-
-              <div className="px-3 pt-4 text-center">
-                <p className="text-2xl font-semibold tracking-tight text-white">
-                  Sign in as another
-                </p>
-                <p className="text-2xl font-semibold tracking-tight text-white">
-                  user
-                </p>
-              </div>
+              <p className="mt-2 text-sm font-semibold tracking-tight text-white">
+                Sign in as another user
+              </p>
             </button>
           </div>
         </div>
@@ -525,7 +496,7 @@ export default function LockPage() {
               <Button
                 type="button"
                 variant="secondary"
-                className="h-14 rounded-xl md:h-16"
+                className="h-10 rounded-xl md:h-12"
                 onClick={handleClear}
                 disabled={keypadDisabled}
               >
@@ -542,11 +513,11 @@ export default function LockPage() {
               <Button
                 type="button"
                 variant="secondary"
-                className="h-14 rounded-xl md:h-16"
+                className="h-10 rounded-xl md:h-12"
                 onClick={handleBackspace}
                 disabled={keypadDisabled}
               >
-                Back
+                <Delete className="h-4 w-4" />
               </Button>
             </div>
           </div>
