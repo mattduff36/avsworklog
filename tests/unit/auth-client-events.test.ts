@@ -71,6 +71,7 @@ class BroadcastChannelMock {
     const members = BroadcastChannelMock.channels.get(this.name);
     if (!members) return;
     for (const member of members) {
+      if (member === this) continue;
       for (const listener of member.listeners) {
         listener({ data } as MessageEvent);
       }
