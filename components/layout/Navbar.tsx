@@ -480,7 +480,7 @@ export function Navbar() {
     setPinSetupSubmitting(false);
   }
 
-  function handlePinSetupDigitPress(digit: string) {
+  const handlePinSetupDigitPress = useCallback((digit: string): void => {
     if (pinSetupSubmitting) return;
     setPinEntry((previousPin) => {
       if (previousPin.length >= PIN_LENGTH) {
@@ -488,17 +488,17 @@ export function Navbar() {
       }
       return `${previousPin}${digit}`;
     });
-  }
+  }, [pinSetupSubmitting]);
 
-  function handlePinSetupBackspace() {
+  const handlePinSetupBackspace = useCallback((): void => {
     if (pinSetupSubmitting) return;
     setPinEntry((previousPin) => previousPin.slice(0, -1));
-  }
+  }, [pinSetupSubmitting]);
 
-  function handlePinSetupClear() {
+  const handlePinSetupClear = useCallback((): void => {
     if (pinSetupSubmitting) return;
     setPinEntry('');
-  }
+  }, [pinSetupSubmitting]);
 
   const flashPinKey = useCallback((keyId: string): void => {
     setActivePinKey(keyId);
@@ -514,17 +514,17 @@ export function Navbar() {
   const handlePinSetupDigitButtonPress = useCallback((digit: string): void => {
     flashPinKey(`digit-${digit}`);
     handlePinSetupDigitPress(digit);
-  }, [flashPinKey]);
+  }, [flashPinKey, handlePinSetupDigitPress]);
 
   const handlePinSetupClearButtonPress = useCallback((): void => {
     flashPinKey('clear');
     handlePinSetupClear();
-  }, [flashPinKey]);
+  }, [flashPinKey, handlePinSetupClear]);
 
   const handlePinSetupBackspaceButtonPress = useCallback((): void => {
     flashPinKey('backspace');
     handlePinSetupBackspace();
-  }, [flashPinKey]);
+  }, [flashPinKey, handlePinSetupBackspace]);
 
   const getPinButtonClassName = useCallback((baseClassName: string, keyId: string): string => {
     return activePinKey === keyId ? `${baseClassName} ${PIN_KEY_FLASH_CLASS}` : baseClassName;
