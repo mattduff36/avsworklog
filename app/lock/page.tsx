@@ -50,7 +50,7 @@ interface DeviceProfilesResponse {
 const PIN_LENGTH = 4;
 const PIN_KEYPAD_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const;
 const PIN_KEY_BUTTON_CLASS =
-  'h-10 rounded-xl text-lg font-semibold bg-slate-950 text-white hover:bg-slate-900 md:h-12 md:text-xl';
+  'h-14 rounded-xl text-xl font-semibold bg-slate-950 text-white hover:bg-slate-900';
 
 function getInitials(name: string | null | undefined): string {
   if (!name) return 'U';
@@ -392,22 +392,20 @@ export default function LockPage() {
                   submitting ? 'pointer-events-none opacity-70' : ''
                 }`}
               >
-                <div className="rounded-2xl border border-slate-700/70 bg-[#101427]/90 p-2 shadow-lg backdrop-blur-sm transition-colors hover:border-slate-500">
-                  <div className="flex aspect-square items-center justify-center rounded-xl border border-slate-700/70 bg-[#151935]">
-                    {deviceProfile.avatar_url ? (
-                      <div className="relative h-full w-full overflow-hidden rounded-xl">
-                        <img
-                          src={deviceProfile.avatar_url}
-                          alt={deviceProfile.full_name || 'Profile avatar'}
-                          className="h-full w-full object-contain"
-                        />
-                      </div>
-                    ) : (
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-800 text-2xl font-semibold text-white">
-                        {getInitials(deviceProfile.full_name)}
-                      </div>
-                    )}
-                  </div>
+                <div className="flex aspect-square items-center justify-center rounded-2xl border border-slate-700/70 bg-[#151935] shadow-lg transition-colors hover:border-slate-500">
+                  {deviceProfile.avatar_url ? (
+                    <div className="relative h-full w-full overflow-hidden rounded-2xl">
+                      <img
+                        src={deviceProfile.avatar_url}
+                        alt={deviceProfile.full_name || 'Profile avatar'}
+                        className="h-full w-full object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-800 text-2xl font-semibold text-white">
+                      {getInitials(deviceProfile.full_name)}
+                    </div>
+                  )}
                 </div>
                 <p className="mt-2 text-sm font-semibold tracking-tight text-white truncate">
                   {deviceProfile.full_name || 'Account'}
@@ -420,10 +418,8 @@ export default function LockPage() {
               onClick={handleSignInAsAnotherUser}
               className="w-28 sm:w-36 text-center transition-transform duration-200 hover:-translate-y-1"
             >
-              <div className="rounded-2xl border border-slate-700/70 bg-[#101427]/90 p-2 shadow-lg backdrop-blur-sm transition-colors hover:border-slate-500">
-                <div className="flex aspect-square items-center justify-center rounded-xl border border-slate-700/70 bg-[#151935]">
-                  <Plus className="h-7 w-7 text-slate-200" strokeWidth={1.6} />
-                </div>
+              <div className="flex aspect-square items-center justify-center rounded-2xl border border-slate-700/70 bg-[#151935] shadow-lg transition-colors hover:border-slate-500">
+                <Plus className="h-7 w-7 text-slate-200" strokeWidth={1.6} />
               </div>
               <p className="mt-2 text-sm font-semibold tracking-tight text-white">
                 Sign in as another user
@@ -496,7 +492,7 @@ export default function LockPage() {
               <Button
                 type="button"
                 variant="secondary"
-                className="h-10 rounded-xl md:h-12"
+                className="h-14 rounded-xl"
                 onClick={handleClear}
                 disabled={keypadDisabled}
               >
@@ -513,7 +509,7 @@ export default function LockPage() {
               <Button
                 type="button"
                 variant="secondary"
-                className="h-10 rounded-xl md:h-12"
+                className="h-14 rounded-xl"
                 onClick={handleBackspace}
                 disabled={keypadDisabled}
               >

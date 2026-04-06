@@ -141,7 +141,7 @@ function checkStandaloneMode(): boolean {
 const PIN_LENGTH = 4;
 const PIN_KEYPAD_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const;
 const PIN_KEY_BUTTON_CLASS =
-  'h-10 rounded-xl text-lg font-semibold bg-slate-950 text-white hover:bg-slate-900 md:h-12 md:text-xl';
+  'h-14 rounded-xl text-xl font-semibold bg-slate-950 text-white hover:bg-slate-900';
 
 export function Navbar() {
   const router = useRouter();
@@ -1235,7 +1235,7 @@ export function Navbar() {
                   variant="outline"
                   onClick={handlePinSetupClear}
                   disabled={pinSetupSubmitting || pinEntry.length === 0}
-                  className="h-10 rounded-xl md:h-12"
+                  className="h-14 rounded-xl"
                 >
                   Clear
                 </Button>
@@ -1253,7 +1253,7 @@ export function Navbar() {
                   variant="outline"
                   onClick={handlePinSetupBackspace}
                   disabled={pinSetupSubmitting || pinEntry.length === 0}
-                  className="h-10 rounded-xl md:h-12"
+                  className="h-14 rounded-xl"
                 >
                   <Delete className="h-4 w-4" />
                 </Button>
