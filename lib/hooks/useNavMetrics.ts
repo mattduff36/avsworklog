@@ -69,10 +69,10 @@ async function fetchPendingAbsenceCount(): Promise<number> {
   return count || 0;
 }
 
-export function usePendingAbsenceCount(enabled: boolean) {
+export function usePendingAbsenceCount(enabled: boolean, userId?: string | null) {
   const query = useQuery({
-    queryKey: ['pending-absence-count'],
-    enabled,
+    queryKey: ['pending-absence-count', userId || null],
+    enabled: enabled && Boolean(userId),
     queryFn: fetchPendingAbsenceCount,
     staleTime: 60_000,
   });

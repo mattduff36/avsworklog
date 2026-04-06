@@ -31,7 +31,8 @@ import { TabletModeToggleActions } from '@/components/layout/TabletModeToggleAct
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { ActiveNowUsersPanel } from '@/components/layout/ActiveNowUsersPanel';
 import { SidebarNav } from './SidebarNav';
-import { createClient } from '@/lib/supabase/client';
+import { createClient, invalidateCachedDataToken } from '@/lib/supabase/client';
+import { broadcastAuthStateChange } from '@/lib/app-auth/client';
 import { usePermissionSnapshot } from '@/lib/hooks/usePermissionSnapshot';
 import { usePendingAbsenceCount, useRamsAssignmentSummary } from '@/lib/hooks/useNavMetrics';
 import { isAccountSwitcherEnabled } from '@/lib/account-switch/feature-flag';
@@ -172,6 +173,7 @@ export function Navbar() {
   const expandedWidthRef = useRef(0);
   const desktopMenuTriggerRef = useRef<HTMLButtonElement>(null);
   const desktopMenuRef = useRef<HTMLDivElement>(null);
+  const activeNotificationUserIdRef = useRef<string | null>(null);
   const [supabase, setSupabase] = useState<ReturnType<typeof createClient> | null>(null);
   const accountSwitcherEnabled = useMemo(() => isAccountSwitcherEnabled(), []);
   const canSubmitPinSetup = pinEntry.length === PIN_LENGTH && !pinSetupSubmitting;
@@ -183,7 +185,8 @@ export function Navbar() {
   const { enabledModuleSet: userPermissions } = usePermissionSnapshot();
   const { data: ramsSummary } = useRamsAssignmentSummary(profile?.id);
   const { count: pendingAbsenceCount } = usePendingAbsenceCount(
-    Boolean(profile?.id) && (effectiveIsManager || effectiveIsAdmin)
+    Boolean(profile?.id) && (effectiveIsManager || effectiveIsAdmin),
+    profile?.id
   );
   const hasRAMSAssignments = ramsSummary?.hasAssignments || false;
 
@@ -208,6 +211,11 @@ export function Navbar() {
     setDesktopMenuOpen(false);
     setActiveNowDialogOpen(false);
   }, [tabletModeEnabled]);
+
+  useEffect(() => {
+    activeNotificationUserIdRef.current = user?.id || null;
+    setUnreadCount(0);
+  }, [user?.id]);
 
   useEffect(() => {
     setIsStandaloneApp(checkStandaloneMode());
@@ -407,15 +415,19 @@ export function Navbar() {
   useEffect(() => {
     if (!user?.id || !supabase) return;
 
-    const filter = `user_id=eq.${user.id}`;
+    const subscribedUserId = user.id;
+    const filter = `user_id=eq.${subscribedUserId}`;
     const channel = supabase
-      .channel(`navbar_notifications_${user.id}`)
+      .channel(`navbar_notifications_${subscribedUserId}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'message_recipients',
         filter,
       }, () => {
+        if (activeNotificationUserIdRef.current !== subscribedUserId) {
+          return;
+        }
         void fetchNotificationCount();
       })
       .on('postgres_changes', {
@@ -424,6 +436,9 @@ export function Navbar() {
         table: 'message_recipients',
         filter,
       }, () => {
+        if (activeNotificationUserIdRef.current !== subscribedUserId) {
+          return;
+        }
         void fetchNotificationCount();
       })
       .subscribe();
@@ -439,19 +454,16 @@ export function Navbar() {
 
       // Close mobile menu if open
       setMobileMenuOpen(false);
-      
-      // Sign out and wait for completion
-      await signOut({
+
+      const { error } = await signOut({
         deviceId: accountSwitcherEnabled ? existingDeviceId : null,
       });
-      
-      // Force a hard redirect to ensure all state is cleared (especially important for admin accounts)
-      // This ensures the sign out works on first click
-      window.location.href = '/login';
+      if (error) {
+        throw new Error(error.message);
+      }
     } catch (error) {
       console.error('Error during sign out:', error);
-      // Still redirect on error to ensure user can log out
-      window.location.href = '/login';
+      toast.error('Could not sign out. Please try again.');
     }
   };
 
@@ -540,6 +552,8 @@ export function Navbar() {
         throw new Error(lockPayload?.error || 'Failed to lock account');
       }
 
+      invalidateCachedDataToken();
+      broadcastAuthStateChange('locked');
       router.push(nextLockPath || buildLockPathWithReturnTo('/dashboard'));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to configure PIN');
@@ -607,6 +621,8 @@ export function Navbar() {
         toast.error(lockPayload?.error || 'Failed to lock account');
         return;
       }
+      invalidateCachedDataToken();
+      broadcastAuthStateChange('locked');
       router.push(lockPath);
       return;
     }

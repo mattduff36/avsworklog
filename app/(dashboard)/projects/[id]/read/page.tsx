@@ -13,6 +13,7 @@ import { SignRAMSModal } from '@/components/rams/SignRAMSModal';
 import { toast } from 'sonner';
 import { RAMSErrorBoundary } from '@/components/rams/RAMSErrorBoundary';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
+import { loadClientAuthSession } from '@/lib/app-auth/client-session';
 
 interface RAMSDocument {
   id: string;
@@ -71,10 +72,14 @@ function ReadRAMSContent() {
       setLoading(true);
       setError(null);
 
-      // Get user session
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.push('/login');
+      const sessionResult = await loadClientAuthSession();
+      if (sessionResult.status === 'locked') {
+        router.replace('/lock');
+        return;
+      }
+
+      if (sessionResult.status !== 'authenticated' || !sessionResult.payload?.user?.id) {
+        router.replace('/login');
         return;
       }
 
@@ -105,7 +110,7 @@ function ReadRAMSContent() {
         .from('rams_assignments')
         .select('*')
         .eq('rams_document_id', documentId)
-        .eq('employee_id', session.user.id)
+        .eq('employee_id', sessionResult.payload.user.id)
         .single();
 
       if (assignmentData) {

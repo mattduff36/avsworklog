@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, CheckCircle2, AlertCircle, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { validatePasswordStrength, getPasswordRequirements } from '@/lib/utils/password';
+import { loadClientAuthSession } from '@/lib/app-auth/client-session';
 
 interface AuthSessionResponse {
   authenticated: boolean;
@@ -36,20 +37,18 @@ export default function ChangePasswordPage() {
   useEffect(function () {
     async function checkUser() {
       try {
-        const response = await fetch('/api/auth/session', {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache',
-          },
-        });
+        const sessionResult = await loadClientAuthSession();
+        if (sessionResult.status === 'locked') {
+          router.replace('/lock');
+          return;
+        }
 
-        if (!response.ok) {
+        if (sessionResult.status !== 'authenticated' || !sessionResult.payload) {
           router.replace('/login');
           return;
         }
 
-        const session = (await response.json()) as AuthSessionResponse;
-        const profile = session.profile;
+        const profile = sessionResult.payload.profile as AuthSessionResponse['profile'];
 
         if (!profile) {
           router.replace('/login');

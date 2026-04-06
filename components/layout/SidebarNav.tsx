@@ -52,7 +52,7 @@ const HOVER_EXPAND_DELAY_MS = 1000;
 
 export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   const pathname = usePathname();
-  const { isAdmin, isManager, effectiveRole, isViewingAs, isActualSuperAdmin } = useAuth();
+  const { profile, isAdmin, isManager, effectiveRole, isViewingAs, isActualSuperAdmin } = useAuth();
   const { tabletModeEnabled } = useTabletMode();
   const [viewAsRoleId, setViewAsRoleIdState] = useState<string>('');
   const [viewAsTeamId, setViewAsTeamIdState] = useState<string>('');
@@ -72,7 +72,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   const activeUsersPanelRef = useRef<HTMLDivElement | null>(null);
   const hoverExpandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { enabledModuleSet: userPermissions } = usePermissionSnapshot();
-  const { count: pendingAbsenceCount } = usePendingAbsenceCount(isManager || isAdmin);
+  const { count: pendingAbsenceCount } = usePendingAbsenceCount(isManager || isAdmin, profile?.id);
   const isExpanded = open || hoverExpanded;
 
   const clearHoverExpandTimer = useCallback(() => {

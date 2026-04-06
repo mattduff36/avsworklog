@@ -9,6 +9,10 @@
  *   npx tsx testsuite/runner/run.ts --grep "auth"
  */
 import { execSync } from 'child_process';
+import {
+  clearAuthLifecycleIssueLog,
+  enforceAuthLifecycleIssueGate,
+} from './auth-lifecycle-audit';
 
 const args = process.argv.slice(2);
 const ROOT = process.cwd();
@@ -39,7 +43,9 @@ function exec(cmd: string, label: string): boolean {
   }
 }
 
-function main(): void {
+async function main(): Promise<void> {
+  clearAuthLifecycleIssueLog();
+
   let apiPassed = true;
   let uiPassed = true;
 
@@ -70,6 +76,8 @@ function main(): void {
     console.warn('Report generation had issues, but continuing.');
   }
 
+  const issueGatePassed = await enforceAuthLifecycleIssueGate({ interactive: true });
+
   // Summary
   console.log('\n' + '='.repeat(60));
   console.log('TESTSUITE COMPLETE');
@@ -79,9 +87,9 @@ function main(): void {
   console.log(`  Report:    testsuite/reports/latest.md`);
   console.log('='.repeat(60) + '\n');
 
-  if (!apiPassed || !uiPassed) {
+  if (!apiPassed || !uiPassed || !issueGatePassed) {
     process.exit(1);
   }
 }
 
-main();
+void main();

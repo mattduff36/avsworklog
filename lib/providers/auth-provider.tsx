@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { type SupabaseClient, type User } from '@supabase/supabase-js';
 import {
   broadcastAuthStateChange,
@@ -21,12 +22,26 @@ import {
   type ClientAuthSessionResult,
 } from '@/lib/app-auth/client-session';
 import {
+  buildSessionSnapshot,
+  getSessionTransition,
+  getUnauthenticatedSessionSnapshot,
+  type AuthSessionSnapshot,
+  type AuthTransitionReason,
+} from '@/lib/app-auth/transition';
+import {
   createClient,
   invalidateCachedDataToken,
 } from '@/lib/supabase/client';
 import type { Database } from '@/types/database';
 import { isAdminRole } from '@/lib/utils/role-access';
-import { clearViewAsSelection, getViewAsSelection } from '@/lib/utils/view-as-cookie';
+import {
+  clearViewAsSelection,
+  getViewAsSelection,
+  VIEW_AS_CHANGE_EVENT,
+  type ViewAsSelection,
+} from '@/lib/utils/view-as-cookie';
+import { registerAuthRecoveryHandlers } from '@/lib/app-auth/recovery-bridge';
+import { installGlobalAuthAwareFetch } from '@/lib/utils/fetch-with-auth';
 
 type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 
@@ -122,6 +137,25 @@ interface AuthProviderProps {
 type BrowserSupabaseClient = SupabaseClient<Database>;
 
 const PUBLIC_PATHS = ['/login', '/change-password', '/offline'];
+const AUTH_SCOPED_QUERY_KEYS = [
+  'permission-snapshot',
+  'absence-secondary-permissions',
+  'rams-assignment-summary',
+  'pending-absence-count',
+  'absences',
+  'absence-summary',
+  'absence-reasons',
+  'absence-reasons-all',
+  'profiles',
+  'projects-manage',
+  'timesheets',
+  'inspections',
+  'maintenance',
+  'customers',
+  'quotes',
+  'workshop-tasks',
+  'notifications',
+] as const;
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -195,8 +229,52 @@ function buildLockRedirectUrl(): string {
   return url.toString();
 }
 
+function buildAuthenticatedRedirectUrl(payload: ClientAuthSessionResponse): string | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const currentUrl = new URL(window.location.href);
+  const currentPath = getCurrentPath();
+  const mustChangePassword =
+    typeof payload.profile === 'object' &&
+    payload.profile !== null &&
+    'must_change_password' in payload.profile &&
+    (payload.profile as { must_change_password?: unknown }).must_change_password === true;
+
+  if (currentPath.startsWith('/login')) {
+    if (mustChangePassword) {
+      return '/change-password';
+    }
+
+    const redirectTarget = currentUrl.searchParams.get('redirect');
+    if (
+      redirectTarget &&
+      redirectTarget.startsWith('/') &&
+      !redirectTarget.startsWith('/lock')
+    ) {
+      return redirectTarget;
+    }
+
+    return '/dashboard';
+  }
+
+  if (currentPath.startsWith('/change-password') && !mustChangePassword) {
+    return '/dashboard';
+  }
+
+  return null;
+}
+
+function isAuthScopedQueryKey(queryKey: readonly unknown[]): boolean {
+  const firstKey = queryKey[0];
+  return typeof firstKey === 'string' && AUTH_SCOPED_QUERY_KEYS.includes(firstKey as (typeof AUTH_SCOPED_QUERY_KEYS)[number]);
+}
+
 export function AuthProvider({ children }: AuthProviderProps) {
+  const queryClient = useQueryClient();
   const previousUserIdRef = useRef<string | null>(null);
+  const sessionSnapshotRef = useRef<AuthSessionSnapshot>(getUnauthenticatedSessionSnapshot());
   const redirectInProgressRef = useRef<'login' | 'lock' | null>(null);
   const recoveryPromiseRef = useRef<Promise<boolean> | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -205,6 +283,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [locked, setLocked] = useState(false);
   const [effectiveRole, setEffectiveRole] = useState<EffectiveRole | null>(null);
   const [supabase, setSupabase] = useState<BrowserSupabaseClient | null>(null);
+  const [viewAsSelection, setViewAsSelection] = useState<ViewAsSelection>({ roleId: '', teamId: '' });
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -212,6 +291,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     setSupabase(createClient());
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const syncViewAsSelection = () => {
+      setViewAsSelection(getViewAsSelection());
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === 'viewAsRoleId' || event.key === 'viewAsTeamId') {
+        syncViewAsSelection();
+      }
+    };
+
+    syncViewAsSelection();
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener(VIEW_AS_CHANGE_EVENT, syncViewAsSelection);
+
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener(VIEW_AS_CHANGE_EVENT, syncViewAsSelection);
+    };
   }, []);
 
   const clearLocalAuthState = useCallback((options?: { clearRoleCache?: boolean; clearViewAs?: boolean }) => {
@@ -228,11 +332,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
     localStorage.removeItem('rememberMe');
     invalidateCachedDataToken();
     previousUserIdRef.current = null;
+    sessionSnapshotRef.current = getUnauthenticatedSessionSnapshot();
     setUser(null);
     setProfile(null);
     setLocked(false);
     setEffectiveRole(null);
   }, []);
+
+  const invalidateAuthScopedQueries = useCallback(async () => {
+    await queryClient.invalidateQueries({
+      predicate: (query) => isAuthScopedQueryKey(query.queryKey),
+    });
+  }, [queryClient]);
 
   const redirectToLogin = useCallback(async () => {
     if (typeof window === 'undefined') {
@@ -275,33 +386,68 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const applySessionPayload = useCallback((payload: ClientAuthSessionResponse) => {
-    const nextUser = buildSyntheticUser(payload);
-    const nextUserId = nextUser?.id ?? null;
-    const previousUserId = previousUserIdRef.current;
-
-    if (previousUserId && nextUserId && previousUserId !== nextUserId) {
-      clearViewAsSelection();
-      localStorage.removeItem(`role_cache_${previousUserId}`);
-    }
-
-    previousUserIdRef.current = nextUserId;
-    setUser(nextUser);
+    setUser(buildSyntheticUser(payload));
     setProfile(payload.profile ? ({ ...payload.profile } as Profile) : null);
     setLocked(payload.locked === true);
   }, []);
 
-  const loadAuthSession = useCallback(async (options?: { silent?: boolean }) => {
+  const onAuthTransition = useCallback(async (
+    nextSnapshot: AuthSessionSnapshot,
+    reason: AuthTransitionReason
+  ) => {
+    const previousSnapshot = sessionSnapshotRef.current;
+    const transition = getSessionTransition(previousSnapshot, nextSnapshot);
+    sessionSnapshotRef.current = nextSnapshot;
+    previousUserIdRef.current = nextSnapshot.userId;
+
+    if (!transition.changed) {
+      return transition;
+    }
+
+    if (transition.userChanged && previousSnapshot?.userId) {
+      clearViewAsSelection();
+      localStorage.removeItem(`role_cache_${previousSnapshot.userId}`);
+    }
+
+    if (transition.shouldInvalidateToken) {
+      invalidateCachedDataToken();
+    }
+
+    if (
+      transition.authChanged ||
+      transition.userChanged ||
+      transition.profileChanged ||
+      transition.lockChanged
+    ) {
+      await invalidateAuthScopedQueries();
+    }
+
+    if (reason === 'sign_out' || reason === 'sign_in' || reason === 'broadcast') {
+      queryClient.invalidateQueries({ queryKey: ['permission-snapshot'] }).catch(() => undefined);
+    }
+
+    return transition;
+  }, [invalidateAuthScopedQueries, queryClient]);
+
+  const loadAuthSession = useCallback(async (options?: { silent?: boolean; reason?: AuthTransitionReason }) => {
+    const reason = options?.reason ?? 'manual';
     const result = await loadClientAuthSession();
 
     if (result.status === 'authenticated' && result.payload) {
       redirectInProgressRef.current = null;
+      await onAuthTransition(buildSessionSnapshot(result.payload), reason);
       applySessionPayload(result.payload);
       setLoading(false);
+      const redirectUrl = buildAuthenticatedRedirectUrl(result.payload);
+      if (redirectUrl) {
+        window.location.replace(redirectUrl);
+      }
       return result;
     }
 
     if (result.status === 'locked' && result.payload) {
       redirectInProgressRef.current = null;
+      await onAuthTransition(buildSessionSnapshot(result.payload), reason);
       applySessionPayload(result.payload);
       setLoading(false);
       redirectToLock();
@@ -309,6 +455,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     if (result.status === 'unauthenticated') {
+      await onAuthTransition(getUnauthenticatedSessionSnapshot(), reason);
       clearLocalAuthState();
       setLoading(false);
       void redirectToLogin();
@@ -324,29 +471,45 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     setLoading(false);
     return result;
-  }, [applySessionPayload, clearLocalAuthState, redirectToLock, redirectToLogin]);
+  }, [applySessionPayload, clearLocalAuthState, onAuthTransition, redirectToLock, redirectToLogin]);
 
   useEffect(() => {
     clearLegacyAccountSwitchClientState();
-    void loadAuthSession();
+    void loadAuthSession({ reason: 'initial_load' });
 
     const unsubscribe = subscribeToAuthStateChange(() => {
-      void loadAuthSession({ silent: true });
+      void loadAuthSession({ silent: true, reason: 'broadcast' });
     });
 
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
-        void loadAuthSession({ silent: true });
+        void loadAuthSession({ silent: true, reason: 'visibility' });
       }
     };
 
+    const handleFocus = () => {
+      void loadAuthSession({ silent: true, reason: 'focus' });
+    };
+
+    const handleOnline = () => {
+      void loadAuthSession({ silent: true, reason: 'online' }).then((result) => {
+        if (result.status === 'authenticated') {
+          void queryClient.refetchQueries({ type: 'active' });
+        }
+      });
+    };
+
     document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('online', handleOnline);
 
     return () => {
       unsubscribe();
       document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('online', handleOnline);
     };
-  }, [loadAuthSession]);
+  }, [loadAuthSession, queryClient]);
 
   useEffect(() => {
     if (!user || !profile) return;
@@ -374,27 +537,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
         },
         body: JSON.stringify({}),
       }).finally(() => {
-        clearLocalAuthState();
-        broadcastAuthStateChange('signed_out');
-        window.location.href = '/login';
+        void onAuthTransition(getUnauthenticatedSessionSnapshot(), 'sign_out').finally(() => {
+          clearLocalAuthState();
+          broadcastAuthStateChange('signed_out');
+          window.location.href = '/login';
+        });
       });
     } else if (!cachedRoleId) {
       localStorage.setItem(storageKey, currentRoleId);
     }
-  }, [clearLocalAuthState, profile, user]);
+  }, [clearLocalAuthState, onAuthTransition, profile, user]);
 
   useEffect(() => {
     if (!user) return;
 
     const interval = setInterval(() => {
-      void loadAuthSession({ silent: true });
+      void loadAuthSession({ silent: true, reason: 'interval' });
     }, 5 * 60 * 1000);
 
     return () => clearInterval(interval);
   }, [loadAuthSession, user]);
 
   useEffect(() => {
-    const { roleId: viewAsRoleId, teamId: viewAsTeamId } = getViewAsSelection();
+    const { roleId: viewAsRoleId, teamId: viewAsTeamId } = viewAsSelection;
     const isActualSuper =
       profile?.super_admin === true || profile?.role?.is_super_admin === true;
 
@@ -465,7 +630,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     void fetchEffectiveRole();
-  }, [profile, supabase]);
+  }, [profile, supabase, viewAsSelection]);
+
+  useEffect(() => installGlobalAuthAwareFetch(), []);
 
   const forceAuthRedirect = useCallback(async (statusCode?: number | null) => {
     if (statusCode === 423 || locked) {
@@ -483,7 +650,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     recoveryPromiseRef.current = (async () => {
       invalidateCachedDataToken();
-      const result = await loadAuthSession({ silent: true });
+      const result = await loadAuthSession({ silent: true, reason: 'recover' });
 
       if (result.status === 'authenticated') {
         return true;
@@ -497,6 +664,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     return recoveryPromiseRef.current;
   }, [forceAuthRedirect, loadAuthSession]);
+
+  useEffect(() => registerAuthRecoveryHandlers({
+    recoverFromAuthFailure,
+    forceAuthRedirect,
+  }), [forceAuthRedirect, recoverFromAuthFailure]);
 
   const signIn = useCallback(async (
     email: string,
@@ -531,7 +703,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     broadcastAuthStateChange('signed_in');
-    await loadAuthSession({ silent: true });
+    await loadAuthSession({ silent: true, reason: 'sign_in' });
     return {
       data: payload,
       error: null,
@@ -554,11 +726,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
       return { error: { message: payload.error || 'Logout failed' } };
     }
 
+    await onAuthTransition(getUnauthenticatedSessionSnapshot(), 'sign_out');
     clearLocalAuthState();
     broadcastAuthStateChange('signed_out');
     redirectInProgressRef.current = null;
+    if (typeof window !== 'undefined') {
+      window.location.replace('/login');
+    }
     return { error: null };
-  }, [clearLocalAuthState]);
+  }, [clearLocalAuthState, onAuthTransition]);
 
   const signUp = useCallback(async (
     email: string,
@@ -608,7 +784,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isActualSuperAdmin,
     isViewingAs,
     effectiveRole,
-    refreshSession: () => loadAuthSession({ silent: true }),
+    refreshSession: () => loadAuthSession({ silent: true, reason: 'manual' }),
     recoverFromAuthFailure,
     forceAuthRedirect,
   }), [

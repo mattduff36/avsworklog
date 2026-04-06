@@ -12,6 +12,7 @@
 
 const ROLE_COOKIE_NAME = 'avs_view_as_role_id';
 const TEAM_COOKIE_NAME = 'avs_view_as_team_id';
+export const VIEW_AS_CHANGE_EVENT = 'avs:view-as-change';
 
 export interface ViewAsSelection {
   roleId: string;
@@ -29,12 +30,18 @@ function setCookie(name: string, value: string, storageKey: string) {
   localStorage.setItem(storageKey, value);
 }
 
+function dispatchViewAsChangeEvent() {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new Event(VIEW_AS_CHANGE_EVENT));
+}
+
 /** Set the view-as role id cookie (client-side). Pass empty string to clear. */
 export function setViewAsRoleId(roleId: string) {
   if (typeof document === 'undefined') return;
   setCookie(ROLE_COOKIE_NAME, roleId, 'viewAsRoleId');
   // Also clean up legacy key
   localStorage.removeItem('viewAsRole');
+  dispatchViewAsChangeEvent();
 }
 
 /** Read the view-as role id from cookie (client-side). Returns empty string if unset. */
@@ -47,6 +54,7 @@ export function getViewAsRoleId(): string {
 export function setViewAsTeamId(teamId: string) {
   if (typeof document === 'undefined') return;
   setCookie(TEAM_COOKIE_NAME, teamId, 'viewAsTeamId');
+  dispatchViewAsChangeEvent();
 }
 
 export function getViewAsTeamId(): string {

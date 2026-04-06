@@ -173,8 +173,10 @@ export default function HelpPage() {
   const handleSignOutNow = useCallback(async () => {
     try {
       setIsSigningOut(true);
-      await signOut();
-      window.location.href = '/login';
+      const { error } = await signOut();
+      if (error) {
+        throw new Error(error.message);
+      }
     } catch (error) {
       console.error('Error signing out from help support action:', error);
       toast.error('Could not sign out. Please try again.');

@@ -35,7 +35,7 @@ export default function LoginPage() {
 
     try {
       const deviceId = getOrCreateAccountSwitchDeviceId();
-      const { data, error } = await signIn(email, password, {
+      const { error } = await signIn(email, password, {
         rememberMe,
         deviceId,
         deviceLabel: getAccountSwitchDeviceLabel(),
@@ -49,13 +49,6 @@ export default function LoginPage() {
       clearLegacyAccountSwitchClientState();
 
       localStorage.setItem('rememberMe', rememberMe ? 'true' : 'false');
-
-      if (data?.profile?.must_change_password) {
-        window.location.replace('/change-password');
-        return;
-      }
-
-      window.location.replace('/dashboard');
     } catch {
       setError('An unexpected error occurred');
     } finally {

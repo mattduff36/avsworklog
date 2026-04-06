@@ -8,6 +8,7 @@
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { resolve } from 'path';
+import { readAuthLifecycleIssues } from './auth-lifecycle-audit';
 
 const REPORTS_DIR = resolve(process.cwd(), 'testsuite', 'reports');
 const PW_RESULTS = resolve(REPORTS_DIR, 'results.json');
@@ -100,6 +101,7 @@ function parseVitestResults(): FailureEntry[] {
 function generateReport(): void {
   const pwFailures = parsePlaywrightResults();
   const vitestFailures = parseVitestResults();
+  const authLifecycleIssues = readAuthLifecycleIssues();
   const allFailures = [...pwFailures, ...vitestFailures];
 
   const lines: string[] = [
@@ -143,7 +145,17 @@ function generateReport(): void {
   lines.push(`- **Failed**: ${totalFailed}`);
   lines.push(`- **Playwright tests**: ${pwTotal} (${pwFailures.length} failures)`);
   lines.push(`- **Vitest tests**: ${vitestTotal} (${vitestFailures.length} failures)`);
+  lines.push(`- **Auth lifecycle findings**: ${authLifecycleIssues.length}`);
   lines.push('');
+
+  if (authLifecycleIssues.length > 0) {
+    lines.push('## Auth Lifecycle Findings');
+    lines.push('');
+    for (const issue of authLifecycleIssues) {
+      lines.push(`- [${issue.severity.toUpperCase()}] ${issue.scenario}: ${issue.details}`);
+    }
+    lines.push('');
+  }
 
   if (allFailures.length === 0) {
     lines.push('## Result: ALL TESTS PASSED');

@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, Clock3, Loader2, MapPin, RefreshCw, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/lib/hooks/useAuth';
+import { fetchWithAuth } from '@/lib/utils/fetch-with-auth';
 
 interface ActiveUserSummary {
   userId: string;
@@ -71,20 +73,22 @@ function UserList({ users }: { users: ActiveUserSummary[] }) {
 }
 
 export function ActiveNowUsersPanel({ open }: ActiveNowUsersPanelProps) {
+  const { profile, isSuperAdmin } = useAuth();
   const [payload, setPayload] = useState<ActiveUsersPayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const canViewActiveUsers = open && Boolean(profile?.id) && isSuperAdmin;
 
   const fetchActiveUsers = useCallback(
     async (backgroundRefresh: boolean) => {
-      if (!open) return;
+      if (!canViewActiveUsers) return;
 
       if (backgroundRefresh) setRefreshing(true);
       else setLoading(true);
 
       try {
-        const response = await fetch('/api/superadmin/active-users', { cache: 'no-store' });
+        const response = await fetchWithAuth('/api/superadmin/active-users', { cache: 'no-store' });
         const data = (await response.json()) as Partial<ActiveUsersPayload> & { error?: string };
         if (!response.ok) {
           throw new Error(data.error || 'Failed to load active users');
@@ -106,23 +110,29 @@ export function ActiveNowUsersPanel({ open }: ActiveNowUsersPanelProps) {
         setRefreshing(false);
       }
     },
-    [open]
+    [canViewActiveUsers]
   );
 
   useEffect(() => {
-    if (!open) return;
+    if (!canViewActiveUsers) {
+      setPayload(null);
+      setLoading(false);
+      setRefreshing(false);
+      setErrorMessage(null);
+      return;
+    }
     void fetchActiveUsers(false);
-  }, [fetchActiveUsers, open]);
+  }, [canViewActiveUsers, fetchActiveUsers]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!canViewActiveUsers) return;
     const intervalId = window.setInterval(() => {
       void fetchActiveUsers(true);
     }, REFRESH_INTERVAL_MS);
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [fetchActiveUsers, open]);
+  }, [canViewActiveUsers, fetchActiveUsers]);
 
   const activeUsers = useMemo(() => payload?.activeNowUsers || [], [payload?.activeNowUsers]);
   const recentUsers = useMemo(() => payload?.recentUsers || [], [payload?.recentUsers]);

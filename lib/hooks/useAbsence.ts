@@ -18,6 +18,7 @@ import { isClosedFinancialYearDate } from '@/lib/services/absence-archive';
 import { getErrorMessage, shouldLogAbsenceManageError } from '@/lib/utils/absence-error-handling';
 import { ANNUAL_LEAVE_MIN_REMAINING_DAYS } from '@/lib/utils/annual-leave';
 import { isAdminRole } from '@/lib/utils/role-access';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 const ANNUAL_LEAVE_REASON_NAME = 'annual leave';
 
@@ -391,17 +392,17 @@ export function useAbsencesForCurrentUser() {
  * Get absences for current user in a selected financial year
  */
 export function useAbsencesForUserFinancialYear(financialYear?: Pick<FinancialYear, 'start' | 'end'>) {
+  const { profile } = useAuth();
   const supabase = createClient();
   const fallback = getCurrentFinancialYear();
   const start = financialYear?.start || fallback.start;
   const end = financialYear?.end || fallback.end;
+  const profileId = profile?.id || null;
   
   return useQuery({
-    queryKey: ['absences', 'current-user', start.toISOString(), end.toISOString()],
+    queryKey: ['absences', profileId, start.toISOString(), end.toISOString()],
+    enabled: Boolean(profileId),
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-      
       const { data, error } = await supabase
         .from('absences')
         .select(`
@@ -409,7 +410,7 @@ export function useAbsencesForUserFinancialYear(financialYear?: Pick<FinancialYe
           absence_reasons (*),
           profiles!absences_profile_id_fkey (full_name, employee_id, team_id)
         `)
-        .eq('profile_id', user.id)
+        .eq('profile_id', profileId!)
         .gte('date', start.toISOString().split('T')[0])
         .lte('date', end.toISOString().split('T')[0])
         .order('date', { ascending: false });
@@ -436,33 +437,33 @@ export function useAbsenceSummaryForCurrentUser() {
  * Get absence summary for current user in a selected financial year
  */
 export function useAbsenceSummaryForUserFinancialYear(financialYear?: Pick<FinancialYear, 'start' | 'end'>) {
+  const { profile } = useAuth();
   const supabase = createClient();
   const fallback = getCurrentFinancialYear();
   const start = financialYear?.start || fallback.start;
   const end = financialYear?.end || fallback.end;
+  const profileId = profile?.id || null;
   
   return useQuery({
-    queryKey: ['absence-summary', 'current-user', start.toISOString(), end.toISOString()],
+    queryKey: ['absence-summary', profileId, start.toISOString(), end.toISOString()],
+    enabled: Boolean(profileId),
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
       const financialYearStartYear = start.getFullYear();
 
       const [{ data: profile, error: profileError }, carryoverByProfile] = await Promise.all([
         supabase
           .from('profiles')
           .select('annual_holiday_allowance_days')
-          .eq('id', user.id)
+          .eq('id', profileId!)
           .single(),
-        fetchCarryoverMapForFinancialYear(supabase, financialYearStartYear, [user.id]),
+        fetchCarryoverMapForFinancialYear(supabase, financialYearStartYear, [profileId!]),
       ]);
 
       if (profileError) throw profileError;
 
       const allowance = getEffectiveAllowance(
         profile?.annual_holiday_allowance_days,
-        carryoverByProfile.get(user.id) || 0
+        carryoverByProfile.get(profileId!) || 0
       );
 
       // Get Annual Leave reason ID
@@ -485,7 +486,7 @@ export function useAbsenceSummaryForUserFinancialYear(financialYear?: Pick<Finan
       const { data: absences, error: absencesError } = await supabase
         .from('absences')
         .select('status, duration_days, reason_id')
-        .eq('profile_id', user.id)
+        .eq('profile_id', profileId!)
         .gte('date', start.toISOString().split('T')[0])
         .lte('date', end.toISOString().split('T')[0]);
       

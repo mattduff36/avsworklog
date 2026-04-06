@@ -11,6 +11,8 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { getAccentFromRoute } from '@/lib/theme/getAccentFromRoute';
 import { TabletModeProvider, useTabletMode } from '@/components/layout/tablet-mode-context';
+import { useAuth } from '@/lib/hooks/useAuth';
+import { fetchWithAuth } from '@/lib/utils/fetch-with-auth';
 
 const PAGE_VISIT_DEBOUNCE_MS = 250;
 const PAGE_VISIT_HEARTBEAT_MS = 60_000;
@@ -34,6 +36,7 @@ function DashboardLayoutShell({
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { profile, loading: authLoading, locked } = useAuth();
   const { tabletModeEnabled, tabletModeInfoOpen, dismissTabletModeInfo } = useTabletMode();
   const lastTrackedPathRef = useRef<string>('');
   const heartbeatIntervalRef = useRef<number | null>(null);
@@ -45,15 +48,15 @@ function DashboardLayoutShell({
   }, [pathname, searchParams]);
 
   const trackPageVisit = useCallback((path: string) => {
-    if (!path) return;
-    fetch('/api/me/page-visits', {
+    if (!path || authLoading || locked || !profile?.id) return;
+    fetchWithAuth('/api/me/page-visits', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path }),
     }).catch(() => {
       // Avoid noisy console logs for non-critical tracking telemetry.
     });
-  }, []);
+  }, [authLoading, locked, profile?.id]);
 
   const stopHeartbeat = useCallback(() => {
     if (!heartbeatIntervalRef.current) return;
@@ -62,11 +65,11 @@ function DashboardLayoutShell({
   }, []);
 
   const sendHeartbeat = useCallback(() => {
-    if (document.hidden) return;
+    if (document.hidden || authLoading || locked || !profile?.id) return;
     const currentPath = getCurrentTrackedPath();
     if (!currentPath) return;
     trackPageVisit(currentPath);
-  }, [getCurrentTrackedPath, trackPageVisit]);
+  }, [authLoading, getCurrentTrackedPath, locked, profile?.id, trackPageVisit]);
   
   // Determine the accent color based on current route
   const accent = getAccentFromRoute(pathname, searchParams);

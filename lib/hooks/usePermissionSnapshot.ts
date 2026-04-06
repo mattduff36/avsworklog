@@ -1,7 +1,8 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { subscribeToAuthStateChange } from '@/lib/app-auth/client';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { ALL_MODULES, type ModuleName } from '@/types/roles';
 import { createStatusError, getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
@@ -38,7 +39,22 @@ export function usePermissionSnapshot() {
     enabled: !authLoading && Boolean(profile?.id) && !isAdmin && !isSuperAdmin,
     queryFn: fetchPermissionSnapshot,
     staleTime: 60_000,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
+
+  useEffect(() => {
+    if (authLoading || !profile?.id) {
+      return;
+    }
+
+    const unsubscribe = subscribeToAuthStateChange(() => {
+      void query.refetch();
+    });
+
+    return unsubscribe;
+  }, [authLoading, profile?.id, query.refetch]);
 
   const enabledModules = useMemo(() => {
     if (isAdmin || isSuperAdmin) {

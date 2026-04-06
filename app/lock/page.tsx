@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { broadcastAuthStateChange, clearLegacyAccountSwitchClientState } from '@/lib/app-auth/client';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { isAccountSwitcherEnabled } from '@/lib/account-switch/feature-flag';
+import { invalidateCachedDataToken } from '@/lib/supabase/client';
 import {
   getAccountSwitchDeviceLabel,
   getOrCreateAccountSwitchDeviceId,
@@ -76,6 +77,7 @@ export default function LockPage() {
   const isFeatureEnabled = useMemo(() => isAccountSwitcherEnabled(), []);
 
   const currentProfileId = profile?.id || null;
+  const forcePinSetup = useMemo(() => searchParams?.get('setupPin') === '1', [searchParams]);
   const returnTo = useMemo(() => {
     const candidate = searchParams?.get('returnTo') || '/dashboard';
     if (!candidate.startsWith('/') || candidate.startsWith('/lock')) {
@@ -152,6 +154,10 @@ export default function LockPage() {
 
         if (settingsPayload.settings?.pin_configured) {
           setMode('locked');
+          if (forcePinSetup && currentProfileId) {
+            setSelectedProfileId(currentProfileId);
+            setPinModalOpen(true);
+          }
         } else {
           setMode('set-pin-enter');
           setSelectedProfileId(currentProfileId);
@@ -164,7 +170,7 @@ export default function LockPage() {
         setLoadingState(false);
       }
     })();
-  }, [authLoading, currentProfileId, deviceId, isFeatureEnabled, reloadProfiles, router]);
+  }, [authLoading, currentProfileId, deviceId, forcePinSetup, isFeatureEnabled, reloadProfiles, router]);
 
   useEffect(() => {
     if (!pinModalOpen) return;
@@ -215,6 +221,8 @@ export default function LockPage() {
             if (!lockResponse.ok) {
               throw new Error(lockPayload.error || 'Failed to lock account');
             }
+            invalidateCachedDataToken();
+            broadcastAuthStateChange('locked');
           }
 
           await reloadProfiles();
@@ -261,6 +269,7 @@ export default function LockPage() {
           throw new Error(unlockPayload.error || 'Incorrect PIN');
         }
 
+        invalidateCachedDataToken();
         broadcastAuthStateChange('pin_unlock');
         window.location.replace(selectedProfileId === currentProfileId ? returnTo : '/dashboard');
       } catch (error) {

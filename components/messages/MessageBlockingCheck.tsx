@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { subscribeToAuthStateChange } from '@/lib/app-auth/client';
+import { loadClientAuthSession } from '@/lib/app-auth/client-session';
+import { fetchWithAuth } from '@/lib/utils/fetch-with-auth';
 import { BlockingMessageModal } from './BlockingMessageModal';
 import { ReminderModal } from './ReminderModal';
 import { Loader2 } from 'lucide-react';
@@ -22,13 +25,6 @@ interface PendingReminder {
   body: string;
   sender_name: string;
   created_at: string;
-}
-
-interface AuthSessionCheckResponse {
-  authenticated: boolean;
-  profile?: {
-    must_change_password?: boolean | null;
-  } | null;
 }
 
 const MESSAGE_BOOTSTRAP_TIMEOUT_MS = 4000;
@@ -52,7 +48,8 @@ export function MessageBlockingCheck() {
   const router = useRouter();
   const pathname = usePathname();
   const isDashboardPath = pathname?.startsWith('/dashboard') ?? false;
-  
+
+  const [authRefreshTick, setAuthRefreshTick] = useState(0);
   const [checking, setChecking] = useState(false);
   const [pendingToolboxTalks, setPendingToolboxTalks] = useState<PendingToolboxTalk[]>([]);
   const [currentToolboxTalkIndex, setCurrentToolboxTalkIndex] = useState(0);
@@ -61,33 +58,20 @@ export function MessageBlockingCheck() {
 
   const checkPendingMessages = useCallback(async (signal: AbortSignal) => {
     try {
-      // First check if user needs to change password (this takes precedence)
-      const sessionResponse = await fetch('/api/auth/session', {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache',
-        },
-        signal,
-      });
-
-      if (!sessionResponse.ok || signal.aborted) {
+      const sessionResult = await loadClientAuthSession();
+      if (signal.aborted || sessionResult.status !== 'authenticated' || !sessionResult.payload) {
         return;
       }
 
-      const session = (await sessionResponse.json()) as AuthSessionCheckResponse;
-
-      if (signal.aborted) {
-        return;
-      }
-
-      if (session.profile?.must_change_password) {
+      const profile = sessionResult.payload.profile as { must_change_password?: boolean | null } | null | undefined;
+      if (profile?.must_change_password) {
         // Password change takes priority - redirect handled by existing system
         router.push('/change-password');
         return;
       }
 
       // Fetch pending messages
-      const response = await fetch('/api/messages/pending', { signal });
+      const response = await fetchWithAuth('/api/messages/pending', { signal });
       if (!response.ok || signal.aborted) {
         if (!signal.aborted) {
           console.warn(`Pending messages API returned ${response.status}, skipping`);
@@ -120,6 +104,10 @@ export function MessageBlockingCheck() {
     }
   }, [router]);
 
+  useEffect(() => subscribeToAuthStateChange(() => {
+    setAuthRefreshTick((current) => current + 1);
+  }), []);
+
   useEffect(() => {
     if (!isDashboardPath) {
       setChecking(false);
@@ -133,7 +121,7 @@ export function MessageBlockingCheck() {
     return () => {
       abortController.abort();
     };
-  }, [checkPendingMessages, isDashboardPath, pathname]);
+  }, [authRefreshTick, checkPendingMessages, isDashboardPath, pathname]);
 
   useEffect(() => {
     if (!checking || !isDashboardPath) return;

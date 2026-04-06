@@ -30,7 +30,7 @@ function getStoragePathFromPublicAvatarUrl(url: string): string | null {
 
 export default function ProfilePage() {
   const supabase = useMemo(() => createClient(), []);
-  const { user, isAdmin, isManager } = useAuth();
+  const { user, profile, isAdmin, isManager } = useAuth();
 
   const [overview, setOverview] = useState<ProfileOverviewPayload | null>(null);
   const [loadingOverview, setLoadingOverview] = useState(true);
@@ -94,9 +94,11 @@ export default function ProfilePage() {
   }, []);
 
   useEffect(() => {
+    setOverview(null);
+    setPreferences([]);
     void fetchProfileOverview();
     void fetchNotificationPreferences();
-  }, [fetchProfileOverview, fetchNotificationPreferences]);
+  }, [fetchNotificationPreferences, fetchProfileOverview, profile?.id]);
 
   const canEditBasicFields = Boolean(overview?.can_edit_basic_fields);
   const hasBasicProfileChanges = useMemo(() => {
