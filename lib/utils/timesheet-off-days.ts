@@ -79,21 +79,16 @@ function parseDidNotWorkReason(value: string | null | undefined): TimesheetDidNo
   return 'Other';
 }
 
-function isBlank(value: string | null | undefined): boolean {
-  return !value || value.trim().length === 0;
-}
-
 function roundHours(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-function hasWorkingData(entry: TimesheetEntryLike): boolean {
+function hasExplicitWorkingInput(entry: TimesheetEntryLike): boolean {
   return Boolean(
     (entry.time_started && entry.time_started.trim()) ||
       (entry.time_finished && entry.time_finished.trim()) ||
       (entry.job_number && entry.job_number.trim()) ||
-      entry.working_in_yard ||
-      ((entry.daily_total || 0) > 0)
+      entry.working_in_yard
   );
 }
 
@@ -215,21 +210,32 @@ export function resolveTimesheetOffDayStates(
         };
         return weight(a.session) - weight(b.session);
       });
+    const effectiveLeaveLabels = leaveLabels.filter((label) => {
+      if (label.session === 'FULL') return sessions.am || sessions.pm;
+      if (label.session === 'AM') return sessions.am;
+      return sessions.pm;
+    });
 
-    const hasAmLeave = leaveLabels.some(
+    const hasAmCoverage = sessions.am && effectiveLeaveLabels.some(
+      (label) => label.session === 'FULL' || label.session === 'AM'
+    );
+    const hasPmCoverage = sessions.pm && effectiveLeaveLabels.some(
+      (label) => label.session === 'FULL' || label.session === 'PM'
+    );
+    const hasAmLeave = sessions.am && effectiveLeaveLabels.some(
       (label) => label.blocksWorkingEntry && (label.session === 'FULL' || label.session === 'AM')
     );
-    const hasPmLeave = leaveLabels.some(
+    const hasPmLeave = sessions.pm && effectiveLeaveLabels.some(
       (label) => label.blocksWorkingEntry && (label.session === 'FULL' || label.session === 'PM')
     );
-    const isOnApprovedLeave = leaveLabels.length > 0;
+    const isOnApprovedLeave = hasAmCoverage || hasPmCoverage;
     const isLeaveLocked = hasAmLeave && hasPmLeave;
     const isPartialLeave = isOnApprovedLeave && !isLeaveLocked;
 
-    const amPaid = leaveLabels.some(
+    const amPaid = sessions.am && effectiveLeaveLabels.some(
       (label) => label.isPaid && (label.session === 'FULL' || label.session === 'AM')
     );
-    const pmPaid = leaveLabels.some(
+    const pmPaid = sessions.pm && effectiveLeaveLabels.some(
       (label) => label.isPaid && (label.session === 'FULL' || label.session === 'PM')
     );
     const paidLeaveHours = roundHours((amPaid ? PAID_LEAVE_HALF_DAY_HOURS : 0) + (pmPaid ? PAID_LEAVE_HALF_DAY_HOURS : 0));
@@ -243,9 +249,10 @@ export function resolveTimesheetOffDayStates(
       }
     }
 
-    const displayRemarks = leaveLabels.map((label) => label.label).join('\n');
-    const firstLabel = leaveLabels[0];
-    const isAnnualLeave = leaveLabels.some((label) => normalizeReasonName(label.reasonName) === 'annual leave');
+    const displayRemarks = effectiveLeaveLabels.map((label) => label.label).join('\n');
+    const firstLabel = effectiveLeaveLabels[0];
+    const isAnnualLeave =
+      isOnApprovedLeave && effectiveLeaveLabels.some((label) => normalizeReasonName(label.reasonName) === 'annual leave');
 
     return {
       day_of_week: dayOfWeek,
@@ -258,7 +265,7 @@ export function resolveTimesheetOffDayStates(
       hasPmLeave,
       workWindow,
       paidLeaveHours,
-      leaveLabels,
+      leaveLabels: effectiveLeaveLabels,
       displayRemarks,
       leaveReasonName: firstLabel?.reasonName || null,
       leaveReasonColor: firstLabel?.color || null,
@@ -309,13 +316,19 @@ export function normalizeTimesheetEntriesForOffDays(
       };
     }
 
-    if (applyNonShiftDefaults && !offDay.isExpectedShiftDay && !hasWorkingData(entry)) {
+    const shouldAutoMarkOffShift =
+      applyNonShiftDefaults &&
+      !offDay.isExpectedShiftDay &&
+      !hasExplicitWorkingInput(entry) &&
+      (entry.did_not_work || !entry.daily_total || entry.daily_total <= 0);
+
+    if (shouldAutoMarkOffShift) {
       return {
         ...entry,
         did_not_work: true,
-        didNotWorkReason: entry.didNotWorkReason || 'Off Shift',
-        daily_total: entry.daily_total ?? 0,
-        remarks: isBlank(entry.remarks) ? 'Not on Shift' : entry.remarks,
+        didNotWorkReason: 'Off Shift',
+        daily_total: 0,
+        remarks: 'Not on Shift',
       };
     }
 

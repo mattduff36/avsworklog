@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { cloneWorkShiftPattern, STANDARD_WORK_SHIFT_PATTERN, calculateDurationDaysForShiftPattern, serializePatternToTemplateSlots } from '@/lib/utils/work-shifts';
+import { getCurrentFinancialYear } from '@/lib/utils/date';
 import type {
   EmployeeWorkShiftRow,
   WorkShiftPattern,
@@ -371,13 +372,15 @@ export async function recalculateAbsenceDurationsForProfiles(
     return 0;
   }
 
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const currentFinancialYear = getCurrentFinancialYear();
+  const financialYearStartIso = currentFinancialYear.start.toISOString().slice(0, 10);
   const patternMap = await loadEmployeeWorkShiftPatternMap(supabase, uniqueProfileIds);
   const { data, error } = await supabase
     .from('absences')
     .select('id, profile_id, date, end_date, is_half_day, half_day_session, duration_days, status')
     .in('profile_id', uniqueProfileIds)
-    .or(`status.eq.pending,date.gte.${todayIso}`);
+    .gte('date', financialYearStartIso)
+    .in('status', ['pending', 'approved', 'processed']);
 
   if (error) {
     throw error;

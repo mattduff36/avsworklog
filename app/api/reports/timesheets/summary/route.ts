@@ -4,6 +4,7 @@ import { logServerError } from '@/lib/utils/server-error-logger';
 import { getDidNotWorkReasonInfo } from '@/lib/utils/timesheetDidNotWork';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { filterTimesheetRowsForReportScope } from '@/lib/server/reports-timesheet-scope';
+import { loadEmployeeWorkShiftPatternMap } from '@/lib/server/work-shifts';
 import { 
   generateExcelFile, 
   formatExcelDate, 
@@ -13,6 +14,7 @@ import {
 import type { ApprovedAbsenceForTimesheet } from '@/lib/utils/timesheet-off-days';
 import { getTimesheetWeekIsoBounds, resolveTimesheetOffDayStates } from '@/lib/utils/timesheet-off-days';
 import { buildLeaveAwareTotals, buildLeaveDaysBreakdown } from '@/lib/utils/timesheet-leave-totals';
+import type { WorkShiftPattern } from '@/types/work-shifts';
 
 type AbsenceReasonRow = {
   is_paid?: boolean | null;
@@ -163,7 +165,8 @@ function groupAbsencesByEmployee(absences: AbsenceRow[]) {
 // Helper function to transform timesheets to Excel rows
 function transformTimesheetsToExcel(
   timesheets: TimesheetRow[],
-  absencesByEmployee: Map<string, { paidDays: number; unpaidDays: number; reasons: string[]; rows: AbsenceRow[] }>
+  absencesByEmployee: Map<string, { paidDays: number; unpaidDays: number; reasons: string[]; rows: AbsenceRow[] }>,
+  shiftPatternByEmployee: Map<string, WorkShiftPattern>
 ) {
   const DAY_NAMES = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   const excelData: Array<Record<string, string>> = [];
@@ -178,7 +181,11 @@ function transformTimesheetsToExcel(
       const absenceEnd = absence.end_date || absence.date;
       return absence.date <= weekBounds.endIso && absenceEnd >= weekBounds.startIso;
     });
-    const offDayStates = resolveTimesheetOffDayStates(timesheet.week_ending, weekAbsences, null);
+    const offDayStates = resolveTimesheetOffDayStates(
+      timesheet.week_ending,
+      weekAbsences,
+      shiftPatternByEmployee.get(timesheet.user_id) || null
+    );
     const leaveAwareTotals = buildLeaveAwareTotals(
       entries.map((entry) => ({
         day_of_week: entry.day_of_week,
@@ -297,10 +304,14 @@ export async function GET(request: NextRequest) {
 
     const scopedEmployeeIds = new Set(scopedTimesheets.map((timesheet) => timesheet.user_id));
     const scopedAbsences = (absences || []).filter((absence) => scopedEmployeeIds.has(absence.profile_id)) as AbsenceRow[];
+    const shiftPatternByEmployee = await loadEmployeeWorkShiftPatternMap(
+      supabase,
+      Array.from(scopedEmployeeIds)
+    );
 
     // Process data
     const absencesByEmployee = groupAbsencesByEmployee(scopedAbsences);
-    const excelData = transformTimesheetsToExcel(scopedTimesheets, absencesByEmployee);
+    const excelData = transformTimesheetsToExcel(scopedTimesheets, absencesByEmployee, shiftPatternByEmployee);
 
     // Add totals
     const approvedTimesheets = excelData.filter(row => row['Status'] === 'Approved');

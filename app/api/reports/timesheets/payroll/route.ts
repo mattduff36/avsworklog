@@ -4,6 +4,7 @@ import { logServerError } from '@/lib/utils/server-error-logger';
 import { getDidNotWorkReasonInfo } from '@/lib/utils/timesheetDidNotWork';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { filterTimesheetRowsForReportScope } from '@/lib/server/reports-timesheet-scope';
+import { loadEmployeeWorkShiftPatternMap } from '@/lib/server/work-shifts';
 import {
   generateExcelFile,
   formatExcelDate,
@@ -167,6 +168,10 @@ export async function GET(request: NextRequest) {
 
     const scopedEmployeeIds = new Set(scopedTimesheets.map((timesheet) => timesheet.user_id));
     const scopedAbsences = ((absences || []) as AbsenceRow[]).filter((absence) => scopedEmployeeIds.has(absence.profile_id));
+    const employeeShiftPatternMap = await loadEmployeeWorkShiftPatternMap(
+      supabase,
+      Array.from(scopedEmployeeIds)
+    );
 
     // Group absences by employee for easier lookup
     const absencesByEmployee = new Map<string, { paidDays: number; unpaidDays: number }>();
@@ -216,7 +221,11 @@ export async function GET(request: NextRequest) {
         const absenceEnd = absence.end_date || absence.date;
         return absence.date <= endIso && absenceEnd >= startIso;
       });
-      const offDayStates = resolveTimesheetOffDayStates(timesheet.week_ending, employeeAbsenceRows, null);
+      const offDayStates = resolveTimesheetOffDayStates(
+        timesheet.week_ending,
+        employeeAbsenceRows,
+        employeeShiftPatternMap.get(timesheet.user_id) || null
+      );
       const leaveAwareTotals = buildLeaveAwareTotals(
         entries.map((entry) => ({
           day_of_week: entry.day_of_week,

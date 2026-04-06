@@ -7,7 +7,7 @@ import {
   resolveTimesheetOffDayStates,
   type TimesheetEntryLike,
 } from '@/lib/utils/timesheet-off-days';
-import { STANDARD_WORK_SHIFT_PATTERN } from '@/lib/utils/work-shifts';
+import { cloneWorkShiftPattern, STANDARD_WORK_SHIFT_PATTERN } from '@/lib/utils/work-shifts';
 
 function buildEntries(): TimesheetEntryLike[] {
   return Array.from({ length: 7 }, (_, i) => ({
@@ -160,6 +160,36 @@ describe('timesheet off-day resolver', () => {
     expect(isTimeWithinWorkWindow('00:15', overnightWindow)).toBe(true);
     expect(isTimeWithinWorkWindow('05:00', overnightWindow)).toBe(true);
     expect(isTimeWithinWorkWindow('12:00', overnightWindow)).toBe(false);
+  });
+
+  it('does not count leave on non-working shift days', () => {
+    const patternWithoutThursday = cloneWorkShiftPattern({
+      ...STANDARD_WORK_SHIFT_PATTERN,
+      thursday_am: false,
+      thursday_pm: false,
+    });
+    const states = resolveTimesheetOffDayStates(
+      '2026-03-29',
+      [
+        {
+          date: '2026-03-26',
+          end_date: null,
+          is_half_day: false,
+          absence_reasons: { name: 'Annual Leave', is_paid: true },
+        },
+      ],
+      patternWithoutThursday
+    );
+
+    const thursday = states.find((row) => row.day_of_week === 4);
+    expect(thursday?.isExpectedShiftDay).toBe(false);
+    expect(thursday?.isOnApprovedLeave).toBe(false);
+    expect(thursday?.isLeaveLocked).toBe(false);
+    expect(thursday?.isPartialLeave).toBe(false);
+    expect(thursday?.paidLeaveHours).toBe(0);
+    expect(thursday?.leaveLabels).toEqual([]);
+    expect(thursday?.displayRemarks).toBe('');
+    expect(thursday?.isAnnualLeave).toBe(false);
   });
 });
 
@@ -333,6 +363,33 @@ describe('timesheet off-day normalization', () => {
     expect(normalized[5].time_started).toBe('09:00');
     expect(normalized[5].time_finished).toBe('13:00');
     expect(normalized[5].remarks).toBe('Overtime Saturday');
+  });
+
+  it('resets legacy non-shift leave placeholders to off-shift defaults', () => {
+    const entries = buildEntries();
+    entries[3] = {
+      ...entries[3],
+      did_not_work: true,
+      didNotWorkReason: 'Holiday',
+      daily_total: 9,
+      remarks: 'Annual Leave',
+    };
+
+    const customPattern = {
+      ...STANDARD_WORK_SHIFT_PATTERN,
+      thursday_am: false,
+      thursday_pm: false,
+    };
+    const states = resolveTimesheetOffDayStates('2026-03-29', [], customPattern);
+    const normalized = normalizeTimesheetEntriesForOffDays(entries, states, {
+      enforceLeaveOverwrite: false,
+      applyNonShiftDefaults: true,
+    });
+
+    expect(normalized[3].did_not_work).toBe(true);
+    expect(normalized[3].didNotWorkReason).toBe('Off Shift');
+    expect(normalized[3].daily_total).toBe(0);
+    expect(normalized[3].remarks).toBe('Not on Shift');
   });
 
   it('retains overnight worked hours when partial leave uses an overnight window', () => {
