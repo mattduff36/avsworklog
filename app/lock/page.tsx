@@ -50,7 +50,7 @@ interface DeviceProfilesResponse {
 const PIN_LENGTH = 4;
 const PIN_KEYPAD_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const;
 const PIN_KEY_BUTTON_CLASS =
-  'h-14 rounded-xl text-xl font-semibold bg-slate-950 text-white hover:bg-slate-900';
+  'h-auto w-full aspect-[2/1] rounded-xl text-lg font-semibold bg-slate-950 text-white hover:bg-slate-900 sm:text-xl';
 
 function getInitials(name: string | null | undefined): string {
   if (!name) return 'U';
@@ -492,7 +492,7 @@ export default function LockPage() {
               <Button
                 type="button"
                 variant="secondary"
-                className="h-14 rounded-xl"
+                className="h-auto w-full aspect-[2/1] rounded-xl text-sm sm:text-base"
                 onClick={handleClear}
                 disabled={keypadDisabled}
               >
@@ -509,7 +509,7 @@ export default function LockPage() {
               <Button
                 type="button"
                 variant="secondary"
-                className="h-14 rounded-xl"
+                className="h-auto w-full aspect-[2/1] rounded-xl"
                 onClick={handleBackspace}
                 disabled={keypadDisabled}
               >
