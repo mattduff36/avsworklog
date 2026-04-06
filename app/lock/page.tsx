@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Delete, Lock, Plus } from 'lucide-react';
 import { toast } from 'sonner';
@@ -50,7 +50,8 @@ interface DeviceProfilesResponse {
 const PIN_LENGTH = 4;
 const PIN_KEYPAD_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const;
 const PIN_KEY_INTERACTION_CLASS =
-  'transition-[transform,background-color,color,box-shadow] duration-150 ease-out will-change-transform active:scale-[0.97] active:bg-avs-yellow active:text-slate-950 active:shadow-[0_0_0_1px_rgba(241,214,74,0.45),0_10px_24px_rgba(241,214,74,0.18)]';
+  'transition-colors duration-200 ease-out';
+const PIN_KEY_FLASH_CLASS = 'bg-avs-yellow text-slate-950';
 const PIN_KEY_BUTTON_CLASS =
   `h-auto w-full aspect-[2/1] rounded-xl text-lg font-semibold bg-slate-950 text-white hover:bg-slate-900 sm:text-xl ${PIN_KEY_INTERACTION_CLASS}`;
 const PIN_ACTION_BUTTON_CLASS =
@@ -78,6 +79,8 @@ export default function LockPage() {
   const [loadingState, setLoadingState] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [pinLockedUntil, setPinLockedUntil] = useState<string | null>(null);
+  const [activePinKey, setActivePinKey] = useState<string | null>(null);
+  const activePinKeyTimeoutRef = useRef<number | null>(null);
   const isFeatureEnabled = useMemo(() => isAccountSwitcherEnabled(), []);
 
   const currentProfileId = profile?.id || null;
@@ -304,6 +307,36 @@ export default function LockPage() {
     setPinEntry('');
   }, [keypadDisabled]);
 
+  const flashPinKey = useCallback((keyId: string): void => {
+    setActivePinKey(keyId);
+    if (activePinKeyTimeoutRef.current) {
+      window.clearTimeout(activePinKeyTimeoutRef.current);
+    }
+    activePinKeyTimeoutRef.current = window.setTimeout(() => {
+      setActivePinKey(null);
+      activePinKeyTimeoutRef.current = null;
+    }, 180);
+  }, []);
+
+  const handleDigitButtonPress = useCallback((digit: string): void => {
+    flashPinKey(`digit-${digit}`);
+    handleDigitPress(digit);
+  }, [flashPinKey, handleDigitPress]);
+
+  const handleClearButtonPress = useCallback((): void => {
+    flashPinKey('clear');
+    handleClear();
+  }, [flashPinKey, handleClear]);
+
+  const handleBackspaceButtonPress = useCallback((): void => {
+    flashPinKey('backspace');
+    handleBackspace();
+  }, [flashPinKey, handleBackspace]);
+
+  const getPinButtonClassName = useCallback((baseClassName: string, keyId: string): string => {
+    return activePinKey === keyId ? `${baseClassName} ${PIN_KEY_FLASH_CLASS}` : baseClassName;
+  }, [activePinKey]);
+
   function openProfile(profileId: string): void {
     setSelectedProfileId(profileId);
     setPinEntry('');
@@ -339,19 +372,19 @@ export default function LockPage() {
 
       if (/^\d$/.test(event.key)) {
         event.preventDefault();
-        handleDigitPress(event.key);
+        handleDigitButtonPress(event.key);
         return;
       }
 
       if (event.key === 'Backspace') {
         event.preventDefault();
-        handleBackspace();
+        handleBackspaceButtonPress();
         return;
       }
 
       if (event.key === 'Delete') {
         event.preventDefault();
-        handleClear();
+        handleClearButtonPress();
       }
     };
 
@@ -359,7 +392,15 @@ export default function LockPage() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [handleBackspace, handleClear, handleDigitPress, pinModalOpen]);
+  }, [handleBackspaceButtonPress, handleClearButtonPress, handleDigitButtonPress, pinModalOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (activePinKeyTimeoutRef.current) {
+        window.clearTimeout(activePinKeyTimeoutRef.current);
+      }
+    };
+  }, []);
 
   if (mode === 'checking' || loadingState) {
     return <div className="min-h-screen bg-slate-950" />;
@@ -486,8 +527,8 @@ export default function LockPage() {
                 <Button
                   key={digit}
                   type="button"
-                  className={PIN_KEY_BUTTON_CLASS}
-                  onClick={() => handleDigitPress(digit)}
+                  className={getPinButtonClassName(PIN_KEY_BUTTON_CLASS, `digit-${digit}`)}
+                  onClick={() => handleDigitButtonPress(digit)}
                   disabled={keypadDisabled}
                 >
                   {digit}
@@ -496,16 +537,16 @@ export default function LockPage() {
               <Button
                 type="button"
                 variant="secondary"
-                className={PIN_ACTION_BUTTON_CLASS}
-                onClick={handleClear}
+                className={getPinButtonClassName(PIN_ACTION_BUTTON_CLASS, 'clear')}
+                onClick={handleClearButtonPress}
                 disabled={keypadDisabled}
               >
                 Clear
               </Button>
               <Button
                 type="button"
-                className={PIN_KEY_BUTTON_CLASS}
-                onClick={() => handleDigitPress('0')}
+                className={getPinButtonClassName(PIN_KEY_BUTTON_CLASS, 'digit-0')}
+                onClick={() => handleDigitButtonPress('0')}
                 disabled={keypadDisabled}
               >
                 0
@@ -513,8 +554,8 @@ export default function LockPage() {
               <Button
                 type="button"
                 variant="secondary"
-                className={PIN_ACTION_BUTTON_CLASS}
-                onClick={handleBackspace}
+                className={getPinButtonClassName(PIN_ACTION_BUTTON_CLASS, 'backspace')}
+                onClick={handleBackspaceButtonPress}
                 disabled={keypadDisabled}
               >
                 <Delete className="h-4 w-4" />

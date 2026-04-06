@@ -141,7 +141,8 @@ function checkStandaloneMode(): boolean {
 const PIN_LENGTH = 4;
 const PIN_KEYPAD_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const;
 const PIN_KEY_INTERACTION_CLASS =
-  'transition-[transform,background-color,color,box-shadow] duration-150 ease-out will-change-transform active:scale-[0.97] active:bg-avs-yellow active:text-slate-950 active:shadow-[0_0_0_1px_rgba(241,214,74,0.45),0_10px_24px_rgba(241,214,74,0.18)]';
+  'transition-colors duration-200 ease-out';
+const PIN_KEY_FLASH_CLASS = 'bg-avs-yellow text-slate-950';
 const PIN_KEY_BUTTON_CLASS =
   `h-auto w-full aspect-[2/1] rounded-xl text-lg font-semibold bg-slate-950 text-white hover:bg-slate-900 sm:text-xl ${PIN_KEY_INTERACTION_CLASS}`;
 const PIN_ACTION_BUTTON_CLASS =
@@ -171,12 +172,14 @@ export function Navbar() {
   const [pendingPin, setPendingPin] = useState('');
   const [pinSetupSubmitting, setPinSetupSubmitting] = useState(false);
   const [pendingLockPath, setPendingLockPath] = useState<string | null>(null);
+  const [activePinKey, setActivePinKey] = useState<string | null>(null);
   const navRef = useRef<HTMLDivElement>(null);
   const isCompactRef = useRef(false);
   const expandedWidthRef = useRef(0);
   const desktopMenuTriggerRef = useRef<HTMLButtonElement>(null);
   const desktopMenuRef = useRef<HTMLDivElement>(null);
   const activeNotificationUserIdRef = useRef<string | null>(null);
+  const activePinKeyTimeoutRef = useRef<number | null>(null);
   const [supabase, setSupabase] = useState<ReturnType<typeof createClient> | null>(null);
   const accountSwitcherEnabled = useMemo(() => isAccountSwitcherEnabled(), []);
   const canSubmitPinSetup = pinEntry.length === PIN_LENGTH && !pinSetupSubmitting;
@@ -497,6 +500,36 @@ export function Navbar() {
     setPinEntry('');
   }
 
+  const flashPinKey = useCallback((keyId: string): void => {
+    setActivePinKey(keyId);
+    if (activePinKeyTimeoutRef.current) {
+      window.clearTimeout(activePinKeyTimeoutRef.current);
+    }
+    activePinKeyTimeoutRef.current = window.setTimeout(() => {
+      setActivePinKey(null);
+      activePinKeyTimeoutRef.current = null;
+    }, 180);
+  }, []);
+
+  const handlePinSetupDigitButtonPress = useCallback((digit: string): void => {
+    flashPinKey(`digit-${digit}`);
+    handlePinSetupDigitPress(digit);
+  }, [flashPinKey]);
+
+  const handlePinSetupClearButtonPress = useCallback((): void => {
+    flashPinKey('clear');
+    handlePinSetupClear();
+  }, [flashPinKey]);
+
+  const handlePinSetupBackspaceButtonPress = useCallback((): void => {
+    flashPinKey('backspace');
+    handlePinSetupBackspace();
+  }, [flashPinKey]);
+
+  const getPinButtonClassName = useCallback((baseClassName: string, keyId: string): string => {
+    return activePinKey === keyId ? `${baseClassName} ${PIN_KEY_FLASH_CLASS}` : baseClassName;
+  }, [activePinKey]);
+
   const handlePinSetupSubmit = useCallback(async (pinOverride?: string) => {
     const pin = pinOverride ?? pinEntry;
     if (pin.length !== PIN_LENGTH || pinSetupSubmitting) return;
@@ -574,6 +607,14 @@ export function Navbar() {
     if (pinSetupSubmitting) return;
     void handlePinSetupSubmit(pinEntry);
   }, [handlePinSetupSubmit, pinEntry, pinSetupSubmitting, showPinSetupDialog]);
+
+  useEffect(() => {
+    return () => {
+      if (activePinKeyTimeoutRef.current) {
+        window.clearTimeout(activePinKeyTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleLockAccount = useCallback(async () => {
     if (!accountSwitcherEnabled) return;
@@ -1226,9 +1267,9 @@ export function Navbar() {
                     key={digit}
                     type="button"
                     variant="secondary"
-                    onClick={() => handlePinSetupDigitPress(digit)}
+                    onClick={() => handlePinSetupDigitButtonPress(digit)}
                     disabled={pinSetupSubmitting}
-                    className={PIN_KEY_BUTTON_CLASS}
+                    className={getPinButtonClassName(PIN_KEY_BUTTON_CLASS, `digit-${digit}`)}
                   >
                     {digit}
                   </Button>
@@ -1237,27 +1278,27 @@ export function Navbar() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={handlePinSetupClear}
+                  onClick={handlePinSetupClearButtonPress}
                   disabled={pinSetupSubmitting || pinEntry.length === 0}
-                  className={PIN_ACTION_BUTTON_CLASS}
+                  className={getPinButtonClassName(PIN_ACTION_BUTTON_CLASS, 'clear')}
                 >
                   Clear
                 </Button>
                 <Button
                   type="button"
                   variant="secondary"
-                  onClick={() => handlePinSetupDigitPress('0')}
+                  onClick={() => handlePinSetupDigitButtonPress('0')}
                   disabled={pinSetupSubmitting}
-                  className={PIN_KEY_BUTTON_CLASS}
+                  className={getPinButtonClassName(PIN_KEY_BUTTON_CLASS, 'digit-0')}
                 >
                   0
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={handlePinSetupBackspace}
+                  onClick={handlePinSetupBackspaceButtonPress}
                   disabled={pinSetupSubmitting || pinEntry.length === 0}
-                  className={PIN_ACTION_BUTTON_CLASS}
+                  className={getPinButtonClassName(PIN_ACTION_BUTTON_CLASS, 'backspace')}
                 >
                   <Delete className="h-4 w-4" />
                 </Button>
