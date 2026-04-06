@@ -49,8 +49,12 @@ interface DeviceProfilesResponse {
 
 const PIN_LENGTH = 4;
 const PIN_KEYPAD_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const;
+const PIN_KEY_INTERACTION_CLASS =
+  'transition-[transform,background-color,color,box-shadow] duration-150 ease-out will-change-transform active:scale-[0.97] active:bg-avs-yellow active:text-slate-950 active:shadow-[0_0_0_1px_rgba(241,214,74,0.45),0_10px_24px_rgba(241,214,74,0.18)]';
 const PIN_KEY_BUTTON_CLASS =
-  'h-auto w-full aspect-[2/1] rounded-xl text-lg font-semibold bg-slate-950 text-white hover:bg-slate-900 sm:text-xl';
+  `h-auto w-full aspect-[2/1] rounded-xl text-lg font-semibold bg-slate-950 text-white hover:bg-slate-900 sm:text-xl ${PIN_KEY_INTERACTION_CLASS}`;
+const PIN_ACTION_BUTTON_CLASS =
+  `h-auto w-full aspect-[2/1] rounded-xl text-sm sm:text-base ${PIN_KEY_INTERACTION_CLASS}`;
 
 function getInitials(name: string | null | undefined): string {
   if (!name) return 'U';
@@ -492,7 +496,7 @@ export default function LockPage() {
               <Button
                 type="button"
                 variant="secondary"
-                className="h-auto w-full aspect-[2/1] rounded-xl text-sm sm:text-base"
+                className={PIN_ACTION_BUTTON_CLASS}
                 onClick={handleClear}
                 disabled={keypadDisabled}
               >
@@ -509,7 +513,7 @@ export default function LockPage() {
               <Button
                 type="button"
                 variant="secondary"
-                className="h-auto w-full aspect-[2/1] rounded-xl"
+                className={PIN_ACTION_BUTTON_CLASS}
                 onClick={handleBackspace}
                 disabled={keypadDisabled}
               >
