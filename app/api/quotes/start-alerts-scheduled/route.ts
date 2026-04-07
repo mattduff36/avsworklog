@@ -5,13 +5,18 @@ import {
   sendQuoteStartAlertEmail,
 } from '@/lib/server/quote-workflow';
 
-export async function POST(request: NextRequest) {
+async function handleQuoteStartAlerts(request: NextRequest, method: 'GET' | 'POST') {
   const startedAt = Date.now();
   try {
     const authHeader = request.headers.get('authorization');
     const expected = `Bearer ${process.env.CRON_SECRET}`;
 
     if (!process.env.CRON_SECRET || authHeader !== expected) {
+      console.warn('Quote start alerts cron unauthorized', {
+        method,
+        hasCronSecret: Boolean(process.env.CRON_SECRET),
+        hasAuthorizationHeader: Boolean(authHeader),
+      });
       return NextResponse.json({ error: 'You must be signed in to use quotes.' }, { status: 401 });
     }
 
@@ -124,4 +129,12 @@ export async function POST(request: NextRequest) {
     console.error('Error processing quote start alerts:', error);
     return NextResponse.json({ error: 'Unable to process quote start alerts right now.' }, { status: 500 });
   }
+}
+
+export async function GET(request: NextRequest) {
+  return handleQuoteStartAlerts(request, 'GET');
+}
+
+export async function POST(request: NextRequest) {
+  return handleQuoteStartAlerts(request, 'POST');
 }

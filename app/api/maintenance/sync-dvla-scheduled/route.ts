@@ -46,7 +46,7 @@ function getErrorMessage(error: unknown): string {
   return 'Internal server error';
 }
 
-export async function POST(request: NextRequest) {
+async function handleScheduledSync(request: NextRequest, method: 'GET' | 'POST') {
   const startedAt = Date.now();
   try {
     // Verify cron secret for security
@@ -54,6 +54,11 @@ export async function POST(request: NextRequest) {
     const cronSecret = process.env.CRON_SECRET;
     
     if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+      console.warn('Scheduled DVLA sync unauthorized', {
+        method,
+        hasCronSecret: Boolean(cronSecret),
+        hasAuthorizationHeader: Boolean(authHeader),
+      });
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 401 }
@@ -183,7 +188,7 @@ export async function POST(request: NextRequest) {
       componentName: '/api/maintenance/sync-dvla-scheduled',
       additionalData: {
         endpoint: '/api/maintenance/sync-dvla-scheduled',
-        method: 'POST',
+        method,
       },
     });
 
@@ -192,5 +197,13 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+export async function GET(request: NextRequest) {
+  return handleScheduledSync(request, 'GET');
+}
+
+export async function POST(request: NextRequest) {
+  return handleScheduledSync(request, 'POST');
 }
 

@@ -14,6 +14,12 @@ interface MiddlewareSessionPayload extends Record<string, unknown> {
   v: number;
 }
 
+const CRON_ROUTE_PATHS = new Set([
+  '/api/maintenance/sync-dvla-scheduled',
+  '/api/quotes/start-alerts-scheduled',
+  '/api/absence/bank-holidays/seed-scheduled',
+])
+
 function getAppSessionCookieValue(request: NextRequest): string | null {
   return (
     request.cookies.get(APP_SESSION_COOKIE_NAME)?.value ||
@@ -39,6 +45,19 @@ function hasLegacySupabaseSessionCookie(request: NextRequest): boolean {
   return request.cookies
     .getAll()
     .some(({ name }) => /^sb-.*-auth-token(?:\.[0-9]+)?$/.test(name))
+}
+
+function isAuthorizedCronRequest(request: NextRequest): boolean {
+  if (!CRON_ROUTE_PATHS.has(request.nextUrl.pathname)) {
+    return false
+  }
+
+  const cronSecret = process.env.CRON_SECRET
+  if (!cronSecret) {
+    return false
+  }
+
+  return request.headers.get('authorization') === `Bearer ${cronSecret}`
 }
 
 export async function updateSession(request: NextRequest) {
@@ -106,6 +125,10 @@ export async function updateSession(request: NextRequest) {
       { error: 'Session is locked', code: 'SESSION_LOCKED' },
       { status: 423 }
     )
+  }
+
+  if (isAuthorizedCronRequest(request)) {
+    return response
   }
 
   if (!isPublicPath && !isAuthenticated && !isAuthRoute) {
