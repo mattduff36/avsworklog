@@ -25,8 +25,10 @@ export default function ChangePasswordPage() {
   // State
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
@@ -79,7 +81,7 @@ export default function ChangePasswordPage() {
     setError('');
 
     // Validate passwords
-    if (!newPassword || !confirmPassword) {
+    if (!currentPassword || !newPassword || !confirmPassword) {
       setError('Please fill in all fields');
       return;
     }
@@ -105,6 +107,7 @@ export default function ChangePasswordPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          currentPassword,
           password: newPassword,
         }),
       });
@@ -208,6 +211,35 @@ export default function ChangePasswordPage() {
                   </li>
                 ))}
               </ul>
+            </div>
+
+            {/* Current Password */}
+            <div className="space-y-2">
+              <Label htmlFor="current-password" className="text-white">
+                Current Password *
+              </Label>
+              <div className="relative">
+                <Input
+                  id="current-password"
+                  type={showCurrentPassword ? 'text' : 'password'}
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="Enter your current password"
+                  autoComplete="current-password"
+                  className="bg-input border-border text-white pr-10"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-300"
+                >
+                  {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                This is required because password changes now need your existing password for verification.
+              </p>
             </div>
 
             {/* New Password */}

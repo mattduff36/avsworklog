@@ -143,7 +143,7 @@ export default function LoginPage() {
         </Card>
 
         <div className="mt-6 text-center text-sm text-muted-foreground">
-          <p>Contact your administrator for account access</p>
+          <p>Contact your administrator for account access or password resets.</p>
         </div>
       </div>
     </div>

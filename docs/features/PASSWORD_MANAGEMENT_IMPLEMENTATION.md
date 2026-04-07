@@ -33,15 +33,18 @@ A comprehensive password management system has been implemented for AVS Worklog,
   - New temporary password generated
   - Password shown to admin
   - Email sent to user
+  - Password resets remain admin-controlled only; users do not have a self-service reset option
   
 ### 4. Forced Password Change
 - **First Login Requirement**:
   - Users with temporary passwords must change them on first login
   - Automatic redirect to `/change-password` page
   - Cannot access dashboard until password is changed
+  - Users must now confirm their current password before setting a new one
   
 - **Password Change Page**:
   - User-friendly interface with password requirements
+  - Current password field for Supabase current-password verification
   - Real-time password strength indicator
   - Password match validation
   - Show/hide password toggles
@@ -129,6 +132,9 @@ RESEND_FROM_EMAIL=your_verified_sender@yourdomain.com
 
 #### After Password Reset
 Same flow as first login - must change password before accessing dashboard.
+
+#### Forgot Password
+Users must contact an administrator to reset a forgotten password. Once logged in, users can change their own password, but they cannot initiate a self-service reset.
 
 ## Password Requirements
 - At least 8 characters long

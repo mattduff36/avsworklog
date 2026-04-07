@@ -176,7 +176,9 @@ export async function countUnreadNotificationsForUser(
   const { count, error } = await withRetry<NotificationCountQueryResult>(async () => {
     const result = (await supabase
       .from('message_recipients')
-      .select('id, messages!inner(id)', { count: 'planned', head: true })
+      // Keep the badge in sync with the inbox contents. This remains selective
+      // because the query hits the partial inbox index for the current user.
+      .select('id, messages!inner(id)', { count: 'exact', head: true })
       .eq('user_id', userId)
       .eq('status', 'PENDING')
       .gte('messages.created_at', sinceIso)
