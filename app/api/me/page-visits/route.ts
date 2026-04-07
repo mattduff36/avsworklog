@@ -4,7 +4,7 @@ import { normalizeTrackedPath, shouldTrackPageVisit } from '@/lib/profile/quick-
 import { PROFILE_HUB_PRD_EPIC_ID } from '@/lib/profile/epic';
 import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
 
-const MIN_SECONDS_BETWEEN_DUPLICATE_TRACKS = 45;
+const MIN_SECONDS_BETWEEN_DUPLICATE_TRACKS = 180;
 
 interface PageVisitBody {
   path?: string;

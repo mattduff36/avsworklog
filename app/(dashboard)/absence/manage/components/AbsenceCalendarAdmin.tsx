@@ -38,7 +38,7 @@ import {
 import { useAllAbsenceReasons, useAllAbsences, useDeleteAbsence, useUpdateAbsence } from '@/lib/hooks/useAbsence';
 import { fetchCarryoverMapForFinancialYear, getEffectiveAllowance } from '@/lib/utils/absence-carryover';
 import { filterEmployeesBySelectedTeam } from '@/lib/utils/absence-admin';
-import { getCurrentFinancialYear, getFinancialYearMonths } from '@/lib/utils/date';
+import { formatDateISO, getCurrentFinancialYear, getFinancialYearMonths } from '@/lib/utils/date';
 import {
   eachDayOfInterval,
   endOfMonth,
@@ -311,7 +311,10 @@ export function AbsenceCalendarAdmin() {
     setCurrentMonthIndex(initialMonthIndex);
   }, [initialMonthIndex]);
 
-  const { data: absences, isLoading } = useAllAbsences({});
+  const { data: absences, isLoading } = useAllAbsences({
+    dateFrom: formatDateISO(displayFinancialYear.start),
+    dateTo: formatDateISO(displayFinancialYear.end),
+  });
   const { data: reasons, isLoading: reasonsLoading } = useAllAbsenceReasons();
   const deleteAbsence = useDeleteAbsence();
   const updateAbsence = useUpdateAbsence();

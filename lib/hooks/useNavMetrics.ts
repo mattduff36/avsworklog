@@ -17,11 +17,11 @@ async function fetchRamsAssignmentSummary(profileId: string): Promise<RamsAssign
     await Promise.all([
       supabase
         .from('rams_assignments')
-        .select('id', { count: 'exact', head: true })
+        .select('id', { count: 'planned', head: true })
         .eq('employee_id', profileId),
       supabase
         .from('rams_assignments')
-        .select('id', { count: 'exact', head: true })
+        .select('id', { count: 'planned', head: true })
         .eq('employee_id', profileId)
         .in('status', ['pending', 'read']),
     ]);
@@ -45,7 +45,7 @@ export function useRamsAssignmentSummary(profileId?: string | null) {
     queryKey: ['rams-assignment-summary', profileId || null],
     enabled: Boolean(profileId),
     queryFn: () => fetchRamsAssignmentSummary(profileId!),
-    staleTime: 60_000,
+    staleTime: 5 * 60_000,
   });
 
   const errorStatus = getErrorStatus(query.error) ?? getLastDataTokenFailureStatus();
@@ -62,7 +62,7 @@ async function fetchPendingAbsenceCount(): Promise<number> {
   const supabase = createClient();
   const { count, error } = await supabase
     .from('absences')
-    .select('id', { count: 'exact', head: true })
+    .select('id', { count: 'planned', head: true })
     .eq('status', 'pending');
 
   if (error) throw error;
@@ -74,7 +74,7 @@ export function usePendingAbsenceCount(enabled: boolean, userId?: string | null)
     queryKey: ['pending-absence-count', userId || null],
     enabled: enabled && Boolean(userId),
     queryFn: fetchPendingAbsenceCount,
-    staleTime: 60_000,
+    staleTime: 5 * 60_000,
   });
 
   return useMemo(

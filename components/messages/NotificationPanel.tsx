@@ -34,7 +34,7 @@ export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
   async function fetchNotifications() {
     setLoading(true);
     try {
-      const response = await fetch('/api/messages/notifications');
+      const response = await fetch('/api/messages/notifications?limit=25');
       const data = await response.json();
 
       if (data.success) {

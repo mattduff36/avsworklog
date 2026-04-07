@@ -349,7 +349,12 @@ export default function AbsencePage() {
     { enabled: canLoadAbsencePageData }
   );
   const { data: allAbsencesData, isLoading: loadingAllAbsences } = useAllAbsences(
-    canLoadAbsencePageData && canViewBookings ? {} : undefined
+    canLoadAbsencePageData && canViewBookings
+      ? {
+          dateFrom: formatDateISO(displayFinancialYear.start),
+          dateTo: formatDateISO(displayFinancialYear.end),
+        }
+      : undefined
   );
   const { data: summary, isLoading: loadingSummary } = useAbsenceSummaryForUserFinancialYear(
     {

@@ -32,6 +32,7 @@ import {
   createClient,
   invalidateCachedDataToken,
 } from '@/lib/supabase/client';
+import { getClientServiceOutage } from '@/lib/app-auth/client-service-health';
 import type { Database } from '@/types/database';
 import { isAdminRole } from '@/lib/utils/role-access';
 import {
@@ -156,6 +157,8 @@ const AUTH_SCOPED_QUERY_KEYS = [
   'workshop-tasks',
   'notifications',
 ] as const;
+const AUTH_RESUME_REFRESH_DEBOUNCE_MS = 800;
+const BACKGROUND_AUTH_REFRESH_COOLDOWN_MS = 30_000;
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -277,6 +280,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const sessionSnapshotRef = useRef<AuthSessionSnapshot>(getUnauthenticatedSessionSnapshot());
   const redirectInProgressRef = useRef<'login' | 'lock' | null>(null);
   const recoveryPromiseRef = useRef<Promise<boolean> | null>(null);
+  const lastBackgroundRefreshAtRef = useRef(0);
+  const pendingResumeRefreshTimeoutRef = useRef<number | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -422,7 +427,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       await invalidateAuthScopedQueries();
     }
 
-    if (reason === 'sign_out' || reason === 'sign_in' || reason === 'broadcast') {
+    if (reason === 'sign_out' || reason === 'sign_in') {
       queryClient.invalidateQueries({ queryKey: ['permission-snapshot'] }).catch(() => undefined);
     }
 
@@ -473,6 +478,39 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return result;
   }, [applySessionPayload, clearLocalAuthState, onAuthTransition, redirectToLock, redirectToLogin]);
 
+  const requestBackgroundAuthRefresh = useCallback(async (
+    reason: Extract<AuthTransitionReason, 'focus' | 'visibility' | 'online' | 'interval'>
+  ) => {
+    if (getClientServiceOutage()) {
+      return null;
+    }
+
+    const now = Date.now();
+    if (now - lastBackgroundRefreshAtRef.current < BACKGROUND_AUTH_REFRESH_COOLDOWN_MS) {
+      return null;
+    }
+
+    lastBackgroundRefreshAtRef.current = now;
+    return loadAuthSession({ silent: true, reason });
+  }, [loadAuthSession]);
+
+  const scheduleResumeAuthRefresh = useCallback((
+    reason: Extract<AuthTransitionReason, 'focus' | 'visibility'>
+  ) => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    if (pendingResumeRefreshTimeoutRef.current !== null) {
+      window.clearTimeout(pendingResumeRefreshTimeoutRef.current);
+    }
+
+    pendingResumeRefreshTimeoutRef.current = window.setTimeout(() => {
+      pendingResumeRefreshTimeoutRef.current = null;
+      void requestBackgroundAuthRefresh(reason);
+    }, AUTH_RESUME_REFRESH_DEBOUNCE_MS);
+  }, [requestBackgroundAuthRefresh]);
+
   useEffect(() => {
     clearLegacyAccountSwitchClientState();
     void loadAuthSession({ reason: 'initial_load' });
@@ -483,18 +521,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
-        void loadAuthSession({ silent: true, reason: 'visibility' });
+        scheduleResumeAuthRefresh('visibility');
       }
     };
 
     const handleFocus = () => {
-      void loadAuthSession({ silent: true, reason: 'focus' });
+      scheduleResumeAuthRefresh('focus');
     };
 
     const handleOnline = () => {
-      void loadAuthSession({ silent: true, reason: 'online' }).then((result) => {
-        if (result.status === 'authenticated') {
-          void queryClient.refetchQueries({ type: 'active' });
+      void requestBackgroundAuthRefresh('online').then((result) => {
+        if (result?.status === 'authenticated') {
+          void invalidateAuthScopedQueries();
         }
       });
     };
@@ -505,11 +543,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     return () => {
       unsubscribe();
+      if (pendingResumeRefreshTimeoutRef.current !== null) {
+        window.clearTimeout(pendingResumeRefreshTimeoutRef.current);
+        pendingResumeRefreshTimeoutRef.current = null;
+      }
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('online', handleOnline);
     };
-  }, [loadAuthSession, queryClient]);
+  }, [invalidateAuthScopedQueries, loadAuthSession, requestBackgroundAuthRefresh, scheduleResumeAuthRefresh]);
 
   useEffect(() => {
     if (!user || !profile) return;
@@ -552,11 +594,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (!user) return;
 
     const interval = setInterval(() => {
-      void loadAuthSession({ silent: true, reason: 'interval' });
+      void requestBackgroundAuthRefresh('interval');
     }, 5 * 60 * 1000);
 
     return () => clearInterval(interval);
-  }, [loadAuthSession, user]);
+  }, [requestBackgroundAuthRefresh, user]);
 
   useEffect(() => {
     const { roleId: viewAsRoleId, teamId: viewAsTeamId } = viewAsSelection;

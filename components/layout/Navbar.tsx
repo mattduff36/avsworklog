@@ -34,6 +34,7 @@ import { createClient, invalidateCachedDataToken } from '@/lib/supabase/client';
 import { broadcastAuthStateChange } from '@/lib/app-auth/client';
 import { usePermissionSnapshot } from '@/lib/hooks/usePermissionSnapshot';
 import { usePendingAbsenceCount, useRamsAssignmentSummary } from '@/lib/hooks/useNavMetrics';
+import { useClientServiceOutage } from '@/lib/hooks/useClientServiceOutage';
 import { isAccountSwitcherEnabled } from '@/lib/account-switch/feature-flag';
 import {
   getAccountSwitchDeviceLabel,
@@ -153,6 +154,7 @@ export function Navbar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { user, profile, signOut, isAdmin, isManager, isActualSuperAdmin, isViewingAs } = useAuth();
+  const clientServiceOutage = useClientServiceOutage();
   const { tabletModeEnabled, toggleTabletMode } = useTabletMode();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false); // Sidebar starts collapsed
@@ -344,8 +346,13 @@ export function Navbar() {
       return;
     }
 
+    if (clientServiceOutage) {
+      setUnreadCount(0);
+      return;
+    }
+
     try {
-      const response = await fetch('/api/messages/notifications');
+      const response = await fetch('/api/messages/notifications/count');
 
       // Handle 401 gracefully - user may have just logged out
       if (response.status === 401) {
@@ -367,7 +374,7 @@ export function Navbar() {
       const errorDetails = {
         message: errorMessage,
         type: error instanceof TypeError ? 'Network' : 'Application',
-        endpoint: '/api/messages/notifications',
+        endpoint: '/api/messages/notifications/count',
         userId: user?.id || 'unknown',
         timestamp: new Date().toISOString()
       };
@@ -384,11 +391,11 @@ export function Navbar() {
 
       setUnreadCount(0);
     }
-  }, [user?.id]);
+  }, [clientServiceOutage, user?.id]);
 
   // Refresh notification count on meaningful client events only.
   useEffect(() => {
-    if (!user?.id) {
+    if (!user?.id || clientServiceOutage) {
       setUnreadCount(0);
       return;
     }
@@ -409,11 +416,11 @@ export function Navbar() {
       window.removeEventListener('notification-dismissed', handleNotificationDismissed);
       window.removeEventListener('focus', handleWindowFocus);
     };
-  }, [user?.id, fetchNotificationCount]);
+  }, [clientServiceOutage, user?.id, fetchNotificationCount]);
 
   // Realtime updates for this user's notification rows.
   useEffect(() => {
-    if (!user?.id || !supabase) return;
+    if (!user?.id || !supabase || clientServiceOutage) return;
 
     const subscribedUserId = user.id;
     const filter = `user_id=eq.${subscribedUserId}`;
@@ -446,7 +453,7 @@ export function Navbar() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [user?.id, supabase, fetchNotificationCount]);
+  }, [clientServiceOutage, user?.id, supabase, fetchNotificationCount]);
 
   const handleSignOut = async () => {
     try {

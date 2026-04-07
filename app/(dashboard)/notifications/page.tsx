@@ -108,7 +108,7 @@ export default function NotificationsPage() {
       setLoading(true);
     }
     try {
-      const response = await fetch('/api/messages/notifications');
+      const response = await fetch('/api/messages/notifications?limit=100');
       const data = await response.json();
 
       if (data.success) {

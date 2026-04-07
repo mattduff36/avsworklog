@@ -187,7 +187,10 @@ function ApprovalsContent() {
   const [processingInProgress, setProcessingInProgress] = useState(false);
   
   // Absence hooks
-  const allAbsenceFilters = useMemo(() => ({ includeArchived: false }), []);
+  const allAbsenceFilters = useMemo(() => ({
+    includeArchived: false,
+    status: absenceStatusFilter === 'all' ? undefined : absenceStatusFilter,
+  }), [absenceStatusFilter]);
   const { data: absences, isLoading: absencesLoading } = useAllAbsences(allAbsenceFilters);
   const approveAbsence = useApproveAbsence();
   const processAbsence = useProcessAbsence();
