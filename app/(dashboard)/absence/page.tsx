@@ -59,6 +59,12 @@ import {
 import { formatDate, formatDateISO, calculateDurationDays, getFinancialYearMonths, getCurrentFinancialYear, getFinancialYear } from '@/lib/utils/date';
 import { ANNUAL_LEAVE_MIN_REMAINING_DAYS } from '@/lib/utils/annual-leave';
 import { createStatusError, getErrorStatus, isServerErrorStatus } from '@/lib/utils/http-error';
+import {
+  clearPageServiceError,
+  getFirstPageServiceError,
+  setPageServiceError,
+  type PageServiceErrorMap,
+} from '@/lib/utils/page-service-errors';
 import type { WorkShiftPattern } from '@/types/work-shifts';
 
 type GenerationStatus = {
@@ -70,6 +76,17 @@ type GenerationStatus = {
   nextFinancialYearLabel: string;
   closedFinancialYearStartYears: number[];
 };
+
+type PageServiceRequestKey =
+  | 'generationStatus'
+  | 'absenceAnnouncement'
+  | 'currentWorkShift';
+
+const PAGE_SERVICE_ERROR_PRIORITY: readonly PageServiceRequestKey[] = [
+  'generationStatus',
+  'absenceAnnouncement',
+  'currentWorkShift',
+];
 
 function isAnnualLeaveReason(name: string): boolean {
   return name.trim().toLowerCase() === 'annual leave';
@@ -222,8 +239,13 @@ export default function AbsencePage() {
   const [generationStatusLoading, setGenerationStatusLoading] = useState(true);
   const [currentWorkShiftPattern, setCurrentWorkShiftPattern] = useState<WorkShiftPattern | null>(null);
   const [absenceAnnouncement, setAbsenceAnnouncement] = useState<string | null>(null);
-  const [pageServiceErrorStatus, setPageServiceErrorStatus] = useState<number | null>(null);
-  const [pageServiceErrorMessage, setPageServiceErrorMessage] = useState<string | null>(null);
+  const [pageServiceErrors, setPageServiceErrors] = useState<PageServiceErrorMap<PageServiceRequestKey>>({});
+  const pageServiceError = getFirstPageServiceError(
+    pageServiceErrors,
+    PAGE_SERVICE_ERROR_PRIORITY
+  );
+  const pageServiceErrorStatus = pageServiceError?.status ?? null;
+  const pageServiceErrorMessage = pageServiceError?.message ?? null;
   const pageServiceUnavailable =
     pageServiceErrorMessage !== null &&
     (pageServiceErrorStatus === null || isServerErrorStatus(pageServiceErrorStatus));
@@ -389,17 +411,30 @@ export default function AbsencePage() {
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  function handleUnavailableError(error: unknown, fallbackMessage: string): boolean {
+  function handleUnavailableError(
+    source: PageServiceRequestKey,
+    error: unknown,
+    fallbackMessage: string
+  ): boolean {
     const status = getErrorStatus(error);
     if (status === null || isServerErrorStatus(status)) {
-      setPageServiceErrorStatus(status);
-      setPageServiceErrorMessage(
-        error instanceof Error && error.message.trim().length > 0 ? error.message : fallbackMessage
+      setPageServiceErrors((current) =>
+        setPageServiceError(current, source, {
+          status,
+          message:
+            error instanceof Error && error.message.trim().length > 0
+              ? error.message
+              : fallbackMessage,
+        })
       );
       return true;
     }
 
     return false;
+  }
+
+  function clearUnavailableError(source: PageServiceRequestKey) {
+    setPageServiceErrors((current) => clearPageServiceError(current, source));
   }
 
   async function retryUnavailableState() {
@@ -439,11 +474,10 @@ export default function AbsencePage() {
         throw createStatusError('Booking window response is empty', response.status);
       }
 
-      setPageServiceErrorStatus(null);
-      setPageServiceErrorMessage(null);
+      clearUnavailableError('generationStatus');
       setGenerationStatus(payload);
     } catch (error) {
-      if (handleUnavailableError(error, 'Booking window is temporarily unavailable.')) {
+      if (handleUnavailableError('generationStatus', error, 'Booking window is temporarily unavailable.')) {
         setGenerationStatus(null);
         return;
       }
@@ -483,11 +517,10 @@ export default function AbsencePage() {
     async function loadAbsenceAnnouncement() {
       try {
         const payload = await fetchAbsenceMessage();
-        setPageServiceErrorStatus(null);
-        setPageServiceErrorMessage(null);
+        clearUnavailableError('absenceAnnouncement');
         setAbsenceAnnouncement(payload.message);
       } catch (error) {
-        if (handleUnavailableError(error, 'Absence announcement is temporarily unavailable.')) {
+        if (handleUnavailableError('absenceAnnouncement', error, 'Absence announcement is temporarily unavailable.')) {
           setAbsenceAnnouncement(null);
           return;
         }
@@ -505,11 +538,10 @@ export default function AbsencePage() {
     async function loadCurrentWorkShift() {
       try {
         const payload = await fetchCurrentWorkShift();
-        setPageServiceErrorStatus(null);
-        setPageServiceErrorMessage(null);
+        clearUnavailableError('currentWorkShift');
         setCurrentWorkShiftPattern(payload.pattern);
       } catch (error) {
-        if (handleUnavailableError(error, 'Work shift data is temporarily unavailable.')) {
+        if (handleUnavailableError('currentWorkShift', error, 'Work shift data is temporarily unavailable.')) {
           setCurrentWorkShiftPattern(null);
           return;
         }

@@ -1,3 +1,4 @@
+import { addMonths, addWeeks } from 'date-fns';
 import type { MaintenanceCategory } from '@/types/maintenance';
 
 export type MaintenanceCategoryType = 'date' | 'mileage' | 'hours';
@@ -58,19 +59,15 @@ export function describePeriod(category: Pick<MaintenanceCategory, 'type' | 'per
 }
 
 export function addDatePeriod(baseDate: Date, periodValue: number, periodUnit: MaintenancePeriodUnit): Date {
-  const nextDate = new Date(baseDate);
-
   if (periodUnit === 'weeks') {
-    nextDate.setDate(nextDate.getDate() + periodValue * 7);
-    return nextDate;
+    return addWeeks(baseDate, periodValue);
   }
 
   if (periodUnit === 'months') {
-    nextDate.setMonth(nextDate.getMonth() + periodValue);
-    return nextDate;
+    return addMonths(baseDate, periodValue);
   }
 
-  return nextDate;
+  return new Date(baseDate);
 }
 
 export function toDateOnlyString(date: Date): string {
