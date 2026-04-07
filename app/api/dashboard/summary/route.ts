@@ -29,6 +29,12 @@ type MaintenanceRow = {
   next_service_hours: number | null;
 };
 
+interface MaintenanceCounts {
+  attentionTotal: number;
+  dueSoonTotal: number;
+  overdueTotal: number;
+}
+
 function createFullAccessPermissionMap(): PermissionMap {
   return ALL_MODULES.reduce<PermissionMap>((acc, moduleName) => {
     acc[moduleName] = true;
@@ -64,12 +70,12 @@ function getThresholds(categories: Array<Record<string, unknown>>) {
   };
 }
 
-function sumMaintenanceAttentionCount(params: {
+function getMaintenanceCountsForAsset(params: {
   assetType: 'van' | 'hgv' | 'plant';
   maintenance: MaintenanceRow | null;
   lolerDueDate?: string | null;
   thresholds: ReturnType<typeof getThresholds>;
-}): number {
+}): MaintenanceCounts {
   const lolerStatus = params.assetType === 'plant'
     ? getDateBasedStatus(params.lolerDueDate || null, params.thresholds.lolerThreshold)
     : { status: 'not_set' as const };
@@ -78,7 +84,11 @@ function sumMaintenanceAttentionCount(params: {
     const counts = params.assetType === 'plant'
       ? calculateAlertCounts([lolerStatus])
       : { overdue: 0, due_soon: 0 };
-    return counts.overdue + counts.due_soon;
+    return {
+      attentionTotal: counts.overdue + counts.due_soon,
+      dueSoonTotal: counts.due_soon,
+      overdueTotal: counts.overdue,
+    };
   }
 
   const statuses = [
@@ -118,10 +128,14 @@ function sumMaintenanceAttentionCount(params: {
   ];
 
   const counts = calculateAlertCounts(statuses);
-  return counts.overdue + counts.due_soon;
+  return {
+    attentionTotal: counts.overdue + counts.due_soon,
+    dueSoonTotal: counts.due_soon,
+    overdueTotal: counts.overdue,
+  };
 }
 
-async function getMaintenanceAttentionCount() {
+async function getMaintenanceCounts(): Promise<MaintenanceCounts> {
   const supabase = await createClient();
   const [{ data: categories, error: categoriesError }, vansResult, hgvsResult, plantResult] = await Promise.all([
     supabase
@@ -194,34 +208,47 @@ async function getMaintenanceAttentionCount() {
   if (plantResult.error) throw plantResult.error;
 
   const thresholds = getThresholds((categories || []) as Array<Record<string, unknown>>);
-  let total = 0;
+  const totals: MaintenanceCounts = {
+    attentionTotal: 0,
+    dueSoonTotal: 0,
+    overdueTotal: 0,
+  };
 
   (vansResult.data || []).forEach((row) => {
-    total += sumMaintenanceAttentionCount({
+    const counts = getMaintenanceCountsForAsset({
       assetType: 'van',
       maintenance: (Array.isArray(row.maintenance) ? row.maintenance[0] : row.maintenance) as MaintenanceRow | null,
       thresholds,
     });
+    totals.attentionTotal += counts.attentionTotal;
+    totals.dueSoonTotal += counts.dueSoonTotal;
+    totals.overdueTotal += counts.overdueTotal;
   });
 
   (hgvsResult.data || []).forEach((row) => {
-    total += sumMaintenanceAttentionCount({
+    const counts = getMaintenanceCountsForAsset({
       assetType: 'hgv',
       maintenance: (Array.isArray(row.maintenance) ? row.maintenance[0] : row.maintenance) as MaintenanceRow | null,
       thresholds,
     });
+    totals.attentionTotal += counts.attentionTotal;
+    totals.dueSoonTotal += counts.dueSoonTotal;
+    totals.overdueTotal += counts.overdueTotal;
   });
 
   (plantResult.data || []).forEach((row) => {
-    total += sumMaintenanceAttentionCount({
+    const counts = getMaintenanceCountsForAsset({
       assetType: 'plant',
       maintenance: (Array.isArray(row.maintenance) ? row.maintenance[0] : row.maintenance) as MaintenanceRow | null,
       lolerDueDate: row.loler_due_date,
       thresholds,
     });
+    totals.attentionTotal += counts.attentionTotal;
+    totals.dueSoonTotal += counts.dueSoonTotal;
+    totals.overdueTotal += counts.overdueTotal;
   });
 
-  return total;
+  return totals;
 }
 
 export async function GET() {
@@ -258,7 +285,7 @@ export async function GET() {
     errorsInvestigatingResult,
     quotesResult,
     errorLogsResult,
-    maintenanceTotal,
+    maintenanceCounts,
   ] = await Promise.all([
     canViewApprovals
       ? supabase.from('timesheets').select('id', { count: 'exact', head: true }).eq('status', 'submitted')
@@ -266,14 +293,14 @@ export async function GET() {
     canViewApprovals
       ? supabase.from('absences').select('id', { count: 'exact', head: true }).eq('status', 'pending')
       : Promise.resolve({ count: 0, error: null }),
-    canViewActions && canViewWorkshopTasks
+    canViewWorkshopTasks
       ? supabase
           .from('actions')
           .select('id', { count: 'exact', head: true })
           .in('action_type', ['inspection_defect', 'workshop_vehicle_task'])
           .eq('status', 'pending')
       : Promise.resolve({ count: 0, error: null }),
-    canViewActions && canViewWorkshopTasks
+    canViewWorkshopTasks
       ? supabase
           .from('actions')
           .select('id', { count: 'exact', head: true })
@@ -298,7 +325,13 @@ export async function GET() {
     effectiveRole.is_actual_super_admin
       ? supabase.from('error_logs').select('id', { count: 'exact', head: true })
       : Promise.resolve({ count: 0, error: null }),
-    canViewActions && canViewMaintenance ? getMaintenanceAttentionCount() : Promise.resolve(0),
+    canViewMaintenance
+      ? getMaintenanceCounts()
+      : Promise.resolve({
+          attentionTotal: 0,
+          dueSoonTotal: 0,
+          overdueTotal: 0,
+        }),
   ]);
 
   for (const result of [
@@ -326,12 +359,15 @@ export async function GET() {
         absences: absencesResult.count || 0,
       },
       actions: {
-        workshop: (workshopPendingResult.count || 0) + (workshopInProgressResult.count || 0),
-        maintenance: maintenanceTotal,
+        workshop: canViewActions ? (workshopPendingResult.count || 0) + (workshopInProgressResult.count || 0) : 0,
+        maintenance: canViewActions ? maintenanceCounts.attentionTotal : 0,
         suggestions: (suggestionsNewResult.count || 0) + (suggestionsReviewResult.count || 0),
         errors: (errorsNewResult.count || 0) + (errorsInvestigatingResult.count || 0),
       },
       badges: {
+        workshop_pending: workshopPendingResult.count || 0,
+        maintenance_due_soon: maintenanceCounts.dueSoonTotal,
+        maintenance_overdue: maintenanceCounts.overdueTotal,
         suggestions_new: suggestionsNewResult.count || 0,
         error_reports_new: errorsNewResult.count || 0,
         quotes_pending_internal_approval: quotesResult.count || 0,

@@ -85,6 +85,9 @@ export default function DashboardPage() {
   const [newErrorReportsCount, setNewErrorReportsCount] = useState(0);
   const [pendingQuotesCount, setPendingQuotesCount] = useState(0);
   const [errorLogsCount, setErrorLogsCount] = useState(0);
+  const [workshopPendingCount, setWorkshopPendingCount] = useState(0);
+  const [maintenanceDueSoonCount, setMaintenanceDueSoonCount] = useState(0);
+  const [maintenanceOverdueCount, setMaintenanceOverdueCount] = useState(0);
   const [badgesLoading, setBadgesLoading] = useState(true);
   const [metricsErrorStatus, setMetricsErrorStatus] = useState<number | null>(null);
   const {
@@ -204,6 +207,9 @@ export default function DashboardPage() {
         newErrorReportsCount: 0,
         pendingQuotesCount: 0,
         errorLogsCount: 0,
+        workshopPendingCount: 0,
+        maintenanceDueSoonCount: 0,
+        maintenanceOverdueCount: 0,
       };
     }
     const response = await fetch('/api/dashboard/summary', { cache: 'no-store' });
@@ -214,6 +220,9 @@ export default function DashboardPage() {
         approvals?: { timesheets?: number; absences?: number };
         actions?: { workshop?: number; maintenance?: number; suggestions?: number; errors?: number };
         badges?: {
+          workshop_pending?: number;
+          maintenance_due_soon?: number;
+          maintenance_overdue?: number;
           suggestions_new?: number;
           error_reports_new?: number;
           quotes_pending_internal_approval?: number;
@@ -234,6 +243,9 @@ export default function DashboardPage() {
     const errorsTotal = payload.metrics?.actions?.errors || 0;
     const suggestionsNewCount = payload.metrics?.badges?.suggestions_new || 0;
     const errorsNewCount = payload.metrics?.badges?.error_reports_new || 0;
+    const workshopPendingCount = payload.metrics?.badges?.workshop_pending || 0;
+    const maintenanceDueSoonCount = payload.metrics?.badges?.maintenance_due_soon || 0;
+    const maintenanceOverdueCount = payload.metrics?.badges?.maintenance_overdue || 0;
 
     return {
       pendingApprovals: canViewApprovals ? buildPendingApprovalsSummary(timesheetsCount, absencesCount) : [],
@@ -249,6 +261,9 @@ export default function DashboardPage() {
       newErrorReportsCount: errorsNewCount,
       pendingQuotesCount: payload.metrics?.badges?.quotes_pending_internal_approval || 0,
       errorLogsCount: payload.metrics?.badges?.error_logs || 0,
+      workshopPendingCount,
+      maintenanceDueSoonCount,
+      maintenanceOverdueCount,
     };
   }, [canViewActions, canViewApprovals]);
 
@@ -259,6 +274,9 @@ export default function DashboardPage() {
     setNewErrorReportsCount(metrics.newErrorReportsCount);
     setPendingQuotesCount(metrics.pendingQuotesCount);
     setErrorLogsCount(metrics.errorLogsCount);
+    setWorkshopPendingCount(metrics.workshopPendingCount);
+    setMaintenanceDueSoonCount(metrics.maintenanceDueSoonCount);
+    setMaintenanceOverdueCount(metrics.maintenanceOverdueCount);
   }, []);
 
   const loadDashboardMetrics = useCallback(async (): Promise<number | null> => {
@@ -288,6 +306,9 @@ export default function DashboardPage() {
         setNewErrorReportsCount(0);
         setPendingQuotesCount(0);
         setErrorLogsCount(0);
+        setWorkshopPendingCount(0);
+        setMaintenanceDueSoonCount(0);
+        setMaintenanceOverdueCount(0);
       }
 
       return errorStatus;
@@ -505,7 +526,18 @@ export default function DashboardPage() {
               })
               .map((formType, index) => {
               const Icon = formType.icon;
-              const showBadge = formType.id === 'rams' && pendingRAMSCount > 0;
+              const tileBadgeCountById: Partial<Record<string, number>> = {
+                rams: pendingRAMSCount,
+                workshop: workshopPendingCount,
+              };
+              const badgeCount = tileBadgeCountById[formType.id] || 0;
+              const showBadge = formType.id === 'rams'
+                ? badgeCount > 0
+                : !badgesLoading && badgeCount > 0;
+              const showMaintenanceBadges =
+                formType.id === 'maintenance' &&
+                !badgesLoading &&
+                (maintenanceDueSoonCount > 0 || maintenanceOverdueCount > 0);
               // Yellow backgrounds need dark text for contrast
               const needsDarkText = formType.color === 'avs-yellow';
               const textColorClass = needsDarkText ? 'text-slate-900' : 'text-white';
@@ -516,9 +548,22 @@ export default function DashboardPage() {
                     className={`relative overflow-hidden bg-${formType.color} hover:opacity-90 hover:scale-105 transition-all duration-200 rounded-lg p-6 text-center shadow-lg aspect-square flex flex-col items-center justify-center space-y-3 cursor-pointer animate-tile-pop ${textColorClass}`}
                     style={{ animationDelay: `${index * 75}ms` }}
                   >
-                    {showBadge && (
+                    {showMaintenanceBadges ? (
+                      <div className="absolute top-2 right-2 flex items-center gap-2">
+                        {maintenanceDueSoonCount > 0 && (
+                          <div className="bg-amber-500 text-white rounded-full h-10 w-10 flex items-center justify-center text-base font-bold shadow-lg ring-2 ring-white">
+                            {maintenanceDueSoonCount > 99 ? '99+' : maintenanceDueSoonCount}
+                          </div>
+                        )}
+                        {maintenanceOverdueCount > 0 && (
+                          <div className="bg-red-500 text-white rounded-full h-10 w-10 flex items-center justify-center text-base font-bold shadow-lg ring-2 ring-white">
+                            {maintenanceOverdueCount > 99 ? '99+' : maintenanceOverdueCount}
+                          </div>
+                        )}
+                      </div>
+                    ) : showBadge && (
                       <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full h-10 w-10 flex items-center justify-center text-base font-bold shadow-lg ring-2 ring-white">
-                        {pendingRAMSCount}
+                        {badgeCount > 99 ? '99+' : badgeCount}
                       </div>
                     )}
                     <Icon className={tabletModeEnabled ? 'h-12 w-12' : 'h-8 w-8'} />
