@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { createDVLAApiService } from '@/lib/services/dvla-api';
 import { createMotHistoryService } from '@/lib/services/mot-history-api';
 import { logServerError } from '@/lib/utils/server-error-logger';
@@ -65,7 +65,7 @@ async function handleScheduledSync(request: NextRequest, method: 'GET' | 'POST')
       );
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const maxTargets = Math.min(
       Math.max(Number.parseInt(request.nextUrl.searchParams.get('limit') || '40', 10) || 40, 1),
       100

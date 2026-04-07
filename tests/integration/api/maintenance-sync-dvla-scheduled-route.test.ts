@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const createClientMock = vi.hoisted(() => vi.fn());
+const createAdminClientMock = vi.hoisted(() => vi.fn());
 const createDVLAApiServiceMock = vi.hoisted(() => vi.fn());
 const createMotHistoryServiceMock = vi.hoisted(() => vi.fn());
 const isRoadEligibleRegistrationMock = vi.hoisted(() => vi.fn((registration: string) => Boolean(registration)));
 const runFleetDvlaSyncMock = vi.hoisted(() => vi.fn());
 const logServerErrorMock = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: createClientMock,
+vi.mock('@/lib/supabase/admin', () => ({
+  createAdminClient: createAdminClientMock,
 }));
 
 vi.mock('@/lib/services/dvla-api', () => ({
@@ -88,12 +88,12 @@ describe('/api/maintenance/sync-dvla-scheduled', () => {
     );
 
     expect(response.status).toBe(401);
-    expect(createClientMock).not.toHaveBeenCalled();
+    expect(createAdminClientMock).not.toHaveBeenCalled();
   });
 
   it('syncs due van, hgv, and plant assets from GET cron requests', async () => {
     const supabase = createSupabaseMock();
-    createClientMock.mockResolvedValue(supabase);
+    createAdminClientMock.mockReturnValue(supabase);
 
     const response = await GET(
       new NextRequest('http://localhost/api/maintenance/sync-dvla-scheduled?limit=10', {
@@ -137,7 +137,7 @@ describe('/api/maintenance/sync-dvla-scheduled', () => {
 
   it('keeps POST support for manual cron replays', async () => {
     const supabase = createSupabaseMock();
-    createClientMock.mockResolvedValue(supabase);
+    createAdminClientMock.mockReturnValue(supabase);
 
     const response = await POST(
       new NextRequest('http://localhost/api/maintenance/sync-dvla-scheduled?limit=1', {
