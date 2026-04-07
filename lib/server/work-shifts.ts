@@ -314,7 +314,10 @@ export async function ensureEmployeeWorkShiftRecords(
 
 export async function loadEmployeeWorkShiftPatternMap(
   supabase: AnySupabase,
-  profileIds: string[]
+  profileIds: string[],
+  options?: {
+    ensureRecords?: boolean;
+  }
 ): Promise<Map<string, WorkShiftPattern>> {
   const uniqueProfileIds = Array.from(new Set(profileIds.filter(Boolean)));
   const patternMap = new Map<string, WorkShiftPattern>();
@@ -323,7 +326,9 @@ export async function loadEmployeeWorkShiftPatternMap(
     return patternMap;
   }
 
-  await ensureEmployeeWorkShiftRecords(supabase, uniqueProfileIds);
+  if (options?.ensureRecords !== false) {
+    await ensureEmployeeWorkShiftRecords(supabase, uniqueProfileIds);
+  }
 
   const { data, error } = await supabase
     .from('employee_work_shifts')

@@ -306,7 +306,8 @@ export async function GET(request: NextRequest) {
     const scopedAbsences = (absences || []).filter((absence) => scopedEmployeeIds.has(absence.profile_id)) as AbsenceRow[];
     const shiftPatternByEmployee = await loadEmployeeWorkShiftPatternMap(
       supabase,
-      Array.from(scopedEmployeeIds)
+      Array.from(scopedEmployeeIds),
+      { ensureRecords: false }
     );
 
     // Process data

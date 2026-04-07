@@ -29,6 +29,7 @@ import { getReadingDigitGrowthWarning } from '@/lib/utils/readingDigitGrowthWarn
 import { Database } from '@/types/database';
 import { Employee } from '@/types/common';
 import { toast } from 'sonner';
+import { getInspectionErrorMessage, isDuplicateInspectionError } from '@/lib/utils/inspection-error-handling';
 import { showErrorWithReport } from '@/lib/utils/error-reporting';
 import { scrollAndHighlightValidationTarget } from '@/lib/utils/validation-scroll';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
@@ -93,6 +94,11 @@ type PreviousDefect = {
   days: number[];
 };
 
+type ExistingInspectionConflict = {
+  id: string;
+  status: 'draft' | 'submitted';
+};
+
 type ProfileWithRole = {
   role?: {
     is_manager_admin?: boolean;
@@ -101,24 +107,8 @@ type ProfileWithRole = {
 
 const STICKY_NAV_OFFSET_PX = 96;
 
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  if (typeof error === 'string') {
-    return error;
-  }
-
-  if (error && typeof error === 'object' && 'message' in error) {
-    return String((error as { message?: unknown }).message || '');
-  }
-
-  return '';
-}
-
 function isTransientNetworkError(error: unknown): boolean {
-  const message = getErrorMessage(error).toLowerCase();
+  const message = getInspectionErrorMessage(error, '').toLowerCase();
   if (!message) return false;
 
   return (
@@ -264,27 +254,6 @@ function NewInspectionContent() {
       const startDate = new Date(weekEndDate);
       startDate.setDate(weekEndDate.getDate() - 6);
 
-      const buildItemsPayload = (inspectionId: string): Database['public']['Tables']['inspection_items']['Insert'][] => {
-        const items: Database['public']['Tables']['inspection_items']['Insert'][] = [];
-        for (let dayOfWeek = 1; dayOfWeek <= 7; dayOfWeek++) {
-          currentChecklist.forEach((item, index) => {
-            const itemNumber = index + 1;
-            const key = `${dayOfWeek}-${itemNumber}`;
-            if (checkboxStates[key]) {
-              items.push({
-                inspection_id: inspectionId,
-                item_number: itemNumber,
-                item_description: item,
-                day_of_week: dayOfWeek,
-                status: checkboxStates[key],
-                comments: comments[key] || null,
-              });
-            }
-          });
-        }
-        return items;
-      };
-
       if (existingInspectionId) {
         const draftPayload: Database['public']['Tables']['van_inspections']['Update'] = {
           van_id: vehicleId,
@@ -318,7 +287,7 @@ function NewInspectionContent() {
           .eq('inspection_id', existingInspectionId);
         if (deleteItemsError) throw deleteItemsError;
 
-        const updatedItems = buildItemsPayload(existingInspectionId);
+        const updatedItems = buildCurrentInspectionItemsPayload(existingInspectionId);
         if (updatedItems.length > 0) {
           const { error: itemsError } = await supabase
             .from('inspection_items')
@@ -327,6 +296,16 @@ function NewInspectionContent() {
         }
 
         return existingInspectionId;
+      }
+
+      const conflict = await findExistingInspectionConflict();
+      if (conflict) {
+        if (conflict.status === 'draft') {
+          const merged = await mergeIntoExistingDraft(conflict.id, { showToast: !silent });
+          return merged ? conflict.id : null;
+        }
+        handleSubmittedInspectionConflict(conflict.id);
+        return null;
       }
 
       const { data: draft, error: draftError } = await supabase
@@ -345,7 +324,7 @@ function NewInspectionContent() {
 
       if (draftError) throw draftError;
 
-      const items = buildItemsPayload(draft.id);
+      const items = buildCurrentInspectionItemsPayload(draft.id);
       if (items.length > 0) {
         const { error: itemsError } = await supabase
           .from('inspection_items')
@@ -358,13 +337,25 @@ function NewInspectionContent() {
       return draft.id;
     } catch (err) {
       const errorContextId = 'van-inspections-new-silent-draft-save-error';
+      if (!existingInspectionId && isDuplicateInspectionError(err)) {
+        const conflict = await findExistingInspectionConflict();
+        if (conflict?.status === 'draft') {
+          const merged = await mergeIntoExistingDraft(conflict.id, { showToast: !silent });
+          return merged ? conflict.id : null;
+        }
+        if (conflict?.status === 'submitted') {
+          handleSubmittedInspectionConflict(conflict.id);
+          return null;
+        }
+      }
+
       if (isTransientNetworkError(err)) {
         console.warn('Silent draft save skipped due transient network error');
       } else {
         console.error('Silent draft save failed:', err, { errorContextId });
       }
       if (!silent) {
-        toast.error('Could not auto-save draft. Please try again.', { id: errorContextId });
+        toast.error(getInspectionErrorMessage(err, 'Could not auto-save draft. Please try again.'), { id: errorContextId });
       }
       return null;
     } finally {
@@ -586,6 +577,161 @@ function NewInspectionContent() {
       setRecentVehicleIds(getRecentVehicleIds(user.id));
     }
   }, [user?.id]);
+
+  const buildCurrentInspectionItemsPayload = useCallback((inspectionId: string) => {
+    type InspectionItemInsert = Database['public']['Tables']['inspection_items']['Insert'];
+    const items: InspectionItemInsert[] = [];
+
+    for (let dayOfWeek = 1; dayOfWeek <= 7; dayOfWeek++) {
+      currentChecklist.forEach((item, index) => {
+        const itemNumber = index + 1;
+        const key = `${dayOfWeek}-${itemNumber}`;
+        if (checkboxStates[key]) {
+          items.push({
+            inspection_id: inspectionId,
+            item_number: itemNumber,
+            item_description: item,
+            day_of_week: dayOfWeek,
+            status: checkboxStates[key],
+            comments: comments[key] || null,
+          });
+        }
+      });
+    }
+
+    return items;
+  }, [checkboxStates, comments, currentChecklist]);
+
+  const findExistingInspectionConflict = useCallback(async (): Promise<ExistingInspectionConflict | null> => {
+    if (!vehicleId || !weekEnding || !isUuid(vehicleId)) {
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from('van_inspections')
+      .select('id, status')
+      .eq('van_id', vehicleId)
+      .eq('inspection_end_date', weekEnding)
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Failed to check for existing van inspection:', error, {
+        errorContextId: 'van-inspections-new-check-existing-error',
+      });
+      return null;
+    }
+
+    if (!data || data.id === existingInspectionId) {
+      return null;
+    }
+
+    return {
+      id: data.id,
+      status: data.status === 'draft' ? 'draft' : 'submitted',
+    };
+  }, [existingInspectionId, supabase, vehicleId, weekEnding]);
+
+  const handleSubmittedInspectionConflict = useCallback((inspectionId: string) => {
+    setDuplicateInspection(inspectionId);
+    setError('An inspection for this vehicle and week has already been submitted.');
+    toast.info('A daily check has already been submitted for this van and week.');
+  }, []);
+
+  const mergeIntoExistingDraft = useCallback(async (
+    inspectionId: string,
+    options: { showToast?: boolean } = {}
+  ): Promise<boolean> => {
+    const { showToast = true } = options;
+    const errorContextId = 'van-inspections-new-merge-draft-error';
+
+    if (!selectedEmployeeId || !vehicleId || !weekEnding) {
+      if (showToast) {
+        toast.error('Select a vehicle, employee and week before continuing', {
+          id: 'van-inspections-new-validation-merge-draft-core-fields',
+        });
+      }
+      return false;
+    }
+    if (!isUuid(vehicleId)) {
+      if (showToast) {
+        toast.error(INVALID_VAN_SELECTION_MESSAGE, {
+          id: 'van-inspections-new-invalid-vehicle-merge-draft',
+        });
+      }
+      return false;
+    }
+
+    const weekEndDate = new Date(weekEnding + 'T00:00:00');
+    const startDate = new Date(weekEndDate);
+    startDate.setDate(weekEndDate.getDate() - 6);
+    const draftMileage = currentMileage.trim() === '' ? null : parseInt(currentMileage, 10);
+
+    const payload: Database['public']['Tables']['van_inspections']['Update'] = {
+      van_id: vehicleId,
+      user_id: selectedEmployeeId,
+      inspection_date: formatDateISO(startDate),
+      inspection_end_date: weekEnding,
+      current_mileage: Number.isNaN(draftMileage) || draftMileage === null || draftMileage < 0 ? null : draftMileage,
+      status: 'draft',
+      submitted_at: null,
+      signature_data: null,
+      signed_at: null,
+      inspector_comments: inspectorComments.trim() || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    try {
+      const { data: updatedDraft, error: updateError } = await supabase
+        .from('van_inspections')
+        .update(payload)
+        .eq('id', inspectionId)
+        .eq('status', 'draft')
+        .select('id')
+        .maybeSingle();
+
+      if (updateError || !updatedDraft) {
+        throw updateError ?? new Error('Draft not found');
+      }
+
+      const { error: deleteItemsError } = await supabase
+        .from('inspection_items')
+        .delete()
+        .eq('inspection_id', inspectionId);
+      if (deleteItemsError) throw deleteItemsError;
+
+      const items = buildCurrentInspectionItemsPayload(inspectionId);
+      if (items.length > 0) {
+        const { error: itemsError } = await supabase
+          .from('inspection_items')
+          .insert(items);
+        if (itemsError) throw itemsError;
+      }
+
+      setExistingInspectionId(inspectionId);
+      setDuplicateInspection(null);
+      window.history.replaceState(null, '', `/van-inspections/new?id=${inspectionId}`);
+      if (showToast) {
+        toast.info('Merged with the existing draft for this van and week.');
+      }
+      return true;
+    } catch (err) {
+      const message = getInspectionErrorMessage(err, 'Could not merge with existing draft');
+      console.error('Failed to merge into existing van draft:', err, { errorContextId });
+      if (showToast) {
+        toast.error(message, { id: errorContextId });
+      }
+      return false;
+    }
+  }, [
+    buildCurrentInspectionItemsPayload,
+    currentMileage,
+    inspectorComments,
+    selectedEmployeeId,
+    supabase,
+    vehicleId,
+    weekEnding,
+  ]);
 
   // Check for duplicate inspection (same vehicle + week ending)
   // clearOtherErrors: whether to clear non-duplicate validation errors
@@ -1192,6 +1338,19 @@ function NewInspectionContent() {
     
     // Check for duplicate inspection before saving
     if (duplicateInspection) {
+      const conflict = await findExistingInspectionConflict();
+      if (conflict?.status === 'draft') {
+        const merged = await mergeIntoExistingDraft(conflict.id);
+        if (merged) {
+          if (status === 'submitted') {
+            toast.info('Existing draft loaded. Submit again to finish this daily check.');
+          }
+          return;
+        }
+      } else if (conflict?.status === 'submitted') {
+        handleSubmittedInspectionConflict(conflict.id);
+        return;
+      }
       setError('An inspection for this vehicle and week already exists. Please select a different vehicle or week.');
       return;
     }
@@ -1289,27 +1448,7 @@ function NewInspectionContent() {
 
       // Create inspection items ONLY for items that have been explicitly set by the user
       // This prevents drafts from showing all items as 'ok' when they haven't been completed
-      type InspectionItemInsert = Database['public']['Tables']['inspection_items']['Insert'];
-      const items: InspectionItemInsert[] = [];
-      
-      for (let dayOfWeek = 1; dayOfWeek <= 7; dayOfWeek++) {
-        currentChecklist.forEach((item, index) => {
-          const itemNumber = index + 1;
-          const key = `${dayOfWeek}-${itemNumber}`;
-          
-          // Only save items that have been explicitly set by the user
-          if (checkboxStates[key]) {
-            items.push({
-              inspection_id: inspection.id,
-              item_number: itemNumber,
-              item_description: item,
-              day_of_week: dayOfWeek,
-              status: checkboxStates[key],
-              comments: comments[key] || null,
-            });
-          }
-        });
-      }
+      const items = buildCurrentInspectionItemsPayload(inspection.id);
 
       // Only insert if there are items to save
       let insertedItems: InspectionItem[] = [];
@@ -1572,6 +1711,24 @@ function NewInspectionContent() {
       router.push('/van-inspections');
     } catch (err) {
       const errorContextId = 'van-inspections-new-save-inspection-error';
+      if (!existingInspectionId && isDuplicateInspectionError(err)) {
+        const conflict = await findExistingInspectionConflict();
+        if (conflict?.status === 'draft') {
+          const merged = await mergeIntoExistingDraft(conflict.id, { showToast: false });
+          if (merged) {
+            if (status === 'submitted') {
+              toast.info('An existing draft was found and updated. Submit again to finish this daily check.');
+            } else {
+              toast.info('Your changes were saved into the existing draft for this van and week.');
+            }
+            return;
+          }
+        } else if (conflict?.status === 'submitted') {
+          handleSubmittedInspectionConflict(conflict.id);
+          return;
+        }
+      }
+
       if (isTransientNetworkError(err)) {
         console.warn('Inspection save failed due transient network error');
       } else {
@@ -1579,11 +1736,9 @@ function NewInspectionContent() {
         console.error('Error details:', JSON.stringify(err, null, 2), { errorContextId });
       }
       
-      // Get detailed error message
-      let errorMessage = 'An unexpected error occurred';
-      
+      const errorMessage = getInspectionErrorMessage(err, 'An unexpected error occurred');
+
       if (err instanceof Error) {
-        errorMessage = err.message;
         console.error('Error stack:', err.stack, { errorContextId });
       }
       

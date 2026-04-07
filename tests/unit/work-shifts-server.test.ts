@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ensureStandardWorkShiftTemplate } from '@/lib/server/work-shifts';
+import { ensureStandardWorkShiftTemplate, loadEmployeeWorkShiftPatternMap } from '@/lib/server/work-shifts';
 import {
   cloneWorkShiftPattern,
   serializePatternToTemplateSlots,
@@ -22,13 +22,33 @@ interface MockSlotRow {
   pm_working: boolean;
 }
 
+interface MockEmployeeWorkShiftRow {
+  profile_id: string;
+  monday_am: boolean;
+  monday_pm: boolean;
+  tuesday_am: boolean;
+  tuesday_pm: boolean;
+  wednesday_am: boolean;
+  wednesday_pm: boolean;
+  thursday_am: boolean;
+  thursday_pm: boolean;
+  friday_am: boolean;
+  friday_pm: boolean;
+  saturday_am: boolean;
+  saturday_pm: boolean;
+  sunday_am: boolean;
+  sunday_pm: boolean;
+}
+
 function buildSupabaseMock(options: {
   existingDefault: MockTemplateRow | null;
   insertedDefault?: MockTemplateRow;
   slotRows: MockSlotRow[];
+  employeeRows?: MockEmployeeWorkShiftRow[];
 }) {
   const upsertCalls: Array<Array<Record<string, unknown>>> = [];
   const insertCalls: Array<Record<string, unknown>> = [];
+  const employeeInCalls: string[][] = [];
 
   const supabase = {
     from(table: string) {
@@ -104,11 +124,27 @@ function buildSupabaseMock(options: {
         };
       }
 
+      if (table === 'employee_work_shifts') {
+        return {
+          select() {
+            return {
+              in(_field: string, profileIds: string[]) {
+                employeeInCalls.push(profileIds);
+                return {
+                  data: (options.employeeRows || []).filter((row) => profileIds.includes(row.profile_id)),
+                  error: null,
+                };
+              },
+            };
+          },
+        };
+      }
+
       throw new Error(`Unexpected table: ${table}`);
     },
   };
 
-  return { supabase, upsertCalls, insertCalls };
+  return { supabase, upsertCalls, insertCalls, employeeInCalls };
 }
 
 describe('ensureStandardWorkShiftTemplate', () => {
@@ -172,5 +208,48 @@ describe('ensureStandardWorkShiftTemplate', () => {
     expect(insertCalls).toHaveLength(0);
     expect(upsertCalls).toHaveLength(1);
     expect(upsertCalls[0]).toHaveLength(7);
+  });
+});
+
+describe('loadEmployeeWorkShiftPatternMap', () => {
+  it('loads existing rows and falls back to the standard pattern in read-only mode', async () => {
+    const employeePattern = cloneWorkShiftPattern({
+      monday_am: true,
+      monday_pm: false,
+      tuesday_am: true,
+      tuesday_pm: true,
+      wednesday_am: false,
+      wednesday_pm: false,
+      thursday_am: true,
+      thursday_pm: true,
+      friday_am: true,
+      friday_pm: false,
+      saturday_am: true,
+      saturday_pm: false,
+      sunday_am: false,
+      sunday_pm: false,
+    });
+    const { supabase, insertCalls, upsertCalls, employeeInCalls } = buildSupabaseMock({
+      existingDefault: null,
+      slotRows: [],
+      employeeRows: [
+        {
+          profile_id: 'profile-1',
+          ...employeePattern,
+        },
+      ],
+    });
+
+    const result = await loadEmployeeWorkShiftPatternMap(
+      supabase as never,
+      ['profile-1', 'profile-2'],
+      { ensureRecords: false }
+    );
+
+    expect(employeeInCalls).toEqual([['profile-1', 'profile-2']]);
+    expect(insertCalls).toHaveLength(0);
+    expect(upsertCalls).toHaveLength(0);
+    expect(result.get('profile-1')).toEqual(employeePattern);
+    expect(result.get('profile-2')).toEqual(STANDARD_WORK_SHIFT_PATTERN);
   });
 });
