@@ -4,7 +4,7 @@ import { applyValidationCookieIfNeeded } from '@/lib/server/app-auth/response';
 import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
 
 export async function GET() {
-  const current = await getCurrentAuthenticatedProfile({ allowLocked: true });
+  const current = await getCurrentAuthenticatedProfile({ allowLocked: true, includeEmail: true });
   if (!current) {
     return NextResponse.json(
       {

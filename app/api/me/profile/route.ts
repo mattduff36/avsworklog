@@ -53,7 +53,7 @@ async function getCurrentUserProfile(userId: string, email: string | null) {
 }
 
 export async function GET() {
-  const current = await getCurrentAuthenticatedProfile();
+  const current = await getCurrentAuthenticatedProfile({ includeEmail: true });
   if (!current) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -76,7 +76,7 @@ export async function GET() {
 }
 
 export async function PUT(request: NextRequest) {
-  const current = await getCurrentAuthenticatedProfile();
+  const current = await getCurrentAuthenticatedProfile({ includeEmail: true });
   if (!current) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

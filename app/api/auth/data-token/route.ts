@@ -4,7 +4,7 @@ import { validateAppSession } from '@/lib/server/app-auth/session';
 import { issueSupabaseDataToken } from '@/lib/server/app-auth/supabase-token';
 
 export async function GET() {
-  const validation = await validateAppSession();
+  const validation = await validateAppSession({ includeEmail: true });
   if (!validation.session || validation.status === 'missing' || validation.status === 'invalid') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

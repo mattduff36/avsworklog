@@ -95,13 +95,27 @@ async function getCurrentRequestMetadata(): Promise<{ userAgent: string | null; 
   };
 }
 
+const AUTH_USER_EMAIL_CACHE_TTL_MS = 5 * 60 * 1000;
+const authUserEmailCache = new Map<string, { email: string | null; expiresAt: number }>();
+
 async function getAuthUserEmail(profileId: string): Promise<string | null> {
+  const cachedEntry = authUserEmailCache.get(profileId);
+  if (cachedEntry && cachedEntry.expiresAt > Date.now()) {
+    return cachedEntry.email;
+  }
+
   const admin = createAdminClient();
   const { data, error } = await admin.auth.admin.getUserById(profileId);
   if (error || !data.user) {
     return null;
   }
-  return data.user.email || null;
+
+  const email = data.user.email || null;
+  authUserEmailCache.set(profileId, {
+    email,
+    expiresAt: Date.now() + AUTH_USER_EMAIL_CACHE_TTL_MS,
+  });
+  return email;
 }
 
 async function resolveDeviceId(
@@ -348,7 +362,7 @@ export async function revokeAppSession(
 }
 
 export async function validateAppSession(
-  options: { allowLocked?: boolean } = {}
+  options: { allowLocked?: boolean; includeEmail?: boolean } = {}
 ): Promise<AppSessionValidationResult> {
   const cookiePayload = await getCurrentAppSessionCookiePayload();
   if (!cookiePayload || cookiePayload.v !== APP_SESSION_COOKIE_VERSION) {
@@ -393,7 +407,7 @@ export async function validateAppSession(
 
   let currentRow = row;
   let isLocked = Boolean(currentRow.locked_at);
-  const email = await getAuthUserEmail(currentRow.profile_id);
+  const email = options.includeEmail ? await getAuthUserEmail(currentRow.profile_id) : null;
   let nextCookieValue: string | null = null;
   let nextCookieExpiresAt: Date | null = null;
 
@@ -480,7 +494,9 @@ export async function lockCurrentAppSession(): Promise<{
   };
 }
 
-export async function getCurrentAuthenticatedProfile(options: { allowLocked?: boolean } = {}) {
+export async function getCurrentAuthenticatedProfile(
+  options: { allowLocked?: boolean; includeEmail?: boolean } = {}
+) {
   const validation = await validateAppSession(options);
   if (
     !validation.session ||

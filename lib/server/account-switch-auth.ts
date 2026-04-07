@@ -15,7 +15,7 @@ export async function getAccountSwitchActorAccess(source = 'unknown'): Promise<{
   hasUser?: boolean;
 }> {
   void source;
-  const validation = await validateAppSession({ allowLocked: true });
+  const validation = await validateAppSession({ allowLocked: true, includeEmail: true });
   if (!validation.session || validation.status === 'missing' || validation.status === 'invalid') {
     return {
       access: null,

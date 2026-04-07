@@ -106,7 +106,7 @@ export async function logServerError({
     let finalUserEmail = userEmail;
     
     if (!finalUserId || !finalUserEmail) {
-      const current = await getCurrentAuthenticatedProfile({ allowLocked: true });
+      const current = await getCurrentAuthenticatedProfile({ allowLocked: true, includeEmail: true });
       finalUserId = finalUserId || current?.profile.id || null;
       finalUserEmail = finalUserEmail || current?.profile.email || null;
     }

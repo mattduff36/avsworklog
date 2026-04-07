@@ -15,7 +15,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { fetchWithAuth } from '@/lib/utils/fetch-with-auth';
 
 const PAGE_VISIT_DEBOUNCE_MS = 250;
-const PAGE_VISIT_HEARTBEAT_MS = 60_000;
+const PAGE_VISIT_HEARTBEAT_MS = 120_000;
 
 export function DashboardLayoutClient({
   children,

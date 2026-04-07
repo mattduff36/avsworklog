@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
 
 export async function GET() {
-  const current = await getCurrentAuthenticatedProfile();
+  const current = await getCurrentAuthenticatedProfile({ includeEmail: true });
   if (!current) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

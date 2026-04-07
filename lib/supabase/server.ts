@@ -34,7 +34,7 @@ export async function createClient() {
     return { ...init, headers }
   }
 
-  const validation = await validateAppSession({ allowLocked: true })
+  const validation = await validateAppSession({ allowLocked: true, includeEmail: true })
   const session = validation.session
   const canUseAppSession = session && validation.status !== 'invalid' && validation.status !== 'missing'
 

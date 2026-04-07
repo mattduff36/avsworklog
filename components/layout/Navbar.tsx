@@ -386,7 +386,7 @@ export function Navbar() {
     }
   }, [user?.id]);
 
-  // Fetch and refresh notification count.
+  // Refresh notification count on meaningful client events only.
   useEffect(() => {
     if (!user?.id) {
       setUnreadCount(0);
@@ -405,13 +405,7 @@ export function Navbar() {
     window.addEventListener('notification-dismissed', handleNotificationDismissed);
     window.addEventListener('focus', handleWindowFocus);
 
-    // Keep the badge responsive even when no other state updates occur.
-    const interval = setInterval(() => {
-      void fetchNotificationCount();
-    }, 15000);
-
     return () => {
-      clearInterval(interval);
       window.removeEventListener('notification-dismissed', handleNotificationDismissed);
       window.removeEventListener('focus', handleWindowFocus);
     };

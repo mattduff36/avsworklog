@@ -199,16 +199,19 @@ describe('app auth session helpers', () => {
     const validation = await validateAppSession();
 
     expect(validation.status).toBe('active');
+    expect(validation.email).toBeNull();
     expect(validation.session?.last_seen_at).toBe('2026-04-04T12:00:00.000Z');
     expect(validation.session?.updated_at).toBe('2026-04-04T12:00:00.000Z');
     expect(validation.cookieValue).toBe('unused-cookie');
+    expect(getUserByIdMock).not.toHaveBeenCalled();
   });
 
-  it('returns the locked profile when allowLocked is enabled', async () => {
-    const current = await getCurrentAuthenticatedProfile({ allowLocked: true });
+  it('returns the locked profile with email when explicitly requested', async () => {
+    const current = await getCurrentAuthenticatedProfile({ allowLocked: true, includeEmail: true });
 
     expect(current?.validation.status).toBe('locked');
     expect(current?.profile.id).toBe('user-1');
     expect(getAppAuthProfileMock).toHaveBeenCalledWith('user-1', 'user-1@example.com');
+    expect(getUserByIdMock).toHaveBeenCalledWith('user-1');
   });
 });

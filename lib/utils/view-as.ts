@@ -59,7 +59,7 @@ export async function getEffectiveRole(): Promise<EffectiveRoleInfo> {
   };
 
   try {
-    const current = await getCurrentAuthenticatedProfile();
+    const current = await getCurrentAuthenticatedProfile({ includeEmail: true });
     if (!current) {
       return none;
     }
