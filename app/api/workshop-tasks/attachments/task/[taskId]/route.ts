@@ -7,6 +7,7 @@ interface RouteParams {
 }
 
 type DynamicDbClient = Awaited<ReturnType<typeof createClient>>;
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' };
 
 async function buildTemplateSnapshot(db: DynamicDbClient, templateId: string) {
   const { data: versions, error: versionsError } = await db
@@ -158,6 +159,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({
       success: true,
       attachments: result,
+    }, {
+      headers: NO_STORE_HEADERS,
     });
   } catch (error) {
     const { taskId } = await params;

@@ -32,6 +32,10 @@ interface AttachmentHybridFormModalProps {
   isCompleted?: boolean;
   attachmentId?: string;
   onSave: (responses: AttachmentSchemaResponse[], markComplete: boolean) => Promise<void>;
+  canUndoComplete?: boolean;
+  undoCompleteLabel?: string | null;
+  onUndoComplete?: () => Promise<void>;
+  undoingComplete?: boolean;
 }
 
 interface LocalResponseValue {
@@ -96,6 +100,11 @@ function toResponseKey(sectionKey: string, fieldKey: string): string {
 function normalizeValue(value: unknown): string {
   if (value === null || value === undefined) return '';
   return String(value).trim();
+}
+
+function toInputValue(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  return String(value);
 }
 
 const SUPPRESSED_FIELD_HELP_TEXTS = new Set([
@@ -211,6 +220,10 @@ export function AttachmentHybridFormModal({
   isCompleted = false,
   attachmentId,
   onSave,
+  canUndoComplete = false,
+  undoCompleteLabel = null,
+  onUndoComplete,
+  undoingComplete = false,
 }: AttachmentHybridFormModalProps) {
   const { tabletModeEnabled } = useTabletMode();
   const sections = useMemo(
@@ -406,7 +419,7 @@ export function AttachmentHybridFormModal({
     const responseValue = response?.response_value ?? '';
     const responseJson = response?.response_json ?? null;
     const noteRequired = requiresAttentionNote(field, response);
-    const noteValue = normalizeValue(responseJson?.note);
+    const noteValue = toInputValue(responseJson?.note);
     const isFieldRequired = field.is_required;
     const fieldHelpText = normalizeValue(field.help_text);
 
@@ -639,7 +652,7 @@ export function AttachmentHybridFormModal({
   }
 
   function handleDialogOpenChange(nextOpen: boolean) {
-    if (!nextOpen && !readOnly && !saving && isDirty) {
+    if (!nextOpen && !readOnly && !saving && !undoingComplete && isDirty) {
       toast.info('Save or discard your draft before closing.');
       return;
     }
@@ -690,7 +703,7 @@ export function AttachmentHybridFormModal({
                 variant="outline"
                 size="icon"
                 onClick={() => handleDialogOpenChange(false)}
-                disabled={saving}
+                disabled={saving || undoingComplete}
                 className="border-border/70 text-muted-foreground hover:text-foreground"
               >
                 <X className="h-4 w-4" />
@@ -712,9 +725,16 @@ export function AttachmentHybridFormModal({
             </div>
           )}
           {readOnly && (
-            <Badge variant="outline" className={isCompleted ? 'mt-3 bg-green-600 text-white' : 'mt-3'}>
-              {isCompleted ? 'Completed' : 'Read Only'}
-            </Badge>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className={isCompleted ? 'bg-green-600 text-white' : ''}>
+                {isCompleted ? 'Completed' : 'Read Only'}
+              </Badge>
+              {canUndoComplete && (
+                <p className="text-xs text-amber-600">
+                  Undo available for {undoCompleteLabel || 'a short grace period'}.
+                </p>
+              )}
+            </div>
           )}
         </div>
 
@@ -851,7 +871,17 @@ export function AttachmentHybridFormModal({
 
         {readOnly && (
           <DialogFooter className="px-5 py-4 border-t border-border">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+            {canUndoComplete && onUndoComplete && (
+              <Button
+                variant="outline"
+                onClick={() => { void onUndoComplete(); }}
+                disabled={undoingComplete}
+                className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-950"
+              >
+                {undoingComplete ? 'Undoing...' : 'Undo Complete'}
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={undoingComplete}>
               Close
             </Button>
           </DialogFooter>

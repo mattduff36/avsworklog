@@ -15,6 +15,8 @@ interface SnapshotJson {
   sections: AttachmentSchemaSection[];
 }
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' };
+
 interface FieldResponseInput {
   field_id?: string | null;
   section_key: string;
@@ -83,6 +85,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       attachment,
       snapshot,
       responses: responses || [],
+    }, {
+      headers: NO_STORE_HEADERS,
     });
   } catch (error) {
     const { id: attachmentId } = await params;

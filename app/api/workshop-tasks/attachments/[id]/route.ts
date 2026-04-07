@@ -7,6 +7,8 @@ interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' };
+
 /**
  * GET /api/workshop-tasks/attachments/[id]
  * Get a single attachment with template and V2 schema responses.
@@ -71,6 +73,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         schema_snapshot: schemaSnapshots && schemaSnapshots.length > 0 ? schemaSnapshots[0] : null,
         field_responses: fieldResponses || [],
       },
+    }, {
+      headers: NO_STORE_HEADERS,
     });
   } catch (error) {
     const { id } = await params;

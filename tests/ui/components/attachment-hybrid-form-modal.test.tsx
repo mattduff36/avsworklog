@@ -116,6 +116,39 @@ const signatureSnapshot: AttachmentSchemaSnapshot = {
   },
 };
 
+const noteSnapshot: AttachmentSchemaSnapshot = {
+  id: 'snapshot-3',
+  attachment_id: 'attachment-3',
+  template_version_id: 'version-3',
+  snapshot_json: {
+    template_id: 'template-3',
+    version_id: 'version-3',
+    generated_at: '2026-04-01T12:00:00.000Z',
+    sections: [
+      {
+        id: 'section-note',
+        section_key: 'wheels',
+        title: 'Wheels',
+        description: null,
+        sort_order: 1,
+        fields: [
+          {
+            id: 'field-note',
+            field_key: 'check_tyres',
+            label: 'Check tyres',
+            help_text: null,
+            field_type: 'marking_code',
+            is_required: true,
+            sort_order: 1,
+            options_json: null,
+            validation_json: { require_note_for: ['attention'] },
+          },
+        ],
+      },
+    ],
+  },
+};
+
 describe('AttachmentHybridFormModal', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -197,5 +230,44 @@ describe('AttachmentHybridFormModal', () => {
 
     expect(signatureResponse).toBeDefined();
     expect(signatureResponse?.response_json).toMatchObject({ signed_by_name: 'J. Inspector' });
+  });
+
+  it('preserves spaces while typing attention notes', async () => {
+    const onSave = vi.fn(async () => undefined);
+
+    render(
+      <TabletModeProvider>
+        <AttachmentHybridFormModal
+          open
+          onOpenChange={vi.fn()}
+          templateName="Note Test"
+          snapshot={noteSnapshot}
+          existingResponses={[]}
+          onSave={onSave}
+        />
+      </TabletModeProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fail' }));
+
+    const noteInput = await screen.findByRole('textbox', { name: /notes/i }) as HTMLTextAreaElement;
+    fireEvent.change(noteInput, { target: { value: 'all ' } });
+    expect(noteInput.value).toBe('all ');
+
+    fireEvent.change(noteInput, { target: { value: 'all four tyres' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }));
+
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledTimes(1);
+    });
+
+    const payload = onSave.mock.calls[0][0] as Array<{
+      field_key: string;
+      response_json: Record<string, unknown> | null;
+    }>;
+    const noteResponse = payload.find((entry) => entry.field_key === 'check_tyres');
+
+    expect(noteResponse).toBeDefined();
+    expect(noteResponse?.response_json).toMatchObject({ note: 'all four tyres' });
   });
 });

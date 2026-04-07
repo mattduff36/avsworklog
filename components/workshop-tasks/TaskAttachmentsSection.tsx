@@ -1,18 +1,22 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { FileText, Plus, Check, Clock, ChevronRight, Download, Loader2 } from 'lucide-react';
+import { FileText, Plus, Check, Clock, ChevronRight, Download, Loader2, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTaskAttachments, TaskAttachmentWithDetails } from '@/lib/hooks/useTaskAttachments';
 import { useAttachmentTemplates } from '@/lib/hooks/useAttachmentTemplates';
 import { AttachmentHybridFormModal } from './AttachmentHybridFormModal';
 import { formatDate } from '@/lib/utils/date';
 import type { AttachmentSchemaResponse } from '@/types/workshop-attachments-v2';
+import {
+  canUndoAttachmentCompletion,
+  formatAttachmentUndoRemaining,
+} from '@/lib/workshop-attachments/completion-window';
 
 interface TaskAttachmentsSectionProps {
   taskId: string;
@@ -21,16 +25,28 @@ interface TaskAttachmentsSectionProps {
 }
 
 export function TaskAttachmentsSection({ taskId, taskStatus, onUpdate }: TaskAttachmentsSectionProps) {
-  const { attachments, loading, addAttachment, saveSchemaResponses, refetch } = useTaskAttachments({ taskId });
+  const { attachments, loading, addAttachment, saveSchemaResponses, undoCompleteAttachment } = useTaskAttachments({ taskId });
   const { templates } = useAttachmentTemplates();
   
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [adding, setAdding] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [activeAttachment, setActiveAttachment] = useState<TaskAttachmentWithDetails | null>(null);
+  const [activeAttachmentId, setActiveAttachmentId] = useState<string | null>(null);
   const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<string | null>(null);
+  const [undoingAttachmentId, setUndoingAttachmentId] = useState<string | null>(null);
 
   const isTaskCompleted = taskStatus === 'completed';
+  const activeAttachment = useMemo(
+    () => attachments.find((attachment) => attachment.id === activeAttachmentId) || null,
+    [activeAttachmentId, attachments],
+  );
+
+  useEffect(() => {
+    if (activeAttachmentId && !activeAttachment) {
+      setShowForm(false);
+      setActiveAttachmentId(null);
+    }
+  }, [activeAttachment, activeAttachmentId]);
 
   // Filter out templates that are already attached
   const attachedTemplateIds = attachments.map(a => a.template_id);
@@ -60,8 +76,15 @@ export function TaskAttachmentsSection({ taskId, taskStatus, onUpdate }: TaskAtt
       toast.error('This attachment is missing a V2 schema snapshot.');
       return;
     }
-    setActiveAttachment(attachment);
+    setActiveAttachmentId(attachment.id);
     setShowForm(true);
+  };
+
+  const handleFormOpenChange = (open: boolean) => {
+    setShowForm(open);
+    if (!open) {
+      setActiveAttachmentId(null);
+    }
   };
 
   const handleSaveSchemaResponses = async (
@@ -70,8 +93,20 @@ export function TaskAttachmentsSection({ taskId, taskStatus, onUpdate }: TaskAtt
   ) => {
     if (!activeAttachment) return;
     await saveSchemaResponses(activeAttachment.id, responses, markComplete);
-    await refetch();
     onUpdate?.();
+  };
+
+  const handleUndoComplete = async (attachment: TaskAttachmentWithDetails) => {
+    setUndoingAttachmentId(attachment.id);
+    try {
+      await undoCompleteAttachment(attachment.id);
+      toast.success('Attachment moved back to draft');
+      onUpdate?.();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to undo attachment completion');
+    } finally {
+      setUndoingAttachmentId(null);
+    }
   };
 
   const handleDownloadPdf = async (attachment: TaskAttachmentWithDetails) => {
@@ -161,6 +196,9 @@ export function TaskAttachmentsSection({ taskId, taskStatus, onUpdate }: TaskAtt
             const schemaProgress = getSchemaCompletionProgress(attachment);
             const progress = schemaProgress || { completed: 0, total: 0, percentage: 0 };
             const templateName = attachment.workshop_attachment_templates?.name || 'Unknown Template';
+            const canUndoComplete = !isTaskCompleted && attachment.status === 'completed'
+              && canUndoAttachmentCompletion(attachment.completed_at);
+            const undoLabel = formatAttachmentUndoRemaining(attachment.completed_at);
 
             return (
               <Card
@@ -194,6 +232,26 @@ export function TaskAttachmentsSection({ taskId, taskStatus, onUpdate }: TaskAtt
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
+                      {canUndoComplete && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void handleUndoComplete(attachment);
+                          }}
+                          disabled={undoingAttachmentId === attachment.id}
+                          className="h-8 px-2 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-950"
+                          title={undoLabel ? `Undo available for ${undoLabel}` : 'Undo attachment completion'}
+                        >
+                          {undoingAttachmentId === attachment.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <RotateCcw className="h-3.5 w-3.5" />
+                          )}
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
@@ -276,14 +334,18 @@ export function TaskAttachmentsSection({ taskId, taskStatus, onUpdate }: TaskAtt
       {activeAttachment && activeAttachment.schema_snapshot?.snapshot_json?.sections?.length && (
             <AttachmentHybridFormModal
               open={showForm}
-              onOpenChange={setShowForm}
+              onOpenChange={handleFormOpenChange}
               templateName={activeAttachment.workshop_attachment_templates?.name || 'Attachment'}
               snapshot={activeAttachment.schema_snapshot}
               existingResponses={activeAttachment.field_responses || []}
               onSave={handleSaveSchemaResponses}
-              readOnly={isTaskCompleted}
+              readOnly={isTaskCompleted || activeAttachment.status === 'completed'}
               isCompleted={activeAttachment.status === 'completed'}
               attachmentId={activeAttachment.id}
+              canUndoComplete={!isTaskCompleted && activeAttachment.status === 'completed' && canUndoAttachmentCompletion(activeAttachment.completed_at)}
+              undoCompleteLabel={formatAttachmentUndoRemaining(activeAttachment.completed_at)}
+              onUndoComplete={() => handleUndoComplete(activeAttachment)}
+              undoingComplete={undoingAttachmentId === activeAttachment.id}
             />
       )}
     </div>

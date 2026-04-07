@@ -26,6 +26,7 @@ interface UseTaskAttachmentsReturn {
   refetch: () => Promise<void>;
   addAttachment: (templateId: string) => Promise<TaskAttachmentWithDetails | null>;
   saveSchemaResponses: (attachmentId: string, responses: AttachmentSchemaResponse[], markComplete?: boolean) => Promise<boolean>;
+  undoCompleteAttachment: (attachmentId: string) => Promise<boolean>;
 }
 
 export function useTaskAttachments({ 
@@ -35,6 +36,12 @@ export function useTaskAttachments({
   const [attachments, setAttachments] = useState<TaskAttachmentWithDetails[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+
+  const mergeAttachment = useCallback((attachment: TaskAttachmentWithDetails) => {
+    setAttachments((prev) => prev.map((entry) => (
+      entry.id === attachment.id ? attachment : entry
+    )));
+  }, []);
 
   const fetchAttachments = useCallback(async () => {
     if (!enabled || !taskId) {
@@ -48,6 +55,7 @@ export function useTaskAttachments({
 
       const response = await fetch(`/api/workshop-tasks/attachments/task/${taskId}`, {
         method: 'GET',
+        cache: 'no-store',
       });
 
       const data = await response.json();
@@ -64,6 +72,22 @@ export function useTaskAttachments({
       setLoading(false);
     }
   }, [taskId, enabled]);
+
+  const refreshAttachment = useCallback(async (attachmentId: string): Promise<TaskAttachmentWithDetails> => {
+    const response = await fetch(`/api/workshop-tasks/attachments/${attachmentId}`, {
+      method: 'GET',
+      cache: 'no-store',
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to refresh attachment');
+    }
+
+    const attachment = data.attachment as TaskAttachmentWithDetails;
+    mergeAttachment(attachment);
+    return attachment;
+  }, [mergeAttachment]);
 
   const addAttachment = useCallback(async (templateId: string): Promise<TaskAttachmentWithDetails | null> => {
     if (!taskId) {
@@ -111,13 +135,33 @@ export function useTaskAttachments({
         throw new Error(data.error || 'Failed to save schema responses');
       }
 
-      await fetchAttachments();
+      await refreshAttachment(attachmentId);
       return true;
     } catch (err) {
       console.error('Error saving schema responses:', err);
       throw err;
     }
-  }, [fetchAttachments]);
+  }, [refreshAttachment]);
+
+  const undoCompleteAttachment = useCallback(async (attachmentId: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`/api/workshop-tasks/attachments/${attachmentId}/undo-complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to undo attachment completion');
+      }
+
+      await refreshAttachment(attachmentId);
+      return true;
+    } catch (err) {
+      console.error('Error undoing attachment completion:', err);
+      throw err;
+    }
+  }, [refreshAttachment]);
 
   useEffect(() => {
     fetchAttachments();
@@ -130,5 +174,6 @@ export function useTaskAttachments({
     refetch: fetchAttachments,
     addAttachment,
     saveSchemaResponses,
+    undoCompleteAttachment,
   };
 }

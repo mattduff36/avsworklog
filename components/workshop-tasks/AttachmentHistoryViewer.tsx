@@ -37,7 +37,9 @@ export function AttachmentHistoryViewer({ children }: AttachmentHistoryViewerPro
   const openAttachment = useCallback(async (attachmentId: string) => {
     setLoadingId(attachmentId);
     try {
-      const response = await fetch(`/api/workshop-tasks/attachments/${attachmentId}`);
+      const response = await fetch(`/api/workshop-tasks/attachments/${attachmentId}`, {
+        cache: 'no-store',
+      });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || 'Failed to load attachment');
