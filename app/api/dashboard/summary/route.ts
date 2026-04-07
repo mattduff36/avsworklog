@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { unstable_cache } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
@@ -252,12 +251,6 @@ async function getMaintenanceCounts(): Promise<MaintenanceCounts> {
   return totals;
 }
 
-const getCachedMaintenanceCounts = unstable_cache(
-  async () => getMaintenanceCounts(),
-  ['dashboard-maintenance-counts'],
-  { revalidate: 60 }
-);
-
 export async function GET() {
   const current = await getCurrentAuthenticatedProfile();
   if (!current) {
@@ -295,45 +288,45 @@ export async function GET() {
     maintenanceCounts,
   ] = await Promise.all([
     canViewApprovals
-      ? supabase.from('timesheets').select('id', { count: 'planned', head: true }).eq('status', 'submitted')
+      ? supabase.from('timesheets').select('id', { count: 'exact', head: true }).eq('status', 'submitted')
       : Promise.resolve({ count: 0, error: null }),
     canViewApprovals
-      ? supabase.from('absences').select('id', { count: 'planned', head: true }).eq('status', 'pending')
+      ? supabase.from('absences').select('id', { count: 'exact', head: true }).eq('status', 'pending')
       : Promise.resolve({ count: 0, error: null }),
     canViewWorkshopTasks
       ? supabase
           .from('actions')
-          .select('id', { count: 'planned', head: true })
+          .select('id', { count: 'exact', head: true })
           .in('action_type', ['inspection_defect', 'workshop_vehicle_task'])
           .eq('status', 'pending')
       : Promise.resolve({ count: 0, error: null }),
     canViewWorkshopTasks
       ? supabase
           .from('actions')
-          .select('id', { count: 'planned', head: true })
+          .select('id', { count: 'exact', head: true })
           .in('action_type', ['inspection_defect', 'workshop_vehicle_task'])
           .eq('status', 'logged')
       : Promise.resolve({ count: 0, error: null }),
     canViewSuggestions
-      ? supabase.from('suggestions').select('id', { count: 'planned', head: true }).eq('status', 'new')
+      ? supabase.from('suggestions').select('id', { count: 'exact', head: true }).eq('status', 'new')
       : Promise.resolve({ count: 0, error: null }),
     canViewSuggestions
-      ? supabase.from('suggestions').select('id', { count: 'planned', head: true }).in('status', ['under_review', 'planned'])
+      ? supabase.from('suggestions').select('id', { count: 'exact', head: true }).in('status', ['under_review', 'planned'])
       : Promise.resolve({ count: 0, error: null }),
     canViewErrorReports
-      ? supabase.from('error_reports').select('id', { count: 'planned', head: true }).eq('status', 'new')
+      ? supabase.from('error_reports').select('id', { count: 'exact', head: true }).eq('status', 'new')
       : Promise.resolve({ count: 0, error: null }),
     canViewErrorReports
-      ? supabase.from('error_reports').select('id', { count: 'planned', head: true }).eq('status', 'investigating')
+      ? supabase.from('error_reports').select('id', { count: 'exact', head: true }).eq('status', 'investigating')
       : Promise.resolve({ count: 0, error: null }),
     canViewQuotes
-      ? supabase.from('quotes').select('id', { count: 'planned', head: true }).eq('status', 'pending_internal_approval')
+      ? supabase.from('quotes').select('id', { count: 'exact', head: true }).eq('status', 'pending_internal_approval')
       : Promise.resolve({ count: 0, error: null }),
     effectiveRole.is_actual_super_admin
-      ? supabase.from('error_logs').select('id', { count: 'planned', head: true })
+      ? supabase.from('error_logs').select('id', { count: 'exact', head: true })
       : Promise.resolve({ count: 0, error: null }),
     canViewMaintenance
-      ? getCachedMaintenanceCounts()
+      ? getMaintenanceCounts()
       : Promise.resolve({
           attentionTotal: 0,
           dueSoonTotal: 0,
