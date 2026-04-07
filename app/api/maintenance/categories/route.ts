@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logger } from '@/lib/utils/logger';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { normalizePeriodUnit } from '@/lib/utils/maintenancePeriods';
 import type {
   CreateCategoryRequest,
   CategoriesListResponse
@@ -100,6 +101,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    const periodUnit = normalizePeriodUnit(body.type, body.period_unit);
     
     // Validate threshold
     if (body.type === 'date' && !body.alert_threshold_days) {
@@ -131,6 +134,7 @@ export async function POST(request: NextRequest) {
         description: body.description || null,
         type: body.type,
         period_value: body.period_value,
+        period_unit: periodUnit,
         alert_threshold_days: body.type === 'date' ? body.alert_threshold_days : null,
         alert_threshold_miles: body.type === 'mileage' ? body.alert_threshold_miles : null,
         alert_threshold_hours: body.type === 'hours' ? body.alert_threshold_hours : null,

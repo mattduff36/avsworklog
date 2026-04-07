@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from './useAuth';
 import { usePermissionSnapshot } from './usePermissionSnapshot';
 import type { ModuleName } from '@/types/roles';
+import { getErrorStatus, isServerErrorStatus } from '@/lib/utils/http-error';
 import { toast } from 'sonner';
 
 /**
@@ -17,10 +18,17 @@ import { toast } from 'sonner';
  */
 export function usePermissionCheck(moduleName: ModuleName, redirectOnFail = true) {
   const { user, profile, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
-  const { permissions, enabledModuleSet, isLoading: permissionsLoading, error } = usePermissionSnapshot();
+  const {
+    permissions,
+    enabledModuleSet,
+    isLoading: permissionsLoading,
+    error,
+  } = usePermissionSnapshot();
   const router = useRouter();
   const [hasPermission, setHasPermission] = useState(false);
   const [loading, setLoading] = useState(true);
+  const errorStatus = getErrorStatus(error);
+  const serviceUnavailable = Boolean(error) && (errorStatus === null || isServerErrorStatus(errorStatus));
 
   useEffect(() => {
     async function checkPermission() {
@@ -50,7 +58,7 @@ export function usePermissionCheck(moduleName: ModuleName, redirectOnFail = true
         console.error('Error checking permission:', error);
         setHasPermission(false);
         
-        if (redirectOnFail) {
+        if (!serviceUnavailable && redirectOnFail) {
           toast.error('Failed to verify permissions');
           router.push('/dashboard');
         }
@@ -73,6 +81,6 @@ export function usePermissionCheck(moduleName: ModuleName, redirectOnFail = true
     checkPermission();
   }, [user, profile, isAdmin, isSuperAdmin, authLoading, permissionsLoading, permissions, enabledModuleSet, error, moduleName, redirectOnFail, router]);
 
-  return { hasPermission, loading };
+  return { hasPermission, loading, serviceUnavailable, errorStatus };
 }
 

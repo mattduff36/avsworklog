@@ -4,6 +4,12 @@ import {
   type SupabaseClient,
   type User,
 } from '@supabase/supabase-js'
+import {
+  clearClientServiceOutage,
+  getClientServiceOutage,
+  reportClientServiceOutage,
+  shouldTripClientServiceOutage,
+} from '@/lib/app-auth/client-service-health'
 import { loadClientAuthSession, type ClientAuthSessionResponse } from '@/lib/app-auth/client-session'
 import { getViewAsRoleId, getViewAsTeamId } from '@/lib/utils/view-as-cookie'
 import { withAuthOverrides } from '@/lib/supabase/with-auth-overrides'
@@ -28,7 +34,15 @@ async function fetchJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> 
   })
 
   const rawPayload = await response.text()
-  const payload = rawPayload ? JSON.parse(rawPayload) as T & { error?: string } : null
+  let payload: (T & { error?: string }) | null = null
+
+  if (rawPayload) {
+    try {
+      payload = JSON.parse(rawPayload) as T & { error?: string }
+    } catch (error) {
+      throw createStatusError('Invalid response payload', response.status, error)
+    }
+  }
 
   if (!response.ok) {
     throw createStatusError(payload?.error || `HTTP ${response.status}`, response.status)
@@ -83,10 +97,20 @@ async function getDataToken(): Promise<string> {
         expiresAt: response.expires_at,
       }
       lastDataTokenFailureStatus = null
+      clearClientServiceOutage('data-token')
       return response.token
     } catch (error) {
       cachedDataToken = null
       lastDataTokenFailureStatus = getErrorStatus(error)
+      if (shouldTripClientServiceOutage(lastDataTokenFailureStatus)) {
+        reportClientServiceOutage(
+          'data-token',
+          lastDataTokenFailureStatus,
+          'We could not obtain a data access token, so direct data requests have been paused.'
+        )
+      } else {
+        clearClientServiceOutage('data-token')
+      }
       return ''
     } finally {
       pendingDataTokenPromise = null
@@ -99,6 +123,7 @@ async function getDataToken(): Promise<string> {
 export function invalidateCachedDataToken(): void {
   cachedDataToken = null
   lastDataTokenFailureStatus = null
+  clearClientServiceOutage('data-token')
 }
 
 export function getLastDataTokenFailureStatus(): number | null {
@@ -143,6 +168,25 @@ export function createClient(): BrowserSupabaseClient {
         global: {
           // Inject view-as headers on every request (read cookies dynamically)
           fetch: (input, init) => {
+            const outage = getClientServiceOutage()
+            if (outage) {
+              const requestUrl = typeof input === 'string'
+                ? input
+                : input instanceof Request
+                  ? input.url
+                  : String(input)
+
+              try {
+                const resolvedUrl = new URL(requestUrl, window.location.origin)
+                const supabaseOrigin = new URL(supabaseUrl).origin
+                if (resolvedUrl.origin === supabaseOrigin) {
+                  return Promise.reject(createStatusError(outage.message, outage.status))
+                }
+              } catch {
+                // Ignore URL parsing issues and let the request proceed.
+              }
+            }
+
             const viewAsRoleId = getViewAsRoleId()
             const viewAsTeamId = getViewAsTeamId()
             if (viewAsRoleId || viewAsTeamId) {

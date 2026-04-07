@@ -1,6 +1,11 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import {
+  createStatusError,
+  getErrorStatus,
+  isServerErrorStatus,
+} from '@/lib/utils/http-error';
 import type {
   AbsenceSecondaryPermissionKey,
   AbsenceSecondaryPermissionMap,
@@ -60,24 +65,43 @@ export function canUseScopedAbsencePermission(
 }
 
 export function useAbsenceSecondaryPermissions(enabled = true) {
-  return useQuery({
+  const query = useQuery({
     queryKey: ['absence-secondary-permissions', 'me'],
     enabled,
     refetchOnMount: 'always',
     queryFn: async () => {
       const response = await fetch('/api/absence/permissions/secondary/me', { cache: 'no-store' });
-      const payload = (await response.json()) as { error?: string } & Partial<AbsenceSecondarySnapshot>;
-      if (!response.ok) {
-        throw new Error(payload.error || 'Failed to load absence secondary permissions');
+      const rawPayload = await response.text();
+      let payload: ({ error?: string } & Partial<AbsenceSecondarySnapshot>) | null = null;
+
+      if (rawPayload) {
+        try {
+          payload = JSON.parse(rawPayload) as { error?: string } & Partial<AbsenceSecondarySnapshot>;
+        } catch (error) {
+          throw createStatusError('Invalid absence secondary permissions response payload', response.status, error);
+        }
       }
 
-      if (!payload.permissions || !payload.flags || !payload.role_tier) {
-        throw new Error('Absence secondary permissions response is incomplete');
+      if (!response.ok) {
+        throw createStatusError(payload?.error || 'Failed to load absence secondary permissions', response.status);
+      }
+
+      if (!payload?.permissions || !payload.flags || !payload.role_tier) {
+        throw createStatusError('Absence secondary permissions response is incomplete', response.status);
       }
 
       return payload as AbsenceSecondarySnapshot;
     },
     staleTime: 30_000,
   });
+
+  const errorStatus = getErrorStatus(query.error);
+  const serviceUnavailable = Boolean(query.error) && (errorStatus === null || isServerErrorStatus(errorStatus));
+
+  return {
+    ...query,
+    errorStatus,
+    serviceUnavailable,
+  };
 }
 

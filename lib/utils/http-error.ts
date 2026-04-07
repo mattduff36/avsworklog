@@ -29,3 +29,7 @@ export function getErrorStatus(error: unknown): number | null {
 export function isAuthErrorStatus(status: number | null | undefined): boolean {
   return status === 401 || status === 423;
 }
+
+export function isServerErrorStatus(status: number | null | undefined): boolean {
+  return typeof status === 'number' && status >= 500;
+}

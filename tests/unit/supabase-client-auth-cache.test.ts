@@ -40,13 +40,16 @@ describe('supabase client auth token cache', () => {
       getLastDataTokenFailureStatus,
       invalidateCachedDataToken,
     } = await import('@/lib/supabase/client');
+    const { getClientServiceOutage } = await import('@/lib/app-auth/client-service-health');
 
     const client = createClient();
     await client.auth.getSession();
     expect(getLastDataTokenFailureStatus()).toBe(401);
+    expect(getClientServiceOutage()).toBeNull();
 
     invalidateCachedDataToken();
     expect(getLastDataTokenFailureStatus()).toBeNull();
+    expect(getClientServiceOutage()).toBeNull();
   });
 
   it('re-fetches data token after cache invalidation', async () => {
@@ -85,5 +88,57 @@ describe('supabase client auth token cache', () => {
     invalidateCachedDataToken();
     await client.auth.getSession();
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports and clears data token outage state around 5xx failures', async () => {
+    setupClientEnv();
+
+    vi.doMock('@/lib/app-auth/client-session', () => ({
+      loadClientAuthSession: vi.fn(async () => ({
+        status: 'authenticated',
+        payload: {
+          authenticated: true,
+          locked: false,
+          user: { id: 'user-3', email: 'user3@example.com' },
+          profile: { id: 'profile-3' },
+        },
+        responseStatus: 200,
+        error: null,
+      })),
+    }));
+
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(async () => new Response(
+        JSON.stringify({ error: 'Temporary failure' }),
+        { status: 503, headers: { 'Content-Type': 'application/json' } }
+      ))
+      .mockImplementationOnce(async () => new Response(
+        JSON.stringify({
+          token: 'recovered-token',
+          expires_at: Math.floor(Date.now() / 1000) + 3_600,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      ));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const {
+      createClient,
+      invalidateCachedDataToken,
+    } = await import('@/lib/supabase/client');
+    const { getClientServiceOutage } = await import('@/lib/app-auth/client-service-health');
+
+    const client = createClient();
+    await client.auth.getSession();
+    expect(getClientServiceOutage()).toMatchObject({
+      source: 'data-token',
+      status: 503,
+    });
+
+    invalidateCachedDataToken();
+    expect(getClientServiceOutage()).toBeNull();
+
+    await client.auth.getSession();
+    expect(getClientServiceOutage()).toBeNull();
   });
 });

@@ -5,7 +5,12 @@ import { useQuery } from '@tanstack/react-query';
 import { subscribeToAuthStateChange } from '@/lib/app-auth/client';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { ALL_MODULES, type ModuleName } from '@/types/roles';
-import { createStatusError, getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
+import {
+  createStatusError,
+  getErrorStatus,
+  isAuthErrorStatus,
+  isServerErrorStatus,
+} from '@/lib/utils/http-error';
 
 interface PermissionSnapshotResponse {
   permissions?: Record<ModuleName, boolean>;
@@ -16,13 +21,22 @@ interface PermissionSnapshotResponse {
 
 async function fetchPermissionSnapshot(): Promise<PermissionSnapshotResponse> {
   const response = await fetch('/api/me/permissions', { cache: 'no-store' });
-  const data = (await response.json()) as PermissionSnapshotResponse & { error?: string };
+  const rawPayload = await response.text();
+  let data: (PermissionSnapshotResponse & { error?: string }) | null = null;
 
-  if (!response.ok) {
-    throw createStatusError(data.error || 'Failed to load permissions', response.status);
+  if (rawPayload) {
+    try {
+      data = JSON.parse(rawPayload) as PermissionSnapshotResponse & { error?: string };
+    } catch (error) {
+      throw createStatusError('Invalid permissions response payload', response.status, error);
+    }
   }
 
-  return data;
+  if (!response.ok) {
+    throw createStatusError(data?.error || 'Failed to load permissions', response.status);
+  }
+
+  return data || {};
 }
 
 export function usePermissionSnapshot() {
@@ -67,6 +81,7 @@ export function usePermissionSnapshot() {
   const enabledModuleSet = useMemo(() => new Set<ModuleName>(enabledModules), [enabledModules]);
   const errorStatus = getErrorStatus(query.error);
   const holdForRecovery = isAuthErrorStatus(errorStatus) && !query.data;
+  const serviceUnavailable = Boolean(query.error) && (errorStatus === null || isServerErrorStatus(errorStatus));
 
   const permissions = useMemo(() => {
     if (isAdmin || isSuperAdmin) {
@@ -88,6 +103,7 @@ export function usePermissionSnapshot() {
     isLoading: authLoading || query.isLoading || holdForRecovery,
     error: query.error,
     errorStatus,
+    serviceUnavailable,
     refetch: query.refetch,
   };
 }

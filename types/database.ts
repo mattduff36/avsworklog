@@ -2063,6 +2063,7 @@ export type Database = {
           name: string
           description: string
           type: 'date' | 'mileage' | 'hours'
+          period_unit: 'weeks' | 'months' | 'miles' | 'hours'
           alert_threshold_days: number
           alert_threshold_miles: number
           is_active: boolean
@@ -2082,6 +2083,7 @@ export type Database = {
           name: string
           description?: string | null
           type: 'date' | 'mileage' | 'hours'
+          period_unit?: 'weeks' | 'months' | 'miles' | 'hours' | null
           alert_threshold_days?: number | null
           alert_threshold_miles?: number | null
           is_active?: boolean | null
@@ -2101,6 +2103,7 @@ export type Database = {
           name?: string
           description?: string | null
           type?: 'date' | 'mileage' | 'hours'
+          period_unit?: 'weeks' | 'months' | 'miles' | 'hours' | null
           alert_threshold_days?: number | null
           alert_threshold_miles?: number | null
           is_active?: boolean | null
@@ -5424,6 +5427,7 @@ export type Database = {
       check__inspection_items__status: 'ok' | 'attention' | 'defect' | 'na'
       check__maintenance_categories__responsibility: 'workshop' | 'office'
       check__maintenance_categories__type: 'date' | 'mileage' | 'hours'
+      check__maintenance_categories__period_unit: 'weeks' | 'months' | 'miles' | 'hours'
       check__maintenance_history__value_type: 'date' | 'mileage' | 'boolean' | 'text'
       check__message_recipients__status: 'PENDING' | 'SHOWN' | 'SIGNED' | 'DISMISSED'
       check__messages__priority: 'HIGH' | 'LOW'

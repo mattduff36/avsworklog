@@ -20,6 +20,7 @@ import {
 import { CategoryDialog } from './CategoryDialog';
 import { CategoryRecipientsDialog } from './CategoryRecipientsDialog';
 import type { MaintenanceCategory } from '@/types/maintenance';
+import { formatCategoryPeriod } from '@/lib/utils/maintenancePeriods';
 
 interface MaintenanceSettingsProps {
   isAdmin: boolean;
@@ -158,12 +159,7 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                         </TableCell>
                         
                         <TableCell className="text-muted-foreground">
-                          {category.type === 'date'
-                            ? `${category.period_value} months`
-                            : category.type === 'hours'
-                            ? `${category.period_value?.toLocaleString()} hours`
-                            : `${category.period_value?.toLocaleString()} miles`
-                          }
+                          {formatCategoryPeriod(category)}
                         </TableCell>
                         
                         <TableCell className="text-muted-foreground">
@@ -277,7 +273,7 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                 <strong>Category Types:</strong>
               </p>
               <ul className="list-disc list-inside mt-1 space-y-1">
-                <li><strong>Date-based</strong> (Tax, MOT, LOLOR / Inspection) - Alert X days before due</li>
+                <li><strong>Date-based</strong> (Tax, MOT, LOLOR / Inspection) - Alert X days before due, with periods in weeks or months</li>
                 <li><strong>Mileage-based</strong> (Service, Cambelt) - Alert X miles before due (displayed as KM for HGV frontend)</li>
                 <li><strong>Hours-based</strong> (Plant Service) - Alert X engine hours before due</li>
               </ul>

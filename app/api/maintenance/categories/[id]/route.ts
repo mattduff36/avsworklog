@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { logger } from '@/lib/utils/logger';
 import type { UpdateCategoryRequest } from '@/types/maintenance';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { normalizePeriodUnit } from '@/lib/utils/maintenancePeriods';
 
 /**
  * PUT /api/maintenance/categories/[id]
@@ -30,6 +31,16 @@ export async function PUT(
     }
     
     const body: UpdateCategoryRequest = await request.json();
+
+    const { data: existingCategory, error: existingCategoryError } = await supabase
+      .from('maintenance_categories')
+      .select('type')
+      .eq('id', id)
+      .single();
+
+    if (existingCategoryError || !existingCategory) {
+      return NextResponse.json({ error: 'Category not found' }, { status: 404 });
+    }
     
     // Build update object
     const updates: Record<string, unknown> = {};
@@ -46,6 +57,9 @@ export async function PUT(
     if (body.show_on_overview !== undefined) updates.show_on_overview = body.show_on_overview;
     if (body.reminder_in_app_enabled !== undefined) updates.reminder_in_app_enabled = body.reminder_in_app_enabled;
     if (body.reminder_email_enabled !== undefined) updates.reminder_email_enabled = body.reminder_email_enabled;
+    if (body.period_unit !== undefined) {
+      updates.period_unit = normalizePeriodUnit(existingCategory.type, body.period_unit);
+    }
     
     const { data, error } = await supabase
       .from('maintenance_categories')

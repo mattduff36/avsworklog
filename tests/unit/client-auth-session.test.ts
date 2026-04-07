@@ -88,4 +88,47 @@ describe('loadClientAuthSession', () => {
     expect(result.status).toBe('unauthenticated');
     expect(result.responseStatus).toBe(401);
   });
+
+  it('reports and clears auth session outage state around 5xx recovery', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(async () => new Response(
+        JSON.stringify({ error: 'Temporary failure' }),
+        {
+          status: 503,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      ))
+      .mockImplementationOnce(async () => new Response(
+        JSON.stringify({
+          authenticated: true,
+          locked: false,
+          user: { id: 'user-123', email: 'restored@example.com' },
+        }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      ));
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { loadClientAuthSession } = await import('@/lib/app-auth/client-session');
+    const { getClientServiceOutage } = await import('@/lib/app-auth/client-service-health');
+
+    const failedResult = await loadClientAuthSession();
+    expect(failedResult.status).toBe('error');
+    expect(getClientServiceOutage()).toMatchObject({
+      source: 'auth-session',
+      status: 503,
+    });
+
+    const recoveredResult = await loadClientAuthSession();
+    expect(recoveredResult.status).toBe('authenticated');
+    expect(getClientServiceOutage()).toBeNull();
+  });
 });

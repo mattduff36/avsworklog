@@ -289,6 +289,7 @@ export const DEMO_MAINTENANCE_CATEGORY = {
   name: 'Tax Due Date',
   description: 'Annual road tax reminder',
   type: 'date' as const,
+  period_unit: 'months' as const,
   period_value: 12,
   alert_threshold_days: 30,
   alert_threshold_miles: null,

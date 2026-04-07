@@ -1,19 +1,33 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isThisMonth } from 'date-fns';
+import {
+  AlertTriangle,
+  Calendar as CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  Settings,
+} from 'lucide-react';
+import { toast } from 'sonner';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { useClientServiceOutage } from '@/lib/hooks/useClientServiceOutage';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import {
   canUseScopedAbsencePermission,
   useAbsenceSecondaryPermissions,
 } from '@/lib/hooks/useAbsenceSecondaryPermissions';
+import { clearClientServiceOutage } from '@/lib/app-auth/client-service-health';
 import { fetchAbsenceMessage } from '@/lib/client/absence-message';
 import { fetchCurrentWorkShift } from '@/lib/client/work-shifts';
-import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PageLoader } from '@/components/ui/page-loader';
+import { ServiceUnavailableState } from '@/components/ui/service-unavailable-state';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -32,29 +46,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { 
-  Calendar as CalendarIcon, 
-  ChevronLeft, 
-  ChevronRight,
-  AlertTriangle,
-  Settings,
-  Plus,
-} from 'lucide-react';
-import Link from 'next/link';
 import { AbsenceScrollingMessage } from '@/app/(dashboard)/absence/components/AbsenceScrollingMessage';
-import { 
+import {
   useAbsencesForUserFinancialYear,
-  useAbsenceSummaryForUserFinancialYear,
-  useAbsenceReasons,
-  useCreateAbsence,
-  useCancelAbsence,
   useAllAbsences,
-  useAbsenceRealtimeQueryInvalidation
+  useAbsenceReasons,
+  useAbsenceRealtimeQueryInvalidation,
+  useAbsenceSummaryForUserFinancialYear,
+  useCancelAbsence,
+  useCreateAbsence,
 } from '@/lib/hooks/useAbsence';
 import { formatDate, formatDateISO, calculateDurationDays, getFinancialYearMonths, getCurrentFinancialYear, getFinancialYear } from '@/lib/utils/date';
 import { ANNUAL_LEAVE_MIN_REMAINING_DAYS } from '@/lib/utils/annual-leave';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isThisMonth } from 'date-fns';
-import { toast } from 'sonner';
+import { createStatusError, getErrorStatus, isServerErrorStatus } from '@/lib/utils/http-error';
 import type { WorkShiftPattern } from '@/types/work-shifts';
 
 type GenerationStatus = {
@@ -151,17 +155,26 @@ function isExpectedAbsenceSubmissionError(message: string): boolean {
 
 export default function AbsencePage() {
   const { profile, isManager, isAdmin, isSuperAdmin } = useAuth();
+  const clientServiceOutage = useClientServiceOutage();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { hasPermission, loading: permissionLoading } = usePermissionCheck('absence');
+  const {
+    hasPermission,
+    loading: permissionLoading,
+    serviceUnavailable: permissionServiceUnavailable,
+  } = usePermissionCheck('absence');
+  const shouldLoadSecondaryPermissions = hasPermission && !permissionServiceUnavailable && !clientServiceOutage;
   const {
     data: absenceSecondarySnapshot,
     isLoading: secondaryLoading,
     isFetchedAfterMount: secondaryFetchedAfterMount,
-  } = useAbsenceSecondaryPermissions(hasPermission);
+    serviceUnavailable: secondaryServiceUnavailable,
+  } = useAbsenceSecondaryPermissions(shouldLoadSecondaryPermissions);
   const hasAbsenceSecondarySnapshot = Boolean(absenceSecondarySnapshot?.permissions && absenceSecondarySnapshot?.flags);
   const isSecondaryContextLoading =
-    hasPermission && (secondaryLoading || (!secondaryFetchedAfterMount && !hasAbsenceSecondarySnapshot));
+    shouldLoadSecondaryPermissions &&
+    !secondaryServiceUnavailable &&
+    (secondaryLoading || (!secondaryFetchedAfterMount && !hasAbsenceSecondarySnapshot));
   const actorProfileId = profile?.id || '';
   const isAdminTier = Boolean(isAdmin || isSuperAdmin);
   const canViewBookings = Boolean(absenceSecondarySnapshot?.flags.can_view_bookings || isAdminTier || isManager);
@@ -209,6 +222,18 @@ export default function AbsencePage() {
   const [generationStatusLoading, setGenerationStatusLoading] = useState(true);
   const [currentWorkShiftPattern, setCurrentWorkShiftPattern] = useState<WorkShiftPattern | null>(null);
   const [absenceAnnouncement, setAbsenceAnnouncement] = useState<string | null>(null);
+  const [pageServiceErrorStatus, setPageServiceErrorStatus] = useState<number | null>(null);
+  const [pageServiceErrorMessage, setPageServiceErrorMessage] = useState<string | null>(null);
+  const pageServiceUnavailable =
+    pageServiceErrorMessage !== null &&
+    (pageServiceErrorStatus === null || isServerErrorStatus(pageServiceErrorStatus));
+  const shouldPauseDataLoading = Boolean(
+    clientServiceOutage ||
+    permissionServiceUnavailable ||
+    secondaryServiceUnavailable ||
+    pageServiceUnavailable
+  );
+  const canLoadAbsencePageData = hasPermission && !shouldPauseDataLoading;
   
   // Financial year months
   const currentFinancialYear = getCurrentFinancialYear();
@@ -294,21 +319,27 @@ export default function AbsencePage() {
   const BOOKINGS_PAGE_SIZE = 15;
   
   // Fetch data - use all absences for managers/admins
-  const { data: userAbsences, isLoading: loadingUserAbsences } = useAbsencesForUserFinancialYear({
-    start: displayFinancialYear.start,
-    end: displayFinancialYear.end,
-  });
-  const { data: allAbsencesData, isLoading: loadingAllAbsences } = useAllAbsences(
-    canViewBookings ? {} : undefined
+  const { data: userAbsences, isLoading: loadingUserAbsences } = useAbsencesForUserFinancialYear(
+    {
+      start: displayFinancialYear.start,
+      end: displayFinancialYear.end,
+    },
+    { enabled: canLoadAbsencePageData }
   );
-  const { data: summary, isLoading: loadingSummary } = useAbsenceSummaryForUserFinancialYear({
-    start: displayFinancialYear.start,
-    end: displayFinancialYear.end,
-  });
-  const { data: reasons } = useAbsenceReasons();
+  const { data: allAbsencesData, isLoading: loadingAllAbsences } = useAllAbsences(
+    canLoadAbsencePageData && canViewBookings ? {} : undefined
+  );
+  const { data: summary, isLoading: loadingSummary } = useAbsenceSummaryForUserFinancialYear(
+    {
+      start: displayFinancialYear.start,
+      end: displayFinancialYear.end,
+    },
+    { enabled: canLoadAbsencePageData }
+  );
+  const { data: reasons } = useAbsenceReasons({ enabled: canLoadAbsencePageData });
   const createAbsence = useCreateAbsence();
   const cancelAbsence = useCancelAbsence();
-  useAbsenceRealtimeQueryInvalidation();
+  useAbsenceRealtimeQueryInvalidation(canLoadAbsencePageData);
   
   const calendarAbsences = useMemo(() => {
     if (!canViewBookings) {
@@ -357,25 +388,66 @@ export default function AbsencePage() {
   const [selectedReasonId, setSelectedReasonId] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  function handleUnavailableError(error: unknown, fallbackMessage: string): boolean {
+    const status = getErrorStatus(error);
+    if (status === null || isServerErrorStatus(status)) {
+      setPageServiceErrorStatus(status);
+      setPageServiceErrorMessage(
+        error instanceof Error && error.message.trim().length > 0 ? error.message : fallbackMessage
+      );
+      return true;
+    }
+
+    return false;
+  }
+
+  async function retryUnavailableState() {
+    clearClientServiceOutage();
+    if (typeof window !== 'undefined') {
+      window.location.reload();
+    }
+  }
   
   useEffect(() => {
-    if (permissionLoading || !hasPermission) {
+    if (permissionLoading || !canLoadAbsencePageData) {
       return;
     }
     void loadGenerationStatus();
-  }, [permissionLoading, hasPermission]);
+  }, [canLoadAbsencePageData, permissionLoading]);
 
   async function loadGenerationStatus() {
     setGenerationStatusLoading(true);
     const errorContextId = 'absence-load-generation-status-error';
     try {
-      const response = await fetch('/api/absence/generation/status');
-      const payload = (await response.json()) as GenerationStatus & { error?: string };
-      if (!response.ok) {
-        throw new Error(payload.error || 'Failed to load booking window');
+      const response = await fetch('/api/absence/generation/status', { cache: 'no-store' });
+      const rawPayload = await response.text();
+      let payload: (GenerationStatus & { error?: string }) | null = null;
+
+      if (rawPayload) {
+        try {
+          payload = JSON.parse(rawPayload) as GenerationStatus & { error?: string };
+        } catch (error) {
+          throw createStatusError('Invalid booking window response payload', response.status, error);
+        }
       }
+
+      if (!response.ok) {
+        throw createStatusError(payload?.error || 'Failed to load booking window', response.status);
+      }
+      if (!payload) {
+        throw createStatusError('Booking window response is empty', response.status);
+      }
+
+      setPageServiceErrorStatus(null);
+      setPageServiceErrorMessage(null);
       setGenerationStatus(payload);
     } catch (error) {
+      if (handleUnavailableError(error, 'Booking window is temporarily unavailable.')) {
+        setGenerationStatus(null);
+        return;
+      }
+
       console.error('Error loading absence generation status:', error, { errorContextId });
       toast.error(error instanceof Error ? error.message : 'Failed to load booking window', { id: errorContextId });
     } finally {
@@ -411,31 +483,45 @@ export default function AbsencePage() {
     async function loadAbsenceAnnouncement() {
       try {
         const payload = await fetchAbsenceMessage();
+        setPageServiceErrorStatus(null);
+        setPageServiceErrorMessage(null);
         setAbsenceAnnouncement(payload.message);
       } catch (error) {
+        if (handleUnavailableError(error, 'Absence announcement is temporarily unavailable.')) {
+          setAbsenceAnnouncement(null);
+          return;
+        }
+
         console.error('Error loading absence announcement:', error);
       }
     }
 
-    if (hasPermission) {
+    if (canLoadAbsencePageData) {
       void loadAbsenceAnnouncement();
     }
-  }, [hasPermission]);
+  }, [canLoadAbsencePageData]);
 
   useEffect(() => {
     async function loadCurrentWorkShift() {
       try {
         const payload = await fetchCurrentWorkShift();
+        setPageServiceErrorStatus(null);
+        setPageServiceErrorMessage(null);
         setCurrentWorkShiftPattern(payload.pattern);
       } catch (error) {
+        if (handleUnavailableError(error, 'Work shift data is temporarily unavailable.')) {
+          setCurrentWorkShiftPattern(null);
+          return;
+        }
+
         console.error('Error loading current work shift:', error);
       }
     }
 
-    if (hasPermission) {
+    if (canLoadAbsencePageData) {
       void loadCurrentWorkShift();
     }
-  }, [hasPermission]);
+  }, [canLoadAbsencePageData]);
 
   useEffect(() => {
     if (isSecondaryContextLoading) return;
@@ -813,9 +899,13 @@ export default function AbsencePage() {
   }
   
   // Show loading while checking permissions
-  const isBookingWindowLoading = generationStatusLoading && !generationStatus;
+  const isBookingWindowLoading = canLoadAbsencePageData && generationStatusLoading && !generationStatus;
+  const serviceUnavailableDescription =
+    clientServiceOutage?.message ||
+    pageServiceErrorMessage ||
+    'Absence data loading has been paused to avoid repeated requests while the backend recovers.';
 
-  if (permissionLoading || isSecondaryContextLoading || loadingAbsences || loadingSummary || isBookingWindowLoading) {
+  if (!shouldPauseDataLoading && (permissionLoading || isSecondaryContextLoading || loadingAbsences || loadingSummary || isBookingWindowLoading)) {
     return (
       <PageLoader
         message={
@@ -825,6 +915,17 @@ export default function AbsencePage() {
             ? 'Loading booking window...'
             : 'Loading absences...'
         }
+      />
+    );
+  }
+
+  if (shouldPauseDataLoading) {
+    return (
+      <ServiceUnavailableState
+        title="Absence data temporarily unavailable"
+        description={serviceUnavailableDescription}
+        retryLabel="Retry absence page"
+        onRetry={retryUnavailableState}
       />
     );
   }

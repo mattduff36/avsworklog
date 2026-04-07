@@ -4,6 +4,7 @@ import {
   appendStatusHistory,
   buildStatusHistoryEvent,
 } from '@/lib/utils/workshopTaskStatusHistory';
+import { inferMaintenanceLink } from '@/lib/utils/workshopMaintenanceSync';
 import type { CompletionData } from '@/components/workshop-tasks/MarkTaskCompleteDialog';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Action } from '../types';
@@ -330,9 +331,19 @@ export function useWorkshopTaskLifecycleActions({
         throw error;
       }
 
-      if (data.maintenanceUpdates && (completingTask.van_id || completingTask.hgv_id)) {
+      const maintenanceAssetId =
+        completingTask.van_id || completingTask.hgv_id || completingTask.plant_id;
+      const assetType =
+        completingTask.plant_id ? 'plant' : completingTask.hgv_id ? 'hgv' : 'van';
+      const linkedMaintenance = inferMaintenanceLink({
+        title: completingTask.title,
+        description: completingTask.description,
+        workshopCategoryName: completingTask.workshop_task_categories?.name,
+        workshopSubcategoryName: completingTask.workshop_task_subcategories?.name,
+      });
+
+      if (maintenanceAssetId && (data.maintenanceUpdates || linkedMaintenance)) {
         try {
-          const maintenanceAssetId = completingTask.van_id || completingTask.hgv_id;
           const maintenanceResponse = await fetch(
             `/api/maintenance/by-vehicle/${maintenanceAssetId}`,
             {
@@ -340,6 +351,12 @@ export function useWorkshopTaskLifecycleActions({
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 ...data.maintenanceUpdates,
+                assetType,
+                completed_at: now.toISOString(),
+                task_title: completingTask.title,
+                task_description: completingTask.description,
+                task_category_name: completingTask.workshop_task_categories?.name,
+                task_subcategory_name: completingTask.workshop_task_subcategories?.name,
                 comment: `Updated from workshop task completion: ${completingTask.title}`,
               }),
             }

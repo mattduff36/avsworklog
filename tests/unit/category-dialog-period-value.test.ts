@@ -3,7 +3,7 @@
  *
  * Tests for the new required period_value field on maintenance categories.
  * period_value represents the due interval:
- *   - Date type: months (e.g. 12 = every 12 months)
+ *   - Date type: weeks or months (e.g. 6 weeks, 12 months)
  *   - Mileage type: miles (e.g. 10000 = every 10,000 miles)
  *   - Hours type: hours (e.g. 250 = every 250 hours)
  */
@@ -16,13 +16,14 @@ const categorySchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
   description: z.string().max(500).optional().nullable(),
   type: z.enum(['date', 'mileage', 'hours'] as const),
+  period_unit: z.enum(['weeks', 'months', 'miles', 'hours'] as const),
   period_value: z.coerce.number()
     .int('Period must be a whole number')
     .positive('Period must be a positive number'),
   alert_threshold_days: z.coerce.number().int().positive().optional().nullable(),
   alert_threshold_miles: z.coerce.number().int().positive().optional().nullable(),
   alert_threshold_hours: z.coerce.number().int().positive().optional().nullable(),
-  applies_to: z.array(z.enum(['van', 'plant']))
+  applies_to: z.array(z.enum(['van', 'plant', 'hgv']))
     .min(1, 'Category must apply to at least one asset type')
     .default(['van']),
   is_active: z.boolean().optional(),
@@ -64,6 +65,7 @@ describe('CategoryDialog period_value validation', () => {
       const data = {
         name: 'Tax Due Date',
         type: 'date' as const,
+        period_unit: 'months' as const,
         alert_threshold_days: 30,
         applies_to: ['van' as const],
       };
@@ -80,6 +82,7 @@ describe('CategoryDialog period_value validation', () => {
       const data = {
         name: 'Service Due',
         type: 'mileage' as const,
+        period_unit: 'miles' as const,
         alert_threshold_miles: 1000,
         applies_to: ['van' as const],
       };
@@ -92,6 +95,7 @@ describe('CategoryDialog period_value validation', () => {
       const data = {
         name: 'Service Due (Hours)',
         type: 'hours' as const,
+        period_unit: 'hours' as const,
         alert_threshold_hours: 50,
         applies_to: ['plant' as const],
       };
@@ -106,6 +110,7 @@ describe('CategoryDialog period_value validation', () => {
       const data = {
         name: 'Tax Due Date',
         type: 'date' as const,
+        period_unit: 'months' as const,
         period_value: 0,
         alert_threshold_days: 30,
         applies_to: ['van' as const],
@@ -119,6 +124,7 @@ describe('CategoryDialog period_value validation', () => {
       const data = {
         name: 'Tax Due Date',
         type: 'date' as const,
+        period_unit: 'months' as const,
         period_value: -6,
         alert_threshold_days: 30,
         applies_to: ['van' as const],
@@ -132,6 +138,7 @@ describe('CategoryDialog period_value validation', () => {
       const data = {
         name: 'Tax Due Date',
         type: 'date' as const,
+        period_unit: 'months' as const,
         period_value: 6.5,
         alert_threshold_days: 30,
         applies_to: ['van' as const],
@@ -147,6 +154,7 @@ describe('CategoryDialog period_value validation', () => {
       const data = {
         name: 'Tax Due Date',
         type: 'date' as const,
+        period_unit: 'months' as const,
         period_value: 12,
         alert_threshold_days: 30,
         applies_to: ['van' as const],
@@ -160,6 +168,7 @@ describe('CategoryDialog period_value validation', () => {
       const data = {
         name: 'Service Due',
         type: 'mileage' as const,
+        period_unit: 'miles' as const,
         period_value: 10000,
         alert_threshold_miles: 1000,
         applies_to: ['van' as const],
@@ -173,6 +182,7 @@ describe('CategoryDialog period_value validation', () => {
       const data = {
         name: 'Service Due (Hours)',
         type: 'hours' as const,
+        period_unit: 'hours' as const,
         period_value: 250,
         alert_threshold_hours: 50,
         applies_to: ['plant' as const],
@@ -188,6 +198,7 @@ describe('CategoryDialog period_value validation', () => {
       const data = {
         name: 'Test Category',
         type: 'date' as const,
+        period_unit: 'months' as const,
         alert_threshold_days: 30,
         applies_to: ['van' as const],
       };
@@ -208,6 +219,7 @@ describe('CategoryDialog period_value validation', () => {
       const data = {
         name: 'Test Category',
         type: 'mileage' as const,
+        period_unit: 'miles' as const,
         period_value: 0,
         alert_threshold_miles: 1000,
         applies_to: ['van' as const],
@@ -230,6 +242,7 @@ describe('CategoryDialog period_value validation', () => {
       const data = {
         name: 'MOT Due Date',
         type: 'date' as const,
+        period_unit: 'months' as const,
         alert_threshold_days: 30,
         applies_to: ['van' as const],
       };
@@ -242,6 +255,7 @@ describe('CategoryDialog period_value validation', () => {
       const data = {
         name: 'MOT Due Date',
         type: 'date' as const,
+        period_unit: 'months' as const,
         period_value: 12,
         applies_to: ['van' as const],
       };
@@ -254,6 +268,7 @@ describe('CategoryDialog period_value validation', () => {
       const data = {
         name: 'MOT Due Date',
         type: 'date' as const,
+        period_unit: 'months' as const,
         period_value: 12,
         alert_threshold_days: 30,
         applies_to: ['van' as const],
@@ -269,6 +284,7 @@ describe('CategoryDialog period_value validation', () => {
       const data = {
         name: 'Tax Due',
         type: 'date' as const,
+        period_unit: 'months' as const,
         period_value: '12',
         alert_threshold_days: 30,
         applies_to: ['van' as const],
@@ -285,6 +301,7 @@ describe('CategoryDialog period_value validation', () => {
       const data = {
         name: 'Service Due',
         type: 'mileage' as const,
+        period_unit: 'miles' as const,
         period_value: '10000',
         alert_threshold_miles: 1000,
         applies_to: ['van' as const],
@@ -301,6 +318,7 @@ describe('CategoryDialog period_value validation', () => {
       const data = {
         name: 'Tax Due',
         type: 'date' as const,
+        period_unit: 'months' as const,
         period_value: 'abc',
         alert_threshold_days: 30,
         applies_to: ['van' as const],
@@ -308,6 +326,22 @@ describe('CategoryDialog period_value validation', () => {
 
       const result = categorySchema.safeParse(data);
       expect(result.success).toBe(false);
+    });
+  });
+
+  describe('date period units', () => {
+    it('should accept weekly date periods', () => {
+      const data = {
+        name: '6 Weekly Inspection Due',
+        type: 'date' as const,
+        period_unit: 'weeks' as const,
+        period_value: 6,
+        alert_threshold_days: 7,
+        applies_to: ['hgv' as const],
+      };
+
+      const result = categorySchema.safeParse(data);
+      expect(result.success).toBe(true);
     });
   });
 });

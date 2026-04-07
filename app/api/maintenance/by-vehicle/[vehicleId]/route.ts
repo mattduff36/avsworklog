@@ -1,15 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logger } from '@/lib/utils/logger';
-import type { UpdateMaintenanceRequest } from '@/types/maintenance';
+import type { MaintenanceCategory, UpdateMaintenanceRequest } from '@/types/maintenance';
+import { buildAutomaticMaintenancePlan } from '@/lib/utils/workshopMaintenanceSync';
 
 type AssetType = 'van' | 'hgv' | 'plant';
 type FkColumn = 'van_id' | 'hgv_id' | 'plant_id';
+type ChangedFieldValueType = 'date' | 'mileage' | 'boolean' | 'text';
+
+type ExtendedUpdateMaintenanceRequest = UpdateMaintenanceRequest & {
+  assetType?: AssetType;
+  completed_at?: string;
+  task_title?: string | null;
+  task_description?: string | null;
+  task_category_name?: string | null;
+  task_subcategory_name?: string | null;
+  loler_due_date?: string | null;
+};
 
 function fkColumnForAssetType(assetType: AssetType): FkColumn {
   if (assetType === 'hgv') return 'hgv_id';
   if (assetType === 'plant') return 'plant_id';
   return 'van_id';
+}
+
+const FIELD_TO_CATEGORY_NAME: Record<string, string> = {
+  tax_due_date: 'Tax Due Date',
+  mot_due_date: 'MOT Due Date',
+  first_aid_kit_expiry: 'First Aid Kit Expiry',
+  six_weekly_inspection_due_date: '6 Weekly Inspection Due',
+  fire_extinguisher_due_date: 'Fire Extinguisher Due',
+  taco_calibration_due_date: 'Taco Calibration Due',
+  next_service_mileage: 'Service Due',
+  last_service_mileage: 'Service Due',
+  cambelt_due_mileage: 'Cambelt Replacement',
+  next_service_hours: 'Service Due (Hours)',
+  last_service_hours: 'Service Due (Hours)',
+  loler_due_date: 'LOLER Due',
+};
+
+function buildCategoryIdByField(categories: MaintenanceCategory[]): Map<string, string> {
+  const categoryIdByName = new Map(
+    categories.map((category) => [category.name.toLowerCase(), category.id])
+  );
+
+  return new Map(
+    Object.entries(FIELD_TO_CATEGORY_NAME)
+      .map(([fieldName, categoryName]) => [
+        fieldName,
+        categoryIdByName.get(categoryName.toLowerCase()),
+      ])
+      .filter((entry): entry is [string, string] => Boolean(entry[1]))
+  );
 }
 
 /**
@@ -45,8 +87,7 @@ export async function POST(
     const userName = profile?.full_name || 'Unknown User';
 
     // Parse request body
-    const body: UpdateMaintenanceRequest & { van_id?: string; assetType?: AssetType } =
-      await request.json();
+    const body: ExtendedUpdateMaintenanceRequest = await request.json();
 
     // Validate comment (mandatory, min 10 characters)
     if (!body.comment || body.comment.trim().length < 10) {
@@ -65,7 +106,7 @@ export async function POST(
       : null;
 
     const selectCols =
-      'id, van_id, hgv_id, plant_id, current_mileage, tax_due_date, mot_due_date, first_aid_kit_expiry, six_weekly_inspection_due_date, fire_extinguisher_due_date, taco_calibration_due_date, next_service_mileage, last_service_mileage, cambelt_due_mileage, tracker_id, notes';
+      'id, van_id, hgv_id, plant_id, current_mileage, current_hours, tax_due_date, mot_due_date, first_aid_kit_expiry, six_weekly_inspection_due_date, fire_extinguisher_due_date, taco_calibration_due_date, next_service_mileage, last_service_mileage, cambelt_due_mileage, next_service_hours, last_service_hours, tracker_id, notes';
 
     type ExistingRecord = {
       id: string;
@@ -73,6 +114,7 @@ export async function POST(
       hgv_id: string | null;
       plant_id: string | null;
       current_mileage: number | null;
+      current_hours: number | null;
       tax_due_date: string | null;
       mot_due_date: string | null;
       first_aid_kit_expiry: string | null;
@@ -82,6 +124,8 @@ export async function POST(
       next_service_mileage: number | null;
       last_service_mileage: number | null;
       cambelt_due_mileage: number | null;
+      next_service_hours: number | null;
+      last_service_hours: number | null;
       tracker_id: string | null;
       notes: string | null;
     };
@@ -140,6 +184,91 @@ export async function POST(
       }
     }
 
+    const { data: categories, error: categoriesError } = await supabase
+      .from('maintenance_categories')
+      .select('*')
+      .eq('is_active', true);
+
+    if (categoriesError) {
+      logger.error('Failed to fetch maintenance categories', categoriesError);
+      throw categoriesError;
+    }
+
+    const maintenanceCategories = (categories || []) as MaintenanceCategory[];
+    const categoryIdByField = buildCategoryIdByField(maintenanceCategories);
+
+    const autoPlan = buildAutomaticMaintenancePlan({
+      context: {
+        title: body.task_title,
+        description: body.task_description,
+        workshopCategoryName: body.task_category_name,
+        workshopSubcategoryName: body.task_subcategory_name,
+      },
+      categories: maintenanceCategories,
+      state: {
+        currentMileage: existingRecord?.current_mileage ?? null,
+        currentHours: existingRecord?.current_hours ?? null,
+      },
+      completedAt: body.completed_at || new Date().toISOString(),
+    });
+
+    const requestedUpdates: Partial<UpdateMaintenanceRequest> = {
+      ...(autoPlan?.maintenanceUpdates || {}),
+    };
+
+    const requestedPlantUpdates: { loler_due_date?: string | null } = {
+      ...(autoPlan?.plantUpdates || {}),
+    };
+
+    const maintenanceFields: Array<keyof UpdateMaintenanceRequest> = [
+      'current_mileage',
+      'tax_due_date',
+      'mot_due_date',
+      'first_aid_kit_expiry',
+      'six_weekly_inspection_due_date',
+      'fire_extinguisher_due_date',
+      'taco_calibration_due_date',
+      'next_service_mileage',
+      'last_service_mileage',
+      'cambelt_due_mileage',
+      'current_hours',
+      'last_service_hours',
+      'next_service_hours',
+      'tracker_id',
+      'notes',
+    ];
+
+    for (const fieldName of maintenanceFields) {
+      const fieldValue = body[fieldName];
+      if (fieldValue !== undefined) {
+        (requestedUpdates as Record<string, unknown>)[fieldName] = fieldValue;
+      }
+    }
+
+    if (body.loler_due_date !== undefined) {
+      requestedPlantUpdates.loler_due_date = body.loler_due_date;
+    }
+
+    const historyAssetKeys = {
+      van_id: fkColumn === 'van_id' ? vehicleId : null,
+      hgv_id: fkColumn === 'hgv_id' ? vehicleId : null,
+      plant_id: fkColumn === 'plant_id' ? vehicleId : null,
+    };
+
+    const { data: plantRecord, error: plantRecordError } =
+      fkColumn === 'plant_id'
+        ? await supabase
+            .from('plant')
+            .select('id, loler_due_date')
+            .eq('id', vehicleId)
+            .maybeSingle()
+        : { data: null, error: null };
+
+    if (plantRecordError) {
+      logger.error('Failed to fetch plant record', plantRecordError);
+      throw plantRecordError;
+    }
+
     const isNewRecord = !existingRecord;
 
     // Track which fields changed for history
@@ -147,7 +276,8 @@ export async function POST(
       field_name: string;
       old_value: string | null;
       new_value: string | null;
-      value_type: 'date' | 'mileage' | 'boolean' | 'text';
+      value_type: ChangedFieldValueType;
+      maintenance_category_id: string | null;
     }> = [];
 
     // Build update payload
@@ -156,155 +286,228 @@ export async function POST(
       last_updated_at: new Date().toISOString(),
     };
 
+    const assignChangedField = (
+      fieldName: string,
+      oldValue: string | number | null | undefined,
+      newValue: string | number | null | undefined,
+      valueType: ChangedFieldValueType
+    ) => {
+      changedFields.push({
+        field_name: fieldName,
+        old_value: oldValue != null ? String(oldValue) : null,
+        new_value: newValue != null ? String(newValue) : null,
+        value_type: valueType,
+        maintenance_category_id: categoryIdByField.get(fieldName) || autoPlan?.linkedCategoryId || null,
+      });
+    };
+
     // Check each field for changes
-    if (body.current_mileage !== undefined) {
-      updates.current_mileage = body.current_mileage;
-      if (!existingRecord || existingRecord.current_mileage !== body.current_mileage) {
-        changedFields.push({
-          field_name: 'current_mileage',
-          old_value: existingRecord?.current_mileage?.toString() || null,
-          new_value: body.current_mileage?.toString() || null,
-          value_type: 'mileage',
-        });
+    if (requestedUpdates.current_mileage !== undefined) {
+      updates.current_mileage = requestedUpdates.current_mileage;
+      if (!existingRecord || existingRecord.current_mileage !== requestedUpdates.current_mileage) {
+        assignChangedField(
+          'current_mileage',
+          existingRecord?.current_mileage,
+          requestedUpdates.current_mileage,
+          'mileage'
+        );
       }
     }
 
-    if (body.tax_due_date !== undefined) {
-      updates.tax_due_date = body.tax_due_date;
-      if (!existingRecord || existingRecord.tax_due_date !== body.tax_due_date) {
-        changedFields.push({
-          field_name: 'tax_due_date',
-          old_value: existingRecord?.tax_due_date || null,
-          new_value: body.tax_due_date || null,
-          value_type: 'date',
-        });
+    if (requestedUpdates.tax_due_date !== undefined) {
+      updates.tax_due_date = requestedUpdates.tax_due_date;
+      if (!existingRecord || existingRecord.tax_due_date !== requestedUpdates.tax_due_date) {
+        assignChangedField(
+          'tax_due_date',
+          existingRecord?.tax_due_date,
+          requestedUpdates.tax_due_date,
+          'date'
+        );
       }
     }
 
-    if (body.mot_due_date !== undefined) {
-      updates.mot_due_date = body.mot_due_date;
-      if (!existingRecord || existingRecord.mot_due_date !== body.mot_due_date) {
-        changedFields.push({
-          field_name: 'mot_due_date',
-          old_value: existingRecord?.mot_due_date || null,
-          new_value: body.mot_due_date || null,
-          value_type: 'date',
-        });
+    if (requestedUpdates.mot_due_date !== undefined) {
+      updates.mot_due_date = requestedUpdates.mot_due_date;
+      if (!existingRecord || existingRecord.mot_due_date !== requestedUpdates.mot_due_date) {
+        assignChangedField(
+          'mot_due_date',
+          existingRecord?.mot_due_date,
+          requestedUpdates.mot_due_date,
+          'date'
+        );
       }
     }
 
-    if (body.first_aid_kit_expiry !== undefined) {
-      updates.first_aid_kit_expiry = body.first_aid_kit_expiry;
-      if (!existingRecord || existingRecord.first_aid_kit_expiry !== body.first_aid_kit_expiry) {
-        changedFields.push({
-          field_name: 'first_aid_kit_expiry',
-          old_value: existingRecord?.first_aid_kit_expiry || null,
-          new_value: body.first_aid_kit_expiry || null,
-          value_type: 'date',
-        });
+    if (requestedUpdates.first_aid_kit_expiry !== undefined) {
+      updates.first_aid_kit_expiry = requestedUpdates.first_aid_kit_expiry;
+      if (!existingRecord || existingRecord.first_aid_kit_expiry !== requestedUpdates.first_aid_kit_expiry) {
+        assignChangedField(
+          'first_aid_kit_expiry',
+          existingRecord?.first_aid_kit_expiry,
+          requestedUpdates.first_aid_kit_expiry,
+          'date'
+        );
       }
     }
 
-    if (body.six_weekly_inspection_due_date !== undefined) {
-      updates.six_weekly_inspection_due_date = body.six_weekly_inspection_due_date;
-      if (!existingRecord || existingRecord.six_weekly_inspection_due_date !== body.six_weekly_inspection_due_date) {
-        changedFields.push({
-          field_name: 'six_weekly_inspection_due_date',
-          old_value: existingRecord?.six_weekly_inspection_due_date || null,
-          new_value: body.six_weekly_inspection_due_date || null,
-          value_type: 'date',
-        });
+    if (requestedUpdates.six_weekly_inspection_due_date !== undefined) {
+      updates.six_weekly_inspection_due_date = requestedUpdates.six_weekly_inspection_due_date;
+      if (!existingRecord || existingRecord.six_weekly_inspection_due_date !== requestedUpdates.six_weekly_inspection_due_date) {
+        assignChangedField(
+          'six_weekly_inspection_due_date',
+          existingRecord?.six_weekly_inspection_due_date,
+          requestedUpdates.six_weekly_inspection_due_date,
+          'date'
+        );
       }
     }
 
-    if (body.fire_extinguisher_due_date !== undefined) {
-      updates.fire_extinguisher_due_date = body.fire_extinguisher_due_date;
-      if (!existingRecord || existingRecord.fire_extinguisher_due_date !== body.fire_extinguisher_due_date) {
-        changedFields.push({
-          field_name: 'fire_extinguisher_due_date',
-          old_value: existingRecord?.fire_extinguisher_due_date || null,
-          new_value: body.fire_extinguisher_due_date || null,
-          value_type: 'date',
-        });
+    if (requestedUpdates.fire_extinguisher_due_date !== undefined) {
+      updates.fire_extinguisher_due_date = requestedUpdates.fire_extinguisher_due_date;
+      if (!existingRecord || existingRecord.fire_extinguisher_due_date !== requestedUpdates.fire_extinguisher_due_date) {
+        assignChangedField(
+          'fire_extinguisher_due_date',
+          existingRecord?.fire_extinguisher_due_date,
+          requestedUpdates.fire_extinguisher_due_date,
+          'date'
+        );
       }
     }
 
-    if (body.taco_calibration_due_date !== undefined) {
-      updates.taco_calibration_due_date = body.taco_calibration_due_date;
-      if (!existingRecord || existingRecord.taco_calibration_due_date !== body.taco_calibration_due_date) {
-        changedFields.push({
-          field_name: 'taco_calibration_due_date',
-          old_value: existingRecord?.taco_calibration_due_date || null,
-          new_value: body.taco_calibration_due_date || null,
-          value_type: 'date',
-        });
+    if (requestedUpdates.taco_calibration_due_date !== undefined) {
+      updates.taco_calibration_due_date = requestedUpdates.taco_calibration_due_date;
+      if (!existingRecord || existingRecord.taco_calibration_due_date !== requestedUpdates.taco_calibration_due_date) {
+        assignChangedField(
+          'taco_calibration_due_date',
+          existingRecord?.taco_calibration_due_date,
+          requestedUpdates.taco_calibration_due_date,
+          'date'
+        );
       }
     }
 
-    if (body.next_service_mileage !== undefined) {
-      updates.next_service_mileage = body.next_service_mileage;
-      if (!existingRecord || existingRecord.next_service_mileage !== body.next_service_mileage) {
-        changedFields.push({
-          field_name: 'next_service_mileage',
-          old_value: existingRecord?.next_service_mileage?.toString() || null,
-          new_value: body.next_service_mileage?.toString() || null,
-          value_type: 'mileage',
-        });
+    if (requestedUpdates.next_service_mileage !== undefined) {
+      updates.next_service_mileage = requestedUpdates.next_service_mileage;
+      if (!existingRecord || existingRecord.next_service_mileage !== requestedUpdates.next_service_mileage) {
+        assignChangedField(
+          'next_service_mileage',
+          existingRecord?.next_service_mileage,
+          requestedUpdates.next_service_mileage,
+          'mileage'
+        );
       }
     }
 
-    if (body.last_service_mileage !== undefined) {
-      updates.last_service_mileage = body.last_service_mileage;
-      if (!existingRecord || existingRecord.last_service_mileage !== body.last_service_mileage) {
-        changedFields.push({
-          field_name: 'last_service_mileage',
-          old_value: existingRecord?.last_service_mileage?.toString() || null,
-          new_value: body.last_service_mileage?.toString() || null,
-          value_type: 'mileage',
-        });
+    if (requestedUpdates.last_service_mileage !== undefined) {
+      updates.last_service_mileage = requestedUpdates.last_service_mileage;
+      if (!existingRecord || existingRecord.last_service_mileage !== requestedUpdates.last_service_mileage) {
+        assignChangedField(
+          'last_service_mileage',
+          existingRecord?.last_service_mileage,
+          requestedUpdates.last_service_mileage,
+          'mileage'
+        );
       }
     }
 
-    if (body.cambelt_due_mileage !== undefined) {
-      updates.cambelt_due_mileage = body.cambelt_due_mileage;
-      if (!existingRecord || existingRecord.cambelt_due_mileage !== body.cambelt_due_mileage) {
-        changedFields.push({
-          field_name: 'cambelt_due_mileage',
-          old_value: existingRecord?.cambelt_due_mileage?.toString() || null,
-          new_value: body.cambelt_due_mileage?.toString() || null,
-          value_type: 'mileage',
-        });
+    if (requestedUpdates.cambelt_due_mileage !== undefined) {
+      updates.cambelt_due_mileage = requestedUpdates.cambelt_due_mileage;
+      if (!existingRecord || existingRecord.cambelt_due_mileage !== requestedUpdates.cambelt_due_mileage) {
+        assignChangedField(
+          'cambelt_due_mileage',
+          existingRecord?.cambelt_due_mileage,
+          requestedUpdates.cambelt_due_mileage,
+          'mileage'
+        );
       }
     }
 
-    if (body.tracker_id !== undefined) {
-      updates.tracker_id = body.tracker_id;
-      if (!existingRecord || existingRecord.tracker_id !== body.tracker_id) {
-        changedFields.push({
-          field_name: 'tracker_id',
-          old_value: existingRecord?.tracker_id || null,
-          new_value: body.tracker_id || null,
-          value_type: 'text',
-        });
+    if (requestedUpdates.current_hours !== undefined) {
+      updates.current_hours = requestedUpdates.current_hours;
+      if (!existingRecord || existingRecord.current_hours !== requestedUpdates.current_hours) {
+        assignChangedField(
+          'current_hours',
+          existingRecord?.current_hours,
+          requestedUpdates.current_hours,
+          'text'
+        );
       }
     }
 
-    if (body.notes !== undefined) {
-      updates.notes = body.notes;
-      if (!existingRecord || existingRecord.notes !== body.notes) {
-        changedFields.push({
-          field_name: 'notes',
-          old_value: existingRecord?.notes || null,
-          new_value: body.notes || null,
-          value_type: 'text',
-        });
+    if (requestedUpdates.last_service_hours !== undefined) {
+      updates.last_service_hours = requestedUpdates.last_service_hours;
+      if (!existingRecord || existingRecord.last_service_hours !== requestedUpdates.last_service_hours) {
+        assignChangedField(
+          'last_service_hours',
+          existingRecord?.last_service_hours,
+          requestedUpdates.last_service_hours,
+          'text'
+        );
+      }
+    }
+
+    if (requestedUpdates.next_service_hours !== undefined) {
+      updates.next_service_hours = requestedUpdates.next_service_hours;
+      if (!existingRecord || existingRecord.next_service_hours !== requestedUpdates.next_service_hours) {
+        assignChangedField(
+          'next_service_hours',
+          existingRecord?.next_service_hours,
+          requestedUpdates.next_service_hours,
+          'text'
+        );
+      }
+    }
+
+    if (requestedUpdates.tracker_id !== undefined) {
+      updates.tracker_id = requestedUpdates.tracker_id;
+      if (!existingRecord || existingRecord.tracker_id !== requestedUpdates.tracker_id) {
+        assignChangedField(
+          'tracker_id',
+          existingRecord?.tracker_id,
+          requestedUpdates.tracker_id,
+          'text'
+        );
+      }
+    }
+
+    if (requestedUpdates.notes !== undefined) {
+      updates.notes = requestedUpdates.notes;
+      if (!existingRecord || existingRecord.notes !== requestedUpdates.notes) {
+        assignChangedField(
+          'notes',
+          existingRecord?.notes,
+          requestedUpdates.notes,
+          'text'
+        );
+      }
+    }
+
+    if (requestedPlantUpdates.loler_due_date !== undefined && plantRecord) {
+      if (plantRecord.loler_due_date !== requestedPlantUpdates.loler_due_date) {
+        const { error: plantUpdateError } = await supabase
+          .from('plant')
+          .update({ loler_due_date: requestedPlantUpdates.loler_due_date })
+          .eq('id', vehicleId);
+
+        if (plantUpdateError) {
+          logger.error('Failed to update plant LOLER due date', plantUpdateError);
+          throw plantUpdateError;
+        }
+
+        assignChangedField(
+          'loler_due_date',
+          plantRecord.loler_due_date,
+          requestedPlantUpdates.loler_due_date,
+          'date'
+        );
       }
     }
 
     // Create or update maintenance record
-    let maintenanceRecord;
+    let maintenanceRecord = existingRecord;
+    const hasMaintenanceUpdates = Object.keys(updates).length > 2;
 
-    if (isNewRecord) {
+    if (isNewRecord && hasMaintenanceUpdates) {
       const { data: created, error: createError } = await supabase
         .from('vehicle_maintenance')
         .insert({
@@ -320,7 +523,7 @@ export async function POST(
       }
 
       maintenanceRecord = created;
-    } else {
+    } else if (!isNewRecord && hasMaintenanceUpdates) {
       // Update existing record
       const { data: updated, error: updateError } = await supabase
         .from('vehicle_maintenance')
@@ -338,15 +541,14 @@ export async function POST(
     }
 
     // Create history entries for all changed fields
-    const historyFk = { [fkColumn]: vehicleId };
-
     if (changedFields.length > 0) {
       const historyEntries = changedFields.map((change) => ({
-        ...historyFk,
+        ...historyAssetKeys,
         field_name: change.field_name,
         old_value: change.old_value,
         new_value: change.new_value,
         value_type: change.value_type,
+        maintenance_category_id: change.maintenance_category_id,
         comment: body.comment.trim(),
         updated_by: user.id,
         updated_by_name: userName,
@@ -361,11 +563,12 @@ export async function POST(
       }
     } else {
       await supabase.from('maintenance_history').insert({
-        ...historyFk,
+        ...historyAssetKeys,
         field_name: 'no_changes',
         old_value: null,
         new_value: null,
         value_type: 'text',
+        maintenance_category_id: null,
         comment: body.comment.trim(),
         updated_by: user.id,
         updated_by_name: userName,
@@ -375,7 +578,7 @@ export async function POST(
     return NextResponse.json({
       success: true,
       maintenance: maintenanceRecord,
-      message: isNewRecord
+      message: isNewRecord && hasMaintenanceUpdates
         ? 'Maintenance record created successfully'
         : 'Maintenance record updated successfully',
     });

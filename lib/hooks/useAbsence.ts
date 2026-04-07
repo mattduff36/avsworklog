@@ -34,11 +34,15 @@ interface AbsenceValidationShape {
   notes: string | null;
 }
 
+interface AbsenceQueryOptions {
+  enabled?: boolean;
+}
+
 function hasFilterValue(value?: string): value is string {
   return !!value && value.trim().length > 0;
 }
 
-export function useAbsenceRealtimeQueryInvalidation() {
+export function useAbsenceRealtimeQueryInvalidation(enabled = true) {
   const queryClient = useQueryClient();
 
   const invalidateAbsenceQueries = useCallback(() => {
@@ -50,7 +54,7 @@ export function useAbsenceRealtimeQueryInvalidation() {
     if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
       invalidateAbsenceQueries();
     }
-  });
+  }, enabled);
 }
 
 async function assertAbsenceFinancialYearOpen(
@@ -334,11 +338,12 @@ async function assertAnnualLeaveAllowanceAvailable(
 /**
  * Get all active absence reasons (for employees)
  */
-export function useAbsenceReasons() {
+export function useAbsenceReasons(options?: AbsenceQueryOptions) {
   const supabase = createClient();
   
   return useQuery({
     queryKey: ['absence-reasons'],
+    enabled: options?.enabled !== false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('absence_reasons')
@@ -391,7 +396,10 @@ export function useAbsencesForCurrentUser() {
 /**
  * Get absences for current user in a selected financial year
  */
-export function useAbsencesForUserFinancialYear(financialYear?: Pick<FinancialYear, 'start' | 'end'>) {
+export function useAbsencesForUserFinancialYear(
+  financialYear?: Pick<FinancialYear, 'start' | 'end'>,
+  options?: AbsenceQueryOptions
+) {
   const { profile } = useAuth();
   const supabase = createClient();
   const fallback = getCurrentFinancialYear();
@@ -401,7 +409,7 @@ export function useAbsencesForUserFinancialYear(financialYear?: Pick<FinancialYe
   
   return useQuery({
     queryKey: ['absences', profileId, start.toISOString(), end.toISOString()],
-    enabled: Boolean(profileId),
+    enabled: Boolean(profileId) && options?.enabled !== false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('absences')
@@ -436,7 +444,10 @@ export function useAbsenceSummaryForCurrentUser() {
 /**
  * Get absence summary for current user in a selected financial year
  */
-export function useAbsenceSummaryForUserFinancialYear(financialYear?: Pick<FinancialYear, 'start' | 'end'>) {
+export function useAbsenceSummaryForUserFinancialYear(
+  financialYear?: Pick<FinancialYear, 'start' | 'end'>,
+  options?: AbsenceQueryOptions
+) {
   const { profile } = useAuth();
   const supabase = createClient();
   const fallback = getCurrentFinancialYear();
@@ -446,7 +457,7 @@ export function useAbsenceSummaryForUserFinancialYear(financialYear?: Pick<Finan
   
   return useQuery({
     queryKey: ['absence-summary', profileId, start.toISOString(), end.toISOString()],
-    enabled: Boolean(profileId),
+    enabled: Boolean(profileId) && options?.enabled !== false,
     queryFn: async () => {
       const financialYearStartYear = start.getFullYear();
 

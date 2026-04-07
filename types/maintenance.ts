@@ -1,6 +1,7 @@
 // Types for Vehicle Maintenance & Service System
 
 export type CategoryResponsibility = 'workshop' | 'office';
+export type MaintenancePeriodUnit = 'weeks' | 'months' | 'miles' | 'hours';
 
 export interface MaintenanceCategory {
   id: string;
@@ -8,6 +9,7 @@ export interface MaintenanceCategory {
   description: string | null;
   type: 'date' | 'mileage' | 'hours';
   period_value: number;
+  period_unit: MaintenancePeriodUnit;
   alert_threshold_days: number | null;
   alert_threshold_miles: number | null;
   alert_threshold_hours: number | null;
@@ -237,6 +239,7 @@ export interface CreateCategoryRequest {
   description?: string;
   type: 'date' | 'mileage' | 'hours';
   period_value: number;
+  period_unit?: MaintenancePeriodUnit;
   alert_threshold_days?: number;
   alert_threshold_miles?: number;
   alert_threshold_hours?: number;
@@ -252,6 +255,7 @@ export interface UpdateCategoryRequest {
   name?: string;
   description?: string;
   period_value?: number;
+  period_unit?: MaintenancePeriodUnit;
   alert_threshold_days?: number;
   alert_threshold_miles?: number;
   alert_threshold_hours?: number;

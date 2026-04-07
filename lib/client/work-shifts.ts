@@ -6,15 +6,25 @@ import type {
   UpdateWorkShiftTemplateRequest,
   WorkShiftMatrixResponse,
 } from '@/types/work-shifts';
+import { createStatusError } from '@/lib/utils/http-error';
 
 async function parseResponse<T>(response: Response): Promise<T> {
-  const payload = (await response.json()) as T & { error?: string };
+  const rawPayload = await response.text();
+  let payload: (T & { error?: string }) | null = null;
 
-  if (!response.ok) {
-    throw new Error(payload.error || 'Request failed');
+  if (rawPayload) {
+    try {
+      payload = JSON.parse(rawPayload) as T & { error?: string };
+    } catch (error) {
+      throw createStatusError('Invalid work shift response payload', response.status, error);
+    }
   }
 
-  return payload;
+  if (!response.ok) {
+    throw createStatusError(payload?.error || 'Request failed', response.status);
+  }
+
+  return payload as T;
 }
 
 export async function fetchWorkShiftMatrix(): Promise<WorkShiftMatrixResponse> {

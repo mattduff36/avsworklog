@@ -21,6 +21,7 @@ import { OfficeActionDialog } from './OfficeActionDialog';
 import { QuickEditPopover } from './QuickEditPopover';
 import { getTaskContent, type AlertType } from '@/lib/utils/serviceTaskCreation';
 import { appendStatusHistory, buildStatusHistoryEvent } from '@/lib/utils/workshopTaskStatusHistory';
+import { inferMaintenanceLink } from '@/lib/utils/workshopMaintenanceSync';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 
@@ -810,8 +811,14 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
 
       if (completeError) throw completeError;
 
-      // Update maintenance if there are any updates
-      if (data.maintenanceUpdates && vehicleId) {
+      const linkedMaintenance = inferMaintenanceLink({
+        title: completingTask.title,
+        description: completingTask.description,
+        workshopCategoryName: completingTask.workshop_task_categories?.name,
+      });
+
+      // Update maintenance if there are explicit updates or a linked maintenance task.
+      if (vehicleId && (data.maintenanceUpdates || linkedMaintenance)) {
         try {
           const maintenanceResponse = await fetch(
             `/api/maintenance/by-vehicle/${vehicleId}`,
@@ -820,6 +827,11 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 ...data.maintenanceUpdates,
+                assetType: completingTask.plant_id ? 'plant' : completingTask.hgv_id ? 'hgv' : 'van',
+                completed_at: now.toISOString(),
+                task_title: completingTask.title,
+                task_description: completingTask.description,
+                task_category_name: completingTask.workshop_task_categories?.name,
                 comment: `Updated from workshop task completion: ${completingTask.title || 'Task'}`,
               }),
             }

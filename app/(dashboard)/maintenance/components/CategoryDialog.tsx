@@ -21,6 +21,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, Save, Plus, Briefcase, Wrench, Bell, Mail, Eye, Truck, HardHat } from 'lucide-react';
 import type { MaintenanceCategory, CreateCategoryRequest, UpdateCategoryRequest } from '@/types/maintenance';
 import { useCreateCategory, useUpdateCategory } from '@/lib/hooks/useMaintenance';
+import {
+  formatPeriodValue,
+  normalizePeriodUnit,
+} from '@/lib/utils/maintenancePeriods';
 
 // ============================================================================
 // Zod Validation Schema
@@ -50,6 +54,7 @@ const createCategorySchema = z.object({
     .positive('Must be positive')
     .optional()
     .nullable(),
+  period_unit: z.enum(['weeks', 'months', 'miles', 'hours']),
   period_value: z.coerce.number()
     .int('Period must be a whole number')
     .positive('Period must be a positive number'),
@@ -137,6 +142,7 @@ export function CategoryDialog({
     defaultValues: {
       type: 'date',
       is_active: true,
+      period_unit: 'months',
       responsibility: 'workshop',
       show_on_overview: true,
       reminder_in_app_enabled: false,
@@ -150,6 +156,7 @@ export function CategoryDialog({
   const reminderInApp = useWatch({ control, name: 'reminder_in_app_enabled' });
   const reminderEmail = useWatch({ control, name: 'reminder_email_enabled' });
   const appliesTo = useWatch({ control, name: 'applies_to' });
+  const selectedPeriodUnit = useWatch({ control, name: 'period_unit' });
 
   // Reset form when dialog opens/closes or category changes
   useEffect(() => {
@@ -158,6 +165,7 @@ export function CategoryDialog({
         name: category.name,
         description: category.description || '',
         type: category.type,
+        period_unit: normalizePeriodUnit(category.type, category.period_unit),
         period_value: category.period_value,
         alert_threshold_days: category.alert_threshold_days || undefined,
         alert_threshold_miles: category.alert_threshold_miles || undefined,
@@ -174,6 +182,7 @@ export function CategoryDialog({
         name: '',
         description: '',
         type: 'date',
+        period_unit: 'months',
         period_value: 12,
         alert_threshold_days: 30,
         alert_threshold_miles: undefined,
@@ -191,6 +200,8 @@ export function CategoryDialog({
   // Clear opposite threshold and set sensible defaults when type changes
   useEffect(() => {
     if (selectedType === 'date') {
+      const nextUnit = normalizePeriodUnit('date', getValues('period_unit'));
+      setValue('period_unit', nextUnit);
       setValue('alert_threshold_miles', undefined);
       setValue('alert_threshold_hours', undefined);
       if (!getValues('alert_threshold_days')) {
@@ -200,6 +211,7 @@ export function CategoryDialog({
         setValue('period_value', 12);
       }
     } else if (selectedType === 'mileage') {
+      setValue('period_unit', 'miles');
       setValue('alert_threshold_days', undefined);
       setValue('alert_threshold_hours', undefined);
       if (!getValues('alert_threshold_miles')) {
@@ -209,6 +221,7 @@ export function CategoryDialog({
         setValue('period_value', 10000);
       }
     } else if (selectedType === 'hours') {
+      setValue('period_unit', 'hours');
       setValue('alert_threshold_days', undefined);
       setValue('alert_threshold_miles', undefined);
       if (!getValues('alert_threshold_hours')) {
@@ -227,6 +240,7 @@ export function CategoryDialog({
         name: data.name,
         description: data.description || undefined,
         type: data.type,
+        period_unit: data.period_unit,
         period_value: data.period_value,
         alert_threshold_days: data.type === 'date' ? (data.alert_threshold_days ?? undefined) : undefined,
         alert_threshold_miles: data.type === 'mileage' ? (data.alert_threshold_miles ?? undefined) : undefined,
@@ -243,6 +257,7 @@ export function CategoryDialog({
       const updateData: UpdateCategoryRequest = {
         name: data.name,
         description: data.description || undefined,
+        period_unit: data.period_unit,
         period_value: data.period_value,
         alert_threshold_days: data.type === 'date' ? (data.alert_threshold_days ?? undefined) : undefined,
         alert_threshold_miles: data.type === 'mileage' ? (data.alert_threshold_miles ?? undefined) : undefined,
@@ -275,6 +290,8 @@ export function CategoryDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <input type="hidden" {...register('period_unit')} />
+
           {/* Category Name */}
           <div className="space-y-2">
             <Label htmlFor="name">
@@ -465,9 +482,40 @@ export function CategoryDialog({
 
           {/* Period (Due Interval) */}
           <div className="space-y-2">
+            {selectedType === 'date' && (
+              <div className="space-y-2">
+                <Label>
+                  Date Period Unit <span className="text-red-400">*</span>
+                </Label>
+                <div className="grid grid-cols-2 gap-3">
+                  {(['weeks', 'months'] as const).map((unit) => {
+                    const isSelected = selectedPeriodUnit === unit;
+                    return (
+                      <button
+                        key={unit}
+                        type="button"
+                        onClick={() => setValue('period_unit', unit)}
+                        className={`rounded-lg border-2 px-4 py-3 text-left transition-all ${
+                          isSelected
+                            ? 'border-blue-500 bg-blue-500/20 ring-2 ring-blue-500/30'
+                            : 'border-slate-600 bg-slate-800 hover:border-slate-500'
+                        }`}
+                      >
+                        <p className={`font-medium capitalize ${isSelected ? 'text-blue-400' : 'text-white'}`}>
+                          {unit}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {unit === 'weeks' ? 'Use for recurring inspections like 6-week checks.' : 'Use for monthly or annual renewals.'}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <Label htmlFor="period_value">
               {selectedType === 'date'
-                ? 'Period (Months)'
+                ? `Period (${selectedPeriodUnit === 'weeks' ? 'Weeks' : 'Months'})`
                 : selectedType === 'mileage'
                 ? 'Period (Miles)'
                 : 'Period (Hours)'} <span className="text-red-400">*</span>
@@ -478,7 +526,9 @@ export function CategoryDialog({
               {...register('period_value')}
               placeholder={
                 selectedType === 'date'
-                  ? 'e.g., 12'
+                  ? selectedPeriodUnit === 'weeks'
+                    ? 'e.g., 6'
+                    : 'e.g., 12'
                   : selectedType === 'mileage'
                   ? 'e.g., 10000'
                   : 'e.g., 250'
@@ -487,7 +537,7 @@ export function CategoryDialog({
             />
             <p className="text-xs text-muted-foreground">
               {selectedType === 'date'
-                ? 'How often this is due, in months (e.g. 12 = every 12 months)'
+                ? `How often this is due, in ${selectedPeriodUnit === 'weeks' ? 'weeks' : 'months'} (e.g. ${selectedPeriodUnit === 'weeks' ? formatPeriodValue(6, 'weeks') : formatPeriodValue(12, 'months')})`
                 : selectedType === 'mileage'
                 ? 'How often this is due, in miles (e.g. 10,000 = every 10,000 miles)'
                 : 'How often this is due, in engine hours (e.g. 250 = every 250 hours)'}

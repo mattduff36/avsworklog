@@ -1,5 +1,10 @@
 'use client';
 
+import {
+  clearClientServiceOutage,
+  reportClientServiceOutage,
+  shouldTripClientServiceOutage,
+} from '@/lib/app-auth/client-service-health';
 import { createStatusError, getErrorStatus } from '@/lib/utils/http-error';
 
 export interface ClientAuthSessionUser {
@@ -24,7 +29,7 @@ export interface ClientAuthSessionResult {
 
 let pendingClientAuthSessionPromise: Promise<ClientAuthSessionResult> | null = null;
 
-function parseSessionPayload(rawPayload: string): ClientAuthSessionResponse | null {
+function parseSessionPayload(rawPayload: string, responseStatus?: number): ClientAuthSessionResponse | null {
   if (!rawPayload) {
     return null;
   }
@@ -32,7 +37,7 @@ function parseSessionPayload(rawPayload: string): ClientAuthSessionResponse | nu
   try {
     return JSON.parse(rawPayload) as ClientAuthSessionResponse;
   } catch (error) {
-    throw createStatusError('Invalid auth session response payload', undefined, error);
+    throw createStatusError('Invalid auth session response payload', responseStatus, error);
   }
 }
 
@@ -44,9 +49,10 @@ async function requestClientAuthSession(): Promise<ClientAuthSessionResult> {
     },
   });
 
-  const payload = parseSessionPayload(await response.text());
+  const payload = parseSessionPayload(await response.text(), response.status);
 
   if (response.status === 401) {
+    clearClientServiceOutage('auth-session');
     return {
       status: 'unauthenticated',
       payload,
@@ -56,6 +62,7 @@ async function requestClientAuthSession(): Promise<ClientAuthSessionResult> {
   }
 
   if (response.status === 423 || payload?.locked === true) {
+    clearClientServiceOutage('auth-session');
     return {
       status: 'locked',
       payload,
@@ -69,6 +76,8 @@ async function requestClientAuthSession(): Promise<ClientAuthSessionResult> {
       ? String((payload as { error?: unknown }).error || `HTTP ${response.status}`)
       : `HTTP ${response.status}`, response.status);
   }
+
+  clearClientServiceOutage('auth-session');
 
   if (!payload?.authenticated || !payload.user?.id) {
     return {
@@ -96,10 +105,21 @@ export async function loadClientAuthSession(): Promise<ClientAuthSessionResult> 
     try {
       return await requestClientAuthSession();
     } catch (error) {
+      const responseStatus = getErrorStatus(error);
+      if (shouldTripClientServiceOutage(responseStatus)) {
+        reportClientServiceOutage(
+          'auth-session',
+          responseStatus,
+          'We could not verify your session, so data loading has been paused.'
+        );
+      } else {
+        clearClientServiceOutage('auth-session');
+      }
+
       return {
         status: 'error',
         payload: null,
-        responseStatus: getErrorStatus(error),
+        responseStatus,
         error: error instanceof Error ? error : new Error('Failed to load auth session'),
       };
     } finally {

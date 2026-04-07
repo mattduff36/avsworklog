@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 
@@ -10,10 +10,12 @@ export function useRealtimeSubscription(
   table: string,
   event: 'INSERT' | 'UPDATE' | 'DELETE' | '*',
   callback: RealtimeCallback,
-  filter?: string
+  filter?: string,
+  enabled = true
 ) {
-  const [supabase] = useState<ReturnType<typeof createClient> | null>(() =>
-    typeof window !== 'undefined' ? createClient() : null
+  const supabase = useMemo(
+    () => (typeof window !== 'undefined' && enabled ? createClient() : null),
+    [enabled]
   );
   const callbackRef = useRef(callback);
 
@@ -22,7 +24,7 @@ export function useRealtimeSubscription(
   }, [callback]);
 
   useEffect(() => {
-    if (!supabase) return;
+    if (!enabled || !supabase) return;
 
     let channel: RealtimeChannel;
 
@@ -56,7 +58,7 @@ export function useRealtimeSubscription(
         supabase.removeChannel(channel);
       }
     };
-  }, [table, event, filter, supabase]);
+  }, [enabled, table, event, filter, supabase]);
 }
 
 export function useTimesheetRealtime(callback: RealtimeCallback) {
@@ -71,7 +73,7 @@ export function usePlantInspectionRealtime(callback: RealtimeCallback) {
   useRealtimeSubscription('plant_inspections', '*', callback);
 }
 
-export function useAbsenceRealtime(callback: RealtimeCallback) {
-  useRealtimeSubscription('absences', '*', callback);
+export function useAbsenceRealtime(callback: RealtimeCallback, enabled = true) {
+  useRealtimeSubscription('absences', '*', callback, undefined, enabled);
 }
 

@@ -229,7 +229,15 @@ export function QuickEditPopover({
       const response = await fetch(`/api/maintenance/by-vehicle/${vehicleId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          ...payload,
+          assetType:
+            vehicle.vehicle?.asset_type === 'plant'
+              ? 'plant'
+              : vehicle.vehicle?.asset_type === 'hgv'
+              ? 'hgv'
+              : 'van',
+        }),
       });
 
       const data = await response.json();
