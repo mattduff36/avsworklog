@@ -8,10 +8,11 @@
  * - Priority assignment based on severity
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
+import { deleteWorkshopTasksForUserMatching, prefixPattern } from './helpers/test-cleanup';
 import { resolveTestVanId } from './helpers/test-assets';
 
 // Load environment variables
@@ -54,6 +55,12 @@ describe('Service Task Creation Integration', () => {
       throw new Error('Failed to authenticate test user');
     }
     testUserId = authData.user.id;
+
+    await deleteWorkshopTasksForUserMatching({
+      createdBy: testUserId,
+      titlePrefixes: [runPrefix],
+      titlePatterns: [prefixPattern('IT-SERVICE-')],
+    });
 
     // Prefer an existing TE57 test van and never fall back to live assets.
     const existingTestVanId = await resolveTestVanId(supabase);
@@ -171,18 +178,14 @@ describe('Service Task Creation Integration', () => {
   });
 
   afterAll(async () => {
-    // Cleanup: Delete test data
-    if (testVehicleId) {
-      await supabase
-        .from('actions')
-        .delete()
-        .eq('van_id', testVehicleId)
-        .eq('created_by', testUserId)
-        .eq('action_type', 'workshop_vehicle_task')
-        .ilike('title', `${runPrefix} | %`);
-      if (createdTestVehicle) {
-        await supabase.from('vans').delete().eq('id', testVehicleId);
-      }
+    await deleteWorkshopTasksForUserMatching({
+      createdBy: testUserId,
+      titlePrefixes: [runPrefix],
+      titlePatterns: [prefixPattern('IT-SERVICE-')],
+    });
+
+    if (testVehicleId && createdTestVehicle) {
+      await supabase.from('vans').delete().eq('id', testVehicleId);
     }
     if (testSubcategoryId && createdTestSubcategory) {
       await supabase.from('workshop_task_subcategories').delete().eq('id', testSubcategoryId);
@@ -194,15 +197,14 @@ describe('Service Task Creation Integration', () => {
 
   beforeEach(async () => {
     testCasePrefix = `${runPrefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  });
 
-    // Clean up any tasks created in previous tests
-    await supabase
-      .from('actions')
-      .delete()
-      .eq('van_id', testVehicleId)
-      .eq('created_by', testUserId)
-      .eq('action_type', 'workshop_vehicle_task')
-      .ilike('title', `${runPrefix}%`);
+  afterEach(async () => {
+    await deleteWorkshopTasksForUserMatching({
+      createdBy: testUserId,
+      titlePrefixes: [testCasePrefix],
+      titlePatterns: [prefixPattern(runPrefix)],
+    });
   });
 
   describe('Task Creation', () => {

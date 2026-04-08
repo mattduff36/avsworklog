@@ -7,6 +7,12 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
+import {
+  deleteActionsByIds,
+  deleteRowsByIds,
+  deleteWorkshopTasksForUserMatching,
+  prefixPattern,
+} from './helpers/test-cleanup';
 import { resolveTestHgvId, resolveTestPlantId, resolveTestVanId } from './helpers/test-assets';
 
 // Load environment variables
@@ -28,6 +34,9 @@ describe('Workshop Tasks Module Workflows', () => {
   let testVehicleId: string;
   let testHgvId: string;
   let testPlantId: string;
+  const createdTaskIds = new Set<string>();
+  const createdCategoryIds = new Set<string>();
+  const createdSubcategoryIds = new Set<string>();
 
   function applyTestAssetScope<TQuery extends { or: (filters: string) => TQuery }>(query: TQuery): TQuery {
     const filters = [testVehicleId && `van_id.eq.${testVehicleId}`, testHgvId && `hgv_id.eq.${testHgvId}`, testPlantId && `plant_id.eq.${testPlantId}`]
@@ -52,9 +61,37 @@ describe('Workshop Tasks Module Workflows', () => {
     testVehicleId = (await resolveTestVanId(supabase)) || '';
     testHgvId = (await resolveTestHgvId(supabase)) || '';
     testPlantId = (await resolveTestPlantId(supabase)) || '';
+
+    await deleteWorkshopTasksForUserMatching({
+      createdBy: testUserId,
+      titlePatterns: [
+        prefixPattern('Test Workflow Task '),
+        prefixPattern('Multi-step Test Task '),
+        prefixPattern('WF Van Task '),
+        prefixPattern('WF HGV Task '),
+        prefixPattern('WF Plant Task '),
+        prefixPattern('WF Dedupe Title '),
+        prefixPattern('New Workshop Task '),
+      ],
+    });
   });
 
   afterAll(async () => {
+    await deleteActionsByIds(Array.from(createdTaskIds));
+    await deleteRowsByIds('workshop_task_subcategories', Array.from(createdSubcategoryIds));
+    await deleteRowsByIds('workshop_task_categories', Array.from(createdCategoryIds));
+    await deleteWorkshopTasksForUserMatching({
+      createdBy: testUserId,
+      titlePatterns: [
+        prefixPattern('Test Workflow Task '),
+        prefixPattern('Multi-step Test Task '),
+        prefixPattern('WF Van Task '),
+        prefixPattern('WF HGV Task '),
+        prefixPattern('WF Plant Task '),
+        prefixPattern('WF Dedupe Title '),
+        prefixPattern('New Workshop Task '),
+      ],
+    });
     await supabase.auth.signOut();
   });
 
@@ -178,16 +215,13 @@ describe('Workshop Tasks Module Workflows', () => {
 
       if (!error && newTask) {
         workflowTestTaskId = newTask.id;
+        createdTaskIds.add(newTask.id);
       }
     });
 
     afterAll(async () => {
-      // Clean up test task
       if (workflowTestTaskId) {
-        await supabase
-          .from('actions')
-          .delete()
-          .eq('id', workflowTestTaskId);
+        createdTaskIds.add(workflowTestTaskId);
       }
     });
 
@@ -318,6 +352,7 @@ describe('Workshop Tasks Module Workflows', () => {
       expect(newTask).toBeDefined();
 
       if (!newTask) return;
+      createdTaskIds.add(newTask.id);
 
       // Step 1: Move to in progress
       const { data: inProgress, error: step1Error } = await supabase
@@ -352,8 +387,7 @@ describe('Workshop Tasks Module Workflows', () => {
       expect(step2Error).toBeNull();
       expect(completed?.status).toBe('completed');
 
-      // Clean up
-      await supabase.from('actions').delete().eq('id', newTask.id);
+      createdTaskIds.add(newTask.id);
     });
   });
 
@@ -413,6 +447,7 @@ describe('Workshop Tasks Module Workflows', () => {
 
         if (data.category) {
           testCategoryId = data.category.id;
+          createdCategoryIds.add(data.category.id);
         }
       } catch (error) {
         console.log('API test skipped - server may not be reachable from test environment');
@@ -476,6 +511,7 @@ describe('Workshop Tasks Module Workflows', () => {
 
       if (data.subcategory) {
         testSubcategoryId = data.subcategory.id;
+        createdSubcategoryIds.add(data.subcategory.id);
       }
     });
 
@@ -587,6 +623,7 @@ describe('Workshop Tasks Module Workflows', () => {
 
       if (task) {
         createdTaskId = task.id;
+        createdTaskIds.add(task.id);
       }
     });
 
@@ -595,22 +632,14 @@ describe('Workshop Tasks Module Workflows', () => {
         console.log('No created task, skipping cleanup');
         return;
       }
-
-      const { error } = await supabase
-        .from('actions')
-        .delete()
-        .eq('id', createdTaskId);
-
-      expect(error).toBeNull();
+      await deleteActionsByIds([createdTaskId]);
+      createdTaskIds.delete(createdTaskId);
     });
   });
 
   describe('Multi-asset lifecycle and dedupe edge cases', () => {
-    const createdTaskIds: string[] = [];
-
     afterAll(async () => {
-      if (createdTaskIds.length === 0) return;
-      await supabase.from('actions').delete().in('id', createdTaskIds);
+      await deleteActionsByIds(Array.from(createdTaskIds));
     });
 
     const getCategoryForAsset = async (assetType: 'van' | 'hgv' | 'plant') => {
@@ -668,7 +697,7 @@ describe('Workshop Tasks Module Workflows', () => {
         category.id,
         `WF Van Task ${Date.now()}`
       );
-      createdTaskIds.push(taskId);
+      createdTaskIds.add(taskId);
 
       const states = ['logged', 'on_hold', 'completed'] as const;
       for (const status of states) {
@@ -697,7 +726,7 @@ describe('Workshop Tasks Module Workflows', () => {
       }
 
       const taskId = await createTaskForAsset('hgv', hgvId, category.id, `WF HGV Task ${Date.now()}`);
-      createdTaskIds.push(taskId);
+      createdTaskIds.add(taskId);
 
       const { data, error } = await supabase
         .from('actions')
@@ -730,7 +759,7 @@ describe('Workshop Tasks Module Workflows', () => {
         category.id,
         `WF Plant Task ${Date.now()}`
       );
-      createdTaskIds.push(taskId);
+      createdTaskIds.add(taskId);
 
       const { data, error } = await supabase
         .from('actions')
@@ -757,10 +786,10 @@ describe('Workshop Tasks Module Workflows', () => {
 
       const sharedTitle = `WF Dedupe Title ${Date.now()}`;
       const activeTaskId = await createTaskForAsset('van', testVehicleId, category.id, sharedTitle);
-      createdTaskIds.push(activeTaskId);
+      createdTaskIds.add(activeTaskId);
 
       const completedTaskId = await createTaskForAsset('van', testVehicleId, category.id, sharedTitle);
-      createdTaskIds.push(completedTaskId);
+      createdTaskIds.add(completedTaskId);
       await supabase.from('actions').update({ status: 'completed' }).eq('id', completedTaskId);
 
       const { data, error } = await supabase
