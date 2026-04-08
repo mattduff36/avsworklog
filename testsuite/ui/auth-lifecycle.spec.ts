@@ -3,10 +3,13 @@
  * Auth lifecycle resilience scenarios focused on sync behavior.
  */
 import { test, expect, type TestInfo } from '@playwright/test';
+import { login } from '../helpers/auth';
 import { waitForAppReady } from '../helpers/wait-for-app';
 import { recordAuthLifecycleIssue, type AuthLifecycleIssueInput } from '../runner/auth-lifecycle-audit';
 
 const AUTH_EVENT_STORAGE_KEY = 'avs_auth_event_v1';
+
+test.use({ storageState: { cookies: [], origins: [] } });
 
 async function logIssue(testInfo: TestInfo, issue: AuthLifecycleIssueInput): Promise<void> {
   recordAuthLifecycleIssue({
@@ -21,10 +24,12 @@ async function logIssue(testInfo: TestInfo, issue: AuthLifecycleIssueInput): Pro
 }
 
 test.describe('@auth @lifecycle Authentication Lifecycle', () => {
-  test('session stays healthy after visibility/focus transitions', async ({ page }, testInfo) => {
-    await page.goto('/dashboard');
+  test.beforeEach(async ({ page }) => {
+    await login(page, 'admin');
     await waitForAppReady(page);
+  });
 
+  test('session stays healthy after visibility/focus transitions', async ({ page }, testInfo) => {
     const initial = await page.request.get('/api/auth/session');
     expect(initial.ok(), 'Initial session request should be successful').toBeTruthy();
 
@@ -52,9 +57,6 @@ test.describe('@auth @lifecycle Authentication Lifecycle', () => {
   });
 
   test('sign-out in one tab propagates to another tab', async ({ page }, testInfo) => {
-    await page.goto('/dashboard');
-    await waitForAppReady(page);
-
     const siblingTab = await page.context().newPage();
     await siblingTab.goto('/dashboard');
     await waitForAppReady(siblingTab);
@@ -96,9 +98,6 @@ test.describe('@auth @lifecycle Authentication Lifecycle', () => {
   });
 
   test('authenticated users do not stay on the login route', async ({ page }, testInfo) => {
-    await page.goto('/dashboard');
-    await waitForAppReady(page);
-
     await page.goto('/login');
     const redirected = await page
       .waitForURL((url) => url.pathname.includes('/dashboard') || url.pathname.includes('/change-password'), {
@@ -118,9 +117,6 @@ test.describe('@auth @lifecycle Authentication Lifecycle', () => {
   });
 
   test('session recovers after offline -> online transition', async ({ page, context }, testInfo) => {
-    await page.goto('/dashboard');
-    await waitForAppReady(page);
-
     await context.setOffline(true);
     await page.waitForTimeout(750);
     await context.setOffline(false);
@@ -138,9 +134,6 @@ test.describe('@auth @lifecycle Authentication Lifecycle', () => {
   });
 
   test('lock flow enters lock state when switcher is available', async ({ page }, testInfo) => {
-    await page.goto('/dashboard');
-    await waitForAppReady(page);
-
     const lockButton = page.getByRole('button', { name: /lock\s*\/\s*switch/i }).first();
     const hasLockButton = (await lockButton.count()) > 0;
     if (!hasLockButton) {

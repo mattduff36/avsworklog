@@ -7,17 +7,8 @@ import type React from 'react';
 let outsidePrevented = false;
 let escapePrevented = false;
 
-vi.mock('@/lib/supabase/client', () => ({
-  createClient: () => ({
-    auth: {
-      getUser: vi.fn(async () => ({
-        data: { user: { id: 'workshop-test-user' } },
-      })),
-      onAuthStateChange: vi.fn(() => ({
-        data: { subscription: { unsubscribe: vi.fn() } },
-      })),
-    },
-  }),
+vi.mock('@/lib/app-auth/client', () => ({
+  subscribeToAuthStateChange: () => vi.fn(),
 }));
 
 vi.mock('@/components/ui/dialog', () => ({
@@ -177,6 +168,25 @@ function createBaseProps(): React.ComponentProps<typeof WorkshopTaskFormDialogs>
 describe('Workshop task dialog tablet safeguards', () => {
   beforeEach(() => {
     localStorage.clear();
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes('/api/auth/session')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            authenticated: true,
+            user: { id: 'workshop-test-user' },
+          }),
+        } as Response;
+      }
+
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({}),
+      } as Response;
+    }) as unknown as typeof fetch;
   });
 
   it('prevents accidental add dialog close when form is dirty', async () => {

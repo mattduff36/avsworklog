@@ -49,9 +49,12 @@ function buildMockSupabase() {
       if (table === 'absences') {
         return {
           select() {
-            let statusFilter: string | null = null;
+            let statusFilter: string[] | null = null;
             const chain = {
               eq(field: string, value: string) {
+                return chain;
+              },
+              in(field: string, value: string[]) {
                 if (field === 'status') {
                   statusFilter = value;
                 }
@@ -70,7 +73,7 @@ function buildMockSupabase() {
                   { profile_id: 'emp-a', duration_days: 3 },
                 ];
                 return {
-                  data: statusFilter === 'approved' ? approvedRows : approvedRows.concat(pendingRows),
+                  data: statusFilter?.includes('processed') ? approvedRows : approvedRows.concat(pendingRows),
                   error: null,
                 };
               },

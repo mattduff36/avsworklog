@@ -12,6 +12,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
+import { resolveTestVanId } from './helpers/test-assets';
 
 // Load environment variables
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
@@ -37,7 +38,8 @@ describe('Service Task Creation Integration', () => {
   let createdTestCategory = false;
   let createdTestSubcategory = false;
   const runPrefix = `IT-SERVICE-${Date.now()}`;
-  const makeTitle = (baseTitle: string) => `${runPrefix} | ${baseTitle}`;
+  let testCasePrefix = runPrefix;
+  const makeTitle = (baseTitle: string) => `${testCasePrefix} | ${baseTitle}`;
 
   beforeAll(async () => {
     supabase = createClient(supabaseUrl, supabaseKey);
@@ -53,17 +55,11 @@ describe('Service Task Creation Integration', () => {
     }
     testUserId = authData.user.id;
 
-    // Prefer an existing active test van first.
-    const { data: existingTestVan } = await supabase
-      .from('vans')
-      .select('id')
-      .ilike('reg_number', 'TE57%')
-      .eq('status', 'active')
-      .limit(1)
-      .single();
+    // Prefer an existing TE57 test van and never fall back to live assets.
+    const existingTestVanId = await resolveTestVanId(supabase);
 
-    if (existingTestVan?.id) {
-      testVehicleId = existingTestVan.id;
+    if (existingTestVanId) {
+      testVehicleId = existingTestVanId;
     } else {
       // Create a valid test van (category_id is required by current schema).
       const { data: vanCategory } = await supabase
@@ -90,18 +86,7 @@ describe('Service Task Creation Integration', () => {
         testVehicleId = createdVehicle.id;
         createdTestVehicle = true;
       } else {
-        // Fallback for environments where this user cannot create vans.
-        const { data: fallbackVan } = await supabase
-          .from('vans')
-          .select('id')
-          .eq('status', 'active')
-          .limit(1)
-          .single();
-
-        if (!fallbackVan?.id) {
-          throw new Error('Failed to create or select a valid test van');
-        }
-        testVehicleId = fallbackVan.id;
+        throw new Error('Failed to create a TE57 test van; refusing to use a live asset');
       }
     }
 
@@ -136,17 +121,30 @@ describe('Service Task Creation Integration', () => {
       createdTestCategory = true;
     }
 
-    const { data: subcategory, error: _subcategoryError } = await supabase
+    const { data: subcategory, error: subcategoryError } = await supabase
       .from('workshop_task_subcategories')
-      .select('id')
+      .select('id, category_id')
       .eq('category_id', testCategoryId)
       .eq('is_active', true)
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (subcategory?.id) {
       testSubcategoryId = subcategory.id;
+      testCategoryId = subcategory.category_id;
     } else {
+      const { data: existingVanSubcategory } = await supabase
+        .from('workshop_task_subcategories')
+        .select('id, category_id')
+        .eq('is_active', true)
+        .limit(50);
+
+      const fallbackSubcategory = existingVanSubcategory?.find((row) => Boolean(row.id && row.category_id));
+
+      if (fallbackSubcategory?.id) {
+        testSubcategoryId = fallbackSubcategory.id;
+        testCategoryId = fallbackSubcategory.category_id;
+      } else {
       const { data: newSubcategory, error: newSubcategoryError } = await supabase
         .from('workshop_task_subcategories')
         .insert({
@@ -159,11 +157,16 @@ describe('Service Task Creation Integration', () => {
         .single();
 
       if (newSubcategoryError || !newSubcategory?.id) {
-        throw new Error('Failed to create test subcategory');
+        throw new Error(
+          `Failed to create test subcategory${
+            subcategoryError?.message ? ` (existing lookup: ${subcategoryError.message})` : ''
+          }${newSubcategoryError?.message ? ` (insert: ${newSubcategoryError.message})` : ''}`
+        );
       }
 
       testSubcategoryId = newSubcategory.id;
       createdTestSubcategory = true;
+    }
     }
   });
 
@@ -190,6 +193,8 @@ describe('Service Task Creation Integration', () => {
   });
 
   beforeEach(async () => {
+    testCasePrefix = `${runPrefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
     // Clean up any tasks created in previous tests
     await supabase
       .from('actions')
@@ -197,7 +202,7 @@ describe('Service Task Creation Integration', () => {
       .eq('van_id', testVehicleId)
       .eq('created_by', testUserId)
       .eq('action_type', 'workshop_vehicle_task')
-      .ilike('title', `${runPrefix} | %`);
+      .ilike('title', `${runPrefix}%`);
   });
 
   describe('Task Creation', () => {
@@ -243,7 +248,8 @@ describe('Service Task Creation Integration', () => {
         .from('actions')
         .select('*')
         .eq('van_id', testVehicleId)
-        .eq('action_type', 'workshop_vehicle_task');
+        .eq('action_type', 'workshop_vehicle_task')
+        .ilike('title', `${testCasePrefix} | %`);
 
       expect(fetchedTasks).toHaveLength(2);
     });
@@ -282,7 +288,8 @@ describe('Service Task Creation Integration', () => {
         .from('actions')
         .select('title, priority')
         .eq('van_id', testVehicleId)
-        .eq('action_type', 'workshop_vehicle_task');
+        .eq('action_type', 'workshop_vehicle_task')
+        .ilike('title', `${testCasePrefix} | %`);
 
       const taxTask = fetchedTasks?.find((t: { title: string }) => t.title.includes('Tax'));
       const serviceTask = fetchedTasks?.find((t: { title: string }) => t.title.includes('Service'));
@@ -310,7 +317,8 @@ describe('Service Task Creation Integration', () => {
       const { data: tasks } = await supabase
         .from('actions')
         .select('title')
-        .eq('van_id', testVehicleId);
+        .eq('van_id', testVehicleId)
+        .eq('title', makeTitle('MOT Due - ABC123'));
 
       expect(tasks?.[0]?.title).toBe(makeTitle('MOT Due - ABC123'));
     });
@@ -436,7 +444,8 @@ describe('Service Task Creation Integration', () => {
       const { data: fetchedTasks } = await supabase
         .from('actions')
         .select('title')
-        .eq('van_id', testVehicleId);
+        .eq('van_id', testVehicleId)
+        .ilike('title', `${testCasePrefix} | %`);
 
       expect(fetchedTasks).toHaveLength(3);
       expect(fetchedTasks?.map((t: { title: string }) => t.title).sort()).toEqual([
@@ -517,7 +526,8 @@ describe('Service Task Creation Integration', () => {
       const { data: fetchedTasks } = await supabase
         .from('actions')
         .select('title, workshop_comments')
-        .eq('van_id', testVehicleId);
+        .eq('van_id', testVehicleId)
+        .ilike('title', `${testCasePrefix} | %`);
 
       expect(fetchedTasks).toHaveLength(5);
       

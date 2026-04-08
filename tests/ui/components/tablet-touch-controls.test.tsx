@@ -17,17 +17,8 @@ import {
 } from '@/components/ui/tablet-mode-controls';
 import { TabletModeProvider } from '@/components/layout/tablet-mode-context';
 
-vi.mock('@/lib/supabase/client', () => ({
-  createClient: () => ({
-    auth: {
-      getUser: vi.fn(async () => ({
-        data: { user: { id: 'tablet-test-user' } },
-      })),
-      onAuthStateChange: vi.fn(() => ({
-        data: { subscription: { unsubscribe: vi.fn() } },
-      })),
-    },
-  }),
+vi.mock('@/lib/app-auth/client', () => ({
+  subscribeToAuthStateChange: () => vi.fn(),
 }));
 
 vi.mock('@/components/ui/button', () => ({
@@ -95,6 +86,25 @@ function Harness({ tabletEnabled }: { tabletEnabled: boolean }) {
 describe('tablet touch controls wrappers', () => {
   beforeEach(() => {
     localStorage.clear();
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes('/api/auth/session')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            authenticated: true,
+            user: { id: 'tablet-test-user' },
+          }),
+        } as Response;
+      }
+
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({}),
+      } as Response;
+    }) as unknown as typeof fetch;
   });
 
   it('keeps default classes when tablet mode is off', async () => {

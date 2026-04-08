@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server';
 
 const {
   mockCanAccess,
+  mockEnsureTeamPermissionRows,
   mockGetTeamManagerOptions,
   mockGetEffectiveRole,
   mockInsertSingleResult,
@@ -15,6 +16,7 @@ const {
   mockValidateTeamManagerSelection,
 } = vi.hoisted(() => ({
   mockCanAccess: vi.fn(),
+  mockEnsureTeamPermissionRows: vi.fn(),
   mockGetTeamManagerOptions: vi.fn(),
   mockGetEffectiveRole: vi.fn(),
   mockInsertSingleResult: vi.fn(),
@@ -89,10 +91,15 @@ vi.mock('@/lib/server/team-managers', () => ({
   validateTeamManagerSelection: mockValidateTeamManagerSelection,
 }));
 
+vi.mock('@/lib/server/team-permissions', () => ({
+  ensureTeamPermissionRows: mockEnsureTeamPermissionRows,
+}));
+
 describe('Hierarchy teams routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCanAccess.mockResolvedValue(true);
+    mockEnsureTeamPermissionRows.mockResolvedValue(undefined);
     mockGetTeamManagerOptions.mockResolvedValue([]);
     mockInsertSingleResult.mockResolvedValue({ data: null, error: null });
     mockTeamInsert.mockReset();

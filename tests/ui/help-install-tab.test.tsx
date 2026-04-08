@@ -70,6 +70,7 @@ describe('Help page install tab', () => {
     });
 
     expect(screen.getByText('Quick Support Actions')).toBeInTheDocument();
+    expect(screen.getByText('Refresh App')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /install now/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /refresh app now/i })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /guided cache-clear steps/i }).length).toBeGreaterThanOrEqual(1);

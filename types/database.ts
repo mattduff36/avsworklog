@@ -1929,8 +1929,8 @@ export type Database = {
           nickname: string
           created_at: string
           current_mileage: number
-          retired_at: string
-          retire_reason: string
+          retired_at: string | null
+          retire_reason: string | null
         }
         Insert: {
           id?: string

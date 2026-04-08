@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
+import { resolveTestHgvId } from './helpers/test-assets';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
@@ -34,15 +35,7 @@ describeHgvHistorySuite('HGV history workflows', () => {
 
     accessToken = authData.session?.access_token || '';
 
-    const { data: hgvs, error: hgvsError } = await supabase
-      .from('hgvs')
-      .select('id')
-      .limit(1);
-
-    if (hgvsError) throw hgvsError;
-    if (hgvs && hgvs.length > 0) {
-      hgvId = hgvs[0].id;
-    }
+    hgvId = (await resolveTestHgvId(supabase)) || '';
   });
 
   afterAll(async () => {

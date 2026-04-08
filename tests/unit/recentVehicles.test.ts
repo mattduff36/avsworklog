@@ -8,7 +8,7 @@ import {
 
 describe('Recent Vehicles Utility', () => {
   const testUserId = 'user-123';
-  const storageKey = `recent_vehicles_${testUserId}`;
+  const storageKey = `recent_vehicles_vehicles_${testUserId}`;
 
   // Create a fresh store for each test
   let store: Record<string, string> = {};

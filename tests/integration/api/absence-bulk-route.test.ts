@@ -5,6 +5,9 @@ import { GET, POST, DELETE } from '@/app/api/absence/shutdown/route';
 
 vi.mock('@/lib/supabase/server');
 vi.mock('@/lib/utils/permissions');
+vi.mock('@/lib/server/absence-secondary-permissions');
+vi.mock('@/lib/utils/view-as');
+vi.mock('@/lib/utils/rbac');
 vi.mock('@/lib/services/absence-bank-holiday-sync');
 
 describe('Bulk Absence API Route', () => {
@@ -12,9 +15,12 @@ describe('Bulk Absence API Route', () => {
     vi.clearAllMocks();
   });
 
-  it('returns 400 on POST when reasonId is missing', async () => {
+  async function mockManagerAbsenceAccess() {
     const { createClient } = await import('@/lib/supabase/server');
     const { getProfileWithRole } = await import('@/lib/utils/permissions');
+    const { getActorAbsenceSecondaryPermissions } = await import('@/lib/server/absence-secondary-permissions');
+    const { getEffectiveRole } = await import('@/lib/utils/view-as');
+    const { canEffectiveRoleAccessModule } = await import('@/lib/utils/rbac');
 
     vi.mocked(createClient).mockResolvedValue({
       auth: {
@@ -25,6 +31,26 @@ describe('Bulk Absence API Route', () => {
       id: 'manager-1',
       role: { is_manager_admin: true },
     } as never);
+    vi.mocked(canEffectiveRoleAccessModule).mockResolvedValue(true);
+    vi.mocked(getEffectiveRole).mockResolvedValue({
+      user_id: 'manager-1',
+      role_name: 'manager',
+      display_name: 'Manager',
+      role_class: 'manager',
+      is_manager_admin: true,
+      is_super_admin: false,
+      team_id: 'team-1',
+      team_name: 'Transport',
+    } as never);
+    vi.mocked(getActorAbsenceSecondaryPermissions).mockResolvedValue({
+      effective: {
+        see_manage_overview_all: true,
+      },
+    } as never);
+  }
+
+  it('returns 400 on POST when reasonId is missing', async () => {
+    await mockManagerAbsenceAccess();
 
     const request = new Request('http://localhost/api/absence/shutdown', {
       method: 'POST',
@@ -39,21 +65,8 @@ describe('Bulk Absence API Route', () => {
   });
 
   it('passes union targeting payload to service on POST', async () => {
-    const { createClient } = await import('@/lib/supabase/server');
-    const { getProfileWithRole } = await import('@/lib/utils/permissions');
     const { bookBulkAbsence } = await import('@/lib/services/absence-bank-holiday-sync');
-
-    const mockSupabase = {
-      auth: {
-        getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'manager-1' } } }),
-      },
-    } as unknown as SupabaseClient;
-
-    vi.mocked(createClient).mockResolvedValue(mockSupabase);
-    vi.mocked(getProfileWithRole).mockResolvedValue({
-      id: 'manager-1',
-      role: { is_manager_admin: true },
-    } as never);
+    await mockManagerAbsenceAccess();
     vi.mocked(bookBulkAbsence).mockResolvedValue({
       startDate: '2026-12-24',
       endDate: '2026-12-24',
@@ -93,6 +106,7 @@ describe('Bulk Absence API Route', () => {
     expect(response.status).toBe(200);
     expect(bookBulkAbsence).toHaveBeenCalledWith(
       expect.objectContaining({
+        actorProfileId: 'manager-1',
         reasonId: 'reason-1',
         applyToAll: false,
         roleIds: ['role-driver'],
@@ -103,19 +117,8 @@ describe('Bulk Absence API Route', () => {
   });
 
   it('returns 200 with batches on GET for manager', async () => {
-    const { createClient } = await import('@/lib/supabase/server');
-    const { getProfileWithRole } = await import('@/lib/utils/permissions');
     const { listBulkAbsenceBatches } = await import('@/lib/services/absence-bank-holiday-sync');
-
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'manager-1' } } }),
-      },
-    } as unknown as SupabaseClient);
-    vi.mocked(getProfileWithRole).mockResolvedValue({
-      id: 'manager-1',
-      role: { is_manager_admin: true },
-    } as never);
+    await mockManagerAbsenceAccess();
     vi.mocked(listBulkAbsenceBatches).mockResolvedValue([
       {
         id: 'batch-1',
@@ -144,18 +147,7 @@ describe('Bulk Absence API Route', () => {
   });
 
   it('returns 400 on DELETE when batchId is missing', async () => {
-    const { createClient } = await import('@/lib/supabase/server');
-    const { getProfileWithRole } = await import('@/lib/utils/permissions');
-
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'manager-1' } } }),
-      },
-    } as unknown as SupabaseClient);
-    vi.mocked(getProfileWithRole).mockResolvedValue({
-      id: 'manager-1',
-      role: { is_manager_admin: true },
-    } as never);
+    await mockManagerAbsenceAccess();
 
     const request = new Request('http://localhost/api/absence/shutdown', {
       method: 'DELETE',

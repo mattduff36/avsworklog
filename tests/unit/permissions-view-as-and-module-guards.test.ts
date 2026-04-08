@@ -113,12 +113,16 @@ describe('module guard alignment checks', () => {
     const vanSource = readSource('app/(dashboard)/van-inspections/page.tsx');
     const plantSource = readSource('app/(dashboard)/plant-inspections/page.tsx');
     const hgvSource = readSource('app/(dashboard)/hgv-inspections/page.tsx');
+    const accessHelperSource = readSource('lib/utils/inspection-access.ts');
 
     [vanSource, plantSource, hgvSource].forEach((source) => {
       expect(source).toContain('isSupervisor');
-      expect(source).toContain('canViewAllInspections');
-      expect(source).toContain('canManageInspections = isManager || isAdmin || isSuperAdmin');
+      expect(source).toContain('canViewCrossUserInspections');
+      expect(source).toContain('canManageInspections');
     });
+
+    expect(accessHelperSource).toContain('input.isManager || input.isSupervisor || input.isAdmin || input.isSuperAdmin');
+    expect(accessHelperSource).toContain('(input.isManager || input.isAdmin || input.isSuperAdmin) && !hasWorkshopReadAllOverride');
   });
 
   it('keeps supervisor read-only on inspection list actions', () => {

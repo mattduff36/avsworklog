@@ -25,6 +25,9 @@ vi.mock('next/link', () => ({
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/dashboard',
+  useRouter: () => ({
+    push: vi.fn(),
+  }),
   useSearchParams: () => new URLSearchParams(),
 }));
 

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
+import { resolveTestVanId } from './helpers/test-assets';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
@@ -31,14 +32,8 @@ describeOrSkip('Workshop Attachments V2 schema compatibility', () => {
     if (authError) throw authError;
     testUserId = authData.user!.id;
 
-    const { data: vans } = await supabase
-      .from('vans')
-      .select('id')
-      .neq('status', 'deleted')
-      .limit(1);
-
-    if (!vans || vans.length === 0) throw new Error('No test van available');
-    testVanId = vans[0].id;
+    testVanId = (await resolveTestVanId(supabase)) || '';
+    if (!testVanId) throw new Error('No TE57 test van available');
   });
 
   afterAll(async () => {

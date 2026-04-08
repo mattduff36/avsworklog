@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
+import { resolveTestHgvId } from './helpers/test-assets';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
@@ -26,11 +27,16 @@ const describeSuite = canRunSuite ? describe : describe.skip;
 
 describeSuite('HGV mileage sync trigger — database integration', () => {
   let supabase: SupabaseClient;
+  let testHgvId = '';
 
   beforeAll(() => {
     supabase = createClient(supabaseUrl!, supabaseKey!, {
       auth: { persistSession: false },
     });
+  });
+
+  beforeAll(async () => {
+    testHgvId = (await resolveTestHgvId(supabase)) || '';
   });
 
   afterAll(() => {
@@ -45,13 +51,14 @@ describeSuite('HGV mileage sync trigger — database integration', () => {
     const { data: inspection } = await supabase
       .from('hgv_inspections')
       .select('hgv_id, current_mileage')
+      .eq('hgv_id', testHgvId)
       .not('current_mileage', 'is', null)
       .not('hgv_id', 'is', null)
       .order('inspection_date', { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    if (!inspection) {
+    if (!testHgvId || !inspection) {
       // No HGV inspections with mileage — skip
       return;
     }
@@ -115,12 +122,13 @@ describeSuite('HGV mileage sync trigger — database integration', () => {
     const { data: hgvWithInspection } = await supabase
       .from('hgv_inspections')
       .select('hgv_id, current_mileage')
+      .eq('hgv_id', testHgvId)
       .not('current_mileage', 'is', null)
       .order('inspection_date', { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    if (!hgvWithInspection) return;
+    if (!testHgvId || !hgvWithInspection) return;
 
     const { data: maintenance } = await supabase
       .from('vehicle_maintenance')

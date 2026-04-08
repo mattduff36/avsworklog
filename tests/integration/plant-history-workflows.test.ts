@@ -7,6 +7,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
+import { resolveTestPlantId } from './helpers/test-assets';
 
 // Load environment variables
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
@@ -37,16 +38,7 @@ describeOrSkip('Plant History Page Workflows', () => {
     if (authError) throw authError;
     void authData.user!.id;
 
-    // SAFETY: Get a test plant asset (if exists)
-    const { data: plantAssets } = await supabase
-      .from('plant')
-      .select('id')
-      .eq('status', 'active')
-      .limit(1);
-
-    if (plantAssets && plantAssets.length > 0) {
-      testPlantId = plantAssets[0].id;
-    }
+    testPlantId = (await resolveTestPlantId(supabase)) || '';
   });
 
   afterAll(async () => {
@@ -207,15 +199,8 @@ describeOrSkip('Plant History Page Workflows', () => {
         return;
       }
 
-      // Attempt to retire plant (should fail due to open tasks)
-      const { error: _updateError } = await supabase
-        .from('plant')
-        .update({ status: 'retired' })
-        .eq('id', testPlantId);
-
-      // We're testing client-side validation, so the DB update might succeed
-      // The actual prevention happens in DeletePlantDialog component
-      console.log('Plant retirement test - open tasks check validated in component');
+      // This suite should not mutate asset status; just verify the open-task guard precondition.
+      expect(openTasks.length).toBeGreaterThan(0);
     });
 
     it('should allow status change to retired when no open tasks', async () => {

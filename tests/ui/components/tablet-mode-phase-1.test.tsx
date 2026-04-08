@@ -7,23 +7,24 @@ import { DashboardLayoutClient } from '@/components/layout/DashboardLayoutClient
 
 let mockedUserId: string | null = 'user-default';
 
-vi.mock('@/lib/supabase/client', () => ({
-  createClient: () => ({
-    auth: {
-      getUser: vi.fn(async () => ({
-        data: {
-          user: mockedUserId ? { id: mockedUserId } : null,
-        },
-      })),
-      onAuthStateChange: vi.fn(() => ({
-        data: {
-          subscription: {
-            unsubscribe: vi.fn(),
-          },
-        },
-      })),
-    },
+vi.mock('@/lib/app-auth/client', () => ({
+  subscribeToAuthStateChange: () => vi.fn(),
+}));
+
+vi.mock('@/lib/hooks/useAuth', () => ({
+  useAuth: () => ({
+    profile: mockedUserId ? { id: mockedUserId } : null,
+    loading: false,
+    locked: false,
   }),
+}));
+
+vi.mock('@/lib/hooks/useClientServiceOutage', () => ({
+  useClientServiceOutage: () => false,
+}));
+
+vi.mock('@/lib/utils/fetch-with-auth', () => ({
+  fetchWithAuth: vi.fn(async () => ({ ok: true })),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -73,6 +74,25 @@ describe('Tablet mode Phase 0/1', () => {
     localStorage.clear();
     mockedUserId = 'user-default';
     vi.clearAllMocks();
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes('/api/auth/session')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            authenticated: Boolean(mockedUserId),
+            user: mockedUserId ? { id: mockedUserId } : null,
+          }),
+        } as Response;
+      }
+
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({}),
+      } as Response;
+    }) as unknown as typeof fetch;
   });
 
   afterEach(() => {

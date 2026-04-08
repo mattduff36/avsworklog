@@ -11,6 +11,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { config } from 'dotenv';
 import { resolve } from 'path';
+import { TEST_ASSET_PREFIX } from '../../tests/integration/helpers/test-assets';
 
 config({ path: resolve(process.cwd(), '.env.local') });
 
@@ -40,7 +41,7 @@ export function getRunTag(): string {
 
 export async function createTestVehicle(overrides?: Record<string, unknown>): Promise<{ id: string; reg_number: string }> {
   const supabase = getAdminClient();
-  const regNumber = `TST-${RUN_TAG.slice(-6)}`;
+  const regNumber = `${TEST_ASSET_PREFIX}${RUN_TAG.slice(-6)}`;
 
   const { data, error } = await supabase
     .from('vans')

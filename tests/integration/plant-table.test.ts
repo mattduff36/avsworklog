@@ -5,6 +5,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { resolveTestPlantId } from './helpers/test-assets';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -74,17 +75,7 @@ describeOrSkip('Plant Table Integration Tests', () => {
       }
     }
 
-    // Get an existing plant for read tests
-    const { data: existingPlant } = await supabase
-      .from('plant')
-      .select('id')
-      .eq('status', 'active')
-      .limit(1)
-      .single();
-    
-    if (existingPlant) {
-      testPlantId = existingPlant.id;
-    }
+    testPlantId = (await resolveTestPlantId(supabase)) || '';
   });
 
   afterAll(async () => {
@@ -163,7 +154,8 @@ describeOrSkip('Plant Table Integration Tests', () => {
       const { data, error } = await supabase
         .from('plant')
         .insert({
-          plant_id: `TEST-PLANT-${Date.now()}`,
+          plant_id: `TE57PLANT${Date.now().toString().slice(-4)}`,
+          reg_number: `TE57PL${Date.now().toString().slice(-4)}`,
           nickname: 'Test Excavator',
           make: 'Caterpillar',
           model: '320',

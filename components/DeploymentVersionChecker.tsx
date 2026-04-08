@@ -22,6 +22,7 @@
 
 import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
+import { forceAppRefresh } from '@/lib/client/force-app-refresh';
 
 // Baked in at build time by Vercel's system env vars.
 // Will be undefined in local dev → checker is a no-op.
@@ -58,7 +59,7 @@ export function DeploymentVersionChecker() {
           `[DeploymentChecker] Stale bundle detected (running=${CLIENT_DEPLOYMENT_ID}, server=${deploymentId}, reason=${reason}). Reloading…`
         );
         reloadingRef.current = true;
-        window.location.reload();
+        await forceAppRefresh();
       }
     } catch {
       // Network error – don't reload, silently skip
@@ -67,17 +68,19 @@ export function DeploymentVersionChecker() {
 
   // Mount + visibility + periodic interval
   useEffect(() => {
-    checkVersion('mount');
+    void checkVersion('mount');
 
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
-        checkVersion('visibility');
+        void checkVersion('visibility');
       }
     };
     document.addEventListener('visibilitychange', handleVisibility);
 
     // Periodic check — catches idle open tabs that never get a focus/nav event
-    const intervalId = setInterval(() => checkVersion('interval'), PERIODIC_CHECK_MS);
+    const intervalId = setInterval(() => {
+      void checkVersion('interval');
+    }, PERIODIC_CHECK_MS);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibility);
@@ -87,7 +90,7 @@ export function DeploymentVersionChecker() {
 
   // Route-change check (client-side navigation)
   useEffect(() => {
-    checkVersion('navigation');
+    void checkVersion('navigation');
   }, [pathname]);
 
   return null;

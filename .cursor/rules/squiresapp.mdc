@@ -17,6 +17,7 @@ alwaysApply: true
 
 ## 2. Git pushes
 - Push to GitHub only when the user writes exactly: `push to GitHub`.
+- Exception: `finalise and push` and `finalise full and push` are explicit push authorisation for the repo finalisation workflow.
 - Local commits are allowed and follow the global Lyra rules:
   - Commit after completing a coding task.
   - Run linter checks before reporting completion.

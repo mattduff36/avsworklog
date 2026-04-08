@@ -49,6 +49,8 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const shouldLoadAnalytics = process.env.NODE_ENV === 'production' && process.env.VERCEL === '1';
+
   return (
     <html
       lang="en"
@@ -68,7 +70,7 @@ export default function RootLayout({
             <AuthProvider>
               {children}
               <Toaster />
-              <Analytics />
+              {shouldLoadAnalytics ? <Analytics /> : null}
             </AuthProvider>
           </QueryProvider>
         </NuqsAdapter>

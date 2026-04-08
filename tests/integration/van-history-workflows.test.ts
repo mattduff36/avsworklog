@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
+import { resolveTestVanId } from './helpers/test-assets';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
@@ -34,16 +35,7 @@ describeVanHistorySuite('Van history workflows', () => {
 
     accessToken = authData.session?.access_token || '';
 
-    const { data: vans, error: vansError } = await supabase
-      .from('vans')
-      .select('id')
-      .neq('status', 'deleted')
-      .limit(1);
-
-    if (vansError) throw vansError;
-    if (vans && vans.length > 0) {
-      vanId = vans[0].id;
-    }
+    vanId = (await resolveTestVanId(supabase)) || '';
   });
 
   afterAll(async () => {

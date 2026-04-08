@@ -7,6 +7,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
+import { resolveTestHgvId, resolveTestPlantId, resolveTestVanId } from './helpers/test-assets';
 
 // Load environment variables
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
@@ -25,6 +26,16 @@ describe('Workshop Tasks Module Workflows', () => {
   let supabase: SupabaseClient;
   let testUserId: string;
   let testVehicleId: string;
+  let testHgvId: string;
+  let testPlantId: string;
+
+  function applyTestAssetScope<TQuery extends { or: (filters: string) => TQuery }>(query: TQuery): TQuery {
+    const filters = [testVehicleId && `van_id.eq.${testVehicleId}`, testHgvId && `hgv_id.eq.${testHgvId}`, testPlantId && `plant_id.eq.${testPlantId}`]
+      .filter(Boolean)
+      .join(',');
+
+    return filters ? query.or(filters) : query;
+  }
 
   beforeAll(async () => {
     supabase = createClient(supabaseUrl, supabaseKey);
@@ -38,16 +49,9 @@ describe('Workshop Tasks Module Workflows', () => {
     if (authError) throw authError;
     testUserId = authData.user!.id;
 
-    // Get a test vehicle
-    const { data: vehicles } = await supabase
-      .from('vans')
-      .select('id')
-      .neq('status', 'deleted')
-      .limit(1);
-
-    if (vehicles && vehicles.length > 0) {
-      testVehicleId = vehicles[0].id;
-    }
+    testVehicleId = (await resolveTestVanId(supabase)) || '';
+    testHgvId = (await resolveTestHgvId(supabase)) || '';
+    testPlantId = (await resolveTestPlantId(supabase)) || '';
   });
 
   afterAll(async () => {
@@ -56,7 +60,7 @@ describe('Workshop Tasks Module Workflows', () => {
 
   describe('Task Viewing and Filtering', () => {
     it('should fetch all workshop tasks', async () => {
-      const { data: tasks, error } = await supabase
+      const { data: tasks, error } = await applyTestAssetScope(supabase
         .from('actions')
         .select(`
           *,
@@ -64,7 +68,7 @@ describe('Workshop Tasks Module Workflows', () => {
           category:workshop_task_categories(id, name, slug),
           subcategory:workshop_task_subcategories(id, name, slug)
         `)
-        .eq('action_type', 'workshop_vehicle_task')
+        .eq('action_type', 'workshop_vehicle_task'))
         .order('created_at', { ascending: false });
 
       expect(error).toBeNull();
@@ -77,11 +81,11 @@ describe('Workshop Tasks Module Workflows', () => {
     });
 
     it('should filter tasks by status - pending', async () => {
-      const { data: tasks, error } = await supabase
+      const { data: tasks, error } = await applyTestAssetScope(supabase
         .from('actions')
         .select('*')
         .eq('action_type', 'workshop_vehicle_task')
-        .eq('status', 'pending');
+        .eq('status', 'pending'));
 
       expect(error).toBeNull();
       expect(tasks).toBeDefined();
@@ -89,11 +93,11 @@ describe('Workshop Tasks Module Workflows', () => {
     });
 
     it('should filter tasks by status - in progress', async () => {
-      const { data: tasks, error } = await supabase
+      const { data: tasks, error } = await applyTestAssetScope(supabase
         .from('actions')
         .select('*')
         .eq('action_type', 'workshop_vehicle_task')
-        .eq('status', 'logged');
+        .eq('status', 'logged'));
 
       expect(error).toBeNull();
       expect(tasks).toBeDefined();
@@ -101,11 +105,11 @@ describe('Workshop Tasks Module Workflows', () => {
     });
 
     it('should filter tasks by status - on hold', async () => {
-      const { data: tasks, error } = await supabase
+      const { data: tasks, error } = await applyTestAssetScope(supabase
         .from('actions')
         .select('*')
         .eq('action_type', 'workshop_vehicle_task')
-        .eq('status', 'on_hold');
+        .eq('status', 'on_hold'));
 
       expect(error).toBeNull();
       expect(tasks).toBeDefined();
@@ -113,11 +117,11 @@ describe('Workshop Tasks Module Workflows', () => {
     });
 
     it('should filter tasks by status - completed', async () => {
-      const { data: tasks, error } = await supabase
+      const { data: tasks, error } = await applyTestAssetScope(supabase
         .from('actions')
         .select('*')
         .eq('action_type', 'workshop_vehicle_task')
-        .eq('status', 'completed');
+        .eq('status', 'completed'));
 
       expect(error).toBeNull();
       expect(tasks).toBeDefined();
@@ -680,10 +684,9 @@ describe('Workshop Tasks Module Workflows', () => {
     });
 
     it('creates and transitions an HGV task through lifecycle states', async () => {
-      const { data: hgvs } = await supabase.from('hgvs').select('id').limit(1);
-      const hgvId = hgvs?.[0]?.id;
+      const hgvId = testHgvId;
       if (!hgvId) {
-        console.log('No HGV available, skipping');
+        console.log('No TE57 test HGV available, skipping');
         return;
       }
 
@@ -709,10 +712,9 @@ describe('Workshop Tasks Module Workflows', () => {
     });
 
     it('creates and transitions a plant task through lifecycle states', async () => {
-      const { data: plants } = await supabase.from('plant').select('id').limit(1);
-      const plantId = plants?.[0]?.id;
+      const plantId = testPlantId;
       if (!plantId) {
-        console.log('No plant asset available, skipping');
+        console.log('No TE57 test plant available, skipping');
         return;
       }
 

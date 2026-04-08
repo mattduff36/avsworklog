@@ -46,6 +46,7 @@ import Link from 'next/link';
 import { MODULE_PAGES, getPageLabel, getPageUrl } from '@/lib/config/module-pages';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PageLoader } from '@/components/ui/page-loader';
+import { forceAppRefresh } from '@/lib/client/force-app-refresh';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -99,6 +100,7 @@ export default function HelpPage() {
   const [cacheGuideOpen, setCacheGuideOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isTriggeringInstallPrompt, setIsTriggeringInstallPrompt] = useState(false);
+  const [isRefreshingApp, setIsRefreshingApp] = useState(false);
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab') || 'faq';
@@ -185,8 +187,15 @@ export default function HelpPage() {
     }
   }, [signOut]);
 
-  const handleRefreshAppNow = useCallback(() => {
-    window.location.reload();
+  const handleRefreshAppNow = useCallback(async () => {
+    try {
+      setIsRefreshingApp(true);
+      await forceAppRefresh({ redirectTo: '/dashboard' });
+    } catch (error) {
+      console.error('Error refreshing app from help support action:', error);
+      setIsRefreshingApp(false);
+      toast.error('Could not fully refresh the app. Please try again.');
+    }
   }, []);
   
   // User permissions
@@ -528,12 +537,34 @@ export default function HelpPage() {
     <div className="mx-auto w-full max-w-6xl space-y-6">
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
-        <h1 className="text-3xl font-bold text-foreground mb-2">
-          Help & FAQ
-        </h1>
-        <p className="text-muted-foreground">
-          Find answers to common questions and submit suggestions
-        </p>
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground mb-2">
+              Help & FAQ
+            </h1>
+            <p className="text-muted-foreground">
+              Find answers to common questions and submit suggestions
+            </p>
+          </div>
+          <div className="hidden md:flex items-center justify-end">
+            <Button
+              type="button"
+              onClick={() => void handleRefreshAppNow()}
+              disabled={isRefreshingApp}
+              title="Refresh App Now"
+              className="h-16 w-24 md:h-[4.5rem] md:w-[6.75rem] flex-col items-center justify-center gap-1 border border-avs-yellow bg-avs-yellow p-1.5 text-slate-900 transition-colors hover:bg-avs-yellow-hover hover:text-slate-900 disabled:opacity-60"
+            >
+              {isRefreshingApp ? (
+                <Loader2 className="h-5 w-5 md:h-6 md:w-6 animate-spin" />
+              ) : (
+                <RefreshCw className="h-5 w-5 md:h-6 md:w-6" />
+              )}
+              <span className="text-[10px] md:text-[11px] font-semibold leading-tight text-center">
+                {isRefreshingApp ? 'Refreshing...' : 'Refresh App'}
+              </span>
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -830,11 +861,16 @@ export default function HelpPage() {
             <CardContent className="flex flex-wrap gap-2">
               <Button
                 variant="outline"
-                onClick={handleRefreshAppNow}
+                onClick={() => void handleRefreshAppNow()}
+                disabled={isRefreshingApp}
                 className="border-slate-600 text-muted-foreground hover:bg-slate-700/50"
               >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh App Now
+                {isRefreshingApp ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                )}
+                {isRefreshingApp ? 'Refreshing App...' : 'Refresh App Now'}
               </Button>
               <Button
                 variant="outline"

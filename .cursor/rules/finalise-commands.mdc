@@ -1,0 +1,29 @@
+---
+description: Route finalise phrases to repo commands
+alwaysApply: true
+---
+
+# Finalise Commands
+
+If the user message is exactly one of these phrases, do not re-plan the workflow:
+- `finalise`
+- `finalise and push`
+- `finalise full`
+- `finalise full and push`
+
+Before running the repo command:
+- Check terminal headers in `C:\Users\mattd\.cursor\projects\d-Websites-avsworklog\terminals`.
+- If an active terminal command appears to be an Agent Review, wait for it to finish.
+- Do not ask follow-up questions unless there is a real blocking error.
+
+Command map:
+- `finalise` → `npm run finalise`
+- `finalise and push` → `npm run finalise:push`
+- `finalise full` → `npm run finalise:full`
+- `finalise full and push` → `npm run finalise:full:push`
+
+These phrases are explicit authorisation for commit, and the push variants are explicit authorisation to push the current branch.
+
+After the command finishes:
+- Return a short summary only.
+- Do not do extra repo analysis unless the command fails and needs diagnosis.
