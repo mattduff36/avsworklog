@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useBrowserSupabaseClient } from '@/lib/hooks/useBrowserSupabaseClient';
+import { AppPageShell } from '@/components/layout/AppPageShell';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -19,7 +20,20 @@ const NotificationSettingsDebugPanel = dynamic(() => import('./components/Notifi
 const TestFleetDebugPanel = dynamic(() => import('./components/TestFleetDebugPanel').then((mod) => ({ default: mod.TestFleetDebugPanel })));
 const UIModalStylesDebugPanel = dynamic(() => import('./components/UIModalStylesDebugPanel').then((mod) => ({ default: mod.UIModalStylesDebugPanel })));
 
-type DebugTab = 'errors' | 'audit' | 'dvla' | 'test-fleet' | 'notifications' | 'modal-styles';
+type DebugTab = 'error-log' | 'audit-log' | 'dvla-sync' | 'test-fleet' | 'notification-settings' | 'modal-styles';
+
+const DEBUG_TAB_ALIASES: Record<string, DebugTab> = {
+  errors: 'error-log',
+  'error-log': 'error-log',
+  audit: 'audit-log',
+  'audit-log': 'audit-log',
+  dvla: 'dvla-sync',
+  'dvla-sync': 'dvla-sync',
+  'test-fleet': 'test-fleet',
+  notifications: 'notification-settings',
+  'notification-settings': 'notification-settings',
+  'modal-styles': 'modal-styles',
+};
 
 export default function DebugPage() {
   const { profile } = useAuth();
@@ -29,7 +43,7 @@ export default function DebugPage() {
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
-  const [activeTab, setActiveTab] = useState<DebugTab>('errors');
+  const [activeTab, setActiveTab] = useState<DebugTab>('error-log');
 
   useEffect(() => {
     if (!supabase) {
@@ -102,14 +116,20 @@ export default function DebugPage() {
   }, [supabase, router]);
 
   useEffect(() => {
-    const requestedTab = searchParams.get('tab') || 'errors';
-    const validTabs: DebugTab[] = ['errors', 'audit', 'dvla', 'test-fleet', 'notifications', 'modal-styles'];
-    if (validTabs.includes(requestedTab as DebugTab)) {
-      setActiveTab(requestedTab as DebugTab);
+    const requestedTab = searchParams.get('tab');
+    const normalizedTab = requestedTab ? DEBUG_TAB_ALIASES[requestedTab] : 'error-log';
+
+    if (normalizedTab) {
+      setActiveTab(normalizedTab);
+
+      if (requestedTab !== normalizedTab) {
+        router.replace(`/debug?tab=${normalizedTab}`, { scroll: false });
+      }
       return;
     }
-    setActiveTab('errors');
-    router.replace('/debug?tab=errors', { scroll: false });
+
+    setActiveTab('error-log');
+    router.replace('/debug?tab=error-log', { scroll: false });
   }, [searchParams, router]);
 
   function handleTabChange(value: DebugTab) {
@@ -126,7 +146,7 @@ export default function DebugPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-7xl">
+    <AppPageShell width="wide">
       <div className="bg-gradient-to-r from-red-500 to-orange-500 rounded-lg p-6 text-white">
         <div className="flex items-center gap-3">
           <Bug className="h-6 md:h-8 w-6 md:w-8" />
@@ -185,17 +205,17 @@ export default function DebugPage() {
 
       <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as DebugTab)} className="space-y-6">
         <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 gap-1 md:gap-0 h-auto md:h-10 p-1">
-          <TabsTrigger value="errors" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
+          <TabsTrigger value="error-log" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
             <Bug className="h-4 w-4 flex-shrink-0" />
             <span className="hidden md:inline">Error Log</span>
             <span className="md:hidden data-[state=active]:inline hidden">Errors</span>
           </TabsTrigger>
-          <TabsTrigger value="audit" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
+          <TabsTrigger value="audit-log" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
             <History className="h-4 w-4 flex-shrink-0" />
             <span className="hidden md:inline">Audit Log</span>
             <span className="md:hidden data-[state=active]:inline hidden">Audit</span>
           </TabsTrigger>
-          <TabsTrigger value="dvla" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
+          <TabsTrigger value="dvla-sync" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
             <RefreshCw className="h-4 w-4 flex-shrink-0" />
             <span className="hidden md:inline">DVLA Sync</span>
             <span className="md:hidden data-[state=active]:inline hidden">DVLA</span>
@@ -205,7 +225,7 @@ export default function DebugPage() {
             <span className="hidden md:inline">Test Fleet</span>
             <span className="md:hidden data-[state=active]:inline hidden">Fleet</span>
           </TabsTrigger>
-          <TabsTrigger value="notifications" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
+          <TabsTrigger value="notification-settings" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
             <Send className="h-4 w-4 flex-shrink-0" />
             <span className="hidden md:inline">Notification Settings</span>
             <span className="md:hidden data-[state=active]:inline hidden">Notifs</span>
@@ -216,15 +236,15 @@ export default function DebugPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="errors">
+        <TabsContent value="error-log">
           <ErrorLogsDebugPanel supabase={supabase} />
         </TabsContent>
 
-        <TabsContent value="audit">
+        <TabsContent value="audit-log">
           <AuditLogDebugPanel supabase={supabase} />
         </TabsContent>
 
-        <TabsContent value="dvla">
+        <TabsContent value="dvla-sync">
           <DVLASyncDebugPanel />
         </TabsContent>
 
@@ -232,7 +252,7 @@ export default function DebugPage() {
           <TestFleetDebugPanel />
         </TabsContent>
 
-        <TabsContent value="notifications">
+        <TabsContent value="notification-settings">
           <NotificationSettingsDebugPanel />
         </TabsContent>
 
@@ -240,6 +260,6 @@ export default function DebugPage() {
           <UIModalStylesDebugPanel />
         </TabsContent>
       </Tabs>
-    </div>
+    </AppPageShell>
   );
 }

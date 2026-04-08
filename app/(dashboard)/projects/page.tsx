@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { AppPageShell } from '@/components/layout/AppPageShell';
 import { Button } from '@/components/ui/button';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -130,7 +131,7 @@ export default function RAMSPage() {
 
   return (
     <RAMSErrorBoundary>
-    <div className="space-y-6 max-w-6xl">
+    <AppPageShell>
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
         <div className="flex items-center justify-between mb-4">
@@ -331,7 +332,7 @@ export default function RAMSPage() {
           documentTitle={selectedDocumentTitle}
         />
       )}
-    </div>
+    </AppPageShell>
     </RAMSErrorBoundary>
   );
 }

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import { useSearchParams, useRouter as useNextRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { AppPageShell } from '@/components/layout/AppPageShell';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, Wrench, Truck, Settings, HardHat, Plus } from 'lucide-react';
@@ -368,7 +369,7 @@ function FleetContent() {
   }
   
   return (
-    <div className="space-y-6 max-w-6xl">
+    <AppPageShell>
       {/* Header */}
       <div className={`bg-white dark:bg-slate-900 rounded-lg border border-border ${tabletModeEnabled ? 'p-5 md:p-6' : 'p-6'}`}>
         <div className="flex items-center justify-between">
@@ -568,7 +569,7 @@ function FleetContent() {
         onHgvCategorySuccess={handleHgvCategorySuccess}
         onDeleteHgvCategory={handleDeleteHgvCategory}
       />
-    </div>
+    </AppPageShell>
   );
 }
 

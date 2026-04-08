@@ -6,6 +6,7 @@ import { fetchAbsenceMessage, updateAbsenceMessage } from '@/lib/client/absence-
 import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { fetchEmployeeWorkShift, fetchWorkShiftMatrix } from '@/lib/client/work-shifts';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { AppPageShell } from '@/components/layout/AppPageShell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -831,7 +832,7 @@ export default function AdminAbsencePage() {
   if (!canAccessAbsenceModule || !canOpenManagePage) return null;
   
   return (
-    <div className="space-y-6 max-w-7xl">
+    <AppPageShell width="wide">
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -1664,7 +1665,7 @@ export default function AdminAbsencePage() {
           </DialogContent>
         </Dialog>
       ) : null}
-    </div>
+    </AppPageShell>
   );
 }
 

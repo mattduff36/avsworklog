@@ -42,7 +42,7 @@
     },
     {
       "slug": "actions",
-      "name": "Manager Actions Hub",
+      "name": "Actions (Legacy)",
       "sort_order": 9
     },
     {
@@ -103,7 +103,7 @@
       "slug": "dashboard-overview",
       "title": "Understanding the Dashboard",
       "summary": "Guide to the main dashboard and navigation.",
-      "content_md": "# Understanding the Dashboard\n\nThe Dashboard is your home screen after logging in. It shows quick actions and important status information.\n\n## Welcome Section\n\nAt the top, you'll see a welcome message with your name and role.\n\n## Quick Actions (Large Square Buttons)\n\nBased on your permissions, you'll see large colored buttons for:\n- **Timesheets** (blue) - Create/view timesheets\n- **Inspections** (yellow) - Perform vehicle inspections\n- **RAMS** (green) - View assigned RAMS documents\n- **Absence** (purple) - Request annual leave\n- **Maintenance** (red) - View fleet maintenance schedules\n- **Workshop** (brown) - View workshop tasks\n- **Help** - Access this FAQ system\n\nIf you have RAMS documents to sign, a red badge shows the count.\n\n## Management Tools (Smaller Cards)\n\nManagers and Admins see additional cards:\n- **Approvals** (blue) - Review submitted forms\n- **Actions** (purple) - Manager actions hub\n- **Toolbox Talks** (red) - Send safety messages\n- **Reports** (green) - Download reports\n- **Users** (grey, Admin only) - Manage user accounts\n- **Vehicles** (grey, Admin only) - Manage fleet\n\n## Pending Approvals Card\n\nManagers see a summary card showing:\n- Pending timesheet count\n- Pending absence request count\n- Quick link to Approvals page\n\n## Manager Actions Card\n\nManagers see a summary showing:\n- Workshop Tasks counts (Pending, In Progress, Completed)\n- Maintenance alerts (Overdue, Due Soon)\n- Site Audit Inspections (Coming Soon badge)"
+      "content_md": "# Understanding the Dashboard\n\nThe Dashboard is your home screen after logging in. It shows quick actions and important status information.\n\n## Welcome Section\n\nAt the top, you'll see a welcome message with your name and role.\n\n## Quick Actions (Large Square Buttons)\n\nBased on your permissions, you'll see large colored buttons for:\n- **Timesheets** (blue) - Create/view timesheets\n- **Inspections** (yellow) - Perform vehicle inspections\n- **RAMS** (green) - View assigned RAMS documents\n- **Absence** (purple) - Request annual leave\n- **Maintenance** (red) - View fleet maintenance schedules\n- **Workshop** (brown) - View workshop tasks\n- **Help** - Access this FAQ system\n\nIf you have RAMS documents to sign, a red badge shows the count.\n\n## Management Tools (Smaller Cards)\n\nManagers and Admins see additional cards:\n- **Approvals** (blue) - Review submitted forms\n- **Actions** (purple) - Legacy placeholder retained for future development\n- **Toolbox Talks** (red) - Send safety messages\n- **Reports** (green) - Download reports\n- **Users** (grey, Admin only) - Manage user accounts\n- **Vehicles** (grey, Admin only) - Manage fleet\n\n## Pending Approvals Card\n\nManagers see a summary card showing:\n- Pending timesheet count\n- Pending absence request count\n- Quick link to Approvals page"
     },
     {
       "category_slug": "getting-started",
@@ -117,7 +117,7 @@
       "slug": "user-roles-explained",
       "title": "What are the different user roles?",
       "summary": "Explanation of Employee, Manager, and Admin roles.",
-      "content_md": "# What are the different user roles?\n\nThe app has three main role types that determine what you can access:\n\n## Employee\n\n- Create and submit timesheets\n- Perform vehicle inspections\n- View and sign assigned RAMS documents\n- Request annual leave\n- View maintenance schedules\n- View assigned workshop tasks\n- Access the Help page\n\n## Manager\n\nEverything an Employee can do, plus:\n- Approve/reject timesheets and absences\n- Access the Manager Actions hub\n- View and manage Workshop Tasks\n- Send Toolbox Talks and Reminders\n- Download reports\n- Create timesheets/inspections on behalf of employees\n- View all employees' data\n- Manage suggestions\n\n## Admin\n\nEverything a Manager can do, plus:\n- Create, edit, and delete user accounts\n- Reset user passwords\n- Manage roles and permissions\n- Manage vehicle fleet and categories\n- Upload and manage RAMS documents\n- Edit FAQ content\n- Configure system settings\n\n## Super Admin\n\nA special protected account (admin@mpdee.co.uk) that cannot be locked out or modified by other admins. Has full system access and special developer tools."
+      "content_md": "# What are the different user roles?\n\nThe app has three main role types that determine what you can access:\n\n## Employee\n\n- Create and submit timesheets\n- Perform vehicle inspections\n- View and sign assigned RAMS documents\n- Request annual leave\n- View maintenance schedules\n- View assigned workshop tasks\n- Access the Help page\n\n## Manager\n\nEverything an Employee can do, plus:\n- Approve/reject timesheets and absences\n- View and manage Workshop Tasks\n- Send Toolbox Talks and Reminders\n- Download reports\n- Create timesheets/inspections on behalf of employees\n- View all employees' data\n- Manage suggestions\n\n## Admin\n\nEverything a Manager can do, plus:\n- Create, edit, and delete user accounts\n- Reset user passwords\n- Manage roles and permissions\n- Manage vehicle fleet and categories\n- Upload and manage RAMS documents\n- Edit FAQ content\n- Configure system settings\n\n## Super Admin\n\nA special protected account (admin@mpdee.co.uk) that cannot be locked out or modified by other admins. Has full system access and special developer tools."
     },
     {
       "category_slug": "timesheets",
@@ -353,9 +353,9 @@
     {
       "category_slug": "actions",
       "slug": "actions-overview",
-      "title": "What is the Manager Actions hub?",
-      "summary": "Overview of the actions page and its categories.",
-      "content_md": "# What is the Manager Actions hub?\n\n**Note:** This is for Managers and Admins only.\n\n## Purpose\n\nThe Manager Actions page is a central hub showing different types of actionable items. It provides quick access to related modules.\n\n## Accessing Actions\n\nClick **Actions** in the sidebar menu.\n\n## Action Categories\n\n### Workshop Tasks\n\nShows summary counts:\n- **Pending** - Tasks not started\n- **In Progress** - Tasks being worked on\n- **Completed** - Finished tasks\n\nClick **Open Workshop Tasks** to go to the full Workshop Tasks page.\n\n### Maintenance & Service\n\nShows maintenance alerts:\n- **Overdue Tasks** (red) - Past due maintenance\n- **Due Soon** (amber) - Within warning period\n\nClick **Open Maintenance** to go to Fleet Management.\n\n### Site Audit Inspections\n\n*Coming Soon* - This feature is planned for a future update and shows a \"Coming Soon\" badge."
+      "title": "What is the Actions page (legacy)?",
+      "summary": "Status of the retired legacy Actions module.",
+      "content_md": "# What is the Actions page (legacy)?\n\n**Note:** This page may still be visible to Managers and Admins with the legacy `Actions` permission.\n\n## Status\n\nThe Actions module has been retired and no longer provides an operational workflow.\n\n## Why it was retired\n\nThe responsibilities that were previously surfaced on this page are now handled in dedicated areas of the app, including Workshop Tasks, Maintenance, Suggestions, Error Reports, notifications, and dashboard indicators.\n\n## What to expect\n\n- The **Actions** tile and permission may still exist for compatibility\n- The page is retained as a legacy placeholder only\n- No live action management features are available here\n\n## Future use\n\nThis area is being retained for future development and may be repurposed in a later release."
     },
     {
       "category_slug": "toolbox-talks",
@@ -488,7 +488,7 @@
       "slug": "permission-denied",
       "title": "I'm getting 'Access Denied' - why?",
       "summary": "Understanding permission errors.",
-      "content_md": "# I'm getting 'Access Denied' - why?\n\n## Role Permissions\n\nYou may not have permission for that feature:\n- Your role determines what you can access\n- Ask your admin if you need access\n\n## Manager-Only Features\n\nSome features require Manager or Admin role:\n- Approvals\n- Manager Actions\n- Toolbox Talks (sending)\n- Reports\n- Workshop Tasks (creating/managing)\n\n## Admin-Only Features\n\nSome features require Admin role:\n- User Management\n- Role Management\n- Vehicle Management (Vehicles tab)\n- FAQ Editor\n- Fleet Settings\n\n## What To Do\n\n1. Check if the feature is appropriate for your role\n2. Contact your administrator if you need access\n3. They can update your role permissions"
+      "content_md": "# I'm getting 'Access Denied' - why?\n\n## Role Permissions\n\nYou may not have permission for that feature:\n- Your role determines what you can access\n- Ask your admin if you need access\n\n## Manager-Only Features\n\nSome features require Manager or Admin role:\n- Approvals\n- Toolbox Talks (sending)\n- Reports\n- Workshop Tasks (creating/managing)\n\n## Admin-Only Features\n\nSome features require Admin role:\n- User Management\n- Role Management\n- Vehicle Management (Vehicles tab)\n- FAQ Editor\n- Fleet Settings\n\n## What To Do\n\n1. Check if the feature is appropriate for your role\n2. Contact your administrator if you need access\n3. They can update your role permissions"
     }
   ]
 }

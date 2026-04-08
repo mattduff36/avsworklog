@@ -44,7 +44,7 @@ export const ALL_PAGES = [
   
   // Manager/Admin Pages
   { path: '/approvals', name: 'Approvals', requiresAuth: true },
-  { path: '/actions', name: 'Manager Actions', requiresAuth: true },
+  { path: '/actions', name: 'Actions (Legacy)', requiresAuth: true },
   { path: '/toolbox-talks', name: 'Toolbox Talks', requiresAuth: true },
   { path: '/reports', name: 'Reports', requiresAuth: true },
   { path: '/suggestions/manage', name: 'Manage Suggestions', requiresAuth: true },

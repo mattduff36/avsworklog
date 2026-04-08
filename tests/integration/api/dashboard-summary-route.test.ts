@@ -73,7 +73,6 @@ describe('GET /api/dashboard/summary', () => {
       team_id: 'team-a',
       team_name: 'Team A',
     });
-    vi.mocked(createAdminClient).mockReturnValue({} as never);
     vi.mocked(getPermissionMapForUser).mockResolvedValue({
       timesheets: false,
       inspections: false,
@@ -147,6 +146,7 @@ describe('GET /api/dashboard/summary', () => {
       },
     };
 
+    vi.mocked(createAdminClient).mockReturnValue(supabase as never);
     vi.mocked(createClient).mockResolvedValue(supabase as unknown as SupabaseClient);
 
     const response = await GET();
@@ -157,12 +157,6 @@ describe('GET /api/dashboard/summary', () => {
       approvals: {
         timesheets: 4,
         absences: 2,
-      },
-      actions: {
-        workshop: 6,
-        maintenance: 0,
-        suggestions: 10,
-        errors: 2,
       },
       badges: {
         workshop_pending: 3,
@@ -204,7 +198,6 @@ describe('GET /api/dashboard/summary', () => {
       team_id: 'team-a',
       team_name: 'Team A',
     });
-    vi.mocked(createAdminClient).mockReturnValue({} as never);
     vi.mocked(getPermissionMapForUser).mockResolvedValue({
       timesheets: false,
       inspections: false,
@@ -315,18 +308,14 @@ describe('GET /api/dashboard/summary', () => {
       },
     };
 
+    vi.mocked(createAdminClient).mockReturnValue(supabase as never);
     vi.mocked(createClient).mockResolvedValue(supabase as unknown as SupabaseClient);
 
     const response = await GET();
     const payload = await response.json();
 
     expect(response.status).toBe(200);
-    expect(payload.metrics.actions).toEqual({
-      workshop: 0,
-      maintenance: 0,
-      suggestions: 0,
-      errors: 0,
-    });
+    expect(payload.metrics).not.toHaveProperty('actions');
     expect(payload.metrics.badges).toMatchObject({
       workshop_pending: 4,
       maintenance_due_soon: 1,

@@ -23,6 +23,7 @@ import {
 import { clearClientServiceOutage } from '@/lib/app-auth/client-service-health';
 import { fetchAbsenceMessage } from '@/lib/client/absence-message';
 import { fetchCurrentWorkShift } from '@/lib/client/work-shifts';
+import { AppPageShell } from '@/components/layout/AppPageShell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -416,11 +417,11 @@ export default function AbsencePage() {
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  function handleUnavailableError(
+  const handleUnavailableError = useCallback((
     source: PageServiceRequestKey,
     error: unknown,
     fallbackMessage: string
-  ): boolean {
+  ): boolean => {
     const status = getErrorStatus(error);
     if (status === null || isServerErrorStatus(status)) {
       setPageServiceErrors((current) =>
@@ -436,11 +437,11 @@ export default function AbsencePage() {
     }
 
     return false;
-  }
+  }, []);
 
-  function clearUnavailableError(source: PageServiceRequestKey) {
+  const clearUnavailableError = useCallback((source: PageServiceRequestKey) => {
     setPageServiceErrors((current) => clearPageServiceError(current, source));
-  }
+  }, []);
 
   async function retryUnavailableState() {
     clearClientServiceOutage();
@@ -449,14 +450,7 @@ export default function AbsencePage() {
     }
   }
   
-  useEffect(() => {
-    if (permissionLoading || !canLoadAbsencePageData) {
-      return;
-    }
-    void loadGenerationStatus();
-  }, [canLoadAbsencePageData, permissionLoading]);
-
-  async function loadGenerationStatus() {
+  const loadGenerationStatus = useCallback(async () => {
     setGenerationStatusLoading(true);
     const errorContextId = 'absence-load-generation-status-error';
     try {
@@ -492,7 +486,14 @@ export default function AbsencePage() {
     } finally {
       setGenerationStatusLoading(false);
     }
-  }
+  }, [clearUnavailableError, handleUnavailableError]);
+
+  useEffect(() => {
+    if (permissionLoading || !canLoadAbsencePageData) {
+      return;
+    }
+    void loadGenerationStatus();
+  }, [canLoadAbsencePageData, loadGenerationStatus, permissionLoading]);
 
   const availableRequestReasons = useMemo(() => {
     const allActive = reasons || [];
@@ -537,7 +538,7 @@ export default function AbsencePage() {
     if (canLoadAbsencePageData) {
       void loadAbsenceAnnouncement();
     }
-  }, [canLoadAbsencePageData]);
+  }, [canLoadAbsencePageData, clearUnavailableError, handleUnavailableError]);
 
   useEffect(() => {
     async function loadCurrentWorkShift() {
@@ -558,7 +559,7 @@ export default function AbsencePage() {
     if (canLoadAbsencePageData) {
       void loadCurrentWorkShift();
     }
-  }, [canLoadAbsencePageData]);
+  }, [canLoadAbsencePageData, clearUnavailableError, handleUnavailableError]);
 
   useEffect(() => {
     if (isSecondaryContextLoading) return;
@@ -974,7 +975,7 @@ export default function AbsencePage() {
   }
   
   return (
-    <div className="space-y-6 max-w-6xl">
+    <AppPageShell>
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
         <div className="flex items-start justify-between gap-4">
@@ -1658,7 +1659,7 @@ export default function AbsencePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </AppPageShell>
   );
 }
 

@@ -34,7 +34,7 @@ import { PLANT_INSPECTION_ITEMS } from '@/lib/checklists/plant-checklists';
 import { Database } from '@/types/database';
 import { Employee } from '@/types/common';
 import { toast } from 'sonner';
-import { showErrorWithReport } from '@/lib/utils/error-reporting';
+import { getInspectionVisibilityFlags } from '@/lib/utils/inspection-access';
 import { scrollAndHighlightValidationTarget } from '@/lib/utils/validation-scroll';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { InspectionPhotoTiles } from '@/components/inspections/InspectionPhotoTiles';
@@ -76,12 +76,6 @@ type InspectionWithRelations = {
   inspection_items?: InspectionItem[];
 };
 
-type ProfileWithRole = {
-  role?: {
-    is_manager_admin?: boolean;
-  } | null;
-};
-
 type PendingNavigation = { type: 'href'; href: string } | { type: 'back' };
 type ExistingInspectionConflict = { id: string; status: 'draft' | 'submitted' };
 
@@ -91,9 +85,14 @@ function NewPlantInspectionContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const draftId = searchParams.get('id');
-  const { user, isManager, isAdmin, isSuperAdmin } = useAuth();
+  const { user, profile, effectiveRole, isManager, isAdmin, isSuperAdmin } = useAuth();
   const { loading: permissionLoading } = usePermissionCheck('plant-inspections');
-  const isElevatedUser = isManager || isAdmin || isSuperAdmin;
+  const { canManageInspections: canManageCrossUserInspections } = getInspectionVisibilityFlags({
+    teamName: effectiveRole?.team_name ?? profile?.team?.name,
+    isManager,
+    isAdmin,
+    isSuperAdmin,
+  });
   const { tabletModeEnabled } = useTabletMode();
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
   if (typeof window !== 'undefined' && !supabaseRef.current) {
@@ -586,20 +585,6 @@ function NewPlantInspectionContent() {
         return;
       }
 
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select(`
-          id,
-          role:roles (
-            name,
-            is_manager_admin
-          )
-        `)
-        .eq('id', currentUserId)
-        .single();
-
-      const userIsManager = (profileData as ProfileWithRole)?.role?.is_manager_admin || false;
-
       const { data: inspection, error: inspectionError } = await supabase
         .from('plant_inspections')
         .select(`
@@ -616,7 +601,7 @@ function NewPlantInspectionContent() {
 
       if (inspectionError) throw inspectionError;
 
-      if (!userIsManager && inspection.user_id !== user?.id) {
+      if (!canManageCrossUserInspections && inspection.user_id !== user?.id) {
         setError('You do not have permission to edit this inspection');
         return;
       }
@@ -685,7 +670,7 @@ function NewPlantInspectionContent() {
       isDraftHydratedRef.current = true;
       setLoading(false);
     }
-  }, [supabase, user]);
+  }, [canManageCrossUserInspections, supabase, user]);
 
   useEffect(() => {
     if (draftId && user && !loadingRef.current) {
@@ -777,7 +762,7 @@ function NewPlantInspectionContent() {
   }, [existingInspectionId, requestNavigation]);
 
   useEffect(() => {
-    if (user && isElevatedUser) {
+    if (user && canManageCrossUserInspections) {
       const fetchEmployees = async () => {
         try {
           const typedProfiles = await fetchUserDirectory({ module: 'plant-inspections' });
@@ -804,7 +789,7 @@ function NewPlantInspectionContent() {
     } else if (user) {
       setSelectedEmployeeId(user.id);
     }
-  }, [user, isElevatedUser, supabase]);
+  }, [canManageCrossUserInspections, user]);
 
   const loadLockedDefects = async (plantId: string) => {
     try {
@@ -1313,6 +1298,7 @@ function NewPlantInspectionContent() {
       allowNavigationRef.current = true;
       router.push('/plant-inspections');
     } catch (err) {
+      const errorContextId = 'plant-inspections-new-save-inspection-error';
       const errMessage = err instanceof Error ? err.message : String(err);
       const errCode = (err && typeof err === 'object' && 'code' in err) ? (err as { code?: string }).code : '';
       const fullErrStr = errMessage + ' ' + errCode;
@@ -1344,13 +1330,17 @@ function NewPlantInspectionContent() {
         return;
       }
 
-      console.error('Error saving inspection:', err, { errorContextId: 'plant-inspections-new-save-inspection-error' });
-      
-      showErrorWithReport(
-        'Failed to save inspection',
-        errMessage,
-        { plantId: selectedPlantId, inspectionDate, existingInspectionId }
-      );
+      console.error('Error saving inspection:', err, {
+        errorContextId,
+        plantId: selectedPlantId,
+        inspectionDate,
+        existingInspectionId: existingInspectionId || null,
+      });
+
+      toast.error('Failed to save inspection', {
+        id: errorContextId,
+        description: errMessage,
+      });
     } finally {
       saveInspectionInFlightRef.current = false;
       setLoading(false);
@@ -1453,7 +1443,7 @@ function NewPlantInspectionContent() {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Manager: Employee Selector */}
-          {isElevatedUser && (
+          {canManageCrossUserInspections && (
             <div className="space-y-2 pb-4 border-b border-border">
               <Label htmlFor="employee" className="text-foreground text-base flex items-center gap-2">
                 <User className="h-4 w-4" />

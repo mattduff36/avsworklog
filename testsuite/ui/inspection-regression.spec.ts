@@ -20,7 +20,7 @@ const SMOKE_ROUTES = [
   { path: '/fleet', name: 'Fleet' },
   { path: '/workshop-tasks', name: 'Workshop Tasks' },
   { path: '/reports', name: 'Reports' },
-  { path: '/actions', name: 'Actions' },
+  { path: '/actions', name: 'Actions (Legacy)' },
   { path: '/timesheets', name: 'Timesheets' },
 ];
 

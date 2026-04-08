@@ -20,6 +20,7 @@ import { ProjectsManageFilters } from '@/components/projects/manage/ProjectsMana
 import { ProjectsFavouriteStrip } from '@/components/projects/manage/ProjectsFavouriteStrip';
 import { ProjectsDocumentsTable } from '@/components/projects/manage/ProjectsDocumentsTable';
 import { ProjectsDocumentsMobileCards } from '@/components/projects/manage/ProjectsDocumentsMobileCards';
+import { AppPageShell } from '@/components/layout/AppPageShell';
 import type { ManageDocumentRow, ManageDocumentsQuery } from '@/types/rams';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
@@ -318,7 +319,7 @@ export default function ProjectsManagePage() {
   }
 
   return (
-    <div className="space-y-6 max-w-6xl">
+    <AppPageShell>
       {/* Mobile info banner */}
       <Alert className="md:hidden bg-blue-900/20 border-blue-700/50">
         <Monitor className="h-4 w-4 text-blue-400" />
@@ -530,6 +531,6 @@ export default function ProjectsManagePage() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </AppPageShell>
   );
 }

@@ -9,6 +9,7 @@ import { useBrowserSupabaseClient } from '@/lib/hooks/useBrowserSupabaseClient';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { AppPageShell } from '@/components/layout/AppPageShell';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PageLoader } from '@/components/ui/page-loader';
 import Link from 'next/link';
@@ -578,7 +579,7 @@ export default function TimesheetsPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-6xl">
+    <AppPageShell>
       
       {/* Header */}
       <div className="bg-slate-900 rounded-lg p-6 border border-border">
@@ -931,7 +932,7 @@ export default function TimesheetsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </AppPageShell>
   );
 }
 

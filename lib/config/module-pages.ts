@@ -93,8 +93,7 @@ export const MODULE_PAGES: ModulePage[] = [
     module: 'actions',
     displayName: MODULE_DISPLAY_NAMES.actions,
     subPages: [
-      { value: 'actions-list', label: 'Actions List' },
-      { value: 'actions-my', label: 'My Actions' },
+      { value: 'actions-list', label: 'Actions (Legacy)' },
     ],
   },
   {
@@ -244,7 +243,6 @@ export function getPageUrl(value: string): string {
     
     // Actions
     'actions-list': '/actions',
-    'actions-my': '/actions/my',
     
     // Reports
     'reports-list': '/reports',

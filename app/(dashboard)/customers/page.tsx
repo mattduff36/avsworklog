@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
+import { AppPageShell } from '@/components/layout/AppPageShell';
 import { Building2, Plus, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
@@ -88,7 +89,7 @@ export default function CustomersPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-6xl">
+    <AppPageShell>
       <div className="bg-white dark:bg-slate-900 rounded-lg border border-border p-6">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -142,6 +143,6 @@ export default function CustomersPage() {
         onSubmit={editingCustomer ? handleUpdate : handleCreate}
         customer={editingCustomer}
       />
-    </div>
+    </AppPageShell>
   );
 }

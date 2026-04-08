@@ -30,7 +30,7 @@ import { Database } from '@/types/database';
 import { Employee } from '@/types/common';
 import { toast } from 'sonner';
 import { getInspectionErrorMessage, isDuplicateInspectionError } from '@/lib/utils/inspection-error-handling';
-import { showErrorWithReport } from '@/lib/utils/error-reporting';
+import { getInspectionVisibilityFlags } from '@/lib/utils/inspection-access';
 import { scrollAndHighlightValidationTarget } from '@/lib/utils/validation-scroll';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { triggerShakeAnimation } from '@/lib/utils/animations';
@@ -99,12 +99,6 @@ type ExistingInspectionConflict = {
   status: 'draft' | 'submitted';
 };
 
-type ProfileWithRole = {
-  role?: {
-    is_manager_admin?: boolean;
-  } | null;
-};
-
 const STICKY_NAV_OFFSET_PX = 96;
 
 function isTransientNetworkError(error: unknown): boolean {
@@ -127,9 +121,14 @@ function NewInspectionContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const draftId = searchParams.get('id'); // Get draft ID from URL if editing
-  const { user, isManager, isAdmin, isSuperAdmin } = useAuth();
+  const { user, profile, effectiveRole, isManager, isAdmin, isSuperAdmin } = useAuth();
   const { loading: permissionLoading } = usePermissionCheck('inspections');
-  const isElevatedUser = isManager || isAdmin || isSuperAdmin;
+  const { canManageInspections: canManageCrossUserInspections } = getInspectionVisibilityFlags({
+    teamName: effectiveRole?.team_name ?? profile?.team?.name,
+    isManager,
+    isAdmin,
+    isSuperAdmin,
+  });
   const { tabletModeEnabled } = useTabletMode();
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
   if (typeof window !== 'undefined' && !supabaseRef.current) {
@@ -417,20 +416,6 @@ function NewInspectionContent() {
         return;
       }
 
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select(`
-          id,
-          role:roles (
-            name,
-            is_manager_admin
-          )
-        `)
-        .eq('id', currentUserId)
-        .single();
-
-      const userIsManager = (profileData as ProfileWithRole)?.role?.is_manager_admin || false;
-
       const { data: inspection, error: inspectionError } = await supabase
         .from('van_inspections')
         .select(`
@@ -447,7 +432,7 @@ function NewInspectionContent() {
 
       if (inspectionError) throw inspectionError;
 
-      if (!userIsManager && inspection.user_id !== user?.id) {
+      if (!canManageCrossUserInspections && inspection.user_id !== user?.id) {
         setError('You do not have permission to edit this inspection');
         return;
       }
@@ -504,7 +489,7 @@ function NewInspectionContent() {
     } finally {
       setLoading(false);
     }
-  }, [supabase, user?.id]);
+  }, [canManageCrossUserInspections, supabase, user?.id]);
 
   // Load draft inspection if ID is provided in URL
   useEffect(() => {
@@ -536,9 +521,9 @@ function NewInspectionContent() {
     };
   }, [savingDraftForPhoto]);
 
-  // Fetch employees if manager, and set initial selected employee
+  // Fetch employees only for roles that can manage other users' inspections.
   useEffect(() => {
-    if (user && isElevatedUser) {
+    if (user && canManageCrossUserInspections) {
       const fetchEmployees = async () => {
         try {
           const allEmployees = await fetchUserDirectory({ module: 'inspections' });
@@ -569,7 +554,7 @@ function NewInspectionContent() {
       // If not a manager, set selected employee to current user
       setSelectedEmployeeId(user.id);
     }
-  }, [user, isElevatedUser, supabase]);
+  }, [canManageCrossUserInspections, user]);
 
   // Load recent vehicle IDs for the user
   useEffect(() => {
@@ -1730,27 +1715,42 @@ function NewInspectionContent() {
       }
 
       if (isTransientNetworkError(err)) {
-        console.warn('Inspection save failed due transient network error');
+        console.warn('Inspection save failed due transient network error', {
+          errorContextId,
+          vehicleId,
+          weekEnding,
+          existingInspectionId: existingInspectionId || null,
+        });
       } else {
-        console.error('Error saving inspection:', err, { errorContextId });
-        console.error('Error details:', JSON.stringify(err, null, 2), { errorContextId });
+        console.error('Error saving inspection:', err, {
+          errorContextId,
+          vehicleId,
+          weekEnding,
+          existingInspectionId: existingInspectionId || null,
+        });
+        console.error('Error details:', JSON.stringify(err, null, 2), {
+          errorContextId,
+          vehicleId,
+          weekEnding,
+          existingInspectionId: existingInspectionId || null,
+        });
       }
       
       const errorMessage = getInspectionErrorMessage(err, 'An unexpected error occurred');
 
       if (err instanceof Error) {
-        console.error('Error stack:', err.stack, { errorContextId });
-      }
-      
-      showErrorWithReport(
-        'Failed to save inspection',
-        errorMessage,
-        {
+        console.error('Error stack:', err.stack, {
+          errorContextId,
           vehicleId,
           weekEnding,
           existingInspectionId: existingInspectionId || null,
-        }
-      );
+        });
+      }
+      
+      toast.error('Failed to save inspection', {
+        id: errorContextId,
+        description: errorMessage,
+      });
     } finally {
       setLoading(false);
     }
@@ -1849,7 +1849,7 @@ function NewInspectionContent() {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Manager: Employee Selector */}
-          {isElevatedUser && (
+          {canManageCrossUserInspections && (
             <div className="space-y-2 pb-4 border-b border-border">
               <Label htmlFor="employee" className="text-foreground text-base flex items-center gap-2">
                 <User className="h-4 w-4" />
@@ -2688,7 +2688,7 @@ function NewInspectionContent() {
                   // If save succeeds, saveInspection navigates away, so dialog closes automatically
                   // If save fails, error is shown and we keep dialog open
                 } catch (error) {
-                  // Error is already handled in saveInspection via showErrorWithReport
+                  // Error is already handled in saveInspection
                   // Keep dialog open so user can see the error and try again
                   console.error('Failed to save draft:', error);
                 } finally {

@@ -7,6 +7,7 @@ import { usePlantInspectionRealtime } from '@/lib/hooks/useRealtime';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { createClient } from '@/lib/supabase/client';
 import { isUuid } from '@/lib/utils/uuid';
+import { AppPageShell } from '@/components/layout/AppPageShell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -584,7 +585,7 @@ function PlantInspectionsContent() {
   const showInitialLoading = (permissionLoading || loading) && inspections.length === 0;
 
   return (
-    <div className="space-y-6 max-w-6xl">
+    <AppPageShell>
       
       {/* Header */}
       <div className={`bg-slate-900 rounded-lg border border-border ${tabletModeEnabled ? 'p-5 md:p-6' : 'p-6'}`}>
@@ -939,7 +940,7 @@ function PlantInspectionsContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </AppPageShell>
   );
 }
 

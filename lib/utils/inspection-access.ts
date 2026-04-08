@@ -30,7 +30,10 @@ export function getInspectionVisibilityFlags(
     hasOrgWideInspectionVisibility,
     hasTeamInspectionVisibility,
     canViewCrossUserInspections: hasOrgWideInspectionVisibility || hasTeamInspectionVisibility,
-    canManageInspections: Boolean(input.isManager || input.isAdmin || input.isSuperAdmin),
+    // Workshop users can view wider inspection data, but write access remains owner-scoped.
+    canManageInspections: Boolean(
+      (input.isManager || input.isAdmin || input.isSuperAdmin) && !hasWorkshopReadAllOverride
+    ),
   };
 }
 

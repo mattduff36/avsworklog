@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { AppPageShell } from '@/components/layout/AppPageShell';
 import { TabletModeToggleActions } from '@/components/layout/TabletModeToggleActions';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import Link from 'next/link';
@@ -14,9 +15,6 @@ import {
   CheckCircle2,
   ChevronRight,
   Bug,
-  Lightbulb,
-  Wrench,
-  Settings,
   FileText,
   Calendar,
   Loader2
@@ -29,7 +27,7 @@ import { useRamsAssignmentSummary } from '@/lib/hooks/useNavMetrics';
 import { getErrorStatus, isAuthErrorStatus, createStatusError } from '@/lib/utils/http-error';
 
 type PendingApprovalCount = {
-  type: 'timesheets' | 'inspections' | 'absences' | 'pending' | 'logged' | 'completed' | 'workshop' | 'maintenance' | 'suggestions' | 'errors';
+  type: 'timesheets' | 'absences';
   label: string;
   count: number;
   icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
@@ -79,7 +77,6 @@ export default function DashboardPage() {
   const recoveryAttemptedRef = useRef(false);
 
   const [pendingApprovals, setPendingApprovals] = useState<PendingApprovalCount[]>([]);
-  const [actionsSummary, setActionsSummary] = useState<PendingApprovalCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [newSuggestionsCount, setNewSuggestionsCount] = useState(0);
   const [newErrorReportsCount, setNewErrorReportsCount] = useState(0);
@@ -127,11 +124,6 @@ export default function DashboardPage() {
   const headerSubtitle = dashboardTeamName ? `${dashboardTeamName} · ${roleLabel}` : roleLabel;
 
   const canViewApprovals = userPermissions.has('approvals');
-  const canViewActions = userPermissions.has('actions');
-  const canViewMaintenance = userPermissions.has('maintenance');
-  const canViewWorkshopTasks = userPermissions.has('workshop-tasks');
-  const canViewSuggestions = userPermissions.has('suggestions');
-  const canViewErrorReports = userPermissions.has('error-reports');
 
   function buildPendingApprovalsSummary(timesheetsCount: number, absencesCount: number): PendingApprovalCount[] {
     return [
@@ -154,55 +146,10 @@ export default function DashboardPage() {
     ];
   }
 
-  function buildActionsSummary(params: {
-    workshopTotal: number;
-    maintenanceTotal: number;
-    suggestionsTotal: number;
-    errorsTotal: number;
-  }): PendingApprovalCount[] {
-    return [
-      {
-        type: 'workshop',
-        label: 'Workshop Tasks',
-        count: params.workshopTotal,
-        icon: Wrench,
-        color: 'hsl(13 37% 48%)',
-        href: '/workshop-tasks',
-      },
-      {
-        type: 'maintenance',
-        label: 'Maintenance & Service',
-        count: params.maintenanceTotal,
-        icon: Settings,
-        color: 'hsl(0 84% 60%)',
-        href: '/maintenance',
-      },
-      {
-        type: 'suggestions',
-        label: 'Suggestions',
-        count: params.suggestionsTotal,
-        icon: Lightbulb,
-        color: 'hsl(48 87% 69%)',
-        href: '/suggestions/manage',
-      },
-      {
-        type: 'errors',
-        label: 'Error Reports',
-        count: params.errorsTotal,
-        icon: Bug,
-        color: 'hsl(48 87% 69%)',
-        href: '/admin/errors/manage',
-      },
-    ];
-  }
-
   const fetchDashboardMetrics = useCallback(async () => {
     if (!navigator.onLine) {
       return {
         pendingApprovals: canViewApprovals ? buildPendingApprovalsSummary(0, 0) : [],
-        actionsSummary: canViewActions
-          ? buildActionsSummary({ workshopTotal: 0, maintenanceTotal: 0, suggestionsTotal: 0, errorsTotal: 0 })
-          : [],
         newSuggestionsCount: 0,
         newErrorReportsCount: 0,
         pendingQuotesCount: 0,
@@ -218,7 +165,6 @@ export default function DashboardPage() {
       error?: string;
       metrics?: {
         approvals?: { timesheets?: number; absences?: number };
-        actions?: { workshop?: number; maintenance?: number; suggestions?: number; errors?: number };
         badges?: {
           workshop_pending?: number;
           maintenance_due_soon?: number;
@@ -237,10 +183,6 @@ export default function DashboardPage() {
 
     const timesheetsCount = payload.metrics?.approvals?.timesheets || 0;
     const absencesCount = payload.metrics?.approvals?.absences || 0;
-    const workshopTotal = payload.metrics?.actions?.workshop || 0;
-    const maintenanceTotal = payload.metrics?.actions?.maintenance || 0;
-    const suggestionsTotal = payload.metrics?.actions?.suggestions || 0;
-    const errorsTotal = payload.metrics?.actions?.errors || 0;
     const suggestionsNewCount = payload.metrics?.badges?.suggestions_new || 0;
     const errorsNewCount = payload.metrics?.badges?.error_reports_new || 0;
     const workshopPendingCount = payload.metrics?.badges?.workshop_pending || 0;
@@ -249,14 +191,6 @@ export default function DashboardPage() {
 
     return {
       pendingApprovals: canViewApprovals ? buildPendingApprovalsSummary(timesheetsCount, absencesCount) : [],
-      actionsSummary: canViewActions
-        ? buildActionsSummary({
-            workshopTotal,
-            maintenanceTotal,
-            suggestionsTotal,
-            errorsTotal,
-          })
-        : [],
       newSuggestionsCount: suggestionsNewCount,
       newErrorReportsCount: errorsNewCount,
       pendingQuotesCount: payload.metrics?.badges?.quotes_pending_internal_approval || 0,
@@ -265,11 +199,10 @@ export default function DashboardPage() {
       maintenanceDueSoonCount,
       maintenanceOverdueCount,
     };
-  }, [canViewActions, canViewApprovals]);
+  }, [canViewApprovals]);
 
   const applyDashboardMetrics = useCallback((metrics: Awaited<ReturnType<typeof fetchDashboardMetrics>>) => {
     setPendingApprovals(metrics.pendingApprovals);
-    setActionsSummary(metrics.actionsSummary);
     setNewSuggestionsCount(metrics.newSuggestionsCount);
     setNewErrorReportsCount(metrics.newErrorReportsCount);
     setPendingQuotesCount(metrics.pendingQuotesCount);
@@ -297,11 +230,6 @@ export default function DashboardPage() {
 
       if (!isAuthErrorStatus(errorStatus)) {
         setPendingApprovals(canViewApprovals ? buildPendingApprovalsSummary(0, 0) : []);
-        setActionsSummary(
-          canViewActions
-            ? buildActionsSummary({ workshopTotal: 0, maintenanceTotal: 0, suggestionsTotal: 0, errorsTotal: 0 })
-            : []
-        );
         setNewSuggestionsCount(0);
         setNewErrorReportsCount(0);
         setPendingQuotesCount(0);
@@ -316,7 +244,7 @@ export default function DashboardPage() {
       setLoading(false);
       setBadgesLoading(false);
     }
-  }, [applyDashboardMetrics, canViewActions, canViewApprovals, fetchDashboardMetrics]);
+  }, [applyDashboardMetrics, canViewApprovals, fetchDashboardMetrics]);
 
   useEffect(() => {
     if (permissionsLoading) {
@@ -402,18 +330,8 @@ export default function DashboardPage() {
   const renderedManagerTiles = visibleManagerTiles.filter(link => link.href !== '/absence/manage');
   const renderedManagementTiles = [...renderedManagerTiles, ...visibleAdminTiles];
   const totalPendingApprovalsCount = pendingApprovals.reduce((sum, a) => sum + a.count, 0);
-
-  const visibleActionsSummary = actionsSummary.filter((item) => {
-    if (item.type === 'workshop') return canViewWorkshopTasks;
-    if (item.type === 'maintenance') return canViewMaintenance;
-    if (item.type === 'suggestions') return canViewSuggestions;
-    if (item.type === 'errors') return canViewErrorReports;
-    return true;
-  });
-  const totalActionsCount = visibleActionsSummary.reduce((sum, a) => sum + a.count, 0);
   const managementTileBadgeCountByHref: Record<string, number> = {
     '/approvals': totalPendingApprovalsCount,
-    '/actions': totalActionsCount,
     '/suggestions/manage': newSuggestionsCount,
     '/admin/errors/manage': newErrorReportsCount,
     '/quotes': pendingQuotesCount,
@@ -423,7 +341,7 @@ export default function DashboardPage() {
   const getManagementTileBadgeCount = (href: string) => managementTileBadgeCountByHref[href] || 0;
 
   return (
-    <div className="space-y-8 max-w-6xl">
+    <AppPageShell className="space-y-8">
       
       {!tabletModeEnabled && (
         <div className="bg-slate-900 rounded-lg p-4 md:p-5 border border-slate-700 relative overflow-hidden">
@@ -776,89 +694,7 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* Manager Actions Section */}
-      {!tabletModeEnabled && canViewActions && (
-        <Card className="border-border animate-card-fade" style={{ animationDelay: '400ms' }}>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between text-white">
-              <span>Manager Actions</span>
-              <Link href="/actions">
-                <Button variant="outline" size="sm" className="border-border text-muted-foreground hover:bg-slate-700/50">
-                  View All Actions
-                </Button>
-              </Link>
-            </CardTitle>
-            <CardDescription className="text-muted-foreground">
-              Track and manage all action items
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <p>Loading actions...</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {visibleActionsSummary.map((actionType) => {
-                  const Icon = actionType.icon;
-                  
-                  return (
-                    <Link
-                      key={actionType.type}
-                      href={actionType.href}
-                      className="block group"
-                    >
-                      <div className="flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-slate-800/30 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-all duration-200 border border-border/50 hover:border-slate-300 dark:hover:border-border">
-                        <div className="flex items-center gap-4">
-                          <div 
-                            className="flex items-center justify-center w-10 h-10 rounded-lg"
-                            style={{ backgroundColor: applyAlphaToHSL(actionType.color) }}
-                          >
-                            <Icon 
-                              className="h-5 w-5" 
-                              style={{ color: actionType.color }}
-                            />
-                          </div>
-                          <div>
-                            <p className="font-medium text-white group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">
-                              {actionType.label}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              {actionType.count === 0 ? 'No' : actionType.count} {actionType.count === 1 ? 'item' : 'items'} {actionType.count === 0 ? '' : 'requiring attention'}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          {actionType.count > 0 && (
-                            <Badge 
-                              variant="outline" 
-                              className="text-base px-3 py-1 font-semibold border-amber-500/30 text-amber-400 bg-amber-500/10"
-                            >
-                              {actionType.count}
-                            </Badge>
-                          )}
-                          <ChevronRight className="h-5 w-5 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-muted-foreground transition-colors" />
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                })}
-                
-                {visibleActionsSummary.reduce((sum, a) => sum + a.count, 0) === 0 && (
-                  <div className="text-center py-8 text-slate-400 mt-4">
-                    <CheckCircle2 className="h-12 w-12 mx-auto mb-3 opacity-20 text-green-400" />
-                    <p className="text-lg mb-1">All clear!</p>
-                    <p className="text-sm text-muted-foreground">
-                      No actions at the moment
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-    </div>
+    </AppPageShell>
   );
 }
 

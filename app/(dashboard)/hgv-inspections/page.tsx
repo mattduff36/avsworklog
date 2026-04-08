@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQueryState } from 'nuqs';
+import { AppPageShell } from '@/components/layout/AppPageShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -410,7 +411,7 @@ function HgvInspectionsContent() {
   }
 
   return (
-    <div className="space-y-6 max-w-6xl">
+    <AppPageShell>
       <div className={`bg-slate-900 rounded-lg border border-border ${tabletModeEnabled ? 'p-5 md:p-6' : 'p-6'}`}>
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
           <div>
@@ -662,7 +663,7 @@ function HgvInspectionsContent() {
           )}
         </>
       )}
-    </div>
+    </AppPageShell>
   );
 }
 

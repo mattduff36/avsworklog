@@ -4,6 +4,7 @@ import { Fragment, useState, useEffect, useMemo, useCallback, useLayoutEffect, u
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createPortal } from 'react-dom';
+import { AppPageShell } from '@/components/layout/AppPageShell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PageLoader } from '@/components/ui/page-loader';
@@ -1166,7 +1167,7 @@ export default function UsersAdminPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-7xl">
+    <AppPageShell width="wide">
       {/* Header */}
       <div className="bg-slate-900 rounded-lg p-6 border border-border">
         <div className="flex items-center justify-between">
@@ -2371,6 +2372,6 @@ export default function UsersAdminPage() {
           </TabsContent>
         )}
       </Tabs>
-    </div>
+    </AppPageShell>
   );
 }

@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { PageLoader } from '@/components/ui/page-loader';
+import { AppPageShell } from '@/components/layout/AppPageShell';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { toast } from 'sonner';
 import { useQueryState } from 'nuqs';
@@ -614,7 +615,7 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="max-w-6xl space-y-6">
+    <AppPageShell>
       <div className="rounded-lg border border-border bg-white p-6 dark:bg-slate-900">
         <div className="flex items-start gap-3">
           <div className="rounded-lg bg-avs-yellow/15 p-2 text-avs-yellow">
@@ -904,6 +905,6 @@ export default function ReportsPage() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+    </AppPageShell>
   );
 }

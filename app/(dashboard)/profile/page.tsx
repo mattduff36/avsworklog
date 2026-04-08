@@ -5,6 +5,7 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { AppPageShell } from '@/components/layout/AppPageShell';
 import { PROFILE_HUB_PRD_EPIC_ID } from '@/lib/profile/epic';
 import { ProfileIdentityCard } from '@/components/profile/ProfileIdentityCard';
 import { ProfileModuleSummaries } from '@/components/profile/ProfileModuleSummaries';
@@ -367,7 +368,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="max-w-6xl space-y-6" data-prd-epic-id={PROFILE_HUB_PRD_EPIC_ID}>
+    <AppPageShell data-prd-epic-id={PROFILE_HUB_PRD_EPIC_ID}>
       <ProfileIdentityCard
         profile={overview.profile}
         onSelectAvatarFile={handleSelectAvatarFile}
@@ -406,7 +407,7 @@ export default function ProfilePage() {
       <AccountSwitcherSettingsCard />
 
       <ProfileHelpShortcuts />
-    </div>
+    </AppPageShell>
   );
 }
 

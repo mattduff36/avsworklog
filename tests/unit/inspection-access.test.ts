@@ -44,6 +44,20 @@ describe('getInspectionVisibilityFlags', () => {
     });
   });
 
+  it('keeps workshop managers read-only for cross-user inspection changes', () => {
+    expect(
+      getInspectionVisibilityFlags({
+        teamName: 'Workshop',
+        isManager: true,
+      })
+    ).toMatchObject({
+      hasOrgWideInspectionVisibility: true,
+      hasTeamInspectionVisibility: false,
+      canViewCrossUserInspections: true,
+      canManageInspections: false,
+    });
+  });
+
   it('keeps non-workshop employees scoped to their own inspections', () => {
     expect(
       getInspectionVisibilityFlags({

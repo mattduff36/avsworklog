@@ -32,6 +32,7 @@ import { toast } from 'sonner';
 import { TRUCK_CHECKLIST_ITEMS } from '@/lib/checklists/vehicle-checklists';
 import { formatDate, formatDateISO, getDayOfWeek } from '@/lib/utils/date';
 import { getRecentVehicleIds, recordRecentVehicleId, splitVehiclesByRecent } from '@/lib/utils/recentVehicles';
+import { getInspectionVisibilityFlags } from '@/lib/utils/inspection-access';
 import { scrollAndHighlightValidationTarget } from '@/lib/utils/validation-scroll';
 import type { Database } from '@/types/database';
 import type { Employee } from '@/types/common';
@@ -77,9 +78,14 @@ function NewHgvInspectionContent() {
     supabaseRef.current = createClient();
   }
   const supabase = supabaseRef.current as ReturnType<typeof createClient>;
-  const { user, isManager, isAdmin, isSuperAdmin } = useAuth();
+  const { user, profile, effectiveRole, isManager, isAdmin, isSuperAdmin } = useAuth();
   const { loading: permissionLoading } = usePermissionCheck('hgv-inspections');
-  const isElevatedUser = isManager || isAdmin || isSuperAdmin;
+  const { canManageInspections: canManageCrossUserInspections } = getInspectionVisibilityFlags({
+    teamName: effectiveRole?.team_name ?? profile?.team?.name,
+    isManager,
+    isAdmin,
+    isSuperAdmin,
+  });
   const { tabletModeEnabled } = useTabletMode();
 
   const [hgvs, setHgvs] = useState<HgvAsset[]>([]);
@@ -499,6 +505,14 @@ function NewHgvInspectionContent() {
         return;
       }
 
+      if (!canManageCrossUserInspections && draft.user_id !== user?.id) {
+        setExistingInspectionId(null);
+        window.history.replaceState(null, '', '/hgv-inspections/new');
+        setError('You do not have permission to edit this inspection');
+        isDraftHydratedRef.current = true;
+        return;
+      }
+
       setExistingInspectionId(id);
       setSubmittedConflictInspectionId(null);
       setShowSubmittedConflictDialog(false);
@@ -550,7 +564,7 @@ function NewHgvInspectionContent() {
       isDraftHydratedRef.current = true;
       setLoading(false);
     }
-  }, [supabase]);
+  }, [canManageCrossUserInspections, supabase, user?.id]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -560,7 +574,7 @@ function NewHgvInspectionContent() {
           .select('id, reg_number, nickname, current_mileage, hgv_categories(name)')
           .eq('status', 'active')
           .order('reg_number'),
-        isElevatedUser
+        canManageCrossUserInspections
           ? fetchUserDirectory({ module: 'hgv-inspections' })
           : Promise.resolve([] as DirectoryUser[]),
       ]);
@@ -578,7 +592,7 @@ function NewHgvInspectionContent() {
     };
 
     loadData();
-  }, [isElevatedUser, supabase, user]);
+  }, [canManageCrossUserInspections, supabase, user]);
 
   useEffect(() => {
     if (draftId && user) {
@@ -1224,7 +1238,7 @@ function NewHgvInspectionContent() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {isElevatedUser && (
+          {canManageCrossUserInspections && (
             <div className="space-y-2 pb-4 border-b border-border">
               <Label className="text-foreground text-base flex items-center gap-2">
                 <User className="h-4 w-4" />

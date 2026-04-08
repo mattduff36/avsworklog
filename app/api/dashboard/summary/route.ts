@@ -267,7 +267,6 @@ export async function GET() {
       : await getPermissionMapForUser(userId, effectiveRole.role_id, admin, effectiveRole.team_id);
 
   const canViewApprovals = permissions.approvals;
-  const canViewActions = permissions.actions;
   const canViewWorkshopTasks = permissions['workshop-tasks'];
   const canViewMaintenance = permissions.maintenance;
   const canViewSuggestions = permissions.suggestions;
@@ -278,7 +277,6 @@ export async function GET() {
     timesheetsResult,
     absencesResult,
     workshopPendingResult,
-    workshopInProgressResult,
     suggestionsNewResult,
     suggestionsReviewResult,
     errorsNewResult,
@@ -299,13 +297,6 @@ export async function GET() {
           .select('id', { count: 'exact', head: true })
           .in('action_type', ['inspection_defect', 'workshop_vehicle_task'])
           .eq('status', 'pending')
-      : Promise.resolve({ count: 0, error: null }),
-    canViewWorkshopTasks
-      ? supabase
-          .from('actions')
-          .select('id', { count: 'exact', head: true })
-          .in('action_type', ['inspection_defect', 'workshop_vehicle_task'])
-          .eq('status', 'logged')
       : Promise.resolve({ count: 0, error: null }),
     canViewSuggestions
       ? supabase.from('suggestions').select('id', { count: 'exact', head: true }).eq('status', 'new')
@@ -338,7 +329,6 @@ export async function GET() {
     timesheetsResult,
     absencesResult,
     workshopPendingResult,
-    workshopInProgressResult,
     suggestionsNewResult,
     suggestionsReviewResult,
     errorsNewResult,
@@ -357,12 +347,6 @@ export async function GET() {
       approvals: {
         timesheets: timesheetsResult.count || 0,
         absences: absencesResult.count || 0,
-      },
-      actions: {
-        workshop: canViewActions ? (workshopPendingResult.count || 0) + (workshopInProgressResult.count || 0) : 0,
-        maintenance: canViewActions ? maintenanceCounts.attentionTotal : 0,
-        suggestions: (suggestionsNewResult.count || 0) + (suggestionsReviewResult.count || 0),
-        errors: (errorsNewResult.count || 0) + (errorsInvestigatingResult.count || 0),
       },
       badges: {
         workshop_pending: workshopPendingResult.count || 0,

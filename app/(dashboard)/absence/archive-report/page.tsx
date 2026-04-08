@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useAllAbsences, useAllAbsenceReasons } from '@/lib/hooks/useAbsence';
 import { createClient } from '@/lib/supabase/client';
+import { AppPageShell } from '@/components/layout/AppPageShell';
 import { BackButton } from '@/components/ui/back-button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageLoader } from '@/components/ui/page-loader';
@@ -129,7 +130,7 @@ export default function AbsenceArchiveReportPage() {
   if (!canAccessAbsenceModule || !canManage) return null;
 
   return (
-    <div className="space-y-6 max-w-7xl">
+    <AppPageShell width="wide">
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
         <div className="flex items-start gap-4">
           <BackButton />
@@ -363,6 +364,6 @@ export default function AbsenceArchiveReportPage() {
       </Card>
 
       <AbsenceAboutHelper variant="archive-report" />
-    </div>
+    </AppPageShell>
   );
 }

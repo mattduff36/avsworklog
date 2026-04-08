@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { SlidersHorizontal } from 'lucide-react';
+import { AppPageShell } from '@/components/layout/AppPageShell';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -61,7 +62,7 @@ export default function AdminSettingsPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-6xl">
+    <AppPageShell>
       <div className="bg-slate-900 rounded-lg p-6 border border-border">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-avs-yellow/20 rounded-lg">
@@ -113,6 +114,6 @@ export default function AdminSettingsPage() {
           <TimesheetTypeExceptionsCard />
         </TabsContent>
       </Tabs>
-    </div>
+    </AppPageShell>
   );
 }

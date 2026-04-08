@@ -4,6 +4,7 @@ import { useEffect, Suspense, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { AppPageShell } from '@/components/layout/AppPageShell';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Loader2, Wrench, Truck, HardHat, Settings } from 'lucide-react';
@@ -120,7 +121,7 @@ function MaintenanceContent() {
   }
 
   return (
-    <div className="space-y-6 max-w-6xl">
+    <AppPageShell>
       {/* Header */}
       <div className={`bg-white dark:bg-slate-900 rounded-lg border border-border ${tabletModeEnabled ? 'p-5 md:p-6' : 'p-6'}`}>
         <div className="flex items-center justify-between">
@@ -225,7 +226,7 @@ function MaintenanceContent() {
           </TabsContent>
         )}
       </Tabs>
-    </div>
+    </AppPageShell>
   );
 }
 
