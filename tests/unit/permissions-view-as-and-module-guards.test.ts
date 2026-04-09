@@ -118,7 +118,7 @@ describe('module guard alignment checks', () => {
     [vanSource, plantSource, hgvSource].forEach((source) => {
       expect(source).toContain('isSupervisor');
       expect(source).toContain('canViewCrossUserInspections');
-      expect(source).toContain('canManageInspections');
+      expect(source).toContain('canDeleteInspections');
     });
 
     expect(accessHelperSource).toContain('input.isManager || input.isSupervisor || input.isAdmin || input.isSuperAdmin');
@@ -131,7 +131,7 @@ describe('module guard alignment checks', () => {
     const hgvSource = readSource('app/(dashboard)/hgv-inspections/page.tsx');
 
     [vanSource, plantSource, hgvSource].forEach((source) => {
-      expect(source).toContain('showDeleteActions={canManageInspections}');
+      expect(source).toContain('showDeleteActions={canDeleteInspections}');
     });
   });
 
