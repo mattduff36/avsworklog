@@ -146,12 +146,16 @@ describe('Inspection defect workflow alignment', () => {
           return {
             select: () => {
               const filters: Record<string, unknown> = {};
+              const completedTasksPayload = { data: [], error: null } as const;
               const query = {
                 eq: (column: string, value: unknown) => {
                   filters[column] = value;
                   return query;
                 },
                 in: async () => ({ data: activeTasks, error: null }),
+                order: () => ({
+                  limit: async () => completedTasksPayload,
+                }),
                 then: (resolve: (value: { data: typeof activeTasks | []; error: null }) => unknown) => {
                   const payload = filters.inspection_id ? { data: [], error: null } : { data: activeTasks, error: null };
                   return Promise.resolve(payload).then(resolve);
@@ -284,12 +288,16 @@ describe('Inspection defect workflow alignment', () => {
           return {
             select: () => {
               const filters: Record<string, unknown> = {};
+              const completedTasksPayload = { data: [], error: null } as const;
               const query = {
                 eq: (column: string, value: unknown) => {
                   filters[column] = value;
                   return query;
                 },
                 in: async () => ({ data: activeTasks, error: null }),
+                order: () => ({
+                  limit: async () => completedTasksPayload,
+                }),
                 then: (resolve: (value: { data: typeof activeTasks | []; error: null }) => unknown) => {
                   const payload = filters.inspection_id ? { data: [], error: null } : { data: activeTasks, error: null };
                   return Promise.resolve(payload).then(resolve);
@@ -411,12 +419,16 @@ describe('Inspection defect workflow alignment', () => {
           return {
             select: () => {
               const filters: Record<string, unknown> = {};
+              const completedTasksPayload = { data: [], error: null } as const;
               const query = {
                 eq: (column: string, value: unknown) => {
                   filters[column] = value;
                   return query;
                 },
                 in: async () => ({ data: [], error: null }),
+                order: () => ({
+                  limit: async () => completedTasksPayload,
+                }),
                 then: (resolve: (value: { data: []; error: null }) => unknown) => {
                   const payload = filters.inspection_id ? { data: [], error: null } : { data: [], error: null };
                   return Promise.resolve(payload).then(resolve);

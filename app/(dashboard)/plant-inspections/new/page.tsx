@@ -135,7 +135,13 @@ function NewPlantInspectionContent() {
   const [, setSignature] = useState<string | null>(null);
   const [showConfirmSubmitDialog, setShowConfirmSubmitDialog] = useState(false);
   const [existingInspectionId, setExistingInspectionId] = useState<string | null>(draftId);
+  const existingInspectionIdRef = useRef<string | null>(draftId);
+  existingInspectionIdRef.current = existingInspectionId;
   const isDraftHydratedRef = useRef(!draftId);
+  const draftSavePromiseRef = useRef<Promise<string | null> | null>(null);
+  const activeDraftLoadIdRef = useRef<string | null>(null);
+  const loadedDraftIdRef = useRef<string | null>(null);
+  const loadLockedDefectsRef = useRef<((plantId: string, mode?: 'replace' | 'merge') => Promise<void>) | null>(null);
   const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation | null>(null);
   const [showDiscardDraftDialog, setShowDiscardDraftDialog] = useState(false);
   const [discardingDraft, setDiscardingDraft] = useState(false);
@@ -458,104 +464,132 @@ function NewPlantInspectionContent() {
   const ensureDraftSaved = async (
     options: { silent?: boolean; source?: 'auto' | 'user' } = {}
   ): Promise<string | null> => {
-    const { silent = false, source = 'user' } = options;
-
-    if (existingInspectionId) {
-      if (source === 'auto' && !isDraftHydratedRef.current) {
-        return existingInspectionId;
-      }
-      const merged = await mergeIntoExistingDraft(existingInspectionId, { showToast: false });
-      if (!merged && !silent) {
-        toast.error('Could not auto-save draft. Please try again.', { id: 'plant-inspections-new-autosave-draft-error' });
-      }
-      return merged ? existingInspectionId : null;
-    }
-    if (!user || !selectedEmployeeId) {
-      if (!silent) toast.error('Select an employee before adding photos', {
-        id: 'plant-inspections-new-validation-photos-employee-required',
-      });
-      return null;
-    }
-    if (!isHiredPlant && !selectedPlantId) {
-      if (!silent) toast.error('Select a plant before adding photos', {
-        id: 'plant-inspections-new-validation-photos-plant-required',
-      });
-      return null;
-    }
-    if (!inspectionDate || inspectionDate.trim() === '') {
-      if (!silent) toast.error('Select an inspection date before adding photos', {
-        id: 'plant-inspections-new-validation-photos-date-required',
-      });
-      return null;
+    if (draftSavePromiseRef.current) {
+      return draftSavePromiseRef.current;
     }
 
-    setSavingDraftForPhoto(true);
-    try {
-      const conflict = await findExistingInspectionConflict();
-      if (conflict) {
-        if (conflict.status === 'draft') {
-          const merged = await mergeIntoExistingDraft(conflict.id, { showToast: !silent });
-          return merged ? conflict.id : null;
+    const pendingDraftSave = (async () => {
+      const { silent = false, source = 'user' } = options;
+
+      if (existingInspectionId) {
+        if (source === 'auto' && !isDraftHydratedRef.current) {
+          return existingInspectionId;
         }
-        handleSubmittedInspectionConflict(conflict.id);
+        if (saveInspectionInFlightRef.current) {
+          return existingInspectionIdRef.current;
+        }
+        saveInspectionInFlightRef.current = true;
+        try {
+          const merged = await mergeIntoExistingDraft(existingInspectionId, { showToast: false });
+          if (!merged && !silent) {
+            toast.error('Could not auto-save draft. Please try again.', { id: 'plant-inspections-new-autosave-draft-error' });
+          }
+          return merged ? existingInspectionId : null;
+        } finally {
+          saveInspectionInFlightRef.current = false;
+        }
+      }
+      if (!user || !selectedEmployeeId) {
+        if (!silent) toast.error('Select an employee before adding photos', {
+          id: 'plant-inspections-new-validation-photos-employee-required',
+        });
         return null;
       }
+      if (!isHiredPlant && !selectedPlantId) {
+        if (!silent) toast.error('Select a plant before adding photos', {
+          id: 'plant-inspections-new-validation-photos-plant-required',
+        });
+        return null;
+      }
+      if (!inspectionDate || inspectionDate.trim() === '') {
+        if (!silent) toast.error('Select an inspection date before adding photos', {
+          id: 'plant-inspections-new-validation-photos-date-required',
+        });
+        return null;
+      }
+      if (saveInspectionInFlightRef.current) {
+        return existingInspectionIdRef.current;
+      }
 
-      const { data: draft, error: draftError } = await supabase
-        .from('plant_inspections')
-        .insert({
-          plant_id: isHiredPlant ? null : selectedPlantId,
-          user_id: selectedEmployeeId,
-          inspection_date: inspectionDate,
-          inspection_end_date: inspectionDate,
-          current_mileage: getParsedHours(),
-          status: 'draft' as const,
-          inspector_comments: inspectorComments.trim() || null,
-          is_hired_plant: isHiredPlant,
-          hired_plant_id_serial: isHiredPlant ? hiredPlantIdSerial.trim() : null,
-          hired_plant_description: isHiredPlant ? hiredPlantDescription.trim() : null,
-          hired_plant_hiring_company: isHiredPlant ? hiredPlantHiringCompany.trim() : null,
-        })
-        .select('id')
-        .single();
-
-      if (draftError) {
-        if (draftError.code === '23505') {
-          const retryConflict = await findExistingInspectionConflict();
-          if (retryConflict) {
-            if (retryConflict.status === 'draft') {
-              const merged = await mergeIntoExistingDraft(retryConflict.id, { showToast: !silent });
-              return merged ? retryConflict.id : null;
-            }
-            handleSubmittedInspectionConflict(retryConflict.id);
-            return null;
+      saveInspectionInFlightRef.current = true;
+      setSavingDraftForPhoto(true);
+      try {
+        const conflict = await findExistingInspectionConflict();
+        if (conflict) {
+          if (conflict.status === 'draft') {
+            const merged = await mergeIntoExistingDraft(conflict.id, { showToast: !silent });
+            return merged ? conflict.id : null;
           }
+          handleSubmittedInspectionConflict(conflict.id);
+          return null;
         }
-        throw draftError;
-      }
 
-      const items = buildCurrentInspectionItemsPayload(draft.id);
-      if (items.length > 0) {
-        const { error: itemsError } = await supabase
-          .from('inspection_items')
-          .insert(items);
-        if (itemsError) throw itemsError;
-      }
+        const { data: draft, error: draftError } = await supabase
+          .from('plant_inspections')
+          .insert({
+            plant_id: isHiredPlant ? null : selectedPlantId,
+            user_id: selectedEmployeeId,
+            inspection_date: inspectionDate,
+            inspection_end_date: inspectionDate,
+            current_mileage: getParsedHours(),
+            status: 'draft' as const,
+            inspector_comments: inspectorComments.trim() || null,
+            is_hired_plant: isHiredPlant,
+            hired_plant_id_serial: isHiredPlant ? hiredPlantIdSerial.trim() : null,
+            hired_plant_description: isHiredPlant ? hiredPlantDescription.trim() : null,
+            hired_plant_hiring_company: isHiredPlant ? hiredPlantHiringCompany.trim() : null,
+          })
+          .select('id')
+          .single();
 
-      setExistingInspectionId(draft.id);
-      setSubmittedConflictInspectionId(null);
-      setShowSubmittedConflictDialog(false);
-      window.history.replaceState(null, '', `/plant-inspections/new?id=${draft.id}`);
-      return draft.id;
-    } catch (err) {
-      const errorContextId = 'plant-inspections-new-silent-draft-save-error';
-      console.error('Silent draft save failed:', err, { errorContextId });
-      if (!silent) {
-        toast.error('Could not auto-save draft. Please try again.', { id: errorContextId });
+        if (draftError) {
+          if (draftError.code === '23505') {
+            const retryConflict = await findExistingInspectionConflict();
+            if (retryConflict) {
+              if (retryConflict.status === 'draft') {
+                const merged = await mergeIntoExistingDraft(retryConflict.id, { showToast: !silent });
+                return merged ? retryConflict.id : null;
+              }
+              handleSubmittedInspectionConflict(retryConflict.id);
+              return null;
+            }
+          }
+          throw draftError;
+        }
+
+        const items = buildCurrentInspectionItemsPayload(draft.id);
+        if (items.length > 0) {
+          const { error: itemsError } = await supabase
+            .from('inspection_items')
+            .insert(items);
+          if (itemsError) throw itemsError;
+        }
+
+        setExistingInspectionId(draft.id);
+        setSubmittedConflictInspectionId(null);
+        setShowSubmittedConflictDialog(false);
+        window.history.replaceState(null, '', `/plant-inspections/new?id=${draft.id}`);
+        return draft.id;
+      } catch (err) {
+        const errorContextId = 'plant-inspections-new-silent-draft-save-error';
+        console.error('Silent draft save failed:', err, { errorContextId });
+        if (!silent) {
+          toast.error('Could not auto-save draft. Please try again.', { id: errorContextId });
+        }
+        return null;
+      } finally {
+        saveInspectionInFlightRef.current = false;
+        setSavingDraftForPhoto(false);
       }
-      return null;
+    })();
+
+    draftSavePromiseRef.current = pendingDraftSave;
+    try {
+      return await pendingDraftSave;
     } finally {
-      setSavingDraftForPhoto(false);
+      if (draftSavePromiseRef.current === pendingDraftSave) {
+        draftSavePromiseRef.current = null;
+      }
     }
   };
 
@@ -588,7 +622,13 @@ function NewPlantInspectionContent() {
   }, [supabase]);
 
   const loadDraftInspection = useCallback(async (id: string) => {
+    if (activeDraftLoadIdRef.current === id || loadedDraftIdRef.current === id) {
+      return;
+    }
+
+    activeDraftLoadIdRef.current = id;
     try {
+      loadingRef.current = true;
       isDraftHydratedRef.current = false;
       setLoading(true);
       setError('');
@@ -678,27 +718,41 @@ function NewPlantInspectionContent() {
       }
 
       if (!inspection.is_hired_plant && inspectionData.plant?.id) {
-        void loadLockedDefects(inspectionData.plant.id, 'merge');
+        void loadLockedDefectsRef.current?.(inspectionData.plant.id, 'merge');
       }
 
+      loadedDraftIdRef.current = id;
       toast.success('Draft inspection loaded');
     } catch (err) {
       console.error('Error loading draft inspection:', err);
       setError(err instanceof Error ? err.message : 'Failed to load draft inspection');
     } finally {
+      if (activeDraftLoadIdRef.current === id) {
+        activeDraftLoadIdRef.current = null;
+      }
+      loadingRef.current = false;
       isDraftHydratedRef.current = true;
       setLoading(false);
     }
-  }, [canManageCrossUserInspections, supabase, user]);
+  }, [canManageCrossUserInspections, supabase, user?.id]);
 
   useEffect(() => {
-    if (draftId && user && !loadingRef.current) {
+    if (
+      draftId &&
+      user &&
+      !loadingRef.current &&
+      loadedDraftIdRef.current !== draftId &&
+      activeDraftLoadIdRef.current !== draftId
+    ) {
       isDraftHydratedRef.current = false;
       const timer = setTimeout(() => {
-        loadDraftInspection(draftId);
+        void loadDraftInspection(draftId);
       }, 100);
       return () => clearTimeout(timer);
     } else {
+      if (!draftId) {
+        loadedDraftIdRef.current = null;
+      }
       isDraftHydratedRef.current = true;
     }
   }, [draftId, user, loadDraftInspection]);
@@ -712,7 +766,12 @@ function NewPlantInspectionContent() {
   useEffect(() => {
     const persistDraft = () => {
       if (existingInspectionId && !isDraftHydratedRef.current) return;
-      if (saveInspectionInFlightRef.current || allowNavigationRef.current) return;
+      if (
+        loadingRef.current ||
+        saveInspectionInFlightRef.current ||
+        draftSavePromiseRef.current ||
+        allowNavigationRef.current
+      ) return;
       void autoSaveDraftRef.current?.();
     };
 
@@ -876,6 +935,7 @@ function NewPlantInspectionContent() {
       setConfirmedRepeatDefects(new Set());
     }
   };
+  loadLockedDefectsRef.current = loadLockedDefects;
 
   const handleStatusChange = (itemNumber: number, status: InspectionStatus) => {
     const key = `${itemNumber}`;

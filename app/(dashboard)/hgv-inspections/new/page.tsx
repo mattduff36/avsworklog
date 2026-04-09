@@ -125,11 +125,15 @@ function NewHgvInspectionContent() {
 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const loadingRef = useRef(false);
+  loadingRef.current = loading;
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
   const saveInspectionInFlightRef = useRef(false);
   const allowNavigationRef = useRef(false);
 
   const [existingInspectionId, setExistingInspectionId] = useState<string | null>(draftId);
+  const existingInspectionIdRef = useRef<string | null>(draftId);
+  existingInspectionIdRef.current = existingInspectionId;
   const [photoUploadItem, setPhotoUploadItem] = useState<{ itemNumber: number; dayOfWeek: number } | null>(null);
   const [savingDraftForPhoto, setSavingDraftForPhoto] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation | null>(null);
@@ -141,6 +145,10 @@ function NewHgvInspectionContent() {
     enabled: Boolean(existingInspectionId),
   });
   const isDraftHydratedRef = useRef(!draftId);
+  const draftSavePromiseRef = useRef<Promise<string | null> | null>(null);
+  const activeDraftLoadIdRef = useRef<string | null>(null);
+  const loadedDraftIdRef = useRef<string | null>(null);
+  const loadLockedDefectsRef = useRef<((selectedHgvId: string, mode?: 'replace' | 'merge') => Promise<void>) | null>(null);
 
   const showPermissionLoader = permissionLoading;
 
@@ -390,109 +398,137 @@ function NewHgvInspectionContent() {
   const ensureDraftSaved = async (
     options: { silent?: boolean; source?: 'auto' | 'user' } = {}
   ): Promise<string | null> => {
-    const { silent = false, source = 'user' } = options;
-
-    if (existingInspectionId) {
-      if (source === 'auto' && !isDraftHydratedRef.current) {
-        return existingInspectionId;
-      }
-      const merged = await mergeIntoExistingDraft(existingInspectionId, { showToast: false });
-      if (!merged && !silent) {
-        toast.error('Could not auto-save draft. Please try again.', { id: 'hgv-inspections-new-autosave-draft-error' });
-      }
-      return merged ? existingInspectionId : null;
-    }
-    if (!user || !selectedEmployeeId || !hgvId) {
-      if (!silent) toast.error('Select an HGV, employee and date before adding photos', {
-        id: 'hgv-inspections-new-validation-photos-core-fields',
-      });
-      return null;
-    }
-    if (!inspectionDate) {
-      if (!silent) toast.error('Select an inspection date before adding photos', {
-        id: 'hgv-inspections-new-validation-photos-date-required',
-      });
-      return null;
+    if (draftSavePromiseRef.current) {
+      return draftSavePromiseRef.current;
     }
 
-    const inspectionConflict = await findExistingInspectionConflict();
-    if (inspectionConflict) {
-      if (inspectionConflict.status === 'draft') {
-        const merged = await mergeIntoExistingDraft(inspectionConflict.id, { showToast: !silent });
-        return merged ? inspectionConflict.id : null;
-      }
-      handleInspectionConflict(inspectionConflict);
-      return null;
-    }
+    const pendingDraftSave = (async () => {
+      const { silent = false, source = 'user' } = options;
 
-    setSavingDraftForPhoto(true);
-    try {
-      const mileageValue = parseInt(currentMileage, 10);
-      const { data: draft, error: draftError } = await supabase
-        .from('hgv_inspections')
-        .insert({
-          hgv_id: hgvId,
-          user_id: selectedEmployeeId,
-          inspection_date: inspectionDate,
-          inspection_end_date: inspectionDate,
-          current_mileage: Number.isNaN(mileageValue) ? null : mileageValue,
-          status: 'draft' as const,
-          inspector_comments: inspectorComments.trim() || null,
-        })
-        .select('id')
-        .single();
-
-      if (draftError) {
-        if (draftError.code === '23505') {
-          const inspectionConflict = await findExistingInspectionConflict();
-          if (inspectionConflict) {
-            if (inspectionConflict.status === 'draft') {
-              const merged = await mergeIntoExistingDraft(inspectionConflict.id, { showToast: !silent });
-              return merged ? inspectionConflict.id : null;
-            }
-            handleInspectionConflict(inspectionConflict);
-            return null;
+      if (existingInspectionId) {
+        if (source === 'auto' && !isDraftHydratedRef.current) {
+          return existingInspectionId;
+        }
+        if (saveInspectionInFlightRef.current) {
+          return existingInspectionIdRef.current;
+        }
+        saveInspectionInFlightRef.current = true;
+        try {
+          const merged = await mergeIntoExistingDraft(existingInspectionId, { showToast: false });
+          if (!merged && !silent) {
+            toast.error('Could not auto-save draft. Please try again.', { id: 'hgv-inspections-new-autosave-draft-error' });
           }
+          return merged ? existingInspectionId : null;
+        } finally {
+          saveInspectionInFlightRef.current = false;
         }
-        throw draftError;
+      }
+      if (!user || !selectedEmployeeId || !hgvId) {
+        if (!silent) toast.error('Select an HGV, employee and date before adding photos', {
+          id: 'hgv-inspections-new-validation-photos-core-fields',
+        });
+        return null;
+      }
+      if (!inspectionDate) {
+        if (!silent) toast.error('Select an inspection date before adding photos', {
+          id: 'hgv-inspections-new-validation-photos-date-required',
+        });
+        return null;
+      }
+      if (saveInspectionInFlightRef.current) {
+        return existingInspectionIdRef.current;
       }
 
-      const dayOfWeek = getDayOfWeek(new Date(inspectionDate + 'T00:00:00'));
-      const items: InspectionItemInsert[] = [];
-      TRUCK_CHECKLIST_ITEMS.forEach((itemDescription, idx) => {
-        const itemNumber = idx + 1;
-        const key = `${itemNumber}`;
-        if (checkboxStates[key]) {
-          items.push({
-            inspection_id: draft.id,
-            item_number: itemNumber,
-            item_description: itemDescription,
-            day_of_week: dayOfWeek,
-            status: checkboxStates[key],
-            comments: comments[key] || null,
-          });
+      saveInspectionInFlightRef.current = true;
+      setSavingDraftForPhoto(true);
+      try {
+        const inspectionConflict = await findExistingInspectionConflict();
+        if (inspectionConflict) {
+          if (inspectionConflict.status === 'draft') {
+            const merged = await mergeIntoExistingDraft(inspectionConflict.id, { showToast: !silent });
+            return merged ? inspectionConflict.id : null;
+          }
+          handleInspectionConflict(inspectionConflict);
+          return null;
         }
-      });
 
-      if (items.length > 0) {
-        const { error: itemsError } = await supabase
-          .from('inspection_items')
-          .insert(items);
-        if (itemsError) throw itemsError;
-      }
+        const mileageValue = parseInt(currentMileage, 10);
+        const { data: draft, error: draftError } = await supabase
+          .from('hgv_inspections')
+          .insert({
+            hgv_id: hgvId,
+            user_id: selectedEmployeeId,
+            inspection_date: inspectionDate,
+            inspection_end_date: inspectionDate,
+            current_mileage: Number.isNaN(mileageValue) ? null : mileageValue,
+            status: 'draft' as const,
+            inspector_comments: inspectorComments.trim() || null,
+          })
+          .select('id')
+          .single();
 
-      setExistingInspectionId(draft.id);
-      window.history.replaceState(null, '', `/hgv-inspections/new?id=${draft.id}`);
-      return draft.id;
-    } catch (err) {
-      const errorContextId = 'hgv-inspections-new-silent-draft-save-error';
-      console.error('Silent draft save failed:', err, { errorContextId });
-      if (!silent) {
-        toast.error('Could not auto-save draft. Please try again.', { id: errorContextId });
+        if (draftError) {
+          if (draftError.code === '23505') {
+            const inspectionConflict = await findExistingInspectionConflict();
+            if (inspectionConflict) {
+              if (inspectionConflict.status === 'draft') {
+                const merged = await mergeIntoExistingDraft(inspectionConflict.id, { showToast: !silent });
+                return merged ? inspectionConflict.id : null;
+              }
+              handleInspectionConflict(inspectionConflict);
+              return null;
+            }
+          }
+          throw draftError;
+        }
+
+        const dayOfWeek = getDayOfWeek(new Date(inspectionDate + 'T00:00:00'));
+        const items: InspectionItemInsert[] = [];
+        TRUCK_CHECKLIST_ITEMS.forEach((itemDescription, idx) => {
+          const itemNumber = idx + 1;
+          const key = `${itemNumber}`;
+          if (checkboxStates[key]) {
+            items.push({
+              inspection_id: draft.id,
+              item_number: itemNumber,
+              item_description: itemDescription,
+              day_of_week: dayOfWeek,
+              status: checkboxStates[key],
+              comments: comments[key] || null,
+            });
+          }
+        });
+
+        if (items.length > 0) {
+          const { error: itemsError } = await supabase
+            .from('inspection_items')
+            .insert(items);
+          if (itemsError) throw itemsError;
+        }
+
+        setExistingInspectionId(draft.id);
+        window.history.replaceState(null, '', `/hgv-inspections/new?id=${draft.id}`);
+        return draft.id;
+      } catch (err) {
+        const errorContextId = 'hgv-inspections-new-silent-draft-save-error';
+        console.error('Silent draft save failed:', err, { errorContextId });
+        if (!silent) {
+          toast.error('Could not auto-save draft. Please try again.', { id: errorContextId });
+        }
+        return null;
+      } finally {
+        saveInspectionInFlightRef.current = false;
+        setSavingDraftForPhoto(false);
       }
-      return null;
+    })();
+
+    draftSavePromiseRef.current = pendingDraftSave;
+    try {
+      return await pendingDraftSave;
     } finally {
-      setSavingDraftForPhoto(false);
+      if (draftSavePromiseRef.current === pendingDraftSave) {
+        draftSavePromiseRef.current = null;
+      }
     }
   };
 
@@ -500,7 +536,13 @@ function NewHgvInspectionContent() {
   autoSaveDraftRef.current = () => ensureDraftSaved({ silent: true, source: 'auto' });
 
   const loadDraftInspection = useCallback(async (id: string) => {
+    if (activeDraftLoadIdRef.current === id || loadedDraftIdRef.current === id) {
+      return;
+    }
+
+    activeDraftLoadIdRef.current = id;
     try {
+      loadingRef.current = true;
       isDraftHydratedRef.current = false;
       setLoading(true);
       const { data: draft, error: draftError } = await supabase
@@ -566,13 +608,18 @@ function NewHgvInspectionContent() {
       setNowMs(inspectionTimerStartMs);
 
       if (draft.hgv_id) {
-        await loadLockedDefects(draft.hgv_id, 'merge');
+        await loadLockedDefectsRef.current?.(draft.hgv_id, 'merge');
       }
+      loadedDraftIdRef.current = id;
     } catch (err) {
       const errorContextId = 'hgv-inspections-new-load-draft-error';
       console.error('Error loading HGV draft:', err, { errorContextId });
       toast.error('Failed to load draft inspection', { id: errorContextId });
     } finally {
+      if (activeDraftLoadIdRef.current === id) {
+        activeDraftLoadIdRef.current = null;
+      }
+      loadingRef.current = false;
       isDraftHydratedRef.current = true;
       setLoading(false);
     }
@@ -607,10 +654,22 @@ function NewHgvInspectionContent() {
   }, [canManageCrossUserInspections, supabase, user]);
 
   useEffect(() => {
-    if (draftId && user) {
+    if (
+      draftId &&
+      user &&
+      !loadingRef.current &&
+      loadedDraftIdRef.current !== draftId &&
+      activeDraftLoadIdRef.current !== draftId
+    ) {
       isDraftHydratedRef.current = false;
-      loadDraftInspection(draftId);
+      const timer = setTimeout(() => {
+        void loadDraftInspection(draftId);
+      }, 100);
+      return () => clearTimeout(timer);
     } else {
+      if (!draftId) {
+        loadedDraftIdRef.current = null;
+      }
       isDraftHydratedRef.current = true;
     }
   }, [draftId, user, loadDraftInspection]);
@@ -624,7 +683,12 @@ function NewHgvInspectionContent() {
   useEffect(() => {
     const persistDraft = () => {
       if (existingInspectionId && !isDraftHydratedRef.current) return;
-      if (saveInspectionInFlightRef.current || allowNavigationRef.current) return;
+      if (
+        loadingRef.current ||
+        saveInspectionInFlightRef.current ||
+        draftSavePromiseRef.current ||
+        allowNavigationRef.current
+      ) return;
       void autoSaveDraftRef.current?.();
     };
 
@@ -788,6 +852,7 @@ function NewHgvInspectionContent() {
       // Non-blocking.
     }
   };
+  loadLockedDefectsRef.current = loadLockedDefects;
 
   const startInspection = async () => {
     if (!hgvId) {

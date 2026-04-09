@@ -102,6 +102,11 @@ type PreviousDefect = PreviousDefectSummary;
 type RecentCompletedDefect = { completedAt: string };
 
 type ExistingInspectionConflict = VanInspectionOverlapConflict;
+type LoadPreviousDefectsOptions = {
+  mode?: 'replace' | 'merge';
+  baseCheckboxStates?: Record<string, InspectionStatus>;
+  baseComments?: Record<string, string>;
+};
 
 const STICKY_NAV_OFFSET_PX = 96;
 
@@ -156,6 +161,10 @@ function NewInspectionContent() {
   // Store checkbox states as "dayOfWeek-itemNumber": status (e.g., "1-5": "ok")
   const [checkboxStates, setCheckboxStates] = useState<Record<string, InspectionStatus>>({});
   const [comments, setComments] = useState<Record<string, string>>({});
+  const checkboxStatesRef = useRef<Record<string, InspectionStatus>>({});
+  checkboxStatesRef.current = checkboxStates;
+  const commentsRef = useRef<Record<string, string>>({});
+  commentsRef.current = comments;
   // Dynamic checklist items based on selected vehicle category
   const [currentChecklist, setCurrentChecklist] = useState<string[]>(INSPECTION_ITEMS);
   const [loading, setLoading] = useState(false);
@@ -172,6 +181,13 @@ function NewInspectionContent() {
   const [addingVehicle, setAddingVehicle] = useState(false);
   const addVehicleDialogContentRef = useRef<HTMLDivElement>(null);
   const [existingInspectionId, setExistingInspectionId] = useState<string | null>(null);
+  const existingInspectionIdRef = useRef<string | null>(null);
+  existingInspectionIdRef.current = existingInspectionId;
+  const inspectionWriteInProgressRef = useRef(false);
+  const draftSavePromiseRef = useRef<Promise<string | null> | null>(null);
+  const activeDraftLoadIdRef = useRef<string | null>(null);
+  const loadedDraftIdRef = useRef<string | null>(null);
+  const loadPreviousDefectsRef = useRef<((selectedVehicleId: string, options?: LoadPreviousDefectsOptions) => Promise<void>) | null>(null);
   
   // Manager-specific states
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -235,155 +251,176 @@ function NewInspectionContent() {
   );
 
   const ensureDraftSaved = async (options: { silent?: boolean } = {}): Promise<string | null> => {
-    const { silent = false } = options;
-    if (!user || !selectedEmployeeId || !vehicleId) {
-      if (!silent) toast.error('Select a vehicle, employee and week before adding photos', {
-        id: 'van-inspections-new-validation-photos-core-fields',
-      });
-      return null;
+    if (draftSavePromiseRef.current) {
+      return draftSavePromiseRef.current;
     }
-    if (!isUuid(vehicleId)) {
-      if (!silent) {
-        setError(INVALID_VAN_SELECTION_MESSAGE);
-        toast.error(INVALID_VAN_SELECTION_MESSAGE, {
-          id: 'van-inspections-new-invalid-vehicle-draft-save',
-          description: 'Please reselect the van before continuing.',
+
+    const pendingDraftSave = (async () => {
+      const { silent = false } = options;
+      if (!user || !selectedEmployeeId || !vehicleId) {
+        if (!silent) toast.error('Select a vehicle, employee and week before adding photos', {
+          id: 'van-inspections-new-validation-photos-core-fields',
         });
-      }
-      return null;
-    }
-    if (!weekEnding || weekEnding.trim() === '') {
-      if (!silent) toast.error('Select a week ending date before adding photos', {
-        id: 'van-inspections-new-validation-photos-week-required',
-      });
-      return null;
-    }
-    setSavingDraftForPhoto(true);
-    try {
-      const weekEndDate = new Date(weekEnding + 'T00:00:00');
-      const startDate = new Date(weekEndDate);
-      startDate.setDate(weekEndDate.getDate() - 6);
-
-      if (existingInspectionId) {
-        const draftPayload: Database['public']['Tables']['van_inspections']['Update'] = {
-          van_id: vehicleId,
-          user_id: selectedEmployeeId,
-          inspection_date: formatDateISO(startDate),
-          inspection_end_date: weekEnding,
-          current_mileage: getParsedMileage(),
-          status: 'draft',
-          submitted_at: null,
-          signature_data: null,
-          signed_at: null,
-          inspector_comments: inspectorComments.trim() || null,
-          updated_at: new Date().toISOString(),
-        };
-
-        const { data: updatedDraft, error: updateError } = await supabase
-          .from('van_inspections')
-          .update(draftPayload)
-          .eq('id', existingInspectionId)
-          .eq('status', 'draft')
-          .select('id')
-          .maybeSingle();
-
-        if (updateError || !updatedDraft) {
-          throw updateError ?? new Error('Draft not found');
-        }
-
-        const { error: deleteItemsError } = await supabase
-          .from('inspection_items')
-          .delete()
-          .eq('inspection_id', existingInspectionId);
-        if (deleteItemsError) throw deleteItemsError;
-
-        const updatedItems = buildCurrentInspectionItemsPayload(existingInspectionId);
-        if (updatedItems.length > 0) {
-          const { error: itemsError } = await supabase
-            .from('inspection_items')
-            .insert(updatedItems);
-          if (itemsError) throw itemsError;
-        }
-
-        return existingInspectionId;
-      }
-
-      const currentStartedDays = getCurrentStartedDays();
-      const conflict = await findExistingInspectionConflict(currentStartedDays);
-      if (conflict) {
-        const canReuseExactDraft =
-          conflict.status === 'draft' &&
-          conflict.conflictCount === 1 &&
-          hasExactMatchingDays(conflict.inspectionDays, currentStartedDays);
-
-        if (canReuseExactDraft) {
-          const merged = await mergeIntoExistingDraft(conflict.id, { showToast: !silent });
-          return merged ? conflict.id : null;
-        }
-        applyInspectionConflictMessage(conflict);
         return null;
       }
-
-      const { data: draft, error: draftError } = await supabase
-        .from('van_inspections')
-        .insert({
-          van_id: vehicleId,
-          user_id: selectedEmployeeId,
-          inspection_date: formatDateISO(startDate),
-          inspection_end_date: weekEnding,
-          current_mileage: getParsedMileage(),
-          status: 'draft' as const,
-          inspector_comments: inspectorComments.trim() || null,
-        })
-        .select('id')
-        .single();
-
-      if (draftError) throw draftError;
-
-      const items = buildCurrentInspectionItemsPayload(draft.id);
-      if (items.length > 0) {
-        const { error: itemsError } = await supabase
-          .from('inspection_items')
-          .insert(items);
-        if (itemsError) throw itemsError;
+      if (!isUuid(vehicleId)) {
+        if (!silent) {
+          setError(INVALID_VAN_SELECTION_MESSAGE);
+          toast.error(INVALID_VAN_SELECTION_MESSAGE, {
+            id: 'van-inspections-new-invalid-vehicle-draft-save',
+            description: 'Please reselect the van before continuing.',
+          });
+        }
+        return null;
+      }
+      if (!weekEnding || weekEnding.trim() === '') {
+        if (!silent) toast.error('Select a week ending date before adding photos', {
+          id: 'van-inspections-new-validation-photos-week-required',
+        });
+        return null;
+      }
+      if (inspectionWriteInProgressRef.current) {
+        return existingInspectionIdRef.current;
       }
 
-      setExistingInspectionId(draft.id);
-      window.history.replaceState(null, '', `/van-inspections/new?id=${draft.id}`);
-      return draft.id;
-    } catch (err) {
-      const errorContextId = 'van-inspections-new-silent-draft-save-error';
-      if (!existingInspectionId && isDuplicateInspectionError(err)) {
+      inspectionWriteInProgressRef.current = true;
+      setSavingDraftForPhoto(true);
+      try {
+        const weekEndDate = new Date(weekEnding + 'T00:00:00');
+        const startDate = new Date(weekEndDate);
+        startDate.setDate(weekEndDate.getDate() - 6);
+
+        if (existingInspectionId) {
+          const draftPayload: Database['public']['Tables']['van_inspections']['Update'] = {
+            van_id: vehicleId,
+            user_id: selectedEmployeeId,
+            inspection_date: formatDateISO(startDate),
+            inspection_end_date: weekEnding,
+            current_mileage: getParsedMileage(),
+            status: 'draft',
+            submitted_at: null,
+            signature_data: null,
+            signed_at: null,
+            inspector_comments: inspectorComments.trim() || null,
+            updated_at: new Date().toISOString(),
+          };
+
+          const { data: updatedDraft, error: updateError } = await supabase
+            .from('van_inspections')
+            .update(draftPayload)
+            .eq('id', existingInspectionId)
+            .eq('status', 'draft')
+            .select('id')
+            .maybeSingle();
+
+          if (updateError || !updatedDraft) {
+            throw updateError ?? new Error('Draft not found');
+          }
+
+          const { error: deleteItemsError } = await supabase
+            .from('inspection_items')
+            .delete()
+            .eq('inspection_id', existingInspectionId);
+          if (deleteItemsError) throw deleteItemsError;
+
+          const updatedItems = buildCurrentInspectionItemsPayload(existingInspectionId);
+          if (updatedItems.length > 0) {
+            const { error: itemsError } = await supabase
+              .from('inspection_items')
+              .insert(updatedItems);
+            if (itemsError) throw itemsError;
+          }
+
+          return existingInspectionId;
+        }
+
         const currentStartedDays = getCurrentStartedDays();
         const conflict = await findExistingInspectionConflict(currentStartedDays);
-        const canReuseExactDraft = Boolean(
-          conflict &&
-          conflict.status === 'draft' &&
-          conflict.conflictCount === 1 &&
-          hasExactMatchingDays(conflict.inspectionDays, currentStartedDays)
-        );
-
-        if (conflict && canReuseExactDraft) {
-          const merged = await mergeIntoExistingDraft(conflict.id, { showToast: !silent });
-          return merged ? conflict.id : null;
-        }
         if (conflict) {
+          const canReuseExactDraft =
+            conflict.status === 'draft' &&
+            conflict.conflictCount === 1 &&
+            hasExactMatchingDays(conflict.inspectionDays, currentStartedDays);
+
+          if (canReuseExactDraft) {
+            const merged = await mergeIntoExistingDraft(conflict.id, { showToast: !silent });
+            return merged ? conflict.id : null;
+          }
           applyInspectionConflictMessage(conflict);
           return null;
         }
-      }
 
-      if (isTransientNetworkError(err)) {
-        console.warn('Silent draft save skipped due transient network error');
-      } else {
-        console.error('Silent draft save failed:', err, { errorContextId });
+        const { data: draft, error: draftError } = await supabase
+          .from('van_inspections')
+          .insert({
+            van_id: vehicleId,
+            user_id: selectedEmployeeId,
+            inspection_date: formatDateISO(startDate),
+            inspection_end_date: weekEnding,
+            current_mileage: getParsedMileage(),
+            status: 'draft' as const,
+            inspector_comments: inspectorComments.trim() || null,
+          })
+          .select('id')
+          .single();
+
+        if (draftError) throw draftError;
+
+        const items = buildCurrentInspectionItemsPayload(draft.id);
+        if (items.length > 0) {
+          const { error: itemsError } = await supabase
+            .from('inspection_items')
+            .insert(items);
+          if (itemsError) throw itemsError;
+        }
+
+        setExistingInspectionId(draft.id);
+        window.history.replaceState(null, '', `/van-inspections/new?id=${draft.id}`);
+        return draft.id;
+      } catch (err) {
+        const errorContextId = 'van-inspections-new-silent-draft-save-error';
+        if (!existingInspectionId && isDuplicateInspectionError(err)) {
+          const currentStartedDays = getCurrentStartedDays();
+          const conflict = await findExistingInspectionConflict(currentStartedDays);
+          const canReuseExactDraft = Boolean(
+            conflict &&
+            conflict.status === 'draft' &&
+            conflict.conflictCount === 1 &&
+            hasExactMatchingDays(conflict.inspectionDays, currentStartedDays)
+          );
+
+          if (conflict && canReuseExactDraft) {
+            const merged = await mergeIntoExistingDraft(conflict.id, { showToast: !silent });
+            return merged ? conflict.id : null;
+          }
+          if (conflict) {
+            applyInspectionConflictMessage(conflict);
+            return null;
+          }
+        }
+
+        if (isTransientNetworkError(err)) {
+          console.warn('Silent draft save skipped due transient network error');
+        } else {
+          console.error('Silent draft save failed:', err, { errorContextId });
+        }
+        if (!silent) {
+          toast.error(getInspectionErrorMessage(err, 'Could not auto-save draft. Please try again.'), { id: errorContextId });
+        }
+        return null;
+      } finally {
+        inspectionWriteInProgressRef.current = false;
+        setSavingDraftForPhoto(false);
       }
-      if (!silent) {
-        toast.error(getInspectionErrorMessage(err, 'Could not auto-save draft. Please try again.'), { id: errorContextId });
-      }
-      return null;
+    })();
+
+    draftSavePromiseRef.current = pendingDraftSave;
+    try {
+      return await pendingDraftSave;
     } finally {
-      setSavingDraftForPhoto(false);
+      if (draftSavePromiseRef.current === pendingDraftSave) {
+        draftSavePromiseRef.current = null;
+      }
     }
   };
 
@@ -432,7 +469,13 @@ function NewInspectionContent() {
   }, [fetchVehicles, supabase]);
 
   const loadDraftInspection = useCallback(async (id: string) => {
+    if (activeDraftLoadIdRef.current === id || loadedDraftIdRef.current === id) {
+      return;
+    }
+
+    activeDraftLoadIdRef.current = id;
     try {
+      loadingRef.current = true;
       setLoading(true);
       setError('');
       const currentUserId = user?.id;
@@ -501,7 +544,7 @@ function NewInspectionContent() {
       });
 
       if (inspectionData.vans?.id) {
-        await loadPreviousDefects(inspectionData.vans.id, {
+        await loadPreviousDefectsRef.current?.(inspectionData.vans.id, {
           mode: 'merge',
           baseCheckboxStates: newCheckboxStates,
           baseComments: newComments,
@@ -515,20 +558,31 @@ function NewInspectionContent() {
         setChecklistStarted(true);
       }
 
+      loadedDraftIdRef.current = id;
       toast.success('Draft inspection loaded');
     } catch (err) {
       console.error('Error loading draft inspection:', err);
       setError(err instanceof Error ? err.message : 'Failed to load draft inspection');
     } finally {
+      if (activeDraftLoadIdRef.current === id) {
+        activeDraftLoadIdRef.current = null;
+      }
+      loadingRef.current = false;
       setLoading(false);
     }
-  }, [canManageCrossUserInspections, loadPreviousDefects, supabase, user?.id]);
+  }, [canManageCrossUserInspections, supabase, user?.id]);
 
   // Load draft inspection if ID is provided in URL
   useEffect(() => {
-    if (draftId && user && !loadingRef.current) {
+    if (
+      draftId &&
+      user &&
+      !loadingRef.current &&
+      loadedDraftIdRef.current !== draftId &&
+      activeDraftLoadIdRef.current !== draftId
+    ) {
       const timer = setTimeout(() => {
-        loadDraftInspection(draftId);
+        void loadDraftInspection(draftId);
       }, 100);
       return () => clearTimeout(timer);
     }
@@ -536,7 +590,7 @@ function NewInspectionContent() {
 
   useEffect(() => {
     const persistDraft = () => {
-      if (loadingRef.current || savingDraftForPhoto) return;
+      if (loadingRef.current || savingDraftForPhoto || inspectionWriteInProgressRef.current || draftSavePromiseRef.current) return;
       void autoSaveDraftRef.current?.();
     };
 
@@ -879,19 +933,15 @@ function NewInspectionContent() {
   };
 
   // Load previous defects for the selected vehicle
-  async function loadPreviousDefects(
+  const loadPreviousDefects = useCallback(async (
     selectedVehicleId: string,
-    options: {
-      mode?: 'replace' | 'merge';
-      baseCheckboxStates?: Record<string, InspectionStatus>;
-      baseComments?: Record<string, string>;
-    } = {}
-  ) {
+    options: LoadPreviousDefectsOptions = {}
+  ) => {
     const mode = options.mode ?? 'replace';
     const baseCheckboxStates =
-      options.baseCheckboxStates ?? (mode === 'merge' ? checkboxStates : {});
+      options.baseCheckboxStates ?? (mode === 'merge' ? checkboxStatesRef.current : {});
     const baseComments =
-      options.baseComments ?? (mode === 'merge' ? comments : {});
+      options.baseComments ?? (mode === 'merge' ? commentsRef.current : {});
 
     if (!isUuid(selectedVehicleId)) {
       setPreviousDefects(new Map());
@@ -1024,7 +1074,8 @@ function NewInspectionContent() {
       setCheckboxStates(mode === 'merge' ? baseCheckboxStates : {});
       setComments(mode === 'merge' ? baseComments : {});
     }
-  }
+  }, []);
+  loadPreviousDefectsRef.current = loadPreviousDefects;
 
   // Format UK registration plates (LLNNLLL -> LLNN LLL)
   const formatRegistration = (reg: string): string => {
@@ -1373,40 +1424,41 @@ function NewInspectionContent() {
       setError('Please enter a valid current mileage');
       return;
     }
-    
-    const currentStartedDays = getCurrentStartedDays();
-    const conflict = await findExistingInspectionConflict(currentStartedDays);
-    if (conflict) {
-      const canReuseExactDraft =
-        !existingInspectionId &&
-        conflict.status === 'draft' &&
-        conflict.conflictCount === 1 &&
-        hasExactMatchingDays(conflict.inspectionDays, currentStartedDays);
 
-      if (canReuseExactDraft) {
-        const merged = await mergeIntoExistingDraft(conflict.id);
-        if (merged) {
-          if (status === 'submitted') {
-            toast.info('Existing draft loaded. Submit again to finish this daily check.');
-          }
-          return;
-        }
-      }
-
-      applyInspectionConflictMessage(conflict);
-      return;
-    }
-    
-    // Prevent duplicate saves
-    if (loading) {
+    if (inspectionWriteInProgressRef.current) {
       console.log('Save already in progress, ignoring duplicate request');
       return;
     }
 
+    inspectionWriteInProgressRef.current = true;
+    loadingRef.current = true;
     setError('');
     setLoading(true);
 
     try {
+      const currentStartedDays = getCurrentStartedDays();
+      const conflict = await findExistingInspectionConflict(currentStartedDays);
+      if (conflict) {
+        const canReuseExactDraft =
+          !existingInspectionId &&
+          conflict.status === 'draft' &&
+          conflict.conflictCount === 1 &&
+          hasExactMatchingDays(conflict.inspectionDays, currentStartedDays);
+
+        if (canReuseExactDraft) {
+          const merged = await mergeIntoExistingDraft(conflict.id);
+          if (merged) {
+            if (status === 'submitted') {
+              toast.info('Existing draft loaded. Submit again to finish this daily check.');
+            }
+            return;
+          }
+        }
+
+        applyInspectionConflictMessage(conflict);
+        return;
+      }
+
       // Calculate inspection start date (Monday of the week)
       const weekEndDate = new Date(weekEnding + 'T00:00:00');
       const startDate = new Date(weekEndDate);
@@ -1810,6 +1862,8 @@ function NewInspectionContent() {
         description: errorMessage,
       });
     } finally {
+      inspectionWriteInProgressRef.current = false;
+      loadingRef.current = false;
       setLoading(false);
     }
   };
