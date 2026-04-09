@@ -9,6 +9,7 @@ import type { ModuleName } from '@/types/roles';
 export interface InspectionRouteActorAccess {
   userId: string;
   canManageOthers: boolean;
+  canDeleteInspections: boolean;
 }
 
 export async function getInspectionRouteActorAccess(
@@ -37,14 +38,16 @@ export async function getInspectionRouteActorAccess(
 
   const effectiveRole = await getEffectiveRole();
   const hasFullAccessRole = hasEffectiveRoleFullAccess(effectiveRole);
+  const isManagerOrHigher = Boolean(hasFullAccessRole || effectiveRole.is_manager_admin);
   const canManageOthers =
-    (hasFullAccessRole || effectiveRole.is_manager_admin) &&
+    isManagerOrHigher &&
     !hasWorkshopInspectionFullVisibilityOverride(effectiveRole.team_name);
 
   return {
     access: {
       userId: user.id,
       canManageOthers,
+      canDeleteInspections: isManagerOrHigher,
     },
     errorResponse: null,
   };

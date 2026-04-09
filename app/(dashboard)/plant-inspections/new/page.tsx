@@ -42,6 +42,7 @@ import { useInspectionPhotos } from '@/lib/hooks/useInspectionPhotos';
 import { getInspectionPhotoKey } from '@/lib/inspection-photos';
 import { getRecentVehicleIds, recordRecentVehicleId, splitVehiclesByRecent } from '@/lib/utils/recentVehicles';
 import { getReadingDigitGrowthWarning } from '@/lib/utils/readingDigitGrowthWarning';
+import { getInspectionErrorMessage, isDuplicateInspectionError } from '@/lib/utils/inspection-error-handling';
 
 // Dynamic imports for heavy components
 const PhotoUpload = dynamic(() => import('@/components/forms/PhotoUpload'), { ssr: false });
@@ -183,7 +184,7 @@ function NewPlantInspectionContent() {
   }, [hasOptionalInspectorComment, informWorkshop]);
 
   const findExistingInspectionConflict = useCallback(async (): Promise<ExistingInspectionConflict | null> => {
-    if (!inspectionDate || inspectionDate.trim() === '') return null;
+    if (!inspectionDate || inspectionDate.trim() === '' || !selectedEmployeeId) return null;
 
     const hiredSerial = hiredPlantIdSerial.trim();
     if (isHiredPlant) {
@@ -196,6 +197,7 @@ function NewPlantInspectionContent() {
       .from('plant_inspections')
       .select('id, status')
       .eq('inspection_date', inspectionDate)
+      .eq('user_id', selectedEmployeeId)
       .limit(1);
 
     if (isHiredPlant) {
@@ -223,12 +225,12 @@ function NewPlantInspectionContent() {
       id: data.id,
       status: data.status as 'draft' | 'submitted',
     };
-  }, [existingInspectionId, hiredPlantIdSerial, inspectionDate, isHiredPlant, selectedPlantId, supabase]);
+  }, [existingInspectionId, hiredPlantIdSerial, inspectionDate, isHiredPlant, selectedEmployeeId, selectedPlantId, supabase]);
 
   const handleSubmittedInspectionConflict = useCallback((inspectionId: string) => {
     setSubmittedConflictInspectionId(inspectionId);
     setShowSubmittedConflictDialog(true);
-    toast.info('A daily check has already been submitted for this plant and date.');
+    toast.info('A daily check has already been submitted for this employee, asset and date.');
   }, []);
 
   const buildCurrentInspectionItemsPayload = useCallback((inspectionId: string) => {
@@ -1033,7 +1035,7 @@ function NewPlantInspectionContent() {
   const handleUseDifferentDateForSubmittedConflict = () => {
     setShowSubmittedConflictDialog(false);
     setSubmittedConflictInspectionId(null);
-    setError('A daily check is already submitted for this plant and date. Choose a different date to continue.');
+    setError('A daily check is already submitted for this employee, asset and date. Choose a different date or employee to continue.');
     scrollToTarget(document.getElementById('inspectionDate'));
   };
 
@@ -1299,17 +1301,9 @@ function NewPlantInspectionContent() {
       router.push('/plant-inspections');
     } catch (err) {
       const errorContextId = 'plant-inspections-new-save-inspection-error';
-      const errMessage = err instanceof Error ? err.message : String(err);
-      const errCode = (err && typeof err === 'object' && 'code' in err) ? (err as { code?: string }).code : '';
-      const fullErrStr = errMessage + ' ' + errCode;
-      
-      const isDuplicateKey =
-        fullErrStr.includes('duplicate key') ||
-        fullErrStr.includes('idx_unique_plant_inspection_date') ||
-        fullErrStr.includes('idx_unique_hired_plant_inspection_date') ||
-        errCode === '23505';
+      const errMessage = getInspectionErrorMessage(err, 'An unexpected error occurred');
 
-      if (isDuplicateKey) {
+      if (isDuplicateInspectionError(err)) {
         const inspectionConflict = await findExistingInspectionConflict();
         if (inspectionConflict) {
           if (inspectionConflict.status === 'draft') {
@@ -1321,10 +1315,10 @@ function NewPlantInspectionContent() {
             handleSubmittedInspectionConflict(inspectionConflict.id);
           }
         } else {
-          setError('An inspection for this plant and date already exists. Please select a different plant or date.');
+          setError('An inspection for this employee, asset and date already exists. Please select a different date or employee.');
           toast.error('Duplicate inspection', {
             id: 'plant-inspections-new-duplicate-inspection-error',
-            description: 'An inspection already exists for this plant on this date.',
+            description: 'An inspection already exists for this employee, asset and date.',
           });
         }
         return;
@@ -1998,7 +1992,7 @@ function NewPlantInspectionContent() {
           <AlertDialogHeader>
             <AlertDialogTitle>Daily check already submitted</AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
-              A Plant daily check already exists for this asset and date. You can view the submitted check or pick another date.
+              A Plant daily check already exists for this employee, asset and date. You can view the submitted check or pick another date.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

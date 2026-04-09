@@ -37,6 +37,14 @@ import { triggerShakeAnimation } from '@/lib/utils/animations';
 import { InspectionPhotoTiles } from '@/components/inspections/InspectionPhotoTiles';
 import { useInspectionPhotos } from '@/lib/hooks/useInspectionPhotos';
 import { getInspectionPhotoKey } from '@/lib/inspection-photos';
+import {
+  findVanInspectionOverlap,
+  formatVanInspectionDayList,
+  getInspectionDaysFromRows,
+  getStartedVanInspectionDays,
+  type VanInspectionDayRow,
+  type VanInspectionOverlapConflict,
+} from '@/lib/utils/van-inspection-overlap';
 
 // Dynamic imports for heavy components - loaded only when needed
 const PhotoUpload = dynamic(() => import('@/components/forms/PhotoUpload'), { ssr: false });
@@ -94,10 +102,7 @@ type PreviousDefect = {
   days: number[];
 };
 
-type ExistingInspectionConflict = {
-  id: string;
-  status: 'draft' | 'submitted';
-};
+type ExistingInspectionConflict = VanInspectionOverlapConflict;
 
 const STICKY_NAV_OFFSET_PX = 96;
 
@@ -185,9 +190,6 @@ function NewInspectionContent() {
   
   // Track if user has started filling checklist (to lock vehicle/date fields)
   const [checklistStarted, setChecklistStarted] = useState(false);
-  const [duplicateCheckLoading, setDuplicateCheckLoading] = useState(false);
-  const [duplicateInspection, setDuplicateInspection] = useState<string | null>(null);
-  
   // Mileage sanity check states
   const [baselineMileage, setBaselineMileage] = useState<number | null>(null);
   const [, setBaselineMileageSource] = useState<string>('none');
@@ -297,13 +299,19 @@ function NewInspectionContent() {
         return existingInspectionId;
       }
 
-      const conflict = await findExistingInspectionConflict();
+      const currentStartedDays = getCurrentStartedDays();
+      const conflict = await findExistingInspectionConflict(currentStartedDays);
       if (conflict) {
-        if (conflict.status === 'draft') {
+        const canReuseExactDraft =
+          conflict.status === 'draft' &&
+          conflict.conflictCount === 1 &&
+          hasExactMatchingDays(conflict.inspectionDays, currentStartedDays);
+
+        if (canReuseExactDraft) {
           const merged = await mergeIntoExistingDraft(conflict.id, { showToast: !silent });
           return merged ? conflict.id : null;
         }
-        handleSubmittedInspectionConflict(conflict.id);
+        applyInspectionConflictMessage(conflict);
         return null;
       }
 
@@ -337,13 +345,21 @@ function NewInspectionContent() {
     } catch (err) {
       const errorContextId = 'van-inspections-new-silent-draft-save-error';
       if (!existingInspectionId && isDuplicateInspectionError(err)) {
-        const conflict = await findExistingInspectionConflict();
-        if (conflict?.status === 'draft') {
+        const currentStartedDays = getCurrentStartedDays();
+        const conflict = await findExistingInspectionConflict(currentStartedDays);
+        const canReuseExactDraft = Boolean(
+          conflict &&
+          conflict.status === 'draft' &&
+          conflict.conflictCount === 1 &&
+          hasExactMatchingDays(conflict.inspectionDays, currentStartedDays)
+        );
+
+        if (conflict && canReuseExactDraft) {
           const merged = await mergeIntoExistingDraft(conflict.id, { showToast: !silent });
           return merged ? conflict.id : null;
         }
-        if (conflict?.status === 'submitted') {
-          handleSubmittedInspectionConflict(conflict.id);
+        if (conflict) {
+          applyInspectionConflictMessage(conflict);
           return null;
         }
       }
@@ -587,41 +603,91 @@ function NewInspectionContent() {
     return items;
   }, [checkboxStates, comments, currentChecklist]);
 
-  const findExistingInspectionConflict = useCallback(async (): Promise<ExistingInspectionConflict | null> => {
-    if (!vehicleId || !weekEnding || !isUuid(vehicleId)) {
+  const getCurrentStartedDays = useCallback(() => getStartedVanInspectionDays(checkboxStates), [checkboxStates]);
+
+  const hasExactMatchingDays = useCallback((left: number[], right: number[]) => {
+    if (left.length !== right.length) return false;
+    return left.every((day, index) => day === right[index]);
+  }, []);
+
+  const applyInspectionConflictMessage = useCallback((conflict: ExistingInspectionConflict) => {
+    const dayLabel = formatVanInspectionDayList(conflict.overlappingDays);
+
+    if (conflict.status === 'submitted') {
+      setError(`This employee already has a submitted van inspection covering ${dayLabel} in the selected week.`);
+      toast.info(`A daily check has already been submitted for ${dayLabel}.`);
+      return;
+    }
+
+    if (conflict.conflictCount > 1) {
+      setError(`This employee already has multiple van drafts covering ${dayLabel} in the selected week. Open an existing draft instead of creating another overlapping one.`);
+      toast.info('Overlapping van draft days already exist for this employee and week.');
+      return;
+    }
+
+    setError(`This employee already has a van draft covering ${dayLabel} in the selected week. Continue that draft or clear the overlapping day here.`);
+    toast.info(`An existing van draft already covers ${dayLabel}.`);
+  }, []);
+
+  const findExistingInspectionConflict = useCallback(async (
+    currentDays: number[] = getCurrentStartedDays()
+  ): Promise<ExistingInspectionConflict | null> => {
+    if (!vehicleId || !weekEnding || !selectedEmployeeId || !isUuid(vehicleId) || currentDays.length === 0) {
       return null;
     }
 
-    const { data, error } = await supabase
+    let inspectionsQuery = supabase
       .from('van_inspections')
-      .select('id, status')
+      .select('id, status, updated_at, created_at')
       .eq('van_id', vehicleId)
-      .eq('inspection_end_date', weekEnding)
-      .limit(1)
-      .maybeSingle();
+      .eq('user_id', selectedEmployeeId)
+      .eq('inspection_end_date', weekEnding);
 
-    if (error) {
-      console.error('Failed to check for existing van inspection:', error, {
+    if (existingInspectionId) {
+      inspectionsQuery = inspectionsQuery.neq('id', existingInspectionId);
+    }
+
+    const { data: inspections, error: inspectionsError } = await inspectionsQuery;
+
+    if (inspectionsError) {
+      console.error('Failed to check for overlapping van inspections:', inspectionsError, {
         errorContextId: 'van-inspections-new-check-existing-error',
       });
       return null;
     }
 
-    if (!data || data.id === existingInspectionId) {
+    if (!inspections || inspections.length === 0) {
       return null;
     }
 
-    return {
-      id: data.id,
-      status: data.status === 'draft' ? 'draft' : 'submitted',
-    };
-  }, [existingInspectionId, supabase, vehicleId, weekEnding]);
+    const inspectionIds = inspections.map((inspection) => inspection.id);
+    const { data: inspectionItems, error: itemsError } = await supabase
+      .from('inspection_items')
+      .select('inspection_id, day_of_week')
+      .in('inspection_id', inspectionIds);
 
-  const handleSubmittedInspectionConflict = useCallback((inspectionId: string) => {
-    setDuplicateInspection(inspectionId);
-    setError('An inspection for this vehicle and week has already been submitted.');
-    toast.info('A daily check has already been submitted for this van and week.');
-  }, []);
+    if (itemsError) {
+      console.error('Failed to load van inspection day coverage:', itemsError, {
+        errorContextId: 'van-inspections-new-check-existing-items-error',
+      });
+      return null;
+    }
+
+    const daysByInspection = getInspectionDaysFromRows(
+      ((inspectionItems || []) as VanInspectionDayRow[])
+    );
+
+    return findVanInspectionOverlap(
+      currentDays,
+      inspections.map((inspection) => ({
+        id: inspection.id,
+        status: inspection.status === 'draft' ? 'draft' : 'submitted',
+        days: daysByInspection.get(inspection.id) || [],
+        updated_at: inspection.updated_at,
+        created_at: inspection.created_at,
+      }))
+    );
+  }, [existingInspectionId, getCurrentStartedDays, selectedEmployeeId, supabase, vehicleId, weekEnding]);
 
   const mergeIntoExistingDraft = useCallback(async (
     inspectionId: string,
@@ -694,7 +760,6 @@ function NewInspectionContent() {
       }
 
       setExistingInspectionId(inspectionId);
-      setDuplicateInspection(null);
       window.history.replaceState(null, '', `/van-inspections/new?id=${inspectionId}`);
       if (showToast) {
         toast.info('Merged with the existing draft for this van and week.');
@@ -717,70 +782,6 @@ function NewInspectionContent() {
     vehicleId,
     weekEnding,
   ]);
-
-  // Check for duplicate inspection (same vehicle + week ending)
-  // clearOtherErrors: whether to clear non-duplicate validation errors
-  const checkForDuplicate = useCallback(async (
-    vehicleIdToCheck: string, 
-    weekEndingToCheck: string,
-    clearOtherErrors: boolean = false
-  ): Promise<boolean> => {
-    if (!vehicleIdToCheck || !weekEndingToCheck || existingInspectionId) {
-      setDuplicateInspection(null);
-      return false;
-    }
-    if (!isUuid(vehicleIdToCheck)) {
-      setDuplicateInspection(null);
-      return false;
-    }
-
-    setDuplicateCheckLoading(true);
-    
-    try {
-      const { data, error } = await supabase
-        .from('van_inspections')
-        .select('id, status')
-        .eq('van_id', vehicleIdToCheck)
-        .eq('inspection_end_date', weekEndingToCheck)
-        .limit(1);
-
-      if (error) throw error;
-
-      if (data && data.length > 0) {
-        const existing = data[0];
-        setDuplicateInspection(existing.id);
-        setError(`An inspection for this vehicle and week already exists (${existing.status}). Please select a different vehicle or week.`);
-        return true;
-      } else {
-        setDuplicateInspection(null);
-        setError(prev => {
-          if (prev.includes('already exists')) {
-            return '';
-          }
-          return clearOtherErrors ? '' : prev;
-        });
-        return false;
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.toLowerCase().includes('network')) {
-        console.warn('Duplicate check skipped (network issue)');
-      } else {
-        console.error('Error checking for duplicate:', err);
-      }
-      setDuplicateInspection(null);
-      return false;
-    } finally {
-      setDuplicateCheckLoading(false);
-    }
-  }, [supabase, existingInspectionId]);
-
-  // Check for duplicate inspection when vehicle or week ending changes
-  useEffect(() => {
-    if (vehicleId && weekEnding && !existingInspectionId) {
-      checkForDuplicate(vehicleId, weekEnding);
-    }
-  }, [vehicleId, weekEnding, existingInspectionId, checkForDuplicate]);
 
   // Fetch baseline mileage for sanity checking
   const fetchBaselineMileage = async (selectedVehicleId: string) => {
@@ -1321,10 +1322,16 @@ function NewInspectionContent() {
       return;
     }
     
-    // Check for duplicate inspection before saving
-    if (duplicateInspection) {
-      const conflict = await findExistingInspectionConflict();
-      if (conflict?.status === 'draft') {
+    const currentStartedDays = getCurrentStartedDays();
+    const conflict = await findExistingInspectionConflict(currentStartedDays);
+    if (conflict) {
+      const canReuseExactDraft =
+        !existingInspectionId &&
+        conflict.status === 'draft' &&
+        conflict.conflictCount === 1 &&
+        hasExactMatchingDays(conflict.inspectionDays, currentStartedDays);
+
+      if (canReuseExactDraft) {
         const merged = await mergeIntoExistingDraft(conflict.id);
         if (merged) {
           if (status === 'submitted') {
@@ -1332,19 +1339,9 @@ function NewInspectionContent() {
           }
           return;
         }
-      } else if (conflict?.status === 'submitted') {
-        handleSubmittedInspectionConflict(conflict.id);
-        return;
       }
-      setError('An inspection for this vehicle and week already exists. Please select a different vehicle or week.');
-      return;
-    }
-    
-    // Re-check for duplicates to prevent race conditions
-    // Pass true to clear other errors since validation will re-run on save anyway
-    const isDuplicate = await checkForDuplicate(vehicleId, weekEnding, true);
-    if (isDuplicate) {
-      setError('An inspection for this vehicle and week already exists. Please select a different vehicle or week.');
+
+      applyInspectionConflictMessage(conflict);
       return;
     }
     
@@ -1697,8 +1694,16 @@ function NewInspectionContent() {
     } catch (err) {
       const errorContextId = 'van-inspections-new-save-inspection-error';
       if (!existingInspectionId && isDuplicateInspectionError(err)) {
-        const conflict = await findExistingInspectionConflict();
-        if (conflict?.status === 'draft') {
+        const currentStartedDays = getCurrentStartedDays();
+        const conflict = await findExistingInspectionConflict(currentStartedDays);
+        const canReuseExactDraft = Boolean(
+          conflict &&
+          conflict.status === 'draft' &&
+          conflict.conflictCount === 1 &&
+          hasExactMatchingDays(conflict.inspectionDays, currentStartedDays)
+        );
+
+        if (conflict && canReuseExactDraft) {
           const merged = await mergeIntoExistingDraft(conflict.id, { showToast: false });
           if (merged) {
             if (status === 'submitted') {
@@ -1708,8 +1713,8 @@ function NewInspectionContent() {
             }
             return;
           }
-        } else if (conflict?.status === 'submitted') {
-          handleSubmittedInspectionConflict(conflict.id);
+        } else if (conflict) {
+          applyInspectionConflictMessage(conflict);
           return;
         }
       }
@@ -2069,8 +2074,8 @@ function NewInspectionContent() {
         </CardContent>
       </Card>
 
-      {/* Safety Check - Only shown when van and week ending are valid and no duplicate exists */}
-      {vehicleId && weekEnding && !duplicateInspection && !duplicateCheckLoading && (
+      {/* Safety Check - shown once van and week ending are selected */}
+      {vehicleId && weekEnding && (
       <Card className="">
         <CardHeader className="pb-3">
           <CardTitle className="text-foreground">{currentChecklist.length}-Point Safety Check</CardTitle>

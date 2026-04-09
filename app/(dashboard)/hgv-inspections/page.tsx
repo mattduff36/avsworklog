@@ -85,7 +85,7 @@ function HgvInspectionsContent() {
     hasOrgWideInspectionVisibility,
     hasTeamInspectionVisibility,
     canViewCrossUserInspections,
-    canManageInspections,
+    canDeleteInspections,
   } = getInspectionVisibilityFlags({
     teamName: effectiveRole?.team_name ?? profile?.team?.name,
     isManager,
@@ -584,7 +584,7 @@ function HgvInspectionsContent() {
                 columnVisibility={columnVisibility}
                 downloadingId={downloading}
                 deletingId={deleting}
-                showDeleteActions={canManageInspections}
+                showDeleteActions={canDeleteInspections}
                 onDownloadPDF={handleDownloadPDF}
                 onDeleteInspection={handleDelete}
               />
@@ -615,7 +615,7 @@ function HgvInspectionsContent() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge className="border-inspection/40 bg-inspection/10 text-inspection">Submitted</Badge>
-                    {canManageInspections && (
+                    {canDeleteInspections && (
                       <Button
                         variant="ghost"
                         size="sm"

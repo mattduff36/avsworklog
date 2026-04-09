@@ -110,6 +110,16 @@ describe('PlantTimesheetV2 calculations', () => {
     expect(errors).toEqual({});
   });
 
+  it('does not require times for remarks-only rows', () => {
+    const errors = buildValidationErrors([
+      createEntry({
+        remarks: 'Did not work this day',
+      }),
+    ]);
+
+    expect(errors).toEqual({});
+  });
+
   it('does not require machine start/finish from derived operator total alone', () => {
     const recalculated = recalculateEntry(
       createEntry({

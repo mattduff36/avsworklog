@@ -12,7 +12,7 @@ export async function DELETE(
       return errorResponse ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!access.canManageOthers) {
+    if (!access.canDeleteInspections) {
       return NextResponse.json(
         { error: 'Forbidden: HGV inspection management access required' },
         { status: 403 }

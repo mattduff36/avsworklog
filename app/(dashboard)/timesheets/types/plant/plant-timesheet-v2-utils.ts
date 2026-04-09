@@ -87,7 +87,6 @@ export function hasPlantData(entry: PlantEntryDraft): boolean {
     entry.machine_finish_time,
     entry.machine_standing_hours,
     entry.maintenance_breakdown_hours,
-    entry.remarks,
   ].some((value) => value.trim().length > 0);
 }
 

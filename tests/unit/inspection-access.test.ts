@@ -16,6 +16,7 @@ describe('getInspectionVisibilityFlags', () => {
       hasTeamInspectionVisibility: false,
       canViewCrossUserInspections: true,
       canManageInspections: false,
+      canDeleteInspections: false,
     });
 
     expect(
@@ -28,6 +29,7 @@ describe('getInspectionVisibilityFlags', () => {
       hasTeamInspectionVisibility: false,
       canViewCrossUserInspections: true,
       canManageInspections: true,
+      canDeleteInspections: true,
     });
   });
 
@@ -41,10 +43,11 @@ describe('getInspectionVisibilityFlags', () => {
       hasTeamInspectionVisibility: true,
       canViewCrossUserInspections: true,
       canManageInspections: false,
+      canDeleteInspections: false,
     });
   });
 
-  it('keeps workshop managers read-only for cross-user inspection changes', () => {
+  it('keeps workshop managers read-only for cross-user inspection changes but allows deletion', () => {
     expect(
       getInspectionVisibilityFlags({
         teamName: 'Workshop',
@@ -55,6 +58,7 @@ describe('getInspectionVisibilityFlags', () => {
       hasTeamInspectionVisibility: false,
       canViewCrossUserInspections: true,
       canManageInspections: false,
+      canDeleteInspections: true,
     });
   });
 
@@ -68,6 +72,7 @@ describe('getInspectionVisibilityFlags', () => {
       hasTeamInspectionVisibility: false,
       canViewCrossUserInspections: false,
       canManageInspections: false,
+      canDeleteInspections: false,
     });
   });
 });

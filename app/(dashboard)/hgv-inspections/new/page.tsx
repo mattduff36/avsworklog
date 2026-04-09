@@ -180,7 +180,7 @@ function NewHgvInspectionContent() {
   }, []);
 
   const findExistingInspectionConflict = useCallback(async (): Promise<ExistingInspectionConflict | null> => {
-    if (!hgvId || !inspectionDate) {
+    if (!hgvId || !inspectionDate || !selectedEmployeeId) {
       return null;
     }
 
@@ -188,6 +188,7 @@ function NewHgvInspectionContent() {
       .from('hgv_inspections')
       .select('id, status')
       .eq('hgv_id', hgvId)
+      .eq('user_id', selectedEmployeeId)
       .eq('inspection_date', inspectionDate)
       .limit(1)
       .maybeSingle();
@@ -211,13 +212,13 @@ function NewHgvInspectionContent() {
       id: data.id,
       status: data.status as 'draft' | 'submitted',
     };
-  }, [existingInspectionId, hgvId, inspectionDate, supabase]);
+  }, [existingInspectionId, hgvId, inspectionDate, selectedEmployeeId, supabase]);
 
   const handleInspectionConflict = useCallback((conflict: ExistingInspectionConflict): void => {
     if (conflict.status !== 'submitted') return;
     setSubmittedConflictInspectionId(conflict.id);
     setShowSubmittedConflictDialog(true);
-    toast.info('A daily check has already been submitted for this HGV and date.');
+    toast.info('A daily check has already been submitted for this employee, HGV and date.');
   }, []);
 
   const buildCurrentInspectionItemsPayload = useCallback((inspectionId: string): InspectionItemInsert[] => {
@@ -1150,7 +1151,7 @@ function NewHgvInspectionContent() {
   const handleUseDifferentDateForSubmittedConflict = () => {
     setShowSubmittedConflictDialog(false);
     setSubmittedConflictInspectionId(null);
-    setError('A daily check is already submitted for this HGV and date. Choose a different date to continue.');
+    setError('A daily check is already submitted for this employee, HGV and date. Choose a different date or employee to continue.');
     scrollAndHighlightValidationTarget(document.getElementById('inspectionDate'), STICKY_NAV_OFFSET_PX);
   };
 
@@ -1709,7 +1710,7 @@ function NewHgvInspectionContent() {
           <AlertDialogHeader>
             <AlertDialogTitle>Daily check already submitted</AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
-              An HGV daily check already exists for this vehicle and date. You can view the submitted check or pick another date.
+              An HGV daily check already exists for this employee, vehicle and date. You can view the submitted check or pick another date.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

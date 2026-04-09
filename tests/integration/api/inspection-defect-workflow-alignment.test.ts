@@ -37,7 +37,7 @@ describe('Inspection defect workflow alignment', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getInspectionRouteActorAccess).mockResolvedValue({
-      access: { userId: 'user-1', canManageOthers: true },
+      access: { userId: 'user-1', canManageOthers: true, canDeleteInspections: true },
       errorResponse: null,
     });
   });
@@ -45,7 +45,7 @@ describe('Inspection defect workflow alignment', () => {
   it('plant sync keeps oldest task and skips creating duplicate for same signature', async () => {
     mockAuthenticatedUser();
     vi.mocked(getInspectionRouteActorAccess).mockResolvedValue({
-      access: { userId: 'user-1', canManageOthers: false },
+      access: { userId: 'user-1', canManageOthers: false, canDeleteInspections: false },
       errorResponse: null,
     });
 

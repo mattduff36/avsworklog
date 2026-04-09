@@ -105,7 +105,7 @@ function PlantInspectionsContent() {
     hasOrgWideInspectionVisibility,
     hasTeamInspectionVisibility,
     canViewCrossUserInspections,
-    canManageInspections,
+    canDeleteInspections,
   } = getInspectionVisibilityFlags({
     teamName: effectiveRole?.team_name ?? profile?.team?.name,
     isManager,
@@ -790,7 +790,7 @@ function PlantInspectionsContent() {
                 columnVisibility={columnVisibility}
                 downloadingId={downloading}
                 deleting={deleting}
-                showDeleteActions={canManageInspections}
+                showDeleteActions={canDeleteInspections}
                 onDownloadPDF={handleDownloadPDF}
                 onOpenDeleteDialog={openDeleteDialog}
               />
@@ -854,7 +854,7 @@ function PlantInspectionsContent() {
                   </div>
                   <div className="flex items-center gap-2">
                     {getStatusBadge(inspection.status)}
-                    {canManageInspections && (
+                    {canDeleteInspections && (
                       <Button
                         onClick={(e) => openDeleteDialog(e, inspection)}
                         variant="ghost"

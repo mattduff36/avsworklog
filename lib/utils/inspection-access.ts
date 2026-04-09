@@ -13,6 +13,7 @@ export interface InspectionVisibilityFlags {
   hasTeamInspectionVisibility: boolean;
   canViewCrossUserInspections: boolean;
   canManageInspections: boolean;
+  canDeleteInspections: boolean;
 }
 
 export function getInspectionVisibilityFlags(
@@ -34,6 +35,7 @@ export function getInspectionVisibilityFlags(
     canManageInspections: Boolean(
       (input.isManager || input.isAdmin || input.isSuperAdmin) && !hasWorkshopReadAllOverride
     ),
+    canDeleteInspections: Boolean(input.isManager || input.isAdmin || input.isSuperAdmin),
   };
 }
 
