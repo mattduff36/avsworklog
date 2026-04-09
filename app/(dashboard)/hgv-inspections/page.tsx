@@ -17,7 +17,7 @@ import { createClient } from '@/lib/supabase/client';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
-import { getInspectionVisibilityFlags } from '@/lib/utils/inspection-access';
+import { canEditDraftInspection, getInspectionVisibilityFlags } from '@/lib/utils/inspection-access';
 import { formatDate } from '@/lib/utils/date';
 import { isUuid } from '@/lib/utils/uuid';
 import type { Employee } from '@/types/common';
@@ -43,7 +43,7 @@ interface HgvInspectionWithRelations {
   hgv_id: string | null;
   inspection_date: string;
   inspection_end_date: string | null;
-  status: 'submitted';
+  status: 'draft' | 'submitted';
   submitted_at: string | null;
   hgv: { reg_number: string; nickname: string | null } | null;
   profile: { full_name: string } | null;
@@ -85,6 +85,7 @@ function HgvInspectionsContent() {
     hasOrgWideInspectionVisibility,
     hasTeamInspectionVisibility,
     canViewCrossUserInspections,
+    canManageInspections,
     canDeleteInspections,
   } = getInspectionVisibilityFlags({
     teamName: effectiveRole?.team_name ?? profile?.team?.name,
@@ -182,7 +183,6 @@ function HgvInspectionsContent() {
       let query = supabase
         .from('hgv_inspections')
         .select('*')
-        .eq('status', 'submitted')
         .order('inspection_date', { ascending: false });
 
       if (!canViewCrossUserInspections) {
@@ -402,6 +402,22 @@ function HgvInspectionsContent() {
     return <Clock className={`h-5 w-5 ${iconColorClass}`} />;
   };
 
+  const canEditInspection = (inspection: Pick<HgvInspectionWithRelations, 'status' | 'user_id'>) =>
+    canEditDraftInspection({
+      status: inspection.status,
+      ownerUserId: inspection.user_id,
+      currentUserId: user?.id,
+      canManageInspections,
+    });
+
+  const canDeleteInspection = (inspection: Pick<HgvInspectionWithRelations, 'status' | 'user_id'>) =>
+    canDeleteInspections && canEditInspection(inspection);
+
+  const getInspectionHref = (inspection: Pick<HgvInspectionWithRelations, 'id' | 'status' | 'user_id'>) =>
+    canEditInspection(inspection)
+      ? `/hgv-inspections/new?id=${inspection.id}`
+      : `/hgv-inspections/${inspection.id}`;
+
   function toggleColumn(column: keyof HgvInspectionsColumnVisibility) {
     setColumnVisibility((prev) => {
       const next = { ...prev, [column]: !prev[column] };
@@ -584,7 +600,8 @@ function HgvInspectionsContent() {
                 columnVisibility={columnVisibility}
                 downloadingId={downloading}
                 deletingId={deleting}
-                showDeleteActions={canDeleteInspections}
+                getInspectionHref={getInspectionHref}
+                canDeleteInspection={canDeleteInspection}
                 onDownloadPDF={handleDownloadPDF}
                 onDeleteInspection={handleDelete}
               />
@@ -596,7 +613,7 @@ function HgvInspectionsContent() {
             <Card
               key={inspection.id}
               className="border-border hover:shadow-lg hover:border-inspection/50 transition-all duration-200 cursor-pointer"
-              onClick={() => router.push(`/hgv-inspections/${inspection.id}`)}
+              onClick={() => router.push(getInspectionHref(inspection))}
             >
               <CardHeader>
                 <div className="flex items-start justify-between">
@@ -614,8 +631,17 @@ function HgvInspectionsContent() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge className="border-inspection/40 bg-inspection/10 text-inspection">Submitted</Badge>
-                    {canDeleteInspections && (
+                    <Badge
+                      variant={inspection.status === 'submitted' ? 'default' : 'secondary'}
+                      className={
+                        inspection.status === 'submitted'
+                          ? 'border-inspection/40 bg-inspection/10 text-inspection'
+                          : undefined
+                      }
+                    >
+                      {inspection.status === 'submitted' ? 'Submitted' : 'Draft'}
+                    </Badge>
+                    {canDeleteInspection(inspection) && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -633,18 +659,24 @@ function HgvInspectionsContent() {
               <CardContent>
                 <div className="flex items-center justify-between text-sm">
                   <div className="text-muted-foreground">
-                    {inspection.submitted_at ? `Submitted ${formatDate(inspection.submitted_at)}` : 'Submitted'}
+                    {inspection.status === 'submitted'
+                      ? inspection.submitted_at
+                        ? `Submitted ${formatDate(inspection.submitted_at)}`
+                        : 'Submitted'
+                      : 'Draft'}
                   </div>
-                  <Button
-                    onClick={(e) => handleDownloadPDF(e, inspection.id)}
-                    disabled={downloading === inspection.id}
-                    variant="outline"
-                    size="sm"
-                    className={`bg-slate-900 border-inspection text-inspection hover:bg-inspection hover:text-white transition-all duration-200 ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    {downloading === inspection.id ? 'Downloading...' : 'Download PDF'}
-                  </Button>
+                  {inspection.status === 'submitted' && (
+                    <Button
+                      onClick={(e) => handleDownloadPDF(e, inspection.id)}
+                      disabled={downloading === inspection.id}
+                      variant="outline"
+                      size="sm"
+                      className={`bg-slate-900 border-inspection text-inspection hover:bg-inspection hover:text-white transition-all duration-200 ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      {downloading === inspection.id ? 'Downloading...' : 'Download PDF'}
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>

@@ -27,7 +27,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { PageLoader } from '@/components/ui/page-loader';
-import { Send, CheckCircle2, XCircle, AlertCircle, Info, User, Camera, ArrowLeft } from 'lucide-react';
+import { Send, CheckCircle2, XCircle, AlertCircle, AlertTriangle, Info, User, Camera, ArrowLeft } from 'lucide-react';
 import { formatDateISO, formatDate, getDayOfWeek } from '@/lib/utils/date';
 import { InspectionStatus } from '@/types/inspection';
 import { PLANT_INSPECTION_ITEMS } from '@/lib/checklists/plant-checklists';
@@ -35,6 +35,7 @@ import { Database } from '@/types/database';
 import { Employee } from '@/types/common';
 import { toast } from 'sonner';
 import { getInspectionVisibilityFlags } from '@/lib/utils/inspection-access';
+import { buildInspectionDefectSignature } from '@/lib/utils/inspectionDefectSignature';
 import { scrollAndHighlightValidationTarget } from '@/lib/utils/validation-scroll';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { InspectionPhotoTiles } from '@/components/inspections/InspectionPhotoTiles';
@@ -76,6 +77,7 @@ type InspectionWithRelations = {
   plant?: PlantWithCategory;
   inspection_items?: InspectionItem[];
 };
+type RecentCompletedDefect = { completedAt: string };
 
 type PendingNavigation = { type: 'href'; href: string } | { type: 'back' };
 type ExistingInspectionConflict = { id: string; status: 'draft' | 'submitted' };
@@ -146,6 +148,15 @@ function NewPlantInspectionContent() {
 
   // Logged defects tracking
   const [loggedDefects, setLoggedDefects] = useState<Map<string, { comment: string; actionId: string }>>(new Map());
+  const [recentlyCompletedDefects, setRecentlyCompletedDefects] = useState<Map<string, RecentCompletedDefect>>(new Map());
+  const [confirmedRepeatDefects, setConfirmedRepeatDefects] = useState<Set<string>>(new Set());
+  const [showRepeatDefectDialog, setShowRepeatDefectDialog] = useState(false);
+  const [pendingRepeatDefect, setPendingRepeatDefect] = useState<{
+    itemNum: number;
+    itemDesc: string;
+    signature: string;
+    completedAt: string;
+  } | null>(null);
   
   const [checklistStarted, setChecklistStarted] = useState(false);
   
@@ -630,6 +641,8 @@ function NewPlantInspectionContent() {
       if (inspection.is_hired_plant) {
         setIsHiredPlant(true);
         setSelectedPlantId('');
+        setRecentlyCompletedDefects(new Map());
+        setConfirmedRepeatDefects(new Set());
         setHiredPlantIdSerial(inspection.hired_plant_id_serial || '');
         setHiredPlantDescription(inspection.hired_plant_description || '');
         setHiredPlantHiringCompany(inspection.hired_plant_hiring_company || '');
@@ -662,6 +675,10 @@ function NewPlantInspectionContent() {
       
       if (Object.keys(newCheckboxStates).length > 0) {
         setChecklistStarted(true);
+      }
+
+      if (!inspection.is_hired_plant && inspectionData.plant?.id) {
+        void loadLockedDefects(inspectionData.plant.id, 'merge');
       }
 
       toast.success('Draft inspection loaded');
@@ -793,14 +810,27 @@ function NewPlantInspectionContent() {
     }
   }, [canManageCrossUserInspections, user]);
 
-  const loadLockedDefects = async (plantId: string) => {
+  const loadLockedDefects = async (plantId: string, mode: 'replace' | 'merge' = 'replace') => {
     try {
-      const response = await fetch(`/api/plant-inspections/locked-defects?plantId=${plantId}`);
+      const [lockedResponse, recentCompletedResponse] = await Promise.all([
+        fetch(`/api/plant-inspections/locked-defects?plantId=${plantId}`),
+        fetch(`/api/plant-inspections/recent-completed-defects?plantId=${plantId}&days=7`),
+      ]);
       
-      if (response.ok) {
-        const { lockedItems } = await response.json();
+      if (lockedResponse.ok) {
+        const { lockedItems } = await lockedResponse.json();
+        const recentCompletedItems = recentCompletedResponse.ok
+          ? ((await recentCompletedResponse.json()) as {
+              recentlyCompletedItems: Array<{ signature: string; completedAt: string }>;
+            }).recentlyCompletedItems
+          : [];
         
         const loggedMap = new Map<string, { comment: string; actionId: string }>();
+        const recentCompletedMap = new Map<string, RecentCompletedDefect>();
+
+        recentCompletedItems.forEach((item) => {
+          recentCompletedMap.set(item.signature, { completedAt: item.completedAt });
+        });
         
         lockedItems.forEach((item: { item_number?: string; status?: string; comment?: string; actionId?: string }) => {
           const key = `${item.item_number ?? ''}`;
@@ -815,8 +845,9 @@ function NewPlantInspectionContent() {
           });
         });
 
+        setRecentlyCompletedDefects(recentCompletedMap);
+        setConfirmedRepeatDefects(new Set());
         setLoggedDefects(loggedMap);
-
         const newCheckboxStates: Record<string, InspectionStatus> = {};
         const newComments: Record<string, string> = {};
 
@@ -825,15 +856,24 @@ function NewPlantInspectionContent() {
           newComments[itemNum] = loggedInfo.comment ?? '';
         });
 
-        setCheckboxStates(newCheckboxStates);
-        setComments(newComments);
+        if (mode === 'merge') {
+          setCheckboxStates((prev) => ({ ...prev, ...newCheckboxStates }));
+          setComments((prev) => ({ ...prev, ...newComments }));
+        } else {
+          setCheckboxStates(newCheckboxStates);
+          setComments(newComments);
+        }
       } else {
         console.error('Failed to fetch locked defects');
+        setRecentlyCompletedDefects(new Map());
+        setConfirmedRepeatDefects(new Set());
         setError('Warning: Unable to check for existing defects. Please refresh the page before continuing.');
       }
     } catch (err) {
       console.error('Error loading locked defects:', err);
       setLoggedDefects(new Map());
+      setRecentlyCompletedDefects(new Map());
+      setConfirmedRepeatDefects(new Set());
     }
   };
 
@@ -842,6 +882,26 @@ function NewPlantInspectionContent() {
     
     if (!checklistStarted) {
       setChecklistStarted(true);
+    }
+
+    if (status === 'attention') {
+      const itemDescription = currentChecklist[itemNumber - 1];
+      const defectSignature = buildInspectionDefectSignature({
+        item_number: itemNumber,
+        item_description: itemDescription,
+      });
+      const recentCompletedDefect = recentlyCompletedDefects.get(defectSignature);
+
+      if (recentCompletedDefect && !confirmedRepeatDefects.has(defectSignature)) {
+        setPendingRepeatDefect({
+          itemNum: itemNumber,
+          itemDesc: itemDescription,
+          signature: defectSignature,
+          completedAt: recentCompletedDefect.completedAt,
+        });
+        setShowRepeatDefectDialog(true);
+        return;
+      }
     }
     
     setCheckboxStates(prev => ({ ...prev, [key]: status }));
@@ -1240,7 +1300,8 @@ function NewPlantInspectionContent() {
                 inspectionId: inspection.id,
                 plantId: selectedPlantId,
                 createdBy: user!.id,
-                defects
+                defects,
+                confirmedRepeatDefectSignatures: Array.from(confirmedRepeatDefects),
               })
             });
 
@@ -1476,6 +1537,10 @@ function NewPlantInspectionContent() {
                     setIsHiredPlant(true);
                     setSelectedPlantId('');
                     setLoggedDefects(new Map());
+                    setRecentlyCompletedDefects(new Map());
+                    setConfirmedRepeatDefects(new Set());
+                    setPendingRepeatDefect(null);
+                    setShowRepeatDefectDialog(false);
                     setCheckboxStates({});
                     setComments({});
                   } else {
@@ -1488,6 +1553,10 @@ function NewPlantInspectionContent() {
                       const updatedRecent = recordRecentVehicleId(user.id, value, 3, 'plant');
                       setRecentPlantIds(updatedRecent);
                     }
+                    setRecentlyCompletedDefects(new Map());
+                    setConfirmedRepeatDefects(new Set());
+                    setPendingRepeatDefect(null);
+                    setShowRepeatDefectDialog(false);
                     loadLockedDefects(value);
                   }
                 }}
@@ -2063,6 +2132,71 @@ function NewPlantInspectionContent() {
             >
               <Send className="h-4 w-4 mr-2" />
               Submit Daily Check
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showRepeatDefectDialog} onOpenChange={(open) => {
+        if (!open && pendingRepeatDefect) {
+          setPendingRepeatDefect(null);
+        }
+        setShowRepeatDefectDialog(open);
+      }}>
+        <DialogContent className="border-border text-white max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-white text-xl flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Confirm Repeat Defect
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              This same checklist item was recently completed by workshop.
+            </DialogDescription>
+          </DialogHeader>
+
+          {pendingRepeatDefect && (
+            <div className="py-4 space-y-4">
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+                <p className="text-sm text-amber-200">
+                  <strong>Item {pendingRepeatDefect.itemNum}:</strong> {pendingRepeatDefect.itemDesc}
+                </p>
+                <p className="text-xs text-amber-300 mt-2">
+                  The most recent workshop task for this defect was completed on{' '}
+                  {formatDate(pendingRepeatDefect.completedAt)}.
+                </p>
+                <p className="text-xs text-amber-300 mt-2">
+                  Please confirm this is a new defect before logging it again.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowRepeatDefectDialog(false);
+                setPendingRepeatDefect(null);
+              }}
+              className="border-slate-600 text-white hover:bg-slate-800"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (!pendingRepeatDefect) {
+                  return;
+                }
+
+                const key = `${pendingRepeatDefect.itemNum}`;
+                setCheckboxStates((prev) => ({ ...prev, [key]: 'attention' }));
+                setConfirmedRepeatDefects((prev) => new Set(prev).add(pendingRepeatDefect.signature));
+                setShowRepeatDefectDialog(false);
+                setPendingRepeatDefect(null);
+              }}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              Yes, log new defect
             </Button>
           </DialogFooter>
         </DialogContent>

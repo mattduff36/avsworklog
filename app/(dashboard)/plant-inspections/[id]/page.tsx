@@ -214,7 +214,7 @@ export default function ViewPlantInspectionPage() {
       });
       setEditableDailyHours(hoursMap);
       
-      // Plant inspections no longer support draft editing
+      // Draft edits are handled on /plant-inspections/new?id=...
     } catch (err) {
       const errorContextId = 'plant-inspection-details-fetch-error';
       console.error('Error fetching inspection:', err, { errorContextId });

@@ -38,16 +38,14 @@ export async function getInspectionRouteActorAccess(
 
   const effectiveRole = await getEffectiveRole();
   const hasFullAccessRole = hasEffectiveRoleFullAccess(effectiveRole);
-  const isManagerOrHigher = Boolean(hasFullAccessRole || effectiveRole.is_manager_admin);
-  const canManageOthers =
-    isManagerOrHigher &&
-    !hasWorkshopInspectionFullVisibilityOverride(effectiveRole.team_name);
+  const isWorkshopTeam = hasWorkshopInspectionFullVisibilityOverride(effectiveRole.team_name);
+  const canManageOthers = Boolean(hasFullAccessRole || (effectiveRole.is_manager_admin && isWorkshopTeam));
 
   return {
     access: {
       userId: user.id,
       canManageOthers,
-      canDeleteInspections: isManagerOrHigher,
+      canDeleteInspections: canManageOthers,
     },
     errorResponse: null,
   };

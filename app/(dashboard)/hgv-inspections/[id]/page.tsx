@@ -33,7 +33,7 @@ interface HgvInspectionDetails {
   inspection_date: string;
   inspection_end_date: string | null;
   current_mileage: number | null;
-  status: 'submitted';
+  status: 'draft' | 'submitted';
   inspector_comments: string | null;
   hgv: {
     reg_number: string;
@@ -221,6 +221,7 @@ export default function ViewHgvInspectionPage() {
   const defectCount = items.filter(item => item.status === 'attention').length;
   const okCount = items.filter(item => item.status === 'ok').length;
   const canUploadPhotos = inspection.user_id === user?.id;
+  const isSubmittedInspection = inspection.status === 'submitted';
   const statusLabel = (status: string) =>
     status === 'logged' ? 'In Progress' : status === 'on_hold' ? 'On Hold' : status === 'resumed' ? 'Resumed' : status === 'completed' ? 'Completed' : status;
   const getPhotosForItem = (itemNumber: number, dayOfWeek: number | null) =>
@@ -244,17 +245,28 @@ export default function ViewHgvInspectionPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.open(`/api/hgv-inspections/${inspection.id}/pdf`, '_blank')}
-              className="border-border text-white hover:bg-slate-800"
+            {isSubmittedInspection && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(`/api/hgv-inspections/${inspection.id}/pdf`, '_blank')}
+                className="border-border text-white hover:bg-slate-800"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Download PDF</span>
+                <span className="sm:hidden">PDF</span>
+              </Button>
+            )}
+            <Badge
+              variant={isSubmittedInspection ? 'default' : 'secondary'}
+              className={
+                isSubmittedInspection
+                  ? 'border-inspection/40 bg-inspection/10 text-inspection'
+                  : undefined
+              }
             >
-              <Download className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Download PDF</span>
-              <span className="sm:hidden">PDF</span>
-            </Button>
-            <Badge className="border-inspection/40 bg-inspection/10 text-inspection">Submitted</Badge>
+              {isSubmittedInspection ? 'Submitted' : 'Draft'}
+            </Badge>
           </div>
         </div>
       </div>

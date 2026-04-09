@@ -22,7 +22,7 @@ import { toast } from 'sonner';
 import { PlantInspection } from '@/types/inspection';
 import { Employee, InspectionStatusFilter } from '@/types/common';
 import { useQueryState } from 'nuqs';
-import { getInspectionVisibilityFlags } from '@/lib/utils/inspection-access';
+import { canEditDraftInspection, getInspectionVisibilityFlags } from '@/lib/utils/inspection-access';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -105,6 +105,7 @@ function PlantInspectionsContent() {
     hasOrgWideInspectionVisibility,
     hasTeamInspectionVisibility,
     canViewCrossUserInspections,
+    canManageInspections,
     canDeleteInspections,
   } = getInspectionVisibilityFlags({
     teamName: effectiveRole?.team_name ?? profile?.team?.name,
@@ -232,7 +233,6 @@ function PlantInspectionsContent() {
       let query = supabase
         .from('plant_inspections')
         .select('*')
-        .eq('status', 'submitted')
         .order('inspection_date', { ascending: false });
 
       // Filter based on user role and selection
@@ -257,6 +257,11 @@ function PlantInspectionsContent() {
         query = query.eq('is_hired_plant', true);
       } else if (currentPlantFilter !== 'all') {
         query = query.eq('plant_id', currentPlantFilter);
+      }
+
+      const currentStatusFilter = statusFilter || 'all';
+      if (currentStatusFilter !== 'all') {
+        query = query.eq('status', currentStatusFilter as 'draft' | 'submitted');
       }
 
       const { data, error } = await query;
@@ -426,6 +431,7 @@ function PlantInspectionsContent() {
     scopedEmployeeIds,
     normalizedEmployeeFilter,
     normalizedPlantFilter,
+    statusFilter,
     supabase,
   ]);
 
@@ -500,6 +506,22 @@ function PlantInspectionsContent() {
 
     return <Clipboard className={`h-5 w-5 ${iconColorClass}`} />;
   };
+
+  const canEditInspection = (inspection: Pick<InspectionWithPlant, 'status' | 'user_id'>) =>
+    canEditDraftInspection({
+      status: inspection.status,
+      ownerUserId: inspection.user_id,
+      currentUserId: user?.id,
+      canManageInspections,
+    });
+
+  const canDeleteInspection = (inspection: Pick<InspectionWithPlant, 'status' | 'user_id'>) =>
+    canDeleteInspections && canEditInspection(inspection);
+
+  const getInspectionHref = (inspection: Pick<InspectionWithPlant, 'id' | 'status' | 'user_id'>) =>
+    canEditInspection(inspection)
+      ? `/plant-inspections/new?id=${inspection.id}`
+      : `/plant-inspections/${inspection.id}`;
 
   function toggleColumn(column: keyof PlantInspectionsColumnVisibility) {
     setColumnVisibility((prev) => {
@@ -642,7 +664,7 @@ function PlantInspectionsContent() {
                 <Filter className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-slate-400 mr-2">Filter by status:</span>
                 <div className="flex gap-2 flex-wrap">
-                  {(['all', 'submitted'] as InspectionStatusFilter[]).map((filter) => (
+                  {(['all', 'draft', 'submitted'] as InspectionStatusFilter[]).map((filter) => (
                     <Button
                       key={filter}
                       variant="outline"
@@ -650,6 +672,7 @@ function PlantInspectionsContent() {
                       onClick={() => setStatusFilter(filter)}
                       className={`${tabletModeEnabled ? 'min-h-11 text-base px-4 [&_svg]:size-5' : ''} ${statusFilter === filter ? 'bg-white text-slate-900 border-white/80 hover:bg-slate-200' : 'border-slate-600 text-muted-foreground hover:bg-slate-700/50'}`}
                     >
+                      {filter === 'draft' && <Clipboard className="h-3 w-3 mr-1" />}
                       {filter === 'submitted' && <Clock className="h-3 w-3 mr-1" />}
                       {getFilterLabel(filter)}
                     </Button>
@@ -790,7 +813,8 @@ function PlantInspectionsContent() {
                 columnVisibility={columnVisibility}
                 downloadingId={downloading}
                 deleting={deleting}
-                showDeleteActions={canDeleteInspections}
+                getInspectionHref={getInspectionHref}
+                canDeleteInspection={canDeleteInspection}
                 onDownloadPDF={handleDownloadPDF}
                 onOpenDeleteDialog={openDeleteDialog}
               />
@@ -799,13 +823,12 @@ function PlantInspectionsContent() {
 
           <div className={canViewCrossUserInspections && viewMode === 'table' ? 'md:hidden grid gap-4' : 'grid gap-4'}>
             {inspections.slice(0, displayCount).map((inspection) => {
-              const inspectionStatus = inspection.status as string;
               return (
             <Card 
               key={inspection.id} 
               className="border-border hover:shadow-lg hover:border-plant-inspection/50 transition-all duration-200 cursor-pointer"
               onClick={() => {
-                router.push(`/plant-inspections/${inspection.id}`);
+                router.push(getInspectionHref(inspection));
               }}
             >
               <CardHeader>
@@ -854,7 +877,7 @@ function PlantInspectionsContent() {
                   </div>
                   <div className="flex items-center gap-2">
                     {getStatusBadge(inspection.status)}
-                    {canDeleteInspections && (
+                    {canDeleteInspection(inspection) && (
                       <Button
                         onClick={(e) => openDeleteDialog(e, inspection)}
                         variant="ghost"
@@ -871,16 +894,13 @@ function PlantInspectionsContent() {
               <CardContent>
                 <div className="flex items-center justify-between text-sm">
                   <div className="text-muted-foreground">
-                    {inspection.submitted_at
-                      ? `Submitted ${formatDate(inspection.submitted_at)}`
-                      : 'Not yet submitted'}
+                    {inspection.status === 'submitted'
+                      ? inspection.submitted_at
+                        ? `Submitted ${formatDate(inspection.submitted_at)}`
+                        : 'Submitted'
+                      : 'Draft'}
                   </div>
-                  {inspectionStatus === 'rejected' && inspection.manager_comments && (
-                    <div className="text-red-600 text-xs">
-                      See manager comments
-                    </div>
-                  )}
-                  {(inspectionStatus === 'approved' || inspectionStatus === 'submitted') && (
+                  {inspection.status === 'submitted' && (
                     <Button
                       onClick={(e) => handleDownloadPDF(e, inspection.id)}
                       disabled={downloading === inspection.id}

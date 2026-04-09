@@ -26,6 +26,7 @@ export const DEFAULT_PLANT_INSPECTIONS_COLUMN_VISIBILITY: PlantInspectionsColumn
 
 interface PlantInspectionRow {
   id: string;
+  user_id: string;
   status: 'draft' | 'submitted';
   has_reported_defect?: boolean;
   has_inform_workshop_task?: boolean;
@@ -53,7 +54,8 @@ interface PlantInspectionsListTableProps {
   columnVisibility: PlantInspectionsColumnVisibility;
   downloadingId: string | null;
   deleting: boolean;
-  showDeleteActions: boolean;
+  getInspectionHref: (inspection: PlantInspectionRow) => string;
+  canDeleteInspection: (inspection: PlantInspectionRow) => boolean;
   onDownloadPDF: (event: React.MouseEvent, inspectionId: string) => void;
   onOpenDeleteDialog: (event: React.MouseEvent, inspection: PlantInspectionRow) => void;
 }
@@ -102,7 +104,8 @@ export function PlantInspectionsListTable({
   columnVisibility,
   downloadingId,
   deleting,
-  showDeleteActions,
+  getInspectionHref,
+  canDeleteInspection,
   onDownloadPDF,
   onOpenDeleteDialog,
 }: PlantInspectionsListTableProps) {
@@ -213,7 +216,7 @@ export function PlantInspectionsListTable({
             <TableRow
               key={inspection.id}
               className="border-slate-700 hover:bg-slate-800/50 cursor-pointer"
-              onClick={() => router.push(`/plant-inspections/${inspection.id}`)}
+              onClick={() => router.push(getInspectionHref(inspection))}
             >
               <TableCell className="font-medium text-white">
                 {inspection.profile?.full_name || 'Unknown User'}
@@ -246,7 +249,11 @@ export function PlantInspectionsListTable({
               )}
               {columnVisibility.submittedAt && (
                 <TableCell className="text-muted-foreground">
-                  {inspection.submitted_at ? formatDate(inspection.submitted_at) : 'Not submitted'}
+                  {inspection.status === 'submitted'
+                    ? inspection.submitted_at
+                      ? formatDate(inspection.submitted_at)
+                      : 'Submitted'
+                    : 'Draft'}
                 </TableCell>
               )}
               <TableCell className="text-right">
@@ -263,7 +270,7 @@ export function PlantInspectionsListTable({
                       {downloadingId === inspection.id ? 'Downloading...' : 'PDF'}
                     </Button>
                   )}
-                  {showDeleteActions && (
+                  {canDeleteInspection(inspection) && (
                     <Button
                       onClick={(event) => onOpenDeleteDialog(event, inspection)}
                       disabled={deleting}

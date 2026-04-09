@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { getInspectionRouteActorAccess } from '@/lib/server/inspection-route-access';
+import { LOCKED_INSPECTION_DEFECT_STATUSES } from '@/lib/utils/inspectionDefectTaskStatuses';
 
 /**
  * GET /api/van-inspections/locked-defects?vehicleId=xxx
@@ -8,7 +9,7 @@ import { getInspectionRouteActorAccess } from '@/lib/server/inspection-route-acc
  * Returns locked checklist items for a vehicle where existing defect tasks are active.
  * Uses service role to bypass RLS (inspectors can't read actions table).
  * 
- * Locked items are those with workshop tasks in statuses: logged, on_hold, in_progress
+ * Locked items are those with workshop tasks in active lock statuses.
  * 
  * Returns: { lockedItems: Array<{ item_number, item_description, status, actionId, comment }> }
  */
@@ -39,8 +40,7 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    // Find active inspection defect tasks for this vehicle
-    // Include: logged, on_hold, in_progress statuses
+    // Find active inspection defect tasks for this vehicle.
     const { data: tasks, error: tasksError } = await supabaseAdmin
       .from('actions')
       .select(`
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
       `)
       .eq('van_id', vehicleId)
       .eq('action_type', 'inspection_defect')
-      .in('status', ['logged', 'on_hold', 'in_progress']);
+      .in('status', LOCKED_INSPECTION_DEFECT_STATUSES);
 
     if (tasksError) {
       console.error('Error fetching tasks:', tasksError);

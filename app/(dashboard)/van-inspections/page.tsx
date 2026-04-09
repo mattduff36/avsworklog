@@ -23,7 +23,7 @@ import { toast } from 'sonner';
 import { VanInspection } from '@/types/inspection';
 import { Employee, InspectionStatusFilter } from '@/types/common';
 import { useQueryState } from 'nuqs';
-import { getInspectionVisibilityFlags } from '@/lib/utils/inspection-access';
+import { canEditDraftInspection, getInspectionVisibilityFlags } from '@/lib/utils/inspection-access';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -100,6 +100,7 @@ function InspectionsContent() {
     hasOrgWideInspectionVisibility,
     hasTeamInspectionVisibility,
     canViewCrossUserInspections,
+    canManageInspections,
     canDeleteInspections,
   } = getInspectionVisibilityFlags({
     teamName: effectiveRole?.team_name ?? profile?.team?.name,
@@ -627,6 +628,22 @@ function InspectionsContent() {
 
   const showInitialLoading = (permissionLoading || loading) && inspections.length === 0;
 
+  const canEditInspection = (inspection: Pick<InspectionWithVehicle, 'status' | 'user_id'>) =>
+    canEditDraftInspection({
+      status: inspection.status,
+      ownerUserId: inspection.user_id,
+      currentUserId: user?.id,
+      canManageInspections,
+    });
+
+  const canDeleteInspection = (inspection: Pick<InspectionWithVehicle, 'status' | 'user_id'>) =>
+    canDeleteInspections && canEditInspection(inspection);
+
+  const getInspectionHref = (inspection: Pick<InspectionWithVehicle, 'id' | 'status' | 'user_id'>) =>
+    canEditInspection(inspection)
+      ? `/van-inspections/new?id=${inspection.id}`
+      : `/van-inspections/${inspection.id}`;
+
   return (
     <AppPageShell>
       
@@ -864,7 +881,8 @@ function InspectionsContent() {
                 columnVisibility={columnVisibility}
                 downloadingId={downloading}
                 deleting={deleting}
-                showDeleteActions={canDeleteInspections}
+                getInspectionHref={getInspectionHref}
+                canDeleteInspection={canDeleteInspection}
                 onDownloadPDF={handleDownloadPDF}
                 onOpenDeleteDialog={openDeleteDialog}
               />
@@ -873,18 +891,12 @@ function InspectionsContent() {
 
           <div className={canViewCrossUserInspections && viewMode === 'table' ? 'md:hidden grid gap-4' : 'grid gap-4'}>
             {inspections.map((inspection) => {
-              const inspectionStatus = inspection.status as string;
               return (
             <Card 
               key={inspection.id} 
               className="border-border hover:shadow-lg hover:border-inspection/50 transition-all duration-200 cursor-pointer"
               onClick={() => {
-                // Draft inspections open in the new/edit page, others in view page
-                if (inspection.status === 'draft') {
-                  router.push(`/van-inspections/new?id=${inspection.id}`);
-                } else {
-                  router.push(`/van-inspections/${inspection.id}`);
-                }
+                router.push(getInspectionHref(inspection));
               }}
             >
               <CardHeader>
@@ -912,7 +924,7 @@ function InspectionsContent() {
                   </div>
                   <div className="flex items-center gap-2">
                     {getStatusBadge(inspection.status)}
-                    {canDeleteInspections && (
+                    {canDeleteInspection(inspection) && (
                       <Button
                         onClick={(e) => openDeleteDialog(e, inspection)}
                         variant="ghost"
@@ -929,17 +941,13 @@ function InspectionsContent() {
               <CardContent>
                 <div className="flex items-center justify-between text-sm">
                   <div className="text-muted-foreground">
-                    {inspection.submitted_at
-                      ? `Submitted ${formatDate(inspection.submitted_at)}`
-                      : 'Not yet submitted'}
+                    {inspection.status === 'submitted'
+                      ? inspection.submitted_at
+                        ? `Submitted ${formatDate(inspection.submitted_at)}`
+                        : 'Submitted'
+                      : 'Draft'}
                   </div>
-                  {inspectionStatus === 'rejected' && inspection.manager_comments && (
-                    <div className="text-red-600 text-xs">
-                      See manager comments
-                    </div>
-                  )}
-                  {/* Download PDF Button for Approved/Pending */}
-                  {(inspectionStatus === 'approved' || inspectionStatus === 'submitted') && (
+                  {inspection.status === 'submitted' && (
                     <Button
                       onClick={(e) => handleDownloadPDF(e, inspection.id)}
                       disabled={downloading === inspection.id}

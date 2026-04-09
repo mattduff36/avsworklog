@@ -26,17 +26,35 @@ export function getInspectionVisibilityFlags(
   const hasTeamInspectionVisibility = Boolean(
     !hasOrgWideInspectionVisibility && hasWorkshopReadAllOverride
   );
+  const canManageInspections = Boolean(
+    input.isAdmin || input.isSuperAdmin || (input.isManager && hasWorkshopReadAllOverride)
+  );
 
   return {
     hasOrgWideInspectionVisibility,
     hasTeamInspectionVisibility,
     canViewCrossUserInspections: hasOrgWideInspectionVisibility || hasTeamInspectionVisibility,
-    // Workshop users can view wider inspection data, but write access remains owner-scoped.
-    canManageInspections: Boolean(
-      (input.isManager || input.isAdmin || input.isSuperAdmin) && !hasWorkshopReadAllOverride
-    ),
-    canDeleteInspections: Boolean(input.isManager || input.isAdmin || input.isSuperAdmin),
+    // Draft management is restricted to admins/superadmins and workshop managers.
+    canManageInspections,
+    canDeleteInspections: canManageInspections,
   };
+}
+
+export function canEditDraftInspection(params: {
+  status: string | null | undefined;
+  ownerUserId: string | null | undefined;
+  currentUserId: string | null | undefined;
+  canManageInspections: boolean;
+}): boolean {
+  if (params.status !== 'draft') {
+    return false;
+  }
+
+  if (!params.ownerUserId || !params.currentUserId) {
+    return false;
+  }
+
+  return params.ownerUserId === params.currentUserId || params.canManageInspections;
 }
 
 export function canAccessScopedInspection(params: {

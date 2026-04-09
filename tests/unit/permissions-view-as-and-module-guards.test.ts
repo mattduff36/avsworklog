@@ -122,7 +122,7 @@ describe('module guard alignment checks', () => {
     });
 
     expect(accessHelperSource).toContain('input.isManager || input.isSupervisor || input.isAdmin || input.isSuperAdmin');
-    expect(accessHelperSource).toContain('(input.isManager || input.isAdmin || input.isSuperAdmin) && !hasWorkshopReadAllOverride');
+    expect(accessHelperSource).toContain('input.isAdmin || input.isSuperAdmin || (input.isManager && hasWorkshopReadAllOverride)');
   });
 
   it('keeps supervisor read-only on inspection list actions', () => {
@@ -131,7 +131,8 @@ describe('module guard alignment checks', () => {
     const hgvSource = readSource('app/(dashboard)/hgv-inspections/page.tsx');
 
     [vanSource, plantSource, hgvSource].forEach((source) => {
-      expect(source).toContain('showDeleteActions={canDeleteInspections}');
+      expect(source).toContain('canDeleteInspection={canDeleteInspection}');
+      expect(source).toContain('canEditDraftInspection');
     });
   });
 

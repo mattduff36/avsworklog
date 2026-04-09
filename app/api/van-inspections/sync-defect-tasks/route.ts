@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { Database } from '@/types/database';
 import { getInspectionRouteActorAccess } from '@/lib/server/inspection-route-access';
+import { buildRecentCompletedDefectMap } from '@/lib/utils/inspectionRecentCompletedDefects';
 
 type ActionInsert = Database['public']['Tables']['actions']['Insert'];
 type ActionUpdate = Database['public']['Tables']['actions']['Update'];
@@ -41,7 +42,12 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { inspectionId, vehicleId, createdBy, defects } = body;
+    const { inspectionId, vehicleId, createdBy, defects, confirmedRepeatDefectSignatures } = body;
+    const confirmedRepeatDefectSignatureSet = new Set<string>(
+      Array.isArray(confirmedRepeatDefectSignatures)
+        ? confirmedRepeatDefectSignatures.filter((value): value is string => typeof value === 'string' && value.length > 0)
+        : []
+    );
 
     if (!inspectionId || !vehicleId || !createdBy || !Array.isArray(defects)) {
       return NextResponse.json(
@@ -165,6 +171,15 @@ export async function POST(request: NextRequest) {
       .eq('action_type', 'inspection_defect')
       .in('status', ['pending', 'logged', 'on_hold', 'in_progress']);
 
+    const { data: completedVehicleTasks } = await supabaseAdmin
+      .from('actions')
+      .select('description, actioned_at, updated_at')
+      .eq('van_id', vehicleId)
+      .eq('action_type', 'inspection_defect')
+      .eq('status', 'completed')
+      .order('actioned_at', { ascending: false, nullsFirst: false })
+      .limit(100);
+
     // Fetch existing actions for this inspection (for updates)
     const { data: existingActions } = await supabaseAdmin
       .from('actions')
@@ -222,6 +237,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const recentCompletedDefects = buildRecentCompletedDefectMap(completedVehicleTasks || [], {
+      lookbackDays: 7,
+    });
+
     const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
     let created = 0;
@@ -264,6 +283,14 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
+      if (recentCompletedDefects.has(signature) && !confirmedRepeatDefectSignatureSet.has(signature)) {
+        console.log(
+          `[sync-defect-tasks] Skipping creation for ${signature}: recently completed task exists and defect was not reconfirmed`
+        );
+        skipped++;
+        continue;
+      }
+
       // Check for existing tasks with this signature in the CURRENT inspection
       const existing = existingMap.get(signature);
 
@@ -299,8 +326,35 @@ export async function POST(request: NextRequest) {
             updated++;
           }
         } else {
-          // All tasks are completed, skip
-          skipped++;
+          // All tasks are completed. Only recreate when the user has explicitly
+          // reconfirmed the same defect after a recent completion.
+          if (!confirmedRepeatDefectSignatureSet.has(signature)) {
+            skipped++;
+            continue;
+          }
+
+          const newTask: ActionInsert = {
+            action_type: 'inspection_defect',
+            inspection_id: inspectionId,
+            inspection_item_id: primaryInspectionItemId,
+            van_id: vehicleId,
+            workshop_subcategory_id: defaultSubcategoryId,
+            title,
+            description,
+            priority: 'high',
+            status: 'pending',
+            created_by: createdBy,
+          } as ActionInsert & { workshop_subcategory_id: string };
+
+          const { error: insertError } = await supabaseAdmin
+            .from('actions')
+            .insert(newTask as never);
+
+          if (insertError) {
+            console.error(`Error recreating task for ${signature}:`, insertError);
+          } else {
+            created++;
+          }
         }
       } else {
         // No active tasks exist anywhere for this vehicle + defect

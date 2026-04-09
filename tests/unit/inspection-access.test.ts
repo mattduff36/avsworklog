@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  canEditDraftInspection,
   canAccessScopedInspection,
   getInspectionVisibilityFlags,
 } from '@/lib/utils/inspection-access';
 
 describe('getInspectionVisibilityFlags', () => {
-  it('grants org-wide visibility to supervisors and managers', () => {
+  it('grants supervisors org-wide visibility and keeps non-workshop managers read-only', () => {
     expect(
       getInspectionVisibilityFlags({
         teamName: 'Civils',
@@ -28,8 +29,8 @@ describe('getInspectionVisibilityFlags', () => {
       hasOrgWideInspectionVisibility: true,
       hasTeamInspectionVisibility: false,
       canViewCrossUserInspections: true,
-      canManageInspections: true,
-      canDeleteInspections: true,
+      canManageInspections: false,
+      canDeleteInspections: false,
     });
   });
 
@@ -47,7 +48,7 @@ describe('getInspectionVisibilityFlags', () => {
     });
   });
 
-  it('keeps workshop managers read-only for cross-user inspection changes but allows deletion', () => {
+  it('grants workshop managers draft management rights', () => {
     expect(
       getInspectionVisibilityFlags({
         teamName: 'Workshop',
@@ -57,7 +58,7 @@ describe('getInspectionVisibilityFlags', () => {
       hasOrgWideInspectionVisibility: true,
       hasTeamInspectionVisibility: false,
       canViewCrossUserInspections: true,
-      canManageInspections: false,
+      canManageInspections: true,
       canDeleteInspections: true,
     });
   });
@@ -120,6 +121,52 @@ describe('canAccessScopedInspection', () => {
         canViewCrossUserInspections: true,
         hasOrgWideInspectionVisibility: false,
         scopedUserIds: ['user-1', 'user-2'],
+      })
+    ).toBe(false);
+  });
+});
+
+describe('canEditDraftInspection', () => {
+  it('allows the owner to edit their own draft', () => {
+    expect(
+      canEditDraftInspection({
+        status: 'draft',
+        ownerUserId: 'user-1',
+        currentUserId: 'user-1',
+        canManageInspections: false,
+      })
+    ).toBe(true);
+  });
+
+  it('allows workshop managers to edit cross-user drafts', () => {
+    expect(
+      canEditDraftInspection({
+        status: 'draft',
+        ownerUserId: 'user-2',
+        currentUserId: 'user-1',
+        canManageInspections: true,
+      })
+    ).toBe(true);
+  });
+
+  it('keeps supervisors and other read-only viewers out of cross-user draft editing', () => {
+    expect(
+      canEditDraftInspection({
+        status: 'draft',
+        ownerUserId: 'user-2',
+        currentUserId: 'user-1',
+        canManageInspections: false,
+      })
+    ).toBe(false);
+  });
+
+  it('never grants edit access for submitted inspections', () => {
+    expect(
+      canEditDraftInspection({
+        status: 'submitted',
+        ownerUserId: 'user-1',
+        currentUserId: 'user-1',
+        canManageInspections: true,
       })
     ).toBe(false);
   });

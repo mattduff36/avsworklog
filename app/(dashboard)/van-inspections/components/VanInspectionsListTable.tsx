@@ -26,6 +26,7 @@ export const DEFAULT_VAN_INSPECTIONS_COLUMN_VISIBILITY: VanInspectionsColumnVisi
 
 interface VanInspectionRow {
   id: string;
+  user_id: string;
   status: 'draft' | 'submitted';
   has_reported_defect?: boolean;
   has_inform_workshop_task?: boolean;
@@ -47,7 +48,8 @@ interface VanInspectionsListTableProps {
   columnVisibility: VanInspectionsColumnVisibility;
   downloadingId: string | null;
   deleting: boolean;
-  showDeleteActions: boolean;
+  getInspectionHref: (inspection: VanInspectionRow) => string;
+  canDeleteInspection: (inspection: VanInspectionRow) => boolean;
   onDownloadPDF: (event: React.MouseEvent, inspectionId: string) => void;
   onOpenDeleteDialog: (event: React.MouseEvent, inspection: VanInspectionRow) => void;
 }
@@ -90,7 +92,8 @@ export function VanInspectionsListTable({
   columnVisibility,
   downloadingId,
   deleting,
-  showDeleteActions,
+  getInspectionHref,
+  canDeleteInspection,
   onDownloadPDF,
   onOpenDeleteDialog,
 }: VanInspectionsListTableProps) {
@@ -125,14 +128,6 @@ export function VanInspectionsListTable({
     }
     setSortField(field);
     setSortDirection('asc');
-  }
-
-  function navigateToInspection(inspection: VanInspectionRow) {
-    if (inspection.status === 'draft') {
-      router.push(`/van-inspections/new?id=${inspection.id}`);
-      return;
-    }
-    router.push(`/van-inspections/${inspection.id}`);
   }
 
   return (
@@ -209,7 +204,7 @@ export function VanInspectionsListTable({
             <TableRow
               key={inspection.id}
               className="border-slate-700 hover:bg-slate-800/50 cursor-pointer"
-              onClick={() => navigateToInspection(inspection)}
+              onClick={() => router.push(getInspectionHref(inspection))}
             >
               <TableCell className="font-medium text-white">
                 {inspection.profile?.full_name || 'Unknown User'}
@@ -240,7 +235,11 @@ export function VanInspectionsListTable({
               )}
               {columnVisibility.submittedAt && (
                 <TableCell className="text-muted-foreground">
-                  {inspection.submitted_at ? formatDate(inspection.submitted_at) : 'Not submitted'}
+                  {inspection.status === 'submitted'
+                    ? inspection.submitted_at
+                      ? formatDate(inspection.submitted_at)
+                      : 'Submitted'
+                    : 'Draft'}
                 </TableCell>
               )}
               <TableCell className="text-right">
@@ -257,7 +256,7 @@ export function VanInspectionsListTable({
                       {downloadingId === inspection.id ? 'Downloading...' : 'PDF'}
                     </Button>
                   )}
-                  {showDeleteActions && (
+                  {canDeleteInspection(inspection) && (
                     <Button
                       onClick={(event) => onOpenDeleteDialog(event, inspection)}
                       disabled={deleting}

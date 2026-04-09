@@ -3,6 +3,7 @@ import { createClient as createSupabaseClient, type SupabaseClient } from '@supa
 import { Database } from '@/types/database';
 import { buildInspectionDefectSignature, extractInspectionDefectSignature } from '@/lib/utils/inspectionDefectSignature';
 import { ACTIVE_INSPECTION_DEFECT_STATUSES } from '@/lib/utils/inspectionDefectTaskStatuses';
+import { buildRecentCompletedDefectMap } from '@/lib/utils/inspectionRecentCompletedDefects';
 import { getInspectionRouteActorAccess } from '@/lib/server/inspection-route-access';
 
 type ActionInsert = Database['public']['Tables']['actions']['Insert'];
@@ -241,12 +242,18 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { inspectionId, plantId, createdBy, defects } = body as {
+    const { inspectionId, plantId, createdBy, defects, confirmedRepeatDefectSignatures } = body as {
       inspectionId?: string;
       plantId?: string;
       createdBy?: string;
       defects?: PlantInspectionDefectPayload[];
+      confirmedRepeatDefectSignatures?: string[];
     };
+    const confirmedRepeatDefectSignatureSet = new Set(
+      Array.isArray(confirmedRepeatDefectSignatures)
+        ? confirmedRepeatDefectSignatures.filter((value): value is string => typeof value === 'string' && value.length > 0)
+        : []
+    );
 
     if (!inspectionId || !plantId || !createdBy || !Array.isArray(defects)) {
       return NextResponse.json(
@@ -353,6 +360,15 @@ export async function POST(request: NextRequest) {
       .eq('inspection_id', inspectionId)
       .eq('action_type', 'inspection_defect');
 
+    const { data: completedPlantTasks } = await supabaseAdmin
+      .from('actions')
+      .select('description, actioned_at, updated_at')
+      .eq('plant_id', plantId)
+      .eq('action_type', 'inspection_defect')
+      .eq('status', 'completed')
+      .order('actioned_at', { ascending: false, nullsFirst: false })
+      .limit(100);
+
     const activeTasksMap = new Map<string, ExistingInspectionDefectTask[]>();
     const existingInspectionMap = new Map<string, ExistingInspectionDefectTask[]>();
 
@@ -369,6 +385,10 @@ export async function POST(request: NextRequest) {
         addTaskToSignatureMap(existingInspectionMap, signature, task);
       }
     }
+
+    const recentCompletedDefects = buildRecentCompletedDefectMap(completedPlantTasks || [], {
+      lookbackDays: 7,
+    });
 
     let created = 0;
     let updated = 0;
@@ -469,6 +489,11 @@ export async function POST(request: NextRequest) {
         } else {
           updated++;
         }
+        continue;
+      }
+
+      if (recentCompletedDefects.has(signature) && !confirmedRepeatDefectSignatureSet.has(signature)) {
+        skipped++;
         continue;
       }
 

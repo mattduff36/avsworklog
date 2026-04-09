@@ -26,6 +26,7 @@ export const DEFAULT_HGV_INSPECTIONS_COLUMN_VISIBILITY: HgvInspectionsColumnVisi
 
 interface HgvInspectionRow {
   id: string;
+  user_id: string;
   status: 'draft' | 'submitted';
   has_reported_defect?: boolean;
   has_inform_workshop_task?: boolean;
@@ -41,7 +42,8 @@ interface HgvInspectionsListTableProps {
   columnVisibility: HgvInspectionsColumnVisibility;
   downloadingId: string | null;
   deletingId: string | null;
-  showDeleteActions: boolean;
+  getInspectionHref: (inspection: HgvInspectionRow) => string;
+  canDeleteInspection: (inspection: HgvInspectionRow) => boolean;
   onDownloadPDF: (event: React.MouseEvent, inspectionId: string) => void;
   onDeleteInspection: (event: React.MouseEvent, inspectionId: string) => void;
 }
@@ -84,7 +86,8 @@ export function HgvInspectionsListTable({
   columnVisibility,
   downloadingId,
   deletingId,
-  showDeleteActions,
+  getInspectionHref,
+  canDeleteInspection,
   onDownloadPDF,
   onDeleteInspection,
 }: HgvInspectionsListTableProps) {
@@ -195,7 +198,7 @@ export function HgvInspectionsListTable({
             <TableRow
               key={inspection.id}
               className="border-slate-700 hover:bg-slate-800/50 cursor-pointer"
-              onClick={() => router.push(`/hgv-inspections/${inspection.id}`)}
+              onClick={() => router.push(getInspectionHref(inspection))}
             >
               <TableCell className="font-medium text-white">
                 {inspection.profile?.full_name || 'Unknown User'}
@@ -226,22 +229,28 @@ export function HgvInspectionsListTable({
               )}
               {columnVisibility.submittedAt && (
                 <TableCell className="text-muted-foreground">
-                  {inspection.submitted_at ? formatDate(inspection.submitted_at) : 'Submitted'}
+                  {inspection.status === 'submitted'
+                    ? inspection.submitted_at
+                      ? formatDate(inspection.submitted_at)
+                      : 'Submitted'
+                    : 'Draft'}
                 </TableCell>
               )}
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-2" onClick={(event) => event.stopPropagation()}>
-                  <Button
-                    onClick={(event) => onDownloadPDF(event, inspection.id)}
-                    disabled={downloadingId === inspection.id}
-                    variant="outline"
-                    size="sm"
-                    className="border-inspection text-inspection hover:bg-inspection hover:text-white"
-                  >
-                    <Download className="h-4 w-4 mr-1.5" />
-                    {downloadingId === inspection.id ? 'Downloading...' : 'PDF'}
-                  </Button>
-                  {showDeleteActions && (
+                  {inspection.status === 'submitted' && (
+                    <Button
+                      onClick={(event) => onDownloadPDF(event, inspection.id)}
+                      disabled={downloadingId === inspection.id}
+                      variant="outline"
+                      size="sm"
+                      className="border-inspection text-inspection hover:bg-inspection hover:text-white"
+                    >
+                      <Download className="h-4 w-4 mr-1.5" />
+                      {downloadingId === inspection.id ? 'Downloading...' : 'PDF'}
+                    </Button>
+                  )}
+                  {canDeleteInspection(inspection) && (
                     <Button
                       onClick={(event) => onDeleteInspection(event, inspection.id)}
                       disabled={deletingId === inspection.id}
