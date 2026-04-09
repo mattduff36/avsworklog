@@ -14,6 +14,8 @@ import {
 import type { ApprovedAbsenceForTimesheet } from '@/lib/utils/timesheet-off-days';
 import { getTimesheetWeekIsoBounds, resolveTimesheetOffDayStates } from '@/lib/utils/timesheet-off-days';
 import { buildLeaveAwareTotals, buildLeaveDaysBreakdown } from '@/lib/utils/timesheet-leave-totals';
+import { normalizeTimesheetEntriesForDisplay } from '@/lib/utils/plant-timesheet-v2-normalization';
+import type { TimesheetEntry } from '@/types/timesheet';
 import type { WorkShiftPattern } from '@/types/work-shifts';
 
 type AbsenceReasonRow = {
@@ -29,6 +31,8 @@ interface AbsenceRow extends ApprovedAbsenceForTimesheet {
 
 type TimesheetEntryRow = {
   day_of_week: number;
+  time_started?: string | null;
+  time_finished?: string | null;
   did_not_work?: boolean | null;
   working_in_yard?: boolean | null;
   daily_total?: number | null;
@@ -46,6 +50,8 @@ type TimesheetRow = {
   user_id: string;
   week_ending: string;
   status: string;
+  timesheet_type?: string | null;
+  template_version?: number | null;
   submitted_at?: string | null;
   reviewed_at?: string | null;
   employee?: EmployeeRow | null;
@@ -65,6 +71,8 @@ function buildTimesheetQuery(
       id,
       week_ending,
       status,
+      timesheet_type,
+      template_version,
       submitted_at,
       reviewed_at,
       user_id,
@@ -173,8 +181,7 @@ function transformTimesheetsToExcel(
 
   timesheets.forEach((timesheet) => {
     const employee = timesheet.employee;
-    const entries = timesheet.timesheet_entries || [];
-    const sortedEntries = [...entries].sort((a, b) => a.day_of_week - b.day_of_week);
+    const rawEntries = timesheet.timesheet_entries || [];
     const weekBounds = getTimesheetWeekIsoBounds(timesheet.week_ending);
     const employeeAbsenceState = absencesByEmployee.get(timesheet.user_id) || { paidDays: 0, unpaidDays: 0, reasons: [], rows: [] };
     const weekAbsences = employeeAbsenceState.rows.filter((absence) => {
@@ -186,6 +193,15 @@ function transformTimesheetsToExcel(
       weekAbsences,
       shiftPatternByEmployee.get(timesheet.user_id) || null
     );
+    const entries = normalizeTimesheetEntriesForDisplay(
+      {
+        timesheet_type: timesheet.timesheet_type ?? null,
+        template_version: timesheet.template_version ?? null,
+      },
+      rawEntries as unknown as TimesheetEntry[],
+      offDayStates
+    );
+    const sortedEntries = [...entries].sort((a, b) => a.day_of_week - b.day_of_week);
     const leaveAwareTotals = buildLeaveAwareTotals(
       entries.map((entry) => ({
         day_of_week: entry.day_of_week,

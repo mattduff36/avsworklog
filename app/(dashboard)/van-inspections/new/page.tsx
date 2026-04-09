@@ -32,10 +32,7 @@ import { toast } from 'sonner';
 import { getInspectionErrorMessage, isDuplicateInspectionError } from '@/lib/utils/inspection-error-handling';
 import { getInspectionVisibilityFlags } from '@/lib/utils/inspection-access';
 import { buildInspectionDefectSignature } from '@/lib/utils/inspectionDefectSignature';
-import {
-  buildUnresolvedPreviousDefects,
-  type PreviousDefectSummary,
-} from '@/lib/utils/inspectionPreviousDefects';
+import { type PreviousDefectSummary } from '@/lib/utils/inspectionPreviousDefects';
 import { scrollAndHighlightValidationTarget } from '@/lib/utils/validation-scroll';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { triggerShakeAnimation } from '@/lib/utils/animations';
@@ -907,47 +904,28 @@ function NewInspectionContent() {
     }
 
     try {
-      // Get the most recent submitted inspection for this vehicle
-      const { data: lastInspection, error: inspectionError } = await supabase
-        .from('van_inspections')
-        .select(`
-          id,
-          inspection_items (
-            item_number,
-            item_description,
-            status,
-            day_of_week
-          )
-        `)
-        .eq('van_id', selectedVehicleId)
-        .eq('status', 'submitted')
-        .order('inspection_date', { ascending: false })
-        .limit(1)
-        .single();
+      const [previousDefectsResponse, recentCompletedResponse, response] = await Promise.all([
+        fetch(`/api/van-inspections/previous-defects?vehicleId=${selectedVehicleId}`),
+        fetch(`/api/van-inspections/recent-completed-defects?vehicleId=${selectedVehicleId}&days=7`),
+        fetch(`/api/van-inspections/locked-defects?vehicleId=${selectedVehicleId}`),
+      ]);
 
-      if (inspectionError || !lastInspection) {
-        // No previous inspection, clear previous defects
-        setPreviousDefects(new Map());
-      } else {
-        const items = ((lastInspection as unknown as InspectionWithRelations).inspection_items || []);
-        const { data: completedActions } = await supabase
-          .from('actions')
-          .select('description')
-          .eq('action_type', 'inspection_defect')
-          .eq('inspection_id', lastInspection.id)
-          .eq('status', 'completed');
+      if (previousDefectsResponse.ok) {
+        const { previousDefects: previousDefectItems } = await previousDefectsResponse.json();
+        const defectsMap = new Map<string, PreviousDefect>();
 
-        const defectsMap = buildUnresolvedPreviousDefects(
-          items,
-          (completedActions || []).map((action) => action.description)
-        );
+        (previousDefectItems as Array<PreviousDefectSummary & { signature: string }>).forEach((item) => {
+          defectsMap.set(item.signature, {
+            item_number: item.item_number,
+            item_description: item.item_description,
+            days: item.days,
+          });
+        });
 
         setPreviousDefects(defectsMap);
+      } else {
+        setPreviousDefects(new Map());
       }
-
-      const recentCompletedResponse = await fetch(
-        `/api/van-inspections/recent-completed-defects?vehicleId=${selectedVehicleId}&days=7`
-      );
 
       if (recentCompletedResponse.ok) {
         const { recentlyCompletedItems } = await recentCompletedResponse.json();
@@ -965,8 +943,6 @@ function NewInspectionContent() {
       setConfirmedRepeatDefects(new Set());
 
       // Load locked defects from server (includes logged, on_hold, in_progress)
-      const response = await fetch(`/api/van-inspections/locked-defects?vehicleId=${selectedVehicleId}`);
-      
       let loggedActionsData: Array<{
         inspection_items: { item_number: number; item_description: string };
         status: string;

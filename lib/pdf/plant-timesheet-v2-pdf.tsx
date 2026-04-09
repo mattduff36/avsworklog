@@ -5,6 +5,7 @@ import { formatDate } from '@/lib/utils/date';
 import { getDidNotWorkReasonInfo } from '@/lib/utils/timesheetDidNotWork';
 import type { TimesheetOffDayState } from '@/lib/utils/timesheet-off-days';
 import { buildLeaveAwareTotals } from '@/lib/utils/timesheet-leave-totals';
+import { normalizeTimesheetEntriesForDisplay } from '@/lib/utils/plant-timesheet-v2-normalization';
 
 const styles = StyleSheet.create({
   page: {
@@ -290,9 +291,10 @@ function formatHours(value: number | null | undefined): string {
 
 export function PlantTimesheetV2PDF({ timesheet, employeeName, offDayStates = [] }: PlantTimesheetV2PDFProps) {
   const sortedEntries = (timesheet.entries || []).sort((a, b) => a.day_of_week - b.day_of_week);
-  const allDays = [1, 2, 3, 4, 5, 6, 7].map((dayNum) => {
+  const allDays = normalizeTimesheetEntriesForDisplay(timesheet, [1, 2, 3, 4, 5, 6, 7].map((dayNum) => {
     const entry = sortedEntries.find((item) => item.day_of_week === dayNum);
     return entry || {
+      timesheet_id: timesheet.id,
       day_of_week: dayNum,
       time_started: '',
       time_finished: '',
@@ -306,11 +308,13 @@ export function PlantTimesheetV2PDF({ timesheet, employeeName, offDayStates = []
       machine_standing_hours: null,
       machine_operator_hours: null,
       maintenance_breakdown_hours: null,
+      job_number: null,
+      working_in_yard: false,
       daily_total: null,
       remarks: '',
       did_not_work: false,
     };
-  });
+  }), offDayStates);
 
   const leaveAwareTotals = buildLeaveAwareTotals(allDays, offDayStates);
   const formNumber = timesheet.id ? timesheet.id.slice(-5).toUpperCase() : '00000';

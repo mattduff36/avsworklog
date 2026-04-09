@@ -38,6 +38,63 @@ export function calculateHours(
   }
 }
 
+function roundHours(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+export const STANDARD_LUNCH_BREAK_THRESHOLD_HOURS = 6.5;
+export const STANDARD_LUNCH_BREAK_DEDUCTION_HOURS = 0.5;
+
+export function applyStandardLunchBreakDeduction(hours: number | null): number | null {
+  if (hours === null) return null;
+  if (hours > STANDARD_LUNCH_BREAK_THRESHOLD_HOURS) {
+    return roundHours(hours - STANDARD_LUNCH_BREAK_DEDUCTION_HOURS);
+  }
+  return roundHours(hours);
+}
+
+export function calculateStandardTimesheetHours(
+  timeStarted: string | null,
+  timeFinished: string | null
+): number | null {
+  return applyStandardLunchBreakDeduction(calculateHours(timeStarted, timeFinished));
+}
+
+interface CalculatePlantDailyTotalOptions {
+  timeStarted: string | null;
+  timeFinished: string | null;
+  paidLeaveHours?: number;
+  isLeaveLocked?: boolean;
+  preserveDailyTotal?: boolean;
+  existingDailyTotal?: number | null;
+}
+
+export function calculatePlantDailyTotal({
+  timeStarted,
+  timeFinished,
+  paidLeaveHours = 0,
+  isLeaveLocked = false,
+  preserveDailyTotal = false,
+  existingDailyTotal = null,
+}: CalculatePlantDailyTotalOptions): number | null {
+  const workedHours = calculateStandardTimesheetHours(timeStarted, timeFinished);
+  const normalizedPaidLeaveHours = roundHours(Math.max(0, paidLeaveHours));
+
+  if (preserveDailyTotal) {
+    return existingDailyTotal;
+  }
+
+  if (isLeaveLocked) {
+    return normalizedPaidLeaveHours;
+  }
+
+  if (normalizedPaidLeaveHours > 0) {
+    return roundHours((workedHours ?? 0) + normalizedPaidLeaveHours);
+  }
+
+  return workedHours;
+}
+
 /**
  * Format decimal hours to display format (e.g., 8.5 -> "8.50")
  */

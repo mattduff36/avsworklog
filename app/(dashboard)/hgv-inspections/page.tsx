@@ -399,7 +399,11 @@ function HgvInspectionsContent() {
       : inspection.has_reported_defect
         ? 'text-red-500'
         : 'text-green-500';
-    return <Clock className={`h-5 w-5 ${iconColorClass}`} />;
+    if (inspection.status === 'submitted') {
+      return <Clock className={`h-5 w-5 ${iconColorClass}`} />;
+    }
+
+    return <Clipboard className={`h-5 w-5 ${iconColorClass}`} />;
   };
 
   const canEditInspection = (inspection: Pick<HgvInspectionWithRelations, 'status' | 'user_id'>) =>

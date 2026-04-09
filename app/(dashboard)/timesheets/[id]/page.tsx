@@ -15,7 +15,7 @@ import { Save, Send, Edit2, CheckCircle2, XCircle, Download, Package, AlertTrian
 import Link from 'next/link';
 import { BackButton } from '@/components/ui/back-button';
 import { formatDate } from '@/lib/utils/date';
-import { calculateHours, formatHours } from '@/lib/utils/time-calculations';
+import { calculateStandardTimesheetHours, formatHours } from '@/lib/utils/time-calculations';
 import { DAY_NAMES, Timesheet, TimesheetEntry } from '@/types/timesheet';
 import SignaturePad from '@/components/forms/SignaturePad';
 import { Database } from '@/types/database';
@@ -28,6 +28,7 @@ import {
   resolveTimesheetOffDayStates,
 } from '@/lib/utils/timesheet-off-days';
 import { buildLeaveAwareTotals, formatLeaveAwareWeeklyDisplayMultiline } from '@/lib/utils/timesheet-leave-totals';
+import { isPlantTimesheetV2, normalizeTimesheetEntriesForDisplay } from '@/lib/utils/plant-timesheet-v2-normalization';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -191,6 +192,12 @@ export default function ViewTimesheetPage() {
     }
   }, [params.id, authLoading, fetchTimesheet]);
 
+  const isPlantV2Timesheet = isPlantTimesheetV2(timesheet);
+  const displayEntries = useMemo(
+    () => normalizeTimesheetEntriesForDisplay(timesheet, entries, offDayStates),
+    [timesheet, entries, offDayStates]
+  );
+
   const updateEntry = (dayIndex: number, field: string, value: string | boolean | number | null) => {
     const newEntries = [...entries];
     const currentEntry = newEntries[dayIndex];
@@ -251,14 +258,7 @@ export default function ViewTimesheetPage() {
     // Auto-calculate daily total if both times are present
     if (field === 'time_started' || field === 'time_finished') {
       const entry = newEntries[dayIndex];
-      let hours = calculateHours(entry.time_started, entry.time_finished);
-      
-      // Auto-deduct 30 mins (0.5 hours) for lunch break if daily total > 6.5 hours
-      if (hours !== null && hours > 6.5) {
-        hours = hours - 0.5;
-      }
-      
-      newEntries[dayIndex].daily_total = hours;
+      newEntries[dayIndex].daily_total = calculateStandardTimesheetHours(entry.time_started, entry.time_finished);
       
       // Clear manual edit flag for this day when times change (recalculation)
       setManuallyEditedDays(prev => {
@@ -283,8 +283,8 @@ export default function ViewTimesheetPage() {
   };
 
   const leaveAwareTotals = useMemo(
-    () => buildLeaveAwareTotals(entries, offDayStates),
-    [entries, offDayStates]
+    () => buildLeaveAwareTotals(displayEntries, offDayStates),
+    [displayEntries, offDayStates]
   );
   const weeklyTotalMultiline = formatLeaveAwareWeeklyDisplayMultiline(
     leaveAwareTotals.weekly.workedHours,
@@ -298,6 +298,8 @@ export default function ViewTimesheetPage() {
     setError('');
 
     try {
+      const entriesToPersist = normalizeTimesheetEntriesForDisplay(timesheet, entries, offDayStates);
+
       // Update timesheet
       const { error: timesheetError } = await supabase
         .from('timesheets')
@@ -316,7 +318,7 @@ export default function ViewTimesheetPage() {
 
       // Insert updated entries, including did-not-work/yard rows
       type TimesheetEntryInsert = Database['public']['Tables']['timesheet_entries']['Insert'];
-      const entriesToInsert: TimesheetEntryInsert[] = entries
+      const entriesToInsert: TimesheetEntryInsert[] = entriesToPersist
         .filter((entry) =>
           Boolean(
             entry.time_started ||
@@ -325,6 +327,14 @@ export default function ViewTimesheetPage() {
             entry.did_not_work ||
             entry.working_in_yard ||
             entry.job_number ||
+            entry.operator_travel_hours ||
+            entry.operator_yard_hours ||
+            entry.machine_travel_hours ||
+            entry.machine_start_time ||
+            entry.machine_finish_time ||
+            entry.machine_standing_hours ||
+            entry.machine_operator_hours ||
+            entry.maintenance_breakdown_hours ||
             ((entry.daily_total || 0) > 0)
           )
         )
@@ -338,10 +348,22 @@ export default function ViewTimesheetPage() {
           day_of_week: entry.day_of_week,
           time_started: entry.time_started || null,
           time_finished: entry.time_finished || null,
+          operator_travel_hours: entry.operator_travel_hours ?? null,
+          operator_yard_hours: entry.operator_yard_hours ?? null,
+          operator_working_hours: entry.operator_working_hours ?? null,
+          machine_travel_hours: entry.machine_travel_hours ?? null,
+          machine_start_time: entry.machine_start_time || null,
+          machine_finish_time: entry.machine_finish_time || null,
+          machine_working_hours: entry.machine_working_hours ?? null,
+          machine_standing_hours: entry.machine_standing_hours ?? null,
+          machine_operator_hours: entry.machine_operator_hours ?? null,
+          maintenance_breakdown_hours: entry.maintenance_breakdown_hours ?? null,
           job_number: entry.job_number || null,
           did_not_work: entry.did_not_work,
           working_in_yard: entry.working_in_yard,
           daily_total: entry.daily_total,
+          night_shift: entry.night_shift ?? false,
+          bank_holiday: entry.bank_holiday ?? false,
           remarks: normalizedRemarks || null,
           };
         });
@@ -608,7 +630,9 @@ export default function ViewTimesheetPage() {
           <div className="flex items-center space-x-3 md:space-x-4">
             <BackButton />
             <div>
-              <h1 className="text-xl md:text-3xl font-bold text-foreground">Timesheet</h1>
+              <h1 className="text-xl md:text-3xl font-bold text-foreground">
+                {isPlantV2Timesheet ? 'Plant Timesheet' : 'Timesheet'}
+              </h1>
               <p className="text-sm md:text-base text-muted-foreground">
                 Week Ending {formatDate(timesheet.week_ending)}
               </p>
@@ -665,9 +689,15 @@ export default function ViewTimesheetPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Time Entries</CardTitle>
+              <CardTitle>{isPlantV2Timesheet ? 'Plant Time Entries' : 'Time Entries'}</CardTitle>
               <CardDescription>
-                {timesheet.reg_number && `Registration: ${timesheet.reg_number}`}
+                {isPlantV2Timesheet
+                  ? [
+                      timesheet.reg_number ? `Machine: ${timesheet.reg_number}` : null,
+                      timesheet.hirer_name ? `Hirer: ${timesheet.hirer_name}` : null,
+                      timesheet.site_address ? `Site: ${timesheet.site_address}` : null,
+                    ].filter(Boolean).join(' • ')
+                  : (timesheet.reg_number ? `Registration: ${timesheet.reg_number}` : '')}
               </CardDescription>
             </div>
             {!editing && ((timesheet.status === 'draft' || timesheet.status === 'rejected') || canEditApproved) && !isEndState && (
@@ -687,6 +717,7 @@ export default function ViewTimesheetPage() {
                   <th className="text-left p-2 font-medium">Day</th>
                   <th className="text-left p-2 font-medium">Time Started</th>
                   <th className="text-left p-2 font-medium">Time Finished</th>
+                  {isPlantV2Timesheet && <th className="text-left p-2 font-medium">Travel Time</th>}
                   <th className="text-left p-2 font-medium">Job Number</th>
                   <th className="text-center p-2 font-medium">Did Not Work</th>
                   <th className="text-center p-2 font-medium">In Yard</th>
@@ -695,7 +726,9 @@ export default function ViewTimesheetPage() {
                 </tr>
               </thead>
               <tbody>
-                {entries.map((entry, index) => (
+                {entries.map((entry, index) => {
+                  const displayEntry = displayEntries[index] || entry;
+                  return (
                   <tr key={entry.day_of_week} className="border-b">
                     <td className="p-2 font-medium">{DAY_NAMES[index]}</td>
                     <td className="p-2">
@@ -724,6 +757,11 @@ export default function ViewTimesheetPage() {
                         <span>{entry.time_finished || '-'}</span>
                       )}
                     </td>
+                    {isPlantV2Timesheet && (
+                      <td className="p-2">
+                        <span>{displayEntry.operator_travel_hours != null ? `${formatHours(displayEntry.operator_travel_hours)}h` : '-'}</span>
+                      </td>
+                    )}
                     <td className="p-2">
                       {canEdit ? (
                         <Input
@@ -765,11 +803,11 @@ export default function ViewTimesheetPage() {
                       )}
                     </td>
                     <td className="p-2 text-right font-semibold">
-                      {canEdit && hasElevatedAccess && !leaveAwareTotals.rowByDay.get(entry.day_of_week)?.hasLeave ? (
+                      {canEdit && hasElevatedAccess && !leaveAwareTotals.rowByDay.get(entry.day_of_week)?.hasLeave && !isPlantV2Timesheet ? (
                         <Input
                           type="number"
                           step="0.25"
-                          value={entry.daily_total ?? ''}
+                          value={displayEntry.daily_total ?? ''}
                           onChange={(e) => {
                             const val = e.target.value === '' ? null : parseFloat(e.target.value);
                             updateEntry(index, 'daily_total', val);
@@ -783,7 +821,7 @@ export default function ViewTimesheetPage() {
                         />
                       ) : (
                         <span className={manuallyEditedDays.has(index) ? 'text-blue-600 dark:text-blue-400' : ''}>
-                          {leaveAwareTotals.rowByDay.get(entry.day_of_week)?.display || `${formatHours(entry.daily_total)}h`}
+                          {leaveAwareTotals.rowByDay.get(entry.day_of_week)?.display || `${formatHours(displayEntry.daily_total)}h`}
                         </span>
                       )}
                     </td>
@@ -799,9 +837,9 @@ export default function ViewTimesheetPage() {
                       )}
                     </td>
                   </tr>
-                ))}
+                )})}
                 <tr className="bg-secondary/50 font-bold">
-                  <td colSpan={6} className="p-2 text-right">
+                  <td colSpan={isPlantV2Timesheet ? 7 : 6} className="p-2 text-right">
                     Weekly Total:
                   </td>
                   <td className="p-2 text-right text-lg whitespace-pre-line">
@@ -815,7 +853,9 @@ export default function ViewTimesheetPage() {
 
           {/* Mobile Card View */}
           <div className="md:hidden space-y-4">
-            {entries.map((entry, index) => (
+            {entries.map((entry, index) => {
+              const displayEntry = displayEntries[index] || entry;
+              return (
               <Card key={entry.day_of_week}>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">{DAY_NAMES[index]}</CardTitle>
@@ -849,6 +889,14 @@ export default function ViewTimesheetPage() {
                       )}
                     </div>
                   </div>
+                  {isPlantV2Timesheet && (
+                    <div className="space-y-1">
+                      <Label className="text-xs">Travel Time</Label>
+                      <p className="text-sm">
+                        {displayEntry.operator_travel_hours != null ? `${formatHours(displayEntry.operator_travel_hours)}h` : '-'}
+                      </p>
+                    </div>
+                  )}
                   <div className="space-y-1">
                     <Label className="text-xs">Job Number</Label>
                     {canEdit ? (
@@ -917,11 +965,11 @@ export default function ViewTimesheetPage() {
                   <div className="pt-2 border-t">
                     <div className="flex justify-between items-center gap-2">
                       <span className="text-sm font-medium">Daily Total:</span>
-                      {canEdit && hasElevatedAccess && !leaveAwareTotals.rowByDay.get(entry.day_of_week)?.hasLeave ? (
+                      {canEdit && hasElevatedAccess && !leaveAwareTotals.rowByDay.get(entry.day_of_week)?.hasLeave && !isPlantV2Timesheet ? (
                         <Input
                           type="number"
                           step="0.25"
-                          value={entry.daily_total ?? ''}
+                          value={displayEntry.daily_total ?? ''}
                           onChange={(e) => {
                             const val = e.target.value === '' ? null : parseFloat(e.target.value);
                             updateEntry(index, 'daily_total', val);
@@ -935,14 +983,14 @@ export default function ViewTimesheetPage() {
                         />
                       ) : (
                         <span className={`text-lg font-bold ${manuallyEditedDays.has(index) ? 'text-blue-600 dark:text-blue-400' : ''}`}>
-                          {leaveAwareTotals.rowByDay.get(entry.day_of_week)?.display || `${formatHours(entry.daily_total)}h`}
+                          {leaveAwareTotals.rowByDay.get(entry.day_of_week)?.display || `${formatHours(displayEntry.daily_total)}h`}
                         </span>
                       )}
                     </div>
                   </div>
                 </CardContent>
               </Card>
-            ))}
+            )})}
 
             <Card className="bg-primary text-primary-foreground">
               <CardContent className="pt-6">

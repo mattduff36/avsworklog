@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { ArrowLeft, Save, Check, AlertCircle, XCircle, Home, User, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 // Removed: getWeekEnding, formatDateISO - no longer needed (week comes from props)
-import { calculateHours, formatHours, roundTimeToNearestQuarterHour } from '@/lib/utils/time-calculations';
+import { calculateStandardTimesheetHours, formatHours, roundTimeToNearestQuarterHour } from '@/lib/utils/time-calculations';
 import { DAY_NAMES } from '@/types/timesheet';
 import { Database } from '@/types/database';
 import { isAdminRole } from '@/lib/utils/role-access';
@@ -741,11 +741,7 @@ export function CivilsTimesheet({
               return newErrors;
             });
             
-            let hours = calculateHours(entry.time_started, entry.time_finished);
-            if (hours !== null && hours > 6.5) {
-              hours = hours - 0.5;
-            }
-            newEntries[dayIndex].daily_total = hours;
+            newEntries[dayIndex].daily_total = calculateStandardTimesheetHours(entry.time_started, entry.time_finished);
           }
         } else {
           newEntries[dayIndex].daily_total = null;
@@ -819,14 +815,10 @@ export function CivilsTimesheet({
               return newErrors;
             });
             
-            let hours = calculateHours(entry.time_started, entry.time_finished);
-            
-            // Auto-deduct 30 mins (0.5 hours) for lunch break if daily total > 6.5 hours
-            if (hours !== null && hours > 6.5) {
-              hours = hours - 0.5;
-            }
-            
-            newEntries[dayIndex].daily_total = hours;
+            newEntries[dayIndex].daily_total = calculateStandardTimesheetHours(
+              entry.time_started,
+              entry.time_finished
+            );
           }
         }
       }

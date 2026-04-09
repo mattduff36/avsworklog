@@ -1,5 +1,5 @@
 import { DAY_NAMES } from '@/types/timesheet';
-import { calculateHours } from '@/lib/utils/time-calculations';
+import { calculateHours, calculatePlantDailyTotal, calculateStandardTimesheetHours } from '@/lib/utils/time-calculations';
 import type { TimesheetDidNotWorkReason, TimesheetOffDayState } from '@/lib/utils/timesheet-off-days';
 
 export interface PlantEntryDraft {
@@ -101,28 +101,22 @@ function hasManualAdditionalPlantData(entry: PlantEntryDraft): boolean {
 }
 
 export function recalculateEntry(entry: PlantEntryDraft, options: RecalculateEntryOptions = {}): PlantEntryDraft {
-  const operatorWorking = entry.time_started && entry.time_finished
-    ? calculateHours(entry.time_started, entry.time_finished)
-    : null;
+  const operatorWorking = calculateStandardTimesheetHours(entry.time_started, entry.time_finished);
 
   const machineWorking = entry.machine_start_time && entry.machine_finish_time
     ? calculateHours(entry.machine_start_time, entry.machine_finish_time)
     : null;
 
-  const operatorTravel = parseHoursInput(entry.operator_travel_hours) ?? 0;
-  const operatorYard = parseHoursInput(entry.operator_yard_hours) ?? 0;
-  const totalWorking = operatorWorking === null ? null : roundHours(operatorWorking + operatorTravel + operatorYard);
   const machineOperatorHours = operatorWorking === null ? '' : String(roundHours(operatorWorking));
   const paidLeaveHours = roundHours(Math.max(0, options.paidLeaveHours ?? 0));
-
-  let dailyTotal = totalWorking;
-  if (options.preserveDailyTotal) {
-    dailyTotal = entry.daily_total;
-  } else if (options.isLeaveLocked) {
-    dailyTotal = paidLeaveHours;
-  } else if (paidLeaveHours > 0) {
-    dailyTotal = roundHours((totalWorking ?? 0) + paidLeaveHours);
-  }
+  const dailyTotal = calculatePlantDailyTotal({
+    timeStarted: entry.time_started || null,
+    timeFinished: entry.time_finished || null,
+    paidLeaveHours,
+    isLeaveLocked: options.isLeaveLocked,
+    preserveDailyTotal: options.preserveDailyTotal,
+    existingDailyTotal: entry.daily_total,
+  });
 
   return {
     ...entry,

@@ -32,7 +32,7 @@ function createEntry(overrides: Partial<PlantEntryDraft> = {}): PlantEntryDraft 
 }
 
 describe('PlantTimesheetV2 calculations', () => {
-  it('calculates operator, machine, and total working hours', () => {
+  it('excludes travel hours from payable total and deducts lunch like the standard sheet', () => {
     const result = recalculateEntry(
       createEntry({
         time_started: '08:00',
@@ -44,9 +44,9 @@ describe('PlantTimesheetV2 calculations', () => {
       })
     );
 
-    expect(result.operator_working_hours).toBe(8.5);
+    expect(result.operator_working_hours).toBe(8);
     expect(result.machine_working_hours).toBe(8);
-    expect(result.daily_total).toBe(10.5);
+    expect(result.daily_total).toBe(8);
   });
 
   it('preserves normalized leave daily totals when requested', () => {
@@ -73,7 +73,7 @@ describe('PlantTimesheetV2 calculations', () => {
       { paidLeaveHours: 4.5 }
     );
 
-    expect(result.daily_total).toBe(10.5);
+    expect(result.daily_total).toBe(9.5);
   });
 
   it('forces locked leave totals to paid leave hours', () => {
