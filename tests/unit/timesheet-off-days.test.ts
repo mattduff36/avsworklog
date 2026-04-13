@@ -124,6 +124,40 @@ describe('timesheet off-day resolver', () => {
     expect(wednesday?.leaveLabels[0]?.label).toBe('Annual Leave (AM)');
   });
 
+  it('treats legacy half-day rows with an end date as single-day only', () => {
+    const states = resolveTimesheetOffDayStates(
+      '2026-03-29',
+      [
+        {
+          date: '2026-03-25',
+          end_date: '2026-03-27',
+          is_half_day: true,
+          half_day_session: 'AM',
+          absence_reasons: { name: 'Unpaid leave', is_paid: false },
+        },
+      ],
+      STANDARD_WORK_SHIFT_PATTERN
+    );
+
+    const wednesday = states.find((row) => row.day_of_week === 3);
+    const thursday = states.find((row) => row.day_of_week === 4);
+    const friday = states.find((row) => row.day_of_week === 5);
+
+    expect(wednesday?.isOnApprovedLeave).toBe(true);
+    expect(wednesday?.isPartialLeave).toBe(true);
+    expect(wednesday?.workWindow?.start).toBe('12:00');
+    expect(wednesday?.workWindow?.end).toBe('23:59');
+    expect(wednesday?.paidLeaveHours).toBe(0);
+
+    expect(thursday?.isOnApprovedLeave).toBe(false);
+    expect(thursday?.isPartialLeave).toBe(false);
+    expect(thursday?.workWindow).toBeNull();
+
+    expect(friday?.isOnApprovedLeave).toBe(false);
+    expect(friday?.isPartialLeave).toBe(false);
+    expect(friday?.workWindow).toBeNull();
+  });
+
   it('supports two separate half-day leave reasons in one day', () => {
     const states = resolveTimesheetOffDayStates(
       '2026-03-29',
@@ -289,6 +323,39 @@ describe('timesheet off-day normalization', () => {
     expect(normalized[1].did_not_work).toBe(false);
     expect(normalized[1].daily_total).toBe(9.5);
     expect(normalized[1].remarks).toBe('Annual Leave (AM)');
+  });
+
+  it('keeps unpaid half-day worked hours when persisted times include seconds', () => {
+    const entries = buildEntries();
+    entries[1] = {
+      ...entries[1],
+      time_started: '13:00:00',
+      time_finished: '15:45:00',
+      job_number: '1234-AB',
+    };
+
+    const states = resolveTimesheetOffDayStates(
+      '2026-03-29',
+      [
+        {
+          date: '2026-03-24',
+          end_date: null,
+          is_half_day: true,
+          half_day_session: 'AM',
+          absence_reasons: { name: 'Unpaid leave', is_paid: false },
+        },
+      ],
+      STANDARD_WORK_SHIFT_PATTERN
+    );
+
+    const normalized = normalizeTimesheetEntriesForOffDays(entries, states, {
+      enforceLeaveOverwrite: true,
+      applyNonShiftDefaults: true,
+    });
+
+    expect(normalized[1].did_not_work).toBe(false);
+    expect(normalized[1].daily_total).toBe(2.75);
+    expect(normalized[1].remarks).toBe('Unpaid leave (AM)');
   });
 
   it('adds worked hours on full-day annual leave when override is enabled', () => {

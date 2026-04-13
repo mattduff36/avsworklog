@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { TimesheetRouter } from '../components/TimesheetRouter';
@@ -23,7 +23,11 @@ import { Employee } from '@/types/common';
 function NewTimesheetContent() {
   const { user, isManager, isAdmin, isSuperAdmin } = useAuth();
   const searchParams = useSearchParams();
-  const supabase = useMemo(() => createClient(), []);
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
+  if (typeof window !== 'undefined' && !supabaseRef.current) {
+    supabaseRef.current = createClient();
+  }
+  const supabase = supabaseRef.current;
   const existingId = searchParams.get('id');
   const hasElevatedPermissions = isSuperAdmin || isManager || isAdmin;
   
@@ -87,7 +91,7 @@ function NewTimesheetContent() {
   // If editing existing timesheet, load its week ending and skip selector (Q6: Answer A)
   useEffect(() => {
     async function loadExistingWeek() {
-      if (existingId && user) {
+      if (existingId && user && supabase) {
         try {
           const { data, error } = await supabase
             .from('timesheets')
@@ -123,6 +127,13 @@ function NewTimesheetContent() {
     setTimesheetId(existingTimesheetId);
 
     if (!existingTimesheetId) {
+      setExistingTimesheetType(null);
+      setExistingTemplateVersion(null);
+      setShowForm(true);
+      return;
+    }
+
+    if (!supabase) {
       setExistingTimesheetType(null);
       setExistingTemplateVersion(null);
       setShowForm(true);

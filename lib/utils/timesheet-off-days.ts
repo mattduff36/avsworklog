@@ -93,7 +93,7 @@ function hasExplicitWorkingInput(entry: TimesheetEntryLike): boolean {
 }
 
 function toMinutes(time: string): number | null {
-  if (!time || !/^\d{2}:\d{2}$/.test(time)) return null;
+  if (!time || !/^\d{2}:\d{2}(?::\d{2})?$/.test(time)) return null;
   const [hours, minutes] = time.split(':').map(Number);
   if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
   return hours * 60 + minutes;
@@ -197,7 +197,9 @@ export function resolveTimesheetOffDayStates(
     const isExpectedShiftDay = sessions.am || sessions.pm;
 
     const dayRows = approvedAbsences.filter((row) => {
-      const rowEnd = row.end_date || row.date;
+      // Half-day bookings are single-day by rule. Treat legacy rows with an
+      // end_date as single-day too so one bad record cannot affect a whole week.
+      const rowEnd = row.is_half_day ? row.date : (row.end_date || row.date);
       return row.date <= entryDateIso && rowEnd >= entryDateIso;
     });
 

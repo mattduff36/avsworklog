@@ -61,6 +61,25 @@ describe('timesheet leave-aware totals', () => {
     expect(totals.weekly.display).toBe('0.00h');
   });
 
+  it('shows worked hours for unpaid half-day leave without adding leave units', () => {
+    const totals = buildLeaveAwareTotals(
+      [{ day_of_week: 3, daily_total: 5 }],
+      [
+        {
+          day_of_week: 3,
+          isOnApprovedLeave: true,
+          paidLeaveHours: 0,
+          leaveLabels: [{ session: 'AM', isPaid: false }],
+        },
+      ]
+    );
+
+    expect(totals.rowByDay.get(3)?.workedHours).toBe(5);
+    expect(totals.rowByDay.get(3)?.display).toBe('5.00h');
+    expect(totals.weekly.leaveDays).toBe(0);
+    expect(totals.weekly.display).toBe('5.00h');
+  });
+
   it('keeps non-leave rows as plain hour totals', () => {
     const totals = buildLeaveAwareTotals([{ day_of_week: 1, daily_total: 8 }], []);
     expect(totals.rowByDay.get(1)?.display).toBe('8.00h');
