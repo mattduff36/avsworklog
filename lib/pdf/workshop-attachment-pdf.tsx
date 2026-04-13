@@ -158,17 +158,71 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     fontStyle: 'italic',
   },
-  signatureMeta: {
+  signatureSection: {
+    marginTop: 6,
+    paddingTop: 6,
+    borderTop: '1pt solid #e2e8f0',
+  },
+  signatureSectionTitle: {
+    fontSize: 8,
+    color: '#64748b',
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  signatureCard: {
+    border: '1pt solid #d1d5db',
+    borderLeft: `4pt solid ${BRAND_YELLOW}`,
+    borderRadius: 4,
+    padding: 6,
+    backgroundColor: '#fbfcfe',
+  },
+  signatureCardTitle: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: '#0f172a',
+    marginBottom: 3,
+  },
+  signatureCardBody: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  signatureMetaColumn: {
+    width: '29%',
+    paddingRight: 6,
+  },
+  signatureMetaLabel: {
+    fontSize: 7.5,
+    color: '#64748b',
+    textTransform: 'uppercase',
+    marginBottom: 1,
+  },
+  signatureMetaValue: {
     fontSize: 8.5,
     color: '#0f172a',
+    marginBottom: 3,
+    lineHeight: 1.15,
+  },
+  signatureCanvasWrap: {
+    width: 176,
+    height: 58,
+    marginLeft: 6,
+    border: '1pt solid #d1d5db',
+    borderRadius: 4,
+    backgroundColor: '#ffffff',
+    padding: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   signatureImage: {
-    marginTop: 4,
-    width: 150,
-    height: 45,
-    objectFit: 'contain',
-    border: '1pt solid #e2e8f0',
-    padding: 2,
+    width: '98%',
+    height: '94%',
+    objectFit: 'cover',
+  },
+  signatureMissing: {
+    fontSize: 8,
+    color: '#94a3b8',
+    fontStyle: 'italic',
   },
   statusBadge: {
     alignSelf: 'flex-start',
@@ -244,7 +298,7 @@ function normalizeValue(value: unknown): string {
   return String(value).trim();
 }
 
-function isSignatureComplete(responseJson: Record<string, unknown> | null | undefined): boolean {
+export function isSignatureComplete(responseJson: Record<string, unknown> | null | undefined): boolean {
   if (!responseJson) return false;
   const dataUrl = normalizeValue(responseJson.data_url);
   const signedBy = normalizeValue(responseJson.signed_by_name);
@@ -288,7 +342,7 @@ function getYesNoLabel(value: string): string {
   return lookup.get(value) || value;
 }
 
-function isV2FieldAnswered(field: V2PdfFieldData): boolean {
+export function isV2FieldAnswered(field: V2PdfFieldData): boolean {
   if (field.field_type === 'signature') return isSignatureComplete(field.response_json);
   return normalizeValue(field.response_value).length > 0;
 }
@@ -316,7 +370,6 @@ function getBadgeAppearance(field: V2PdfFieldData): BadgeAppearance | null {
     if (value === 'serviceable') return { label: 'Pass', backgroundColor: '#16a34a', textColor: '#ffffff' };
     if (value === 'monitor') return { label: 'Monitor', backgroundColor: '#f59e0b', textColor: BRAND_TEXT };
     if (value === 'attention') return { label: 'Fail', backgroundColor: '#dc2626', textColor: '#ffffff' };
-    if (value === 'not_checked') return { label: 'N/A', backgroundColor: '#9ca3af', textColor: BRAND_TEXT };
     if (value === 'not_applicable') return { label: 'N/A', backgroundColor: '#9ca3af', textColor: BRAND_TEXT };
     return { label: getMarkingCodeLabel(value), backgroundColor: '#9ca3af', textColor: BRAND_TEXT };
   }
@@ -446,68 +499,95 @@ export function WorkshopAttachmentPDF({
         </View>
 
         <View style={styles.section}>
-          {v2Sections.map((section) => (
+          {v2Sections.map((section) => {
+            const standardFields = section.fields.filter((field) => field.field_type !== 'signature' && isV2FieldAnswered(field));
+            const signatureFields = section.fields.filter((field) => field.field_type === 'signature' && isSignatureComplete(field.response_json));
+
+            return (
             <View key={section.section_key} style={{ marginBottom: 10 }}>
               <Text style={styles.checklistSectionTitle}>{section.title}</Text>
               {section.description && (
                 <Text style={styles.checklistSectionDescription}>{section.description}</Text>
               )}
 
-              <View style={styles.checklistTableHeader}>
-                <Text style={styles.checklistTableHeaderCellLabel}>Checklist Item</Text>
-                <Text style={styles.checklistTableHeaderCellValue}>Result / Response</Text>
-              </View>
-
-              {section.fields.map((field) => {
-                const renderedValue = displayValue(field);
-                const badge = getBadgeAppearance(field);
-                const hasValue = renderedValue.length > 0;
-                const signatureName = normalizeValue(field.response_json?.signed_by_name);
-                const signatureAt = normalizeValue(field.response_json?.signed_at);
-                const signatureDataUrl = normalizeValue(field.response_json?.data_url);
-
-                return (
-                  <View key={`${section.section_key}::${field.field_key}`} style={styles.checklistRow} wrap={false}>
-                    <Text style={styles.checklistLabelCell}>
-                      {field.label}
-                      {field.is_required && <Text style={styles.requiredMarker}> *</Text>}
-                    </Text>
-
-                    <View style={styles.checklistValueCell}>
-                      {field.field_type === 'signature' ? (
-                        <>
-                          <Text style={styles.signatureMeta}>
-                            {isSignatureComplete(field.response_json)
-                              ? `Signed by ${signatureName} on ${formatDateTimeSafe(signatureAt)}`
-                              : 'No signature captured'}
-                          </Text>
-                          {signatureDataUrl ? (
-                            // eslint-disable-next-line jsx-a11y/alt-text
-                            <Image src={signatureDataUrl} style={styles.signatureImage} />
-                          ) : null}
-                        </>
-                      ) : hasValue ? (
-                        badge ? (
-                          <Text style={{ ...styles.valueBadge, backgroundColor: badge.backgroundColor, color: badge.textColor }}>
-                            {badge.label}
-                          </Text>
-                        ) : (
-                          <Text>{renderedValue}</Text>
-                        )
-                      ) : (
-                        <Text style={styles.emptyValue}>No response</Text>
-                      )}
-                    </View>
+              {standardFields.length > 0 && (
+                <>
+                  <View style={styles.checklistTableHeader}>
+                    <Text style={styles.checklistTableHeaderCellLabel}>Checklist Item</Text>
+                    <Text style={styles.checklistTableHeaderCellValue}>Result / Response</Text>
                   </View>
-                );
-              })}
-            </View>
-          ))}
-        </View>
 
-        <Text style={attachmentStatus === 'completed' ? { ...styles.statusBadge, ...styles.statusCompleted } : { ...styles.statusBadge, ...styles.statusPending }}>
-          {attachmentStatus === 'completed' ? 'Attachment Completed' : 'Attachment In Progress'}
-        </Text>
+                  {standardFields.map((field) => {
+                    const renderedValue = displayValue(field);
+                    const badge = getBadgeAppearance(field);
+                    const hasValue = renderedValue.length > 0;
+
+                    return (
+                      <View key={`${section.section_key}::${field.field_key}`} style={styles.checklistRow} wrap={false}>
+                        <Text style={styles.checklistLabelCell}>
+                          {field.label}
+                          {field.is_required && <Text style={styles.requiredMarker}> *</Text>}
+                        </Text>
+
+                        <View style={styles.checklistValueCell}>
+                          {hasValue ? (
+                            badge ? (
+                              <Text style={{ ...styles.valueBadge, backgroundColor: badge.backgroundColor, color: badge.textColor }}>
+                                {badge.label}
+                              </Text>
+                            ) : (
+                              <Text>{renderedValue}</Text>
+                            )
+                          ) : null}
+                        </View>
+                      </View>
+                    );
+                  })}
+                </>
+              )}
+
+              {signatureFields.length > 0 && (
+                <View style={styles.signatureSection}>
+                  <Text style={styles.signatureSectionTitle}>Section Sign-Off</Text>
+                  {signatureFields.map((field) => {
+                    const signatureName = normalizeValue(field.response_json?.signed_by_name);
+                    const signatureAt = normalizeValue(field.response_json?.signed_at);
+                    const signatureDataUrl = normalizeValue(field.response_json?.data_url);
+
+                    return (
+                      <View
+                        key={`${section.section_key}::${field.field_key}::signature`}
+                        style={styles.signatureCard}
+                        wrap={false}
+                      >
+                        <Text style={styles.signatureCardTitle}>{field.label}</Text>
+                        <View style={styles.signatureCardBody}>
+                          <View style={styles.signatureMetaColumn}>
+                            <Text style={styles.signatureMetaLabel}>Signed By</Text>
+                            <Text style={styles.signatureMetaValue}>{signatureName || 'No signature captured'}</Text>
+                            <Text style={styles.signatureMetaLabel}>Signed At</Text>
+                            <Text style={styles.signatureMetaValue}>
+                              {signatureAt ? formatDateTimeSafe(signatureAt) : 'No signature captured'}
+                            </Text>
+                          </View>
+                          <View style={styles.signatureCanvasWrap}>
+                            {signatureDataUrl ? (
+                              // eslint-disable-next-line jsx-a11y/alt-text
+                              <Image src={signatureDataUrl} style={styles.signatureImage} />
+                            ) : (
+                              <Text style={styles.signatureMissing}>No signature captured</Text>
+                            )}
+                          </View>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+            );
+          })}
+        </View>
 
         <View style={styles.footer}>
           <Text>

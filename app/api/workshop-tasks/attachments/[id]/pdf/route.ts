@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { renderToStream } from '@react-pdf/renderer';
 import { WorkshopAttachmentPDF, type V2PdfSectionData } from '@/lib/pdf/workshop-attachment-pdf';
 import { loadSquiresLogoDataUrl } from '@/lib/pdf/squires-logo';
+import { normalizeSignatureDataUrl } from '@/lib/pdf/signature-image';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { inferAssetMeterUnit, normalizeAssetMeterUnit } from '@/lib/workshop-tasks/asset-meter';
 
@@ -121,6 +122,34 @@ function mapSnapshotToV2PdfSections(
     .filter((section) => section.fields.length > 0);
 }
 
+async function normalizeSectionSignatureImages(
+  sections: V2PdfSectionData[],
+): Promise<V2PdfSectionData[]> {
+  return Promise.all(
+    sections.map(async (section) => ({
+      ...section,
+      fields: await Promise.all(
+        section.fields.map(async (field) => {
+          if (field.field_type !== 'signature') return field;
+          const dataUrl = typeof field.response_json?.data_url === 'string'
+            ? field.response_json.data_url
+            : null;
+
+          if (!dataUrl) return field;
+
+          return {
+            ...field,
+            response_json: {
+              ...field.response_json,
+              data_url: await normalizeSignatureDataUrl(dataUrl, { width: 176, height: 58 }),
+            },
+          };
+        }),
+      ),
+    })),
+  );
+}
+
 /**
  * GET /api/workshop-tasks/attachments/[id]/pdf
  * Generate and download a PDF for a workshop task attachment.
@@ -179,7 +208,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     if (fieldResponsesError) throw fieldResponsesError;
 
     const fieldResponses = (rawFieldResponses || []) as unknown as FieldResponseRow[];
-    const v2Sections = mapSnapshotToV2PdfSections(snapshot, fieldResponses);
+    const rawV2Sections = mapSnapshotToV2PdfSections(snapshot, fieldResponses);
+    const v2Sections = await normalizeSectionSignatureImages(rawV2Sections);
     if (v2Sections.length === 0) {
       return NextResponse.json(
         { error: 'Attachment has no V2 schema data to render' },
