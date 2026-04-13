@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createSupabaseClient, type SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '@/types/database';
-import { buildInspectionDefectSignature, extractInspectionDefectSignature } from '@/lib/utils/inspectionDefectSignature';
+import {
+  buildInspectionDefectSignature,
+  extractInspectionDefectSignature,
+  normalizeInspectionDefectSignature,
+} from '@/lib/utils/inspectionDefectSignature';
 import { ACTIVE_INSPECTION_DEFECT_STATUSES } from '@/lib/utils/inspectionDefectTaskStatuses';
 import { buildRecentCompletedDefectMap } from '@/lib/utils/inspectionRecentCompletedDefects';
 import { getInspectionRouteActorAccess } from '@/lib/server/inspection-route-access';
@@ -251,7 +255,9 @@ export async function POST(request: NextRequest) {
     };
     const confirmedRepeatDefectSignatureSet = new Set(
       Array.isArray(confirmedRepeatDefectSignatures)
-        ? confirmedRepeatDefectSignatures.filter((value): value is string => typeof value === 'string' && value.length > 0)
+        ? confirmedRepeatDefectSignatures
+            .map((value) => normalizeInspectionDefectSignature(typeof value === 'string' ? value : null))
+            .filter((value): value is string => Boolean(value))
         : []
     );
 

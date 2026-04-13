@@ -3,6 +3,11 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { Database } from '@/types/database';
 import { getInspectionRouteActorAccess } from '@/lib/server/inspection-route-access';
 import { buildRecentCompletedDefectMap } from '@/lib/utils/inspectionRecentCompletedDefects';
+import {
+  buildInspectionDefectSignature,
+  extractInspectionDefectSignature,
+  normalizeInspectionDefectSignature,
+} from '@/lib/utils/inspectionDefectSignature';
 
 type ActionInsert = Database['public']['Tables']['actions']['Insert'];
 type ActionUpdate = Database['public']['Tables']['actions']['Update'];
@@ -45,7 +50,9 @@ export async function POST(request: NextRequest) {
     const { inspectionId, vehicleId, createdBy, defects, confirmedRepeatDefectSignatures } = body;
     const confirmedRepeatDefectSignatureSet = new Set<string>(
       Array.isArray(confirmedRepeatDefectSignatures)
-        ? confirmedRepeatDefectSignatures.filter((value): value is string => typeof value === 'string' && value.length > 0)
+        ? confirmedRepeatDefectSignatures
+            .map((value) => normalizeInspectionDefectSignature(typeof value === 'string' ? value : null))
+            .filter((value): value is string => Boolean(value))
         : []
     );
 
@@ -197,17 +204,12 @@ export async function POST(request: NextRequest) {
 
     // Build a map of ACTIVE tasks across ALL inspections for this vehicle
     // This is our primary check to prevent duplicates
-    const activeTasksMap = new Map<string, typeof activeVehicleTasks>();
+    const activeTasksMap = new Map<string, NonNullable<typeof activeVehicleTasks>>();
 
     if (activeVehicleTasks) {
       for (const action of activeVehicleTasks) {
-        // Parse signature from description: "Item X - Description"
-        const match = action.description?.match(/Item (\d+) - ([^(]+)/);
-        if (match) {
-          const itemNum = match[1];
-          const itemDesc = match[2].trim();
-          const signature = `${itemNum}-${itemDesc}`;
-          
+        const signature = extractInspectionDefectSignature(action.description);
+        if (signature) {
           if (!activeTasksMap.has(signature)) {
             activeTasksMap.set(signature, []);
           }
@@ -218,17 +220,12 @@ export async function POST(request: NextRequest) {
 
     // Build a map of existing tasks by stable signature (current inspection only)
     // Signature: item_number-item_description (normalized)
-    const existingMap = new Map<string, typeof existingActions>();
+    const existingMap = new Map<string, NonNullable<typeof existingActions>>();
 
     if (existingActions) {
       for (const action of existingActions) {
-        // Parse signature from description: "Item X - Description"
-        const match = action.description?.match(/Item (\d+) - ([^(]+)/);
-        if (match) {
-          const itemNum = match[1];
-          const itemDesc = match[2].trim();
-          const signature = `${itemNum}-${itemDesc}`;
-          
+        const signature = extractInspectionDefectSignature(action.description);
+        if (signature) {
           if (!existingMap.has(signature)) {
             existingMap.set(signature, []);
           }
@@ -252,8 +249,10 @@ export async function POST(request: NextRequest) {
     for (const defect of defects) {
       const { item_number, item_description, days, comment, primaryInspectionItemId } = defect;
 
-      // Build stable signature
-      const signature = `${item_number}-${item_description.trim()}`;
+      const signature = buildInspectionDefectSignature({
+        item_number,
+        item_description,
+      });
 
       // Build day range string
       let dayRange: string;

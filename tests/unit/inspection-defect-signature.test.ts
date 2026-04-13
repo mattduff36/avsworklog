@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildInspectionDefectSignature,
   extractInspectionDefectSignature,
+  normalizeInspectionDefectSignature,
 } from '@/lib/utils/inspectionDefectSignature';
 
 describe('inspectionDefectSignature', () => {
@@ -22,5 +23,9 @@ describe('inspectionDefectSignature', () => {
 
   it('returns null when the description does not contain an inspection item signature', () => {
     expect(extractInspectionDefectSignature('General workshop notes only')).toBeNull();
+  });
+
+  it('normalizes raw signature strings from route payloads', () => {
+    expect(normalizeInspectionDefectSignature(' 3 -   TYRES  ')).toBe('3-tyres');
   });
 });
