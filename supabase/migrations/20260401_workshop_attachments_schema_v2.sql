@@ -122,6 +122,20 @@ ALTER TABLE workshop_attachment_template_fields ENABLE ROW LEVEL SECURITY;
 ALTER TABLE workshop_attachment_schema_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE workshop_attachment_field_responses ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Authenticated users can read template versions" ON workshop_attachment_template_versions;
+DROP POLICY IF EXISTS "Managers and admins can create template versions" ON workshop_attachment_template_versions;
+DROP POLICY IF EXISTS "Managers and admins can update template versions" ON workshop_attachment_template_versions;
+DROP POLICY IF EXISTS "Managers and admins can delete template versions" ON workshop_attachment_template_versions;
+DROP POLICY IF EXISTS "Authenticated users can read template sections" ON workshop_attachment_template_sections;
+DROP POLICY IF EXISTS "Managers and admins can manage template sections" ON workshop_attachment_template_sections;
+DROP POLICY IF EXISTS "Authenticated users can read template fields" ON workshop_attachment_template_fields;
+DROP POLICY IF EXISTS "Managers and admins can manage template fields" ON workshop_attachment_template_fields;
+DROP POLICY IF EXISTS "Workshop users can read schema snapshots" ON workshop_attachment_schema_snapshots;
+DROP POLICY IF EXISTS "Workshop users can create schema snapshots" ON workshop_attachment_schema_snapshots;
+DROP POLICY IF EXISTS "Workshop users can read field responses v2" ON workshop_attachment_field_responses;
+DROP POLICY IF EXISTS "Workshop users can create field responses v2" ON workshop_attachment_field_responses;
+DROP POLICY IF EXISTS "Workshop users can update field responses v2" ON workshop_attachment_field_responses;
+
 -- Template versions: read for authenticated, write for manager/admin
 CREATE POLICY "Authenticated users can read template versions"
   ON workshop_attachment_template_versions

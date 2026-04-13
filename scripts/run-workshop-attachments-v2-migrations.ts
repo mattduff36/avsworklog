@@ -12,6 +12,7 @@ const migrationFiles = [
   'supabase/migrations/20260401_workshop_attachments_schema_v2.sql',
   'supabase/migrations/20260401_seed_hgv_6_week_template_v2.sql',
   'supabase/migrations/20260402_publish_hgv_6_week_template_full_v2.sql',
+  'supabase/migrations/20260413_publish_trailer_6_week_template_v2.sql',
 ];
 
 if (!connectionString) {
@@ -54,6 +55,12 @@ async function runMigrations() {
       ['6 Week Inspection - HGV'],
     );
     console.log(`Verification: 6 Week Inspection - HGV templates found = ${hgvTemplateRows[0]?.count || 0}`);
+
+    const { rows: trailerTemplateRows } = await client.query(
+      `SELECT COUNT(*)::int AS count FROM workshop_attachment_templates WHERE LOWER(name) = LOWER($1)`,
+      ['6 Week Inspection - Trailer'],
+    );
+    console.log(`Verification: 6 Week Inspection - Trailer templates found = ${trailerTemplateRows[0]?.count || 0}`);
 
     console.log('Workshop attachments v2 migrations completed successfully');
   } catch (error) {
