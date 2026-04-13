@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Delete, Lock, Plus } from 'lucide-react';
 import { toast } from 'sonner';
@@ -440,10 +441,12 @@ export default function LockPage() {
                 <div className="flex aspect-square items-center justify-center rounded-2xl border border-slate-700/70 bg-[#151935] shadow-lg transition-colors hover:border-slate-500">
                   {deviceProfile.avatar_url ? (
                     <div className="relative h-full w-full overflow-hidden rounded-2xl">
-                      <img
+                      <Image
                         src={deviceProfile.avatar_url}
                         alt={deviceProfile.full_name || 'Profile avatar'}
-                        className="h-full w-full object-contain"
+                        fill
+                        sizes="(max-width: 640px) 112px, 144px"
+                        className="object-contain"
                       />
                     </div>
                   ) : (

@@ -9,61 +9,12 @@ import {
 } from 'lucide-react';
 import { formatDateTime } from '@/lib/utils/date';
 import { StatusHistoryEvent } from '@/lib/utils/workshopTaskStatusHistory';
-
-type WorkshopTaskComment = {
-  id: string;
-  body: string;
-  created_at: string;
-  updated_at: string | null;
-  author: {
-    id: string;
-    full_name: string;
-  } | null;
-};
-
-type WorkshopTaskTimelineTask = {
-  id: string;
-  created_at: string;
-  logged_at?: string | null;
-  logged_comment?: string | null;
-  actioned_at?: string | null;
-  actioned_comment?: string | null;
-  actioned_signature_data?: string | null;
-  actioned_signed_at?: string | null;
-  status_history?: unknown[] | null;
-  profiles_created?: {
-    full_name: string | null;
-  } | null;
-  profiles?: {
-    full_name: string | null;
-  } | null;
-};
-
-type TimelineItem =
-  | {
-      id: string;
-      type: 'created';
-      created_at: string;
-      author?: string | null;
-      body?: string | null;
-    }
-  | {
-      id: string;
-      type: 'status';
-      created_at: string;
-      author?: string | null;
-      status: StatusHistoryEvent['status'];
-      body?: string | null;
-      meta?: StatusHistoryEvent['meta'];
-    }
-  | {
-      id: string;
-      type: 'comment';
-      created_at: string;
-      author?: string | null;
-      body: string;
-      updated_at?: string | null;
-    };
+import {
+  buildWorkshopTaskTimelineItems,
+  type WorkshopTaskTimelineComment,
+  type WorkshopTaskTimelineTask,
+} from '@/lib/utils/workshopTaskTimeline';
+import type { AdjustTimestampTarget } from '@/components/workshop-tasks/AdjustTaskTimestampDialog';
 
 const getStatusConfig = (status: StatusHistoryEvent['status']) => {
   switch (status) {
@@ -107,102 +58,69 @@ const getStatusConfig = (status: StatusHistoryEvent['status']) => {
   }
 };
 
-const buildFallbackStatusHistory = (task: WorkshopTaskTimelineTask): StatusHistoryEvent[] => {
-  const items: StatusHistoryEvent[] = [];
-  if (task.logged_at) {
-    items.push({
-      id: `status:logged:${task.id}`,
-      type: 'status',
-      status: 'logged',
-      created_at: task.logged_at,
-      author_id: null,
-      author_name: null,
-      body: task.logged_comment || 'Marked as in progress',
-    });
+function getAdjustmentLabel(status: StatusHistoryEvent['status']) {
+  switch (status) {
+    case 'logged':
+      return 'In Progress';
+    case 'on_hold':
+      return 'On Hold';
+    case 'resumed':
+      return 'Resumed';
+    case 'completed':
+      return 'Completed';
+    case 'undo':
+      return 'Undo';
+    case 'pending':
+    default:
+      return 'Status Event';
   }
-  if (task.actioned_at) {
-    items.push({
-      id: `status:completed:${task.id}`,
-      type: 'status',
-      status: 'completed',
-      created_at: task.actioned_at,
-      author_id: null,
-      author_name: null,
-      body: task.actioned_comment || 'Marked as complete',
-      meta: {
-        signature_data: task.actioned_signature_data || undefined,
-        signed_at: task.actioned_signed_at || undefined,
-      },
-    });
-  }
-  return items;
-};
-
-function isStatusHistoryEvent(value: unknown): value is StatusHistoryEvent {
-  if (!value || typeof value !== 'object') return false;
-  const candidate = value as Partial<StatusHistoryEvent>;
-  return (
-    typeof candidate.id === 'string' &&
-    candidate.type === 'status' &&
-    typeof candidate.status === 'string' &&
-    typeof candidate.created_at === 'string'
-  );
 }
 
 export function WorkshopTaskTimeline({
   task,
   comments = [],
+  onAdjustTimestamp,
 }: {
   task: WorkshopTaskTimelineTask;
-  comments?: WorkshopTaskComment[];
+  comments?: WorkshopTaskTimelineComment[];
+  onAdjustTimestamp?: (target: AdjustTimestampTarget) => void;
 }) {
-  const statusHistory =
-    Array.isArray(task.status_history) && task.status_history.length > 0
-      ? task.status_history.filter(isStatusHistoryEvent)
-      : buildFallbackStatusHistory(task);
+  const timelineItems = buildWorkshopTaskTimelineItems(task, comments);
 
-  const createdBy =
-    task.profiles_created?.full_name || task.profiles?.full_name || 'Unknown';
+  const handleAdjustTimestamp = (target: AdjustTimestampTarget) => {
+    if (!onAdjustTimestamp) {
+      return;
+    }
 
-  const timelineItems: TimelineItem[] = [
-    {
-      id: `created:${task.id}`,
-      type: 'created',
-      created_at: task.created_at,
-      author: createdBy,
-      body: null,
-    },
-    ...statusHistory.map((event) => ({
-      id: event.id,
-      type: 'status' as const,
-      created_at: event.created_at,
-      author: event.author_name || 'Unknown',
-      status: event.status,
-      body: event.body || null,
-      meta: event.meta,
-    })),
-    ...comments.map((comment) => ({
-      id: comment.id,
-      type: 'comment' as const,
-      created_at: comment.created_at,
-      author: comment.author?.full_name || 'Unknown',
-      body: comment.body,
-      updated_at: comment.updated_at,
-    })),
-  ];
+    onAdjustTimestamp(target);
+  };
 
-  timelineItems.sort((a, b) => {
-    const dateA = new Date(a.created_at).getTime();
-    const dateB = new Date(b.created_at).getTime();
-    return dateA - dateB;
-  });
+  const renderTimestamp = (target: AdjustTimestampTarget, className = 'text-xs text-muted-foreground') => {
+    if (!onAdjustTimestamp) {
+      return (
+        <p className={className}>
+          {formatDateTime(target.currentTimestamp)}
+        </p>
+      );
+    }
+
+    return (
+      <button
+        type="button"
+        onClick={() => handleAdjustTimestamp(target)}
+        className={`${className} inline-flex w-fit cursor-pointer rounded-sm underline underline-offset-2 transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background`}
+      >
+        {formatDateTime(target.currentTimestamp)}
+      </button>
+    );
+  };
 
   return (
     <div className="space-y-3 border-l-2 border-border pl-4 ml-2">
       {timelineItems.map((item) => {
         if (item.type === 'created') {
           return (
-            <div key={item.id} className="relative">
+            <div key={item.key} className="relative">
               <div className="absolute -left-[1.3rem] top-1 h-3 w-3 rounded-full bg-muted border-2 border-slate-900"></div>
               <div className="flex items-start gap-3">
                 <User className="h-4 w-4 text-muted-foreground mt-0.5" />
@@ -211,9 +129,12 @@ export function WorkshopTaskTimeline({
                     <span className="text-sm font-medium">{item.author || 'Unknown'}</span>
                     <span className="text-xs text-muted-foreground">created task</span>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {formatDateTime(item.created_at)}
-                  </p>
+                  {renderTimestamp({
+                    itemType: 'created',
+                    timelineItemId: item.timelineItemId,
+                    label: 'Created',
+                    currentTimestamp: item.created_at,
+                  })}
                 </div>
               </div>
             </div>
@@ -228,7 +149,7 @@ export function WorkshopTaskTimeline({
               : '';
 
           return (
-            <div key={item.id} className="relative">
+            <div key={item.key} className="relative">
               <div
                 className={`absolute -left-[1.3rem] top-1 h-3 w-3 rounded-full ${config.dotClass} border-2 border-slate-900`}
               ></div>
@@ -255,9 +176,12 @@ export function WorkshopTaskTimeline({
                       )}
                     </div>
                   )}
-                  <p className="text-xs text-muted-foreground">
-                    {formatDateTime(item.created_at)}
-                  </p>
+                  {renderTimestamp({
+                    itemType: 'status_event',
+                    timelineItemId: item.timelineItemId,
+                    label: `${getAdjustmentLabel(item.status)} event`,
+                    currentTimestamp: item.created_at,
+                  })}
                 </div>
               </div>
             </div>
@@ -265,7 +189,7 @@ export function WorkshopTaskTimeline({
         }
 
         return (
-          <div key={item.id} className="relative">
+          <div key={item.key} className="relative">
             <div className="absolute -left-[1.3rem] top-1 h-3 w-3 rounded-full bg-muted border-2 border-slate-900"></div>
             <div className="flex items-start gap-3">
               <MessageSquare className="h-4 w-4 text-muted-foreground mt-0.5" />
@@ -275,10 +199,15 @@ export function WorkshopTaskTimeline({
                   <span className="text-xs text-muted-foreground">added comment</span>
                 </div>
                 <p className="text-sm text-muted-foreground">{item.body}</p>
-                <p className="text-xs text-muted-foreground">
-                  {formatDateTime(item.created_at)}
+                <div className="text-xs text-muted-foreground">
+                  {renderTimestamp({
+                    itemType: 'comment',
+                    timelineItemId: item.timelineItemId,
+                    label: 'Comment',
+                    currentTimestamp: item.created_at,
+                  }, 'text-xs text-muted-foreground')}
                   {item.updated_at && <span className="ml-1">(edited)</span>}
-                </p>
+                </div>
               </div>
             </div>
           </div>

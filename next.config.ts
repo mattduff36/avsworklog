@@ -5,11 +5,28 @@ const bundleAnalyzer = withBundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
 });
 
+const supabaseImageRemotePatterns: NonNullable<NextConfig["images"]>["remotePatterns"] = [];
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+if (supabaseUrl) {
+  try {
+    const parsedSupabaseUrl = new URL(supabaseUrl);
+    supabaseImageRemotePatterns.push({
+      protocol: parsedSupabaseUrl.protocol.replace(":", "") as "http" | "https",
+      hostname: parsedSupabaseUrl.hostname,
+      port: parsedSupabaseUrl.port,
+      pathname: "/**",
+    });
+  } catch {
+    // Ignore invalid env values so local config still loads.
+  }
+}
+
 const nextConfig: NextConfig = {
   /* config options here */
   reactStrictMode: true,
   images: {
-    domains: [], // Add Supabase storage domain when configured
+    remotePatterns: supabaseImageRemotePatterns,
   },
   // Mark server-only packages to prevent client-side bundling
   serverExternalPackages: ['exceljs'],

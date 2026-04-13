@@ -147,6 +147,7 @@ export default function WorkshopTasksPage() {
   const [showErrorDetailsModal, setShowErrorDetailsModal] = useState(false);
   const [errorDetails, setErrorDetails] = useState<ErrorDetailsResponse | null>(null);
   const [errorDetailsLoading, setErrorDetailsLoading] = useState(false);
+  const requestedTaskId = searchParams.get('taskId');
 
   const getAssetIdLabel = (asset?: { reg_number?: string | null; plant_id?: string | null }) => !asset ? 'Unknown' : asset.plant_id || asset.reg_number || 'Unknown';
   const getAssetDisplay = (asset?: { reg_number?: string | null; plant_id?: string | null; nickname?: string | null }) => !asset ? 'Unknown' : asset.nickname ? `${getAssetIdLabel(asset)} (${asset.nickname})` : getAssetIdLabel(asset);
@@ -225,6 +226,55 @@ export default function WorkshopTasksPage() {
     }
   }
 
+  function clearTaskIdFromUrl() {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('taskId');
+    const query = params.toString();
+    router.replace(query ? `/workshop-tasks?${query}` : '/workshop-tasks', { scroll: false });
+  }
+
+  function handleTaskModalOpen(task: Action) {
+    setModalTask(task);
+    setShowTaskModal(true);
+  }
+
+  function handleTaskModalOpenChange(nextOpen: boolean) {
+    setShowTaskModal(nextOpen);
+    if (!nextOpen) {
+      setModalTask(null);
+      if (requestedTaskId) {
+        clearTaskIdFromUrl();
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (!requestedTaskId || tasks.length === 0) {
+      return;
+    }
+
+    const requestedTask = tasks.find((task) => task.id === requestedTaskId);
+    if (!requestedTask) {
+      return;
+    }
+
+    if (!showTaskModal || modalTask?.id !== requestedTask.id) {
+      setModalTask(requestedTask);
+      setShowTaskModal(true);
+    }
+  }, [requestedTaskId, tasks, showTaskModal, modalTask?.id]);
+
+  useEffect(() => {
+    if (!modalTask) {
+      return;
+    }
+
+    const refreshedTask = tasks.find((task) => task.id === modalTask.id);
+    if (refreshedTask && refreshedTask !== modalTask) {
+      setModalTask(refreshedTask);
+    }
+  }, [tasks, modalTask]);
+
   if (!supabase || permissionLoading) return <PageLoader message="Checking permissions..." />;
   if (!hasPermission) return null;
 
@@ -284,7 +334,7 @@ export default function WorkshopTasksPage() {
           getSourceLabel={getSourceLabel}
           getAssetDisplay={getAssetDisplay}
           onCreateTask={() => setShowAddModal(true)}
-          onOpenTaskModal={(task) => { setModalTask(task); setShowTaskModal(true); }}
+          onOpenTaskModal={handleTaskModalOpen}
           onOpenComments={(task) => { setCommentsTask(task); setShowCommentsDrawer(true); }}
           onMarkInProgress={(task) => { setSelectedTask(task); setLoggedComment(''); setShowStatusModal(true); }}
           onMarkComplete={(task) => { setCompletingTask(task); setShowCompleteModal(true); }}
@@ -337,7 +387,7 @@ export default function WorkshopTasksPage() {
       <WorkshopTaskAdminDialogs showSettings={showSettings} showCategoryModal={showCategoryModal} onShowCategoryModalChange={setShowCategoryModal} editingCategory={editingCategory} categoryName={categoryName} onCategoryNameChange={setCategoryName} submittingCategory={submittingCategory} onSaveCategory={crud.handleSaveCategory} onResetCategoryForm={() => { setShowCategoryModal(false); setEditingCategory(null); setCategoryName(''); }} showDeleteConfirm={showDeleteConfirm} onShowDeleteConfirmChange={setShowDeleteConfirm} taskToDelete={taskToDelete} getVehicleReg={getVehicleReg} deleting={deleting} onConfirmDeleteTask={crud.confirmDeleteTask} onResetDeleteTask={() => { setShowDeleteConfirm(false); setTaskToDelete(null); }} />
       {commentsTask && <TaskCommentsDrawer open={showCommentsDrawer} onOpenChange={setShowCommentsDrawer} taskId={commentsTask.id} taskTitle={getVehicleReg(commentsTask)} />}
       {(showTaskModal || !!modalTask) && (
-        <WorkshopTaskModal open={showTaskModal} onOpenChange={setShowTaskModal} task={modalTask} inspectionPhotos={modalTask ? taskInspectionPhotos[modalTask.id] || [] : []} onEdit={(task) => { setShowTaskModal(false); crud.handleEditTask(task as Action); }} onDelete={(task) => { setShowTaskModal(false); crud.handleDeleteTask(task as Action); }} onMarkInProgress={(task) => { setShowTaskModal(false); setSelectedTask(task as Action); setLoggedComment(''); setShowStatusModal(true); }} onMarkComplete={(task) => { setShowTaskModal(false); setCompletingTask(task as Action); setShowCompleteModal(true); }} onMarkOnHold={(task) => { setShowTaskModal(false); setOnHoldingTask(task as Action); setOnHoldComment(''); setShowOnHoldModal(true); }} onResume={(task) => { setShowTaskModal(false); setResumingTask(task as Action); setResumeComment(''); setShowResumeModal(true); }} isUpdating={modalTask ? updatingStatus.has(modalTask.id) : false} />
+        <WorkshopTaskModal open={showTaskModal} onOpenChange={handleTaskModalOpenChange} task={modalTask} inspectionPhotos={modalTask ? taskInspectionPhotos[modalTask.id] || [] : []} onEdit={(task) => { handleTaskModalOpenChange(false); crud.handleEditTask(task as Action); }} onDelete={(task) => { handleTaskModalOpenChange(false); crud.handleDeleteTask(task as Action); }} onMarkInProgress={(task) => { handleTaskModalOpenChange(false); setSelectedTask(task as Action); setLoggedComment(''); setShowStatusModal(true); }} onMarkComplete={(task) => { handleTaskModalOpenChange(false); setCompletingTask(task as Action); setShowCompleteModal(true); }} onMarkOnHold={(task) => { handleTaskModalOpenChange(false); setOnHoldingTask(task as Action); setOnHoldComment(''); setShowOnHoldModal(true); }} onResume={(task) => { handleTaskModalOpenChange(false); setResumingTask(task as Action); setResumeComment(''); setShowResumeModal(true); }} isUpdating={modalTask ? updatingStatus.has(modalTask.id) : false} onTaskUpdated={fetcher.fetchTasks} />
       )}
       {selectedCategoryForSubcategory && <SubcategoryDialog open={showSubcategoryModal} onOpenChange={setShowSubcategoryModal} mode={subcategoryMode} categoryId={selectedCategoryForSubcategory.id} categoryName={selectedCategoryForSubcategory.name} subcategory={editingSubcategory} onSuccess={fetcher.fetchSubcategories} />}
       {showErrorDetailsModal && (

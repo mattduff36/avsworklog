@@ -108,6 +108,11 @@ export const ListCommentsQuerySchema = z.object({
   order: z.enum(['asc', 'desc']).default('asc'),
 });
 
+export const AdjustWorkshopTaskTimestampSchema = z.object({
+  itemType: z.enum(['created', 'status_event', 'comment']),
+  timestamp: z.string().datetime({ offset: true }),
+});
+
 /**
  * Helper function to validate request body
  * Usage: const result = await validateRequest(req, schema);

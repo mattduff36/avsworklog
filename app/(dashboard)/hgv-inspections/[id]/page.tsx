@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
+import { fetchInspectionLinks, type LinkedInspectionTaskSummary } from '@/lib/client/inspection-links';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
@@ -13,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertCircle, CheckCircle2, Download, XCircle } from 'lucide-react';
+import Link from 'next/link';
 import { formatDate } from '@/lib/utils/date';
 import type { InspectionItem, InspectionStatus } from '@/types/inspection';
 import { enrichDefectsWithWorkshopCompletion, type EnrichedDefectItem } from '@/lib/utils/hgvDefectWorkshopDetails';
@@ -21,6 +23,7 @@ import { InspectionPhotoGallery } from '@/components/inspections/InspectionPhoto
 import { InspectionPhotoTiles } from '@/components/inspections/InspectionPhotoTiles';
 import { useInspectionPhotos } from '@/lib/hooks/useInspectionPhotos';
 import { getInspectionPhotoKey } from '@/lib/inspection-photos';
+import { formatReferenceId, getReferenceIdSuffix, getWorkshopTaskHref } from '@/lib/utils/reference-ids';
 
 interface InspectionItemWithDay extends InspectionItem {
   day_of_week: number | null;
@@ -77,6 +80,7 @@ export default function ViewHgvInspectionPage() {
 
   const [inspection, setInspection] = useState<HgvInspectionDetails | null>(null);
   const [items, setItems] = useState<InspectionItemWithDay[]>([]);
+  const [linkedTasks, setLinkedTasks] = useState<LinkedInspectionTaskSummary[]>([]);
   const [scopedEmployeeIds, setScopedEmployeeIds] = useState<string[]>([]);
   const [defectsWithWorkshop, setDefectsWithWorkshop] = useState<EnrichedDefectItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -150,17 +154,24 @@ export default function ViewHgvInspectionPage() {
         return;
       }
 
-      const { data: itemsData, error: itemsError } = await supabase
-        .from('inspection_items')
-        .select('*')
-        .eq('inspection_id', id)
-        .order('item_number');
+      const [{ data: itemsData, error: itemsError }, linkedTasksData] = await Promise.all([
+        supabase
+          .from('inspection_items')
+          .select('*')
+          .eq('inspection_id', id)
+          .order('item_number'),
+        fetchInspectionLinks(id, 'hgv').catch((linkedTasksError) => {
+          console.error('Error fetching linked HGV inspection tasks:', linkedTasksError);
+          return [];
+        }),
+      ]);
 
       if (itemsError) throw itemsError;
 
       setInspection(inspectionData as HgvInspectionDetails);
       const typedItems = (itemsData || []) as InspectionItemWithDay[];
       setItems(typedItems);
+      setLinkedTasks(linkedTasksData);
       const attentionItems = typedItems
         .filter((item) => item.status === 'attention')
         .map((item) => ({
@@ -222,6 +233,17 @@ export default function ViewHgvInspectionPage() {
   const okCount = items.filter(item => item.status === 'ok').length;
   const canUploadPhotos = inspection.user_id === user?.id;
   const isSubmittedInspection = inspection.status === 'submitted';
+  const inspectionReference = formatReferenceId(inspection.id);
+  const linkedTaskReferences = linkedTasks
+    .map((task) => ({
+      id: task.id,
+      suffix: getReferenceIdSuffix(task.id),
+      href: getWorkshopTaskHref(task.id, 'hgv'),
+    }))
+    .filter(
+      (task): task is { id: string; suffix: string; href: string } =>
+        Boolean(task.suffix && task.href)
+    );
   const statusLabel = (status: string) =>
     status === 'logged' ? 'In Progress' : status === 'on_hold' ? 'On Hold' : status === 'resumed' ? 'Resumed' : status === 'completed' ? 'Completed' : status;
   const getPhotosForItem = (itemNumber: number, dayOfWeek: number | null) =>
@@ -242,6 +264,28 @@ export default function ViewHgvInspectionPage() {
                 {formatDate(inspection.inspection_date)}
                 {inspection.profiles?.full_name ? ` • ${inspection.profiles.full_name}` : ''}
               </p>
+              {inspectionReference && (
+                <div className="mt-1 text-xs md:text-sm text-slate-500 dark:text-slate-400/80">
+                  <span>{inspectionReference}</span>
+                  {linkedTaskReferences.length > 0 && (
+                    <>
+                      <span>{` [linked task ID${linkedTaskReferences.length > 1 ? 's' : ''} `}</span>
+                      {linkedTaskReferences.map((task, index) => (
+                        <span key={task.id}>
+                          {index > 0 && ', '}
+                          <Link
+                            href={task.href}
+                            className="text-blue-400/80 hover:text-blue-300/90 underline underline-offset-2"
+                          >
+                            {task.suffix}
+                          </Link>
+                        </span>
+                      ))}
+                      <span>]</span>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2">

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
+import { fetchInspectionLinks, type LinkedInspectionTaskSummary } from '@/lib/client/inspection-links';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { canAccessScopedInspection, getInspectionVisibilityFlags } from '@/lib/utils/inspection-access';
@@ -15,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Save, Send, Edit2, CheckCircle2, XCircle, AlertCircle, Download } from 'lucide-react';
 import { BackButton } from '@/components/ui/back-button';
+import Link from 'next/link';
 import { formatDate } from '@/lib/utils/date';
 import { InspectionStatus, InspectionItem } from '@/types/inspection';
 import PhotoUpload from '@/components/forms/PhotoUpload';
@@ -22,6 +24,7 @@ import { Database } from '@/types/database';
 import { InspectionPhotoGallery } from '@/components/inspections/InspectionPhotoGallery';
 import { useInspectionPhotos } from '@/lib/hooks/useInspectionPhotos';
 import { getInspectionPhotoKey } from '@/lib/inspection-photos';
+import { formatReferenceId, getReferenceIdSuffix, getWorkshopTaskHref } from '@/lib/utils/reference-ids';
 import { toast } from 'sonner';
 
 interface PlantInspectionWithDetails {
@@ -94,6 +97,7 @@ export default function ViewPlantInspectionPage() {
   
   const [inspection, setInspection] = useState<PlantInspectionWithDetails | null>(null);
   const [items, setItems] = useState<InspectionItemWithDay[]>([]);
+  const [linkedTasks, setLinkedTasks] = useState<LinkedInspectionTaskSummary[]>([]);
   const [scopedEmployeeIds, setScopedEmployeeIds] = useState<string[]>([]);
   const [dailyHours, setDailyHours] = useState<DailyHour[]>([]);
   const [originalDefectItems, setOriginalDefectItems] = useState<InspectionItemWithDay[]>([]);
@@ -179,17 +183,23 @@ export default function ViewPlantInspectionPage() {
 
       setInspection(inspectionData as PlantInspectionWithDetails);
 
-      // Fetch items
-      const { data: itemsData, error: itemsError } = await supabase
-        .from('inspection_items')
-        .select('*')
-        .eq('inspection_id', id)
-        .order('item_number');
+      const [{ data: itemsData, error: itemsError }, linkedTasksData] = await Promise.all([
+        supabase
+          .from('inspection_items')
+          .select('*')
+          .eq('inspection_id', id)
+          .order('item_number'),
+        fetchInspectionLinks(id, 'plant').catch((linkedTasksError) => {
+          console.error('Error fetching linked plant inspection tasks:', linkedTasksError);
+          return [];
+        }),
+      ]);
 
       if (itemsError) throw itemsError;
 
       const typedItems = (itemsData || []) as InspectionItemWithDay[];
       setItems(typedItems);
+      setLinkedTasks(linkedTasksData);
       
       const defectItems = typedItems.filter((item: InspectionItemWithDay) => item.status === 'attention');
       setOriginalDefectItems(defectItems);
@@ -526,6 +536,17 @@ export default function ViewPlantInspectionPage() {
 
   const defectCount = items.filter(item => item.status === 'attention').length;
   const okCount = items.filter(item => item.status === 'ok').length;
+  const inspectionReference = formatReferenceId(inspection.id);
+  const linkedTaskReferences = linkedTasks
+    .map((task) => ({
+      id: task.id,
+      suffix: getReferenceIdSuffix(task.id),
+      href: getWorkshopTaskHref(task.id, 'plant'),
+    }))
+    .filter(
+      (task): task is { id: string; suffix: string; href: string } =>
+        Boolean(task.suffix && task.href)
+    );
 
   const isWeeklyInspection = inspection.inspection_end_date && 
     inspection.inspection_end_date !== inspection.inspection_date;
@@ -583,6 +604,28 @@ export default function ViewPlantInspectionPage() {
                   : formatDate(inspection.inspection_date)
                 }
               </p>
+              {inspectionReference && (
+                <div className="mt-1 text-xs md:text-sm text-slate-500 dark:text-slate-400/80">
+                  <span>{inspectionReference}</span>
+                  {linkedTaskReferences.length > 0 && (
+                    <>
+                      <span>{` [linked task ID${linkedTaskReferences.length > 1 ? 's' : ''} `}</span>
+                      {linkedTaskReferences.map((task, index) => (
+                        <span key={task.id}>
+                          {index > 0 && ', '}
+                          <Link
+                            href={task.href}
+                            className="text-blue-400/80 hover:text-blue-300/90 underline underline-offset-2"
+                          >
+                            {task.suffix}
+                          </Link>
+                        </span>
+                      ))}
+                      <span>]</span>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2">

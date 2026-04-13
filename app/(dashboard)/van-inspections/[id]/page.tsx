@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
+import { fetchInspectionLinks, type LinkedInspectionTaskSummary } from '@/lib/client/inspection-links';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { canAccessScopedInspection, getInspectionVisibilityFlags } from '@/lib/utils/inspection-access';
@@ -23,6 +24,7 @@ import { InspectionPhotoGallery } from '@/components/inspections/InspectionPhoto
 import { InspectionPhotoTiles } from '@/components/inspections/InspectionPhotoTiles';
 import { useInspectionPhotos } from '@/lib/hooks/useInspectionPhotos';
 import { getInspectionPhotoKey } from '@/lib/inspection-photos';
+import { formatReferenceId, getReferenceIdSuffix, getWorkshopTaskHref } from '@/lib/utils/reference-ids';
 import { toast } from 'sonner';
 
 interface InspectionWithDetails extends VanInspection {
@@ -71,6 +73,7 @@ export default function ViewInspectionPage() {
   
   const [inspection, setInspection] = useState<InspectionWithDetails | null>(null);
   const [items, setItems] = useState<InspectionItemWithDay[]>([]);
+  const [linkedTasks, setLinkedTasks] = useState<LinkedInspectionTaskSummary[]>([]);
   const [scopedEmployeeIds, setScopedEmployeeIds] = useState<string[]>([]);
   const [originalDefectItems, setOriginalDefectItems] = useState<InspectionItemWithDay[]>([]); // Track original defects for auto-completion
   const [loading, setLoading] = useState(true);
@@ -149,17 +152,23 @@ export default function ViewInspectionPage() {
 
       setInspection(inspectionData!);
 
-      // Fetch items
-      const { data: itemsData, error: itemsError } = await supabase
-        .from('inspection_items')
-        .select('*')
-        .eq('inspection_id', id)
-        .order('item_number');
+      const [{ data: itemsData, error: itemsError }, linkedTasksData] = await Promise.all([
+        supabase
+          .from('inspection_items')
+          .select('*')
+          .eq('inspection_id', id)
+          .order('item_number'),
+        fetchInspectionLinks(id, 'van').catch((linkedTasksError) => {
+          console.error('Error fetching linked van inspection tasks:', linkedTasksError);
+          return [];
+        }),
+      ]);
 
       if (itemsError) throw itemsError;
 
       const typedItems = (itemsData || []) as InspectionItemWithDay[];
       setItems(typedItems);
+      setLinkedTasks(linkedTasksData);
       
       // Track original defect items for auto-completion when resolved
       const defectItems = typedItems.filter((item: InspectionItemWithDay) => item.status === 'attention');
@@ -704,6 +713,17 @@ export default function ViewInspectionPage() {
   const okCount = items.filter(item => item.status === 'ok').length;
   // Check if this is a weekly inspection (has day_of_week data)
   const isWeeklyInspection = items.length > 0 && items[0].day_of_week !== null;
+  const inspectionReference = formatReferenceId(inspection.id);
+  const linkedTaskReferences = linkedTasks
+    .map((task) => ({
+      id: task.id,
+      suffix: getReferenceIdSuffix(task.id),
+      href: getWorkshopTaskHref(task.id, 'van'),
+    }))
+    .filter(
+      (task): task is { id: string; suffix: string; href: string } =>
+        Boolean(task.suffix && task.href)
+    );
   const getPhotosForItem = (itemNumber: number, dayOfWeek: number | null) =>
     photoMap[getInspectionPhotoKey(itemNumber, dayOfWeek)] ?? [];
 
@@ -748,6 +768,28 @@ export default function ViewInspectionPage() {
                     : formatDate(inspection.inspection_date)
                 }
               </p>
+              {inspectionReference && (
+                <div className="mt-1 text-xs md:text-sm text-slate-500 dark:text-slate-400/80">
+                  <span>{inspectionReference}</span>
+                  {linkedTaskReferences.length > 0 && (
+                    <>
+                      <span>{` [linked task ID${linkedTaskReferences.length > 1 ? 's' : ''} `}</span>
+                      {linkedTaskReferences.map((task, index) => (
+                        <span key={task.id}>
+                          {index > 0 && ', '}
+                          <Link
+                            href={task.href}
+                            className="text-blue-400/80 hover:text-blue-300/90 underline underline-offset-2"
+                          >
+                            {task.suffix}
+                          </Link>
+                        </span>
+                      ))}
+                      <span>]</span>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2">

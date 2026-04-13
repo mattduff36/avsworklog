@@ -1,5 +1,8 @@
 'use client';
 
+import { useState } from 'react';
+import Link from 'next/link';
+import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,12 +19,22 @@ import {
 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { WorkshopTaskTimeline } from '@/components/workshop-tasks/WorkshopTaskTimeline';
+import {
+  AdjustTaskTimestampDialog,
+  type AdjustTimestampTarget,
+} from '@/components/workshop-tasks/AdjustTaskTimestampDialog';
 import { TaskAttachmentsSection } from '@/components/workshop-tasks/TaskAttachmentsSection';
 import { useWorkshopTaskComments } from '@/lib/hooks/useWorkshopTaskComments';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { InspectionPhotoGallery } from '@/components/inspections/InspectionPhotoGallery';
 import type { InspectionPhoto } from '@/types/inspection';
 import type { Database } from '@/types/database';
+import {
+  formatReferenceId,
+  getInspectionHref,
+  getReferenceIdSuffix,
+  type InspectionReferenceType,
+} from '@/lib/utils/reference-ids';
 
 type Task = Database['public']['Tables']['actions']['Row'] & {
   status_history?: unknown[] | null;
@@ -59,6 +72,7 @@ interface WorkshopTaskModalProps {
   onMarkOnHold: (task: Task) => void;
   onResume: (task: Task) => void;
   isUpdating: boolean;
+  onTaskUpdated?: () => Promise<void>;
   inspectionPhotos?: InspectionPhoto[];
 }
 
@@ -73,14 +87,17 @@ export function WorkshopTaskModal({
   onMarkOnHold,
   onResume,
   isUpdating,
+  onTaskUpdated,
   inspectionPhotos = [],
 }: WorkshopTaskModalProps) {
   const { tabletModeEnabled } = useTabletMode();
   const taskActionButtonClass = tabletModeEnabled ? 'min-h-11 text-base px-4' : '';
-  const { comments: taskComments, loading } = useWorkshopTaskComments({
+  const { comments: taskComments, loading, refetch } = useWorkshopTaskComments({
     taskIds: task ? [task.id] : [],
     enabled: open && !!task,
   });
+  const [timestampTarget, setTimestampTarget] = useState<AdjustTimestampTarget | null>(null);
+  const [adjustTimestampOpen, setAdjustTimestampOpen] = useState(false);
 
   if (!task) return null;
 
@@ -93,6 +110,78 @@ export function WorkshopTaskModal({
     ? task.description?.trim() || null
     : null;
   const workshopNotes = task.workshop_comments?.trim() || null;
+  const taskReference = formatReferenceId(task.id);
+  const linkedInspectionType: InspectionReferenceType | null = task.hgv_id
+    ? 'hgv'
+    : task.plant_id
+      ? 'plant'
+      : task.van_id
+        ? 'van'
+        : null;
+  const linkedInspectionHref = linkedInspectionType
+    ? getInspectionHref(linkedInspectionType, task.inspection_id)
+    : null;
+  const linkedInspectionReference = getReferenceIdSuffix(task.inspection_id);
+
+  const openAdjustTimestampDialog = (target: AdjustTimestampTarget) => {
+    setTimestampTarget(target);
+    setAdjustTimestampOpen(true);
+  };
+
+  const handleAdjustTimestamp = async (nextTimestampIso: string) => {
+    if (!task || !timestampTarget) {
+      return;
+    }
+
+    const response = await fetch(
+      `/api/workshop-tasks/tasks/${task.id}/timeline/${encodeURIComponent(timestampTarget.timelineItemId)}/timestamp`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          itemType: timestampTarget.itemType,
+          timestamp: nextTimestampIso,
+        }),
+      }
+    );
+
+    const payload = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      throw new Error(payload?.error || 'Failed to adjust timestamp.');
+    }
+
+    await Promise.all([
+      onTaskUpdated?.(),
+      refetch(),
+    ]);
+
+    toast.success(`${timestampTarget.label} timestamp updated`);
+    setTimestampTarget(null);
+  };
+
+  const renderEditableTimestamp = (
+    label: string,
+    value: string,
+    colorClass: string,
+    timelineItemId: AdjustTimestampTarget['timelineItemId'],
+    itemType: AdjustTimestampTarget['itemType']
+  ) => (
+    <button
+      type="button"
+      onClick={() => openAdjustTimestampDialog({
+        itemType,
+        timelineItemId,
+        label,
+        currentTimestamp: value,
+      })}
+      className={`ml-2 ${colorClass} underline underline-offset-2 transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background`}
+    >
+      {formatDate(value)}
+    </button>
+  );
 
   const getVehicleDisplay = () => {
     const getAssetIdLabel = (asset?: { reg_number?: string | null; plant_id?: string | null }) => {
@@ -183,9 +272,28 @@ export function WorkshopTaskModal({
             {/* Header with asset */}
             <div className="flex items-center gap-3">
               {getTaskTypeIcon()}
-              <DialogTitle className="text-2xl font-bold text-foreground">
-                {getVehicleDisplay()}
-              </DialogTitle>
+              <div>
+                <DialogTitle className="text-2xl font-bold text-foreground">
+                  {getVehicleDisplay()}
+                </DialogTitle>
+                {taskReference && (
+                  <div className="mt-1 text-xs md:text-sm text-slate-500 dark:text-slate-400/80">
+                    <span>{taskReference}</span>
+                    {linkedInspectionHref && linkedInspectionReference && (
+                      <>
+                        <span>{' '}[linked inspection ID </span>
+                        <Link
+                          href={linkedInspectionHref}
+                          className="text-blue-400/80 hover:text-blue-300/90 underline underline-offset-2"
+                        >
+                          {linkedInspectionReference}
+                        </Link>
+                        <span>]</span>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Badges row with status on the right */}
@@ -362,6 +470,7 @@ export function WorkshopTaskModal({
             <WorkshopTaskTimeline
               task={task}
               comments={taskComments[task.id] || []}
+              onAdjustTimestamp={openAdjustTimestampDialog}
             />
           )}
         </div>
@@ -371,22 +480,33 @@ export function WorkshopTaskModal({
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <span className="text-muted-foreground">Created:</span>
-              <span className="ml-2 text-muted-foreground">{formatDate(task.created_at)}</span>
+              {renderEditableTimestamp('Created', task.created_at, 'text-muted-foreground', 'created', 'created')}
             </div>
             {task.logged_at && (
               <div>
                 <span className="text-muted-foreground">Started:</span>
-                <span className="ml-2 text-blue-400">{formatDate(task.logged_at)}</span>
+                {renderEditableTimestamp('Started', task.logged_at, 'text-blue-400', 'started', 'status_event')}
               </div>
             )}
             {task.actioned_at && (
               <div>
                 <span className="text-muted-foreground">Completed:</span>
-                <span className="ml-2 text-green-400">{formatDate(task.actioned_at)}</span>
+                {renderEditableTimestamp('Completed', task.actioned_at, 'text-green-400', 'completed', 'status_event')}
               </div>
             )}
           </div>
         </div>
+        <AdjustTaskTimestampDialog
+          open={adjustTimestampOpen}
+          target={timestampTarget}
+          onOpenChange={(nextOpen) => {
+            setAdjustTimestampOpen(nextOpen);
+            if (!nextOpen) {
+              setTimestampTarget(null);
+            }
+          }}
+          onConfirm={handleAdjustTimestamp}
+        />
       </DialogContent>
     </Dialog>
   );
