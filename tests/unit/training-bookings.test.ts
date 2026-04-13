@@ -1,0 +1,241 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('@/lib/supabase/admin', () => ({
+  createAdminClient: vi.fn(),
+}));
+
+vi.mock('@/lib/utils/permissions', () => ({
+  getProfileWithRole: vi.fn(),
+}));
+
+vi.mock('@/lib/utils/email', () => ({
+  sendTrainingBookingDeclinedEmail: vi.fn(),
+}));
+
+import { declineTrainingBookings } from '@/lib/server/training-bookings';
+
+describe('training booking decline helper', () => {
+  const state = {
+    deletedAbsenceIds: [] as string[],
+    createdMessage: null as Record<string, unknown> | null,
+    createdRecipients: [] as Array<Record<string, unknown>>,
+  };
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    state.deletedAbsenceIds = [];
+    state.createdMessage = null;
+    state.createdRecipients = [];
+
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+    const { getProfileWithRole } = await import('@/lib/utils/permissions');
+    const { sendTrainingBookingDeclinedEmail } = await import('@/lib/utils/email');
+
+    vi.mocked(getProfileWithRole).mockResolvedValue({
+      id: 'employee-1',
+      full_name: 'Alice Employee',
+      email: null,
+      phone_number: null,
+      employee_id: 'E001',
+      role_id: 'role-employee',
+      must_change_password: false,
+      is_super_admin: false,
+      created_at: '2026-04-13T09:00:00.000Z',
+      updated_at: '2026-04-13T09:00:00.000Z',
+      role: {
+        name: 'employee',
+        display_name: 'Employee',
+        role_class: 'employee',
+        hierarchy_rank: 1,
+        is_manager_admin: false,
+        is_super_admin: false,
+      },
+    });
+    vi.mocked(sendTrainingBookingDeclinedEmail).mockResolvedValue({ success: true });
+
+    const adminClient = {
+      auth: {
+        admin: {
+          getUserById: vi.fn(async (profileId: string) => ({
+            data: {
+              user: profileId === 'manager-1'
+                ? { email: 'manager@example.com' }
+                : { email: 'sarah@avsquires.co.uk' },
+            },
+            error: null,
+          })),
+        },
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'absences') {
+          return {
+            select: vi.fn(() => ({
+              in: vi.fn(async () => ({
+                data: [
+                  {
+                    id: 'absence-1',
+                    date: '2026-04-15',
+                    profile_id: 'employee-1',
+                    absence_reasons: { name: 'Training' },
+                    profile: {
+                      id: 'employee-1',
+                      full_name: 'Alice Employee',
+                      team_id: 'team-1',
+                      line_manager_id: 'manager-1',
+                      secondary_manager_id: null,
+                    },
+                  },
+                ],
+                error: null,
+              })),
+            })),
+            delete: vi.fn(() => ({
+              in: vi.fn(async (_column: string, ids: string[]) => {
+                state.deletedAbsenceIds = ids;
+                return { error: null };
+              }),
+            })),
+          };
+        }
+
+        if (table === 'profiles') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn((_column: string, value: string) => ({
+                maybeSingle: vi.fn(async () => ({
+                  data: value === 'manager-1'
+                    ? { id: 'manager-1', full_name: 'Molly Manager' }
+                    : null,
+                  error: null,
+                })),
+              })),
+              ilike: vi.fn(() => ({
+                maybeSingle: vi.fn(async () => ({
+                  data: { id: 'sarah-profile', full_name: 'Sarah Hubbard' },
+                  error: null,
+                })),
+              })),
+            })),
+          };
+        }
+
+        if (table === 'messages') {
+          return {
+            insert: vi.fn((payload: Record<string, unknown>) => {
+              state.createdMessage = payload;
+              return {
+                select: vi.fn(() => ({
+                  single: vi.fn(async () => ({
+                    data: { id: 'message-1' },
+                    error: null,
+                  })),
+                })),
+              };
+            }),
+          };
+        }
+
+        if (table === 'message_recipients') {
+          return {
+            insert: vi.fn(async (payload: Array<Record<string, unknown>>) => {
+              state.createdRecipients = payload;
+              return { error: null };
+            }),
+          };
+        }
+
+        if (table === 'org_teams') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn(async () => ({
+                  data: { manager_1_profile_id: null, manager_2_profile_id: null },
+                  error: null,
+                })),
+              })),
+            })),
+          };
+        }
+
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    };
+
+    vi.mocked(createAdminClient).mockReturnValue(adminClient as never);
+  });
+
+  it('deletes the booking and notifies the manager plus Sarah Hubbard', async () => {
+    const { sendTrainingBookingDeclinedEmail } = await import('@/lib/utils/email');
+
+    const result = await declineTrainingBookings('employee-1', ['absence-1']);
+
+    expect(result.deletedAbsenceIds).toEqual(['absence-1']);
+    expect(result.employeeName).toBe('Alice Employee');
+    expect(result.trainingDate).toContain('Wednesday');
+    expect(state.deletedAbsenceIds).toEqual(['absence-1']);
+    expect(state.createdMessage).toMatchObject({
+      type: 'NOTIFICATION',
+      created_via: 'timesheet_training_decline',
+    });
+    expect(state.createdRecipients).toEqual([
+      { message_id: 'message-1', user_id: 'manager-1', status: 'PENDING' },
+      { message_id: 'message-1', user_id: 'sarah-profile', status: 'PENDING' },
+    ]);
+    expect(sendTrainingBookingDeclinedEmail).toHaveBeenCalledTimes(2);
+    expect(sendTrainingBookingDeclinedEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: 'manager@example.com', recipientName: 'Molly Manager' })
+    );
+    expect(sendTrainingBookingDeclinedEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: 'sarah@avsquires.co.uk', recipientName: 'Sarah Hubbard' })
+    );
+  });
+
+  it('rejects non-training bookings', async () => {
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+
+    const adminClient = {
+      auth: {
+        admin: {
+          getUserById: vi.fn(),
+        },
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'absences') {
+          return {
+            select: vi.fn(() => ({
+              in: vi.fn(async () => ({
+                data: [
+                  {
+                    id: 'absence-1',
+                    date: '2026-04-15',
+                    profile_id: 'employee-1',
+                    absence_reasons: { name: 'Annual Leave' },
+                    profile: {
+                      id: 'employee-1',
+                      full_name: 'Alice Employee',
+                      team_id: 'team-1',
+                      line_manager_id: 'manager-1',
+                      secondary_manager_id: null,
+                    },
+                  },
+                ],
+                error: null,
+              })),
+            })),
+            delete: vi.fn(() => ({
+              in: vi.fn(async () => ({ error: null })),
+            })),
+          };
+        }
+
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    };
+
+    vi.mocked(createAdminClient).mockReturnValue(adminClient as never);
+
+    await expect(declineTrainingBookings('employee-1', ['absence-1'])).rejects.toThrow(
+      'Only Training bookings can be declined from the timesheet'
+    );
+  });
+});

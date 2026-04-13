@@ -53,6 +53,7 @@ export function ConfirmationModal({
   submitting,
 }: ConfirmationModalProps) {
   const leaveAwareTotals = buildLeaveAwareTotals(entries, offDayStates);
+  const offDayByDay = new Map(offDayStates.map((state) => [state.day_of_week, state] as const));
   const weeklyTotalMultiline = formatLeaveAwareWeeklyDisplayMultiline(
     leaveAwareTotals.weekly.workedHours,
     leaveAwareTotals.weekly.leaveDays
@@ -72,7 +73,11 @@ export function ConfirmationModal({
       .map(entry => entry.job_number)
   );
   const daysWithMissingJobs = entries.filter(
-    entry => !entry.did_not_work && !entry.working_in_yard && !entry.job_number
+    entry =>
+      !entry.did_not_work &&
+      !entry.working_in_yard &&
+      !offDayByDay.get(entry.day_of_week)?.hasTrainingBooking &&
+      !entry.job_number
   ).length;
 
   // Generate warnings (Q9 requirements)
@@ -174,6 +179,7 @@ export function ConfirmationModal({
             <div className="divide-y divide-slate-200 dark:divide-slate-700">
               {entries.map((entry, index) => {
                 const rowTotal = leaveAwareTotals.rowByDay.get(entry.day_of_week);
+                const dayOffState = offDayByDay.get(entry.day_of_week);
                 const hasWork = (rowTotal?.workedHours || 0) > 0;
                 return (
                   <div 
@@ -215,6 +221,11 @@ export function ConfirmationModal({
                             <Badge variant="secondary" className="text-xs">
                               <Home className="h-3 w-3 mr-1" />
                               Yard Work
+                            </Badge>
+                          )}
+                          {dayOffState?.hasTrainingBooking && (
+                            <Badge variant="secondary" className="text-xs bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                              Training
                             </Badge>
                           )}
                           {entry.night_shift && (

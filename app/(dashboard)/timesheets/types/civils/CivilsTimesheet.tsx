@@ -24,6 +24,8 @@ import { fetchUKBankHolidays } from '@/lib/utils/bank-holidays';
 import { Employee } from '@/types/common';
 import { toast } from 'sonner';
 import { ConfirmationModal } from '../../components/ConfirmationModal';
+import { TrainingDeclineDialog } from '../../components/TrainingDeclineDialog';
+import { declineTrainingBookingsClient } from '@/lib/client/training-bookings';
 import { fetchCurrentWorkShift, fetchEmployeeWorkShift } from '@/lib/client/work-shifts';
 import type { WorkShiftPattern } from '@/types/work-shifts';
 import {
@@ -121,6 +123,9 @@ export function CivilsTimesheet({
   const [showBankHolidayWarning, setShowBankHolidayWarning] = useState(false);
   const [bankHolidayDayIndex, setBankHolidayDayIndex] = useState<number | null>(null);
   const [bankHolidayDate, setBankHolidayDate] = useState<string>('');
+  const [offDayRefreshToken, setOffDayRefreshToken] = useState(0);
+  const [trainingDeclineDayIndex, setTrainingDeclineDayIndex] = useState<number | null>(null);
+  const [decliningTraining, setDecliningTraining] = useState(false);
   
   // Track time validation errors per day
   const [timeErrors, setTimeErrors] = useState<Record<number, string>>({});
@@ -225,7 +230,7 @@ export function CivilsTimesheet({
         const { startIso, endIso } = getTimesheetWeekIsoBounds(weekEnding);
         const absenceResult = await supabase
           .from('absences')
-          .select('date, end_date, is_half_day, half_day_session, allow_timesheet_work_on_leave, absence_reasons(name,color,is_paid)')
+          .select('id, date, end_date, is_half_day, half_day_session, allow_timesheet_work_on_leave, absence_reasons(name,color,is_paid)')
           .eq('profile_id', selectedEmployeeId)
           .in('status', ['approved', 'processed'])
           .lte('date', endIso);
@@ -279,7 +284,7 @@ export function CivilsTimesheet({
     return () => {
       cancelled = true;
     };
-  }, [selectedEmployeeId, supabase, user, weekEnding]);
+  }, [offDayRefreshToken, selectedEmployeeId, supabase, user, weekEnding]);
 
   useEffect(() => {
     if (!existingTimesheetLoaded) return;
@@ -345,6 +350,45 @@ export function CivilsTimesheet({
   const getLeaveLabelStyle = (color: string | null | undefined): CSSProperties | undefined => {
     if (!color) return undefined;
     return { color };
+  };
+
+  const getTrainingLabel = (dayOffState: TimesheetOffDayState | undefined): string =>
+    dayOffState?.trainingDisplayRemarks || dayOffState?.trainingLabels[0]?.label || 'Training';
+
+  const handleTrainingStatusToggle = (dayIndex: number) => {
+    const dayOffState = getOffDayForIndex(dayIndex);
+    if (!dayOffState?.hasTrainingBooking) return;
+    setTrainingDeclineDayIndex(dayIndex);
+  };
+
+  const handleCancelTrainingDecline = () => {
+    if (decliningTraining) return;
+    setTrainingDeclineDayIndex(null);
+  };
+
+  const handleConfirmTrainingDecline = async () => {
+    if (trainingDeclineDayIndex === null) return;
+    const dayOffState = getOffDayForIndex(trainingDeclineDayIndex);
+    if (!dayOffState?.trainingAbsenceIds.length) {
+      setTrainingDeclineDayIndex(null);
+      return;
+    }
+
+    setDecliningTraining(true);
+    try {
+      await declineTrainingBookingsClient({
+        absenceIds: dayOffState.trainingAbsenceIds,
+      });
+      toast.success('Training booking removed and notifications sent.');
+      setTrainingDeclineDayIndex(null);
+      setOffDayRefreshToken((value) => value + 1);
+    } catch (trainingError) {
+      const message =
+        trainingError instanceof Error ? trainingError.message : 'Failed to remove training booking';
+      toast.error(message);
+    } finally {
+      setDecliningTraining(false);
+    }
   };
 
   // Check if a specific day is a bank holiday
@@ -850,6 +894,7 @@ export function CivilsTimesheet({
     const offDay = getOffDayForIndex(dayIndex);
     if (offDay?.isOnApprovedLeave) return true;
     const hasHours = Boolean(entry.time_started && entry.time_finished);
+    if (offDay?.hasTrainingBooking) return hasHours;
     return hasHours || entry.did_not_work;
   };
 
@@ -885,6 +930,7 @@ export function CivilsTimesheet({
       const offDay = offDayByDay.get(entry.day_of_week);
       if (offDay?.isOnApprovedLeave) return true;
       const hasHours = entry.time_started && entry.time_finished;
+      if (offDay?.hasTrainingBooking) return Boolean(hasHours);
       const markedDidNotWork = entry.did_not_work;
       return hasHours || markedDidNotWork;
     });
@@ -943,6 +989,7 @@ export function CivilsTimesheet({
       const offDay = offDayByDay.get(entry.day_of_week);
       const hasHours = Boolean(entry.time_started && entry.time_finished);
       if (offDay?.isOnApprovedLeave && !hasHours) return true;
+      if (offDay?.hasTrainingBooking) return true;
       if (entry.did_not_work) return true; // Skip validation for non-working days
       if (entry.working_in_yard) return true; // Skip validation for yard work
       if (!hasHours) return true;
@@ -1391,10 +1438,18 @@ export function CivilsTimesheet({
                 const dayOffState = getOffDayForIndex(index);
                 const isLeaveLocked = Boolean(dayOffState?.isLeaveLocked);
                 const isLeaveDayForRow = Boolean(dayOffState?.isOnApprovedLeave);
+                const hasTrainingBooking = Boolean(dayOffState?.hasTrainingBooking);
                 const isPartialLeave = Boolean(dayOffState?.isPartialLeave);
                 const workWindow = dayOffState?.workWindow ?? null;
                 const disableForDidNotWork = entry.did_not_work && !isPartialLeave;
                 const disableWorkingInputs = isLeaveLocked || disableForDidNotWork;
+                const disableStatusForTraining = hasTrainingBooking;
+                const disableJobNumberInput = disableWorkingInputs || entry.working_in_yard || hasTrainingBooking;
+                const jobNumberPlaceholder = hasTrainingBooking
+                  ? 'N/A (Training)'
+                  : entry.working_in_yard
+                    ? 'N/A (Yard)'
+                    : '1234-AB';
 
                 return (
                 <TabsContent key={index} value={String(index)} className="space-y-4 px-4 pb-4 overflow-hidden">
@@ -1450,15 +1505,16 @@ export function CivilsTimesheet({
                     <div className="space-y-2">
                       <Label className="text-foreground text-xl flex items-center gap-2">
                         Job Number
-                        {!entry.working_in_yard && <span className="text-red-400 text-lg">*</span>}
+                        {!entry.working_in_yard && !hasTrainingBooking && <span className="text-red-400 text-lg">*</span>}
                         {entry.working_in_yard && <span className="text-muted-foreground text-base">(Not required - working in yard)</span>}
+                        {hasTrainingBooking && <span className="text-muted-foreground text-base">(Not required - training)</span>}
                       </Label>
                       <Input
                         value={entry.job_number}
                         onChange={(e) => handleJobNumberChange(index, e.target.value)}
-                        placeholder={entry.working_in_yard ? "N/A (Yard)" : "1234-AB"}
+                        placeholder={jobNumberPlaceholder}
                         maxLength={7}
-                        disabled={disableWorkingInputs || entry.working_in_yard}
+                        disabled={disableJobNumberInput}
                         className="h-16 text-3xl text-center bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground uppercase disabled:opacity-30 disabled:cursor-not-allowed"
                       />
                     </div>
@@ -1466,12 +1522,12 @@ export function CivilsTimesheet({
                     {/* Status Buttons */}
                     <div className="space-y-3">
                       <Label className="text-foreground text-xl">Status</Label>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className={`grid gap-3 ${hasTrainingBooking ? 'grid-cols-3' : 'grid-cols-2'}`}>
                         {/* Working in Yard Button */}
                         <button
                           type="button"
                           onClick={() => updateEntry(index, 'working_in_yard', !entry.working_in_yard)}
-                          disabled={disableWorkingInputs}
+                          disabled={disableWorkingInputs || disableStatusForTraining}
                           className={`flex flex-col items-center justify-center h-24 rounded-lg border-2 transition-all ${
                             entry.working_in_yard
                               ? 'bg-blue-500/20 border-blue-500 shadow-lg shadow-blue-500/20'
@@ -1488,7 +1544,7 @@ export function CivilsTimesheet({
                         <button
                           type="button"
                           onClick={() => updateEntry(index, 'did_not_work', !entry.did_not_work)}
-                          disabled={isLeaveDayForRow}
+                          disabled={isLeaveDayForRow || disableStatusForTraining}
                           className={`flex flex-col items-center justify-center h-24 rounded-lg border-2 transition-all ${
                             entry.did_not_work
                               ? 'bg-amber-500/20 border-amber-500 shadow-lg shadow-amber-500/20'
@@ -1500,13 +1556,35 @@ export function CivilsTimesheet({
                             Did Not Work
                           </span>
                         </button>
+
+                        {hasTrainingBooking && (
+                          <button
+                            type="button"
+                            onClick={() => handleTrainingStatusToggle(index)}
+                            disabled={decliningTraining}
+                            className="flex flex-col items-center justify-center h-24 rounded-lg border-2 transition-all bg-emerald-500/20 border-emerald-500 shadow-lg shadow-emerald-500/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                          >
+                            <User className="h-8 w-8 mb-2 text-emerald-400" />
+                            <span className="text-lg font-medium text-emerald-400">
+                              Training
+                            </span>
+                          </button>
+                        )}
                       </div>
                       
-                      {(dayOffState?.leaveLabels.length || entry.did_not_work) ? (
+                      {(hasTrainingBooking || dayOffState?.leaveLabels.length || entry.did_not_work) ? (
                         <div className="flex justify-center">
-                          {dayOffState?.leaveLabels.length ? (
+                          {(dayOffState?.leaveLabels.length || hasTrainingBooking) ? (
                             <div className="space-y-1 text-center">
-                              {dayOffState.leaveLabels.map((label, labelIndex) => (
+                              {hasTrainingBooking && (
+                                <p
+                                  className="text-sm font-semibold text-emerald-400"
+                                  style={getLeaveLabelStyle(dayOffState?.trainingReasonColor)}
+                                >
+                                  {getTrainingLabel(dayOffState)}
+                                </p>
+                              )}
+                              {dayOffState?.leaveLabels.map((label, labelIndex) => (
                                 <p
                                   key={`${label.reasonName}-${label.session}-${labelIndex}`}
                                   className="text-sm font-semibold text-amber-400"
@@ -1515,9 +1593,9 @@ export function CivilsTimesheet({
                                   {label.label}
                                 </p>
                               ))}
-                              {dayOffState.workWindow && (
+                              {dayOffState?.workWindow && (dayOffState?.leaveLabels.length ?? 0) > 0 && (
                                 <p className="text-xs text-muted-foreground">
-                                  Working hours allowed: {dayOffState.workWindow.start} to {dayOffState.workWindow.end}
+                                  Working hours allowed: {dayOffState?.workWindow?.start} to {dayOffState?.workWindow?.end}
                                 </p>
                               )}
                             </div>
@@ -1569,10 +1647,18 @@ export function CivilsTimesheet({
                   const dayOffState = getOffDayForIndex(index);
                   const isLeaveLocked = Boolean(dayOffState?.isLeaveLocked);
                   const isLeaveDayForRow = Boolean(dayOffState?.isOnApprovedLeave);
+                  const hasTrainingBooking = Boolean(dayOffState?.hasTrainingBooking);
                   const isPartialLeave = Boolean(dayOffState?.isPartialLeave);
                   const workWindow = dayOffState?.workWindow ?? null;
                   const disableForDidNotWork = entry.did_not_work && !isPartialLeave;
                   const disableWorkingInputs = isLeaveLocked || disableForDidNotWork;
+                  const disableStatusForTraining = hasTrainingBooking;
+                  const disableJobNumberInput = disableWorkingInputs || entry.working_in_yard || hasTrainingBooking;
+                  const jobNumberPlaceholder = hasTrainingBooking
+                    ? 'N/A (Training)'
+                    : entry.working_in_yard
+                      ? 'N/A (Yard)'
+                      : '1234-AB';
 
                   return (
                   <tr key={entry.day_of_week} className="border-b border-border/50">
@@ -1617,9 +1703,9 @@ export function CivilsTimesheet({
                       <Input
                         value={entry.job_number}
                         onChange={(e) => handleJobNumberChange(index, e.target.value)}
-                        placeholder={entry.working_in_yard ? "N/A (Yard)" : "1234-AB"}
+                        placeholder={jobNumberPlaceholder}
                         maxLength={7}
-                        disabled={disableWorkingInputs || entry.working_in_yard}
+                        disabled={disableJobNumberInput}
                         className="w-28 bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground uppercase disabled:opacity-30 disabled:cursor-not-allowed"
                       />
                     </td>
@@ -1630,7 +1716,7 @@ export function CivilsTimesheet({
                           <button
                             type="button"
                             onClick={() => updateEntry(index, 'working_in_yard', !entry.working_in_yard)}
-                            disabled={disableWorkingInputs}
+                            disabled={disableWorkingInputs || disableStatusForTraining}
                             className={`flex items-center justify-center w-10 h-10 rounded-lg border-2 transition-all ${
                               entry.working_in_yard
                                 ? 'bg-blue-500/20 border-blue-500 shadow-lg shadow-blue-500/20'
@@ -1645,7 +1731,7 @@ export function CivilsTimesheet({
                           <button
                             type="button"
                             onClick={() => updateEntry(index, 'did_not_work', !entry.did_not_work)}
-                            disabled={isLeaveDayForRow}
+                            disabled={isLeaveDayForRow || disableStatusForTraining}
                             className={`flex items-center justify-center w-10 h-10 rounded-lg border-2 transition-all ${
                               entry.did_not_work
                                 ? 'bg-amber-500/20 border-amber-500 shadow-lg shadow-amber-500/20'
@@ -1655,13 +1741,33 @@ export function CivilsTimesheet({
                           >
                             <XCircle className={`h-5 w-5 ${entry.did_not_work ? 'text-amber-400' : 'text-muted-foreground'}`} />
                           </button>
+
+                          {hasTrainingBooking && (
+                            <button
+                              type="button"
+                              onClick={() => handleTrainingStatusToggle(index)}
+                              disabled={decliningTraining}
+                              className="flex items-center justify-center w-10 h-10 rounded-lg border-2 transition-all bg-emerald-500/20 border-emerald-500 shadow-lg shadow-emerald-500/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                              title="Training"
+                            >
+                              <User className="h-5 w-5 text-emerald-400" />
+                            </button>
+                          )}
                         </div>
                         
-                        {(dayOffState?.leaveLabels.length || entry.did_not_work) ? (
+                        {(hasTrainingBooking || dayOffState?.leaveLabels.length || entry.did_not_work) ? (
                           <div className="flex justify-center">
-                            {dayOffState?.leaveLabels.length ? (
+                            {(dayOffState?.leaveLabels.length || hasTrainingBooking) ? (
                               <div className="space-y-1 text-center">
-                                {dayOffState.leaveLabels.map((label, labelIndex) => (
+                                {hasTrainingBooking && (
+                                  <p
+                                    className="text-[10px] font-semibold text-emerald-400"
+                                    style={getLeaveLabelStyle(dayOffState?.trainingReasonColor)}
+                                  >
+                                    {getTrainingLabel(dayOffState)}
+                                  </p>
+                                )}
+                                {dayOffState?.leaveLabels.map((label, labelIndex) => (
                                   <p
                                     key={`${label.reasonName}-${label.session}-${labelIndex}`}
                                     className="text-[10px] font-semibold text-amber-400"
@@ -1807,6 +1913,19 @@ export function CivilsTimesheet({
         offDayStates={offDayStates}
         regNumber={regNumber}
         submitting={false}
+      />
+
+      <TrainingDeclineDialog
+        open={trainingDeclineDayIndex !== null}
+        dayLabel={trainingDeclineDayIndex === null ? '' : DAY_NAMES[trainingDeclineDayIndex]}
+        trainingLabel={
+          trainingDeclineDayIndex === null
+            ? 'Training'
+            : getTrainingLabel(getOffDayForIndex(trainingDeclineDayIndex))
+        }
+        pending={decliningTraining}
+        onCancel={handleCancelTrainingDecline}
+        onConfirm={handleConfirmTrainingDecline}
       />
 
       {/* Signature Dialog */}

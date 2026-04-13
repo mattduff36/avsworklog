@@ -8,6 +8,7 @@ export const PAID_LEAVE_DAILY_HOURS = 9;
 const PAID_LEAVE_HALF_DAY_HOURS = PAID_LEAVE_DAILY_HOURS / 2;
 
 export interface ApprovedAbsenceForTimesheet {
+  id?: string;
   date: string;
   end_date: string | null;
   is_half_day?: boolean | null;
@@ -17,11 +18,13 @@ export interface ApprovedAbsenceForTimesheet {
 }
 
 export interface TimesheetLeaveLabel {
+  absenceId: string | null;
   reasonName: string;
   label: string;
   session: LeaveSession | 'FULL';
   color: string | null;
   isPaid: boolean;
+  isTraining: boolean;
   blocksWorkingEntry: boolean;
 }
 
@@ -42,9 +45,14 @@ export interface TimesheetOffDayState {
   workWindow: TimesheetWorkWindow | null;
   paidLeaveHours: number;
   leaveLabels: TimesheetLeaveLabel[];
+  trainingLabels: TimesheetLeaveLabel[];
+  hasTrainingBooking: boolean;
+  trainingAbsenceIds: string[];
+  trainingDisplayRemarks: string;
   displayRemarks: string;
   leaveReasonName: string | null;
   leaveReasonColor: string | null;
+  trainingReasonColor: string | null;
   isAnnualLeave: boolean;
 }
 
@@ -69,6 +77,10 @@ function formatLocalIsoDate(date: Date): string {
 
 function normalizeReasonName(value: string | null | undefined): string {
   return (value || '').trim().toLowerCase();
+}
+
+export function isTrainingReasonName(value: string | null | undefined): boolean {
+  return normalizeReasonName(value) === 'training';
 }
 
 function parseDidNotWorkReason(value: string | null | undefined): TimesheetDidNotWorkReason {
@@ -172,14 +184,17 @@ function toLeaveLabel(row: ApprovedAbsenceForTimesheet): TimesheetLeaveLabel {
   const isHalf = Boolean(row.is_half_day);
   const session: LeaveSession | 'FULL' = isHalf && row.half_day_session ? row.half_day_session : 'FULL';
   const isAnnualLeave = normalizeReasonName(reasonName) === 'annual leave';
+  const isTraining = isTrainingReasonName(reasonName);
   const allowsTimesheetWork = isAnnualLeave && Boolean(row.allow_timesheet_work_on_leave);
 
   return {
+    absenceId: row.id || null,
     reasonName,
     label: session === 'FULL' ? reasonName : `${reasonName} (${session})`,
     session,
     color: row.absence_reasons?.color || null,
     isPaid: Boolean(row.absence_reasons?.is_paid),
+    isTraining,
     blocksWorkingEntry: !allowsTimesheetWork,
   };
 }
@@ -203,7 +218,7 @@ export function resolveTimesheetOffDayStates(
       return row.date <= entryDateIso && rowEnd >= entryDateIso;
     });
 
-    const leaveLabels = dayRows
+    const resolvedLabels = dayRows
       .map(toLeaveLabel)
       .sort((a, b) => {
         const weight = (session: LeaveSession | 'FULL') => {
@@ -212,11 +227,13 @@ export function resolveTimesheetOffDayStates(
         };
         return weight(a.session) - weight(b.session);
       });
-    const effectiveLeaveLabels = leaveLabels.filter((label) => {
+    const effectiveLabels = resolvedLabels.filter((label) => {
       if (label.session === 'FULL') return sessions.am || sessions.pm;
       if (label.session === 'AM') return sessions.am;
       return sessions.pm;
     });
+    const effectiveTrainingLabels = effectiveLabels.filter((label) => label.isTraining);
+    const effectiveLeaveLabels = effectiveLabels.filter((label) => !label.isTraining);
 
     const hasAmCoverage = sessions.am && effectiveLeaveLabels.some(
       (label) => label.session === 'FULL' || label.session === 'AM'
@@ -253,6 +270,12 @@ export function resolveTimesheetOffDayStates(
 
     const displayRemarks = effectiveLeaveLabels.map((label) => label.label).join('\n');
     const firstLabel = effectiveLeaveLabels[0];
+    const trainingDisplayRemarks = effectiveTrainingLabels.map((label) => label.label).join('\n');
+    const trainingReasonColor = effectiveTrainingLabels[0]?.color || null;
+    const trainingAbsenceIds = effectiveTrainingLabels
+      .map((label) => label.absenceId)
+      .filter((value): value is string => Boolean(value));
+    const hasTrainingBooking = trainingAbsenceIds.length > 0 || effectiveTrainingLabels.length > 0;
     const isAnnualLeave =
       isOnApprovedLeave && effectiveLeaveLabels.some((label) => normalizeReasonName(label.reasonName) === 'annual leave');
 
@@ -268,9 +291,14 @@ export function resolveTimesheetOffDayStates(
       workWindow,
       paidLeaveHours,
       leaveLabels: effectiveLeaveLabels,
+      trainingLabels: effectiveTrainingLabels,
+      hasTrainingBooking,
+      trainingAbsenceIds,
+      trainingDisplayRemarks,
       displayRemarks,
       leaveReasonName: firstLabel?.reasonName || null,
       leaveReasonColor: firstLabel?.color || null,
+      trainingReasonColor,
       isAnnualLeave,
     };
   });
@@ -291,6 +319,22 @@ export function normalizeTimesheetEntriesForOffDays(
   return entries.map((entry) => {
     const offDay = offDayByDay.get(entry.day_of_week);
     if (!offDay) return entry;
+
+    if (
+      offDay.hasTrainingBooking &&
+      entry.did_not_work &&
+      entry.didNotWorkReason === 'Off Shift' &&
+      !hasExplicitWorkingInput(entry) &&
+      (!entry.remarks || entry.remarks.trim() === '' || entry.remarks.trim() === 'Not on Shift')
+    ) {
+      return {
+        ...entry,
+        did_not_work: false,
+        didNotWorkReason: null,
+        daily_total: null,
+        remarks: '',
+      };
+    }
 
     if (enforceLeaveOverwrite && offDay.isLeaveLocked) {
       const primaryReason = offDay.leaveReasonName || 'Approved Leave';

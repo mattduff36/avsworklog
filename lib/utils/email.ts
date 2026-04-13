@@ -927,6 +927,111 @@ export async function sendTimesheetAdjustmentEmail(params: SendTimesheetAdjustme
   }
 }
 
+interface SendTrainingBookingDeclinedEmailParams {
+  to: string;
+  recipientName: string;
+  employeeName: string;
+  trainingDate: string;
+  declinedBy: string;
+}
+
+export async function sendTrainingBookingDeclinedEmail(
+  params: SendTrainingBookingDeclinedEmailParams
+): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  const { to, recipientName, employeeName, trainingDate, declinedBy } = params;
+
+  try {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      console.error('RESEND_API_KEY not configured');
+      return {
+        success: false,
+        error: 'Email service not configured',
+      };
+    }
+
+    const subject = 'Training Booking Removed From Timesheet';
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background-color: #F1D64A; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+            <h1 style="margin: 0; color: #252525;">SquiresApp</h1>
+          </div>
+
+          <div style="background-color: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
+            <h2 style="color: #b45309; margin-top: 0;">Training Booking Removed</h2>
+
+            <p>Hello ${recipientName},</p>
+
+            <p>
+              The training booking for <strong>${employeeName}</strong> on
+              <strong>${trainingDate}</strong> was removed from their timesheet.
+            </p>
+
+            <div style="background-color: #fff; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 20px; margin: 20px 0;">
+              <p style="margin: 0 0 10px 0; font-weight: bold; color: #b45309;">Reason</p>
+              <p style="margin: 0; color: #4b5563;">
+                ${employeeName} confirmed they did not attend the booked training. The booking was deleted automatically from the timesheet flow by ${declinedBy}.
+              </p>
+            </div>
+
+            <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
+              This is an automated notification from SquiresApp.
+            </p>
+          </div>
+
+          <div style="text-align: center; margin-top: 20px; color: #9ca3af; font-size: 12px;">
+            <p>© ${new Date().getFullYear()} A&V Squires Plant Co. Ltd. All rights reserved.</p>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: process.env.RESEND_FROM_EMAIL || 'AVS Worklog <onboarding@resend.dev>',
+        to: [to],
+        subject,
+        html: htmlContent,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = (await response.json()) as { message?: string };
+      console.error('Resend API error:', error);
+      return {
+        success: false,
+        error: `Failed to send email: ${error.message ?? 'Unknown error'}`,
+      };
+    }
+
+    const data = await response.json();
+    console.log('Training booking declined email sent successfully:', data);
+    return { success: true };
+  } catch (error: unknown) {
+    console.error('Error sending training booking declined email:', error);
+    const message = error instanceof Error ? error.message : 'Failed to send email';
+    return {
+      success: false,
+      error: message,
+    };
+  }
+}
+
 /**
  * Send error report email to admins
  */

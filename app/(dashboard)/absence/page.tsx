@@ -54,7 +54,6 @@ import {
   useAbsenceReasons,
   useAbsenceRealtimeQueryInvalidation,
   useAbsenceSummaryForUserFinancialYear,
-  useCancelAbsence,
   useCreateAbsence,
 } from '@/lib/hooks/useAbsence';
 import { formatDate, formatDateISO, calculateDurationDays, getFinancialYearMonths, getCurrentFinancialYear, getFinancialYear } from '@/lib/utils/date';
@@ -82,6 +81,14 @@ type PageServiceRequestKey =
   | 'generationStatus'
   | 'absenceAnnouncement'
   | 'currentWorkShift';
+
+interface ContactLineManagerTarget {
+  id: string;
+  status: string;
+  date: string;
+  endDate: string | null;
+  reasonName: string;
+}
 
 const PAGE_SERVICE_ERROR_PRIORITY: readonly PageServiceRequestKey[] = [
   'generationStatus',
@@ -156,6 +163,14 @@ function getErrorMessage(error: unknown, fallback: string): string {
   }
 
   return rawMessage;
+}
+
+function formatAbsenceRangeLabel(startDate: string, endDate: string | null): string {
+  if (endDate && endDate !== startDate) {
+    return `${formatDate(startDate)} - ${formatDate(endDate)}`;
+  }
+
+  return formatDate(startDate);
 }
 
 function isExpectedAbsenceSubmissionError(message: string): boolean {
@@ -333,10 +348,8 @@ export default function AbsencePage() {
   }, [initialMonthIndex]);
   
   const [showDayModal, setShowDayModal] = useState(false);
-  const [showCancelDialog, setShowCancelDialog] = useState(false);
-  const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
-  const [cancelTargetStatus, setCancelTargetStatus] = useState<string>('pending');
-  const [cancelSubmitting, setCancelSubmitting] = useState(false);
+  const [contactLineManagerTarget, setContactLineManagerTarget] = useState<ContactLineManagerTarget | null>(null);
+  const [contactLineManagerSubmitting, setContactLineManagerSubmitting] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [bookingsPage, setBookingsPage] = useState(1);
   const BOOKINGS_PAGE_SIZE = 15;
@@ -366,7 +379,6 @@ export default function AbsencePage() {
   );
   const { data: reasons } = useAbsenceReasons({ enabled: canLoadAbsencePageData });
   const createAbsence = useCreateAbsence();
-  const cancelAbsence = useCancelAbsence();
   useAbsenceRealtimeQueryInvalidation(canLoadAbsencePageData);
   
   const calendarAbsences = useMemo(() => {
@@ -729,27 +741,38 @@ export default function AbsencePage() {
     }
   }
   
-  // Handle cancel
-  function handleCancel(id: string, status: string) {
-    setCancelTargetId(id);
-    setCancelTargetStatus(status);
-    setShowCancelDialog(true);
+  function handleContactLineManager(
+    id: string,
+    status: string,
+    date: string,
+    endDate: string | null,
+    reasonName: string
+  ) {
+    setContactLineManagerTarget({ id, status, date, endDate, reasonName });
   }
 
-  async function confirmCancelAbsence() {
-    if (!cancelTargetId) return;
-    const cancelErrorContextId = 'absence-cancel-error';
-    setCancelSubmitting(true);
+  async function confirmContactLineManager() {
+    if (!contactLineManagerTarget) return;
+    const contactErrorContextId = 'absence-contact-line-manager-error';
+    setContactLineManagerSubmitting(true);
     try {
-      await cancelAbsence.mutateAsync(cancelTargetId);
-      toast.success('Absence cancelled');
-      setShowCancelDialog(false);
-      setCancelTargetId(null);
+      const response = await fetch(`/api/absence/${contactLineManagerTarget.id}/contact-line-manager`, {
+        method: 'POST',
+      });
+      const payload = (await response.json().catch(() => null)) as { error?: string; message?: string } | null;
+
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Failed to contact line manager');
+      }
+
+      toast.success(payload?.message || 'Your line manager has been notified');
+      setContactLineManagerTarget(null);
     } catch (error) {
-      console.error('Error cancelling:', error, { errorContextId: cancelErrorContextId });
-      toast.error('Failed to cancel absence', { id: cancelErrorContextId });
+      const message = getErrorMessage(error, 'Failed to contact line manager');
+      console.error('Error contacting line manager:', error, { errorContextId: contactErrorContextId });
+      toast.error(message, { id: contactErrorContextId });
     } finally {
-      setCancelSubmitting(false);
+      setContactLineManagerSubmitting(false);
     }
   }
   
@@ -1402,6 +1425,7 @@ export default function AbsencePage() {
                     const canCancel = 
                       (absence.status === 'pending' && new Date(absence.date) >= new Date()) ||
                       ((absence.status === 'approved' || absence.status === 'processed') && new Date(absence.date) >= new Date());
+                    const canContactLineManager = canCancel;
                     
                     return (
                       <div
@@ -1465,11 +1489,19 @@ export default function AbsencePage() {
                             )}
                           </div>
                           
-                          {canCancel && (
+                          {canContactLineManager && (
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleCancel(absence.id, absence.status)}
+                              onClick={() =>
+                                handleContactLineManager(
+                                  absence.id,
+                                  absence.status,
+                                  absence.date,
+                                  absence.end_date,
+                                  absence.absence_reasons.name
+                                )
+                              }
                               className="border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
                             >
                               Cancel
@@ -1638,23 +1670,49 @@ export default function AbsencePage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+      <Dialog
+        open={Boolean(contactLineManagerTarget)}
+        onOpenChange={(open) => {
+          if (!open && !contactLineManagerSubmitting) {
+            setContactLineManagerTarget(null);
+          }
+        }}
+      >
         <DialogContent className="border-border max-w-3xl">
           <DialogHeader>
-            <DialogTitle className="text-foreground">Cancel Absence</DialogTitle>
+            <DialogTitle className="text-foreground">Contact line manager</DialogTitle>
             <DialogDescription className="text-slate-400/90">
-              Are you sure you want to cancel this {cancelTargetStatus === 'processed' ? 'processed' : cancelTargetStatus === 'approved' ? 'approved' : 'pending'} absence?
+              Leave bookings cannot be cancelled in the app. We can send your line manager a notification now.
             </DialogDescription>
           </DialogHeader>
           <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3">
-            <p className="text-sm text-red-300">This change cannot be undone from this screen.</p>
+            <p className="text-sm text-red-300">
+              Contact line manager
+            </p>
+            {contactLineManagerTarget && (
+              <p className="mt-2 text-sm text-red-200/90">
+                Type: {contactLineManagerTarget.reasonName}
+                <br />
+                Booking: {formatAbsenceRangeLabel(contactLineManagerTarget.date, contactLineManagerTarget.endDate)}
+                {' '}({contactLineManagerTarget.status})
+              </p>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCancelDialog(false)} className="border-border text-muted-foreground">
-              Keep Booking
+            <Button
+              variant="outline"
+              onClick={() => setContactLineManagerTarget(null)}
+              className="border-border text-muted-foreground"
+              disabled={contactLineManagerSubmitting}
+            >
+              Close
             </Button>
-            <Button variant="destructive" onClick={confirmCancelAbsence} disabled={cancelSubmitting || !cancelTargetId}>
-              {cancelSubmitting ? 'Cancelling...' : 'Cancel Absence'}
+            <Button
+              onClick={confirmContactLineManager}
+              disabled={contactLineManagerSubmitting || !contactLineManagerTarget}
+              className="bg-absence hover:bg-absence-dark text-white"
+            >
+              {contactLineManagerSubmitting ? 'Notifying...' : 'Notify line manager'}
             </Button>
           </DialogFooter>
         </DialogContent>

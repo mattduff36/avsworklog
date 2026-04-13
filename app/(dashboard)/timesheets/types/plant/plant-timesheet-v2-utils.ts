@@ -150,5 +150,6 @@ export function buildValidationErrors(entries: PlantEntryDraft[]): Record<number
 export function isPlantEntryComplete(entry: PlantEntryDraft, offDayState?: TimesheetOffDayState): boolean {
   if (offDayState?.isOnApprovedLeave) return true;
   const hasHours = Boolean(entry.time_started && entry.time_finished);
+  if (offDayState?.hasTrainingBooking) return hasHours;
   return hasHours || entry.did_not_work;
 }

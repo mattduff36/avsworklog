@@ -33,6 +33,8 @@ import { Database } from '@/types/database';
 import { isAdminRole } from '@/lib/utils/role-access';
 import { Employee } from '@/types/common';
 import { toast } from 'sonner';
+import { TrainingDeclineDialog } from '../../components/TrainingDeclineDialog';
+import { declineTrainingBookingsClient } from '@/lib/client/training-bookings';
 import {
   getRecentVehicleIds,
   recordRecentVehicleId,
@@ -122,6 +124,10 @@ function getDidNotWorkAutoStyle(dayOffState: TimesheetOffDayState | undefined): 
   };
 }
 
+function getTrainingLabel(dayOffState: TimesheetOffDayState | undefined): string {
+  return dayOffState?.trainingDisplayRemarks || dayOffState?.trainingLabels[0]?.label || 'Training';
+}
+
 function toMinutes(time: string): number {
   const [hours, minutes] = time.split(':').map(Number);
   return hours * 60 + minutes;
@@ -163,6 +169,7 @@ function buildJobNumberValidationErrors(
     const hasHours = Boolean(entry.time_started && entry.time_finished);
 
     if (offDay?.isOnApprovedLeave && !hasHours) return;
+    if (offDay?.hasTrainingBooking) return;
     if (entry.did_not_work || entry.working_in_yard || !hasHours) return;
 
     if (!entry.job_number || !JOB_NUMBER_REGEX.test(entry.job_number)) {
@@ -278,6 +285,9 @@ export function PlantTimesheetV2({
   const [offDayStates, setOffDayStates] = useState<TimesheetOffDayState[]>([]);
   const [offDayKey, setOffDayKey] = useState('');
   const [loadingOffDays, setLoadingOffDays] = useState(true);
+  const [offDayRefreshToken, setOffDayRefreshToken] = useState(0);
+  const [trainingDeclineDayIndex, setTrainingDeclineDayIndex] = useState<number | null>(null);
+  const [decliningTraining, setDecliningTraining] = useState(false);
 
   const currentOffDayKey = selectedEmployeeId && weekEnding ? `${selectedEmployeeId}:${weekEnding}` : '';
   const offDayMap = useMemo(
@@ -567,7 +577,7 @@ export function PlantTimesheetV2({
         const { startIso, endIso } = getTimesheetWeekIsoBounds(weekEnding);
         const absenceResult = await supabase
           .from('absences')
-          .select('date, end_date, is_half_day, half_day_session, allow_timesheet_work_on_leave, absence_reasons(name,color,is_paid)')
+          .select('id, date, end_date, is_half_day, half_day_session, allow_timesheet_work_on_leave, absence_reasons(name,color,is_paid)')
           .eq('profile_id', selectedEmployeeId)
           .in('status', ['approved', 'processed'])
           .lte('date', endIso);
@@ -620,7 +630,7 @@ export function PlantTimesheetV2({
     return () => {
       cancelled = true;
     };
-  }, [selectedEmployeeId, supabase, user, weekEnding]);
+  }, [offDayRefreshToken, selectedEmployeeId, supabase, user, weekEnding]);
 
   useEffect(() => {
     if (!existingTimesheetLoaded) return;
@@ -673,6 +683,42 @@ export function PlantTimesheetV2({
 
   const getOffDayForIndex = (dayIndex: number): TimesheetOffDayState | undefined =>
     offDayMap.get(dayIndex + 1);
+
+  const handleTrainingStatusToggle = (dayIndex: number) => {
+    const dayOffState = getOffDayForIndex(dayIndex);
+    if (!dayOffState?.hasTrainingBooking) return;
+    setTrainingDeclineDayIndex(dayIndex);
+  };
+
+  const handleCancelTrainingDecline = () => {
+    if (decliningTraining) return;
+    setTrainingDeclineDayIndex(null);
+  };
+
+  const handleConfirmTrainingDecline = async () => {
+    if (trainingDeclineDayIndex === null) return;
+    const dayOffState = getOffDayForIndex(trainingDeclineDayIndex);
+    if (!dayOffState?.trainingAbsenceIds.length) {
+      setTrainingDeclineDayIndex(null);
+      return;
+    }
+
+    setDecliningTraining(true);
+    try {
+      await declineTrainingBookingsClient({
+        absenceIds: dayOffState.trainingAbsenceIds,
+      });
+      toast.success('Training booking removed and notifications sent.');
+      setTrainingDeclineDayIndex(null);
+      setOffDayRefreshToken((value) => value + 1);
+    } catch (trainingError) {
+      const message =
+        trainingError instanceof Error ? trainingError.message : 'Failed to remove training booking';
+      toast.error(message);
+    } finally {
+      setDecliningTraining(false);
+    }
+  };
 
   const updateEntryField = (dayIndex: number, field: keyof PlantEntryDraft, value: string | boolean) => {
     const normalizedValue =
@@ -1308,10 +1354,18 @@ export function PlantTimesheetV2({
                 const dayOffState = getOffDayForIndex(index);
                 const isLeaveLocked = Boolean(dayOffState?.isLeaveLocked);
                 const isLeaveDayForRow = Boolean(dayOffState?.isOnApprovedLeave);
+                const hasTrainingBooking = Boolean(dayOffState?.hasTrainingBooking);
                 const isPartialLeave = Boolean(dayOffState?.isPartialLeave);
                 const disableForDidNotWork = entry.did_not_work && !isPartialLeave;
                 const disableInputs = isLeaveLocked || disableForDidNotWork;
                 const workWindow = dayOffState?.workWindow ?? null;
+                const disableStatusForTraining = hasTrainingBooking;
+                const disableJobNumberInput = disableInputs || entry.working_in_yard || hasTrainingBooking;
+                const jobNumberPlaceholder = hasTrainingBooking
+                  ? 'N/A (Training)'
+                  : entry.working_in_yard
+                    ? 'N/A (Yard)'
+                    : '1234-AB';
 
                 return (
                   <TabsContent key={entry.day_of_week} value={String(index)} className="space-y-4 px-4 pb-4 overflow-hidden">
@@ -1322,9 +1376,17 @@ export function PlantTimesheetV2({
                       </p>
                     </div>
 
-                    {dayOffState?.leaveLabels.length ? (
+                    {(hasTrainingBooking || dayOffState?.leaveLabels.length) ? (
                       <div className="space-y-1 text-center">
-                        {dayOffState.leaveLabels.map((label, labelIndex) => (
+                        {hasTrainingBooking && (
+                          <p
+                            className="text-sm font-semibold text-emerald-400"
+                            style={getLeaveLabelStyle(dayOffState?.trainingReasonColor)}
+                          >
+                            {getTrainingLabel(dayOffState)}
+                          </p>
+                        )}
+                        {dayOffState?.leaveLabels.map((label, labelIndex) => (
                           <p
                             key={`${label.reasonName}-${label.session}-${labelIndex}`}
                             className="text-sm font-semibold"
@@ -1333,9 +1395,9 @@ export function PlantTimesheetV2({
                             {label.label}
                           </p>
                         ))}
-                        {dayOffState.workWindow && (
+                        {dayOffState?.workWindow && (dayOffState?.leaveLabels.length ?? 0) > 0 && (
                           <p className="text-xs text-muted-foreground">
-                            Working hours allowed: {dayOffState.workWindow.start} to {dayOffState.workWindow.end}
+                            Working hours allowed: {dayOffState?.workWindow?.start} to {dayOffState?.workWindow?.end}
                           </p>
                         )}
                       </div>
@@ -1398,14 +1460,14 @@ export function PlantTimesheetV2({
                         <div className="space-y-2">
                           <Label className="text-foreground text-xl flex items-center gap-2">
                             Job Number
-                            {!entry.working_in_yard && <span className="text-red-400 text-lg">*</span>}
+                            {!entry.working_in_yard && !hasTrainingBooking && <span className="text-red-400 text-lg">*</span>}
                           </Label>
                           <Input
                             value={entry.job_number}
                             onChange={(event) => handleJobNumberChange(index, event.target.value)}
-                            placeholder={entry.working_in_yard ? 'N/A (Yard)' : '1234-AB'}
+                            placeholder={jobNumberPlaceholder}
                             maxLength={7}
-                            disabled={disableInputs || entry.working_in_yard}
+                            disabled={disableJobNumberInput}
                             className="h-16 text-3xl text-center bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground uppercase disabled:opacity-30 disabled:cursor-not-allowed"
                           />
                         </div>
@@ -1413,11 +1475,11 @@ export function PlantTimesheetV2({
 
                       <div className="space-y-3">
                         <Label className="text-foreground text-xl">Day Status</Label>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className={`grid gap-3 ${hasTrainingBooking ? 'grid-cols-3' : 'grid-cols-2'}`}>
                           <button
                             type="button"
                             onClick={() => toggleWorkingInYard(index)}
-                            disabled={disableInputs}
+                            disabled={disableInputs || disableStatusForTraining}
                             className={`flex flex-col items-center justify-center h-24 rounded-lg border-2 transition-all ${
                               entry.working_in_yard
                                 ? 'bg-blue-500/20 border-blue-500 shadow-lg shadow-blue-500/20'
@@ -1433,7 +1495,7 @@ export function PlantTimesheetV2({
                           <button
                             type="button"
                             onClick={() => toggleDidNotWork(index)}
-                            disabled={isLeaveDayForRow}
+                            disabled={isLeaveDayForRow || disableStatusForTraining}
                             className={`flex flex-col items-center justify-center h-24 rounded-lg border-2 transition-all ${
                               entry.did_not_work
                                 ? 'bg-amber-500/20 border-amber-500 shadow-lg shadow-amber-500/20'
@@ -1445,12 +1507,34 @@ export function PlantTimesheetV2({
                               Did Not Work
                             </span>
                           </button>
+
+                          {hasTrainingBooking && (
+                            <button
+                              type="button"
+                              onClick={() => handleTrainingStatusToggle(index)}
+                              disabled={decliningTraining}
+                              className="flex flex-col items-center justify-center h-24 rounded-lg border-2 transition-all bg-emerald-500/20 border-emerald-500 shadow-lg shadow-emerald-500/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              <User className="h-8 w-8 mb-2 text-emerald-400" />
+                              <span className="text-lg font-medium text-emerald-400">
+                                Training
+                              </span>
+                            </button>
+                          )}
                         </div>
-                        {(dayOffState?.leaveLabels.length || entry.did_not_work) ? (
+                        {(hasTrainingBooking || dayOffState?.leaveLabels.length || entry.did_not_work) ? (
                           <div className="flex justify-center">
-                            {dayOffState?.leaveLabels.length ? (
+                            {(dayOffState?.leaveLabels.length || hasTrainingBooking) ? (
                               <div className="space-y-1 text-center">
-                                {dayOffState.leaveLabels.map((label, labelIndex) => (
+                                {hasTrainingBooking && (
+                                  <p
+                                    className="text-sm font-semibold text-emerald-400"
+                                    style={getLeaveLabelStyle(dayOffState?.trainingReasonColor)}
+                                  >
+                                    {getTrainingLabel(dayOffState)}
+                                  </p>
+                                )}
+                                {dayOffState?.leaveLabels.map((label, labelIndex) => (
                                   <p
                                     key={`${label.reasonName}-${label.session}-${labelIndex}`}
                                     className="text-sm font-semibold text-amber-400"
@@ -1459,9 +1543,9 @@ export function PlantTimesheetV2({
                                     {label.label}
                                   </p>
                                 ))}
-                                {dayOffState.workWindow && (
+                                {dayOffState?.workWindow && (dayOffState?.leaveLabels.length ?? 0) > 0 && (
                                   <p className="text-xs text-muted-foreground">
-                                    Working hours allowed: {dayOffState.workWindow.start} to {dayOffState.workWindow.end}
+                                    Working hours allowed: {dayOffState?.workWindow?.start} to {dayOffState?.workWindow?.end}
                                   </p>
                                 )}
                               </div>
@@ -1623,10 +1707,18 @@ export function PlantTimesheetV2({
                   const dayOffState = getOffDayForIndex(index);
                   const isLeaveLocked = Boolean(dayOffState?.isLeaveLocked);
                   const isLeaveDayForRow = Boolean(dayOffState?.isOnApprovedLeave);
+                  const hasTrainingBooking = Boolean(dayOffState?.hasTrainingBooking);
                   const isPartialLeave = Boolean(dayOffState?.isPartialLeave);
                   const disableForDidNotWork = entry.did_not_work && !isPartialLeave;
                   const disableInputs = isLeaveLocked || disableForDidNotWork;
                   const workWindow = dayOffState?.workWindow ?? null;
+                  const disableStatusForTraining = hasTrainingBooking;
+                  const disableJobNumberInput = disableInputs || entry.working_in_yard || hasTrainingBooking;
+                  const jobNumberPlaceholder = hasTrainingBooking
+                    ? 'N/A (Training)'
+                    : entry.working_in_yard
+                      ? 'N/A (Yard)'
+                      : '1234-AB';
 
                   return (
                     <Fragment key={entry.day_of_week}>
@@ -1683,9 +1775,9 @@ export function PlantTimesheetV2({
                           <Input
                             value={entry.job_number}
                             onChange={(event) => handleJobNumberChange(index, event.target.value)}
-                            placeholder={entry.working_in_yard ? 'N/A (Yard)' : '1234-AB'}
+                            placeholder={jobNumberPlaceholder}
                             maxLength={7}
-                            disabled={disableInputs || entry.working_in_yard}
+                            disabled={disableJobNumberInput}
                             className="w-28 bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground uppercase disabled:opacity-30 disabled:cursor-not-allowed"
                           />
                         </td>
@@ -1695,7 +1787,7 @@ export function PlantTimesheetV2({
                               <button
                                 type="button"
                                 onClick={() => toggleWorkingInYard(index)}
-                                disabled={disableInputs}
+                                disabled={disableInputs || disableStatusForTraining}
                                 className={`flex items-center justify-center w-10 h-10 rounded-lg border-2 transition-all ${
                                   entry.working_in_yard
                                     ? 'bg-blue-500/20 border-blue-500 shadow-lg shadow-blue-500/20'
@@ -1708,7 +1800,7 @@ export function PlantTimesheetV2({
                               <button
                                 type="button"
                                 onClick={() => toggleDidNotWork(index)}
-                                disabled={isLeaveDayForRow}
+                                disabled={isLeaveDayForRow || disableStatusForTraining}
                                 className={`flex items-center justify-center w-10 h-10 rounded-lg border-2 transition-all ${
                                   entry.did_not_work
                                     ? 'bg-amber-500/20 border-amber-500 shadow-lg shadow-amber-500/20'
@@ -1718,12 +1810,32 @@ export function PlantTimesheetV2({
                               >
                                 <XCircle className={`h-5 w-5 ${entry.did_not_work ? 'text-amber-400' : 'text-muted-foreground'}`} />
                               </button>
+
+                              {hasTrainingBooking && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleTrainingStatusToggle(index)}
+                                  disabled={decliningTraining}
+                                  className="flex items-center justify-center w-10 h-10 rounded-lg border-2 transition-all bg-emerald-500/20 border-emerald-500 shadow-lg shadow-emerald-500/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                                  title="Training"
+                                >
+                                  <User className="h-5 w-5 text-emerald-400" />
+                                </button>
+                              )}
                             </div>
-                            {(dayOffState?.leaveLabels.length || entry.did_not_work) ? (
+                            {(hasTrainingBooking || dayOffState?.leaveLabels.length || entry.did_not_work) ? (
                               <div className="flex justify-center">
-                                {dayOffState?.leaveLabels.length ? (
+                                {(dayOffState?.leaveLabels.length || hasTrainingBooking) ? (
                                   <div className="space-y-1 text-center">
-                                    {dayOffState.leaveLabels.map((label, labelIndex) => (
+                                    {hasTrainingBooking && (
+                                      <p
+                                        className="text-[10px] font-semibold text-emerald-400"
+                                        style={getLeaveLabelStyle(dayOffState?.trainingReasonColor)}
+                                      >
+                                        {getTrainingLabel(dayOffState)}
+                                      </p>
+                                    )}
+                                    {dayOffState?.leaveLabels.map((label, labelIndex) => (
                                       <p
                                         key={`${label.reasonName}-${label.session}-${labelIndex}`}
                                         className="text-[10px] font-semibold text-amber-400"
@@ -1955,6 +2067,19 @@ export function PlantTimesheetV2({
           </Button>
         </div>
       </div>
+
+      <TrainingDeclineDialog
+        open={trainingDeclineDayIndex !== null}
+        dayLabel={trainingDeclineDayIndex === null ? '' : DAY_NAMES[trainingDeclineDayIndex]}
+        trainingLabel={
+          trainingDeclineDayIndex === null
+            ? 'Training'
+            : getTrainingLabel(getOffDayForIndex(trainingDeclineDayIndex))
+        }
+        pending={decliningTraining}
+        onCancel={handleCancelTrainingDecline}
+        onConfirm={handleConfirmTrainingDecline}
+      />
 
       <Dialog open={showSignatureDialog} onOpenChange={setShowSignatureDialog}>
         <DialogContent className="border-border text-white max-w-lg">

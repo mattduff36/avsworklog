@@ -339,7 +339,7 @@ describe('Timesheets Complete Workflows', () => {
       expect(normalized[0].daily_total).toBe(9);
     });
 
-    it('adds paid half-day credit while preserving allowed worked session', () => {
+    it('keeps training rows editable without adding leave credit', () => {
       const entries = Array.from({ length: 7 }, (_, index) => ({
         ...createMockTimesheetEntry({
           day_of_week: index + 1,
@@ -363,6 +363,7 @@ describe('Timesheets Complete Workflows', () => {
         time_started: '12:00',
         time_finished: '17:00',
         job_number: '1234-AB',
+        daily_total: 5,
       };
 
       const offDays = resolveTimesheetOffDayStates(
@@ -385,8 +386,8 @@ describe('Timesheets Complete Workflows', () => {
       });
 
       expect(normalized[0].did_not_work).toBe(false);
-      expect(normalized[0].daily_total).toBe(9.5);
-      expect(normalized[0].remarks).toBe('Training (AM)');
+      expect(normalized[0].daily_total).toBe(5);
+      expect(normalized[0].remarks).toBe('');
     });
   });
 });

@@ -181,9 +181,38 @@ describe('timesheet off-day resolver', () => {
     );
 
     const tuesday = states.find((row) => row.day_of_week === 2);
-    expect(tuesday?.isLeaveLocked).toBe(true);
-    expect(tuesday?.leaveLabels.map((row) => row.label)).toEqual(['Annual Leave (AM)', 'Training (PM)']);
-    expect(tuesday?.paidLeaveHours).toBe(9);
+    expect(tuesday?.isLeaveLocked).toBe(false);
+    expect(tuesday?.leaveLabels.map((row) => row.label)).toEqual(['Annual Leave (AM)']);
+    expect(tuesday?.trainingLabels.map((row) => row.label)).toEqual(['Training (PM)']);
+    expect(tuesday?.hasTrainingBooking).toBe(true);
+    expect(tuesday?.paidLeaveHours).toBe(4.5);
+  });
+
+  it('exposes training bookings separately from approved leave totals', () => {
+    const states = resolveTimesheetOffDayStates(
+      '2026-03-29',
+      [
+        {
+          id: 'training-absence-id',
+          date: '2026-03-24',
+          end_date: null,
+          is_half_day: false,
+          absence_reasons: { name: 'Training', color: '#22c55e', is_paid: true },
+        },
+      ],
+      STANDARD_WORK_SHIFT_PATTERN
+    );
+
+    const tuesday = states.find((row) => row.day_of_week === 2);
+    expect(tuesday?.isOnApprovedLeave).toBe(false);
+    expect(tuesday?.isLeaveLocked).toBe(false);
+    expect(tuesday?.paidLeaveHours).toBe(0);
+    expect(tuesday?.leaveLabels).toEqual([]);
+    expect(tuesday?.trainingLabels.map((row) => row.label)).toEqual(['Training']);
+    expect(tuesday?.hasTrainingBooking).toBe(true);
+    expect(tuesday?.trainingAbsenceIds).toEqual(['training-absence-id']);
+    expect(tuesday?.trainingDisplayRemarks).toBe('Training');
+    expect(tuesday?.trainingReasonColor).toBe('#22c55e');
   });
 
   it('supports overnight work windows when validating time bounds', () => {
@@ -323,6 +352,41 @@ describe('timesheet off-day normalization', () => {
     expect(normalized[1].did_not_work).toBe(false);
     expect(normalized[1].daily_total).toBe(9.5);
     expect(normalized[1].remarks).toBe('Annual Leave (AM)');
+  });
+
+  it('keeps training bookings editable without adding leave credit', () => {
+    const entries = buildEntries();
+    entries[1] = {
+      ...entries[1],
+      time_started: '12:00',
+      time_finished: '17:00',
+      daily_total: 5,
+      remarks: '',
+    };
+
+    const states = resolveTimesheetOffDayStates(
+      '2026-03-29',
+      [
+        {
+          id: 'training-absence-id',
+          date: '2026-03-24',
+          end_date: null,
+          is_half_day: true,
+          half_day_session: 'AM',
+          absence_reasons: { name: 'Training', is_paid: true },
+        },
+      ],
+      STANDARD_WORK_SHIFT_PATTERN
+    );
+
+    const normalized = normalizeTimesheetEntriesForOffDays(entries, states, {
+      enforceLeaveOverwrite: true,
+      applyNonShiftDefaults: true,
+    });
+
+    expect(normalized[1].did_not_work).toBe(false);
+    expect(normalized[1].daily_total).toBe(5);
+    expect(normalized[1].remarks).toBe('');
   });
 
   it('keeps unpaid half-day worked hours when persisted times include seconds', () => {
@@ -481,9 +545,14 @@ describe('timesheet off-day normalization', () => {
         workWindow: { start: '17:00', end: '05:00' },
         paidLeaveHours: 0,
         leaveLabels: [],
+        trainingLabels: [],
+        hasTrainingBooking: false,
+        trainingAbsenceIds: [],
+        trainingDisplayRemarks: '',
         displayRemarks: '',
         leaveReasonName: null,
         leaveReasonColor: null,
+        trainingReasonColor: null,
         isAnnualLeave: false,
       },
     ], {
