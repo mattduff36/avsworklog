@@ -60,6 +60,7 @@ interface TimesheetsApprovalTableProps {
   onReject: (id: string) => Promise<void>;
   onProcess: (id: string) => void;
   columnVisibility: ColumnVisibility;
+  visibleCount?: number;
 }
 
 type SortField = 'name' | 'date' | 'totalHours' | 'status' | 'submittedAt';
@@ -85,6 +86,7 @@ export function TimesheetsApprovalTable({
   onReject,
   onProcess,
   columnVisibility,
+  visibleCount,
 }: TimesheetsApprovalTableProps) {
   const router = useRouter();
   const [sortField, setSortField] = useState<SortField>('date');
@@ -119,6 +121,10 @@ export function TimesheetsApprovalTable({
       }
     });
   }, [timesheets, sortField, sortDirection]);
+  const visibleTimesheets = useMemo(
+    () => sortedTimesheets.slice(0, visibleCount ?? sortedTimesheets.length),
+    [sortedTimesheets, visibleCount]
+  );
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -145,7 +151,7 @@ export function TimesheetsApprovalTable({
         );
       case 'processed':
         return (
-          <Badge variant="default">
+          <Badge variant="default" className="bg-blue-500/10 text-blue-300 border-blue-500/20 hover:bg-blue-500/20">
             Manager Approved
           </Badge>
         );
@@ -256,7 +262,7 @@ export function TimesheetsApprovalTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedTimesheets.map((ts) => {
+            {visibleTimesheets.map((ts) => {
               const totalHours = ts.leave_worked_hours ?? computeTotalHours(ts.timesheet_entries);
               const totalDisplay = ts.leave_days !== undefined
                 ? formatLeaveAwareWeeklyDisplayMultiline(totalHours, ts.leave_days)
@@ -341,6 +347,9 @@ export function TimesheetsApprovalTable({
                           <Package className="h-3.5 w-3.5 mr-1" />
                           Manager Approved
                         </Button>
+                      )}
+                      {ts.status !== 'submitted' && ts.status !== 'approved' && (
+                        <span className="text-xs text-muted-foreground">-</span>
                       )}
                     </div>
                   </TableCell>

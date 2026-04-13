@@ -36,10 +36,12 @@ interface AuditLogDebugPanelProps {
 
 type AuditTimeFilter = 'all' | '24h' | '7d' | '30d' | '90d';
 type AuditChangeFilter = 'all' | 'with_changes' | 'without_changes';
+const INITIAL_AUDIT_LOG_LIMIT = 1000;
+const AUDIT_LOG_BATCH_SIZE = 1000;
 
 export function AuditLogDebugPanel({ supabase }: AuditLogDebugPanelProps) {
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
-  const [auditLogsLimit, setAuditLogsLimit] = useState(100);
+  const [auditLogsLimit, setAuditLogsLimit] = useState(INITIAL_AUDIT_LOG_LIMIT);
   const [loadingMoreAudits, setLoadingMoreAudits] = useState(false);
   const [expandedAudits, setExpandedAudits] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -123,7 +125,7 @@ export function AuditLogDebugPanel({ supabase }: AuditLogDebugPanelProps) {
 
   const loadMoreAuditLogs = async () => {
     setLoadingMoreAudits(true);
-    const newLimit = auditLogsLimit + 100;
+    const newLimit = auditLogsLimit + AUDIT_LOG_BATCH_SIZE;
     setAuditLogsLimit(newLimit);
     await fetchAuditLogs(newLimit);
     setLoadingMoreAudits(false);
@@ -644,7 +646,7 @@ ${log.changes && Object.keys(log.changes).length > 0
               ) : (
                 <>
                   <ChevronDown className="h-4 w-4 mr-2" />
-                  Show 100 More Entries
+                  Show {AUDIT_LOG_BATCH_SIZE.toLocaleString('en-GB')} More Entries
                 </>
               )}
             </Button>

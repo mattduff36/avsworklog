@@ -2,11 +2,30 @@
  * @tags @errors @critical
  * Tests error logging and console error absence on critical pages.
  * Auth: admin storage state.
- * NON-DESTRUCTIVE: read-only.
+ * NON-DESTRUCTIVE: creates scoped test errors and removes them afterwards.
  */
 import { test, expect } from '@playwright/test';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { config } from 'dotenv';
+import { resolve } from 'path';
+import { getTestUser } from '../helpers/auth';
 import { attachConsoleErrorCapture } from '../helpers/console-error-fixture';
 import { waitForAppReady } from '../helpers/wait-for-app';
+
+config({ path: resolve(process.cwd(), '.env.local') });
+
+const CLIENT_ERROR_MARKER = 'Test client-side error: Button click handler failed';
+const SERVER_ERROR_MARKER = 'Test caught error: Database connection failed';
+const adminUser = getTestUser('admin');
+
+interface ErrorLogRow {
+  id: string;
+  error_message: string;
+  user_email: string | null;
+  timestamp: string;
+  page_url: string;
+  component_name: string | null;
+}
 
 async function gotoWithTimeoutSkip(
   page: import('@playwright/test').Page,
@@ -28,29 +47,127 @@ async function gotoWithTimeoutSkip(
   }
 }
 
+function getServiceClient(): SupabaseClient {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !key) {
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env.local');
+  }
+
+  return createClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
+function isTargetErrorLog(log: ErrorLogRow): boolean {
+  return log.error_message.includes(CLIENT_ERROR_MARKER) || log.error_message.includes(SERVER_ERROR_MARKER);
+}
+
+async function fetchRecentTargetErrorLogs(sinceIso: string): Promise<ErrorLogRow[]> {
+  const supabase = getServiceClient();
+  const { data, error } = await supabase
+    .from('error_logs')
+    .select('id, error_message, user_email, timestamp, page_url, component_name')
+    .eq('user_email', adminUser.email)
+    .gte('timestamp', sinceIso)
+    .order('timestamp', { ascending: false })
+    .limit(50);
+
+  if (error) {
+    throw new Error(`Failed to fetch recent error logs: ${error.message}`);
+  }
+
+  return (data || []).filter(isTargetErrorLog);
+}
+
+async function cleanupRecentTargetErrorLogs(sinceIso: string): Promise<void> {
+  const supabase = getServiceClient();
+  const logs = await fetchRecentTargetErrorLogs(sinceIso);
+  const ids = logs.map((log) => log.id);
+
+  if (ids.length === 0) {
+    return;
+  }
+
+  const { error } = await supabase.from('error_logs').delete().in('id', ids);
+  if (error) {
+    throw new Error(`Failed to clean up test error logs: ${error.message}`);
+  }
+}
+
 test.describe('@errors @critical Error Logging', () => {
-  test('admin can access debug console', async ({ page }) => {
+  test('superadmin can access debug console', async ({ page }) => {
     const capture = attachConsoleErrorCapture(page);
     await gotoWithTimeoutSkip(page, '/debug', 'Debug route timed out in this environment');
 
-    // Some admin fixtures are non-superadmin and can be redirected away from /debug.
-    const onDebugRoute = /\/debug(?:$|[?#/])/.test(page.url());
-    test.skip(!onDebugRoute, 'Debug console requires superadmin privileges in this environment');
-
     const bodyText = await page.locator('body').innerText();
-    const accessDenied = /access denied|forbidden|unauthori|super\s*admin/i.test(bodyText);
-    test.skip(accessDenied, 'Debug console is superadmin-only for this environment');
-
-    const hasContent = /debug|error|log|report/i.test(bodyText);
-    expect(hasContent, 'Debug console should be accessible to admin').toBeTruthy();
+    const onDebugRoute = /\/debug(?:$|[?#/])/.test(page.url());
+    const accessDenied = /access denied|forbidden|unauthori|super\s*admin\s+only|actual role mode/i.test(bodyText);
+    expect(onDebugRoute, 'Debug console should be accessible to the testsuite superadmin').toBeTruthy();
+    expect(accessDenied, 'Debug console should not show a permissions error').toBeFalsy();
+    await expect(page.getByText('SuperAdmin Debug Console')).toBeVisible({ timeout: 15_000 });
+    await page.getByRole('tab', { name: /error log|errors/i }).click();
+    await expect(page.getByText('Application Error Log')).toBeVisible({ timeout: 10_000 });
 
     const errors = capture.getErrors();
     expect(errors, 'No page errors on debug console').toHaveLength(0);
   });
 
-  test('error logging endpoint responds', async ({ request }) => {
-    const res = await request.post('/api/test-error-logging');
-    expect(res.status()).toBeLessThan(500);
+  test('fresh client and server errors are logged and visible in debug console', async ({ page }) => {
+    test.setTimeout(60_000);
+    const capture = attachConsoleErrorCapture(page);
+    const sinceIso = new Date().toISOString();
+
+    try {
+      await gotoWithTimeoutSkip(page, '/test-error-logging', 'Error logging test page timed out in this environment');
+      await expect(page.getByRole('heading', { name: 'Error Logging Test Suite' })).toBeVisible();
+      await expect
+        .poll(async () => page.evaluate(() => Boolean(window.errorLogger)), { timeout: 10_000 })
+        .toBe(true);
+
+      await page.getByRole('button', { name: 'Test Client Error' }).click();
+      await expect(page.getByText('Client error logged! Check /debug')).toBeVisible({ timeout: 10_000 });
+
+      await page.getByRole('button', { name: 'Test Server Error (Catch)' }).click();
+      await expect(page.getByText('Server error logged! Check /debug')).toBeVisible({ timeout: 15_000 });
+
+      await expect
+        .poll(
+          async () => {
+            const logs = await fetchRecentTargetErrorLogs(sinceIso);
+            const hasClientError = logs.some((log) => log.error_message.includes(CLIENT_ERROR_MARKER));
+            const hasServerError = logs.some((log) => log.error_message.includes(SERVER_ERROR_MARKER));
+            return `${hasClientError}-${hasServerError}`;
+          },
+          {
+            timeout: 20_000,
+            intervals: [1_000, 2_000, 4_000],
+          }
+        )
+        .toBe('true-true');
+
+      capture.clear();
+
+      await gotoWithTimeoutSkip(page, '/debug?tab=error-log', 'Debug route timed out in this environment');
+      await expect(page.getByText('SuperAdmin Debug Console')).toBeVisible({ timeout: 15_000 });
+      await page.getByRole('tab', { name: /error log|errors/i }).click();
+      await expect(page.getByText('Application Error Log')).toBeVisible({ timeout: 10_000 });
+
+      await page.getByText('Hide Localhost').click();
+
+      const searchInput = page.getByPlaceholder('Search errors...');
+      await searchInput.fill('Test client-side error');
+      await expect(page.getByText(CLIENT_ERROR_MARKER).first()).toBeVisible({ timeout: 10_000 });
+
+      await searchInput.fill('Test caught error');
+      await expect(page.getByText(SERVER_ERROR_MARKER).first()).toBeVisible({ timeout: 10_000 });
+
+      const debugErrors = capture.getErrors();
+      expect(debugErrors, 'No unexpected page errors on the debug error log view').toHaveLength(0);
+    } finally {
+      await cleanupRecentTargetErrorLogs(sinceIso);
+    }
   });
 });
 

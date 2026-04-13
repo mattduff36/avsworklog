@@ -179,6 +179,40 @@ export function applyAbsenceSecondaryOverrides(
   return next;
 }
 
+export function canOpenAbsenceManageArea(params: {
+  permissions: Partial<AbsenceSecondaryPermissionMap> | null | undefined;
+  isAdminTier?: boolean;
+}): boolean {
+  if (params.isAdminTier) {
+    return true;
+  }
+
+  const permissions = params.permissions;
+  if (!permissions) {
+    return false;
+  }
+
+  return Boolean(
+    permissions.see_bookings_all ||
+      permissions.see_bookings_team ||
+      permissions.add_edit_bookings_all ||
+      permissions.add_edit_bookings_team ||
+      permissions.see_allowances_all ||
+      permissions.see_allowances_team ||
+      permissions.add_edit_allowances_all ||
+      permissions.add_edit_allowances_team ||
+      permissions.see_manage_overview_all ||
+      permissions.see_manage_overview_team ||
+      permissions.see_manage_reasons ||
+      permissions.see_manage_work_shifts_all ||
+      permissions.see_manage_work_shifts_team ||
+      permissions.edit_manage_work_shifts_all ||
+      permissions.edit_manage_work_shifts_team ||
+      permissions.authorise_bookings_all ||
+      permissions.authorise_bookings_team
+  );
+}
+
 export const ABSENCE_SECONDARY_PERMISSION_HEADERS: AbsenceSecondaryPermissionHeaderConfig = {
   groups: [
     {

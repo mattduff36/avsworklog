@@ -57,6 +57,8 @@ import {
 } from '@/lib/utils/timesheet-off-days';
 import { buildLeaveAwareTotals, formatLeaveAwareWeeklyDisplayMultiline } from '@/lib/utils/timesheet-leave-totals';
 
+const APPROVALS_PAGE_SIZE = 50;
+
 function isAnnualLeaveReason(name: string): boolean {
   return name.trim().toLowerCase() === 'annual leave';
 }
@@ -123,6 +125,10 @@ function ApprovalsContent() {
   const statusFilter: StatusFilter = activeTab === 'timesheets' ? timesheetFilter : absenceStatusFilter;
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('all');
   const [selectedTeamId, setSelectedTeamId] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [visibleTimesheetCount, setVisibleTimesheetCount] = useState(APPROVALS_PAGE_SIZE);
+  const [visibleAbsenceCount, setVisibleAbsenceCount] = useState(APPROVALS_PAGE_SIZE);
   const [employees, setEmployees] = useState<FilterEmployee[]>([]);
   const [employeesLoading, setEmployeesLoading] = useState(false);
 
@@ -343,9 +349,12 @@ function ApprovalsContent() {
       }
 
       if (absenceStatusFilter !== 'all' && absence.status !== absenceStatusFilter) return false;
+      const absenceEnd = absence.end_date || absence.date;
+      if (dateFrom && absenceEnd < dateFrom) return false;
+      if (dateTo && absence.date > dateTo) return false;
       return true;
     });
-  }, [scopedAbsences, selectedEmployeeId, effectiveTeamFilter, absenceStatusFilter]);
+  }, [scopedAbsences, selectedEmployeeId, effectiveTeamFilter, absenceStatusFilter, dateFrom, dateTo]);
 
   const scopedTimesheets = useMemo(() => {
     if (timesheets.length === 0) return [] as TimesheetWithProfile[];
@@ -385,11 +394,30 @@ function ApprovalsContent() {
         }
       }
 
-      if (timesheetFilter === 'pending') return timesheet.status === 'submitted';
-      if (timesheetFilter !== 'all') return timesheet.status === timesheetFilter;
+      if (timesheetFilter === 'pending' && timesheet.status !== 'submitted') return false;
+      if (timesheetFilter !== 'all' && timesheetFilter !== 'pending' && timesheet.status !== timesheetFilter) return false;
+      if (dateFrom && timesheet.week_ending < dateFrom) return false;
+      if (dateTo && timesheet.week_ending > dateTo) return false;
       return true;
     });
-  }, [scopedTimesheets, selectedEmployeeId, employeeById, effectiveTeamFilter, timesheetFilter]);
+  }, [scopedTimesheets, selectedEmployeeId, employeeById, effectiveTeamFilter, timesheetFilter, dateFrom, dateTo]);
+
+  const visibleTimesheetCards = useMemo(
+    () => filteredTimesheets.slice(0, visibleTimesheetCount),
+    [filteredTimesheets, visibleTimesheetCount]
+  );
+  const visibleAbsenceCards = useMemo(
+    () => filteredAbsences.slice(0, visibleAbsenceCount),
+    [filteredAbsences, visibleAbsenceCount]
+  );
+
+  useEffect(() => {
+    setVisibleTimesheetCount(APPROVALS_PAGE_SIZE);
+  }, [selectedEmployeeId, effectiveTeamFilter, timesheetFilter, dateFrom, dateTo]);
+
+  useEffect(() => {
+    setVisibleAbsenceCount(APPROVALS_PAGE_SIZE);
+  }, [selectedEmployeeId, effectiveTeamFilter, absenceStatusFilter, dateFrom, dateTo]);
 
   const fetchApprovals = useCallback(async () => {
     try {
@@ -635,13 +663,17 @@ function ApprovalsContent() {
   const hasActiveFilters =
     selectedEmployeeId !== 'all' ||
     (!isTeamFilterLocked && selectedTeamId !== 'all') ||
-    (activeTab === 'timesheets' ? timesheetFilter !== 'pending' : absenceStatusFilter !== 'pending');
+    (activeTab === 'timesheets' ? timesheetFilter !== 'pending' : absenceStatusFilter !== 'pending') ||
+    Boolean(dateFrom) ||
+    Boolean(dateTo);
 
   const clearFilters = () => {
     setSelectedEmployeeId('all');
     setSelectedTeamId(isTeamFilterLocked ? (actorTeamId || '__no_team_scope__') : 'all');
     setTimesheetFilter('pending');
     setAbsenceStatusFilter('pending');
+    setDateFrom('');
+    setDateTo('');
   };
 
   const handleTabChange = (tab: string) => {
@@ -674,7 +706,7 @@ function ApprovalsContent() {
         );
       case 'processed':
         return (
-          <Badge variant="default">
+          <Badge variant="default" className="bg-blue-500/10 text-blue-300 border-blue-500/20 hover:bg-blue-500/20">
             Manager Approved
           </Badge>
         );
@@ -745,7 +777,7 @@ function ApprovalsContent() {
           </div>
         </CardHeader>
         <CardContent className="pt-0">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div>
               <p className="text-sm text-muted-foreground mb-2">Employee</p>
               <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
@@ -802,6 +834,35 @@ function ApprovalsContent() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="approvals-date-from" className="text-sm text-muted-foreground mb-2 block">Date From</Label>
+              <Input
+                id="approvals-date-from"
+                type="date"
+                value={dateFrom}
+                onChange={(event) => {
+                  const nextValue = event.target.value;
+                  setDateFrom(nextValue);
+                  if (dateTo && nextValue && dateTo < nextValue) {
+                    setDateTo(nextValue);
+                  }
+                }}
+                className="bg-background border-border text-foreground"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="approvals-date-to" className="text-sm text-muted-foreground mb-2 block">Date To</Label>
+              <Input
+                id="approvals-date-to"
+                type="date"
+                value={dateTo}
+                min={dateFrom || undefined}
+                onChange={(event) => setDateTo(event.target.value)}
+                className="bg-background border-border text-foreground"
+              />
             </div>
           </div>
         </CardContent>
@@ -944,13 +1005,14 @@ function ApprovalsContent() {
                       onReject={async (id) => { await handleQuickReject('timesheet', id); }}
                       onProcess={handleOpenProcessModal}
                       columnVisibility={columnVisibility}
+                      visibleCount={visibleTimesheetCount}
                     />
                   </div>
                 )}
 
                 {/* Card View - Always on mobile, conditional on desktop */}
                 <div className={timesheetViewMode === 'table' ? 'md:hidden space-y-4' : 'space-y-4'}>
-                  {filteredTimesheets.map((timesheet) => {
+                  {visibleTimesheetCards.map((timesheet) => {
                     const cardTotalDisplay = typeof timesheet.leave_worked_hours === 'number' && typeof timesheet.leave_days === 'number'
                       ? formatLeaveAwareWeeklyDisplayMultiline(timesheet.leave_worked_hours, timesheet.leave_days)
                       : timesheet.leave_total_display;
@@ -1038,6 +1100,20 @@ function ApprovalsContent() {
                     );
                   })}
                 </div>
+                {filteredTimesheets.length > visibleTimesheetCount && (
+                  <div className="flex flex-col items-center gap-3 pt-2">
+                    <p className="text-sm text-muted-foreground">
+                      Showing {visibleTimesheetCount} of {filteredTimesheets.length} timesheets
+                    </p>
+                    <Button
+                      variant="outline"
+                      onClick={() => setVisibleTimesheetCount((count) => count + APPROVALS_PAGE_SIZE)}
+                      className="border-border text-foreground"
+                    >
+                      Show More
+                    </Button>
+                  </div>
+                )}
               </>
             )}
           </TabsContent>
@@ -1155,13 +1231,14 @@ function ApprovalsContent() {
                         }
                       }}
                       columnVisibility={absenceColumnVisibility}
+                      visibleCount={visibleAbsenceCount}
                     />
                   </div>
                 )}
 
                 {/* Card View - Always on mobile, conditional on desktop */}
                 <div className={absenceViewMode === 'table' ? 'md:hidden space-y-4' : 'space-y-4'}>
-                  {filteredAbsences.map((absence) => (
+                  {visibleAbsenceCards.map((absence) => (
                     <AbsenceApprovalCard
                       key={absence.id}
                       absence={absence}
@@ -1171,6 +1248,20 @@ function ApprovalsContent() {
                     />
                   ))}
                 </div>
+                {filteredAbsences.length > visibleAbsenceCount && (
+                  <div className="flex flex-col items-center gap-3 pt-2">
+                    <p className="text-sm text-muted-foreground">
+                      Showing {visibleAbsenceCount} of {filteredAbsences.length} absences
+                    </p>
+                    <Button
+                      variant="outline"
+                      onClick={() => setVisibleAbsenceCount((count) => count + APPROVALS_PAGE_SIZE)}
+                      className="border-border text-foreground"
+                    >
+                      Show More
+                    </Button>
+                  </div>
+                )}
               </>
             )}
           </TabsContent>

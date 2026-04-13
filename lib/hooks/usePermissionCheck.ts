@@ -79,7 +79,7 @@ export function usePermissionCheck(moduleName: ModuleName, redirectOnFail = true
     }
 
     checkPermission();
-  }, [user, profile, isAdmin, isSuperAdmin, authLoading, permissionsLoading, permissions, enabledModuleSet, error, moduleName, redirectOnFail, router]);
+  }, [user, profile, isAdmin, isSuperAdmin, authLoading, permissionsLoading, permissions, enabledModuleSet, error, serviceUnavailable, moduleName, redirectOnFail, router]);
 
   return { hasPermission, loading, serviceUnavailable, errorStatus };
 }

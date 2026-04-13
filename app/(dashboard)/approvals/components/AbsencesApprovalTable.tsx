@@ -35,6 +35,7 @@ interface AbsencesApprovalTableProps {
   onReject: (id: string) => void;
   onProcess: (id: string) => void;
   columnVisibility: AbsenceColumnVisibility;
+  visibleCount?: number;
 }
 
 type SortField = 'name' | 'reason' | 'date' | 'duration' | 'submittedAt';
@@ -46,6 +47,7 @@ export function AbsencesApprovalTable({
   onReject,
   onProcess,
   columnVisibility,
+  visibleCount,
 }: AbsencesApprovalTableProps) {
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
@@ -78,6 +80,10 @@ export function AbsencesApprovalTable({
       }
     });
   }, [absences, sortField, sortDirection]);
+  const visibleAbsences = useMemo(
+    () => sortedAbsences.slice(0, visibleCount ?? sortedAbsences.length),
+    [sortedAbsences, visibleCount]
+  );
 
   if (absences.length === 0) {
     return (
@@ -221,7 +227,7 @@ export function AbsencesApprovalTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedAbsences.map((absence) => (
+            {visibleAbsences.map((absence) => (
               <TableRow
                 key={absence.id}
                 className="border-slate-700 hover:bg-slate-800/50"

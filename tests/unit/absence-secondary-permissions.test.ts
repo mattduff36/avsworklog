@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ABSENCE_SECONDARY_PERMISSION_KEYS,
   applyAbsenceSecondaryOverrides,
+  canOpenAbsenceManageArea,
   getAbsenceSecondaryDefaultMap,
 } from '@/types/absence-permissions';
 import { canActorUseScopedAbsencePermission } from '@/lib/server/absence-secondary-permissions';
@@ -138,6 +139,35 @@ describe('absence secondary permissions', () => {
         allKey: 'see_allowances_all',
         teamKey: 'see_allowances_team',
         ownKey: 'add_edit_allowances_all',
+      })
+    ).toBe(true);
+  });
+
+  it('does not open the manage area for employee own-booking permissions alone', () => {
+    const employeeDefaults = getAbsenceSecondaryDefaultMap('employee');
+
+    expect(
+      canOpenAbsenceManageArea({
+        permissions: employeeDefaults,
+        isAdminTier: false,
+      })
+    ).toBe(false);
+  });
+
+  it('opens the manage area for elevated team or admin absence permissions', () => {
+    const managerDefaults = getAbsenceSecondaryDefaultMap('manager');
+
+    expect(
+      canOpenAbsenceManageArea({
+        permissions: managerDefaults,
+        isAdminTier: false,
+      })
+    ).toBe(true);
+
+    expect(
+      canOpenAbsenceManageArea({
+        permissions: undefined,
+        isAdminTier: true,
       })
     ).toBe(true);
   });

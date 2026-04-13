@@ -10,8 +10,9 @@ export function ErrorLoggerInit() {
   useEffect(() => {
     let mounted = true;
 
-    void import('@/lib/utils/error-logger').then(({ errorLogger }) => {
+    void import('@/lib/utils/error-logger').then(({ errorLogger, initializeErrorLogger }) => {
       if (!mounted || typeof window === 'undefined') return;
+      initializeErrorLogger();
       (window as unknown as Record<string, unknown>).errorLogger = errorLogger;
       console.log('✅ Error logger initialized');
     });

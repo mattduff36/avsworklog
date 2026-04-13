@@ -58,6 +58,7 @@ import {
   canUseScopedAbsencePermission,
   useAbsenceSecondaryPermissions,
 } from '@/lib/hooks/useAbsenceSecondaryPermissions';
+import { canOpenAbsenceManageArea } from '@/types/absence-permissions';
 import type { AbsenceWithRelations } from '@/types/absence';
 import type { WorkShiftPattern } from '@/types/work-shifts';
 
@@ -106,14 +107,10 @@ export default function AdminAbsencePage() {
   const canEditWorkShifts = Boolean(absenceSecondarySnapshot?.flags.can_edit_manage_work_shifts || isAdminTier);
   const canEditWorkShiftsAllScope = Boolean(absenceSecondarySnapshot?.flags.can_edit_manage_work_shifts_all || isAdminTier);
   const canRunGlobalOverviewActions = Boolean(isAdminTier || canViewOverviewAllScope);
-  const canOpenManagePage =
-    canViewBookings ||
-    canViewAllowances ||
-    canAddEditBookings ||
-    canAuthoriseBookings ||
-    canViewOverviewTab ||
-    canViewReasonsTab ||
-    canViewWorkShiftsTab;
+  const canOpenManagePage = canOpenAbsenceManageArea({
+    permissions: absenceSecondarySnapshot?.permissions,
+    isAdminTier,
+  });
   const hasAbsenceSecondarySnapshot = Boolean(absenceSecondarySnapshot?.permissions && absenceSecondarySnapshot?.flags);
   const isAbsenceSecondaryContextLoading =
     canAccessAbsenceModule && (absenceSecondaryLoading || (!absenceSecondaryFetchedAfterMount && !hasAbsenceSecondarySnapshot));

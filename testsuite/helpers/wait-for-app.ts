@@ -14,4 +14,14 @@ export async function waitForAppReady(page: Page, timeout = 15_000): Promise<voi
   // Also wait for "Checking permissions..." to disappear
   const permCheck = page.getByText('Checking permissions...');
   await permCheck.waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => {});
+
+  // Many dashboard routes render a shared full-page loader after auth has completed.
+  // Wait for those transient shells to unmount so tests inspect the actual page state.
+  await page
+    .waitForFunction(
+      () => document.querySelectorAll('[data-testid="page-loader"]').length === 0,
+      undefined,
+      { timeout }
+    )
+    .catch(() => {});
 }

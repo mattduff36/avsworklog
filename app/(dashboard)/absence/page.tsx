@@ -23,6 +23,7 @@ import {
 import { clearClientServiceOutage } from '@/lib/app-auth/client-service-health';
 import { fetchAbsenceMessage } from '@/lib/client/absence-message';
 import { fetchCurrentWorkShift } from '@/lib/client/work-shifts';
+import { canOpenAbsenceManageArea } from '@/types/absence-permissions';
 import { AppPageShell } from '@/components/layout/AppPageShell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -211,12 +212,6 @@ export default function AbsencePage() {
   const actorProfileId = profile?.id || '';
   const isAdminTier = Boolean(isAdmin || isSuperAdmin);
   const canViewBookings = Boolean(absenceSecondarySnapshot?.flags.can_view_bookings || isAdminTier || isManager);
-  const canAddEditBookings = Boolean(absenceSecondarySnapshot?.flags.can_add_edit_bookings || isAdminTier);
-  const canViewAllowances = Boolean(absenceSecondarySnapshot?.flags.can_view_allowances || isAdminTier);
-  const canAuthoriseBookings = Boolean(absenceSecondarySnapshot?.flags.can_authorise_bookings || isAdminTier);
-  const canViewOverviewTab = Boolean(absenceSecondarySnapshot?.flags.can_view_manage_overview || isAdminTier);
-  const canViewReasonsTab = Boolean(absenceSecondarySnapshot?.flags.can_view_manage_reasons || isAdminTier);
-  const canViewWorkShiftsTab = Boolean(absenceSecondarySnapshot?.flags.can_view_manage_work_shifts || isAdminTier);
   const canRequestLeave =
     isAdminTier ||
     Boolean(
@@ -239,16 +234,10 @@ export default function AbsencePage() {
           }
         )
     );
-  const canOpenManageLink = Boolean(
-    isManager ||
-      canViewBookings ||
-      canViewAllowances ||
-      canAddEditBookings ||
-      canAuthoriseBookings ||
-      canViewOverviewTab ||
-      canViewReasonsTab ||
-      canViewWorkShiftsTab
-  );
+  const canOpenManageLink = canOpenAbsenceManageArea({
+    permissions: absenceSecondarySnapshot?.permissions,
+    isAdminTier,
+  });
   const [activeTab, setActiveTab] = useState<'calendar' | 'bookings'>('calendar');
   const [showRequestDialog, setShowRequestDialog] = useState(false);
   const [generationStatus, setGenerationStatus] = useState<GenerationStatus | null>(null);

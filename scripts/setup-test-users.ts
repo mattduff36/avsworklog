@@ -37,6 +37,7 @@ const TEST_USERS = [
     email: 'testsuite-admin@squiresapp.test',
     fullName: 'Testsuite Admin',
     employeeId: 'TS-ADM',
+    superAdmin: true,
     roleMatcher: { is_manager_admin: true, is_super_admin: false, name: 'admin' },
     roleFallback: { is_manager_admin: true },
   },
@@ -45,6 +46,7 @@ const TEST_USERS = [
     email: 'testsuite-manager@squiresapp.test',
     fullName: 'Testsuite Manager',
     employeeId: 'TS-MGR',
+    superAdmin: false,
     roleMatcher: { is_manager_admin: true, name: 'manager' },
     roleFallback: { is_manager_admin: true },
   },
@@ -53,6 +55,7 @@ const TEST_USERS = [
     email: 'testsuite-employee@squiresapp.test',
     fullName: 'Testsuite Employee',
     employeeId: 'TS-EMP',
+    superAdmin: false,
     roleMatcher: { is_manager_admin: false, name: 'employee' },
     roleFallback: { is_manager_admin: false },
   },
@@ -125,13 +128,17 @@ async function ensureUser(userDef: typeof TEST_USERS[number]): Promise<{ email: 
       full_name: userDef.fullName,
       employee_id: userDef.employeeId,
       role_id: roleId,
+      super_admin: userDef.superAdmin,
       must_change_password: false,
     }, { onConflict: 'id' });
 
   // Double-check: explicitly set must_change_password to false
   await supabase
     .from('profiles')
-    .update({ must_change_password: false })
+    .update({
+      must_change_password: false,
+      super_admin: userDef.superAdmin,
+    })
     .eq('id', userId);
 
   if (profileError) {

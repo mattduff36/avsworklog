@@ -728,6 +728,10 @@ function getBrowserErrorLogger(): ErrorLogger | null {
   return ErrorLogger.getInstance();
 }
 
+export function initializeErrorLogger(): void {
+  void getBrowserErrorLogger();
+}
+
 // Export a server-safe facade so accidental SSR imports do not instantiate the browser client.
 export const errorLogger: ErrorLoggerFacade = {
   async logError(args) {
