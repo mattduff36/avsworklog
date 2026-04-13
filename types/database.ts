@@ -1000,6 +1000,8 @@ export type Database = {
           van_id: string
           workshop_category_id: string
           workshop_comments: string
+          asset_meter_reading: number
+          asset_meter_unit: 'miles' | 'km' | 'hours'
           actioned_comment: string
           workshop_subcategory_id: string
           status_history: Json
@@ -1029,6 +1031,8 @@ export type Database = {
           van_id?: string | null
           workshop_category_id?: string | null
           workshop_comments?: string | null
+          asset_meter_reading?: number | null
+          asset_meter_unit?: 'miles' | 'km' | 'hours' | null
           actioned_comment?: string | null
           workshop_subcategory_id?: string | null
           status_history?: Json | null
@@ -1058,6 +1062,8 @@ export type Database = {
           van_id?: string | null
           workshop_category_id?: string | null
           workshop_comments?: string | null
+          asset_meter_reading?: number | null
+          asset_meter_unit?: 'miles' | 'km' | 'hours' | null
           actioned_comment?: string | null
           workshop_subcategory_id?: string | null
           status_history?: Json | null

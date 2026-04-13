@@ -43,6 +43,8 @@ describe('Workshop Attachment PDF', () => {
         ],
         assetName: '878 (Trailer woodford tilt bed)',
         assetType: 'plant' as const,
+        assetMeterReading: 1450,
+        assetMeterUnit: 'hours' as const,
       };
 
       expect(pdfProps.templateName).toBe('Service Checklist');
@@ -80,6 +82,8 @@ describe('Workshop Attachment PDF', () => {
         ],
         assetName: null,
         assetType: null,
+        assetMeterReading: null,
+        assetMeterUnit: null,
       };
 
       expect(pdfProps.v2Sections[0].fields[0].response_value).toBeNull();
@@ -165,6 +169,8 @@ describe('Workshop Attachment PDF', () => {
         id: 'task-1',
         status: 'completed',
         workshop_comments: 'carry out inspection',
+        asset_meter_reading: 1450,
+        asset_meter_unit: 'hours',
         workshop_task_categories: { name: 'Service (Plant)' },
       };
 
@@ -172,6 +178,8 @@ describe('Workshop Attachment PDF', () => {
       expect(v2Sections).toHaveLength(1);
       expect(v2Sections[0].fields).toHaveLength(1);
       expect(task.workshop_task_categories?.name).toBe('Service (Plant)');
+      expect(task.asset_meter_reading).toBe(1450);
+      expect(task.asset_meter_unit).toBe('hours');
     });
   });
 });

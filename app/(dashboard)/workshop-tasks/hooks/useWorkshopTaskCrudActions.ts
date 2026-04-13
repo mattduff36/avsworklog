@@ -2,6 +2,7 @@ import type React from 'react';
 import { toast } from 'sonner';
 import { recordRecentVehicleId } from '@/lib/utils/recentVehicles';
 import { showErrorWithDetails, fetchErrorDetails } from '@/lib/utils/error-details';
+import { inferAssetMeterUnit } from '@/lib/workshop-tasks/asset-meter';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ErrorDetailsResponse } from '@/types/error-details';
 import type { Action, Category, Subcategory, Vehicle } from '../types';
@@ -203,6 +204,11 @@ export function useWorkshopTaskCrudActions({
       const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId);
       const isPlant = selectedVehicle?.asset_type === 'plant';
       const isHgv = selectedVehicle?.asset_type === 'hgv';
+      const assetType =
+        selectedVehicle?.asset_type === 'van' || selectedVehicle?.asset_type === 'plant' || selectedVehicle?.asset_type === 'hgv'
+          ? selectedVehicle.asset_type
+          : null;
+      const assetMeterUnit = inferAssetMeterUnit(assetType);
       const taskTitle = `Workshop Task - ${getAssetIdLabel(selectedVehicle)}`;
 
       const taskData: Record<string, unknown> = {
@@ -213,6 +219,8 @@ export function useWorkshopTaskCrudActions({
         status: 'pending',
         priority: 'medium',
         created_by: userId,
+        asset_meter_reading: readingValue,
+        asset_meter_unit: assetMeterUnit,
       };
 
       if (categoryHasSubcategories) {
@@ -452,11 +460,18 @@ export function useWorkshopTaskCrudActions({
       const selectedVehicle = vehicles.find(v => v.id === editVehicleId);
       const isPlant = selectedVehicle?.asset_type === 'plant';
       const isHgv = selectedVehicle?.asset_type === 'hgv';
+      const assetType =
+        selectedVehicle?.asset_type === 'van' || selectedVehicle?.asset_type === 'plant' || selectedVehicle?.asset_type === 'hgv'
+          ? selectedVehicle.asset_type
+          : null;
+      const assetMeterUnit = inferAssetMeterUnit(assetType);
 
       const updateData: Record<string, unknown> = {
         workshop_comments: editComments,
         title: `Workshop Task - ${getAssetIdLabel(selectedVehicle)}`,
         description: editComments.substring(0, 200),
+        asset_meter_reading: mileageValue,
+        asset_meter_unit: assetMeterUnit,
       };
 
       if (editCategoryHasSubcategories && editSubcategoryId) {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Document, Image, Page, StyleSheet, Text, View } from '@react-pdf/renderer';
 import { format } from 'date-fns';
+import { formatAssetMeterReading, getAssetMeterLabel, type AssetMeterUnit } from '@/lib/workshop-tasks/asset-meter';
 
 const BRAND_YELLOW = '#f2cc0c';
 const BRAND_YELLOW_LIGHT = '#fff6cc';
@@ -233,6 +234,8 @@ interface WorkshopAttachmentPDFProps {
   v2Sections: V2PdfSectionData[];
   assetName: string | null;
   assetType: 'van' | 'plant' | 'hgv' | null;
+  assetMeterReading?: number | null;
+  assetMeterUnit?: AssetMeterUnit | null;
   logoSrc?: string | null;
 }
 
@@ -339,12 +342,15 @@ export function WorkshopAttachmentPDF({
   v2Sections,
   assetName,
   assetType,
+  assetMeterReading = null,
+  assetMeterUnit = null,
   logoSrc = null,
 }: WorkshopAttachmentPDFProps) {
   const itemCount = v2Sections.reduce((count, section) => count + section.fields.length, 0);
   const displayedAnsweredCount = v2Sections.reduce((count, section) => (
     count + section.fields.filter((field) => isV2FieldAnswered(field)).length
   ), 0);
+  const formattedAssetMeterReading = formatAssetMeterReading(assetMeterReading);
 
   return (
     <Document>
@@ -392,6 +398,12 @@ export function WorkshopAttachmentPDF({
                 {assetType === 'plant' ? 'Plant:' : assetType === 'hgv' ? 'HGV:' : 'Van:'}
               </Text>
               <Text style={styles.value}>{assetName}</Text>
+            </View>
+          )}
+          {formattedAssetMeterReading && (
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>{getAssetMeterLabel(assetMeterUnit)}:</Text>
+              <Text style={styles.value}>{formattedAssetMeterReading}</Text>
             </View>
           )}
           <View style={styles.infoRow}>

@@ -4,6 +4,7 @@ import { renderToStream } from '@react-pdf/renderer';
 import { WorkshopAttachmentPDF, type V2PdfSectionData } from '@/lib/pdf/workshop-attachment-pdf';
 import { loadSquiresLogoDataUrl } from '@/lib/pdf/squires-logo';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { inferAssetMeterUnit, normalizeAssetMeterUnit } from '@/lib/workshop-tasks/asset-meter';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -29,6 +30,8 @@ interface TaskRow {
   title: string;
   status: string;
   workshop_comments: string | null;
+  asset_meter_reading: number | null;
+  asset_meter_unit: string | null;
   van_id: string | null;
   plant_id: string | null;
   hgv_id: string | null;
@@ -58,6 +61,11 @@ interface FieldResponseRow {
   field_key: string;
   response_value: string | null;
   response_json: Record<string, unknown> | null;
+}
+
+interface MaintenanceMeterRow {
+  current_hours?: number | null;
+  current_mileage?: number | null;
 }
 
 function normalizeFieldType(
@@ -187,6 +195,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         title,
         status,
         workshop_comments,
+        asset_meter_reading,
+        asset_meter_unit,
         van_id,
         plant_id,
         hgv_id,
@@ -206,6 +216,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // Try to get asset name for context
     let assetName: string | null = null;
     let assetType: 'van' | 'plant' | 'hgv' | null = null;
+    let assetMeterReading = task?.asset_meter_reading ?? null;
+    let assetMeterUnit = normalizeAssetMeterUnit(task?.asset_meter_unit ?? null);
 
     if (task?.van_id) {
       const { data: vehicle } = await supabase
@@ -243,6 +255,29 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       }
     }
 
+    if (assetMeterReading == null && task) {
+      const idColumn = task.plant_id ? 'plant_id' : task.hgv_id ? 'hgv_id' : task.van_id ? 'van_id' : null;
+      const assetId = task.plant_id ?? task.hgv_id ?? task.van_id ?? null;
+      const meterColumn = task.plant_id ? 'current_hours' : 'current_mileage';
+
+      if (idColumn && assetId) {
+        const { data: maintenance } = await supabase
+          .from('vehicle_maintenance')
+          .select(meterColumn)
+          .eq(idColumn, assetId)
+          .maybeSingle();
+
+        const meterData = maintenance as MaintenanceMeterRow | null;
+        assetMeterReading = meterColumn === 'current_hours'
+          ? (meterData?.current_hours ?? null)
+          : (meterData?.current_mileage ?? null);
+      }
+    }
+
+    if (!assetMeterUnit) {
+      assetMeterUnit = inferAssetMeterUnit(assetType);
+    }
+
     const templateName = attachment.workshop_attachment_templates?.name || 'Attachment';
     const logoSrc = await loadSquiresLogoDataUrl();
 
@@ -259,6 +294,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       v2Sections,
       assetName,
       assetType,
+      assetMeterReading,
+      assetMeterUnit,
       logoSrc,
     });
 

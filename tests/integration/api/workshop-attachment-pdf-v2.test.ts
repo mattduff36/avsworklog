@@ -50,6 +50,8 @@ describe('WorkshopAttachmentPDF rendering paths', () => {
         ],
         assetName: 'VN-TEST-001',
         assetType: 'van',
+        assetMeterReading: 84215,
+        assetMeterUnit: 'miles',
       }),
     );
 
@@ -98,6 +100,8 @@ describe('WorkshopAttachmentPDF rendering paths', () => {
         ],
         assetName: 'HGV-TEST-001',
         assetType: 'hgv',
+        assetMeterReading: 128000,
+        assetMeterUnit: 'km',
       }),
     );
 

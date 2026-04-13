@@ -52,6 +52,7 @@
 - All attachment data stored in database (no file uploads for MVP)
 - Responses are preserved even if template questions are later modified
 - Question snapshots stored with responses for historical accuracy
+- Attachment PDF exports must show the task's captured asset meter snapshot in the top `Details` section
 
 ---
 

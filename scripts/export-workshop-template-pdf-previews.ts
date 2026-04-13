@@ -93,6 +93,20 @@ function selectAssetName(assetType: 'van' | 'plant' | 'hgv' | null): string | nu
   return null;
 }
 
+function selectAssetMeterReading(assetType: 'van' | 'plant' | 'hgv' | null): number | null {
+  if (assetType === 'plant') return 1450;
+  if (assetType === 'hgv') return 128000;
+  if (assetType === 'van') return 84215;
+  return null;
+}
+
+function selectAssetMeterUnit(assetType: 'van' | 'plant' | 'hgv' | null): 'miles' | 'km' | 'hours' | null {
+  if (assetType === 'plant') return 'hours';
+  if (assetType === 'hgv') return 'km';
+  if (assetType === 'van') return 'miles';
+  return null;
+}
+
 function buildDummyResponseValue(
   fieldType: V2PdfSectionData['fields'][number]['field_type'],
   label: string,
@@ -261,6 +275,8 @@ async function run() {
 
       const assetType = selectAssetType(template.applies_to);
       const assetName = selectAssetName(assetType);
+      const assetMeterReading = selectAssetMeterReading(assetType);
+      const assetMeterUnit = selectAssetMeterUnit(assetType);
       const documentNode = WorkshopAttachmentPDF({
         templateName: template.name,
         templateDescription: template.description,
@@ -273,6 +289,8 @@ async function run() {
         v2Sections,
         assetType,
         assetName,
+        assetMeterReading,
+        assetMeterUnit,
         logoSrc,
       });
 
