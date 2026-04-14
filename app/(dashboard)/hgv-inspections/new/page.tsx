@@ -43,6 +43,7 @@ import { InspectionPhotoTiles } from '@/components/inspections/InspectionPhotoTi
 import { useInspectionPhotos } from '@/lib/hooks/useInspectionPhotos';
 import { getInspectionPhotoKey } from '@/lib/inspection-photos';
 import { getReadingDigitGrowthWarning } from '@/lib/utils/readingDigitGrowthWarning';
+import { getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
 
 const PhotoUpload = dynamic(() => import('@/components/forms/PhotoUpload'), { ssr: false });
 const SignaturePad = dynamic(() => import('@/components/forms/SignaturePad'), { ssr: false });
@@ -80,7 +81,7 @@ function NewHgvInspectionContent() {
     supabaseRef.current = createClient();
   }
   const supabase = supabaseRef.current as ReturnType<typeof createClient>;
-  const { user, profile, effectiveRole, isManager, isAdmin, isSuperAdmin } = useAuth();
+  const { user, profile, effectiveRole, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
   const { loading: permissionLoading } = usePermissionCheck('hgv-inspections');
   const { canManageInspections: canManageCrossUserInspections } = getInspectionVisibilityFlags({
     teamName: effectiveRole?.team_name ?? profile?.team?.name,
@@ -325,8 +326,10 @@ function NewHgvInspectionContent() {
       return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not merge with existing draft';
-      console.error('Failed to merge into existing HGV draft:', err, { errorContextId });
-      if (showToast) {
+      if (!isAuthErrorStatus(getErrorStatus(err))) {
+        console.error('Failed to merge into existing HGV draft:', err, { errorContextId });
+      }
+      if (showToast && !isAuthErrorStatus(getErrorStatus(err))) {
         toast.error(message, { id: errorContextId });
       }
       return false;
@@ -626,32 +629,42 @@ function NewHgvInspectionContent() {
   }, [canManageCrossUserInspections, supabase, user?.id]);
 
   useEffect(() => {
-    const loadData = async () => {
-      const [{ data: hgvData }, employeeData] = await Promise.all([
-        supabase
-          .from('hgvs')
-          .select('id, reg_number, nickname, current_mileage, hgv_categories(name)')
-          .eq('status', 'active')
-          .order('reg_number'),
-        canManageCrossUserInspections
-          ? fetchUserDirectory({ module: 'hgv-inspections' })
-          : Promise.resolve([] as DirectoryUser[]),
-      ]);
+    if (authLoading || permissionLoading || !user) {
+      return;
+    }
 
-      setHgvs((hgvData || []) as HgvAsset[]);
-      setEmployees(
-        employeeData.map((employee) => ({
-          id: employee.id,
-          full_name: employee.full_name || 'Unknown User',
-          employee_id: employee.employee_id,
-          has_module_access: employee.has_module_access,
-        })) as Employee[]
-      );
-      if (user) setSelectedEmployeeId(user.id);
+    const loadData = async () => {
+      try {
+        const [{ data: hgvData }, employeeData] = await Promise.all([
+          supabase
+            .from('hgvs')
+            .select('id, reg_number, nickname, current_mileage, hgv_categories(name)')
+            .eq('status', 'active')
+            .order('reg_number'),
+          canManageCrossUserInspections
+            ? fetchUserDirectory({ module: 'hgv-inspections' })
+            : Promise.resolve([] as DirectoryUser[]),
+        ]);
+
+        setHgvs((hgvData || []) as HgvAsset[]);
+        setEmployees(
+          employeeData.map((employee) => ({
+            id: employee.id,
+            full_name: employee.full_name || 'Unknown User',
+            employee_id: employee.employee_id,
+            has_module_access: employee.has_module_access,
+          })) as Employee[]
+        );
+        setSelectedEmployeeId(user.id);
+      } catch (error) {
+        if (!isAuthErrorStatus(getErrorStatus(error))) {
+          console.error('Error loading HGV inspection setup data:', error);
+        }
+      }
     };
 
-    loadData();
-  }, [canManageCrossUserInspections, supabase, user]);
+    void loadData();
+  }, [authLoading, canManageCrossUserInspections, permissionLoading, supabase, user]);
 
   useEffect(() => {
     if (

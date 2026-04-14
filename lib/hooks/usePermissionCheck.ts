@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from './useAuth';
 import { usePermissionSnapshot } from './usePermissionSnapshot';
 import type { ModuleName } from '@/types/roles';
-import { getErrorStatus, isServerErrorStatus } from '@/lib/utils/http-error';
+import { getErrorStatus, isAuthErrorStatus, isServerErrorStatus } from '@/lib/utils/http-error';
 import { toast } from 'sonner';
 
 /**
@@ -54,6 +54,11 @@ export function usePermissionCheck(moduleName: ModuleName, redirectOnFail = true
         return;
       }
 
+      if (isAuthErrorStatus(errorStatus)) {
+        setLoading(true);
+        return;
+      }
+
       if (error) {
         console.error('Error checking permission:', error);
         setHasPermission(false);
@@ -79,7 +84,7 @@ export function usePermissionCheck(moduleName: ModuleName, redirectOnFail = true
     }
 
     checkPermission();
-  }, [user, profile, isAdmin, isSuperAdmin, authLoading, permissionsLoading, permissions, enabledModuleSet, error, serviceUnavailable, moduleName, redirectOnFail, router]);
+  }, [user, profile, isAdmin, isSuperAdmin, authLoading, permissionsLoading, permissions, enabledModuleSet, error, errorStatus, serviceUnavailable, moduleName, redirectOnFail, router]);
 
   return { hasPermission, loading, serviceUnavailable, errorStatus };
 }

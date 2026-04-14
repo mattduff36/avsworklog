@@ -20,6 +20,7 @@ import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { canEditDraftInspection, getInspectionVisibilityFlags } from '@/lib/utils/inspection-access';
 import { formatDate } from '@/lib/utils/date';
 import { isUuid } from '@/lib/utils/uuid';
+import { getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
 import type { Employee } from '@/types/common';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import {
@@ -146,34 +147,44 @@ function HgvInspectionsContent() {
   }, [hgvFilter, normalizedHgvFilter, setHgvFilter]);
 
   const fetchFilters = useCallback(async () => {
-    const { data: hgvData } = await supabase
-      .from('hgvs')
-      .select('id, reg_number, nickname')
-      .eq('status', 'active')
-      .order('reg_number');
-    setHgvs(hgvData || []);
-
-    if (
-      user &&
-      canAccessInspectionModule &&
-      !permissionLoading &&
-      canViewCrossUserInspections
-    ) {
-      const profileData = await fetchUserDirectory({ module: 'hgv-inspections' });
-      setScopedEmployeeIds(Array.from(new Set([user.id, ...profileData.map((employee) => employee.id)])));
-      setEmployees(
-        profileData.map((employee) => ({
-          id: employee.id,
-          full_name: employee.full_name || 'Unknown User',
-          employee_id: employee.employee_id,
-          has_module_access: employee.has_module_access,
-        })) as Employee[]
-      );
-    } else if (user) {
-      setEmployees([]);
-      setScopedEmployeeIds([user.id]);
+    if (authLoading || !user || permissionLoading || !canAccessInspectionModule) {
+      setHgvs([]);
+      return;
     }
-  }, [canAccessInspectionModule, permissionLoading, canViewCrossUserInspections, supabase, user]);
+
+    try {
+      if (canViewCrossUserInspections) {
+        const { data: hgvData } = await supabase
+          .from('hgvs')
+          .select('id, reg_number, nickname')
+          .eq('status', 'active')
+          .order('reg_number');
+        setHgvs(hgvData || []);
+      } else {
+        setHgvs([]);
+      }
+
+      if (canViewCrossUserInspections) {
+        const profileData = await fetchUserDirectory({ module: 'hgv-inspections' });
+        setScopedEmployeeIds(Array.from(new Set([user.id, ...profileData.map((employee) => employee.id)])));
+        setEmployees(
+          profileData.map((employee) => ({
+            id: employee.id,
+            full_name: employee.full_name || 'Unknown User',
+            employee_id: employee.employee_id,
+            has_module_access: employee.has_module_access,
+          })) as Employee[]
+        );
+      } else {
+        setEmployees([]);
+        setScopedEmployeeIds([user.id]);
+      }
+    } catch (error) {
+      if (!isAuthErrorStatus(getErrorStatus(error))) {
+        console.error('Error fetching HGV filters:', error);
+      }
+    }
+  }, [authLoading, canAccessInspectionModule, permissionLoading, canViewCrossUserInspections, supabase, user]);
 
   const fetchInspections = useCallback(async () => {
     if (!user || authLoading || permissionLoading || !canAccessInspectionModule) return;

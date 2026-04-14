@@ -20,7 +20,7 @@ type BrowserSupabaseClient = SupabaseClient<Database>
 
 let client: BrowserSupabaseClient | null = null
 let cachedDataToken: { token: string; expiresAt: number } | null = null
-let pendingDataTokenPromise: Promise<string> | null = null
+let pendingDataTokenPromise: Promise<string | null> | null = null
 let lastDataTokenFailureStatus: number | null = null
 
 async function fetchJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
@@ -80,7 +80,7 @@ async function getCurrentAuthSessionResponse(): Promise<ClientAuthSessionRespons
   }
 }
 
-async function getDataToken(): Promise<string> {
+async function loadDataToken(): Promise<string | null> {
   if (cachedDataToken && cachedDataToken.expiresAt * 1000 > Date.now() + 30_000) {
     return cachedDataToken.token
   }
@@ -111,13 +111,25 @@ async function getDataToken(): Promise<string> {
       } else {
         clearClientServiceOutage('data-token')
       }
-      return ''
+      return null
     } finally {
       pendingDataTokenPromise = null
     }
   })()
 
   return pendingDataTokenPromise
+}
+
+async function getDataTokenOrThrow(): Promise<string> {
+  const token = await loadDataToken()
+  if (token) {
+    return token
+  }
+
+  throw createStatusError(
+    lastDataTokenFailureStatus === 423 ? 'Session is locked' : 'Unauthorized',
+    lastDataTokenFailureStatus ?? 401
+  )
 }
 
 export function invalidateCachedDataToken(): void {
@@ -154,10 +166,8 @@ export function createClient(): BrowserSupabaseClient {
       supabaseAnonKey,
       {
         accessToken: async () => {
-          const token = await getDataToken()
-          if (token) {
-            baseClient.realtime.setAuth(token)
-          }
+          const token = await getDataTokenOrThrow()
+          baseClient.realtime.setAuth(token)
           return token
         },
         auth: {
@@ -227,7 +237,16 @@ export function createClient(): BrowserSupabaseClient {
           }
         }
 
-        const token = await getDataToken()
+        const token = await loadDataToken()
+        if (!token) {
+          return {
+            data: {
+              session: null,
+            },
+            error: null,
+          }
+        }
+
         const expiresAt = cachedDataToken?.expiresAt ?? Math.floor(Date.now() / 1000)
         return {
           data: {

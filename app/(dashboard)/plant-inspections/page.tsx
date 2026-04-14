@@ -23,6 +23,7 @@ import { PlantInspection } from '@/types/inspection';
 import { Employee, InspectionStatusFilter } from '@/types/common';
 import { useQueryState } from 'nuqs';
 import { canEditDraftInspection, getInspectionVisibilityFlags } from '@/lib/utils/inspection-access';
+import { getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -190,7 +191,9 @@ function PlantInspectionsContent() {
         if (error) throw error;
         setPlants(data || []);
       } catch (err) {
-        console.error('Error fetching plants:', err);
+        if (!isAuthErrorStatus(getErrorStatus(err))) {
+          console.error('Error fetching plants:', err);
+        }
       }
     };
 
@@ -218,12 +221,17 @@ function PlantInspectionsContent() {
       };
 
       void fetchEmployees();
+      void fetchPlants();
     } else if (user) {
       setEmployees([]);
       setScopedEmployeeIds([user.id]);
+      setPlants([]);
     }
-    fetchPlants();
-  }, [user, canAccessInspectionModule, permissionLoading, canViewCrossUserInspections, supabase]);
+
+    if (authLoading || permissionLoading || !canAccessInspectionModule || !canViewCrossUserInspections) {
+      setPlants([]);
+    }
+  }, [authLoading, user, canAccessInspectionModule, permissionLoading, canViewCrossUserInspections, supabase]);
 
   const fetchInspections = useCallback(async () => {
     if (!user || authLoading || permissionLoading || !canAccessInspectionModule) return;

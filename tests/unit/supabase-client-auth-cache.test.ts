@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 function setupClientEnv(): void {
-  vi.stubGlobal('window', {} as Window);
+  vi.stubGlobal('window', {
+    location: {
+      origin: 'https://app.example.com',
+    },
+  } as unknown as Window);
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co';
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'anon-key';
 }
@@ -140,5 +144,55 @@ describe('supabase client auth token cache', () => {
 
     await client.auth.getSession();
     expect(getClientServiceOutage()).toBeNull();
+  });
+
+  it('stops Supabase queries before sending an empty bearer token', async () => {
+    setupClientEnv();
+
+    vi.doMock('@/lib/app-auth/client-session', () => ({
+      loadClientAuthSession: vi.fn(async () => ({
+        status: 'authenticated',
+        payload: {
+          authenticated: true,
+          locked: false,
+          user: { id: 'user-4', email: 'user4@example.com' },
+          profile: { id: 'profile-4' },
+        },
+        responseStatus: 200,
+        error: null,
+      })),
+    }));
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = input instanceof Request ? input.url : String(input);
+
+      if (url.includes('/api/auth/data-token')) {
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized' }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      return new Response(JSON.stringify({ data: [] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { createClient } = await import('@/lib/supabase/client');
+    const client = createClient();
+
+    const result = await client.from('profiles').select('id');
+
+    expect(result.data).toBeNull();
+    expect(result.error?.message).toContain('Unauthorized');
+
+    const requestedUrls = fetchMock.mock.calls.map(([input]) =>
+      input instanceof Request ? input.url : String(input)
+    );
+
+    expect(requestedUrls).toHaveLength(1);
+    expect(requestedUrls[0]).toContain('/api/auth/data-token');
   });
 });

@@ -44,6 +44,7 @@ import { getInspectionPhotoKey } from '@/lib/inspection-photos';
 import { getRecentVehicleIds, recordRecentVehicleId, splitVehiclesByRecent } from '@/lib/utils/recentVehicles';
 import { getReadingDigitGrowthWarning } from '@/lib/utils/readingDigitGrowthWarning';
 import { getInspectionErrorMessage, isDuplicateInspectionError } from '@/lib/utils/inspection-error-handling';
+import { getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
 
 // Dynamic imports for heavy components
 const PhotoUpload = dynamic(() => import('@/components/forms/PhotoUpload'), { ssr: false });
@@ -88,7 +89,7 @@ function NewPlantInspectionContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const draftId = searchParams.get('id');
-  const { user, profile, effectiveRole, isManager, isAdmin, isSuperAdmin } = useAuth();
+  const { user, profile, effectiveRole, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
   const { loading: permissionLoading } = usePermissionCheck('plant-inspections');
   const { canManageInspections: canManageCrossUserInspections } = getInspectionVisibilityFlags({
     teamName: effectiveRole?.team_name ?? profile?.team?.name,
@@ -392,8 +393,10 @@ function NewPlantInspectionContent() {
       return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not merge with existing draft';
-      console.error('Failed to merge into existing plant draft:', err, { errorContextId });
-      if (showToast) {
+      if (!isAuthErrorStatus(getErrorStatus(err))) {
+        console.error('Failed to merge into existing plant draft:', err, { errorContextId });
+      }
+      if (showToast && !isAuthErrorStatus(getErrorStatus(err))) {
         toast.error(message, { id: errorContextId });
       }
       return false;
@@ -597,6 +600,10 @@ function NewPlantInspectionContent() {
   autoSaveDraftRef.current = () => ensureDraftSaved({ silent: true, source: 'auto' });
 
   useEffect(() => {
+    if (authLoading || permissionLoading || !user) {
+      return;
+    }
+
     const fetchPlants = async () => {
       try {
         const { data, error } = await supabase
@@ -613,13 +620,15 @@ function NewPlantInspectionContent() {
         if (error) throw error;
         setPlants(data || []);
       } catch (err) {
-        console.error('Error fetching plants:', err);
-        setError('Failed to load plants');
+        if (!isAuthErrorStatus(getErrorStatus(err))) {
+          console.error('Error fetching plants:', err);
+          setError('Failed to load plants');
+        }
       }
     };
 
-    fetchPlants();
-  }, [supabase]);
+    void fetchPlants();
+  }, [authLoading, permissionLoading, supabase, user]);
 
   const loadDraftInspection = useCallback(async (id: string) => {
     if (activeDraftLoadIdRef.current === id || loadedDraftIdRef.current === id) {

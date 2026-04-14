@@ -30,6 +30,8 @@ interface TaskRow {
   id: string;
   title: string;
   status: string;
+  created_at: string;
+  actioned_at: string | null;
   workshop_comments: string | null;
   asset_meter_reading: number | null;
   asset_meter_unit: string | null;
@@ -224,6 +226,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         id,
         title,
         status,
+        created_at,
+        actioned_at,
         workshop_comments,
         asset_meter_reading,
         asset_meter_unit,
@@ -310,6 +314,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const templateName = attachment.workshop_attachment_templates?.name || 'Attachment';
     const logoSrc = await loadSquiresLogoDataUrl();
+    const reportCreatedAt = task?.created_at ?? attachment.created_at;
+    const reportCompletedAt = task ? task.actioned_at : attachment.completed_at;
 
     // Generate PDF
     const pdfDocument = WorkshopAttachmentPDF({
@@ -319,8 +325,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       taskCategory: task?.workshop_task_categories?.name || 'Workshop Task',
       taskStatus: task?.status || 'unknown',
       attachmentStatus: attachment.status,
-      completedAt: attachment.completed_at,
-      createdAt: attachment.created_at,
+      completedAt: reportCompletedAt,
+      createdAt: reportCreatedAt,
       v2Sections,
       assetName,
       assetType,

@@ -69,6 +69,7 @@ export default function DashboardPage() {
     isActualSuperAdmin,
     isViewingAs,
     effectiveRole,
+    loading: authLoading,
     recoverFromAuthFailure,
     forceAuthRedirect,
   } = useAuth();
@@ -224,9 +225,11 @@ export default function DashboardPage() {
     } catch (error) {
       const errorStatus = getErrorStatus(error);
       setMetricsErrorStatus(errorStatus);
-      console.error('Error loading dashboard metrics:', error, {
-        errorContextId: 'dashboard-load-metrics-error',
-      });
+      if (!isAuthErrorStatus(errorStatus)) {
+        console.error('Error loading dashboard metrics:', error, {
+          errorContextId: 'dashboard-load-metrics-error',
+        });
+      }
 
       if (!isAuthErrorStatus(errorStatus)) {
         setPendingApprovals(canViewApprovals ? buildPendingApprovalsSummary(0, 0) : []);
@@ -247,12 +250,12 @@ export default function DashboardPage() {
   }, [applyDashboardMetrics, canViewApprovals, fetchDashboardMetrics]);
 
   useEffect(() => {
-    if (permissionsLoading) {
+    if (authLoading || permissionsLoading || !profile?.id) {
       return;
     }
 
     void loadDashboardMetrics();
-  }, [loadDashboardMetrics, permissionsLoading, profile?.id]);
+  }, [authLoading, loadDashboardMetrics, permissionsLoading, profile?.id]);
 
   useEffect(() => {
     recoveryAttemptedRef.current = false;

@@ -15,6 +15,8 @@ import { Label } from '@/components/ui/label';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { formatDateTime } from '@/lib/utils/date';
 
+const PRIMARY_CTA_BUTTON_CLASS = 'bg-avs-yellow text-slate-900 hover:bg-avs-yellow-hover font-semibold disabled:opacity-60';
+
 export interface AdjustTimestampTarget {
   itemType: 'created' | 'status_event' | 'comment';
   timelineItemId: string;
@@ -153,7 +155,7 @@ export function AdjustTaskTimestampDialog({
           <Button
             onClick={handleConfirm}
             disabled={submitting}
-            className={tabletModeEnabled ? 'min-h-11 text-base px-4' : undefined}
+            className={`${PRIMARY_CTA_BUTTON_CLASS}${tabletModeEnabled ? ' min-h-11 text-base px-4' : ''}`}
           >
             {submitting ? 'Saving...' : 'Save Timestamp'}
           </Button>

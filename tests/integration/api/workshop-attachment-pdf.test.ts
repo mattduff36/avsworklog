@@ -131,7 +131,7 @@ describe('Workshop Attachment PDF', () => {
       expect(filename).not.toMatch(/[/\\:*?"<>|()]/);
     });
 
-    it('should build correct response data structure from Supabase queries', () => {
+    it('should prefer parent task lifecycle timestamps for report dates', () => {
       // Simulates the data joining done in the route
       const attachment = {
         id: 'att-1',
@@ -168,11 +168,16 @@ describe('Workshop Attachment PDF', () => {
       const task = {
         id: 'task-1',
         status: 'completed',
+        created_at: '2026-02-01T08:35:00Z',
+        actioned_at: '2026-02-07T16:47:00Z',
         workshop_comments: 'carry out inspection',
         asset_meter_reading: 1450,
         asset_meter_unit: 'hours',
         workshop_task_categories: { name: 'Service (Plant)' },
       };
+
+      const reportCreatedAt = task.created_at ?? attachment.created_at;
+      const reportCompletedAt = task.actioned_at ?? null;
 
       expect(attachment.workshop_attachment_templates?.name).toBe('Service Checklist');
       expect(v2Sections).toHaveLength(1);
@@ -180,6 +185,8 @@ describe('Workshop Attachment PDF', () => {
       expect(task.workshop_task_categories?.name).toBe('Service (Plant)');
       expect(task.asset_meter_reading).toBe(1450);
       expect(task.asset_meter_unit).toBe('hours');
+      expect(reportCreatedAt).toBe('2026-02-01T08:35:00Z');
+      expect(reportCompletedAt).toBe('2026-02-07T16:47:00Z');
     });
   });
 });
