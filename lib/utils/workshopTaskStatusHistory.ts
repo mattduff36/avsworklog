@@ -11,6 +11,7 @@ export type StatusHistoryEvent = {
     to?: string;
     signature_data?: string;
     signed_at?: string;
+    timestamp_adjusted?: boolean;
   };
 };
 

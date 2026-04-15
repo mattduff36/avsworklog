@@ -36,6 +36,19 @@ import { Button } from '@/components/ui/button';
 import { PageLoader } from '@/components/ui/page-loader';
 import type { Category, HgvAsset, HgvCategory, PlantAsset, Vehicle } from './types';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
+import { getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
+
+function isExpectedFleetLoadError(error: unknown): boolean {
+  const status = getErrorStatus(error);
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return (
+    isAuthErrorStatus(status) ||
+    message.includes('Unauthorized') ||
+    message.includes('Not authenticated') ||
+    message.includes('Failed to fetch') ||
+    message.includes('NetworkError')
+  );
+}
 
 function FleetContent() {
   const searchParams = useSearchParams();
@@ -143,7 +156,7 @@ function FleetContent() {
 
   // Fetch plant assets
   const fetchPlantAssets = async () => {
-    if (!supabase) return;
+    if (!supabase || authLoading || fleetPermissionLoading || !canViewFleet) return;
     setPlantAssetsLoading(true);
     try {
       const { data, error } = await supabase
@@ -154,7 +167,11 @@ function FleetContent() {
       if (error) throw error;
       setPlantAssets(data || []);
     } catch (error) {
-      logger.error('Failed to fetch plant assets', error, 'FleetPage');
+      if (isExpectedFleetLoadError(error)) {
+        setPlantAssets([]);
+      } else {
+        logger.error('Failed to fetch plant assets', error, 'FleetPage');
+      }
     } finally {
       setPlantAssetsLoading(false);
     }
@@ -178,7 +195,7 @@ function FleetContent() {
 
   // Fetch HGV assets
   const fetchHgvAssets = async () => {
-    if (!supabase) return;
+    if (!supabase || authLoading || fleetPermissionLoading || !canViewFleet) return;
     setHgvAssetsLoading(true);
     try {
       const { data, error } = await supabase
@@ -190,7 +207,11 @@ function FleetContent() {
       if (error) throw error;
       setHgvAssets(data || []);
     } catch (error) {
-      logger.error('Failed to fetch HGV assets', error, 'FleetPage');
+      if (isExpectedFleetLoadError(error)) {
+        setHgvAssets([]);
+      } else {
+        logger.error('Failed to fetch HGV assets', error, 'FleetPage');
+      }
     } finally {
       setHgvAssetsLoading(false);
     }
@@ -214,6 +235,10 @@ function FleetContent() {
 
   // Fetch data on initial load based on active tab from URL
   useEffect(() => {
+    if (authLoading || fleetPermissionLoading || !canViewFleet) {
+      return;
+    }
+
     if (pageTab === 'settings') {
       if (categories.length === 0) fetchCategories();
       if (vehicles.length === 0) fetchVehicles();
@@ -229,7 +254,7 @@ function FleetContent() {
       if (hgvAssets.length === 0) fetchHgvAssets();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageTab, assetTab]);
+  }, [pageTab, assetTab, authLoading, fleetPermissionLoading, canViewFleet]);
   
   const handlePageTabChange = (value: string) => {
     const v = value as 'overview' | 'settings';

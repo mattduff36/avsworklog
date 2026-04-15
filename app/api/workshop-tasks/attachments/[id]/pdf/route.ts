@@ -5,6 +5,7 @@ import { WorkshopAttachmentPDF, type V2PdfSectionData } from '@/lib/pdf/workshop
 import { loadSquiresLogoDataUrl } from '@/lib/pdf/squires-logo';
 import { normalizeSignatureDataUrl } from '@/lib/pdf/signature-image';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import type { StatusHistoryEvent } from '@/lib/utils/workshopTaskStatusHistory';
 import { inferAssetMeterUnit, normalizeAssetMeterUnit } from '@/lib/workshop-tasks/asset-meter';
 
 interface RouteParams {
@@ -32,6 +33,7 @@ interface TaskRow {
   status: string;
   created_at: string;
   actioned_at: string | null;
+  status_history: unknown[] | null;
   workshop_comments: string | null;
   asset_meter_reading: number | null;
   asset_meter_unit: string | null;
@@ -69,6 +71,71 @@ interface FieldResponseRow {
 interface MaintenanceMeterRow {
   current_hours?: number | null;
   current_mileage?: number | null;
+}
+
+function isStatusHistoryEvent(value: unknown): value is StatusHistoryEvent {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as Partial<StatusHistoryEvent>;
+  return (
+    candidate.type === 'status' &&
+    typeof candidate.id === 'string' &&
+    typeof candidate.status === 'string' &&
+    typeof candidate.created_at === 'string'
+  );
+}
+
+function getLatestCompletedStatusEvent(statusHistory: unknown[] | null | undefined): StatusHistoryEvent | null {
+  if (!Array.isArray(statusHistory)) {
+    return null;
+  }
+
+  return statusHistory
+    .filter(isStatusHistoryEvent)
+    .filter((event) => event.status === 'completed')
+    .sort((left, right) => new Date(left.created_at).getTime() - new Date(right.created_at).getTime())
+    .at(-1) ?? null;
+}
+
+function getIsoDatePart(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed.toISOString().slice(0, 10);
+}
+
+function hasSignatureDateMismatch(
+  sections: V2PdfSectionData[],
+  completedAt: string | null
+): boolean {
+  const completedDate = getIsoDatePart(completedAt);
+  if (!completedDate) {
+    return false;
+  }
+
+  return sections.some((section) =>
+    section.fields.some((field) => {
+      if (field.field_type !== 'signature') {
+        return false;
+      }
+
+      const signatureDate = getIsoDatePart(
+        typeof field.response_json?.signed_at === 'string'
+          ? field.response_json.signed_at
+          : null
+      );
+
+      return Boolean(signatureDate && signatureDate !== completedDate);
+    })
+  );
 }
 
 function normalizeFieldType(
@@ -228,6 +295,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         status,
         created_at,
         actioned_at,
+        status_history,
         workshop_comments,
         asset_meter_reading,
         asset_meter_unit,
@@ -316,6 +384,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const logoSrc = await loadSquiresLogoDataUrl();
     const reportCreatedAt = task?.created_at ?? attachment.created_at;
     const reportCompletedAt = task ? task.actioned_at : attachment.completed_at;
+    const completedStatusEvent = getLatestCompletedStatusEvent(task?.status_history);
+    const completedTimestampAdjusted = Boolean(completedStatusEvent?.meta?.timestamp_adjusted);
+    const signatureTimestampOverride = reportCompletedAt && (
+      completedTimestampAdjusted || hasSignatureDateMismatch(v2Sections, reportCompletedAt)
+    )
+      ? reportCompletedAt
+      : null;
 
     // Generate PDF
     const pdfDocument = WorkshopAttachmentPDF({
@@ -327,6 +402,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       attachmentStatus: attachment.status,
       completedAt: reportCompletedAt,
       createdAt: reportCreatedAt,
+      signatureTimestampOverride,
+      signatureTimestampOverrideDateOnly: Boolean(signatureTimestampOverride),
       v2Sections,
       assetName,
       assetType,

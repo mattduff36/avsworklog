@@ -216,6 +216,10 @@ describe('PATCH /api/workshop-tasks/tasks/[taskId]/timeline/[timelineItemId]/tim
             author_id: 'user-completed',
             author_name: 'Completer',
             body: 'Completed work',
+            meta: {
+              signature_data: 'data:image/png;base64,signature',
+              signed_at: '2026-04-13T12:00:00.000Z',
+            },
           },
         ],
       }),
@@ -235,10 +239,16 @@ describe('PATCH /api/workshop-tasks/tasks/[taskId]/timeline/[timelineItemId]/tim
       expect.objectContaining({
         actioned: true,
         actioned_at: nextTimestamp,
+        actioned_signed_at: nextTimestamp,
         status_history: expect.arrayContaining([
           expect.objectContaining({
             id: 'event-completed',
             created_at: nextTimestamp,
+            meta: expect.objectContaining({
+              signature_data: 'data:image/png;base64,signature',
+              signed_at: nextTimestamp,
+              timestamp_adjusted: true,
+            }),
           }),
         ]),
       })

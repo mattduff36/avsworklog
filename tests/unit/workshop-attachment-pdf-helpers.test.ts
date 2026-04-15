@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { isSignatureComplete, isV2FieldAnswered, type V2PdfFieldData } from '@/lib/pdf/workshop-attachment-pdf';
+import {
+  getSignatureTimestampText,
+  isSignatureComplete,
+  isV2FieldAnswered,
+  type V2PdfFieldData,
+} from '@/lib/pdf/workshop-attachment-pdf';
 
 function buildField(overrides: Partial<V2PdfFieldData> = {}): V2PdfFieldData {
   return {
@@ -32,5 +37,22 @@ describe('workshop attachment PDF helpers', () => {
       signed_by_name: 'LUKE WILLIAMS',
       signed_at: '2026-04-10T16:46:00.000Z',
     })).toBe(false);
+  });
+
+  it('shows the original signature timestamp with time when no override exists', () => {
+    const result = getSignatureTimestampText({
+      signatureAt: '2026-04-10T15:45:00.000Z',
+    });
+
+    expect(result).toContain('April 10th, 2026');
+    expect(result).toMatch(/\d{1,2}:\d{2} [AP]M/);
+  });
+
+  it('shows the adjusted completed date without time when overridden', () => {
+    expect(getSignatureTimestampText({
+      signatureAt: '2026-04-10T15:45:00.000Z',
+      signatureTimestampOverride: '2026-04-07T08:35:00.000Z',
+      signatureTimestampOverrideDateOnly: true,
+    })).toBe('April 7th, 2026');
   });
 });

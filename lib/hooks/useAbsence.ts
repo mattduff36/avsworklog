@@ -974,7 +974,11 @@ export function useProcessAbsence() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      await assertAbsenceFinancialYearOpen(supabase, id);
+      const canProceed = await assertAbsenceFinancialYearOpen(supabase, id, { treatMissingAsNoop: true });
+      if (!canProceed) {
+        // Stale UI state: record already removed or unavailable. Treat as an idempotent success.
+        return { id, status: 'processed' } as const;
+      }
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -990,9 +994,10 @@ export function useProcessAbsence() {
         .eq('id', id)
         .eq('status', 'approved')
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
+      if (!data) return { id, status: 'processed' } as const;
       return data;
     },
     onSuccess: () => {

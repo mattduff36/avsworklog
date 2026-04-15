@@ -56,6 +56,7 @@ import {
   resolveTimesheetOffDayStates,
 } from '@/lib/utils/timesheet-off-days';
 import { buildLeaveAwareTotals, formatLeaveAwareWeeklyDisplayMultiline } from '@/lib/utils/timesheet-leave-totals';
+import { getErrorMessage, shouldLogAbsenceManageError } from '@/lib/utils/absence-error-handling';
 
 const APPROVALS_PAGE_SIZE = 50;
 
@@ -260,6 +261,21 @@ function ApprovalsContent() {
     actorTeamName ||
     teamOptions.find((team) => team.value === actorTeamId)?.label ||
     (actorTeamId ? 'My Team' : 'No team assigned');
+
+  const reportAbsenceActionError = useCallback((
+    actionLabel: string,
+    error: unknown,
+    errorContextId: string,
+    fallbackMessage: string
+  ) => {
+    const message = getErrorMessage(error, fallbackMessage);
+    if (shouldLogAbsenceManageError(error)) {
+      console.error(`${actionLabel}:`, error, { errorContextId });
+    } else {
+      console.warn(`${actionLabel}:`, message);
+    }
+    toast.error(message, { id: errorContextId });
+  }, []);
 
   useEffect(() => {
     if (selectedEmployeeId === 'all') return;
@@ -1208,8 +1224,7 @@ function ApprovalsContent() {
                         try { await approveAbsence.mutateAsync(id); }
                         catch (e) {
                           const errorContextId = 'approvals-table-absence-approve-error';
-                          console.error('Error approving absence:', e, { errorContextId });
-                          toast.error('Failed to approve absence', { id: errorContextId });
+                          reportAbsenceActionError('Error approving absence', e, errorContextId, 'Failed to approve absence');
                         }
                       }}
                       onReject={async (id) => {
@@ -1218,16 +1233,14 @@ function ApprovalsContent() {
                         try { await rejectAbsence.mutateAsync({ id, reason }); }
                         catch (e) {
                           const errorContextId = 'approvals-table-absence-reject-error';
-                          console.error('Error rejecting absence:', e, { errorContextId });
-                          toast.error('Failed to reject absence', { id: errorContextId });
+                          reportAbsenceActionError('Error rejecting absence', e, errorContextId, 'Failed to reject absence');
                         }
                       }}
                       onProcess={async (id) => {
                         try { await processAbsence.mutateAsync(id); }
                         catch (e) {
                           const errorContextId = 'approvals-table-absence-process-error';
-                          console.error('Error processing absence:', e, { errorContextId });
-                          toast.error('Failed to process absence', { id: errorContextId });
+                          reportAbsenceActionError('Error processing absence', e, errorContextId, 'Failed to process absence');
                         }
                       }}
                       columnVisibility={absenceColumnVisibility}
@@ -1245,6 +1258,7 @@ function ApprovalsContent() {
                       onApprove={approveAbsence}
                       onProcess={processAbsence}
                       onReject={rejectAbsence}
+                      reportAbsenceActionError={reportAbsenceActionError}
                     />
                   ))}
                 </div>
@@ -1286,12 +1300,14 @@ function AbsenceApprovalCard({
   absence, 
   onApprove, 
   onProcess,
-  onReject 
+  onReject,
+  reportAbsenceActionError,
 }: { 
   absence: AbsenceWithRelations;
   onApprove: ReturnType<typeof useApproveAbsence>;
   onProcess: ReturnType<typeof useProcessAbsence>;
   onReject: ReturnType<typeof useRejectAbsence>;
+  reportAbsenceActionError: (actionLabel: string, error: unknown, errorContextId: string, fallbackMessage: string) => void;
 }) {
   const [rejecting, setRejecting] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
@@ -1324,8 +1340,7 @@ function AbsenceApprovalCard({
       await onApprove.mutateAsync(absence.id);
     } catch (error) {
       const errorContextId = 'approvals-absence-approve-error';
-      console.error('Error approving absence:', error, { errorContextId });
-      toast.error('Failed to approve absence', { id: errorContextId });
+      reportAbsenceActionError('Error approving absence', error, errorContextId, 'Failed to approve absence');
     }
   }
 
@@ -1336,8 +1351,7 @@ function AbsenceApprovalCard({
       await onProcess.mutateAsync(absence.id);
     } catch (error) {
       const errorContextId = 'approvals-absence-process-error';
-      console.error('Error processing absence:', error, { errorContextId });
-      toast.error('Failed to process absence', { id: errorContextId });
+      reportAbsenceActionError('Error processing absence', error, errorContextId, 'Failed to process absence');
     }
   }
   
@@ -1358,8 +1372,7 @@ function AbsenceApprovalCard({
       setRejectionReason('');
     } catch (error) {
       const errorContextId = 'approvals-absence-reject-error';
-      console.error('Error rejecting absence:', error, { errorContextId });
-      toast.error('Failed to reject absence', { id: errorContextId });
+      reportAbsenceActionError('Error rejecting absence', error, errorContextId, 'Failed to reject absence');
     }
   }
   

@@ -302,6 +302,20 @@ export async function PATCH(
           ? {
               ...event,
               created_at: timestamp,
+              meta: event.status === 'completed'
+                ? {
+                    ...event.meta,
+                    signed_at: timestamp,
+                    timestamp_adjusted: true,
+                  }
+                : event.meta
+                  ? {
+                      ...event.meta,
+                      timestamp_adjusted: true,
+                    }
+                  : {
+                      timestamp_adjusted: true,
+                    },
             }
           : event
       )

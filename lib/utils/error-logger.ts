@@ -307,6 +307,37 @@ class ErrorLogger {
     return false;
   }
 
+  private shouldIgnoreUnhandledPromiseRejection(reason: unknown): boolean {
+    const reasonLike = reason && typeof reason === 'object' ? reason as { message?: unknown; stack?: unknown } : null;
+    const message =
+      (reason instanceof Error ? this.asText(reason.message) : null) ||
+      this.asText(reasonLike?.message) ||
+      '';
+    const stack =
+      (reason instanceof Error ? this.asText(reason.stack) : null) ||
+      this.asText(reasonLike?.stack) ||
+      '';
+
+    if (!message) {
+      return false;
+    }
+
+    if (message.includes('We could not verify your session, so data loading has been paused.')) {
+      return true;
+    }
+
+    if (message !== 'Unauthorized' && message !== 'Session is locked') {
+      return false;
+    }
+
+    return (
+      stack.includes('accessToken') ||
+      stack.includes('_getAccessToken') ||
+      stack.includes('setAuth') ||
+      stack.includes('SupabaseClient')
+    );
+  }
+
   private constructor() {
     // Load last email sent date from localStorage
     if (typeof window !== 'undefined') {
@@ -366,6 +397,9 @@ class ErrorLogger {
       // Capture unhandled promise rejections
       window.addEventListener('unhandledrejection', (event) => {
         const reason = event.reason;
+        if (this.shouldIgnoreUnhandledPromiseRejection(reason)) {
+          return;
+        }
         let errorMessage = 'Promise rejected';
         
         if (reason instanceof Error) {

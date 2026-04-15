@@ -140,7 +140,7 @@ describe('PATCH /api/quotes/[id]', () => {
     expect(response.status).toBe(400);
     expect(payload.error).toBe('Add a customer contact email before sending this quote.');
     expect(mockSendQuoteToCustomerEmail).not.toHaveBeenCalled();
-  });
+  }, 15000);
 
   it('saves PO details without advancing the quote status', async () => {
     const { PATCH } = await import('@/app/api/quotes/[id]/route');

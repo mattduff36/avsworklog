@@ -814,9 +814,14 @@ export default function AdminAbsencePage() {
       setShowDeleteDialog(false);
       setDeleteTargetId(null);
     } catch (error) {
+      const message = getErrorMessage(error, 'Failed to delete absence');
       const errorContextId = 'absence-manage-delete-error';
-      console.error('Error deleting:', error, { errorContextId });
-      toast.error('Failed to delete absence', { id: errorContextId });
+      if (shouldLogAbsenceManageError(error)) {
+        console.error('Error deleting:', error, { errorContextId });
+      } else {
+        console.warn('Delete absence request rejected:', message);
+      }
+      toast.error(message, { id: errorContextId });
     } finally {
       setDeleteSubmitting(false);
     }

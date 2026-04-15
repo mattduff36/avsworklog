@@ -9,6 +9,7 @@ const EXPECTED_ABSENCE_VALIDATION_MESSAGES = [
   'Half-day absences must be a single day',
   'This absence is in a closed financial year and is read-only',
   'This financial year is closed for employee bookings. Please contact your manager.',
+  'Cannot modify absences from a closed financial year',
 ];
 
 const EXPECTED_ABSENCE_ACCESS_MESSAGES = [
@@ -16,7 +17,10 @@ const EXPECTED_ABSENCE_ACCESS_MESSAGES = [
   'Forbidden: Work shifts edit access required',
   'Forbidden: Out of scope for this team',
   'Unauthorized',
+  'Not authenticated',
+  'Session is locked',
   'JWT expired',
+  'We could not verify your session, so data loading has been paused.',
 ];
 
 function extractErrorMessage(error: unknown): string {

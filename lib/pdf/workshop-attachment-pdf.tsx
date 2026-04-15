@@ -285,6 +285,8 @@ interface WorkshopAttachmentPDFProps {
   attachmentStatus: 'pending' | 'completed';
   completedAt: string | null;
   createdAt: string;
+  signatureTimestampOverride?: string | null;
+  signatureTimestampOverrideDateOnly?: boolean;
   v2Sections: V2PdfSectionData[];
   assetName: string | null;
   assetType: 'van' | 'plant' | 'hgv' | null;
@@ -320,6 +322,26 @@ function formatDateTimeSafe(value: string): string {
   } catch {
     return value;
   }
+}
+
+export function getSignatureTimestampText({
+  signatureAt,
+  signatureTimestampOverride = null,
+  signatureTimestampOverrideDateOnly = false,
+}: {
+  signatureAt: string | null;
+  signatureTimestampOverride?: string | null;
+  signatureTimestampOverrideDateOnly?: boolean;
+}): string {
+  const effectiveTimestamp = signatureTimestampOverride || signatureAt;
+
+  if (!effectiveTimestamp) {
+    return 'No signature captured';
+  }
+
+  return signatureTimestampOverrideDateOnly
+    ? formatDateSafe(effectiveTimestamp)
+    : formatDateTimeSafe(effectiveTimestamp);
 }
 
 function getMarkingCodeLabel(value: string): string {
@@ -392,6 +414,8 @@ export function WorkshopAttachmentPDF({
   attachmentStatus,
   completedAt,
   createdAt,
+  signatureTimestampOverride = null,
+  signatureTimestampOverrideDateOnly = false,
   v2Sections,
   assetName,
   assetType,
@@ -567,7 +591,11 @@ export function WorkshopAttachmentPDF({
                             <Text style={styles.signatureMetaValue}>{signatureName || 'No signature captured'}</Text>
                             <Text style={styles.signatureMetaLabel}>Signed At</Text>
                             <Text style={styles.signatureMetaValue}>
-                              {signatureAt ? formatDateTimeSafe(signatureAt) : 'No signature captured'}
+                              {getSignatureTimestampText({
+                                signatureAt: signatureAt || null,
+                                signatureTimestampOverride,
+                                signatureTimestampOverrideDateOnly,
+                              })}
                             </Text>
                           </View>
                           <View style={styles.signatureCanvasWrap}>
