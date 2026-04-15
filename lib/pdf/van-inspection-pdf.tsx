@@ -2,6 +2,7 @@ import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Image as PdfImage } from '@react-pdf/renderer';
 import { VanInspection, InspectionItem } from '@/types/inspection';
 import { formatDate } from '@/lib/utils/date';
+import { buildInspectionPdfCommentsText } from '@/lib/utils/inspection-pdf-comments';
 
 // Create styles for the PDF matching the Van inspection form
 const styles = StyleSheet.create({
@@ -281,17 +282,10 @@ export function VanInspectionPDF({ inspection, items, vehicleReg, employeeName }
     return item.status === 'ok' ? 'PASS' : item.status === 'attention' ? 'FAIL' : 'N/A';
   };
 
-  // Collect all defects and comments
-  const defectsAndComments = items
-    .filter(item => item.comments || item.status === 'attention')
-    .map(item => {
-      const itemName = item.item_description;
-      const status = item.status === 'ok' ? 'PASS' : item.status === 'attention' ? 'FAIL' : 'N/A';
-      const dayIndex = Number((item as unknown as { day_of_week?: number }).day_of_week ?? 1) - 1;
-      const dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][dayIndex];
-      return `${item.item_number}. ${itemName} (${dayName}) [${status}]${item.comments ? ': ' + item.comments : ''}`;
-    })
-    .join('\n');
+  const defectsAndComments = buildInspectionPdfCommentsText({
+    inspectorComments: inspection.inspector_comments,
+    items: items as Array<InspectionItem & { day_of_week?: number | null }>,
+  });
 
   return (
     <Document>

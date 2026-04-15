@@ -827,13 +827,24 @@ export default function ViewInspectionPage() {
         </div>
       )}
 
+      {inspection.inspector_comments && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Inspector Comments</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm whitespace-pre-wrap">{inspection.inspector_comments}</p>
+          </CardContent>
+        </Card>
+      )}
+
       {inspection.manager_comments && (
         <Card className="bg-white dark:bg-slate-900 border-amber-200 bg-amber-50 dark:bg-amber-950/20">
           <CardHeader>
             <CardTitle className="text-amber-900 dark:text-amber-400">Manager Comments</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-amber-800 dark:text-amber-300">{inspection.manager_comments}</p>
+            <p className="text-amber-800 dark:text-amber-300 whitespace-pre-wrap">{inspection.manager_comments}</p>
           </CardContent>
         </Card>
       )}

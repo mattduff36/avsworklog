@@ -12,6 +12,7 @@ export interface VanInspection {
   reviewed_by: string | null;
   reviewed_at: string | null;
   manager_comments: string | null;
+  inspector_comments?: string | null;
   signature_data?: string | null;
   signed_at?: string | null;
   created_at: string;

@@ -16,11 +16,13 @@ describe('Inspection Types Contract', () => {
         reviewed_by: null,
         reviewed_at: null,
         manager_comments: null,
+        inspector_comments: 'Driver noted damage near the rear door',
         created_at: '2026-01-01T00:00:00Z',
         updated_at: '2026-01-01T00:00:00Z',
       };
       expect(van.van_id).toBe('vehicle-id');
       expect(van.status).toBe('draft');
+      expect(van.inspector_comments).toContain('rear door');
     });
 
     it('allows submitted status', () => {
@@ -29,7 +31,7 @@ describe('Inspection Types Contract', () => {
         inspection_date: '2026-01-01', inspection_end_date: '2026-01-07',
         current_mileage: null, status: 'submitted',
         submitted_at: '2026-01-07T10:00:00Z',
-        reviewed_by: null, reviewed_at: null, manager_comments: null,
+        reviewed_by: null, reviewed_at: null, manager_comments: null, inspector_comments: null,
         created_at: '', updated_at: '',
       };
       expect(van.status).toBe('submitted');
@@ -95,7 +97,7 @@ describe('Inspection Types Contract', () => {
         inspection_date: '2026-01-01', inspection_end_date: '2026-01-07',
         current_mileage: null, status: 'draft',
         submitted_at: null, reviewed_by: null, reviewed_at: null,
-        manager_comments: null, created_at: '', updated_at: '',
+        manager_comments: null, inspector_comments: null, created_at: '', updated_at: '',
       };
       const assignable: VanInspection = v;
       expect(assignable.van_id).toBe('v');

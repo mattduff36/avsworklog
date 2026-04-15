@@ -978,7 +978,7 @@ export default function ViewPlantInspectionPage() {
             <CardTitle>Inspector Comments</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm">{inspection.inspector_comments}</p>
+            <p className="text-sm whitespace-pre-wrap">{inspection.inspector_comments}</p>
           </CardContent>
         </Card>
       )}
