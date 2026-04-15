@@ -110,6 +110,11 @@ export function TaskAttachmentsSection({ taskId, taskStatus, onUpdate }: TaskAtt
   };
 
   const handleDownloadPdf = async (attachment: TaskAttachmentWithDetails) => {
+    if (!attachment.schema_snapshot?.snapshot_json?.sections?.length) {
+      toast.error('This attachment is missing a V2 schema snapshot.');
+      return;
+    }
+
     setDownloadingAttachmentId(attachment.id);
     try {
       const response = await fetch(`/api/workshop-tasks/attachments/${attachment.id}/pdf`);
@@ -196,6 +201,7 @@ export function TaskAttachmentsSection({ taskId, taskStatus, onUpdate }: TaskAtt
             const schemaProgress = getSchemaCompletionProgress(attachment);
             const progress = schemaProgress || { completed: 0, total: 0, percentage: 0 };
             const templateName = attachment.workshop_attachment_templates?.name || 'Unknown Template';
+            const hasSchemaSnapshot = Boolean(attachment.schema_snapshot?.snapshot_json?.sections?.length);
             const canUndoComplete = !isTaskCompleted && attachment.status === 'completed'
               && canUndoAttachmentCompletion(attachment.completed_at);
             const undoLabel = formatAttachmentUndoRemaining(attachment.completed_at);
@@ -260,8 +266,9 @@ export function TaskAttachmentsSection({ taskId, taskStatus, onUpdate }: TaskAtt
                           event.stopPropagation();
                           void handleDownloadPdf(attachment);
                         }}
-                        disabled={downloadingAttachmentId === attachment.id}
+                        disabled={downloadingAttachmentId === attachment.id || !hasSchemaSnapshot}
                         className="h-8 px-2"
+                        title={hasSchemaSnapshot ? 'Download attachment PDF' : 'This attachment is missing a V2 schema snapshot'}
                       >
                         {downloadingAttachmentId === attachment.id ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />

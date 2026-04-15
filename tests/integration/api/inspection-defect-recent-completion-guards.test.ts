@@ -33,6 +33,10 @@ interface MockClientOptions {
   insertCalls: unknown[];
 }
 
+function buildRecentCompletionTimestamp(): string {
+  return new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+}
+
 const ROUTE_CASES: RouteCase[] = [
   {
     name: 'van',
@@ -298,6 +302,7 @@ describe('inspection defect recent completion guards', () => {
     'skips creating a new $name defect task when the same defect was completed recently',
     async ({ assetKind, route, url, requestBody }) => {
       const insertCalls: unknown[] = [];
+      const recentCompletionTimestamp = buildRecentCompletionTimestamp();
       const adminClient = createMockAdminClient({
         assetKind,
         completedTasks: [
@@ -308,7 +313,7 @@ describe('inspection defect recent completion guards', () => {
                 : assetKind === 'hgv'
                   ? 'HGV inspection defect found:\nItem 3 - Tyres (Sunday)\nComment: previous report'
                   : 'Plant inspection defect found:\nItem 3 - Tyres (Sunday)\nComment: previous report',
-            actioned_at: '2026-04-08T14:12:20.907Z',
+            actioned_at: recentCompletionTimestamp,
           },
         ],
         insertCalls,
@@ -337,6 +342,7 @@ describe('inspection defect recent completion guards', () => {
     'allows $name repeat defects when reconfirmed with a non-normalized signature payload',
     async ({ assetKind, route, url, requestBody }) => {
       const insertCalls: unknown[] = [];
+      const recentCompletionTimestamp = buildRecentCompletionTimestamp();
       const adminClient = createMockAdminClient({
         assetKind,
         completedTasks: [
@@ -347,7 +353,7 @@ describe('inspection defect recent completion guards', () => {
                 : assetKind === 'hgv'
                   ? 'HGV inspection defect found:\nItem 3 - Tyres (Sunday)\nComment: previous report'
                   : 'Plant inspection defect found:\nItem 3 - Tyres (Sunday)\nComment: previous report',
-            actioned_at: '2026-04-08T14:12:20.907Z',
+            actioned_at: recentCompletionTimestamp,
           },
         ],
         insertCalls,

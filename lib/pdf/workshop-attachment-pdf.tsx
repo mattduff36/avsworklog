@@ -119,14 +119,16 @@ const styles = StyleSheet.create({
   checklistTableHeaderCellLabel: {
     width: '46%',
     borderRight: '1pt solid #d1d5db',
-    padding: 5,
+    paddingVertical: 4,
+    paddingHorizontal: 5,
     fontSize: 8.5,
     fontWeight: 'bold',
     color: '#334155',
   },
   checklistTableHeaderCellValue: {
     width: '54%',
-    padding: 5,
+    paddingVertical: 4,
+    paddingHorizontal: 5,
     fontSize: 8.5,
     fontWeight: 'bold',
     color: '#334155',
@@ -139,17 +141,19 @@ const styles = StyleSheet.create({
   checklistLabelCell: {
     width: '46%',
     borderRight: '1pt solid #e2e8f0',
-    padding: 5,
+    paddingVertical: 3,
+    paddingHorizontal: 5,
     fontSize: 8.5,
     color: '#1f2937',
-    lineHeight: 1.35,
+    lineHeight: 1.2,
   },
   checklistValueCell: {
     width: '54%',
-    padding: 5,
+    paddingVertical: 3,
+    paddingHorizontal: 5,
     fontSize: 8.5,
     color: '#0f172a',
-    lineHeight: 1.35,
+    lineHeight: 1.2,
   },
   requiredMarker: {
     color: '#dc2626',
@@ -175,21 +179,22 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     padding: 6,
     backgroundColor: '#fbfcfe',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  signatureInfoColumn: {
+    flex: 1,
+    paddingRight: 8,
   },
   signatureCardTitle: {
     fontSize: 9,
     fontWeight: 'bold',
     color: '#0f172a',
-    marginBottom: 3,
-  },
-  signatureCardBody: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    marginBottom: 4,
   },
   signatureMetaColumn: {
-    width: '29%',
-    paddingRight: 6,
+    width: '100%',
   },
   signatureMetaLabel: {
     fontSize: 7.5,
@@ -243,8 +248,8 @@ const styles = StyleSheet.create({
   valueBadge: {
     alignSelf: 'flex-start',
     borderRadius: 3,
-    padding: '2pt 6pt',
-    fontSize: 8,
+    padding: '1pt 5pt',
+    fontSize: 7.25,
     fontWeight: 'bold',
   },
   footer: {
@@ -584,8 +589,8 @@ export function WorkshopAttachmentPDF({
                         style={styles.signatureCard}
                         wrap={false}
                       >
-                        <Text style={styles.signatureCardTitle}>{field.label}</Text>
-                        <View style={styles.signatureCardBody}>
+                        <View style={styles.signatureInfoColumn}>
+                          <Text style={styles.signatureCardTitle}>{field.label}</Text>
                           <View style={styles.signatureMetaColumn}>
                             <Text style={styles.signatureMetaLabel}>Signed By</Text>
                             <Text style={styles.signatureMetaValue}>{signatureName || 'No signature captured'}</Text>
@@ -598,14 +603,14 @@ export function WorkshopAttachmentPDF({
                               })}
                             </Text>
                           </View>
-                          <View style={styles.signatureCanvasWrap}>
-                            {signatureDataUrl ? (
-                              // eslint-disable-next-line jsx-a11y/alt-text
-                              <Image src={signatureDataUrl} style={styles.signatureImage} />
-                            ) : (
-                              <Text style={styles.signatureMissing}>No signature captured</Text>
-                            )}
-                          </View>
+                        </View>
+                        <View style={styles.signatureCanvasWrap}>
+                          {signatureDataUrl ? (
+                            // eslint-disable-next-line jsx-a11y/alt-text
+                            <Image src={signatureDataUrl} style={styles.signatureImage} />
+                          ) : (
+                            <Text style={styles.signatureMissing}>No signature captured</Text>
+                          )}
                         </View>
                       </View>
                     );

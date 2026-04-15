@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
 
     const { data: linkedTasks, error: linkedTasksError } = await supabaseAdmin
       .from('actions')
-      .select('id, action_type, status, created_at')
+      .select('id, action_type, status, created_at, logged_at, actioned_at')
       .eq('inspection_id', inspectionId)
       .in('action_type', ['inspection_defect', 'workshop_vehicle_task'])
       .order('created_at', { ascending: false });

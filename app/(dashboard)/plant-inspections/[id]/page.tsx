@@ -22,6 +22,7 @@ import { InspectionStatus, InspectionItem } from '@/types/inspection';
 import PhotoUpload from '@/components/forms/PhotoUpload';
 import { Database } from '@/types/database';
 import { InspectionPhotoGallery } from '@/components/inspections/InspectionPhotoGallery';
+import { InformWorkshopSummary } from '@/components/inspections/InformWorkshopSummary';
 import { useInspectionPhotos } from '@/lib/hooks/useInspectionPhotos';
 import { getInspectionPhotoKey } from '@/lib/inspection-photos';
 import { formatReferenceId, getReferenceIdSuffix, getWorkshopTaskHref } from '@/lib/utils/reference-ids';
@@ -547,6 +548,7 @@ export default function ViewPlantInspectionPage() {
       (task): task is { id: string; suffix: string; href: string } =>
         Boolean(task.suffix && task.href)
     );
+  const hasInformWorkshopTask = linkedTasks.some((task) => task.action_type === 'workshop_vehicle_task');
 
   const isWeeklyInspection = inspection.inspection_end_date && 
     inspection.inspection_end_date !== inspection.inspection_date;
@@ -972,13 +974,22 @@ export default function ViewPlantInspectionPage() {
       )}
 
       {/* Inspector Comments */}
-      {inspection.inspector_comments && (
+      {(inspection.inspector_comments || hasInformWorkshopTask) && (
         <Card>
-          <CardHeader>
-            <CardTitle>Inspector Comments</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm whitespace-pre-wrap">{inspection.inspector_comments}</p>
+          <CardContent className="p-6">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
+              <div className="min-w-0 space-y-3">
+                <h2 className="text-xl font-semibold tracking-tight">Inspector Comments</h2>
+                <div className="rounded-lg border border-white/10 p-4">
+                  {inspection.inspector_comments ? (
+                    <p className="text-sm whitespace-pre-wrap">{inspection.inspector_comments}</p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No inspector comment recorded.</p>
+                  )}
+                </div>
+              </div>
+              <InformWorkshopSummary linkedTasks={linkedTasks} inspectionType="plant" />
+            </div>
           </CardContent>
         </Card>
       )}

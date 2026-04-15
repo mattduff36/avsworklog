@@ -61,12 +61,19 @@ export async function handleAuthFailureStatus(
   }
 
   pendingRecoveryPromise = (async () => {
-    if (!allowRecovery) {
-      await registeredHandlers?.forceAuthRedirect(statusCode);
+    try {
+      if (!allowRecovery) {
+        await registeredHandlers?.forceAuthRedirect(statusCode);
+        return false;
+      }
+
+      return await registeredHandlers.recoverFromAuthFailure({ statusCode });
+    } catch {
+      if (fallbackToRedirect) {
+        return fallbackRedirect(statusCode);
+      }
       return false;
     }
-
-    return registeredHandlers.recoverFromAuthFailure({ statusCode });
   })().finally(() => {
     pendingRecoveryPromise = null;
   });

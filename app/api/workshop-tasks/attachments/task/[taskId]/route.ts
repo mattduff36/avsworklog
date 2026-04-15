@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { logServerError } from '@/lib/utils/server-error-logger';
 
@@ -287,7 +288,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       throw insertError || new Error('Failed to create attachment');
     }
 
-    const { error: snapshotInsertError } = await db
+    const admin = createAdminClient();
+    const { error: snapshotInsertError } = await admin
       .from('workshop_attachment_schema_snapshots')
       .insert({
         attachment_id: (attachment as { id: string }).id,

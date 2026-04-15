@@ -21,6 +21,7 @@ import { enrichDefectsWithWorkshopCompletion, type EnrichedDefectItem } from '@/
 import PhotoUpload from '@/components/forms/PhotoUpload';
 import { InspectionPhotoGallery } from '@/components/inspections/InspectionPhotoGallery';
 import { InspectionPhotoTiles } from '@/components/inspections/InspectionPhotoTiles';
+import { InformWorkshopSummary } from '@/components/inspections/InformWorkshopSummary';
 import { useInspectionPhotos } from '@/lib/hooks/useInspectionPhotos';
 import { getInspectionPhotoKey } from '@/lib/inspection-photos';
 import { formatReferenceId, getReferenceIdSuffix, getWorkshopTaskHref } from '@/lib/utils/reference-ids';
@@ -244,6 +245,7 @@ export default function ViewHgvInspectionPage() {
       (task): task is { id: string; suffix: string; href: string } =>
         Boolean(task.suffix && task.href)
     );
+  const hasInformWorkshopTask = linkedTasks.some((task) => task.action_type === 'workshop_vehicle_task');
   const statusLabel = (status: string) =>
     status === 'logged' ? 'In Progress' : status === 'on_hold' ? 'On Hold' : status === 'resumed' ? 'Resumed' : status === 'completed' ? 'Completed' : status;
   const getPhotosForItem = (itemNumber: number, dayOfWeek: number | null) =>
@@ -435,14 +437,26 @@ export default function ViewHgvInspectionPage() {
         </CardContent>
       </Card>
 
-      {(inspection.inspector_comments || defectsWithWorkshop.length > 0) && (
+      {(inspection.inspector_comments || defectsWithWorkshop.length > 0 || hasInformWorkshopTask) && (
         <Card>
-          <CardHeader>
-            <CardTitle>Defects / Comments</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {inspection.inspector_comments && (
-              <p className="text-sm whitespace-pre-wrap">{inspection.inspector_comments}</p>
+          <CardContent className="space-y-4 p-6">
+            {!(inspection.inspector_comments || hasInformWorkshopTask) && (
+              <h2 className="text-xl font-semibold tracking-tight">Defects / Comments</h2>
+            )}
+            {(inspection.inspector_comments || hasInformWorkshopTask) && (
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_18rem] xl:items-start">
+                <div className="min-w-0 space-y-3">
+                  <h2 className="text-xl font-semibold tracking-tight">Defects / Comments</h2>
+                  <div className="rounded-lg border border-white/10 p-4">
+                    {inspection.inspector_comments ? (
+                      <p className="text-sm whitespace-pre-wrap">{inspection.inspector_comments}</p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No inspector comment recorded.</p>
+                    )}
+                  </div>
+                </div>
+                <InformWorkshopSummary linkedTasks={linkedTasks} inspectionType="hgv" />
+              </div>
             )}
             {defectsWithWorkshop.length > 0 && (
               <div className="space-y-4">

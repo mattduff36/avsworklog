@@ -12,6 +12,7 @@ const migrationFiles = [
   'supabase/migrations/20260401_workshop_attachments_schema_v2.sql',
   'supabase/migrations/20260401_seed_hgv_6_week_template_v2.sql',
   'supabase/migrations/20260402_publish_hgv_6_week_template_full_v2.sql',
+  'supabase/migrations/20260415_publish_hgv_6_week_signature_cleanup.sql',
   'supabase/migrations/20260413_publish_trailer_6_week_template_v2.sql',
 ];
 

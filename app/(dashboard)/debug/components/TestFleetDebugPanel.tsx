@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Car, Loader2, RefreshCw, Search, Trash, Truck, Wrench } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,29 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { PurgeActions, TestVehicle } from '../types';
 
+type VehicleIdsByFleetType = {
+  vans: string[];
+  hgvs: string[];
+  plant: string[];
+};
+
+function groupVehicleIdsByFleetType(vehicleIds: string[], vehicles: TestVehicle[]): VehicleIdsByFleetType {
+  return vehicleIds.reduce<VehicleIdsByFleetType>(
+    (acc, id) => {
+      const vehicle = vehicles.find((entry) => entry.id === id);
+      if (vehicle?.fleet_type === 'hgv') {
+        acc.hgvs.push(id);
+      } else if (vehicle?.fleet_type === 'plant') {
+        acc.plant.push(id);
+      } else {
+        acc.vans.push(id);
+      }
+      return acc;
+    },
+    { vans: [], hgvs: [], plant: [] },
+  );
+}
+
 export function TestFleetDebugPanel() {
   const [testVehiclePrefix, setTestVehiclePrefix] = useState('TE57');
   const [fleetTypeFilter, setFleetTypeFilter] = useState<'vans' | 'hgvs' | 'plant' | 'all'>('all');
@@ -19,6 +42,7 @@ export function TestFleetDebugPanel() {
   const [loadingTestVehicles, setLoadingTestVehicles] = useState(false);
   const [purgePreview, setPurgePreview] = useState<Record<string, number> | null>(null);
   const [purging, setPurging] = useState(false);
+  const [confirmQuickPurge, setConfirmQuickPurge] = useState(false);
   const [purgeActions, setPurgeActions] = useState<PurgeActions>({
     inspections: true,
     workshop_tasks: true,
@@ -26,17 +50,48 @@ export function TestFleetDebugPanel() {
     attachments: true,
     archives: true,
   });
+  const quickPurgeConfirmTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const fetchTestVehicles = async () => {
+  const clearQuickPurgeConfirmation = () => {
+    if (quickPurgeConfirmTimeoutRef.current) {
+      clearTimeout(quickPurgeConfirmTimeoutRef.current);
+      quickPurgeConfirmTimeoutRef.current = null;
+    }
+    setConfirmQuickPurge(false);
+  };
+
+  const armQuickPurgeConfirmation = () => {
+    if (quickPurgeConfirmTimeoutRef.current) {
+      clearTimeout(quickPurgeConfirmTimeoutRef.current);
+    }
+
+    setConfirmQuickPurge(true);
+    quickPurgeConfirmTimeoutRef.current = setTimeout(() => {
+      setConfirmQuickPurge(false);
+      quickPurgeConfirmTimeoutRef.current = null;
+    }, 3000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (quickPurgeConfirmTimeoutRef.current) {
+        clearTimeout(quickPurgeConfirmTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const fetchTestVehicles = async (): Promise<TestVehicle[] | null> => {
     setLoadingTestVehicles(true);
     try {
       const response = await fetch(`/api/debug/test-vehicles?prefix=${encodeURIComponent(testVehiclePrefix)}&type=${fleetTypeFilter}`);
       const data = await response.json();
 
       if (data.success) {
-        setTestVehicles(data.vehicles || []);
+        const vehicles = (data.vehicles || []) as TestVehicle[];
+        setTestVehicles(vehicles);
         setSelectedVehicleIds([]);
         setPurgePreview(null);
+        return vehicles;
       } else {
         toast.error(data.error || 'Failed to fetch test fleet');
       }
@@ -46,6 +101,7 @@ export function TestFleetDebugPanel() {
     } finally {
       setLoadingTestVehicles(false);
     }
+    return null;
   };
 
   const previewPurge = async () => {
@@ -54,13 +110,7 @@ export function TestFleetDebugPanel() {
       return;
     }
 
-    const byType = { vans: [] as string[], hgvs: [] as string[], plant: [] as string[] };
-    for (const id of selectedVehicleIds) {
-      const v = testVehicles.find((t) => t.id === id);
-      if (v?.fleet_type === 'hgv') byType.hgvs.push(id);
-      else if (v?.fleet_type === 'plant') byType.plant.push(id);
-      else byType.vans.push(id);
-    }
+    const byType = groupVehicleIdsByFleetType(selectedVehicleIds, testVehicles);
 
     setPurging(true);
     try {
@@ -97,29 +147,29 @@ export function TestFleetDebugPanel() {
     }
   };
 
-  const executePurge = async () => {
-    if (selectedVehicleIds.length === 0) {
+  const executePurgeForSelection = async (
+    vehicleIds: string[],
+    vehicles: TestVehicle[],
+    options?: { requireConfirmation?: boolean },
+  ) => {
+    if (vehicleIds.length === 0) {
       toast.error('Please select at least one fleet item');
       return;
     }
 
-    const byType = { vans: [] as string[], hgvs: [] as string[], plant: [] as string[] };
-    for (const id of selectedVehicleIds) {
-      const v = testVehicles.find((t) => t.id === id);
-      if (v?.fleet_type === 'hgv') byType.hgvs.push(id);
-      else if (v?.fleet_type === 'plant') byType.plant.push(id);
-      else byType.vans.push(id);
+    const byType = groupVehicleIdsByFleetType(vehicleIds, vehicles);
+
+    if (options?.requireConfirmation !== false) {
+      const notificationService = await import('@/lib/services/notification.service');
+      const confirmed = await notificationService.notify.confirm({
+        title: 'Confirm Purge',
+        description: `This will permanently delete selected records for ${vehicleIds.length} fleet item(s). This cannot be undone.`,
+        confirmText: 'Purge Records',
+        destructive: true,
+      });
+
+      if (!confirmed) return;
     }
-
-    const notificationService = await import('@/lib/services/notification.service');
-    const confirmed = await notificationService.notify.confirm({
-      title: 'Confirm Purge',
-      description: `This will permanently delete selected records for ${selectedVehicleIds.length} fleet item(s). This cannot be undone.`,
-      confirmText: 'Purge Records',
-      destructive: true,
-    });
-
-    if (!confirmed) return;
 
     setPurging(true);
     try {
@@ -146,13 +196,45 @@ export function TestFleetDebugPanel() {
       }
       toast.success(`Purged records for ${totalAffected} fleet item(s)`);
       setPurgePreview(null);
-      fetchTestVehicles();
+      void fetchTestVehicles();
     } catch (error) {
       console.error('Error executing purge:', error);
       toast.error('Failed to execute purge');
     } finally {
       setPurging(false);
     }
+  };
+
+  const executePurge = async () => {
+    await executePurgeForSelection(selectedVehicleIds, testVehicles);
+  };
+
+  const quickPurgeAllTe57Assets = async () => {
+    if (!testVehiclePrefix.trim()) {
+      toast.error('Please enter a fleet registration prefix');
+      return;
+    }
+
+    if (!confirmQuickPurge) {
+      armQuickPurgeConfirmation();
+      return;
+    }
+
+    clearQuickPurgeConfirmation();
+
+    const latestVehicles = await fetchTestVehicles();
+    if (!latestVehicles) {
+      return;
+    }
+
+    if (latestVehicles.length === 0) {
+      toast.error(`No fleet items found matching prefix "${testVehiclePrefix}"`);
+      return;
+    }
+
+    const latestVehicleIds = latestVehicles.map((vehicle) => vehicle.id);
+    setSelectedVehicleIds(latestVehicleIds);
+    await executePurgeForSelection(latestVehicleIds, latestVehicles, { requireConfirmation: false });
   };
 
   const archiveVehicles = async () => {
@@ -274,7 +356,7 @@ export function TestFleetDebugPanel() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <CardTitle className="flex items-center gap-2">
               <Car className="h-5 w-5 text-red-500" />
@@ -282,10 +364,32 @@ export function TestFleetDebugPanel() {
             </CardTitle>
             <CardDescription>Manage and purge test fleet data (vans, HGVs & plant, TE57 prefix)</CardDescription>
           </div>
-          <Button onClick={fetchTestVehicles} variant="outline" size="sm" disabled={loadingTestVehicles}>
-            {loadingTestVehicles ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-            Refresh
-          </Button>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button
+              onClick={quickPurgeAllTe57Assets}
+              variant={confirmQuickPurge ? 'outline' : 'destructive'}
+              size="sm"
+              disabled={loadingTestVehicles || purging || !testVehiclePrefix.trim()}
+              className={
+                confirmQuickPurge
+                  ? 'border border-red-500 text-red-300 bg-red-500/10 hover:bg-red-500/20 shadow-sm'
+                  : 'border border-red-500/60 shadow-sm'
+              }
+            >
+              {loadingTestVehicles || purging ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash className="h-4 w-4 mr-2" />}
+              {loadingTestVehicles
+                ? 'Refreshing TE57 Assets...'
+                : purging
+                  ? 'Purging TE57 Assets...'
+                  : confirmQuickPurge
+                    ? 'Confirm Purge of TE57 Assets'
+                    : 'Quick Purge All TE57 Assets'}
+            </Button>
+            <Button onClick={fetchTestVehicles} variant="outline" size="sm" disabled={loadingTestVehicles || purging}>
+              {loadingTestVehicles ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+              Refresh
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -487,7 +591,12 @@ export function TestFleetDebugPanel() {
                   <Search className="h-4 w-4 mr-2" />
                   Preview Counts
                 </Button>
-                <Button onClick={executePurge} variant="destructive" disabled={purging || selectedVehicleIds.length === 0}>
+                <Button
+                  onClick={executePurge}
+                  variant="destructive"
+                  disabled={purging || selectedVehicleIds.length === 0}
+                  className="border border-red-500/60 shadow-sm"
+                >
                   {purging ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash className="h-4 w-4 mr-2" />}
                   Purge Selected Records
                 </Button>

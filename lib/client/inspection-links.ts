@@ -5,6 +5,8 @@ export interface LinkedInspectionTaskSummary {
   action_type: string;
   status: string;
   created_at: string | null;
+  logged_at: string | null;
+  actioned_at: string | null;
 }
 
 export async function fetchInspectionLinks(

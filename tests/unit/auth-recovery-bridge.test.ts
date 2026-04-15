@@ -51,4 +51,36 @@ describe('auth recovery bridge', () => {
     expect(recovered).toBe(false);
     expect(replace).toHaveBeenCalledWith('/lock');
   });
+
+  it('falls back to redirect instead of rejecting when recovery handler throws', async () => {
+    const replace = vi.fn();
+    vi.stubGlobal('window', {
+      location: {
+        replace,
+      },
+    } as unknown as Window);
+
+    const recoverFromAuthFailure = vi.fn(async () => {
+      throw Object.assign(new Error('Unauthorized'), { status: 401 });
+    });
+    const forceAuthRedirect = vi.fn(async () => undefined);
+
+    const {
+      handleAuthFailureStatus,
+      registerAuthRecoveryHandlers,
+    } = await import('@/lib/app-auth/recovery-bridge');
+
+    const unregister = registerAuthRecoveryHandlers({
+      recoverFromAuthFailure,
+      forceAuthRedirect,
+    });
+
+    await expect(handleAuthFailureStatus(401)).resolves.toBe(false);
+
+    unregister();
+
+    expect(recoverFromAuthFailure).toHaveBeenCalledTimes(1);
+    expect(forceAuthRedirect).not.toHaveBeenCalled();
+    expect(replace).toHaveBeenCalledWith('/login');
+  });
 });
