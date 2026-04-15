@@ -17,6 +17,25 @@ type VehicleIdsByFleetType = {
   plant: string[];
 };
 
+function getQuickPurgeTargetLabel(prefix: string, fleetType: 'vans' | 'hgvs' | 'plant' | 'all'): string {
+  const normalizedPrefix = prefix.trim().toUpperCase();
+  const prefixLabel = normalizedPrefix || 'matching';
+
+  if (fleetType === 'hgvs') {
+    return `${prefixLabel} HGVs`;
+  }
+
+  if (fleetType === 'plant') {
+    return `${prefixLabel} Plant Assets`;
+  }
+
+  if (fleetType === 'vans') {
+    return `${prefixLabel} Vans`;
+  }
+
+  return `${prefixLabel} Assets`;
+}
+
 function groupVehicleIdsByFleetType(vehicleIds: string[], vehicles: TestVehicle[]): VehicleIdsByFleetType {
   return vehicleIds.reduce<VehicleIdsByFleetType>(
     (acc, id) => {
@@ -51,6 +70,7 @@ export function TestFleetDebugPanel() {
     archives: true,
   });
   const quickPurgeConfirmTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const quickPurgeTargetLabel = getQuickPurgeTargetLabel(testVehiclePrefix, fleetTypeFilter);
 
   const clearQuickPurgeConfirmation = () => {
     if (quickPurgeConfirmTimeoutRef.current) {
@@ -209,7 +229,7 @@ export function TestFleetDebugPanel() {
     await executePurgeForSelection(selectedVehicleIds, testVehicles);
   };
 
-  const quickPurgeAllTe57Assets = async () => {
+  const quickPurgeMatchingAssets = async () => {
     if (!testVehiclePrefix.trim()) {
       toast.error('Please enter a fleet registration prefix');
       return;
@@ -366,7 +386,7 @@ export function TestFleetDebugPanel() {
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Button
-              onClick={quickPurgeAllTe57Assets}
+              onClick={quickPurgeMatchingAssets}
               variant={confirmQuickPurge ? 'outline' : 'destructive'}
               size="sm"
               disabled={loadingTestVehicles || purging || !testVehiclePrefix.trim()}
@@ -378,12 +398,12 @@ export function TestFleetDebugPanel() {
             >
               {loadingTestVehicles || purging ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash className="h-4 w-4 mr-2" />}
               {loadingTestVehicles
-                ? 'Refreshing TE57 Assets...'
+                ? `Refreshing ${quickPurgeTargetLabel}...`
                 : purging
-                  ? 'Purging TE57 Assets...'
+                  ? `Purging ${quickPurgeTargetLabel}...`
                   : confirmQuickPurge
-                    ? 'Confirm Purge of TE57 Assets'
-                    : 'Quick Purge All TE57 Assets'}
+                    ? `Confirm Purge of ${quickPurgeTargetLabel}`
+                    : `Quick Purge ${quickPurgeTargetLabel}`}
             </Button>
             <Button onClick={fetchTestVehicles} variant="outline" size="sm" disabled={loadingTestVehicles || purging}>
               {loadingTestVehicles ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
@@ -403,7 +423,10 @@ export function TestFleetDebugPanel() {
                 <Input
                   id="vehicle-prefix"
                   value={testVehiclePrefix}
-                  onChange={(e) => setTestVehiclePrefix(e.target.value.toUpperCase())}
+                  onChange={(e) => {
+                    clearQuickPurgeConfirmation();
+                    setTestVehiclePrefix(e.target.value.toUpperCase());
+                  }}
                   placeholder="TE57"
                   className="w-32 font-mono"
                 />
@@ -414,7 +437,13 @@ export function TestFleetDebugPanel() {
             </div>
             <div className="space-y-2">
               <Label className="text-sm font-medium">Fleet Type</Label>
-              <Select value={fleetTypeFilter} onValueChange={(v: 'vans' | 'hgvs' | 'plant' | 'all') => setFleetTypeFilter(v)}>
+              <Select
+                value={fleetTypeFilter}
+                onValueChange={(v: 'vans' | 'hgvs' | 'plant' | 'all') => {
+                  clearQuickPurgeConfirmation();
+                  setFleetTypeFilter(v);
+                }}
+              >
                 <SelectTrigger className="w-40">
                   <SelectValue />
                 </SelectTrigger>

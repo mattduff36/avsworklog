@@ -77,7 +77,7 @@ describe('TestFleetDebugPanel', () => {
   it('requires a timed second click before quick purging TE57 assets', async () => {
     render(<TestFleetDebugPanel />);
 
-    fireEvent.click(screen.getByRole('button', { name: /quick purge all te57 assets/i }));
+    fireEvent.click(screen.getByRole('button', { name: /quick purge te57 assets/i }));
 
     expect(screen.getByRole('button', { name: /confirm purge of te57 assets/i })).toBeInTheDocument();
     expect(global.fetch).not.toHaveBeenCalled();
@@ -107,23 +107,41 @@ describe('TestFleetDebugPanel', () => {
     try {
       render(<TestFleetDebugPanel />);
 
-      fireEvent.click(screen.getByRole('button', { name: /quick purge all te57 assets/i }));
+      fireEvent.click(screen.getByRole('button', { name: /quick purge te57 assets/i }));
       expect(screen.getByRole('button', { name: /confirm purge of te57 assets/i })).toBeInTheDocument();
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(3000);
       });
 
-      expect(screen.getByRole('button', { name: /quick purge all te57 assets/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /quick purge te57 assets/i })).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }
   });
 
+  it('uses the current prefix in the quick purge label and resets confirmation when the prefix changes', async () => {
+    render(<TestFleetDebugPanel />);
+
+    fireEvent.change(screen.getByLabelText(/fleet registration prefix/i), {
+      target: { value: 'ab12' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /quick purge ab12 assets/i }));
+    expect(screen.getByRole('button', { name: /confirm purge of ab12 assets/i })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/fleet registration prefix/i), {
+      target: { value: 'cd34' },
+    });
+
+    expect(screen.getByRole('button', { name: /quick purge cd34 assets/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /confirm purge of ab12 assets/i })).not.toBeInTheDocument();
+  });
+
   it('shows bordered destructive purge buttons', async () => {
     render(<TestFleetDebugPanel />);
 
-    expect(screen.getByRole('button', { name: /quick purge all te57 assets/i }).className).toContain('border-red-500/60');
+    expect(screen.getByRole('button', { name: /quick purge te57 assets/i }).className).toContain('border-red-500/60');
 
     fireEvent.click(screen.getByRole('button', { name: /^load fleet$/i }));
 
