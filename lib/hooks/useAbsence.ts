@@ -16,6 +16,7 @@ import { getCurrentFinancialYear, getFinancialYear } from '@/lib/utils/date';
 import { calculateDurationDays } from '@/lib/utils/date';
 import { isClosedFinancialYearDate } from '@/lib/services/absence-archive';
 import { getErrorMessage, shouldLogAbsenceManageError } from '@/lib/utils/absence-error-handling';
+import { getCrossFinancialYearAbsenceError } from '@/lib/utils/absence-financial-year';
 import { ANNUAL_LEAVE_MIN_REMAINING_DAYS } from '@/lib/utils/annual-leave';
 import { isAdminRole } from '@/lib/utils/role-access';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -242,6 +243,13 @@ async function buildValidatedAbsence(
   options?: { excludeAbsenceId?: string; currentUserId?: string }
 ): Promise<AbsenceValidationShape> {
   const resolvedAbsence = await resolveAbsenceDuration(absence, options?.currentUserId);
+  const crossFinancialYearError = getCrossFinancialYearAbsenceError(
+    resolvedAbsence.date,
+    resolvedAbsence.end_date
+  );
+  if (crossFinancialYearError) {
+    throw new Error(crossFinancialYearError);
+  }
   await assertNoAbsenceConflictBeforeSave(supabase, resolvedAbsence, options?.excludeAbsenceId);
   return resolvedAbsence;
 }
@@ -401,32 +409,22 @@ export function useAbsencesForUserFinancialYear(
   options?: AbsenceQueryOptions
 ) {
   const { profile } = useAuth();
-  const supabase = createClient();
   const fallback = getCurrentFinancialYear();
   const start = financialYear?.start || fallback.start;
   const end = financialYear?.end || fallback.end;
   const profileId = profile?.id || null;
-  
-  return useQuery({
-    queryKey: ['absences', profileId, start.toISOString(), end.toISOString()],
-    enabled: Boolean(profileId) && options?.enabled !== false,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('absences')
-        .select(`
-          *,
-          absence_reasons (*),
-          profiles!absences_profile_id_fkey (full_name, employee_id, team_id)
-        `)
-        .eq('profile_id', profileId!)
-        .gte('date', start.toISOString().split('T')[0])
-        .lte('date', end.toISOString().split('T')[0])
-        .order('date', { ascending: false });
-      
-      if (error) throw error;
-      return data as AbsenceWithRelations[];
-    },
-  });
+
+  return useAllAbsences(
+    Boolean(profileId) && options?.enabled !== false
+      ? {
+          profileId: profileId!,
+          dateFrom: start.toISOString().split('T')[0],
+          dateTo: end.toISOString().split('T')[0],
+          includeArchived: true,
+          matchOverlappingDateRange: true,
+        }
+      : undefined
+  );
 }
 
 /**
@@ -813,6 +811,7 @@ export function useAllAbsences(filters?: {
   status?: string;
   includeArchived?: boolean;
   archivedOnly?: boolean;
+  matchOverlappingDateRange?: boolean;
 }) {
   const supabase = createClient();
   
@@ -856,11 +855,17 @@ export function useAllAbsences(filters?: {
           if (hasFilterValue(filters?.profileId)) {
             query = query.eq('profile_id', filters.profileId);
           }
-          if (filters?.dateFrom) {
-            query = query.gte('date', filters.dateFrom);
-          }
           if (filters?.dateTo) {
             query = query.lte('date', filters.dateTo);
+          }
+          if (filters?.dateFrom) {
+            if (filters.matchOverlappingDateRange) {
+              query = query.or(
+                `end_date.gte.${filters.dateFrom},and(end_date.is.null,date.gte.${filters.dateFrom})`
+              );
+            } else {
+              query = query.gte('date', filters.dateFrom);
+            }
           }
           if (hasFilterValue(filters?.reasonId)) {
             query = query.eq('reason_id', filters.reasonId);

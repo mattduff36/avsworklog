@@ -49,6 +49,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { AbsenceScrollingMessage } from '@/app/(dashboard)/absence/components/AbsenceScrollingMessage';
+import { AllowanceDetailsPanel } from '@/app/(dashboard)/absence/components/AllowanceDetailsPanel';
 import {
   useAbsencesForUserFinancialYear,
   useAllAbsences,
@@ -356,6 +357,8 @@ export default function AbsencePage() {
       ? {
           dateFrom: formatDateISO(displayFinancialYear.start),
           dateTo: formatDateISO(displayFinancialYear.end),
+          includeArchived: true,
+          matchOverlappingDateRange: true,
         }
       : undefined
   );
@@ -1069,6 +1072,7 @@ export default function AbsencePage() {
               Submit leave dates for approval in the current booking window.
             </DialogDescription>
           </DialogHeader>
+          <AllowanceDetailsPanel summary={summary} loading={loadingSummary} />
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="rounded-lg border border-[hsl(var(--absence-primary)/0.25)] bg-[hsl(var(--absence-primary)/0.06)] p-4 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

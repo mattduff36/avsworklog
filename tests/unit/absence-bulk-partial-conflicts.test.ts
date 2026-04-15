@@ -370,6 +370,26 @@ describe('bookBulkAbsence partial conflict handling', () => {
     expect(result.warnings).toEqual([]);
   });
 
+  it('rejects bulk bookings that span multiple financial years', async () => {
+    const { supabase } = buildMockSupabase({
+      profiles,
+      annualAbsences: [],
+      existingRows: [],
+    });
+
+    await expect(
+      bookBulkAbsence({
+        supabase: supabase as never,
+        actorProfileId: 'manager-1',
+        reasonId: 'reason-annual',
+        startDate: '2026-03-30',
+        endDate: '2026-04-02',
+        applyToAll: true,
+        confirm: false,
+      })
+    ).rejects.toThrow('Absence bookings cannot span multiple financial years');
+  });
+
   it('excludes zero-allowance users from apply-to-all bulk booking', async () => {
     const { supabase, insertedAbsenceRows } = buildMockSupabase({
       profiles: [

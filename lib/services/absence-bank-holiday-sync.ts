@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { loadEmployeeWorkShiftPatternMap } from '@/lib/server/work-shifts';
 import { fetchCarryoverMapForFinancialYear, getEffectiveAllowance } from '@/lib/utils/absence-carryover';
+import { getCrossFinancialYearAbsenceError } from '@/lib/utils/absence-financial-year';
 import { getBankHolidaysForYear } from '@/lib/utils/bank-holidays';
 import { calculateDurationDays } from '@/lib/utils/date';
 import type { WorkShiftPattern } from '@/types/work-shifts';
@@ -1144,6 +1145,11 @@ export async function bookBulkAbsence(
   }
   if (end < start) {
     throw new Error('End date cannot be before start date');
+  }
+
+  const crossFinancialYearError = getCrossFinancialYearAbsenceError(startDate, endDate);
+  if (crossFinancialYearError) {
+    throw new Error(crossFinancialYearError);
   }
 
   const reason = await getAbsenceReasonById(options.supabase, options.reasonId);

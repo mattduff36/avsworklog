@@ -35,6 +35,7 @@ import {
   useAllAbsenceReasons,
   useCreateAbsence,
   useDeleteAbsence,
+  useAbsenceSummaryForEmployee,
   useAbsenceRealtimeQueryInvalidation
 } from '@/lib/hooks/useAbsence';
 import { formatDate, calculateDurationDays } from '@/lib/utils/date';
@@ -50,6 +51,7 @@ import {
   type AbsenceEditDialogMode,
 } from '@/app/(dashboard)/absence/manage/components/AbsenceEditDialog';
 import { AbsenceAboutHelper } from '@/app/(dashboard)/absence/components/AbsenceAboutHelper';
+import { AllowanceDetailsPanel } from '@/app/(dashboard)/absence/components/AllowanceDetailsPanel';
 import { ManageOverviewAdminActions } from '@/app/(dashboard)/absence/manage/components/ManageOverviewAdminActions';
 import { WorkShiftsContent } from '@/app/(dashboard)/absence/manage/components/WorkShiftsContent';
 import { getErrorMessage, shouldLogAbsenceManageError } from '@/lib/utils/absence-error-handling';
@@ -295,6 +297,8 @@ export default function AdminAbsencePage() {
   const [halfDaySession, setHalfDaySession] = useState<'AM' | 'PM'>('AM');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const { data: selectedProfileSummary, isLoading: loadingSelectedProfileSummary } =
+    useAbsenceSummaryForEmployee(selectedProfileId);
   
   const isProtectedTab = useCallback((tab: ManageTab): tab is ProtectedManageTab => {
     return tab === 'overview' || tab === 'allowances' || tab === 'reasons';
@@ -1425,6 +1429,11 @@ export default function AdminAbsencePage() {
               Create an absence entry for any employee
             </DialogDescription>
           </DialogHeader>
+          <AllowanceDetailsPanel
+            summary={selectedProfileSummary}
+            loading={Boolean(selectedProfileId) && loadingSelectedProfileSummary}
+            empty={!selectedProfileId}
+          />
           
           <div className="rounded-lg border border-[hsl(var(--absence-primary)/0.25)] bg-[hsl(var(--absence-primary)/0.06)] p-4 space-y-4">
             <div className="space-y-1.5">

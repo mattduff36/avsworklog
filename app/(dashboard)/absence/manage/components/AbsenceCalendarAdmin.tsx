@@ -311,9 +311,16 @@ export function AbsenceCalendarAdmin() {
     setCurrentMonthIndex(initialMonthIndex);
   }, [initialMonthIndex]);
 
-  const { data: absences, isLoading } = useAllAbsences({
+  const { data: calendarAbsences, isLoading } = useAllAbsences({
     dateFrom: formatDateISO(displayFinancialYear.start),
     dateTo: formatDateISO(displayFinancialYear.end),
+    includeArchived: true,
+    matchOverlappingDateRange: true,
+  });
+  const { data: allowanceAbsences, isLoading: allowanceRowsLoading } = useAllAbsences({
+    dateFrom: formatDateISO(displayFinancialYear.start),
+    dateTo: formatDateISO(displayFinancialYear.end),
+    includeArchived: true,
   });
   const { data: reasons, isLoading: reasonsLoading } = useAllAbsenceReasons();
   const deleteAbsence = useDeleteAbsence();
@@ -452,7 +459,7 @@ export function AbsenceCalendarAdmin() {
   }, [employees]);
 
   const calendarEvents = useMemo(() => {
-    const filteredAbsences = (absences || []).filter((absence) => {
+    const filteredAbsences = (calendarAbsences || []).filter((absence) => {
       if (!canViewBookings) return false;
       if (absence.status === 'cancelled') return false;
       const employee = employeeById.get(absence.profile_id);
@@ -520,7 +527,7 @@ export function AbsenceCalendarAdmin() {
       } as CalendarEvent;
     });
   }, [
-    absences,
+    calendarAbsences,
     canViewBookings,
     employeeById,
     selectedEmployeeId,
@@ -636,7 +643,7 @@ export function AbsenceCalendarAdmin() {
     }
 
     // Use unfiltered absence records so allowance totals remain correct even when UI filters are active.
-    for (const absence of absences || []) {
+    for (const absence of allowanceAbsences || []) {
       if (!annualLeaveReasonIds.has(absence.reason_id)) continue;
       if (absence.status !== 'approved' && absence.status !== 'pending') continue;
 
@@ -649,7 +656,7 @@ export function AbsenceCalendarAdmin() {
     }
 
     return map;
-  }, [employees, annualLeaveReasonIds, displayFinancialYear, absences, carryoverByProfile]);
+  }, [employees, annualLeaveReasonIds, displayFinancialYear, allowanceAbsences, carryoverByProfile]);
 
   const reasonLegend = useMemo(() => {
     const map = new Map<string, { name: string; color: string }>();
@@ -755,7 +762,7 @@ export function AbsenceCalendarAdmin() {
     return 'full';
   }
 
-  if (isLoading || reasonsLoading || loadingEmployees || isAbsenceSecondaryContextLoading) {
+  if (isLoading || allowanceRowsLoading || reasonsLoading || loadingEmployees || isAbsenceSecondaryContextLoading) {
     return <PageLoader message="Loading calendar..." />;
   }
 
@@ -1121,7 +1128,7 @@ export function AbsenceCalendarAdmin() {
                   <h4 className="text-sm font-semibold text-foreground">Absences on this day:</h4>
                   <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-3">
                     {dayAbsences.map((event) => {
-                      const target = (absences || []).find((absence) => absence.id === event.id) || null;
+                      const target = (calendarAbsences || []).find((absence) => absence.id === event.id) || null;
                       const nextEditMode = target ? getAbsenceEditMode(target) : null;
                       const canEditTarget = Boolean(nextEditMode && !isSelectedFinancialYearClosed);
                       const isAnnualLeaveTarget = target ? isAnnualLeaveAbsence(target) : false;
