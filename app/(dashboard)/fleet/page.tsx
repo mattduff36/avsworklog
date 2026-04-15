@@ -37,10 +37,11 @@ import { PageLoader } from '@/components/ui/page-loader';
 import type { Category, HgvAsset, HgvCategory, PlantAsset, Vehicle } from './types';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
+import { getErrorMessage } from '@/lib/utils/absence-error-handling';
 
 function isExpectedFleetLoadError(error: unknown): boolean {
   const status = getErrorStatus(error);
-  const message = error instanceof Error ? error.message : String(error ?? '');
+  const message = getErrorMessage(error, '');
   return (
     isAuthErrorStatus(status) ||
     message.includes('Unauthorized') ||
