@@ -11,6 +11,7 @@ interface SenderShape {
 interface PendingMessageShape {
   id?: string;
   type?: 'TOOLBOX_TALK' | 'REMINDER' | 'NOTIFICATION';
+  created_via?: string | null;
   subject?: string | null;
   body?: string | null;
   priority?: 'HIGH' | 'LOW';
@@ -61,6 +62,7 @@ export async function GET() {
         messages!inner(
           id,
           type,
+          created_via,
           subject,
           body,
           priority,
@@ -95,6 +97,7 @@ export async function GET() {
         messages!inner(
           id,
           type,
+          created_via,
           subject,
           body,
           priority,
@@ -135,7 +138,7 @@ export async function GET() {
           created_at: message.created_at,
           updated_at: message.created_at,
           deleted_at: message.deleted_at ?? null,
-          created_via: 'api',
+          created_via: message.created_via ?? 'api',
           pdf_file_path: message.pdf_file_path ?? null,
           sender: {
             id: message.sender_id ?? '',
@@ -164,7 +167,7 @@ export async function GET() {
           created_at: message.created_at,
           updated_at: message.created_at,
           deleted_at: message.deleted_at ?? null,
-          created_via: 'api',
+          created_via: message.created_via ?? 'api',
           pdf_file_path: message.pdf_file_path ?? null,
           sender: {
             id: message.sender_id ?? '',

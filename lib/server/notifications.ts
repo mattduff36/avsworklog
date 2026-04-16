@@ -11,6 +11,7 @@ interface SenderShape {
 interface MessageShape {
   type?: NotificationItem['type'];
   priority?: NotificationItem['priority'];
+  created_via?: string | null;
   subject?: string | null;
   body?: string | null;
   sender_id?: string | null;
@@ -113,6 +114,7 @@ export async function listNotificationsForUser(
         messages!inner(
           id,
           type,
+          created_via,
           subject,
           body,
           priority,
@@ -155,6 +157,7 @@ export async function listNotificationsForUser(
         message_id: item.message_id ?? '',
         type: message.type,
         priority: message.priority,
+        created_via: message.created_via ?? null,
         subject: message.subject ?? '',
         body: message.body ?? '',
         sender_name: sender?.full_name ?? 'Deleted User',

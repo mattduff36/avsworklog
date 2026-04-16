@@ -11,6 +11,7 @@ interface SenderShape {
 interface MessageShape {
   type?: NotificationItem['type'];
   priority?: NotificationItem['priority'];
+  created_via?: string | null;
   subject?: string | null;
   body?: string | null;
   sender_id?: string | null;
@@ -106,6 +107,7 @@ export async function GET(request: NextRequest) {
         messages!inner(
           id,
           type,
+          created_via,
           subject,
           body,
           priority,
@@ -130,7 +132,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform to NotificationItem format
-    const notifications: NotificationItem[] = (recipients ?? [])
+    const notifications = (recipients ?? [])
       .map((rawItem) => {
         const item = rawItem as RecipientShape;
         const message = pickMessage(item.messages);
@@ -142,6 +144,7 @@ export async function GET(request: NextRequest) {
           message_id: item.message_id ?? '',
           type: message.type,
           priority: message.priority,
+          created_via: message.created_via ?? null,
           subject: message.subject ?? '',
           body: message.body ?? '',
           sender_name: sender?.full_name ?? 'Deleted User',

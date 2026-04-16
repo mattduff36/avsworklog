@@ -21,6 +21,7 @@ interface PendingToolboxTalk {
 interface PendingReminder {
   id: string;
   recipient_id: string;
+  created_via?: string | null;
   subject: string;
   body: string;
   sender_name: string;

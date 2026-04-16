@@ -194,6 +194,11 @@ describe('GET /api/management/suggestions/[id]', () => {
     expect(payload.success).toBe(true);
     expect(suggestionUpdatesInsert).toHaveBeenCalledTimes(1);
     expect(messageInsert).toHaveBeenCalledTimes(1);
+    expect(messageInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        created_via: 'suggestion:suggestion-1',
+      })
+    );
     expect(messageRecipientsInsert).toHaveBeenCalledWith([
       { message_id: 'msg-1', user_id: 'user-1', status: 'PENDING' },
       { message_id: 'msg-1', user_id: 'manager-1', status: 'PENDING' },

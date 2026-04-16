@@ -65,6 +65,7 @@ export interface NotificationItem {
   message_id: string;
   type: MessageType;
   priority: MessagePriority;
+  created_via: string | null;
   subject: string;
   body: string;
   sender_name: string;

@@ -107,7 +107,33 @@ describe('GET /api/dashboard/summary', () => {
         if (table === 'timesheets') return { select: () => createCountQuery(4) };
         if (table === 'absences') return { select: () => createCountQuery(2) };
         if (table === 'actions') return { select: () => createCountQuery(3) };
-        if (table === 'suggestions') return { select: () => createCountQuery(5) };
+        if (table === 'suggestions') {
+          return {
+            select: () => Promise.resolve({
+              data: [
+                { id: 'suggestion-new-1', created_by: 'user-1', status: 'new' },
+                { id: 'suggestion-new-2', created_by: 'user-2', status: 'new' },
+                { id: 'suggestion-new-3', created_by: 'user-3', status: 'new' },
+                { id: 'suggestion-new-4', created_by: 'user-4', status: 'new' },
+                { id: 'suggestion-new-5', created_by: 'user-5', status: 'new' },
+                { id: 'suggestion-replied', created_by: 'user-6', status: 'under_review' },
+              ],
+              error: null,
+            }),
+          };
+        }
+        if (table === 'suggestion_updates') {
+          return {
+            select: () => ({
+              order: vi.fn().mockResolvedValue({
+                data: [
+                  { suggestion_id: 'suggestion-replied', created_by: 'user-6', created_at: '2026-04-16T10:15:00Z' },
+                ],
+                error: null,
+              }),
+            }),
+          };
+        }
         if (table === 'error_reports') return { select: () => createCountQuery(1) };
         if (table === 'quotes') return { select: () => createCountQuery(6) };
         if (table === 'error_logs') return { select: () => createCountQuery(0) };
@@ -162,7 +188,7 @@ describe('GET /api/dashboard/summary', () => {
         workshop_pending: 3,
         maintenance_due_soon: 0,
         maintenance_overdue: 0,
-        suggestions_new: 5,
+        suggestions_new: 6,
         error_reports_new: 1,
         quotes_pending_internal_approval: 6,
         error_logs: 0,

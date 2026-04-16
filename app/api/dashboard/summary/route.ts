@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -6,6 +7,7 @@ import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { ALL_MODULES, createEmptyModulePermissionRecord } from '@/types/roles';
 import { getPermissionMapForUser } from '@/lib/server/team-permissions';
+import type { Database } from '@/types/database';
 import {
   calculateAlertCounts,
   getDateBasedStatus,
@@ -33,6 +35,11 @@ interface MaintenanceCounts {
   attentionTotal: number;
   dueSoonTotal: number;
   overdueTotal: number;
+}
+
+interface SuggestionBadgeMetrics {
+  newCount: number;
+  awaitingAdminReplyCount: number;
 }
 
 function createFullAccessPermissionMap(): PermissionMap {
@@ -251,6 +258,43 @@ async function getMaintenanceCounts(): Promise<MaintenanceCounts> {
   return totals;
 }
 
+async function getSuggestionBadgeMetrics(supabase: SupabaseClient<Database>): Promise<SuggestionBadgeMetrics> {
+  const [{ data: suggestions, error: suggestionsError }, { data: updates, error: updatesError }] = await Promise.all([
+    supabase.from('suggestions').select('id, created_by, status'),
+    supabase.from('suggestion_updates').select('suggestion_id, created_by, created_at').order('created_at', { ascending: false }),
+  ]);
+
+  if (suggestionsError) throw suggestionsError;
+  if (updatesError) throw updatesError;
+
+  const latestUpdateBySuggestionId = new Map<string, { created_by: string | null }>();
+  for (const update of updates || []) {
+    if (!latestUpdateBySuggestionId.has(update.suggestion_id)) {
+      latestUpdateBySuggestionId.set(update.suggestion_id, { created_by: update.created_by });
+    }
+  }
+
+  let newCount = 0;
+  let awaitingAdminReplyCount = 0;
+
+  for (const suggestion of suggestions || []) {
+    if (suggestion.status === 'new') {
+      newCount += 1;
+      continue;
+    }
+
+    const latestUpdate = latestUpdateBySuggestionId.get(suggestion.id);
+    if (latestUpdate?.created_by && latestUpdate.created_by === suggestion.created_by) {
+      awaitingAdminReplyCount += 1;
+    }
+  }
+
+  return {
+    newCount,
+    awaitingAdminReplyCount,
+  };
+}
+
 export async function GET() {
   const current = await getCurrentAuthenticatedProfile();
   if (!current) {
@@ -277,8 +321,7 @@ export async function GET() {
     timesheetsResult,
     absencesResult,
     workshopPendingResult,
-    suggestionsNewResult,
-    suggestionsReviewResult,
+    suggestionBadgeMetrics,
     errorsNewResult,
     errorsInvestigatingResult,
     quotesResult,
@@ -299,11 +342,8 @@ export async function GET() {
           .eq('status', 'pending')
       : Promise.resolve({ count: 0, error: null }),
     canViewSuggestions
-      ? supabase.from('suggestions').select('id', { count: 'exact', head: true }).eq('status', 'new')
-      : Promise.resolve({ count: 0, error: null }),
-    canViewSuggestions
-      ? supabase.from('suggestions').select('id', { count: 'exact', head: true }).in('status', ['under_review', 'planned'])
-      : Promise.resolve({ count: 0, error: null }),
+      ? getSuggestionBadgeMetrics(supabase)
+      : Promise.resolve({ newCount: 0, awaitingAdminReplyCount: 0 }),
     canViewErrorReports
       ? supabase.from('error_reports').select('id', { count: 'exact', head: true }).eq('status', 'new')
       : Promise.resolve({ count: 0, error: null }),
@@ -329,8 +369,6 @@ export async function GET() {
     timesheetsResult,
     absencesResult,
     workshopPendingResult,
-    suggestionsNewResult,
-    suggestionsReviewResult,
     errorsNewResult,
     errorsInvestigatingResult,
     quotesResult,
@@ -352,7 +390,7 @@ export async function GET() {
         workshop_pending: workshopPendingResult.count || 0,
         maintenance_due_soon: maintenanceCounts.dueSoonTotal,
         maintenance_overdue: maintenanceCounts.overdueTotal,
-        suggestions_new: suggestionsNewResult.count || 0,
+        suggestions_new: suggestionBadgeMetrics.newCount + suggestionBadgeMetrics.awaitingAdminReplyCount,
         error_reports_new: errorsNewResult.count || 0,
         quotes_pending_internal_approval: quotesResult.count || 0,
         error_logs: errorLogsResult.count || 0,

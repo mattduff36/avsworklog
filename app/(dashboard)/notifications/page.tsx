@@ -662,6 +662,7 @@ export default function NotificationsPage() {
               message={{
                 id: selectedNotification.message_id,
                 recipient_id: selectedNotification.id,
+                created_via: selectedNotification.created_via ?? null,
                 subject: selectedNotification.subject,
                 body: selectedNotification.body,
                 sender_name: selectedNotification.sender_name,
