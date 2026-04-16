@@ -23,6 +23,9 @@ const envSchema = z.object({
   
   // Email Configuration (Optional - for error reporting)
   RESEND_API_KEY: z.string().min(1).optional(),
+  RESEND_FROM_EMAIL: z.string().min(1).optional(),
+  RESEND_API_KEY_2: z.string().min(1).optional(),
+  RESEND_FROM_EMAIL_2: z.string().min(1).optional(),
   ADMIN_EMAIL: z.string().email().optional(),
   
   // Vercel Analytics (Optional)

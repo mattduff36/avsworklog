@@ -51,6 +51,9 @@ import {
   adminNavItems 
 } from '@/lib/config/navigation';
 
+const ACCOUNT_SWITCH_TEMPORARILY_DISABLED = true;
+const ACCOUNT_SWITCH_DISABLED_REASON = 'Temporarily disabled while issues are investigated.';
+
 /**
  * Get the module-specific active color classes for a nav item
  * Each module gets its own color when the link is active
@@ -184,6 +187,7 @@ export function Navbar() {
   const activePinKeyTimeoutRef = useRef<number | null>(null);
   const [supabase, setSupabase] = useState<ReturnType<typeof createClient> | null>(null);
   const accountSwitcherEnabled = useMemo(() => isAccountSwitcherEnabled(), []);
+  const accountSwitchDisabled = accountSwitcherEnabled && ACCOUNT_SWITCH_TEMPORARILY_DISABLED;
   const canSubmitPinSetup = pinEntry.length === PIN_LENGTH && !pinSetupSubmitting;
 
   // useAuth now provides effective role flags (respecting View As cookie)
@@ -784,8 +788,10 @@ export function Navbar() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-muted-foreground hover:text-white hover:bg-slate-800/50"
+                    className="text-muted-foreground hover:text-white hover:bg-slate-800/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
                     onClick={handleLockAccount}
+                    disabled={accountSwitchDisabled}
+                    title={accountSwitchDisabled ? ACCOUNT_SWITCH_DISABLED_REASON : undefined}
                   >
                     <Users className="h-4 w-4 mr-2" />
                     {accountLockLabel}
@@ -906,11 +912,14 @@ export function Navbar() {
                     {accountSwitcherEnabled ? (
                       <button
                         type="button"
-                        className="flex w-full items-center px-3 py-2 text-lg font-medium rounded-md text-muted-foreground hover:bg-slate-800/50 hover:text-white"
+                        className="flex w-full items-center px-3 py-2 text-lg font-medium rounded-md text-muted-foreground hover:bg-slate-800/50 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
                         onClick={() => {
                           setDesktopMenuOpen(false);
                           handleLockAccount();
                         }}
+                        disabled={accountSwitchDisabled}
+                        title={accountSwitchDisabled ? ACCOUNT_SWITCH_DISABLED_REASON : undefined}
+                        aria-disabled={accountSwitchDisabled}
                       >
                         <Users className="w-6 h-6 mr-3 text-avs-yellow" />
                         {accountLockLabel}
@@ -1098,7 +1107,10 @@ export function Navbar() {
                         setMobileMenuOpen(false);
                         handleLockAccount();
                       }}
-                      className="flex w-full items-center px-3 py-2 text-lg font-medium rounded-md text-muted-foreground hover:bg-slate-800/50 hover:text-white"
+                      className="flex w-full items-center px-3 py-2 text-lg font-medium rounded-md text-muted-foreground hover:bg-slate-800/50 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+                      disabled={accountSwitchDisabled}
+                      title={accountSwitchDisabled ? ACCOUNT_SWITCH_DISABLED_REASON : undefined}
+                      aria-disabled={accountSwitchDisabled}
                     >
                       <Users className="w-6 h-6 mr-3 text-avs-yellow" />
                       {accountLockLabel}

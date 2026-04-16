@@ -1,6 +1,7 @@
 import pg from 'pg';
 import { renderToStream } from '@react-pdf/renderer';
 import { QuotePDF } from '@/lib/pdf/quote-pdf';
+import { getQuotesCustomersEmailConfig } from '@/lib/server/quotes-customers-email-config';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { Database } from '@/types/database';
 import {
@@ -349,7 +350,7 @@ async function sendEmail(params: {
   html: string;
   attachments?: EmailAttachment[];
 }): Promise<{ success: boolean; error?: string }> {
-  const apiKey = process.env.RESEND_API_KEY;
+  const { apiKey, fromEmail } = getQuotesCustomersEmailConfig();
   if (!apiKey) {
     return { success: false, error: 'Email service not configured' };
   }
@@ -361,7 +362,7 @@ async function sendEmail(params: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: params.from || process.env.RESEND_FROM_EMAIL || 'AVS Worklog <onboarding@resend.dev>',
+      from: params.from || fromEmail,
       to: params.to,
       cc: params.cc,
       subject: params.subject,
@@ -379,7 +380,7 @@ async function sendEmail(params: {
 }
 
 function getDefaultFromEmail(): string {
-  return process.env.RESEND_FROM_EMAIL || 'SquiresApp <no-reply@squiresapp.com>';
+  return getQuotesCustomersEmailConfig().fromEmail;
 }
 
 export async function renderQuotePdfAttachment(bundle: QuoteBundle): Promise<EmailAttachment> {
