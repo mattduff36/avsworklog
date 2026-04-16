@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
+import {
+  getAdminFieldResponsesForAttachmentIds,
+  getAdminSchemaSnapshotsForAttachmentIds,
+} from '@/lib/server/workshop-attachment-admin';
 import { logServerError } from '@/lib/utils/server-error-logger';
 
 interface RouteParams {
@@ -122,30 +126,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     const attachmentIds = (attachments || []).map((a: { id: string }) => a.id);
-    let schemaSnapshots: unknown[] = [];
-    let fieldResponsesV2: unknown[] = [];
-
-    if (attachmentIds.length > 0) {
-      const { data: snapshotsData, error: snapshotsError } = await db
-        .from('workshop_attachment_schema_snapshots')
-        .select('*')
-        .in('attachment_id', attachmentIds);
-
-      if (snapshotsError) {
-        throw snapshotsError;
-      }
-      schemaSnapshots = snapshotsData || [];
-
-      const { data: fieldResponsesData, error: fieldResponsesError } = await db
-        .from('workshop_attachment_field_responses')
-        .select('*')
-        .in('attachment_id', attachmentIds);
-
-      if (fieldResponsesError) {
-        throw fieldResponsesError;
-      }
-      fieldResponsesV2 = fieldResponsesData || [];
-    }
+    const [schemaSnapshots, fieldResponsesV2] = await Promise.all([
+      getAdminSchemaSnapshotsForAttachmentIds(attachmentIds),
+      getAdminFieldResponsesForAttachmentIds(attachmentIds),
+    ]);
 
     // Combine data
     const typedAttachments = (attachments || []) as Array<{ id: string; template_id: string } & Record<string, unknown>>;

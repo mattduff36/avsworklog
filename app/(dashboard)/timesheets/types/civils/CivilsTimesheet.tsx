@@ -18,6 +18,7 @@ import Link from 'next/link';
 import { calculateStandardTimesheetHours, formatHours, roundTimeToNearestQuarterHour } from '@/lib/utils/time-calculations';
 import { DAY_NAMES } from '@/types/timesheet';
 import { Database } from '@/types/database';
+import { getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
 import { isAdminRole } from '@/lib/utils/role-access';
 import { SignaturePad } from '@/components/forms/SignaturePad';
 import { fetchUKBankHolidays } from '@/lib/utils/bank-holidays';
@@ -92,7 +93,7 @@ export function CivilsTimesheet({
   onSelectedEmployeeChange,
 }: CivilsTimesheetProps) {
   const router = useRouter();
-  const { user, profile, isManager, isAdmin, isSuperAdmin } = useAuth();
+  const { user, profile, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
   
   const supabase = useMemo(() => createClient(), []);
   
@@ -197,11 +198,11 @@ export function CivilsTimesheet({
   useEffect(() => {
     // Wait for ID, authenticated user, AND profile before loading
     // (profile needed for permission checks)
-    if (initialExistingId && user && profile && !loadingExisting) {
+    if (initialExistingId && user && profile && !authLoading && !loadingExisting) {
       loadExistingTimesheet(initialExistingId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialExistingId, user, profile]);
+  }, [authLoading, initialExistingId, user, profile]);
 
   // Fetch last used vehicle when selectedEmployeeId changes (for new timesheets only)
   useEffect(() => {
@@ -722,7 +723,9 @@ export function CivilsTimesheet({
       
       setEntries(fullWeek);
     } catch (err) {
-      console.error('Error loading existing timesheet:', err);
+      if (!isAuthErrorStatus(getErrorStatus(err))) {
+        console.error('Error loading existing timesheet:', err);
+      }
       setError(err instanceof Error ? err.message : 'Failed to load timesheet');
       setShowErrorDialog(true);
     } finally {

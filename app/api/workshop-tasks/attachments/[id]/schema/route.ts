@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  getAdminFieldResponsesForAttachment,
+  getAdminSchemaSnapshotForAttachment,
+} from '@/lib/server/workshop-attachment-admin';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { validateRequiredSchemaResponses } from '@/lib/workshop-attachments/schema-validation';
@@ -59,32 +64,16 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Attachment not found' }, { status: 404 });
     }
 
-    const { data: snapshotRows, error: snapshotError } = await db
-      .from('workshop_attachment_schema_snapshots')
-      .select('*')
-      .eq('attachment_id', attachmentId)
-      .limit(1);
-
-    if (snapshotError) {
-      throw snapshotError;
-    }
-
-    const snapshot = snapshotRows && snapshotRows.length > 0 ? snapshotRows[0] : null;
-
-    const { data: responses, error: responsesError } = await db
-      .from('workshop_attachment_field_responses')
-      .select('*')
-      .eq('attachment_id', attachmentId);
-
-    if (responsesError) {
-      throw responsesError;
-    }
+    const [snapshot, responses] = await Promise.all([
+      getAdminSchemaSnapshotForAttachment(attachmentId),
+      getAdminFieldResponsesForAttachment(attachmentId),
+    ]);
 
     return NextResponse.json({
       success: true,
       attachment,
       snapshot,
-      responses: responses || [],
+      responses,
     }, {
       headers: NO_STORE_HEADERS,
     });
@@ -124,6 +113,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Invalid request body: responses must be an array' }, { status: 400 });
     }
 
+    const admin = createAdminClient();
+
     const { data: attachment, error: attachmentError } = await db
       .from('workshop_task_attachments')
       .select('id, status')
@@ -142,26 +133,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const { data: snapshotRows, error: snapshotError } = await db
-      .from('workshop_attachment_schema_snapshots')
-      .select('*')
-      .eq('attachment_id', attachmentId)
-      .limit(1);
+    const snapshot = await getAdminSchemaSnapshotForAttachment(attachmentId);
 
-    if (snapshotError) {
-      throw snapshotError;
-    }
-
-    if (!snapshotRows || snapshotRows.length === 0) {
+    if (!snapshot) {
       return NextResponse.json(
         { error: 'No schema snapshot exists for this attachment.' },
         { status: 400 }
       );
     }
 
-    const snapshot = snapshotRows[0] as { snapshot_json: SnapshotJson };
-    const snapshotJson = snapshot.snapshot_json;
-    const snapshotSections = Array.isArray(snapshotJson.sections) ? snapshotJson.sections : [];
+    const snapshotJson = (snapshot.snapshot_json ?? null) as unknown as SnapshotJson | null;
+    const snapshotSections = Array.isArray(snapshotJson?.sections) ? snapshotJson.sections : [];
 
     const rowsToUpsert = responsesInput
       .filter((entry) => normalizeValue(entry.section_key).length > 0 && normalizeValue(entry.field_key).length > 0)
@@ -175,7 +157,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }));
 
     if (rowsToUpsert.length > 0) {
-      const { error: upsertError } = await db
+      const { error: upsertError } = await admin
         .from('workshop_attachment_field_responses')
         .upsert(rowsToUpsert as never, {
           onConflict: 'attachment_id,section_key,field_key',
@@ -186,14 +168,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
     }
 
-    const { data: updatedResponses, error: fetchResponsesError } = await db
-      .from('workshop_attachment_field_responses')
-      .select('*')
-      .eq('attachment_id', attachmentId);
-
-    if (fetchResponsesError) {
-      throw fetchResponsesError;
-    }
+    const updatedResponses = await getAdminFieldResponsesForAttachment(attachmentId);
 
     if (markComplete) {
       const typedResponses = (updatedResponses || []) as Array<{
@@ -238,7 +213,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({
       success: true,
       attachment: refreshedAttachment,
-      responses: updatedResponses || [],
+      responses: updatedResponses,
     });
   } catch (error) {
     const { id: attachmentId } = await params;

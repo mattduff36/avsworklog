@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { TimesheetRouter } from '../components/TimesheetRouter';
 import { WeekSelector } from '../components/WeekSelector';
 import { createClient } from '@/lib/supabase/client';
+import { getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
 import { PageLoader } from '@/components/ui/page-loader';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { Employee } from '@/types/common';
@@ -21,7 +22,7 @@ import { Employee } from '@/types/common';
  */
 
 function NewTimesheetContent() {
-  const { user, isManager, isAdmin, isSuperAdmin } = useAuth();
+  const { user, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
   const searchParams = useSearchParams();
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
   if (typeof window !== 'undefined' && !supabaseRef.current) {
@@ -91,7 +92,7 @@ function NewTimesheetContent() {
   // If editing existing timesheet, load its week ending and skip selector (Q6: Answer A)
   useEffect(() => {
     async function loadExistingWeek() {
-      if (existingId && user && supabase) {
+      if (existingId && user && supabase && !authLoading) {
         try {
           const { data, error } = await supabase
             .from('timesheets')
@@ -108,7 +109,9 @@ function NewTimesheetContent() {
           setShowForm(true);
           setTimesheetId(existingId);
         } catch (err) {
-          console.error('Error loading existing timesheet:', err);
+          if (!isAuthErrorStatus(getErrorStatus(err))) {
+            console.error('Error loading existing timesheet:', err);
+          }
           // Fall back to showing week selector
           setExistingTimesheetType(null);
           setExistingTemplateVersion(null);
@@ -117,8 +120,8 @@ function NewTimesheetContent() {
       }
     }
 
-    loadExistingWeek();
-  }, [existingId, user, supabase]);
+    void loadExistingWeek();
+  }, [authLoading, existingId, user, supabase]);
 
   // Handle week selection from WeekSelector
   const handleWeekSelected = async (weekEnding: string, existingTimesheetId: string | null) => {
@@ -154,7 +157,9 @@ function NewTimesheetContent() {
       setLoadedWeek(data.week_ending || weekEnding);
       setSelectedEmployeeId(data.user_id || user?.id || '');
     } catch (err) {
-      console.error('Error loading timesheet metadata from week selector:', err);
+      if (!isAuthErrorStatus(getErrorStatus(err))) {
+        console.error('Error loading timesheet metadata from week selector:', err);
+      }
       // Fallback keeps current behavior but avoids stale metadata.
       setExistingTimesheetType(null);
       setExistingTemplateVersion(null);

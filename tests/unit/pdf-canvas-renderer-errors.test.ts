@@ -15,6 +15,12 @@ describe('isExpectedPdfRenderError', () => {
     expect(isExpectedPdfRenderError(error)).toBe(true);
   });
 
+  it('returns true for transport destroyed teardown errors', () => {
+    const error = new Error('Transport destroyed');
+
+    expect(isExpectedPdfRenderError(error)).toBe(true);
+  });
+
   it('returns false for non-cancellation render errors', () => {
     const error = new Error('Failed to fetch');
 

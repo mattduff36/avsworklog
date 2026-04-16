@@ -4,5 +4,9 @@ export function isExpectedPdfRenderError(error: unknown): boolean {
   const name = error.name.toLowerCase();
   const message = error.message.toLowerCase();
 
-  return name.includes('renderingcancelledexception') || message.includes('rendering cancelled');
+  return (
+    name.includes('renderingcancelledexception') ||
+    message.includes('rendering cancelled') ||
+    message.includes('transport destroyed')
+  );
 }

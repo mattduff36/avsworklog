@@ -7,6 +7,7 @@
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import type { Database } from '@/types/database';
+import { getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
 
 export interface ErrorHandlingMetadata {
   wasHandled: boolean;
@@ -317,6 +318,7 @@ class ErrorLogger {
       (reason instanceof Error ? this.asText(reason.stack) : null) ||
       this.asText(reasonLike?.stack) ||
       '';
+    const status = getErrorStatus(reason);
 
     if (!message) {
       return false;
@@ -328,6 +330,10 @@ class ErrorLogger {
 
     if (message !== 'Unauthorized' && message !== 'Session is locked') {
       return false;
+    }
+
+    if (isAuthErrorStatus(status)) {
+      return true;
     }
 
     return (

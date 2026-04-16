@@ -240,7 +240,20 @@ function PlantInspectionsContent() {
     try {
       let query = supabase
         .from('plant_inspections')
-        .select('*')
+        .select(`
+          id,
+          plant_id,
+          user_id,
+          inspection_date,
+          inspection_end_date,
+          current_mileage,
+          status,
+          submitted_at,
+          is_hired_plant,
+          hired_plant_id_serial,
+          hired_plant_description,
+          hired_plant_hiring_company
+        `)
         .order('inspection_date', { ascending: false });
 
       // Filter based on user role and selection

@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  getAdminFieldResponsesForAttachment,
+  getAdminSchemaSnapshotForAttachment,
+} from '@/lib/server/workshop-attachment-admin';
 import { createClient } from '@/lib/supabase/server';
 import { renderToStream } from '@react-pdf/renderer';
 import { WorkshopAttachmentPDF, type V2PdfSectionData } from '@/lib/pdf/workshop-attachment-pdf';
@@ -257,26 +261,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const attachment = rawAttachment as unknown as AttachmentRow;
 
-    const { data: rawSnapshot, error: snapshotError } = await supabase
-      .from('workshop_attachment_schema_snapshots')
-      .select('snapshot_json')
-      .eq('attachment_id', attachmentId)
-      .limit(1);
+    const [rawSnapshot, rawFieldResponses] = await Promise.all([
+      getAdminSchemaSnapshotForAttachment(attachmentId),
+      getAdminFieldResponsesForAttachment(attachmentId),
+    ]);
 
-    if (snapshotError) throw snapshotError;
-
-    const snapshot = (rawSnapshot && rawSnapshot.length > 0)
-      ? (rawSnapshot[0] as unknown as SchemaSnapshotRow)
-      : null;
-
-    const { data: rawFieldResponses, error: fieldResponsesError } = await supabase
-      .from('workshop_attachment_field_responses')
-      .select('section_key, field_key, response_value, response_json')
-      .eq('attachment_id', attachmentId);
-
-    if (fieldResponsesError) throw fieldResponsesError;
-
-    const fieldResponses = (rawFieldResponses || []) as unknown as FieldResponseRow[];
+    const snapshot = rawSnapshot as SchemaSnapshotRow | null;
+    const fieldResponses = rawFieldResponses as unknown as FieldResponseRow[];
     const rawV2Sections = mapSnapshotToV2PdfSections(snapshot, fieldResponses);
     const v2Sections = await normalizeSectionSignatureImages(rawV2Sections);
     if (v2Sections.length === 0) {

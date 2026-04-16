@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  getAdminFieldResponsesForAttachment,
+  getAdminSchemaSnapshotForAttachment,
+} from '@/lib/server/workshop-attachment-admin';
 import { createClient } from '@/lib/supabase/server';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
@@ -47,31 +51,17 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       throw attachmentError;
     }
 
-    const { data: schemaSnapshots, error: snapshotsError } = await db
-      .from('workshop_attachment_schema_snapshots')
-      .select('*')
-      .eq('attachment_id', id)
-      .limit(1);
-
-    if (snapshotsError) {
-      throw snapshotsError;
-    }
-
-    const { data: fieldResponses, error: fieldResponsesError } = await db
-      .from('workshop_attachment_field_responses')
-      .select('*')
-      .eq('attachment_id', id);
-
-    if (fieldResponsesError) {
-      throw fieldResponsesError;
-    }
+    const [schemaSnapshot, fieldResponses] = await Promise.all([
+      getAdminSchemaSnapshotForAttachment(id),
+      getAdminFieldResponsesForAttachment(id),
+    ]);
 
     return NextResponse.json({
       success: true,
       attachment: {
         ...attachment,
-        schema_snapshot: schemaSnapshots && schemaSnapshots.length > 0 ? schemaSnapshots[0] : null,
-        field_responses: fieldResponses || [],
+        schema_snapshot: schemaSnapshot,
+        field_responses: fieldResponses,
       },
     }, {
       headers: NO_STORE_HEADERS,
