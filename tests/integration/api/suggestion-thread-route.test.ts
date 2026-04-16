@@ -4,9 +4,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { GET } from '@/app/api/suggestions/[id]/route';
 import { POST } from '@/app/api/suggestions/[id]/reply/route';
 
-const { mockCreateClient, mockLogServerError } = vi.hoisted(() => ({
+const { mockCreateClient, mockLogServerError, mockCanAccess } = vi.hoisted(() => ({
   mockCreateClient: vi.fn(),
   mockLogServerError: vi.fn(),
+  mockCanAccess: vi.fn(),
 }));
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -17,10 +18,15 @@ vi.mock('@/lib/utils/server-error-logger', () => ({
   logServerError: mockLogServerError,
 }));
 
+vi.mock('@/lib/utils/rbac', () => ({
+  canEffectiveRoleAccessModule: mockCanAccess,
+}));
+
 describe('GET /api/suggestions/[id]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockLogServerError.mockResolvedValue(undefined);
+    mockCanAccess.mockResolvedValue(false);
   });
 
   it('returns the current user suggestion thread with profile names', async () => {
@@ -61,8 +67,7 @@ describe('GET /api/suggestions/[id]', () => {
     ];
 
     const suggestionsSingle = vi.fn().mockResolvedValue({ data: suggestionRow, error: null });
-    const suggestionsEqCreatedBy = vi.fn(() => ({ single: suggestionsSingle }));
-    const suggestionsEqId = vi.fn(() => ({ eq: suggestionsEqCreatedBy }));
+    const suggestionsEqId = vi.fn(() => ({ single: suggestionsSingle }));
     const suggestionsSelect = vi.fn(() => ({ eq: suggestionsEqId }));
 
     const updatesOrder = vi.fn().mockResolvedValue({ data: updateRows, error: null });
@@ -99,6 +104,57 @@ describe('GET /api/suggestions/[id]', () => {
     expect(payload.updates).toHaveLength(2);
     expect(payload.updates[0].user).toEqual({ full_name: 'Matt Duffill' });
     expect(payload.updates[1].user).toEqual({ full_name: 'Richard User' });
+  });
+
+  it('allows suggestions managers to view another user suggestion thread', async () => {
+    const suggestionRow = {
+      id: 'suggestion-2',
+      created_by: 'user-2',
+      title: 'Van not in use button',
+      body: 'Could we add a van not in use button?',
+      page_hint: '/van-inspections',
+      status: 'under_review',
+      admin_notes: null,
+      created_at: '2026-04-16T10:00:00Z',
+      updated_at: '2026-04-16T10:00:00Z',
+    };
+
+    const suggestionsSingle = vi.fn().mockResolvedValue({ data: suggestionRow, error: null });
+    const suggestionsEqId = vi.fn(() => ({ single: suggestionsSingle }));
+    const suggestionsSelect = vi.fn(() => ({ eq: suggestionsEqId }));
+
+    const updatesOrder = vi.fn().mockResolvedValue({ data: [], error: null });
+    const updatesEq = vi.fn(() => ({ order: updatesOrder }));
+    const updatesSelect = vi.fn(() => ({ eq: updatesEq }));
+
+    const profilesIn = vi.fn().mockResolvedValue({ data: [{ id: 'user-2', full_name: 'David User' }], error: null });
+    const profilesSelect = vi.fn(() => ({ in: profilesIn }));
+
+    mockCanAccess.mockResolvedValue(true);
+    mockCreateClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'manager-1' } },
+          error: null,
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'suggestions') return { select: suggestionsSelect };
+        if (table === 'suggestion_updates') return { select: updatesSelect };
+        if (table === 'profiles') return { select: profilesSelect };
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    } as unknown as SupabaseClient);
+
+    const response = await GET(
+      new NextRequest('http://localhost/api/suggestions/suggestion-2'),
+      { params: Promise.resolve({ id: 'suggestion-2' }) }
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.suggestion.user).toEqual({ full_name: 'David User' });
+    expect(mockCanAccess).toHaveBeenCalledWith('suggestions');
   });
 });
 

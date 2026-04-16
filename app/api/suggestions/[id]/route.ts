@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type { Suggestion, SuggestionUpdateWithUser } from '@/types/faq';
 
@@ -21,7 +22,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       .from('suggestions')
       .select('id, created_by, title, body, page_hint, status, admin_notes, created_at, updated_at')
       .eq('id', id)
-      .eq('created_by', user.id)
       .single();
 
     if (suggestionError) {
@@ -29,6 +29,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         return NextResponse.json({ error: 'Suggestion not found' }, { status: 404 });
       }
       throw suggestionError;
+    }
+
+    const rawSuggestion = suggestion as Suggestion;
+    const isOwner = rawSuggestion.created_by === user.id;
+    if (!isOwner) {
+      const canManageSuggestions = await canEffectiveRoleAccessModule('suggestions');
+      if (!canManageSuggestions) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
     }
 
     const { data: updates, error: updatesError } = await supabase
@@ -41,7 +50,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       throw updatesError;
     }
 
-    const rawSuggestion = suggestion as Suggestion;
     const rawUpdates = (updates || []) as SuggestionUpdateWithUser[];
     const profileIds = Array.from(new Set([
       rawSuggestion.created_by,

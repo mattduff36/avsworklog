@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/lib/hooks/useAuth';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
@@ -38,12 +39,18 @@ interface SuggestionThreadResponse {
   error?: string;
 }
 
+interface SuggestionListResponse {
+  success?: boolean;
+  suggestions?: Array<Pick<Suggestion, 'id' | 'title'>>;
+}
+
 export function ReminderModal({
   open,
   onClose,
   message,
   onDismissed
 }: ReminderModalProps) {
+  const { user } = useAuth();
   const hasDismissed = useRef(false);
   const [resolvedSuggestionId, setResolvedSuggestionId] = useState<string | null>(null);
   const [suggestionThread, setSuggestionThread] = useState<SuggestionThreadResponse['suggestion'] | null>(null);
@@ -65,6 +72,12 @@ export function ReminderModal({
     || fallbackSuggestionTitle
     || message.subject.toLowerCase().startsWith('suggestion')
   );
+  const canReplyToSuggestion = Boolean(
+    resolvedSuggestionId
+    && suggestionThread
+    && user?.id
+    && suggestionThread.created_by === user.id
+  );
 
   useEffect(() => {
     hasDismissed.current = false;
@@ -84,20 +97,26 @@ export function ReminderModal({
   }, []);
 
   const resolveSuggestionIdFromFallbackTitle = useCallback(async (title: string) => {
-    const response = await fetch('/api/suggestions?limit=200', { cache: 'no-store' });
-    const data = await response.json() as {
-      success?: boolean;
-      suggestions?: Suggestion[];
-      error?: string;
-    };
+    const normalizedTitle = title.trim().toLowerCase();
 
-    if (!response.ok || !data.success) {
-      throw new Error(data.error || 'Failed to resolve suggestion');
+    for (const endpoint of ['/api/suggestions?limit=200', '/api/management/suggestions?limit=200']) {
+      const response = await fetch(endpoint, { cache: 'no-store' });
+      if (!response.ok) {
+        continue;
+      }
+
+      const data = await response.json() as SuggestionListResponse;
+      if (!data.success) {
+        continue;
+      }
+
+      const match = (data.suggestions || []).find((suggestion) => suggestion.title.trim().toLowerCase() === normalizedTitle);
+      if (match) {
+        return match.id;
+      }
     }
 
-    const normalizedTitle = title.trim().toLowerCase();
-    const match = (data.suggestions || []).find((suggestion) => suggestion.title.trim().toLowerCase() === normalizedTitle);
-    return match?.id || null;
+    return null;
   }, []);
 
   useEffect(() => {
@@ -245,7 +264,9 @@ export function ReminderModal({
                 <div>
                   <p className="text-sm font-semibold text-foreground">Suggestion thread</p>
                   <p className="text-xs text-muted-foreground">
-                    Add a reply here and it will be attached to the original suggestion.
+                    {canReplyToSuggestion
+                      ? 'Add a reply here and it will be attached to the original suggestion.'
+                      : 'Review the original suggestion and its reply history here.'}
                   </p>
                 </div>
                 {suggestionThread && (
@@ -328,25 +349,31 @@ export function ReminderModal({
               ) : null}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="suggestion-reply">Reply</Label>
-              <Textarea
-                id="suggestion-reply"
-                value={replyText}
-                onChange={(event) => setReplyText(event.target.value)}
-                placeholder="Add your reply or extra detail here..."
-                rows={4}
-                disabled={!resolvedSuggestionId || loadingSuggestionThread || submittingReply}
-              />
-            </div>
+            {canReplyToSuggestion ? (
+              <div className="space-y-2">
+                <Label htmlFor="suggestion-reply">Reply</Label>
+                <Textarea
+                  id="suggestion-reply"
+                  value={replyText}
+                  onChange={(event) => setReplyText(event.target.value)}
+                  placeholder="Add your reply or extra detail here..."
+                  rows={4}
+                  disabled={!resolvedSuggestionId || loadingSuggestionThread || submittingReply}
+                />
+              </div>
+            ) : suggestionThread ? (
+              <p className="text-xs text-muted-foreground">
+                Replying is only available when the original suggestion submitter opens this notification.
+              </p>
+            ) : null}
           </div>
         )}
 
         <DialogFooter>
-          {isSuggestionNotification && (
+          {isSuggestionNotification && canReplyToSuggestion && (
             <Button
               onClick={() => void handleReplySubmit()}
-              disabled={!resolvedSuggestionId || !replyText.trim() || loadingSuggestionThread || submittingReply}
+              disabled={!replyText.trim() || loadingSuggestionThread || submittingReply}
               className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900"
             >
               {submittingReply ? (
