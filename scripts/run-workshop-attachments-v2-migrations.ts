@@ -14,6 +14,7 @@ const migrationFiles = [
   'supabase/migrations/20260402_publish_hgv_6_week_template_full_v2.sql',
   'supabase/migrations/20260415_publish_hgv_6_week_signature_cleanup.sql',
   'supabase/migrations/20260413_publish_trailer_6_week_template_v2.sql',
+  'supabase/migrations/20260417_publish_hgv_service_templates_v2.sql',
 ];
 
 if (!connectionString) {
@@ -62,6 +63,18 @@ async function runMigrations() {
       ['6 Week Inspection - Trailer'],
     );
     console.log(`Verification: 6 Week Inspection - Trailer templates found = ${trailerTemplateRows[0]?.count || 0}`);
+
+    const { rows: fullServiceTemplateRows } = await client.query(
+      `SELECT COUNT(*)::int AS count FROM workshop_attachment_templates WHERE LOWER(name) = LOWER($1)`,
+      ['Full Service (HGV)'],
+    );
+    console.log(`Verification: Full Service (HGV) templates found = ${fullServiceTemplateRows[0]?.count || 0}`);
+
+    const { rows: basicServiceTemplateRows } = await client.query(
+      `SELECT COUNT(*)::int AS count FROM workshop_attachment_templates WHERE LOWER(name) = LOWER($1)`,
+      ['Basic Service (HGV)'],
+    );
+    console.log(`Verification: Basic Service (HGV) templates found = ${basicServiceTemplateRows[0]?.count || 0}`);
 
     console.log('Workshop attachments v2 migrations completed successfully');
   } catch (error) {
