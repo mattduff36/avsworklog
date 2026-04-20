@@ -56,6 +56,7 @@ import type { WorkShiftPattern, WorkShiftTemplate } from '@/types/work-shifts';
 import { WORK_SHIFT_DAY_LABELS, WORK_SHIFT_DAY_ORDER } from '@/types/work-shifts';
 import { getRoleSortPriority } from '@/lib/config/roles-core';
 import { calculateNewUserRemainingLeaveDefault, roundToNearestHalfDay } from '@/lib/utils/absence-onboarding';
+import { isClientSessionPausedError } from '@/lib/app-auth/session-error';
 import { formatDateTime } from '@/lib/utils/date';
 import {
   computeQuickEditFloatingPosition,
@@ -533,7 +534,9 @@ export default function UsersAdminPage() {
 
         setAvailableRoles(rolesForAssignment);
       } catch (error) {
-        console.error('Error fetching roles:', error);
+        if (!isClientSessionPausedError(error)) {
+          console.error('Error fetching roles:', error);
+        }
       }
     }
 

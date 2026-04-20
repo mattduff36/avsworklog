@@ -348,4 +348,113 @@ describe('GET /api/dashboard/summary', () => {
       maintenance_overdue: 1,
     });
   });
+
+  it('falls back to zero when a dashboard count query fails', async () => {
+    const { createClient } = await import('@/lib/supabase/server');
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+    const { getEffectiveRole } = await import('@/lib/utils/view-as');
+    const { getPermissionMapForUser } = await import('@/lib/server/team-permissions');
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    vi.mocked(getCurrentAuthenticatedProfile).mockResolvedValue({
+      profile: {
+        id: 'user-1',
+      },
+      validation: {
+        cookieValue: null,
+        cookieExpiresAt: null,
+      },
+    } as never);
+    vi.mocked(getEffectiveRole).mockResolvedValue({
+      role_id: 'employee-role',
+      role_name: 'employee',
+      role_class: 'employee',
+      display_name: 'Employee',
+      is_manager_admin: false,
+      is_super_admin: false,
+      is_viewing_as: false,
+      is_actual_super_admin: false,
+      user_id: 'user-1',
+      team_id: 'team-a',
+      team_name: 'Team A',
+    });
+    vi.mocked(getPermissionMapForUser).mockResolvedValue({
+      timesheets: false,
+      inspections: false,
+      'plant-inspections': false,
+      'hgv-inspections': false,
+      rams: false,
+      absence: false,
+      maintenance: false,
+      'toolbox-talks': false,
+      'workshop-tasks': false,
+      approvals: true,
+      actions: false,
+      reports: false,
+      suggestions: false,
+      'faq-editor': false,
+      'error-reports': false,
+      'admin-users': false,
+      'admin-settings': false,
+      'admin-vans': false,
+      customers: false,
+      quotes: false,
+    });
+
+    const supabase = {
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1' } },
+          error: null,
+        }),
+      },
+      from: (table: string) => {
+        if (table === 'timesheets') {
+          return {
+            select: () => ({
+              eq: vi.fn().mockResolvedValue({
+                count: null,
+                error: new Error('statement timeout'),
+              }),
+            }),
+          };
+        }
+
+        if (table === 'absences') {
+          return { select: () => createCountQuery(5) };
+        }
+
+        throw new Error(`Unexpected table: ${table}`);
+      },
+    };
+
+    vi.mocked(createAdminClient).mockReturnValue(supabase as never);
+    vi.mocked(createClient).mockResolvedValue(supabase as unknown as SupabaseClient);
+
+    const response = await GET();
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.metrics).toEqual({
+      approvals: {
+        timesheets: 0,
+        absences: 5,
+      },
+      badges: {
+        workshop_pending: 0,
+        maintenance_due_soon: 0,
+        maintenance_overdue: 0,
+        suggestions_new: 0,
+        error_reports_new: 0,
+        quotes_pending_internal_approval: 0,
+        error_logs: 0,
+      },
+    });
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      'Failed to load submitted timesheets dashboard metric:',
+      expect.any(Error)
+    );
+
+    consoleErrorSpy.mockRestore();
+  });
 });

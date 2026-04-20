@@ -42,6 +42,38 @@ interface SuggestionBadgeMetrics {
   awaitingAdminReplyCount: number;
 }
 
+interface CountMetricResult {
+  count: number | null;
+  error: unknown;
+}
+
+async function resolveCountMetric(
+  label: string,
+  promise: PromiseLike<CountMetricResult>
+): Promise<{ count: number; error: null }> {
+  try {
+    const result = await promise;
+    if (result.error) {
+      console.error(`Failed to load ${label} dashboard metric:`, result.error);
+      return { count: 0, error: null };
+    }
+
+    return { count: result.count || 0, error: null };
+  } catch (error) {
+    console.error(`Failed to load ${label} dashboard metric:`, error);
+    return { count: 0, error: null };
+  }
+}
+
+async function resolveMetricValue<T>(label: string, promise: PromiseLike<T>, fallback: T): Promise<T> {
+  try {
+    return await promise;
+  } catch (error) {
+    console.error(`Failed to load ${label} dashboard metric:`, error);
+    return fallback;
+  }
+}
+
 function createFullAccessPermissionMap(): PermissionMap {
   return ALL_MODULES.reduce<PermissionMap>((acc, moduleName) => {
     acc[moduleName] = true;
@@ -323,61 +355,73 @@ export async function GET() {
     workshopPendingResult,
     suggestionBadgeMetrics,
     errorsNewResult,
-    errorsInvestigatingResult,
     quotesResult,
     errorLogsResult,
     maintenanceCounts,
   ] = await Promise.all([
     canViewApprovals
-      ? supabase.from('timesheets').select('id', { count: 'exact', head: true }).eq('status', 'submitted')
+      ? resolveCountMetric(
+          'submitted timesheets',
+          supabase.from('timesheets').select('id', { count: 'exact', head: true }).eq('status', 'submitted')
+        )
       : Promise.resolve({ count: 0, error: null }),
     canViewApprovals
-      ? supabase.from('absences').select('id', { count: 'exact', head: true }).eq('status', 'pending')
+      ? resolveCountMetric(
+          'pending absences',
+          supabase.from('absences').select('id', { count: 'exact', head: true }).eq('status', 'pending')
+        )
       : Promise.resolve({ count: 0, error: null }),
     canViewWorkshopTasks
-      ? supabase
-          .from('actions')
-          .select('id', { count: 'exact', head: true })
-          .in('action_type', ['inspection_defect', 'workshop_vehicle_task'])
-          .eq('status', 'pending')
+      ? resolveCountMetric(
+          'pending workshop actions',
+          supabase
+            .from('actions')
+            .select('id', { count: 'exact', head: true })
+            .in('action_type', ['inspection_defect', 'workshop_vehicle_task'])
+            .eq('status', 'pending')
+        )
       : Promise.resolve({ count: 0, error: null }),
     canViewSuggestions
-      ? getSuggestionBadgeMetrics(supabase)
+      ? resolveMetricValue(
+          'suggestion badges',
+          getSuggestionBadgeMetrics(supabase),
+          { newCount: 0, awaitingAdminReplyCount: 0 }
+        )
       : Promise.resolve({ newCount: 0, awaitingAdminReplyCount: 0 }),
     canViewErrorReports
-      ? supabase.from('error_reports').select('id', { count: 'exact', head: true }).eq('status', 'new')
-      : Promise.resolve({ count: 0, error: null }),
-    canViewErrorReports
-      ? supabase.from('error_reports').select('id', { count: 'exact', head: true }).eq('status', 'investigating')
+      ? resolveCountMetric(
+          'new error reports',
+          supabase.from('error_reports').select('id', { count: 'exact', head: true }).eq('status', 'new')
+        )
       : Promise.resolve({ count: 0, error: null }),
     canViewQuotes
-      ? supabase.from('quotes').select('id', { count: 'exact', head: true }).eq('status', 'pending_internal_approval')
+      ? resolveCountMetric(
+          'pending quotes',
+          supabase.from('quotes').select('id', { count: 'exact', head: true }).eq('status', 'pending_internal_approval')
+        )
       : Promise.resolve({ count: 0, error: null }),
     effectiveRole.is_actual_super_admin
-      ? supabase.from('error_logs').select('id', { count: 'exact', head: true })
+      ? resolveCountMetric(
+          'error logs',
+          supabase.from('error_logs').select('id', { count: 'exact', head: true })
+        )
       : Promise.resolve({ count: 0, error: null }),
     canViewMaintenance
-      ? getMaintenanceCounts()
+      ? resolveMetricValue(
+          'maintenance totals',
+          getMaintenanceCounts(),
+          {
+            attentionTotal: 0,
+            dueSoonTotal: 0,
+            overdueTotal: 0,
+          }
+        )
       : Promise.resolve({
           attentionTotal: 0,
           dueSoonTotal: 0,
           overdueTotal: 0,
         }),
   ]);
-
-  for (const result of [
-    timesheetsResult,
-    absencesResult,
-    workshopPendingResult,
-    errorsNewResult,
-    errorsInvestigatingResult,
-    quotesResult,
-    errorLogsResult,
-  ]) {
-    if (result.error) {
-      throw result.error;
-    }
-  }
 
   return NextResponse.json({
     success: true,

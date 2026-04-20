@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import type { RoleMatrixRow } from '@/types/roles';
 import { toast } from 'sonner';
+import { isClientSessionPausedError } from '@/lib/app-auth/session-error';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { getRoleSortPriority, isCoreRoleName } from '@/lib/config/roles-core';
 import { isAdminRole } from '@/lib/utils/role-access';
@@ -74,7 +75,9 @@ export function JobRolesTab() {
       if (!response.ok) throw new Error(data.error || 'Failed to fetch roles');
       setRoles(data.matrix ?? []);
     } catch (error) {
-      console.error('Error fetching roles:', error);
+      if (!isClientSessionPausedError(error)) {
+        console.error('Error fetching roles:', error);
+      }
       toast.error('Failed to load roles');
     } finally {
       setLoading(false);

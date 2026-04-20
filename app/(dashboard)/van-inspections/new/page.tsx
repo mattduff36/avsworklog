@@ -47,6 +47,8 @@ import {
   type VanInspectionDayRow,
   type VanInspectionOverlapConflict,
 } from '@/lib/utils/van-inspection-overlap';
+import { isClientSessionPausedError } from '@/lib/app-auth/session-error';
+import { getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
 
 // Dynamic imports for heavy components - loaded only when needed
 const PhotoUpload = dynamic(() => import('@/components/forms/PhotoUpload'), { ssr: false });
@@ -402,7 +404,9 @@ function NewInspectionContent() {
         if (isTransientNetworkError(err)) {
           console.warn('Silent draft save skipped due transient network error');
         } else {
-          console.error('Silent draft save failed:', err, { errorContextId });
+          if (!isAuthErrorStatus(getErrorStatus(err)) && !isClientSessionPausedError(err)) {
+            console.error('Silent draft save failed:', err, { errorContextId });
+          }
         }
         if (!silent) {
           toast.error(getInspectionErrorMessage(err, 'Could not auto-save draft. Please try again.'), { id: errorContextId });
@@ -721,9 +725,11 @@ function NewInspectionContent() {
     const { data: inspections, error: inspectionsError } = await inspectionsQuery;
 
     if (inspectionsError) {
-      console.error('Failed to check for overlapping van inspections:', inspectionsError, {
-        errorContextId: 'van-inspections-new-check-existing-error',
-      });
+      if (!isAuthErrorStatus(getErrorStatus(inspectionsError)) && !isClientSessionPausedError(inspectionsError)) {
+        console.error('Failed to check for overlapping van inspections:', inspectionsError, {
+          errorContextId: 'van-inspections-new-check-existing-error',
+        });
+      }
       return null;
     }
 

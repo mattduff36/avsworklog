@@ -6,6 +6,7 @@
 
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
+import { isClientSessionPausedMessage } from '@/lib/app-auth/session-error';
 import type { Database } from '@/types/database';
 import { getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
 
@@ -487,6 +488,10 @@ class ErrorLogger {
           errorMessage.includes('TypeError: Failed to fetch') &&
           (errorMessage.includes('Error fetching profile:') || errorMessage.includes('Error checking for duplicate:'))
         ) {
+          return;
+        }
+
+        if (isClientSessionPausedMessage(errorMessage)) {
           return;
         }
         

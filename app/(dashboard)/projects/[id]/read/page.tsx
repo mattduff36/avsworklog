@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { RAMSErrorBoundary } from '@/components/rams/RAMSErrorBoundary';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { loadClientAuthSession } from '@/lib/app-auth/client-session';
+import { isClientSessionPausedError } from '@/lib/app-auth/session-error';
 
 interface RAMSDocument {
   id: string;
@@ -46,6 +47,10 @@ function getErrorMessage(error: unknown, fallback: string): string {
     }
   }
   return fallback;
+}
+
+function shouldLogRamSError(error: unknown): boolean {
+  return !isClientSessionPausedError(error);
 }
 
 function ReadRAMSContent() {
@@ -92,12 +97,14 @@ function ReadRAMSContent() {
 
       if (docError || !doc) {
         const errorMessage = getErrorMessage(docError, 'Document not found');
-        console.error('Error fetching document:', {
-          message: errorMessage,
-          documentId,
-          error: docError,
-          timestamp: new Date().toISOString()
-        });
+        if (shouldLogRamSError(docError)) {
+          console.error('Error fetching document:', {
+            message: errorMessage,
+            documentId,
+            error: docError,
+            timestamp: new Date().toISOString()
+          });
+        }
         setError('Document not found or you do not have permission to view it');
         return;
       }
@@ -132,16 +139,18 @@ function ReadRAMSContent() {
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('Error loading RAMS document:', {
-        message: errorMessage,
-        documentId,
-        error: error instanceof Error ? {
-          name: error.name,
-          message: error.message,
-          stack: error.stack
-        } : error,
-        timestamp: new Date().toISOString()
-      });
+      if (shouldLogRamSError(error)) {
+        console.error('Error loading RAMS document:', {
+          message: errorMessage,
+          documentId,
+          error: error instanceof Error ? {
+            name: error.name,
+            message: error.message,
+            stack: error.stack
+          } : error,
+          timestamp: new Date().toISOString()
+        });
+      }
       setError('Failed to load document. Please try refreshing the page.');
     } finally {
       setLoading(false);
@@ -201,13 +210,15 @@ function ReadRAMSContent() {
 
         if (updateError) {
           const errorMessage = getErrorMessage(updateError, 'Unknown error');
-          console.error('Error recording RAMS action:', {
-            message: errorMessage,
-            assignmentId: assignment.id,
-            action,
-            error: updateError,
-            timestamp: new Date().toISOString()
-          });
+          if (shouldLogRamSError(updateError)) {
+            console.error('Error recording RAMS action:', {
+              message: errorMessage,
+              assignmentId: assignment.id,
+              action,
+              error: updateError,
+              timestamp: new Date().toISOString()
+            });
+          }
           return;
         }
 
@@ -222,16 +233,18 @@ function ReadRAMSContent() {
         } : null);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        console.error('Error recording RAMS action (outer catch):', {
-          message: errorMessage,
-          assignmentId: assignment?.id,
-          action,
-          error: error instanceof Error ? {
-            name: error.name,
-            message: error.message
-          } : error,
-          timestamp: new Date().toISOString()
-        });
+        if (shouldLogRamSError(error)) {
+          console.error('Error recording RAMS action (outer catch):', {
+            message: errorMessage,
+            assignmentId: assignment?.id,
+            action,
+            error: error instanceof Error ? {
+              name: error.name,
+              message: error.message
+            } : error,
+            timestamp: new Date().toISOString()
+          });
+        }
       }
     }
   };
@@ -265,17 +278,19 @@ function ReadRAMSContent() {
       await recordAction('downloaded', !!assignment);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('Error downloading RAMS document:', {
-        message: errorMessage,
-        documentId,
-        documentTitle: ramsDocument?.title,
-        action: 'download',
-        error: error instanceof Error ? {
-          name: error.name,
-          message: error.message
-        } : error,
-        timestamp: new Date().toISOString()
-      });
+      if (shouldLogRamSError(error)) {
+        console.error('Error downloading RAMS document:', {
+          message: errorMessage,
+          documentId,
+          documentTitle: ramsDocument?.title,
+          action: 'download',
+          error: error instanceof Error ? {
+            name: error.name,
+            message: error.message
+          } : error,
+          timestamp: new Date().toISOString()
+        });
+      }
       setError('Failed to download document. Please try again or select a different option.');
     } finally {
       setActionInProgress(null);
@@ -318,17 +333,19 @@ function ReadRAMSContent() {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 
                           typeof error === 'string' ? error : 'Unknown error';
-      console.error('Error opening RAMS document:', {
-        message: errorMessage,
-        documentId,
-        documentTitle: ramsDocument?.title,
-        action: 'open',
-        error: error instanceof Error ? {
-          name: error.name,
-          message: error.message
-        } : error,
-        timestamp: new Date().toISOString()
-      });
+      if (shouldLogRamSError(error)) {
+        console.error('Error opening RAMS document:', {
+          message: errorMessage,
+          documentId,
+          documentTitle: ramsDocument?.title,
+          action: 'open',
+          error: error instanceof Error ? {
+            name: error.name,
+            message: error.message
+          } : error,
+          timestamp: new Date().toISOString()
+        });
+      }
       setError(errorMessage || 'Failed to open document. Please try again or select a different option.');
     } finally {
       setActionInProgress(null);
@@ -359,17 +376,19 @@ function ReadRAMSContent() {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 
                           typeof error === 'string' ? error : 'Unknown error';
-      console.error('Error sending RAMS email:', {
-        message: errorMessage,
-        documentId,
-        documentTitle: ramsDocument?.title,
-        action: 'email',
-        error: error instanceof Error ? {
-          name: error.name,
-          message: error.message
-        } : error,
-        timestamp: new Date().toISOString()
-      });
+      if (shouldLogRamSError(error)) {
+        console.error('Error sending RAMS email:', {
+          message: errorMessage,
+          documentId,
+          documentTitle: ramsDocument?.title,
+          action: 'email',
+          error: error instanceof Error ? {
+            name: error.name,
+            message: error.message
+          } : error,
+          timestamp: new Date().toISOString()
+        });
+      }
       setError(errorMessage || 'Failed to send email. Please try again or select a different option.');
     } finally {
       setActionInProgress(null);

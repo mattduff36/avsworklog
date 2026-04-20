@@ -5,6 +5,7 @@ import {
   reportClientServiceOutage,
   shouldTripClientServiceOutage,
 } from '@/lib/app-auth/client-service-health';
+import { CLIENT_SESSION_PAUSED_MESSAGE } from '@/lib/app-auth/session-error';
 import { createStatusError, getErrorStatus } from '@/lib/utils/http-error';
 
 export interface ClientAuthSessionUser {
@@ -110,7 +111,7 @@ export async function loadClientAuthSession(): Promise<ClientAuthSessionResult> 
         reportClientServiceOutage(
           'auth-session',
           responseStatus,
-          'We could not verify your session, so data loading has been paused.'
+          CLIENT_SESSION_PAUSED_MESSAGE
         );
       } else {
         clearClientServiceOutage('auth-session');

@@ -56,7 +56,13 @@ import {
   resolveTimesheetOffDayStates,
 } from '@/lib/utils/timesheet-off-days';
 import { buildLeaveAwareTotals, formatLeaveAwareWeeklyDisplayMultiline } from '@/lib/utils/timesheet-leave-totals';
-import { getErrorMessage, shouldLogAbsenceManageError } from '@/lib/utils/absence-error-handling';
+import {
+  getErrorMessage,
+  isNetworkFetchError,
+  shouldLogAbsenceManageError,
+} from '@/lib/utils/absence-error-handling';
+import { isClientSessionPausedError } from '@/lib/app-auth/session-error';
+import { getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
 
 const APPROVALS_PAGE_SIZE = 50;
 
@@ -494,7 +500,8 @@ function ApprovalsContent() {
         .select('profile_id, date, end_date, is_half_day, half_day_session, allow_timesheet_work_on_leave, absence_reasons(name,color,is_paid)')
         .in('profile_id', userIds)
         .in('status', ['approved', 'processed'])
-        .lte('date', maxEndIso);
+        .lte('date', maxEndIso)
+        .or(`end_date.gte.${minStartIso},and(end_date.is.null,date.gte.${minStartIso})`);
 
       if (absencesError) throw absencesError;
 
@@ -527,7 +534,14 @@ function ApprovalsContent() {
       setTimesheets(enriched);
     } catch (error) {
       const errorContextId = 'approvals-fetch-list-error';
-      console.error('Error fetching approvals:', error, { errorContextId });
+      const shouldLogError =
+        !isAuthErrorStatus(getErrorStatus(error)) &&
+        !isClientSessionPausedError(error) &&
+        !isNetworkFetchError(error);
+
+      if (shouldLogError) {
+        console.error('Error fetching approvals:', error, { errorContextId });
+      }
       toast.error('Failed to load approvals', { id: errorContextId });
     } finally {
       setLoading(false);
