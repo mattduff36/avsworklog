@@ -431,11 +431,21 @@ export default function VanHistoryPage({
           current_mileage
         `)
         .eq('van_id', resolvedParams.vanId)
-        .single();
+        .order('updated_at', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(2);
 
-      if (!maintenanceError) {
-        setVehicleData((maintenanceData as VehicleData) ?? null);
+      if (maintenanceError) {
+        throw maintenanceError;
       }
+
+      if ((maintenanceData?.length ?? 0) > 1) {
+        console.warn('Multiple vehicle_maintenance rows found for van; using the latest row.', {
+          vanId: resolvedParams.vanId,
+        });
+      }
+
+      setVehicleData(((maintenanceData || [])[0] as VehicleData | undefined) ?? null);
     } catch (error) {
       console.error('Error fetching vehicle:', error);
     }

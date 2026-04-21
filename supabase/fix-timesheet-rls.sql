@@ -23,13 +23,7 @@ CREATE POLICY "Users can view own timesheets"
 CREATE POLICY "Managers can view all timesheets"
   ON timesheets
   FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM profiles
-      WHERE profiles.id = auth.uid()
-      AND profiles.role IN ('admin', 'manager')
-    )
-  );
+  USING (effective_is_manager_admin());
 
 -- Users can create their own timesheets
 CREATE POLICY "Users can create own timesheets"
@@ -41,13 +35,7 @@ CREATE POLICY "Users can create own timesheets"
 CREATE POLICY "Managers can create timesheets for any user"
   ON timesheets
   FOR INSERT
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM profiles
-      WHERE profiles.id = auth.uid()
-      AND profiles.role IN ('admin', 'manager')
-    )
-  );
+  WITH CHECK (effective_is_manager_admin());
 
 -- Users can update their own draft or rejected timesheets
 -- USING checks the current row (before update), WITH CHECK allows status change to submitted
@@ -61,13 +49,7 @@ CREATE POLICY "Users can update own timesheets"
 CREATE POLICY "Managers can update all timesheets"
   ON timesheets
   FOR UPDATE
-  USING (
-    EXISTS (
-      SELECT 1 FROM profiles
-      WHERE profiles.id = auth.uid()
-      AND profiles.role IN ('admin', 'manager')
-    )
-  );
+  USING (effective_is_manager_admin());
 
 -- Fix timesheet_entries policies similarly
 -- Drop all existing policies (including the old "FOR ALL" policy)
@@ -98,13 +80,7 @@ CREATE POLICY "Users can view own timesheet entries"
 CREATE POLICY "Managers can view all timesheet entries"
   ON timesheet_entries
   FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM profiles
-      WHERE profiles.id = auth.uid()
-      AND profiles.role IN ('admin', 'manager')
-    )
-  );
+  USING (effective_is_manager_admin());
 
 -- Users can insert their own timesheet entries
 -- This allows inserting entries even when submitting (status changes from draft to submitted)
@@ -123,13 +99,7 @@ CREATE POLICY "Users can insert own timesheet entries"
 CREATE POLICY "Managers can insert any timesheet entries"
   ON timesheet_entries
   FOR INSERT
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM profiles
-      WHERE profiles.id = auth.uid()
-      AND profiles.role IN ('admin', 'manager')
-    )
-  );
+  WITH CHECK (effective_is_manager_admin());
 
 -- Users can update their own timesheet entries (for drafts and rejected)
 CREATE POLICY "Users can update own timesheet entries"
@@ -155,13 +125,7 @@ CREATE POLICY "Users can update own timesheet entries"
 CREATE POLICY "Managers can update all timesheet entries"
   ON timesheet_entries
   FOR UPDATE
-  USING (
-    EXISTS (
-      SELECT 1 FROM profiles
-      WHERE profiles.id = auth.uid()
-      AND profiles.role IN ('admin', 'manager')
-    )
-  );
+  USING (effective_is_manager_admin());
 
 -- Users can delete their own timesheet entries (for drafts and rejected)
 -- This is needed when updating a draft to submitted (delete old entries, insert new ones)
@@ -181,13 +145,7 @@ CREATE POLICY "Users can delete own timesheet entries"
 CREATE POLICY "Managers can delete any timesheet entries"
   ON timesheet_entries
   FOR DELETE
-  USING (
-    EXISTS (
-      SELECT 1 FROM profiles
-      WHERE profiles.id = auth.uid()
-      AND profiles.role IN ('admin', 'manager')
-    )
-  );
+  USING (effective_is_manager_admin());
 
 SELECT 'Timesheet RLS policies fixed successfully!' as status;
 

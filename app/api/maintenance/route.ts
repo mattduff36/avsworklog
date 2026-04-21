@@ -446,9 +446,11 @@ export async function POST(request: NextRequest) {
       .from('vehicle_maintenance')
       .select('id')
       .eq(assetColumn, assetId)
-      .single();
+      .order('updated_at', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(1);
     
-    if (existingRecord) {
+    if ((existingRecord?.length ?? 0) > 0) {
       return NextResponse.json(
         { error: 'Maintenance record already exists for this vehicle' },
         { status: 409 }

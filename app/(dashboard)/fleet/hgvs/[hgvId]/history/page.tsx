@@ -435,11 +435,21 @@ export default function HgvHistoryPage({
           current_mileage
         `)
         .eq('hgv_id', resolvedParams.hgvId)
-        .single();
+        .order('updated_at', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(2);
 
-      if (!maintenanceError) {
-        setVehicleData((maintenanceData as VehicleData) ?? null);
+      if (maintenanceError) {
+        throw maintenanceError;
       }
+
+      if ((maintenanceData?.length ?? 0) > 1) {
+        console.warn('Multiple vehicle_maintenance rows found for HGV; using the latest row.', {
+          hgvId: resolvedParams.hgvId,
+        });
+      }
+
+      setVehicleData(((maintenanceData || [])[0] as VehicleData | undefined) ?? null);
     } catch (error) {
       console.error('Error fetching vehicle:', error);
     }
@@ -451,16 +461,29 @@ export default function HgvHistoryPage({
         .from('vehicle_maintenance')
         .select('*')
         .eq('hgv_id', resolvedParams.hgvId)
-        .single();
+        .order('updated_at', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(2);
 
-      if (error || !maintenance) {
+      if (error) {
+        throw error;
+      }
+
+      if ((maintenance?.length ?? 0) > 1) {
+        console.warn('Multiple vehicle_maintenance rows found for HGV maintenance record; using the latest row.', {
+          hgvId: resolvedParams.hgvId,
+        });
+      }
+
+      const latestMaintenance = maintenance?.[0] ?? null;
+      if (!latestMaintenance) {
         setMaintenanceRecord(null);
         return;
       }
 
       setMaintenanceRecord({
-        ...(maintenance as Record<string, unknown>),
-        hgv_id: (maintenance as { hgv_id?: string | null }).hgv_id ?? resolvedParams.hgvId,
+        ...(latestMaintenance as Record<string, unknown>),
+        hgv_id: (latestMaintenance as { hgv_id?: string | null }).hgv_id ?? resolvedParams.hgvId,
         overdue_count: 0,
         due_soon_count: 0,
       } as VehicleMaintenanceWithStatus);

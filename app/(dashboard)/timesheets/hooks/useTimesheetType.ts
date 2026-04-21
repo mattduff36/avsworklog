@@ -17,6 +17,24 @@ interface UseTimesheetTypeReturn {
   error: string | null;
 }
 
+interface ProfileTimesheetTypeRow {
+  team?: { timesheet_type?: string | null } | Array<{ timesheet_type?: string | null }> | null;
+  role?: { timesheet_type?: string | null } | Array<{ timesheet_type?: string | null }> | null;
+}
+
+interface TimesheetTypeOverrideRow {
+  timesheet_type?: string | null;
+}
+
+function pickFirstRow<T>(rows: T[] | null | undefined): T | null {
+  return rows?.[0] ?? null;
+}
+
+function pickSingleRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? value[0] ?? null : value;
+}
+
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === 'object' && error !== null && 'message' in error) {
@@ -60,11 +78,12 @@ async function fetchRoleTimesheetType(supabase: ReturnType<typeof createClient>,
       )
     `)
     .eq('id', userId)
-    .single();
+    .limit(1);
 
   if (error) throw error;
 
-  const roleData = data?.role as { timesheet_type?: string | null } | null;
+  const profileRow = pickFirstRow((data || []) as ProfileTimesheetTypeRow[]);
+  const roleData = pickSingleRelation(profileRow?.role);
   return (roleData?.timesheet_type || DEFAULT_TIMESHEET_TYPE) as TimesheetType;
 }
 
@@ -100,19 +119,26 @@ export function useTimesheetType(userId?: string): UseTimesheetTypeReturn {
               )
             `)
             .eq('id', userId)
-            .single(),
+            .limit(1),
           supabase
             .from('timesheet_type_exceptions')
             .select('timesheet_type')
             .eq('profile_id', userId)
-            .maybeSingle(),
+            .order('updated_at', { ascending: false })
+            .limit(2),
         ]);
 
         if (overrideError && !isMissingTimesheetOverrideSchemaError(overrideError)) {
           throw overrideError;
         }
 
-        const overrideType = normalizeTimesheetType(overrideData?.timesheet_type);
+        const overrideRow = pickFirstRow((overrideData || []) as TimesheetTypeOverrideRow[]);
+        if ((overrideData?.length ?? 0) > 1) {
+          console.warn('Multiple timesheet_type_exceptions rows found for profile; using the latest row.', {
+            userId,
+          });
+        }
+        const overrideType = normalizeTimesheetType(overrideRow?.timesheet_type);
 
         if (fetchError) {
           if (isMissingTeamTimesheetTypeError(fetchError)) {
@@ -124,8 +150,15 @@ export function useTimesheetType(userId?: string): UseTimesheetTypeReturn {
           throw fetchError;
         }
 
-        const teamData = data?.team as { timesheet_type?: string | null } | null;
-        const roleData = data?.role as { timesheet_type?: string | null } | null;
+        const profileRow = pickFirstRow((data || []) as ProfileTimesheetTypeRow[]);
+        if (!profileRow) {
+          setTimesheetType((overrideType || DEFAULT_TIMESHEET_TYPE) as TimesheetType);
+          setError(null);
+          return;
+        }
+
+        const teamData = pickSingleRelation(profileRow.team);
+        const roleData = pickSingleRelation(profileRow.role);
         const type = resolveTimesheetTypeWithOverride({
           overrideType,
           teamType: teamData?.timesheet_type,

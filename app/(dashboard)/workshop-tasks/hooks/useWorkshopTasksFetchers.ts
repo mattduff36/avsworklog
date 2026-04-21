@@ -568,7 +568,9 @@ export function useWorkshopTasksFetchers({
         .from('vehicle_maintenance')
         .select(isPlant ? 'current_hours' : 'current_mileage')
         .eq(isPlant ? 'plant_id' : (isHgv ? 'hgv_id' : 'van_id'), vehicleId)
-        .single();
+        .order('updated_at', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(2);
 
       if (error) {
         if (error.code === 'PGRST116') {
@@ -577,7 +579,13 @@ export function useWorkshopTasksFetchers({
         }
         throw error;
       }
-      const meterData = data as { current_hours?: number | null; current_mileage?: number | null } | null;
+      if ((data?.length ?? 0) > 1) {
+        console.warn('Multiple vehicle_maintenance rows found for meter reading; using the latest row.', {
+          vehicleId,
+          assetType: isPlant ? 'plant' : (isHgv ? 'hgv' : 'van'),
+        });
+      }
+      const meterData = ((data || [])[0] as { current_hours?: number | null; current_mileage?: number | null } | undefined) ?? null;
       setCurrentMeterReading(isPlant ? (meterData?.current_hours || null) : (meterData?.current_mileage || null));
     } catch (err) {
       if (isTransientNetworkError(err)) {
