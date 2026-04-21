@@ -15,7 +15,6 @@ export async function POST(request: NextRequest) {
   const accountSwitcherEnabled = isAccountSwitcherEnabledServer();
 
   try {
-    const supabase = await createClient();
     const validation = await validateAppSession({ allowLocked: true });
     if (validation.session) {
       const body = (await request.json().catch(() => ({}))) as LogoutRequestBody;
@@ -40,9 +39,10 @@ export async function POST(request: NextRequest) {
       }
 
       await revokeAppSession(validation.session.id, 'logout');
+    } else {
+      const supabase = await createClient();
+      await supabase.auth.signOut();
     }
-
-    await supabase.auth.signOut();
   } catch (error) {
     response = NextResponse.json(
       { error: error instanceof Error ? error.message : 'Logout failed' },
