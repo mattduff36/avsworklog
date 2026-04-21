@@ -56,6 +56,17 @@ CREATE TABLE IF NOT EXISTS timesheet_entries (
   UNIQUE(timesheet_id, day_of_week)
 );
 
+CREATE TABLE IF NOT EXISTS timesheet_entry_job_codes (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  timesheet_entry_id UUID REFERENCES timesheet_entries(id) ON DELETE CASCADE NOT NULL,
+  job_number TEXT NOT NULL,
+  display_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT timesheet_entry_job_codes_display_order_check CHECK (display_order >= 0),
+  CONSTRAINT timesheet_entry_job_codes_unique_entry_job UNIQUE (timesheet_entry_id, job_number)
+);
+
 -- Create vehicle_inspections table
 CREATE TABLE IF NOT EXISTS vehicle_inspections (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -111,6 +122,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
 CREATE INDEX IF NOT EXISTS idx_timesheets_user_id ON timesheets(user_id);
 CREATE INDEX IF NOT EXISTS idx_timesheets_week_ending ON timesheets(week_ending);
 CREATE INDEX IF NOT EXISTS idx_timesheets_status ON timesheets(status);
+CREATE INDEX IF NOT EXISTS idx_timesheet_entry_job_codes_entry_order ON timesheet_entry_job_codes(timesheet_entry_id, display_order);
 CREATE INDEX IF NOT EXISTS idx_inspections_vehicle_id ON vehicle_inspections(vehicle_id);
 CREATE INDEX IF NOT EXISTS idx_inspections_user_id ON vehicle_inspections(user_id);
 CREATE INDEX IF NOT EXISTS idx_inspections_week_ending ON vehicle_inspections(week_ending);
@@ -120,6 +132,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_log_record ON audit_log(table_name, record_
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE timesheets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE timesheet_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE timesheet_entry_job_codes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vehicle_inspections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE inspection_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE inspection_photos ENABLE ROW LEVEL SECURITY;
@@ -180,6 +193,25 @@ CREATE POLICY "Managers can view all timesheet entries" ON timesheet_entries
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM profiles 
+      WHERE id = auth.uid() AND role IN ('manager', 'admin')
+    )
+  );
+
+CREATE POLICY "Users can manage own timesheet entry job codes" ON timesheet_entry_job_codes
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1
+      FROM timesheet_entries
+      JOIN timesheets ON timesheets.id = timesheet_entries.timesheet_id
+      WHERE timesheet_entries.id = timesheet_entry_job_codes.timesheet_entry_id
+      AND timesheets.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Managers can view all timesheet entry job codes" ON timesheet_entry_job_codes
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM profiles
       WHERE id = auth.uid() AND role IN ('manager', 'admin')
     )
   );
@@ -278,6 +310,10 @@ CREATE TRIGGER set_updated_at_timesheets
 
 CREATE TRIGGER set_updated_at_timesheet_entries
   BEFORE UPDATE ON timesheet_entries
+  FOR EACH ROW EXECUTE FUNCTION handle_updated_at();
+
+CREATE TRIGGER set_updated_at_timesheet_entry_job_codes
+  BEFORE UPDATE ON timesheet_entry_job_codes
   FOR EACH ROW EXECUTE FUNCTION handle_updated_at();
 
 CREATE TRIGGER set_updated_at_vehicle_inspections

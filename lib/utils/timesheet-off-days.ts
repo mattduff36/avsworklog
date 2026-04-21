@@ -1,4 +1,5 @@
 import { calculateHours } from '@/lib/utils/time-calculations';
+import { getEntryJobNumbers } from '@/lib/utils/timesheet-job-codes';
 import { getWorkingSessionsForDate } from '@/lib/utils/work-shifts';
 import type { WorkShiftPattern } from '@/types/work-shifts';
 
@@ -61,6 +62,7 @@ export interface TimesheetEntryLike {
   time_started: string;
   time_finished: string;
   job_number: string;
+  job_numbers?: string[];
   working_in_yard: boolean;
   did_not_work: boolean;
   didNotWorkReason: TimesheetDidNotWorkReason | null;
@@ -99,7 +101,7 @@ function hasExplicitWorkingInput(entry: TimesheetEntryLike): boolean {
   return Boolean(
     (entry.time_started && entry.time_started.trim()) ||
       (entry.time_finished && entry.time_finished.trim()) ||
-      (entry.job_number && entry.job_number.trim()) ||
+      getEntryJobNumbers(entry).length > 0 ||
       entry.working_in_yard
   );
 }
@@ -343,6 +345,7 @@ export function normalizeTimesheetEntriesForOffDays(
         time_started: '',
         time_finished: '',
         job_number: '',
+        job_numbers: [],
         working_in_yard: false,
         did_not_work: true,
         didNotWorkReason: parseDidNotWorkReason(primaryReason),

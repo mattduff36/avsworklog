@@ -192,6 +192,7 @@ export function PlantTimesheetV2({
             did_not_work: existingEntry.did_not_work || false,
             didNotWorkReason: null,
             job_number: existingEntry.job_number || '',
+            job_numbers: existingEntry.job_number ? [existingEntry.job_number] : [],
             working_in_yard: existingEntry.working_in_yard || false,
             time_started: existingEntry.time_started || '',
             time_finished: existingEntry.time_finished || '',

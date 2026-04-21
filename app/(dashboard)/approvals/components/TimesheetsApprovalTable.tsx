@@ -16,11 +16,14 @@ import {
 import { formatDate } from '@/lib/utils/date';
 import { Timesheet } from '@/types/timesheet';
 import { formatLeaveAwareWeeklyDisplayMultiline } from '@/lib/utils/timesheet-leave-totals';
+import { collectUniqueJobNumbers } from '@/lib/utils/timesheet-job-codes';
 
 interface TimesheetEntry {
   day_of_week: number;
   daily_total: number | null;
   job_number: string | null;
+  job_numbers?: string[];
+  timesheet_entry_job_codes?: Array<{ job_number?: string | null; display_order?: number | null }>;
   working_in_yard: boolean;
   did_not_work: boolean;
 }
@@ -73,10 +76,10 @@ function computeTotalHours(entries?: TimesheetEntry[]): number {
 
 function computeJobNumbers(entries?: TimesheetEntry[]): string {
   if (!entries || entries.length === 0) return '-';
-  const jobs = entries
-    .filter(e => !e.did_not_work && !e.working_in_yard && e.job_number)
-    .map(e => e.job_number!);
-  const unique = [...new Set(jobs)];
+  const unique = collectUniqueJobNumbers(entries, {
+    excludeDidNotWork: true,
+    excludeWorkingInYard: true,
+  });
   return unique.length > 0 ? unique.join(', ') : '-';
 }
 

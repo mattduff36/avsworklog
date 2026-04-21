@@ -5,6 +5,7 @@ import { formatDate } from '@/lib/utils/date';
 import { getDidNotWorkReasonInfo } from '@/lib/utils/timesheetDidNotWork';
 import type { TimesheetOffDayState } from '@/lib/utils/timesheet-off-days';
 import { buildLeaveAwareTotals } from '@/lib/utils/timesheet-leave-totals';
+import { formatEntryJobNumbers, getPrimaryJobNumber } from '@/lib/utils/timesheet-job-codes';
 
 // Create styles for the PDF matching the scanned form
 const styles = StyleSheet.create({
@@ -196,14 +197,15 @@ export function TimesheetPDF({ timesheet, employeeName, offDayStates = [] }: Tim
     : '00000';
 
   // Helper to format remarks with job number (entry may be full TimesheetEntry or partial from allDays)
-  const formatRemarks = (entry: { job_number?: string | null; remarks?: string | null }) => {
-    const jobNumber = entry.job_number;
+  const formatRemarks = (entry: { job_number?: string | null; job_numbers?: string[]; remarks?: string | null }) => {
+    const jobNumber = getPrimaryJobNumber(entry);
     const remarks = entry.remarks;
+    const formattedJobNumbers = formatEntryJobNumbers(entry);
     
     if (jobNumber && remarks) {
-      return `Job number ${jobNumber} - ${remarks}`;
+      return `Job number${formattedJobNumbers.includes(',') ? 's' : ''} ${formattedJobNumbers} - ${remarks}`;
     } else if (jobNumber) {
-      return `Job number ${jobNumber}`;
+      return `Job number${formattedJobNumbers.includes(',') ? 's' : ''} ${formattedJobNumbers}`;
     } else if (remarks) {
       return remarks;
     }

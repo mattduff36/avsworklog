@@ -1,12 +1,14 @@
 import { DAY_NAMES } from '@/types/timesheet';
 import { calculateHours, calculatePlantDailyTotal, calculateStandardTimesheetHours } from '@/lib/utils/time-calculations';
 import type { TimesheetDidNotWorkReason, TimesheetOffDayState } from '@/lib/utils/timesheet-off-days';
+import { getEntryJobNumbers } from '@/lib/utils/timesheet-job-codes';
 
 export interface PlantEntryDraft {
   day_of_week: number;
   did_not_work: boolean;
   didNotWorkReason: TimesheetDidNotWorkReason | null;
   job_number: string;
+  job_numbers: string[];
   working_in_yard: boolean;
   time_started: string;
   time_finished: string;
@@ -34,6 +36,7 @@ export const EMPTY_ENTRY: Omit<PlantEntryDraft, 'day_of_week'> = {
   did_not_work: false,
   didNotWorkReason: null,
   job_number: '',
+  job_numbers: [],
   working_in_yard: false,
   time_started: '',
   time_finished: '',
@@ -79,7 +82,7 @@ export function hasPlantData(entry: PlantEntryDraft): boolean {
   return [
     entry.time_started,
     entry.time_finished,
-    entry.job_number,
+    ...getEntryJobNumbers(entry),
     entry.operator_travel_hours,
     entry.operator_yard_hours,
     entry.machine_travel_hours,

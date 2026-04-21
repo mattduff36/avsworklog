@@ -15,6 +15,7 @@ import type { ApprovedAbsenceForTimesheet } from '@/lib/utils/timesheet-off-days
 import { getTimesheetWeekIsoBounds, resolveTimesheetOffDayStates } from '@/lib/utils/timesheet-off-days';
 import { buildLeaveAwareTotals, buildLeaveDaysBreakdown } from '@/lib/utils/timesheet-leave-totals';
 import { normalizeTimesheetEntriesForDisplay } from '@/lib/utils/plant-timesheet-v2-normalization';
+import { collectUniqueJobNumbers } from '@/lib/utils/timesheet-job-codes';
 import type { TimesheetEntry } from '@/types/timesheet';
 import type { WorkShiftPattern } from '@/types/work-shifts';
 
@@ -37,6 +38,7 @@ type TimesheetEntryRow = {
   working_in_yard?: boolean | null;
   daily_total?: number | null;
   job_number?: string | null;
+  timesheet_entry_job_codes?: Array<{ job_number?: string | null; display_order?: number | null }> | null;
   remarks?: string | null;
 };
 
@@ -90,6 +92,10 @@ function buildTimesheetQuery(
         working_in_yard,
         did_not_work,
         job_number,
+        timesheet_entry_job_codes (
+          job_number,
+          display_order
+        ),
         remarks
       )
     `)
@@ -222,7 +228,6 @@ function transformTimesheetsToExcel(
       'Weekly Total (Hours + Days)': leaveAwareTotals.weekly.display,
     };
 
-    const jobNumbers: string[] = [];
     const dnwDetails: string[] = [];
     const dnwReasons = new Set<string>();
     let dnwDays = 0;
@@ -250,13 +255,12 @@ function transformTimesheetsToExcel(
       } else {
         row[`${day} Hours`] = formatExcelHours(rowTotal?.workedHours ?? entry.daily_total ?? null);
       }
-
-      if (entry.job_number && !entry.did_not_work) {
-        jobNumbers.push(entry.job_number);
-      }
     });
 
-    row['Job Numbers'] = [...new Set(jobNumbers)].join(', ') || '-';
+    row['Job Numbers'] = collectUniqueJobNumbers(sortedEntries, {
+      excludeDidNotWork: true,
+      excludeWorkingInYard: true,
+    }).join(', ') || '-';
     row['DNW Days'] = dnwDays > 0 ? String(dnwDays) : '-';
     row['DNW Reasons'] = dnwReasons.size > 0 ? [...dnwReasons].join(', ') : '-';
     row['DNW Details'] = dnwDetails.length > 0 ? dnwDetails.join('; ') : '-';

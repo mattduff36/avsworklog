@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { JobCodeFields } from '@/components/timesheets/JobCodeFields';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import {
   Select,
@@ -52,6 +53,14 @@ import {
   resolveTimesheetOffDayStates,
 } from '@/lib/utils/timesheet-off-days';
 import { buildLeaveAwareTotals, formatLeaveAwareWeeklyDisplayMultiline } from '@/lib/utils/timesheet-leave-totals';
+import {
+  getEntryJobNumbers,
+  getNormalizedJobNumbers,
+  getPrimaryJobNumber,
+  hasDuplicateJobNumbers,
+  isValidJobNumber,
+  normalizeJobNumberInput,
+} from '@/lib/utils/timesheet-job-codes';
 import type { WorkShiftPattern } from '@/types/work-shifts';
 import {
   buildValidationErrors,
@@ -83,7 +92,6 @@ const HIRED_PLANT_SENTINEL = '__hired_plant__';
 const NO_MACHINE_SENTINEL = '__no_machine__';
 const HIRER_RECENT_SCOPE = 'timesheet_plant_hirer';
 const SITE_ADDRESS_RECENT_SCOPE = 'timesheet_plant_site_address';
-const JOB_NUMBER_REGEX = /^\d{4}-[A-Z]{2}$/;
 const QUARTER_HOUR_TIME_FIELDS: ReadonlySet<keyof PlantEntryDraft> = new Set([
   'time_started',
   'time_finished',
@@ -172,8 +180,9 @@ function buildJobNumberValidationErrors(
     if (offDay?.hasTrainingBooking) return;
     if (entry.did_not_work || entry.working_in_yard || !hasHours) return;
 
-    if (!entry.job_number || !JOB_NUMBER_REGEX.test(entry.job_number)) {
-      errors[index] = `${DAY_NAMES[index]}: Job Number must be in format 1234-AB (not required when working in yard).`;
+    const jobNumbers = getNormalizedJobNumbers(entry.job_numbers);
+    if (jobNumbers.length === 0 || hasDuplicateJobNumbers(entry.job_numbers) || !jobNumbers.every((jobNumber) => isValidJobNumber(jobNumber))) {
+      errors[index] = `${DAY_NAMES[index]}: Add at least one valid Job Number in format 1234-AB and do not repeat the same code on a single day.`;
     }
   });
 
@@ -487,14 +496,18 @@ export function PlantTimesheetV2({
 
         const { data: entriesData, error: entriesError } = await supabase
           .from('timesheet_entries')
-          .select('*')
+          .select('*, timesheet_entry_job_codes(job_number, display_order)')
           .eq('timesheet_id', timesheetData.id)
           .order('day_of_week');
 
         if (entriesError) throw entriesError;
         if (cancelled) return;
 
-        const typedEntries = (entriesData || []) as Database['public']['Tables']['timesheet_entries']['Row'][];
+        const typedEntries = (entriesData || []) as Array<
+          Database['public']['Tables']['timesheet_entries']['Row'] & {
+            timesheet_entry_job_codes?: Array<{ job_number?: string | null; display_order?: number | null }> | null;
+          }
+        >;
         const fullWeek = Array.from({ length: 7 }, (_, index) => {
           const dayOfWeek = index + 1;
           const existingEntry = typedEntries.find((entry) => entry.day_of_week === dayOfWeek);
@@ -504,7 +517,8 @@ export function PlantTimesheetV2({
             day_of_week: dayOfWeek,
             did_not_work: existingEntry.did_not_work || false,
             didNotWorkReason: null,
-            job_number: existingEntry.job_number || '',
+            job_number: getPrimaryJobNumber(existingEntry) || '',
+            job_numbers: getEntryJobNumbers(existingEntry),
             working_in_yard: existingEntry.working_in_yard || false,
             time_started: existingEntry.time_started || '',
             time_finished: existingEntry.time_finished || '',
@@ -750,14 +764,44 @@ export function PlantTimesheetV2({
     });
   };
 
-  const handleJobNumberChange = (dayIndex: number, value: string) => {
-    let cleaned = value.replace(/[^0-9A-Za-z-]/g, '').toUpperCase();
-    cleaned = cleaned.replace(/-/g, '');
-    if (cleaned.length > 4) {
-      cleaned = `${cleaned.substring(0, 4)}-${cleaned.substring(4, 6)}`;
+  const trimTrailingEmptyJobNumbers = (values: string[]): string[] => {
+    const next = [...values];
+    while (next.length > 0 && next[next.length - 1]?.trim() === '') {
+      next.pop();
     }
-    cleaned = cleaned.substring(0, 7);
-    updateEntry(dayIndex, { job_number: cleaned });
+    return next;
+  };
+
+  const getEditableJobNumbers = (entry: PlantEntryDraft): string[] => (
+    entry.job_numbers.length > 0 ? [...entry.job_numbers] : ['']
+  );
+
+  const handleJobNumberChange = (dayIndex: number, jobIndex: number, value: string) => {
+    const nextJobNumbers = getEditableJobNumbers(entries[dayIndex]);
+    nextJobNumbers[jobIndex] = normalizeJobNumberInput(value);
+    updateEntry(dayIndex, {
+      job_numbers: trimTrailingEmptyJobNumbers(nextJobNumbers),
+      job_number: getPrimaryJobNumber(nextJobNumbers) || '',
+    });
+  };
+
+  const handleAddJobNumberField = (dayIndex: number) => {
+    const nextJobNumbers = getEditableJobNumbers(entries[dayIndex]);
+    nextJobNumbers.push('');
+    updateEntry(dayIndex, {
+      job_numbers: nextJobNumbers,
+      job_number: getPrimaryJobNumber(nextJobNumbers) || '',
+    });
+  };
+
+  const handleRemoveJobNumberField = (dayIndex: number, jobIndex: number) => {
+    const nextJobNumbers = getEditableJobNumbers(entries[dayIndex]);
+    nextJobNumbers.splice(jobIndex, 1);
+    const trimmed = trimTrailingEmptyJobNumbers(nextJobNumbers);
+    updateEntry(dayIndex, {
+      job_numbers: trimmed,
+      job_number: getPrimaryJobNumber(trimmed) || '',
+    });
   };
 
   const toggleWorkingInYard = (dayIndex: number) => {
@@ -769,6 +813,7 @@ export function PlantTimesheetV2({
       did_not_work: nextValue ? false : currentEntry.did_not_work,
       didNotWorkReason: nextValue ? null : currentEntry.didNotWorkReason,
       job_number: nextValue ? '' : currentEntry.job_number,
+      job_numbers: nextValue ? [] : currentEntry.job_numbers,
       operator_yard_hours: '',
     });
   };
@@ -788,6 +833,7 @@ export function PlantTimesheetV2({
           time_started: '',
           time_finished: '',
           job_number: '',
+          job_numbers: [],
           operator_travel_hours: '',
           operator_yard_hours: '',
           machine_travel_hours: '',
@@ -977,6 +1023,7 @@ export function PlantTimesheetV2({
       const entriesToInsert: TimesheetEntryInsert[] = entries.map((entry) => {
         const offDayState = offDayMap.get(entry.day_of_week);
         const recalculated = recalculateEntry(entry, getRecalculateOptionsForOffDay(offDayState));
+        const persistedJobNumbers = getNormalizedJobNumbers(recalculated.job_numbers);
         const operatorTravel = parseHoursInput(recalculated.operator_travel_hours);
         const operatorYard = parseHoursInput(recalculated.operator_yard_hours);
         const machineTravel = parseHoursInput(recalculated.machine_travel_hours);
@@ -1005,7 +1052,7 @@ export function PlantTimesheetV2({
           machine_operator_hours: machineOperator,
           maintenance_breakdown_hours: maintenanceBreakdown,
           daily_total: recalculated.daily_total,
-          job_number: recalculated.job_number || null,
+          job_number: persistedJobNumbers[0] || null,
           working_in_yard: recalculated.working_in_yard,
           did_not_work: recalculated.did_not_work,
           night_shift: false,
@@ -1014,11 +1061,35 @@ export function PlantTimesheetV2({
         };
       });
 
-      const { error: entriesError } = await supabase
+      const { data: insertedEntries, error: entriesError } = await supabase
         .from('timesheet_entries')
-        .insert(entriesToInsert);
+        .insert(entriesToInsert)
+        .select('id, day_of_week');
 
       if (entriesError) throw entriesError;
+
+      type TimesheetEntryJobCodeInsert = Database['public']['Tables']['timesheet_entry_job_codes']['Insert'];
+      const entryIdByDay = new Map(
+        (insertedEntries || []).map((entry) => [entry.day_of_week, entry.id] as const)
+      );
+      const jobCodesToInsert: TimesheetEntryJobCodeInsert[] = entries.flatMap((entry) => {
+        const entryId = entryIdByDay.get(entry.day_of_week);
+        if (!entryId) return [];
+
+        return getNormalizedJobNumbers(entry.job_numbers).map((jobNumber, displayOrder) => ({
+          timesheet_entry_id: entryId,
+          job_number: jobNumber,
+          display_order: displayOrder,
+        }));
+      });
+
+      if (jobCodesToInsert.length > 0) {
+        const { error: jobCodesError } = await supabase
+          .from('timesheet_entry_job_codes')
+          .insert(jobCodesToInsert);
+
+        if (jobCodesError) throw jobCodesError;
+      }
 
       commitRecentHeaderValues();
 
@@ -1462,13 +1533,14 @@ export function PlantTimesheetV2({
                             Job Number
                             {!entry.working_in_yard && !hasTrainingBooking && <span className="text-red-400 text-lg">*</span>}
                           </Label>
-                          <Input
-                            value={entry.job_number}
-                            onChange={(event) => handleJobNumberChange(index, event.target.value)}
+                          <JobCodeFields
+                            values={entry.job_numbers}
+                            onChange={(jobIndex, value) => handleJobNumberChange(index, jobIndex, value)}
+                            onAdd={() => handleAddJobNumberField(index)}
+                            onRemove={(jobIndex) => handleRemoveJobNumberField(index, jobIndex)}
                             placeholder={jobNumberPlaceholder}
-                            maxLength={7}
                             disabled={disableJobNumberInput}
-                            className="h-16 text-3xl text-center bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground uppercase disabled:opacity-30 disabled:cursor-not-allowed"
+                            inputClassName="h-16 text-3xl text-center bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground uppercase disabled:opacity-30 disabled:cursor-not-allowed"
                           />
                         </div>
                       </div>
@@ -1772,13 +1844,14 @@ export function PlantTimesheetV2({
                           />
                         </td>
                         <td className="p-3">
-                          <Input
-                            value={entry.job_number}
-                            onChange={(event) => handleJobNumberChange(index, event.target.value)}
+                          <JobCodeFields
+                            values={entry.job_numbers}
+                            onChange={(jobIndex, value) => handleJobNumberChange(index, jobIndex, value)}
+                            onAdd={() => handleAddJobNumberField(index)}
+                            onRemove={(jobIndex) => handleRemoveJobNumberField(index, jobIndex)}
                             placeholder={jobNumberPlaceholder}
-                            maxLength={7}
                             disabled={disableJobNumberInput}
-                            className="w-28 bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground uppercase disabled:opacity-30 disabled:cursor-not-allowed"
+                            inputClassName="w-28 bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground uppercase disabled:opacity-30 disabled:cursor-not-allowed"
                           />
                         </td>
                         <td className="p-3">

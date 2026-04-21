@@ -34,7 +34,10 @@ export async function GET(
       .from('timesheets')
       .select(`
         *,
-        entries:timesheet_entries(*)
+        entries:timesheet_entries(
+          *,
+          timesheet_entry_job_codes(job_number, display_order)
+        )
       `)
       .eq('id', id)
       .single();

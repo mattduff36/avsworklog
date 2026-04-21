@@ -4220,6 +4220,41 @@ export type Database = {
           },
         ]
       }
+      timesheet_entry_job_codes: {
+        Row: {
+          id: string
+          timesheet_entry_id: string
+          job_number: string
+          display_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          timesheet_entry_id: string
+          job_number: string
+          display_order?: number
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          timesheet_entry_id?: string
+          job_number?: string
+          display_order?: number
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'timesheet_entry_job_codes_timesheet_entry_id_fkey'
+            columns: ['timesheet_entry_id']
+            isOneToOne: false
+            referencedRelation: 'timesheet_entries'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       timesheet_type_exceptions: {
         Row: {
           profile_id: string

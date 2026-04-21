@@ -1,3 +1,12 @@
+export interface TimesheetEntryJobCode {
+  id?: string;
+  timesheet_entry_id?: string;
+  job_number: string;
+  display_order: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface TimesheetEntry {
   id?: string;
   timesheet_id: string;
@@ -15,6 +24,8 @@ export interface TimesheetEntry {
   machine_operator_hours?: number | null;
   maintenance_breakdown_hours?: number | null;
   job_number: string | null;
+  job_numbers?: string[];
+  timesheet_entry_job_codes?: TimesheetEntryJobCode[];
   working_in_yard: boolean;
   did_not_work: boolean;
   night_shift?: boolean;

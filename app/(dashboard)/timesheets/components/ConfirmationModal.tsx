@@ -17,12 +17,14 @@ import { DAY_NAMES } from '@/types/timesheet';
 import { formatHours } from '@/lib/utils/time-calculations';
 import type { TimesheetOffDayState } from '@/lib/utils/timesheet-off-days';
 import { buildLeaveAwareTotals, formatLeaveAwareWeeklyDisplayMultiline } from '@/lib/utils/timesheet-leave-totals';
+import { collectUniqueJobNumbers, getEntryJobNumbers } from '@/lib/utils/timesheet-job-codes';
 
 interface TimesheetEntry {
   day_of_week: number;
   time_started: string;
   time_finished: string;
   job_number: string;
+  job_numbers?: string[];
   working_in_yard: boolean;
   did_not_work: boolean;
   daily_total: number | null;
@@ -67,17 +69,16 @@ export function ConfirmationModal({
     const row = leaveAwareTotals.rowByDay.get(entry.day_of_week);
     return !entry.did_not_work && (((row?.workedHours || 0) > 0) || Boolean(row?.hasLeave));
   }).length;
-  const uniqueJobNumbers = new Set(
-    entries
-      .filter(entry => entry.job_number && !entry.working_in_yard)
-      .map(entry => entry.job_number)
-  );
+  const uniqueJobNumbers = collectUniqueJobNumbers(entries, {
+    excludeDidNotWork: true,
+    excludeWorkingInYard: true,
+  });
   const daysWithMissingJobs = entries.filter(
     entry =>
       !entry.did_not_work &&
       !entry.working_in_yard &&
       !offDayByDay.get(entry.day_of_week)?.hasTrainingBooking &&
-      !entry.job_number
+      getEntryJobNumbers(entry).length === 0
   ).length;
 
   // Generate warnings (Q9 requirements)
@@ -144,7 +145,7 @@ export function ConfirmationModal({
                 <Briefcase className="h-4 w-4 text-muted-foreground" />
                 <p className="text-xs text-muted-foreground dark:text-muted-foreground font-medium">Job Numbers</p>
               </div>
-              <p className="text-2xl font-bold text-foreground">{uniqueJobNumbers.size}</p>
+              <p className="text-2xl font-bold text-foreground">{uniqueJobNumbers.length}</p>
             </div>
 
             {/* Vehicle */}
@@ -212,11 +213,14 @@ export function ConfirmationModal({
                         
                         {/* Additional Info */}
                         <div className="flex flex-wrap gap-2 mt-2">
-                          {entry.job_number && (
-                            <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-2 py-1 rounded">
-                              Job: {entry.job_number}
+                          {getEntryJobNumbers(entry).map((jobNumber) => (
+                            <span
+                              key={`${entry.day_of_week}-${jobNumber}`}
+                              className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-2 py-1 rounded"
+                            >
+                              Job: {jobNumber}
                             </span>
-                          )}
+                          ))}
                           {entry.working_in_yard && (
                             <Badge variant="secondary" className="text-xs">
                               <Home className="h-3 w-3 mr-1" />

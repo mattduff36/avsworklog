@@ -12,6 +12,7 @@ function createEntry(overrides: Partial<PlantEntryDraft> = {}): PlantEntryDraft 
     did_not_work: false,
     didNotWorkReason: null,
     job_number: '',
+    job_numbers: [],
     working_in_yard: false,
     time_started: '',
     time_finished: '',

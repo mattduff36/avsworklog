@@ -14,6 +14,7 @@ import type { ApprovedAbsenceForTimesheet } from '@/lib/utils/timesheet-off-days
 import { getTimesheetWeekIsoBounds, resolveTimesheetOffDayStates } from '@/lib/utils/timesheet-off-days';
 import { buildLeaveAwareTotals, buildLeaveDaysBreakdown } from '@/lib/utils/timesheet-leave-totals';
 import { normalizeTimesheetEntriesForDisplay } from '@/lib/utils/plant-timesheet-v2-normalization';
+import { collectUniqueJobNumbers } from '@/lib/utils/timesheet-job-codes';
 import type { TimesheetEntry } from '@/types/timesheet';
 
 type AbsenceReasonRow = {
@@ -36,6 +37,7 @@ type TimesheetEntryRow = {
   did_not_work?: boolean | null;
   remarks?: string | null;
   job_number?: string | null;
+  timesheet_entry_job_codes?: Array<{ job_number?: string | null; display_order?: number | null }> | null;
   night_shift?: boolean | null;
   bank_holiday?: boolean | null;
 };
@@ -107,6 +109,10 @@ export async function GET(request: NextRequest) {
           did_not_work,
           remarks,
           job_number,
+          timesheet_entry_job_codes (
+            job_number,
+            display_order
+          ),
           night_shift,
           bank_holiday
         )
@@ -311,6 +317,10 @@ export async function GET(request: NextRequest) {
         'Employee Name': employee?.full_name || 'Unknown',
         'Employee ID': employee?.employee_id || '-',
         'Week Ending': formatExcelDate(timesheet.week_ending),
+        'Job Numbers': collectUniqueJobNumbers(entries, {
+          excludeDidNotWork: true,
+          excludeWorkingInYard: true,
+        }).join(', ') || '-',
         'Basic Hours (Mon-Fri)': formatExcelHours(basicHours),
         'Overtime 1.5x (Weekend)': formatExcelHours(overtime15Hours),
         'Overtime 2x (Night/Bank Holiday)': formatExcelHours(overtime2Hours),
@@ -342,6 +352,7 @@ export async function GET(request: NextRequest) {
       'Employee Name': '',
       'Employee ID': '',
       'Week Ending': '',
+      'Job Numbers': '',
       'Basic Hours (Mon-Fri)': '',
       'Overtime 1.5x (Weekend)': '',
       'Overtime 2x (Night/Bank Holiday)': '',

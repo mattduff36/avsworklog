@@ -15,6 +15,7 @@ function buildEntries(): TimesheetEntryLike[] {
     time_started: '',
     time_finished: '',
     job_number: '',
+    job_numbers: [],
     working_in_yard: false,
     did_not_work: false,
     didNotWorkReason: null,
@@ -291,6 +292,7 @@ describe('timesheet off-day normalization', () => {
     expect(normalized[1].time_started).toBe('');
     expect(normalized[1].time_finished).toBe('');
     expect(normalized[1].job_number).toBe('');
+    expect(normalized[1].job_numbers).toEqual([]);
     expect(normalized[1].daily_total).toBe(9);
     expect(normalized[1].remarks).toBe('Sickness');
   });
@@ -494,6 +496,27 @@ describe('timesheet off-day normalization', () => {
     expect(normalized[5].time_started).toBe('09:00');
     expect(normalized[5].time_finished).toBe('13:00');
     expect(normalized[5].remarks).toBe('Overtime Saturday');
+  });
+
+  it('treats multiple job codes as explicit work input on non-shift days', () => {
+    const entries = buildEntries();
+    entries[5] = {
+      ...entries[5],
+      job_number: '1234-AB',
+      job_numbers: ['1234-AB', '5678-CD'],
+      did_not_work: false,
+      remarks: 'Weekend split jobs',
+    };
+
+    const states = resolveTimesheetOffDayStates('2026-03-29', [], STANDARD_WORK_SHIFT_PATTERN);
+    const normalized = normalizeTimesheetEntriesForOffDays(entries, states, {
+      enforceLeaveOverwrite: false,
+      applyNonShiftDefaults: true,
+    });
+
+    expect(normalized[5].did_not_work).toBe(false);
+    expect(normalized[5].job_numbers).toEqual(['1234-AB', '5678-CD']);
+    expect(normalized[5].remarks).toBe('Weekend split jobs');
   });
 
   it('resets legacy non-shift leave placeholders to off-shift defaults', () => {

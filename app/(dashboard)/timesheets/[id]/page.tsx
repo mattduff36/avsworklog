@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Input } from '@/components/ui/input';
+import { JobCodeFields } from '@/components/timesheets/JobCodeFields';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -29,6 +30,15 @@ import {
 } from '@/lib/utils/timesheet-off-days';
 import { buildLeaveAwareTotals, formatLeaveAwareWeeklyDisplayMultiline } from '@/lib/utils/timesheet-leave-totals';
 import { isPlantTimesheetV2, normalizeTimesheetEntriesForDisplay } from '@/lib/utils/plant-timesheet-v2-normalization';
+import {
+  formatEntryJobNumbers,
+  getEntryJobNumbers,
+  getNormalizedJobNumbers,
+  getPrimaryJobNumber,
+  hasDuplicateJobNumbers,
+  isValidJobNumber,
+  normalizeJobNumberInput,
+} from '@/lib/utils/timesheet-job-codes';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -117,7 +127,7 @@ export default function ViewTimesheetPage() {
       // Fetch entries
       const { data: entriesData, error: entriesError } = await supabase
         .from('timesheet_entries')
-        .select('*')
+        .select('*, timesheet_entry_job_codes(job_number, display_order)')
         .eq('timesheet_id', id)
         .order('day_of_week');
 
@@ -132,6 +142,7 @@ export default function ViewTimesheetPage() {
           day_of_week: i + 1,
           timesheet_id: id,
           job_number: null,
+          job_numbers: [],
           did_not_work: false,
           time_started: null,
           time_finished: null,
@@ -141,7 +152,13 @@ export default function ViewTimesheetPage() {
         };
       });
 
-      setEntries(fullWeek);
+      const normalizedWeek = fullWeek.map((entry) => ({
+        ...entry,
+        job_numbers: getEntryJobNumbers(entry),
+        job_number: getPrimaryJobNumber(entry),
+      }));
+
+      setEntries(normalizedWeek);
 
       try {
         const { startIso, endIso } = getTimesheetWeekIsoBounds(timesheetData.week_ending);
@@ -168,7 +185,7 @@ export default function ViewTimesheetPage() {
       // Store original data if this is an approved timesheet (for change tracking)
       if (timesheetData.status === 'approved') {
         setOriginalData({
-          entries: JSON.parse(JSON.stringify(fullWeek)),
+          entries: JSON.parse(JSON.stringify(normalizedWeek)),
           regNumber: timesheetData.reg_number
         });
       }
@@ -198,7 +215,37 @@ export default function ViewTimesheetPage() {
     [timesheet, entries, offDayStates]
   );
 
-  const updateEntry = (dayIndex: number, field: string, value: string | boolean | number | null) => {
+  const trimTrailingEmptyJobNumbers = (values: string[]): string[] => {
+    const next = [...values];
+    while (next.length > 0 && next[next.length - 1]?.trim() === '') {
+      next.pop();
+    }
+    return next;
+  };
+
+  const getEditableJobNumbers = (entry: TimesheetEntry): string[] => (
+    (entry.job_numbers?.length ?? 0) > 0 ? [...(entry.job_numbers || [])] : ['']
+  );
+
+  const handleJobNumberChange = (dayIndex: number, jobIndex: number, value: string) => {
+    const nextJobNumbers = getEditableJobNumbers(entries[dayIndex]);
+    nextJobNumbers[jobIndex] = normalizeJobNumberInput(value);
+    updateEntry(dayIndex, 'job_numbers', trimTrailingEmptyJobNumbers(nextJobNumbers));
+  };
+
+  const handleAddJobNumberField = (dayIndex: number) => {
+    const nextJobNumbers = getEditableJobNumbers(entries[dayIndex]);
+    nextJobNumbers.push('');
+    updateEntry(dayIndex, 'job_numbers', nextJobNumbers);
+  };
+
+  const handleRemoveJobNumberField = (dayIndex: number, jobIndex: number) => {
+    const nextJobNumbers = getEditableJobNumbers(entries[dayIndex]);
+    nextJobNumbers.splice(jobIndex, 1);
+    updateEntry(dayIndex, 'job_numbers', trimTrailingEmptyJobNumbers(nextJobNumbers));
+  };
+
+  const updateEntry = (dayIndex: number, field: string, value: string | boolean | number | null | string[]) => {
     const newEntries = [...entries];
     const currentEntry = newEntries[dayIndex];
 
@@ -215,6 +262,7 @@ export default function ViewTimesheetPage() {
         time_started: nextDidNotWork ? null : currentEntry.time_started,
         time_finished: nextDidNotWork ? null : currentEntry.time_finished,
         job_number: nextDidNotWork ? null : currentEntry.job_number,
+        job_numbers: nextDidNotWork ? [] : currentEntry.job_numbers,
         working_in_yard: nextDidNotWork ? false : currentEntry.working_in_yard,
         daily_total: nextDidNotWork ? 0 : currentEntry.daily_total,
         remarks: nextRemarks,
@@ -236,16 +284,31 @@ export default function ViewTimesheetPage() {
       return;
     }
 
-    const nextEntry = {
-      ...currentEntry,
-      [field]: value,
-    };
+    const nextEntry =
+      field === 'job_numbers'
+        ? {
+            ...currentEntry,
+            job_numbers: Array.isArray(value) ? value.map((jobNumber) => normalizeJobNumberInput(jobNumber)) : [],
+            job_number: getPrimaryJobNumber(Array.isArray(value) ? value : []) || null,
+          }
+        : {
+            ...currentEntry,
+            [field]: value,
+          };
+
+    if (field === 'working_in_yard' && value === true) {
+      nextEntry.job_number = null;
+      nextEntry.job_numbers = [];
+    }
+
+    const hasMeaningfulValue =
+      field === 'job_numbers'
+        ? getNormalizedJobNumbers(Array.isArray(value) ? value : []).length > 0
+        : value !== null && value !== false && value !== '';
 
     if (
-      (field === 'time_started' || field === 'time_finished' || field === 'job_number' || field === 'working_in_yard') &&
-      value !== null &&
-      value !== false &&
-      value !== ''
+      (field === 'time_started' || field === 'time_finished' || field === 'job_number' || field === 'job_numbers' || field === 'working_in_yard') &&
+      hasMeaningfulValue
     ) {
       nextEntry.did_not_work = false;
       if (nextEntry.remarks === 'Did Not Work') {
@@ -299,6 +362,18 @@ export default function ViewTimesheetPage() {
 
     try {
       const entriesToPersist = normalizeTimesheetEntriesForDisplay(timesheet, entries, offDayStates);
+      const invalidJobEntry = entriesToPersist.find((entry) => {
+        const hasHours = Boolean(entry.time_started && entry.time_finished);
+        if (!hasHours || entry.did_not_work || entry.working_in_yard) return false;
+
+        const jobNumbers = getNormalizedJobNumbers(entry.job_numbers);
+        return jobNumbers.length === 0 || hasDuplicateJobNumbers(entry.job_numbers) || !jobNumbers.every((jobNumber) => isValidJobNumber(jobNumber));
+      });
+
+      if (invalidJobEntry) {
+        setError(`${DAY_NAMES[invalidJobEntry.day_of_week - 1]}: add at least one valid Job Number in format 1234-AB and do not repeat the same code on a single day.`);
+        return;
+      }
 
       // Update timesheet
       const { error: timesheetError } = await supabase
@@ -339,6 +414,7 @@ export default function ViewTimesheetPage() {
           )
         )
         .map((entry) => {
+          const persistedJobNumbers = getNormalizedJobNumbers(entry.job_numbers);
           const normalizedRemarks =
             entry.remarks?.trim() ||
             (entry.did_not_work ? 'Did Not Work' : '');
@@ -358,7 +434,7 @@ export default function ViewTimesheetPage() {
           machine_standing_hours: entry.machine_standing_hours ?? null,
           machine_operator_hours: entry.machine_operator_hours ?? null,
           maintenance_breakdown_hours: entry.maintenance_breakdown_hours ?? null,
-          job_number: entry.job_number || null,
+          job_number: persistedJobNumbers[0] || null,
           did_not_work: entry.did_not_work,
           working_in_yard: entry.working_in_yard,
           daily_total: entry.daily_total,
@@ -369,11 +445,35 @@ export default function ViewTimesheetPage() {
         });
 
       if (entriesToInsert.length > 0) {
-        const { error: entriesError } = await supabase
+        const { data: insertedEntries, error: entriesError } = await supabase
           .from('timesheet_entries')
-          .insert(entriesToInsert);
+          .insert(entriesToInsert)
+          .select('id, day_of_week');
 
         if (entriesError) throw entriesError;
+
+        type TimesheetEntryJobCodeInsert = Database['public']['Tables']['timesheet_entry_job_codes']['Insert'];
+        const entryIdByDay = new Map(
+          (insertedEntries || []).map((entry) => [entry.day_of_week, entry.id] as const)
+        );
+        const jobCodesToInsert: TimesheetEntryJobCodeInsert[] = entriesToPersist.flatMap((entry) => {
+          const entryId = entryIdByDay.get(entry.day_of_week);
+          if (!entryId) return [];
+
+          return getNormalizedJobNumbers(entry.job_numbers).map((jobNumber, displayOrder) => ({
+            timesheet_entry_id: entryId,
+            job_number: jobNumber,
+            display_order: displayOrder,
+          }));
+        });
+
+        if (jobCodesToInsert.length > 0) {
+          const { error: jobCodesError } = await supabase
+            .from('timesheet_entry_job_codes')
+            .insert(jobCodesToInsert);
+
+          if (jobCodesError) throw jobCodesError;
+        }
       }
 
       // Refresh data
@@ -764,16 +864,18 @@ export default function ViewTimesheetPage() {
                     )}
                     <td className="p-2">
                       {canEdit ? (
-                        <Input
-                          value={(entry as TimesheetEntry & { job_number?: string }).job_number || ''}
-                          onChange={(e) => updateEntry(index, 'job_number', e.target.value.toUpperCase())}
-                          disabled={entry.did_not_work}
+                        <JobCodeFields
+                          values={entry.job_numbers || []}
+                          onChange={(jobIndex, value) => handleJobNumberChange(index, jobIndex, value)}
+                          onAdd={() => handleAddJobNumberField(index)}
+                          onRemove={(jobIndex) => handleRemoveJobNumberField(index, jobIndex)}
+                          disabled={entry.did_not_work || entry.working_in_yard}
                           placeholder={entry.working_in_yard ? 'YARD' : 'Job #'}
-                          className="w-32 font-mono text-slate-900"
+                          inputClassName="w-32 font-mono text-slate-900"
                         />
                       ) : (
                         <span className="text-sm font-mono">
-                          {(entry as TimesheetEntry & { job_number?: string }).job_number || (entry.working_in_yard ? 'YARD' : '-')}
+                          {entry.working_in_yard ? 'YARD' : formatEntryJobNumbers(entry)}
                         </span>
                       )}
                     </td>
@@ -900,16 +1002,18 @@ export default function ViewTimesheetPage() {
                   <div className="space-y-1">
                     <Label className="text-xs">Job Number</Label>
                     {canEdit ? (
-                      <Input
-                        value={(entry as TimesheetEntry & { job_number?: string }).job_number || ''}
-                        onChange={(e) => updateEntry(index, 'job_number', e.target.value.toUpperCase())}
-                        disabled={entry.did_not_work}
+                      <JobCodeFields
+                        values={entry.job_numbers || []}
+                        onChange={(jobIndex, value) => handleJobNumberChange(index, jobIndex, value)}
+                        onAdd={() => handleAddJobNumberField(index)}
+                        onRemove={(jobIndex) => handleRemoveJobNumberField(index, jobIndex)}
+                        disabled={entry.did_not_work || entry.working_in_yard}
                         placeholder={entry.working_in_yard ? 'YARD' : 'Job #'}
-                        className="font-mono"
+                        inputClassName="font-mono"
                       />
                     ) : (
                       <p className="text-sm font-mono">
-                        {(entry as TimesheetEntry & { job_number?: string }).job_number || (entry.working_in_yard ? 'YARD' : '-')}
+                        {entry.working_in_yard ? 'YARD' : formatEntryJobNumbers(entry)}
                       </p>
                     )}
                   </div>

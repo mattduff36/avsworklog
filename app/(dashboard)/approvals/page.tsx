@@ -74,6 +74,8 @@ interface TimesheetEntry {
   day_of_week: number;
   daily_total: number | null;
   job_number: string | null;
+  job_numbers?: string[];
+  timesheet_entry_job_codes?: Array<{ job_number?: string | null; display_order?: number | null }>;
   working_in_yard: boolean;
   did_not_work: boolean;
 }
@@ -458,6 +460,10 @@ function ApprovalsContent() {
             day_of_week,
             daily_total,
             job_number,
+            timesheet_entry_job_codes (
+              job_number,
+              display_order
+            ),
             working_in_yard,
             did_not_work
           )

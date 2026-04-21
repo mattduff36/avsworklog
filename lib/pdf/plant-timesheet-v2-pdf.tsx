@@ -6,6 +6,7 @@ import { getDidNotWorkReasonInfo } from '@/lib/utils/timesheetDidNotWork';
 import type { TimesheetOffDayState } from '@/lib/utils/timesheet-off-days';
 import { buildLeaveAwareTotals } from '@/lib/utils/timesheet-leave-totals';
 import { normalizeTimesheetEntriesForDisplay } from '@/lib/utils/plant-timesheet-v2-normalization';
+import { formatEntryJobNumbers } from '@/lib/utils/timesheet-job-codes';
 
 const styles = StyleSheet.create({
   page: {
@@ -289,6 +290,17 @@ function formatHours(value: number | null | undefined): string {
   return Number(value).toFixed(2);
 }
 
+function formatPlantRemarks(entry: { job_number?: string | null; job_numbers?: string[]; remarks?: string | null }): string {
+  const jobNumbers = formatEntryJobNumbers(entry);
+  if (jobNumbers !== '-' && entry.remarks?.trim()) {
+    return `Job numbers ${jobNumbers} - ${entry.remarks.trim()}`;
+  }
+  if (jobNumbers !== '-') {
+    return `Job numbers ${jobNumbers}`;
+  }
+  return entry.remarks || '';
+}
+
 export function PlantTimesheetV2PDF({ timesheet, employeeName, offDayStates = [] }: PlantTimesheetV2PDFProps) {
   const sortedEntries = (timesheet.entries || []).sort((a, b) => a.day_of_week - b.day_of_week);
   const allDays = normalizeTimesheetEntriesForDisplay(timesheet, [1, 2, 3, 4, 5, 6, 7].map((dayNum) => {
@@ -309,6 +321,7 @@ export function PlantTimesheetV2PDF({ timesheet, employeeName, offDayStates = []
       machine_operator_hours: null,
       maintenance_breakdown_hours: null,
       job_number: null,
+      job_numbers: [],
       working_in_yard: false,
       daily_total: null,
       remarks: '',
@@ -429,7 +442,7 @@ export function PlantTimesheetV2PDF({ timesheet, employeeName, offDayStates = []
                         entry.did_not_work,
                         entry.remarks?.trim() ? entry.remarks : 'Not on Shift'
                       ).combinedDisplay
-                    : (entry.remarks || '')}
+                    : formatPlantRemarks(entry)}
                 </Text>
               </View>
             </View>

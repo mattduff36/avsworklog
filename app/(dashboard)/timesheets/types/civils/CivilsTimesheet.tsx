@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { JobCodeFields } from '@/components/timesheets/JobCodeFields';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -41,6 +42,14 @@ import {
   resolveTimesheetOffDayStates,
 } from '@/lib/utils/timesheet-off-days';
 import { buildLeaveAwareTotals, formatLeaveAwareWeeklyDisplayMultiline } from '@/lib/utils/timesheet-leave-totals';
+import {
+  getEntryJobNumbers,
+  getNormalizedJobNumbers,
+  getPrimaryJobNumber,
+  hasDuplicateJobNumbers,
+  isValidJobNumber,
+  normalizeJobNumberInput,
+} from '@/lib/utils/timesheet-job-codes';
 
 /**
  * Civils Timesheet Component
@@ -72,6 +81,7 @@ const createBlankEntry = (dayOfWeek: number): TimesheetEntryDraft => ({
   time_started: '',
   time_finished: '',
   job_number: '',
+  job_numbers: [],
   working_in_yard: false,
   did_not_work: false,
   didNotWorkReason: null,
@@ -456,6 +466,7 @@ export function CivilsTimesheet({
         time_started: '',
         time_finished: '',
         job_number: '',
+        job_numbers: [],
         did_not_work: true,
         working_in_yard: false,
         daily_total: 0,
@@ -467,28 +478,40 @@ export function CivilsTimesheet({
     setBankHolidayDayIndex(null);
   };
 
+  const trimTrailingEmptyJobNumbers = (values: string[]): string[] => {
+    const next = [...values];
+    while (next.length > 0 && next[next.length - 1]?.trim() === '') {
+      next.pop();
+    }
+    return next;
+  };
+
+  const getEditableJobNumbers = (entry: TimesheetEntryDraft): string[] => (
+    (entry.job_numbers?.length ?? 0) > 0 ? [...(entry.job_numbers || [])] : ['']
+  );
+
   // Handle job number input with auto-dash formatting (NNNN-LL format)
-  const handleJobNumberChange = (index: number, value: string) => {
+  const handleJobNumberChange = (dayIndex: number, jobIndex: number, value: string) => {
     // Check for bank holiday warning when user enters a job number
     if (value && value.trim().length > 0) {
-      checkAndShowBankHolidayWarning(index, value);
+      checkAndShowBankHolidayWarning(dayIndex, value);
     }
-    
-    // Remove all non-alphanumeric characters except dash
-    let cleaned = value.replace(/[^0-9A-Za-z-]/g, '').toUpperCase();
-    
-    // Remove any existing dashes
-    cleaned = cleaned.replace(/-/g, '');
-    
-    // Auto-format: add dash after 4 digits
-    if (cleaned.length > 4) {
-      cleaned = cleaned.substring(0, 4) + '-' + cleaned.substring(4, 6);
-    }
-    
-    // Limit to 7 characters (4 digits + dash + 2 letters)
-    cleaned = cleaned.substring(0, 7);
-    
-    updateEntry(index, 'job_number', cleaned);
+
+    const nextJobNumbers = getEditableJobNumbers(entries[dayIndex]);
+    nextJobNumbers[jobIndex] = normalizeJobNumberInput(value);
+    updateEntry(dayIndex, 'job_numbers', trimTrailingEmptyJobNumbers(nextJobNumbers));
+  };
+
+  const handleAddJobNumberField = (dayIndex: number) => {
+    const nextJobNumbers = getEditableJobNumbers(entries[dayIndex]);
+    nextJobNumbers.push('');
+    updateEntry(dayIndex, 'job_numbers', nextJobNumbers);
+  };
+
+  const handleRemoveJobNumberField = (dayIndex: number, jobIndex: number) => {
+    const nextJobNumbers = getEditableJobNumbers(entries[dayIndex]);
+    nextJobNumbers.splice(jobIndex, 1);
+    updateEntry(dayIndex, 'job_numbers', trimTrailingEmptyJobNumbers(nextJobNumbers));
   };
 
   const fetchEmployees = async () => {
@@ -683,7 +706,7 @@ export function CivilsTimesheet({
       // Fetch entries
       const { data: entriesData, error: entriesError } = await supabase
         .from('timesheet_entries')
-        .select('*')
+        .select('*, timesheet_entry_job_codes(job_number, display_order)')
         .eq('timesheet_id', timesheetId)
         .order('day_of_week');
       
@@ -709,7 +732,8 @@ export function CivilsTimesheet({
           day_of_week: i + 1,
           time_started: existingEntry.time_started || '',
           time_finished: existingEntry.time_finished || '',
-          job_number: existingEntry.job_number || '',
+          job_number: getPrimaryJobNumber(existingEntry) || '',
+          job_numbers: getEntryJobNumbers(existingEntry),
           working_in_yard: existingEntry.working_in_yard || false,
           did_not_work: existingEntry.did_not_work || false,
           didNotWorkReason: inferredReason,
@@ -743,7 +767,7 @@ export function CivilsTimesheet({
   };
 
   // Calculate hours when times change
-  const updateEntry = (dayIndex: number, field: string, value: string | boolean) => {
+  const updateEntry = (dayIndex: number, field: string, value: string | boolean | string[]) => {
     if (isLeaveLockedDay(dayIndex)) return;
     const workWindow = getWorkWindowForDay(dayIndex);
 
@@ -760,6 +784,8 @@ export function CivilsTimesheet({
           didNotWorkReason: null, // Clear any previous reason
           time_started: '',
           time_finished: '',
+          job_number: '',
+          job_numbers: [],
           working_in_yard: false,
           daily_total: 0,
         };
@@ -818,10 +844,27 @@ export function CivilsTimesheet({
         }
       }
       
-      newEntries[dayIndex] = {
-        ...newEntries[dayIndex],
-        [field]: value,
-      };
+      if (field === 'job_numbers') {
+        const nextJobNumbers = Array.isArray(value) ? value.map((jobNumber) => normalizeJobNumberInput(jobNumber)) : [];
+        newEntries[dayIndex] = {
+          ...newEntries[dayIndex],
+          job_numbers: nextJobNumbers,
+          job_number: getPrimaryJobNumber(nextJobNumbers) || '',
+        };
+      } else {
+        newEntries[dayIndex] = {
+          ...newEntries[dayIndex],
+          [field]: value,
+        };
+      }
+
+      if (field === 'working_in_yard' && value === true) {
+        newEntries[dayIndex] = {
+          ...newEntries[dayIndex],
+          job_number: '',
+          job_numbers: [],
+        };
+      }
 
       // Auto-calculate daily total if both times are present
       if (field === 'time_started' || field === 'time_finished') {
@@ -987,7 +1030,6 @@ export function CivilsTimesheet({
     }
 
     // Validate job numbers for all working days (unless working in yard)
-    const jobNumberRegex = /^\d{4}-[A-Z]{2}$/;
     const allJobNumbersValid = entriesForValidation.every(entry => {
       const offDay = offDayByDay.get(entry.day_of_week);
       const hasHours = Boolean(entry.time_started && entry.time_finished);
@@ -996,11 +1038,15 @@ export function CivilsTimesheet({
       if (entry.did_not_work) return true; // Skip validation for non-working days
       if (entry.working_in_yard) return true; // Skip validation for yard work
       if (!hasHours) return true;
-      return entry.job_number && jobNumberRegex.test(entry.job_number);
+
+      const jobNumbers = getNormalizedJobNumbers(entry.job_numbers);
+      if (jobNumbers.length === 0) return false;
+      if (hasDuplicateJobNumbers(entry.job_numbers)) return false;
+      return jobNumbers.every((jobNumber) => isValidJobNumber(jobNumber));
     });
     
     if (!allJobNumbersValid) {
-      setError('Please enter a valid Job Number (format: 1234-AB) for all working days (not required when working in yard)');
+      setError('Please enter at least one valid Job Number (format: 1234-AB) for all working days, and do not repeat the same code on a single day.');
       setShowErrorDialog(true);
       return;
     }
@@ -1146,6 +1192,7 @@ export function CivilsTimesheet({
       const entriesToInsert: TimesheetEntryInsert[] = entriesForPersistence.map((entry) => {
           const entryDate = getTimesheetEntryDateFromWeekEnding(weekEnding, entry.day_of_week);
           const offDay = offDayByDay.get(entry.day_of_week);
+          const persistedJobNumbers = getNormalizedJobNumbers(entry.job_numbers);
           
           // Automatically detect night shift and bank holiday
           const isNight = !entry.did_not_work && isNightShift(entry.time_started, entry.daily_total);
@@ -1161,7 +1208,7 @@ export function CivilsTimesheet({
             day_of_week: entry.day_of_week,
             time_started: entry.time_started || null,
             time_finished: entry.time_finished || null,
-            job_number: entry.job_number || null,
+            job_number: persistedJobNumbers[0] || null,
             working_in_yard: entry.working_in_yard,
             did_not_work: entry.did_not_work,
             night_shift: isNight,
@@ -1172,13 +1219,40 @@ export function CivilsTimesheet({
         });
 
       // Insert all entries (all 7 days)
-      const { error: entriesError } = await supabase
+      const { data: insertedEntries, error: entriesError } = await supabase
         .from('timesheet_entries')
-        .insert(entriesToInsert);
+        .insert(entriesToInsert)
+        .select('id, day_of_week');
 
       if (entriesError) {
         console.error('Error inserting timesheet entries:', entriesError);
         throw new Error(`Failed to insert timesheet entries: ${entriesError.message}`);
+      }
+
+      type TimesheetEntryJobCodeInsert = Database['public']['Tables']['timesheet_entry_job_codes']['Insert'];
+      const entryIdByDay = new Map(
+        (insertedEntries || []).map((entry) => [entry.day_of_week, entry.id] as const)
+      );
+      const jobCodesToInsert: TimesheetEntryJobCodeInsert[] = entriesForPersistence.flatMap((entry) => {
+        const entryId = entryIdByDay.get(entry.day_of_week);
+        if (!entryId) return [];
+
+        return getNormalizedJobNumbers(entry.job_numbers).map((jobNumber, displayOrder) => ({
+          timesheet_entry_id: entryId,
+          job_number: jobNumber,
+          display_order: displayOrder,
+        }));
+      });
+
+      if (jobCodesToInsert.length > 0) {
+        const { error: jobCodesError } = await supabase
+          .from('timesheet_entry_job_codes')
+          .insert(jobCodesToInsert);
+
+        if (jobCodesError) {
+          console.error('Error inserting timesheet entry job codes:', jobCodesError);
+          throw new Error(`Failed to insert timesheet job codes: ${jobCodesError.message}`);
+        }
       }
 
       // Show success message
@@ -1512,13 +1586,14 @@ export function CivilsTimesheet({
                         {entry.working_in_yard && <span className="text-muted-foreground text-base">(Not required - working in yard)</span>}
                         {hasTrainingBooking && <span className="text-muted-foreground text-base">(Not required - training)</span>}
                       </Label>
-                      <Input
-                        value={entry.job_number}
-                        onChange={(e) => handleJobNumberChange(index, e.target.value)}
+                      <JobCodeFields
+                        values={entry.job_numbers || []}
+                        onChange={(jobIndex, value) => handleJobNumberChange(index, jobIndex, value)}
+                        onAdd={() => handleAddJobNumberField(index)}
+                        onRemove={(jobIndex) => handleRemoveJobNumberField(index, jobIndex)}
                         placeholder={jobNumberPlaceholder}
-                        maxLength={7}
                         disabled={disableJobNumberInput}
-                        className="h-16 text-3xl text-center bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground uppercase disabled:opacity-30 disabled:cursor-not-allowed"
+                        inputClassName="h-16 text-3xl text-center bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground uppercase disabled:opacity-30 disabled:cursor-not-allowed"
                       />
                     </div>
 
@@ -1703,13 +1778,14 @@ export function CivilsTimesheet({
                       </div>
                     </td>
                     <td className="p-3">
-                      <Input
-                        value={entry.job_number}
-                        onChange={(e) => handleJobNumberChange(index, e.target.value)}
+                      <JobCodeFields
+                        values={entry.job_numbers || []}
+                        onChange={(jobIndex, value) => handleJobNumberChange(index, jobIndex, value)}
+                        onAdd={() => handleAddJobNumberField(index)}
+                        onRemove={(jobIndex) => handleRemoveJobNumberField(index, jobIndex)}
                         placeholder={jobNumberPlaceholder}
-                        maxLength={7}
                         disabled={disableJobNumberInput}
-                        className="w-28 bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground uppercase disabled:opacity-30 disabled:cursor-not-allowed"
+                        inputClassName="w-28 bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground uppercase disabled:opacity-30 disabled:cursor-not-allowed"
                       />
                     </td>
                     <td className="p-3">
