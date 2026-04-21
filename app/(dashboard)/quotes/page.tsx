@@ -43,6 +43,7 @@ function buildFormRequestError(payload: { error?: string; field_errors?: Record<
 
 export default function QuotesPage() {
   const { hasPermission: canViewQuotes, loading: permissionLoading } = usePermissionCheck('quotes', false);
+  const { hasPermission: canViewCustomers, loading: customerPermissionLoading } = usePermissionCheck('customers', false);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -84,10 +85,12 @@ export default function QuotesPage() {
           limit: 250,
           errorMessage: 'Failed to load quotes',
         }),
-        fetchAllPaginatedItems<CustomerOption>('/api/customers', 'customers', {
-          limit: 500,
-          errorMessage: 'Failed to load customers',
-        }),
+        canViewCustomers
+          ? fetchAllPaginatedItems<CustomerOption>('/api/customers', 'customers', {
+            limit: 500,
+            errorMessage: 'Failed to load customers',
+          })
+          : Promise.resolve({ items: [], firstPagePayload: null }),
         fetch('/api/quotes/metadata'),
       ]);
 
@@ -106,17 +109,17 @@ export default function QuotesPage() {
     } finally {
       setLoading(false);
     }
-  }, [customerId]);
+  }, [canViewCustomers, customerId]);
 
   useEffect(() => {
-    if (permissionLoading) return;
+    if (permissionLoading || customerPermissionLoading) return;
     if (!canViewQuotes) {
       toast.error('You do not have access to quotes.', { id: 'quotes-access-denied' });
       router.push('/dashboard');
       return;
     }
     fetchData();
-  }, [permissionLoading, canViewQuotes, router, fetchData]);
+  }, [permissionLoading, customerPermissionLoading, canViewQuotes, router, fetchData]);
 
   useEffect(() => {
     setDetailQuoteId(quoteIdFromQuery);
@@ -179,7 +182,7 @@ export default function QuotesPage() {
     setFormOpen(true);
   }
 
-  if (permissionLoading || loading) {
+  if (permissionLoading || customerPermissionLoading || loading) {
     return <PageLoader message="Loading quotes..." />;
   }
 
@@ -198,13 +201,26 @@ export default function QuotesPage() {
               </p>
             </div>
           </div>
-          <Button
-            onClick={() => { setEditingQuote(null); setFormOpen(true); }}
-            className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90 font-semibold"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            New Quote
-          </Button>
+          <div className="flex flex-col items-end gap-1">
+            <Button
+              onClick={() => {
+                if (!canViewCustomers) return;
+                setEditingQuote(null);
+                setFormOpen(true);
+              }}
+              disabled={!canViewCustomers}
+              aria-describedby={!canViewCustomers ? 'quotes-customer-access-note' : undefined}
+              className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90 font-semibold disabled:bg-slate-300 disabled:text-slate-600 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              New Quote
+            </Button>
+            {!canViewCustomers ? (
+              <p id="quotes-customer-access-note" className="text-xs text-muted-foreground">
+                Customer access is required to create quotes.
+              </p>
+            ) : null}
+          </div>
         </div>
       </div>
 

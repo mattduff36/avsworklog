@@ -1,19 +1,63 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
+import { getPermissionMapForUser } from '@/lib/server/team-permissions';
 import { createClient } from '@/lib/supabase/server';
+import { getEffectiveRole } from '@/lib/utils/view-as';
+
+interface EffectiveRoleSnapshot {
+  role_name: string | null;
+  role_class: 'admin' | 'manager' | 'employee' | null;
+  is_super_admin: boolean;
+  is_actual_super_admin: boolean;
+  is_viewing_as: boolean;
+}
+
+function hasFullCustomerAccess(effectiveRole: EffectiveRoleSnapshot): boolean {
+  return (
+    effectiveRole.is_super_admin
+    || effectiveRole.role_name === 'admin'
+    || effectiveRole.role_class === 'admin'
+    || (effectiveRole.is_actual_super_admin && !effectiveRole.is_viewing_as)
+  );
+}
+
+async function canReadCustomersModule(): Promise<{ allowed: boolean } | null> {
+  const current = await getCurrentAuthenticatedProfile();
+  if (!current) {
+    return null;
+  }
+
+  const effectiveRole = await getEffectiveRole();
+  if (hasFullCustomerAccess(effectiveRole)) {
+    return { allowed: true };
+  }
+
+  const permissions = await getPermissionMapForUser(
+    current.profile.id,
+    effectiveRole.role_id,
+    createAdminClient(),
+    effectiveRole.team_id
+  );
+
+  return { allowed: permissions.customers === true };
+}
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const access = await canReadCustomersModule();
+    if (!access) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    if (!access.allowed) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
     const limit = Math.min(Math.max(Number.parseInt(searchParams.get('limit') || '200', 10) || 200, 1), 500);
     const offset = Math.max(Number.parseInt(searchParams.get('offset') || '0', 10) || 0, 0);
 
-    const { data, error } = await supabase
+    const { data, error } = await createAdminClient()
       .from('customers')
       .select('*')
       .order('company_name', { ascending: true })

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -92,8 +92,11 @@ export function QuoteFormDialog({
 }: QuoteFormDialogProps) {
   const { profile } = useAuth();
   const isEditing = !!quote;
+  const wasOpenRef = useRef(false);
+  const lastDialogKeyRef = useRef<string | null>(null);
 
   const defaultManager = managerOptions.find(option => option.profile_id === profile?.id) || managerOptions[0];
+  const dialogKey = quote ? `edit:${quote.id}` : `new:${initialCustomerId || ''}`;
 
   const [form, setForm] = useState<QuoteFormData>({
     customer_id: '',
@@ -202,6 +205,16 @@ export function QuoteFormDialog({
   }
 
   useEffect(() => {
+    if (!open) {
+      wasOpenRef.current = false;
+      return;
+    }
+
+    const shouldInitialize = !wasOpenRef.current || lastDialogKeyRef.current !== dialogKey;
+    if (!shouldInitialize) {
+      return;
+    }
+
     setFieldErrors({});
     setSubmitError(null);
     if (quote) {
@@ -267,8 +280,10 @@ export function QuoteFormDialog({
 
       setForm(next);
     }
+    wasOpenRef.current = true;
+    lastDialogKeyRef.current = dialogKey;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quote, open, profile, defaultManager, initialCustomerId, customers]);
+  }, [quote, open, profile, defaultManager, initialCustomerId, customers, dialogKey]);
 
   function updateField<K extends keyof QuoteFormData>(key: K, value: QuoteFormData[K]) {
     clearFieldError(String(key));
