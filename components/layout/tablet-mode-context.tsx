@@ -2,6 +2,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { subscribeToAuthStateChange } from '@/lib/app-auth/client';
+import { useOptionalAuth } from '@/lib/providers/auth-provider';
+import { createClient } from '@/lib/supabase/client';
 
 const TABLET_MODE_STORAGE_KEY_PREFIX = 'tablet_mode:';
 const TABLET_MODE_ON_VALUE = 'on';
@@ -61,6 +63,10 @@ function safeLocalStorageSet(key: string, value: string): void {
 }
 
 export function TabletModeProvider({ children }: TabletModeProviderProps) {
+  const auth = useOptionalAuth();
+  const hasAuthContext = auth !== null;
+  const profileId = auth?.profile?.id ?? null;
+  const authLoading = auth?.loading ?? false;
   const [tabletModeEnabled, setTabletModeEnabled] = useState(false);
   const [tabletModeInfoOpen, setTabletModeInfoOpen] = useState(false);
   const [storageUserId, setStorageUserId] = useState<string | null>(null);
@@ -85,7 +91,7 @@ export function TabletModeProvider({ children }: TabletModeProviderProps) {
       setHydratedStorage(true);
     }
 
-    async function loadInitialUser() {
+    async function resolveFallbackUserId() {
       try {
         const response = await fetch('/api/auth/session', {
           cache: 'no-store',
@@ -94,16 +100,40 @@ export function TabletModeProvider({ children }: TabletModeProviderProps) {
           },
         });
 
-        if (!response.ok) {
-          applyUserStorageState(null);
-          return;
+        if (response.ok) {
+          const data = await response.json() as AuthSessionResponse;
+          return data.authenticated ? data.user?.id ?? null : null;
         }
-
-        const data = (await response.json()) as AuthSessionResponse;
-        applyUserStorageState(data.authenticated ? data.user?.id ?? null : null);
       } catch {
-        applyUserStorageState(null);
+        // Fall through to the browser client fallback for isolated tests or transient fetch issues.
       }
+
+      try {
+        const {
+          data: { user },
+        } = await createClient().auth.getUser();
+        return user?.id ?? null;
+      } catch {
+        return null;
+      }
+    }
+
+    if (hasAuthContext) {
+      if (authLoading) {
+        return () => {
+          mounted = false;
+        };
+      }
+
+      applyUserStorageState(profileId);
+      return () => {
+        mounted = false;
+      };
+    }
+
+    async function loadInitialUser() {
+      const userId = await resolveFallbackUserId();
+      applyUserStorageState(userId);
     }
 
     void loadInitialUser();
@@ -115,7 +145,7 @@ export function TabletModeProvider({ children }: TabletModeProviderProps) {
       mounted = false;
       unsubscribe();
     };
-  }, []);
+  }, [authLoading, hasAuthContext, profileId]);
 
   useEffect(() => {
     if (!hydratedStorage || !storageUserId) return;

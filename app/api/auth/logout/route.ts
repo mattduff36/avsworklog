@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isAccountSwitcherEnabledServer } from '@/lib/account-switch/feature-flag';
 import { clearAccountSwitchDevicePin, parseAccountSwitchDeviceId } from '@/lib/server/account-switch-device';
 import { createAccountSwitchAuditEvent } from '@/lib/server/account-switch-audit';
 import { clearAllAuthCookies } from '@/lib/server/app-auth/response';
 import { revokeAppSession, validateAppSession } from '@/lib/server/app-auth/session';
+import { createClient } from '@/lib/supabase/server';
 
 interface LogoutRequestBody {
   deviceId?: string;
@@ -10,12 +12,14 @@ interface LogoutRequestBody {
 
 export async function POST(request: NextRequest) {
   let response: NextResponse = NextResponse.json({ success: true });
+  const accountSwitcherEnabled = isAccountSwitcherEnabledServer();
 
   try {
+    const supabase = await createClient();
     const validation = await validateAppSession({ allowLocked: true });
     if (validation.session) {
       const body = (await request.json().catch(() => ({}))) as LogoutRequestBody;
-      const deviceId = parseAccountSwitchDeviceId(body.deviceId);
+      const deviceId = accountSwitcherEnabled ? parseAccountSwitchDeviceId(body.deviceId) : null;
 
       if (deviceId) {
         const pinCleared = await clearAccountSwitchDevicePin({
@@ -37,6 +41,8 @@ export async function POST(request: NextRequest) {
 
       await revokeAppSession(validation.session.id, 'logout');
     }
+
+    await supabase.auth.signOut();
   } catch (error) {
     response = NextResponse.json(
       { error: error instanceof Error ? error.message : 'Logout failed' },

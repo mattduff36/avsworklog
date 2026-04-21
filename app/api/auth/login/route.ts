@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
-import { clearAllAuthCookies, clearLegacyLockCookie } from '@/lib/server/app-auth/response';
+import type { SupabaseClient, User } from '@supabase/supabase-js';
 import {
   setAppSessionCookieInResponse,
 } from '@/lib/server/app-auth/cookies';
+import { clearAllAuthCookies } from '@/lib/server/app-auth/response';
 import { getAppAuthProfile } from '@/lib/server/app-auth/profile';
 import { issueAppSession, validateAppSession, revokeAppSession } from '@/lib/server/app-auth/session';
+import { createClient } from '@/lib/supabase/server';
+import type { Database } from '@/types/database';
 
 interface LoginRequestBody {
   email?: string;
@@ -15,23 +17,12 @@ interface LoginRequestBody {
   deviceLabel?: string;
 }
 
-async function verifyPasswordLogin(email: string, password: string) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Supabase environment variables are not configured');
-  }
-
-  const supabase = createSupabaseClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-      detectSessionInUrl: false,
-    },
-  });
-
-  async function attemptPassword(candidate: string) {
+async function verifyPasswordLogin(
+  supabase: SupabaseClient<Database>,
+  email: string,
+  password: string
+): Promise<User | null> {
+  async function attemptPassword(candidate: string): Promise<User | null> {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password: candidate,
@@ -70,7 +61,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const user = await verifyPasswordLogin(email, password);
+    const supabase = await createClient();
+    const user = await verifyPasswordLogin(supabase, email, password);
     if (!user) {
       return NextResponse.json(
         { error: 'Invalid email or password' },
@@ -107,7 +99,6 @@ export async function POST(request: NextRequest) {
 
     clearAllAuthCookies(request, response);
     setAppSessionCookieInResponse(response, nextSession.cookieValue, nextSession.cookieExpiresAt);
-    clearLegacyLockCookie(response);
     return response;
   } catch (error) {
     return NextResponse.json(

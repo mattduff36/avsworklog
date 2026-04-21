@@ -29,7 +29,7 @@ describe('fetchWithAuth helpers', () => {
     expect(handleAuthFailureStatus).toHaveBeenCalledWith(423);
   });
 
-  it('skips auth recovery for login requests and explicit opt-outs', async () => {
+  it('skips auth recovery for auth routes and explicit opt-outs', async () => {
     const handleAuthFailureStatus = vi.fn(async () => false);
     vi.doMock('@/lib/app-auth/recovery-bridge', () => ({
       handleAuthFailureStatus,
@@ -46,6 +46,7 @@ describe('fetchWithAuth helpers', () => {
     const wrappedFetch = createAuthAwareFetch(baseFetch as unknown as typeof fetch);
 
     await wrappedFetch('/api/auth/login');
+    await wrappedFetch('/api/auth/change-password');
     await wrappedFetch('/api/dashboard/summary', { skipAuthRecovery: true });
 
     expect(handleAuthFailureStatus).not.toHaveBeenCalled();

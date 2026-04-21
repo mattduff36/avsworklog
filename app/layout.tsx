@@ -1,12 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
-import { Analytics } from "@vercel/analytics/react";
-import { Toaster } from "@/components/ui/sonner";
-import { AuthProvider } from "@/lib/providers/auth-provider";
-import { QueryProvider } from "@/lib/providers/query-provider";
-import { NuqsAdapter } from 'nuqs/adapters/next/app';
-import { ErrorLoggerInit } from "@/components/ErrorLoggerInit";
-import { DeploymentVersionChecker } from "@/components/DeploymentVersionChecker";
+import { AppProviders } from "@/lib/providers/app-providers";
 import "./globals.css";
 
 // Force dynamic rendering to prevent build-time static generation errors
@@ -63,17 +57,7 @@ export default function RootLayout({
         <meta name="color-scheme" content="dark" />
       </head>
       <body className={`${inter.variable} font-sans antialiased`}>
-        <ErrorLoggerInit />
-        <DeploymentVersionChecker />
-        <NuqsAdapter>
-          <QueryProvider>
-            <AuthProvider>
-              {children}
-              <Toaster />
-              {shouldLoadAnalytics ? <Analytics /> : null}
-            </AuthProvider>
-          </QueryProvider>
-        </NuqsAdapter>
+        <AppProviders shouldLoadAnalytics={shouldLoadAnalytics}>{children}</AppProviders>
       </body>
     </html>
   );

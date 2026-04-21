@@ -5,6 +5,7 @@ import {
   reportClientServiceOutage,
   shouldTripClientServiceOutage,
 } from '@/lib/app-auth/client-service-health';
+import { shouldTreatAuthResponseAsLocked } from '@/lib/app-auth/client-auth-policy';
 import { CLIENT_SESSION_PAUSED_MESSAGE } from '@/lib/app-auth/session-error';
 import { createStatusError, getErrorStatus } from '@/lib/utils/http-error';
 
@@ -62,7 +63,7 @@ async function requestClientAuthSession(): Promise<ClientAuthSessionResult> {
     };
   }
 
-  if (response.status === 423 || payload?.locked === true) {
+  if (shouldTreatAuthResponseAsLocked({ statusCode: response.status, payloadLocked: payload?.locked })) {
     clearClientServiceOutage('auth-session');
     return {
       status: 'locked',
@@ -113,7 +114,7 @@ export async function loadClientAuthSession(): Promise<ClientAuthSessionResult> 
           responseStatus,
           CLIENT_SESSION_PAUSED_MESSAGE
         );
-      } else {
+      } else if (typeof responseStatus === 'number') {
         clearClientServiceOutage('auth-session');
       }
 

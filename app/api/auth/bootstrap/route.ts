@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import { applyValidationCookieIfNeeded, clearAllAuthCookies } from '@/lib/server/app-auth/response';
 import { setAppSessionCookieInResponse } from '@/lib/server/app-auth/cookies';
 import { issueAppSession, validateAppSession } from '@/lib/server/app-auth/session';
+import type { Database } from '@/types/database';
 
 function getReturnTo(request: NextRequest): string {
   const candidate = request.nextUrl.searchParams.get('returnTo') || '/dashboard';
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
   }
 
   let supabaseResponse = NextResponse.next({ request });
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+  const supabase = createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -72,6 +73,9 @@ export async function GET(request: NextRequest) {
 
   const response = NextResponse.redirect(redirectUrl, 307);
   clearAllAuthCookies(request, response);
+  supabaseResponse.cookies.getAll().forEach((cookie) => {
+    response.cookies.set(cookie);
+  });
   setAppSessionCookieInResponse(response, nextSession.cookieValue, nextSession.cookieExpiresAt);
   return response;
 }

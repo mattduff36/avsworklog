@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { buildAccountSwitchErrorResponse } from '@/lib/server/account-switch-route-helpers';
-import { validateAppSession } from '@/lib/server/app-auth/session';
+import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
 
 export interface AccountSwitchActorAccess {
   userId: string;
@@ -15,20 +15,20 @@ export async function getAccountSwitchActorAccess(source = 'unknown'): Promise<{
   hasUser?: boolean;
 }> {
   void source;
-  const validation = await validateAppSession({ allowLocked: true, includeEmail: true });
-  if (!validation.session || validation.status === 'missing' || validation.status === 'invalid') {
+  const current = await getCurrentAuthenticatedProfile({ allowLocked: true, includeEmail: true });
+  if (!current) {
     return {
       access: null,
       errorResponse: buildAccountSwitchErrorResponse('UNAUTHORIZED', 'Unauthorized', 401),
-      authErrorMessage: 'No authenticated app session',
+      authErrorMessage: 'No authenticated user',
       hasUser: false,
     };
   }
 
   return {
     access: {
-      userId: validation.session.profile_id,
-      email: validation.email || null,
+      userId: current.profile.id,
+      email: current.profile.email || null,
     },
     errorResponse: null,
     authErrorMessage: null,

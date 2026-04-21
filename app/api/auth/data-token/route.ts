@@ -1,36 +1,21 @@
 import { NextResponse } from 'next/server';
-import { applyValidationCookieIfNeeded } from '@/lib/server/app-auth/response';
-import { validateAppSession } from '@/lib/server/app-auth/session';
-import { issueSupabaseDataToken } from '@/lib/server/app-auth/supabase-token';
+import { createClient } from '@/lib/supabase/server';
 
 export async function GET() {
-  const validation = await validateAppSession({ includeEmail: true });
-  if (!validation.session || validation.status === 'missing' || validation.status === 'invalid') {
+  const supabase = await createClient();
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+  if (userError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  if (validation.status === 'locked') {
-    return NextResponse.json({ error: 'Session is locked' }, { status: 423 });
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    return NextResponse.json({ error: 'No active access token' }, { status: 503 });
   }
 
-  const token = await issueSupabaseDataToken({
-    profileId: validation.session.profile_id,
-    email: validation.email,
-    sessionId: validation.session.id,
+  return NextResponse.json({
+    token: session.access_token,
+    expires_at: session.expires_at ?? Math.floor(Date.now() / 1000),
   });
-
-  if (!token) {
-    return NextResponse.json(
-      { error: 'SUPABASE_JWT_SECRET is not configured' },
-      { status: 503 }
-    );
-  }
-
-  const response = NextResponse.json({
-    token: token.token,
-    expires_at: token.expiresAt,
-  });
-
-  applyValidationCookieIfNeeded(response, validation);
-  return response;
 }

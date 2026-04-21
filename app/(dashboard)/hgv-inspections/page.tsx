@@ -37,6 +37,7 @@ import {
   HgvInspectionsListTable,
   HGV_INSPECTIONS_COLUMN_VISIBILITY_STORAGE_KEY,
 } from './components/HgvInspectionsListTable';
+import { NuqsClientAdapter } from '@/components/providers/NuqsClientAdapter';
 
 interface HgvInspectionWithRelations {
   id: string;
@@ -716,8 +717,10 @@ function HgvInspectionsContent() {
 
 export default function HgvInspectionsPage() {
   return (
-    <Suspense fallback={<PageLoader message="Loading HGV inspections..." />}>
-      <HgvInspectionsContent />
-    </Suspense>
+    <NuqsClientAdapter>
+      <Suspense fallback={<PageLoader message="Loading HGV inspections..." />}>
+        <HgvInspectionsContent />
+      </Suspense>
+    </NuqsClientAdapter>
   );
 }

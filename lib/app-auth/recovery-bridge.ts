@@ -1,5 +1,6 @@
 'use client';
 
+import { getAuthFailureRedirectPath } from '@/lib/app-auth/client-auth-policy';
 import { isAuthErrorStatus } from '@/lib/utils/http-error';
 
 type RecoverFromAuthFailure = (options?: { statusCode?: number | null }) => Promise<boolean>;
@@ -18,13 +19,9 @@ interface HandleAuthFailureOptions {
 let registeredHandlers: AuthRecoveryHandlers | null = null;
 let pendingRecoveryPromise: Promise<boolean> | null = null;
 
-function getFallbackRedirectPath(statusCode?: number | null): string {
-  return statusCode === 423 ? '/lock' : '/login';
-}
-
 async function fallbackRedirect(statusCode?: number | null): Promise<boolean> {
   if (typeof window !== 'undefined') {
-    window.location.replace(getFallbackRedirectPath(statusCode));
+    window.location.replace(getAuthFailureRedirectPath(statusCode));
   }
   return false;
 }

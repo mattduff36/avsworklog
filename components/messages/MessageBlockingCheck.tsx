@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { subscribeToAuthStateChange } from '@/lib/app-auth/client';
 import { loadClientAuthSession } from '@/lib/app-auth/client-session';
 import { fetchWithAuth } from '@/lib/utils/fetch-with-auth';
+import { getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
 import { BlockingMessageModal } from './BlockingMessageModal';
 import { ReminderModal } from './ReminderModal';
 import { Loader2 } from 'lucide-react';
@@ -74,9 +75,6 @@ export function MessageBlockingCheck() {
       // Fetch pending messages
       const response = await fetchWithAuth('/api/messages/pending', { signal });
       if (!response.ok || signal.aborted) {
-        if (!signal.aborted) {
-          console.warn(`Pending messages API returned ${response.status}, skipping`);
-        }
         return;
       }
 
@@ -97,7 +95,9 @@ export function MessageBlockingCheck() {
       if (signal.aborted) {
         return;
       }
-      console.error('Error checking pending messages:', error);
+      if (!isAuthErrorStatus(getErrorStatus(error))) {
+        console.error('Error checking pending messages:', error);
+      }
     } finally {
       if (!signal.aborted) {
         setChecking(false);

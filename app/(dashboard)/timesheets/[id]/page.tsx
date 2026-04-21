@@ -354,8 +354,18 @@ export default function ViewTimesheetPage() {
     leaveAwareTotals.weekly.leaveDays
   );
 
-  const handleSave = async () => {
-    if (!timesheet || !user) return;
+  interface SaveTimesheetResult {
+    success: boolean;
+    errorMessage?: string;
+  }
+
+  const handleSave = async (): Promise<SaveTimesheetResult> => {
+    if (!timesheet || !user) {
+      return {
+        success: false,
+        errorMessage: 'Timesheet is not ready to save',
+      };
+    }
 
     setSaving(true);
     setError('');
@@ -371,8 +381,12 @@ export default function ViewTimesheetPage() {
       });
 
       if (invalidJobEntry) {
-        setError(`${DAY_NAMES[invalidJobEntry.day_of_week - 1]}: add at least one valid Job Number in format 1234-AB and do not repeat the same code on a single day.`);
-        return;
+        const errorMessage = `${DAY_NAMES[invalidJobEntry.day_of_week - 1]}: add at least one valid Job Number in format 1234-AB and do not repeat the same code on a single day.`;
+        setError(errorMessage);
+        return {
+          success: false,
+          errorMessage,
+        };
       }
 
       // Update timesheet
@@ -479,11 +493,19 @@ export default function ViewTimesheetPage() {
       // Refresh data
       await fetchTimesheet(timesheet.id);
       setEditing(false);
+      return {
+        success: true,
+      };
     } catch (err) {
       const errorContextId = 'timesheet-details-save-error';
       console.error('Error saving timesheet:', err, { errorContextId });
-      setError(err instanceof Error ? err.message : 'Failed to save timesheet');
-      toast.error(err instanceof Error ? err.message : 'Failed to save timesheet', { id: errorContextId });
+      const errorMessage = err instanceof Error ? err.message : 'Failed to save timesheet';
+      setError(errorMessage);
+      toast.error(errorMessage, { id: errorContextId });
+      return {
+        success: false,
+        errorMessage,
+      };
     } finally {
       setSaving(false);
     }
@@ -497,12 +519,15 @@ export default function ViewTimesheetPage() {
       return;
     }
 
-    setSaving(true);
-    setError('');
-
     try {
       // Save entries first
-      await handleSave();
+      const saveResult = await handleSave();
+      if (!saveResult.success) {
+        return;
+      }
+
+      setSaving(true);
+      setError('');
 
       // Update timesheet status
       const { error: updateError } = await supabase
@@ -640,7 +665,13 @@ export default function ViewTimesheetPage() {
 
     try {
       // Save the entries first
-      await handleSave();
+      const saveResult = await handleSave();
+      if (!saveResult.success) {
+        if (saveResult.errorMessage) {
+          toast.error(saveResult.errorMessage, { id: 'timesheet-details-adjust-save-validation' });
+        }
+        return;
+      }
 
       // Call API endpoint to handle adjustment with notifications
       const response = await fetch(`/api/timesheets/${timesheet.id}/adjust`, {

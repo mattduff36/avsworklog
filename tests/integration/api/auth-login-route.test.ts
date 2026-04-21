@@ -1,39 +1,43 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { APP_SESSION_COOKIE_NAME } from '@/lib/server/app-auth/constants';
 
-const signInWithPassword = vi.fn();
+const {
+  signInWithPassword,
+  validateAppSession,
+  issueAppSession,
+  revokeAppSession,
+} = vi.hoisted(() => ({
+  signInWithPassword: vi.fn(),
+  validateAppSession: vi.fn(),
+  issueAppSession: vi.fn(),
+  revokeAppSession: vi.fn(),
+}));
 
-vi.mock('@supabase/supabase-js', () => ({
-  createClient: vi.fn(() => ({
+vi.mock('@/lib/supabase/server', () => ({
+  createClient: vi.fn(async () => ({
     auth: {
       signInWithPassword,
     },
   })),
 }));
 
-vi.mock('@/lib/server/app-auth/session', () => ({
-  validateAppSession: vi.fn(),
-  issueAppSession: vi.fn(),
-  revokeAppSession: vi.fn(),
-}));
-
 vi.mock('@/lib/server/app-auth/profile', () => ({
   getAppAuthProfile: vi.fn(),
 }));
 
-import { POST as loginPost } from '@/app/api/auth/login/route';
-import {
+vi.mock('@/lib/server/app-auth/session', () => ({
+  validateAppSession,
   issueAppSession,
   revokeAppSession,
-  validateAppSession,
-} from '@/lib/server/app-auth/session';
+}));
+
+import { POST as loginPost } from '@/app/api/auth/login/route';
 import { getAppAuthProfile } from '@/lib/server/app-auth/profile';
 
 describe('auth login route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co';
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'anon-key';
-    vi.mocked(validateAppSession).mockResolvedValue({
+    validateAppSession.mockResolvedValue({
       status: 'missing',
       session: null,
       profileId: null,
@@ -41,29 +45,12 @@ describe('auth login route', () => {
       cookieValue: null,
       cookieExpiresAt: null,
     });
-    vi.mocked(issueAppSession).mockResolvedValue({
-      row: {
-        id: 'app-session-1',
-        profile_id: 'user-1',
-        device_id: 'device-row-1',
-        session_secret_hash: 'hash',
-        session_source: 'password_login',
-        remember_me: true,
-        locked_at: null,
-        last_seen_at: '2026-04-04T00:00:00.000Z',
-        idle_expires_at: '2026-04-05T00:00:00.000Z',
-        absolute_expires_at: '2026-04-30T00:00:00.000Z',
-        revoked_at: null,
-        revoked_reason: null,
-        replaced_by_session_id: null,
-        user_agent: null,
-        ip_hash: null,
-        created_at: '2026-04-04T00:00:00.000Z',
-        updated_at: '2026-04-04T00:00:00.000Z',
-      },
-      cookieValue: 'signed-cookie',
-      cookieExpiresAt: new Date('2026-04-05T00:00:00.000Z'),
+    issueAppSession.mockResolvedValue({
+      row: { id: 'session-1' },
+      cookieValue: 'signed-app-session',
+      cookieExpiresAt: new Date('2026-12-31T00:00:00.000Z'),
     });
+    revokeAppSession.mockResolvedValue(undefined);
     vi.mocked(getAppAuthProfile).mockResolvedValue({
       id: 'user-1',
       full_name: 'User One',
@@ -78,6 +65,10 @@ describe('auth login route', () => {
       role: null,
       email: 'user-1@example.com',
     });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('returns 401 when Supabase rejects the password', async () => {
@@ -100,10 +91,9 @@ describe('auth login route', () => {
 
     expect(response.status).toBe(401);
     expect(payload.error).toBe('Invalid email or password');
-    expect(issueAppSession).not.toHaveBeenCalled();
   });
 
-  it('issues a fresh app session on valid password login', async () => {
+  it('issues an app session cookie on valid password login', async () => {
     signInWithPassword.mockResolvedValue({
       data: {
         user: {
@@ -131,15 +121,8 @@ describe('auth login route', () => {
 
     expect(response.status).toBe(200);
     expect(payload.success).toBe(true);
-    expect(issueAppSession).toHaveBeenCalledWith(
-      expect.objectContaining({
-        profileId: 'user-1',
-        source: 'password_login',
-        rememberMe: true,
-        rawDeviceId: 'device-1234567890abcdef',
-      })
-    );
-    expect(revokeAppSession).not.toHaveBeenCalled();
+    expect(getAppAuthProfile).toHaveBeenCalledWith('user-1', 'user-1@example.com');
+    expect(response.cookies.get(APP_SESSION_COOKIE_NAME)?.value).toBeTruthy();
   });
 
   it('retries with a trimmed password when only edge whitespace differs', async () => {

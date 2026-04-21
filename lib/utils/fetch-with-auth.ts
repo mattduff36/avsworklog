@@ -38,11 +38,7 @@ function shouldHandleAuthRecovery(input: string | URL | Request): boolean {
     return false;
   }
 
-  if (
-    requestUrl.pathname === '/api/auth/login' ||
-    requestUrl.pathname === '/api/auth/logout' ||
-    requestUrl.pathname === '/api/auth/session'
-  ) {
+  if (requestUrl.pathname.startsWith('/api/auth/')) {
     return false;
   }
 

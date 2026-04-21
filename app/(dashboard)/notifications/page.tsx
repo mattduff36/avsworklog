@@ -32,6 +32,7 @@ import { toast } from 'sonner';
 import type { NotificationItem } from '@/types/messages';
 import type { NotificationPreference, NotificationModuleKey } from '@/types/notifications';
 import { NOTIFICATION_MODULES } from '@/types/notifications';
+import { NuqsClientAdapter } from '@/components/providers/NuqsClientAdapter';
 
 // Dynamic imports for modal components
 const BlockingMessageModal = dynamic(() => import('@/components/messages/BlockingMessageModal').then(m => ({ default: m.BlockingMessageModal })), { ssr: false });
@@ -45,7 +46,7 @@ const MODULE_ICONS: Record<string, React.ComponentType<{ className?: string }>> 
   'ClipboardCheck': ClipboardCheck,
 };
 
-export default function NotificationsPage() {
+function NotificationsContent() {
   const { isAdmin, isManager } = useAuth();
   
   // Deep-link query param from notification panel
@@ -674,5 +675,13 @@ export default function NotificationsPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function NotificationsPage() {
+  return (
+    <NuqsClientAdapter>
+      <NotificationsContent />
+    </NuqsClientAdapter>
   );
 }

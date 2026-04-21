@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getAccountSwitcherDisabledResponse } from '@/lib/server/account-switch-route-helpers';
 import { clearLegacySupabaseCookies } from '@/lib/server/app-auth/response';
 import { setAppSessionCookieInResponse } from '@/lib/server/app-auth/cookies';
 import { lockCurrentAppSession } from '@/lib/server/app-auth/session';
 
 export async function POST(request: NextRequest) {
+  const disabledResponse = getAccountSwitcherDisabledResponse();
+  if (disabledResponse) {
+    return disabledResponse;
+  }
+
   try {
     const locked = await lockCurrentAppSession();
     const response = NextResponse.json({ success: true });

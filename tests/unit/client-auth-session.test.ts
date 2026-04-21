@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 describe('loadClientAuthSession', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
     vi.resetModules();
   });
@@ -40,6 +41,8 @@ describe('loadClientAuthSession', () => {
   });
 
   it('returns a locked result when the session payload is locked', async () => {
+    vi.stubEnv('NEXT_PUBLIC_ACCOUNT_SWITCHER_ENABLED', 'true');
+
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => new Response(
@@ -61,6 +64,31 @@ describe('loadClientAuthSession', () => {
     const result = await loadClientAuthSession();
 
     expect(result.status).toBe('locked');
+    expect(result.payload?.locked).toBe(true);
+  });
+
+  it('treats a locked payload as authenticated when account switch is disabled', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(
+        JSON.stringify({
+          authenticated: true,
+          locked: true,
+          user: { id: 'user-123', email: 'locked@example.com' },
+        }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      ))
+    );
+
+    const { loadClientAuthSession } = await import('@/lib/app-auth/client-session');
+    const result = await loadClientAuthSession();
+
+    expect(result.status).toBe('authenticated');
     expect(result.payload?.locked).toBe(true);
   });
 
@@ -129,6 +157,58 @@ describe('loadClientAuthSession', () => {
 
     const recoveredResult = await loadClientAuthSession();
     expect(recoveredResult.status).toBe('authenticated');
+    expect(getClientServiceOutage()).toBeNull();
+  });
+
+  it('preserves an existing outage when a later transport error has no status', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(async () => new Response(
+        JSON.stringify({ error: 'Temporary failure' }),
+        {
+          status: 503,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      ))
+      .mockImplementationOnce(async () => {
+        throw new TypeError('Failed to fetch');
+      });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { loadClientAuthSession } = await import('@/lib/app-auth/client-session');
+    const { getClientServiceOutage } = await import('@/lib/app-auth/client-service-health');
+
+    const failedResult = await loadClientAuthSession();
+    expect(failedResult.status).toBe('error');
+    expect(getClientServiceOutage()).toMatchObject({
+      source: 'auth-session',
+      status: 503,
+    });
+
+    const transportErrorResult = await loadClientAuthSession();
+    expect(transportErrorResult.status).toBe('error');
+    expect(transportErrorResult.responseStatus).toBeNull();
+    expect(getClientServiceOutage()).toMatchObject({
+      source: 'auth-session',
+      status: 503,
+    });
+  });
+
+  it('does not latch outage state for transient transport failures', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      throw new TypeError('Failed to fetch');
+    }));
+
+    const { loadClientAuthSession } = await import('@/lib/app-auth/client-session');
+    const { getClientServiceOutage } = await import('@/lib/app-auth/client-service-health');
+
+    const failedResult = await loadClientAuthSession();
+
+    expect(failedResult.status).toBe('error');
+    expect(failedResult.responseStatus).toBeNull();
     expect(getClientServiceOutage()).toBeNull();
   });
 });

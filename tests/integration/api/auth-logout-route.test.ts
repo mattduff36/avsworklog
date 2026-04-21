@@ -1,6 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_SESSION_COOKIE_NAME } from '@/lib/server/app-auth/constants';
 
+const {
+  signOut,
+  revokeAppSession,
+} = vi.hoisted(() => ({
+  signOut: vi.fn(),
+  revokeAppSession: vi.fn(),
+}));
+
 vi.mock('@/lib/server/account-switch-device', () => ({
   clearAccountSwitchDevicePin: vi.fn(),
   parseAccountSwitchDeviceId: vi.fn(() => null),
@@ -10,17 +18,27 @@ vi.mock('@/lib/server/account-switch-audit', () => ({
   createAccountSwitchAuditEvent: vi.fn(),
 }));
 
+vi.mock('@/lib/supabase/server', () => ({
+  createClient: vi.fn(async () => ({
+    auth: {
+      signOut,
+    },
+  })),
+}));
+
 vi.mock('@/lib/server/app-auth/session', () => ({
-  revokeAppSession: vi.fn(),
   validateAppSession: vi.fn(),
+  revokeAppSession,
 }));
 
 import { POST as logoutPost } from '@/app/api/auth/logout/route';
-import { revokeAppSession, validateAppSession } from '@/lib/server/app-auth/session';
+import { validateAppSession } from '@/lib/server/app-auth/session';
 
 describe('auth logout route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    signOut.mockResolvedValue({ error: null });
+    revokeAppSession.mockResolvedValue(undefined);
     vi.mocked(validateAppSession).mockResolvedValue({
       status: 'active',
       session: {
@@ -34,8 +52,8 @@ describe('auth logout route', () => {
     } as never);
   });
 
-  it('still clears auth cookies when logout revocation throws', async () => {
-    vi.mocked(revokeAppSession).mockRejectedValue(new Error('database down'));
+  it('still clears auth cookies when Supabase sign-out throws', async () => {
+    signOut.mockRejectedValue(new Error('network down'));
 
     const request = new Request('http://localhost/api/auth/logout', {
       method: 'POST',
@@ -50,7 +68,7 @@ describe('auth logout route', () => {
     const payload = await response.json();
 
     expect(response.status).toBe(500);
-    expect(payload.error).toBe('database down');
+    expect(payload.error).toBe('network down');
     expect(response.cookies.get(APP_SESSION_COOKIE_NAME)?.value).toBe('');
     expect(response.cookies.get('avs_account_locked')?.value).toBe('');
     expect(response.cookies.get('sb-project-auth-token')?.value).toBe('');

@@ -50,6 +50,7 @@ import { AbsencesApprovalTable, ABSENCE_COLUMN_VISIBILITY_STORAGE_KEY, DEFAULT_A
 import type { AbsenceColumnVisibility } from './components/AbsencesApprovalTable';
 import { ProcessTimesheetModal } from './components/ProcessTimesheetModal';
 import { PageLoader } from '@/components/ui/page-loader';
+import { NuqsClientAdapter } from '@/components/providers/NuqsClientAdapter';
 import {
   type ApprovedAbsenceForTimesheet,
   getTimesheetWeekIsoBounds,
@@ -1612,9 +1613,11 @@ function AbsenceApprovalCard({
 
 export default function ApprovalsPage() {
   return (
-    <Suspense fallback={<PageLoader message="Loading approvals..." />}>
-      <ApprovalsContent />
-    </Suspense>
+    <NuqsClientAdapter>
+      <Suspense fallback={<PageLoader message="Loading approvals..." />}>
+        <ApprovalsContent />
+      </Suspense>
+    </NuqsClientAdapter>
   );
 }
 

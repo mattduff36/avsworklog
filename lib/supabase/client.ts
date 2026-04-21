@@ -1,145 +1,18 @@
-import {
-  createClient as createSupabaseClient,
-  type Session,
-  type SupabaseClient,
-  type User,
-} from '@supabase/supabase-js'
-import {
-  clearClientServiceOutage,
-  getClientServiceOutage,
-  reportClientServiceOutage,
-  shouldTripClientServiceOutage,
-} from '@/lib/app-auth/client-service-health'
-import { loadClientAuthSession, type ClientAuthSessionResponse } from '@/lib/app-auth/client-session'
+import { createBrowserClient } from '@supabase/ssr'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { getViewAsRoleId, getViewAsTeamId } from '@/lib/utils/view-as-cookie'
-import { withAuthOverrides } from '@/lib/supabase/with-auth-overrides'
-import { createStatusError, getErrorStatus } from '@/lib/utils/http-error'
 import type { Database } from '@/types/database'
 
 type BrowserSupabaseClient = SupabaseClient<Database>
 
 let client: BrowserSupabaseClient | null = null
-let cachedDataToken: { token: string; expiresAt: number } | null = null
-let pendingDataTokenPromise: Promise<string | null> | null = null
-let lastDataTokenFailureStatus: number | null = null
-
-async function fetchJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
-  const response = await fetch(input, {
-    ...init,
-    cache: 'no-store',
-    headers: {
-      ...(init?.headers || {}),
-      'Cache-Control': 'no-cache',
-    },
-  })
-
-  const rawPayload = await response.text()
-  let payload: (T & { error?: string }) | null = null
-
-  if (rawPayload) {
-    try {
-      payload = JSON.parse(rawPayload) as T & { error?: string }
-    } catch (error) {
-      throw createStatusError('Invalid response payload', response.status, error)
-    }
-  }
-
-  if (!response.ok) {
-    throw createStatusError(payload?.error || `HTTP ${response.status}`, response.status)
-  }
-
-  return payload as T
-}
-
-function buildSyntheticUser(sessionResponse: ClientAuthSessionResponse): User | null {
-  if (!sessionResponse.user?.id) {
-    return null
-  }
-
-  const nowIso = new Date().toISOString()
-  return {
-    id: sessionResponse.user.id,
-    app_metadata: {
-      provider: 'app_session',
-      providers: ['app_session'],
-    },
-    user_metadata: {},
-    aud: 'authenticated',
-    created_at: nowIso,
-    email: sessionResponse.user.email || undefined,
-  } as User
-}
-
-async function getCurrentAuthSessionResponse(): Promise<ClientAuthSessionResponse> {
-  const result = await loadClientAuthSession()
-  return result.payload || {
-    authenticated: false,
-    locked: false,
-    user: null,
-    data_token_available: false,
-  }
-}
-
-async function loadDataToken(): Promise<string | null> {
-  if (cachedDataToken && cachedDataToken.expiresAt * 1000 > Date.now() + 30_000) {
-    return cachedDataToken.token
-  }
-
-  if (pendingDataTokenPromise) {
-    return pendingDataTokenPromise
-  }
-
-  pendingDataTokenPromise = (async () => {
-    try {
-      const response = await fetchJson<{ token: string; expires_at: number }>('/api/auth/data-token')
-      cachedDataToken = {
-        token: response.token,
-        expiresAt: response.expires_at,
-      }
-      lastDataTokenFailureStatus = null
-      clearClientServiceOutage('data-token')
-      return response.token
-    } catch (error) {
-      cachedDataToken = null
-      lastDataTokenFailureStatus = getErrorStatus(error)
-      if (shouldTripClientServiceOutage(lastDataTokenFailureStatus)) {
-        reportClientServiceOutage(
-          'data-token',
-          lastDataTokenFailureStatus,
-          'We could not obtain a data access token, so direct data requests have been paused.'
-        )
-      } else {
-        clearClientServiceOutage('data-token')
-      }
-      return null
-    } finally {
-      pendingDataTokenPromise = null
-    }
-  })()
-
-  return pendingDataTokenPromise
-}
-
-async function getDataTokenOrThrow(): Promise<string> {
-  const token = await loadDataToken()
-  if (token) {
-    return token
-  }
-
-  throw createStatusError(
-    lastDataTokenFailureStatus === 423 ? 'Session is locked' : 'Unauthorized',
-    lastDataTokenFailureStatus ?? 401
-  )
-}
 
 export function invalidateCachedDataToken(): void {
-  cachedDataToken = null
-  lastDataTokenFailureStatus = null
-  clearClientServiceOutage('data-token')
+  // Native Supabase SSR sessions manage token refresh internally.
 }
 
 export function getLastDataTokenFailureStatus(): number | null {
-  return lastDataTokenFailureStatus
+  return null
 }
 
 export function createClient(): BrowserSupabaseClient {
@@ -160,125 +33,30 @@ export function createClient(): BrowserSupabaseClient {
     throw new Error('Supabase environment variables are not set')
   }
 
-  try {
-    const baseClient = createSupabaseClient<Database>(
-      supabaseUrl,
-      supabaseAnonKey,
-      {
-        accessToken: async () => {
-          const token = await getDataTokenOrThrow()
-          baseClient.realtime.setAuth(token)
-          return token
-        },
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-          detectSessionInUrl: false,
-        },
-        global: {
-          // Inject view-as headers on every request (read cookies dynamically)
-          fetch: (input, init) => {
-            const outage = getClientServiceOutage()
-            if (outage) {
-              const requestUrl = typeof input === 'string'
-                ? input
-                : input instanceof Request
-                  ? input.url
-                  : String(input)
-
-              try {
-                const resolvedUrl = new URL(requestUrl, window.location.origin)
-                const supabaseOrigin = new URL(supabaseUrl).origin
-                if (resolvedUrl.origin === supabaseOrigin) {
-                  return Promise.reject(createStatusError(outage.message, outage.status))
-                }
-              } catch {
-                // Ignore URL parsing issues and let the request proceed.
-              }
+  client = createBrowserClient<Database>(
+    supabaseUrl,
+    supabaseAnonKey,
+    {
+      global: {
+        fetch: (input, init) => {
+          const viewAsRoleId = getViewAsRoleId()
+          const viewAsTeamId = getViewAsTeamId()
+          if (viewAsRoleId || viewAsTeamId) {
+            const headers = new Headers(init?.headers)
+            if (viewAsRoleId) {
+              headers.set('x-view-as-role-id', viewAsRoleId)
             }
-
-            const viewAsRoleId = getViewAsRoleId()
-            const viewAsTeamId = getViewAsTeamId()
-            if (viewAsRoleId || viewAsTeamId) {
-              const headers = new Headers(init?.headers)
-              if (viewAsRoleId) {
-                headers.set('x-view-as-role-id', viewAsRoleId)
-              }
-              if (viewAsTeamId) {
-                headers.set('x-view-as-team-id', viewAsTeamId)
-              }
-              return globalThis.fetch(input, { ...init, headers })
+            if (viewAsTeamId) {
+              headers.set('x-view-as-team-id', viewAsTeamId)
             }
-            return globalThis.fetch(input, init)
-          },
+            return globalThis.fetch(input, { ...init, headers })
+          }
+
+          return globalThis.fetch(input, init)
         },
-      }
-    )
-
-    client = withAuthOverrides(baseClient, {
-      getUser: (async () => {
-        const sessionResponse = await getCurrentAuthSessionResponse()
-        return {
-          data: {
-            user: buildSyntheticUser(sessionResponse) as User,
-          },
-          error: null,
-        }
-      }) as typeof baseClient.auth.getUser,
-      getSession: (async () => {
-        const sessionResponse = await getCurrentAuthSessionResponse()
-        const user = buildSyntheticUser(sessionResponse)
-        if (!user || sessionResponse.locked) {
-          return {
-            data: {
-              session: null,
-            },
-            error: null,
-          }
-        }
-
-        const token = await loadDataToken()
-        if (!token) {
-          return {
-            data: {
-              session: null,
-            },
-            error: null,
-          }
-        }
-
-        const expiresAt = cachedDataToken?.expiresAt ?? Math.floor(Date.now() / 1000)
-        return {
-          data: {
-            session: {
-              access_token: token,
-              refresh_token: '',
-              token_type: 'bearer',
-              expires_in: Math.max(0, expiresAt - Math.floor(Date.now() / 1000)),
-              expires_at: expiresAt,
-              user,
-            } as Session,
-          },
-          error: null,
-        }
-      }) as typeof baseClient.auth.getSession,
-      signOut: (async () => {
-        invalidateCachedDataToken()
-        await fetch('/api/auth/logout', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({}),
-        }).catch(() => undefined)
-        return {
-          error: null,
-        }
-      }) as typeof baseClient.auth.signOut,
-    }) as BrowserSupabaseClient
-  } catch (error) {
-    throw error
-  }
+      },
+    }
+  ) as BrowserSupabaseClient
 
   return client as BrowserSupabaseClient
 }

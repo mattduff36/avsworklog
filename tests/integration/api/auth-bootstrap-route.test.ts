@@ -2,66 +2,79 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { APP_SESSION_COOKIE_NAME } from '@/lib/server/app-auth/constants';
 
-vi.mock('@supabase/ssr', () => ({
+const {
+  getUser,
+  validateAppSession,
+  issueAppSession,
+  createServerClient,
+} = vi.hoisted(() => ({
+  getUser: vi.fn(),
+  validateAppSession: vi.fn(),
+  issueAppSession: vi.fn(),
   createServerClient: vi.fn(),
 }));
 
-vi.mock('@/lib/server/app-auth/session', () => ({
-  validateAppSession: vi.fn(),
-  issueAppSession: vi.fn(),
+vi.mock('@supabase/ssr', () => ({
+  createServerClient: createServerClient.mockImplementation(() => ({
+    auth: {
+      getUser,
+    },
+  })),
 }));
 
-vi.mock('@/lib/server/app-auth/response', async () => {
-  const actual = await vi.importActual<typeof import('@/lib/server/app-auth/response')>(
-    '@/lib/server/app-auth/response'
-  );
-  return {
-    ...actual,
-    clearAllAuthCookies: vi.fn(),
-  };
-});
+vi.mock('@/lib/server/app-auth/session', () => ({
+  validateAppSession,
+  issueAppSession,
+}));
 
 import { GET as bootstrapGet } from '@/app/api/auth/bootstrap/route';
-import { validateAppSession } from '@/lib/server/app-auth/session';
 
 describe('auth bootstrap route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    validateAppSession.mockResolvedValue({
+      status: 'missing',
+      session: null,
+      profileId: null,
+      email: null,
+      cookieValue: null,
+      cookieExpiresAt: null,
+    });
+    issueAppSession.mockResolvedValue({
+      row: { id: 'session-1' },
+      cookieValue: 'signed-app-session',
+      cookieExpiresAt: new Date('2026-12-31T00:00:00.000Z'),
+    });
+    getUser.mockResolvedValue({
+      data: {
+        user: {
+          id: 'user-1',
+          email: 'user-1@example.com',
+        },
+      },
+    });
   });
 
-  it('applies refreshed validation cookies on early redirect', async () => {
-    vi.mocked(validateAppSession).mockResolvedValue({
-      status: 'active',
-      session: {
-        id: 'session-1',
-        profile_id: 'user-1',
-        device_id: null,
-        session_secret_hash: 'hash',
-        session_source: 'password_login',
-        remember_me: true,
-        locked_at: null,
-        last_seen_at: '2026-04-04T00:00:00.000Z',
-        idle_expires_at: '2026-04-05T00:00:00.000Z',
-        absolute_expires_at: '2026-04-30T00:00:00.000Z',
-        revoked_at: null,
-        revoked_reason: null,
-        replaced_by_session_id: null,
-        user_agent: null,
-        ip_hash: null,
-        created_at: '2026-04-04T00:00:00.000Z',
-        updated_at: '2026-04-04T00:00:00.000Z',
+  it('redirects authenticated users to the requested destination and issues an app-session cookie', async () => {
+    const request = new NextRequest('http://localhost/api/auth/bootstrap?returnTo=%2Fdashboard');
+    const response = await bootstrapGet(request);
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('http://localhost/dashboard');
+    expect(response.cookies.get(APP_SESSION_COOKIE_NAME)?.value).toBeTruthy();
+  });
+
+  it('redirects unauthenticated users back to login', async () => {
+    getUser.mockResolvedValueOnce({
+      data: {
+        user: null,
       },
-      profileId: 'user-1',
-      email: 'user-1@example.com',
-      cookieValue: 'rotated-cookie-value',
-      cookieExpiresAt: new Date('2026-04-05T00:00:00.000Z'),
     });
 
     const request = new NextRequest('http://localhost/api/auth/bootstrap?returnTo=%2Fdashboard');
     const response = await bootstrapGet(request);
 
     expect(response.status).toBe(307);
-    expect(response.headers.get('location')).toBe('http://localhost/dashboard');
-    expect(response.cookies.get(APP_SESSION_COOKIE_NAME)?.value).toBe('rotated-cookie-value');
+    expect(response.headers.get('location')).toBe('http://localhost/login');
   });
 });

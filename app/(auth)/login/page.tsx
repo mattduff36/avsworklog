@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { isAccountSwitcherEnabled } from '@/lib/account-switch/feature-flag';
 import {
   getAccountSwitchDeviceLabel,
   getOrCreateAccountSwitchDeviceId,
@@ -34,11 +35,11 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const deviceId = getOrCreateAccountSwitchDeviceId();
+      const accountSwitcherEnabled = isAccountSwitcherEnabled();
       const { error } = await signIn(email, password, {
         rememberMe,
-        deviceId,
-        deviceLabel: getAccountSwitchDeviceLabel(),
+        deviceId: accountSwitcherEnabled ? getOrCreateAccountSwitchDeviceId() : null,
+        deviceLabel: accountSwitcherEnabled ? getAccountSwitchDeviceLabel() : null,
       });
 
       if (error) {

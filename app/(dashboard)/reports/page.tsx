@@ -12,6 +12,7 @@ import { AppPageShell } from '@/components/layout/AppPageShell';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { toast } from 'sonner';
 import { useQueryState } from 'nuqs';
+import { NuqsClientAdapter } from '@/components/providers/NuqsClientAdapter';
 import {
   Calendar,
   ClipboardList,
@@ -268,7 +269,7 @@ function ReportDateRangeCard({
   );
 }
 
-export default function ReportsPage() {
+function ReportsContent() {
   const { hasPermission: canViewReports, loading: reportsPermissionLoading } = usePermissionCheck('reports');
   const [tabParam, setTabParam] = useQueryState('tab', {
     defaultValue: 'overview',
@@ -906,5 +907,13 @@ export default function ReportsPage() {
         </TabsContent>
       </Tabs>
     </AppPageShell>
+  );
+}
+
+export default function ReportsPage() {
+  return (
+    <NuqsClientAdapter>
+      <ReportsContent />
+    </NuqsClientAdapter>
   );
 }

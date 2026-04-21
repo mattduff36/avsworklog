@@ -49,6 +49,7 @@ import {
   VanInspectionsColumnVisibility,
   VanInspectionsListTable,
 } from './components/VanInspectionsListTable';
+import { NuqsClientAdapter } from '@/components/providers/NuqsClientAdapter';
 
 interface InspectionWithVehicle extends VanInspection {
   vans: {
@@ -1013,8 +1014,10 @@ function InspectionsContent() {
 
 export default function InspectionsPage() {
   return (
-    <Suspense fallback={<PageLoader message="Loading van inspections..." />}>
-      <InspectionsContent />
-    </Suspense>
+    <NuqsClientAdapter>
+      <Suspense fallback={<PageLoader message="Loading van inspections..." />}>
+        <InspectionsContent />
+      </Suspense>
+    </NuqsClientAdapter>
   );
 }

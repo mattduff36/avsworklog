@@ -1,4 +1,6 @@
 import { headers } from 'next/headers';
+import { isAccountSwitcherEnabledServer } from '@/lib/account-switch/feature-flag';
+import { createClient as createServerSupabaseClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import {
   APP_SESSION_ABSOLUTE_HOURS,
@@ -406,16 +408,18 @@ export async function validateAppSession(
   }
 
   let currentRow = row;
-  let isLocked = Boolean(currentRow.locked_at);
+  const lockEnforced = isAccountSwitcherEnabledServer();
+  let isLocked = lockEnforced && Boolean(currentRow.locked_at);
   const email = options.includeEmail ? await getAuthUserEmail(currentRow.profile_id) : null;
   let nextCookieValue: string | null = null;
   let nextCookieExpiresAt: Date | null = null;
 
   const needsRotation = shouldRotateSession(currentRow, now);
+  const needsLockReset = !lockEnforced && Boolean(currentRow.locked_at);
   const needsLockFlagSync = cookiePayload.locked !== isLocked;
   const needsSeenUpdate = now.getTime() - new Date(currentRow.last_seen_at).getTime() >= 60 * 1000;
 
-  if (needsRotation || needsLockFlagSync || needsSeenUpdate) {
+  if (needsRotation || needsLockReset || needsLockFlagSync || needsSeenUpdate) {
     const refreshed = await updateSessionActivity(currentRow, {
       rotate: needsRotation,
       locked: isLocked,
@@ -461,9 +465,41 @@ export async function lockCurrentAppSession(): Promise<{
   cookieValue: string;
   cookieExpiresAt: Date;
 }> {
+  if (!isAccountSwitcherEnabledServer()) {
+    throw new Error('Account switch is disabled');
+  }
+
   const validation = await validateAppSession({ allowLocked: true });
   if (!validation.session || validation.status === 'missing' || validation.status === 'invalid') {
-    throw new Error('No active app session to lock');
+    const current = await getCurrentAuthenticatedProfileFromSupabase({ includeEmail: true });
+    if (!current) {
+      throw new Error('No active session to lock');
+    }
+
+    const nextSession = await issueAppSession({
+      profileId: current.profile.id,
+      source: 'session_bootstrap',
+      rememberMe: true,
+      actorProfileId: current.profile.id,
+      lockSession: true,
+    });
+
+    await markDeviceLocked(nextSession.row.device_id);
+    await createAccountSwitchAuditEvent({
+      profileId: nextSession.row.profile_id,
+      actorProfileId: nextSession.row.profile_id,
+      eventType: 'app_session_locked',
+      metadata: {
+        app_session_id: nextSession.row.id,
+        device_id: nextSession.row.device_id,
+      },
+    });
+
+    return {
+      row: nextSession.row,
+      cookieValue: nextSession.cookieValue,
+      cookieExpiresAt: nextSession.cookieExpiresAt,
+    };
   }
 
   const refreshed = await updateSessionActivity(validation.session, {
@@ -499,17 +535,47 @@ export async function getCurrentAuthenticatedProfile(
 ) {
   const validation = await validateAppSession(options);
   if (
-    !validation.session ||
-    validation.status === 'missing' ||
-    validation.status === 'invalid' ||
-    (validation.status === 'locked' && options.allowLocked !== true)
+    validation.session &&
+    validation.status !== 'missing' &&
+    validation.status !== 'invalid' &&
+    (validation.status !== 'locked' || options.allowLocked === true)
   ) {
+    const profile = await getAppAuthProfile(validation.session.profile_id, validation.email);
+    return {
+      validation,
+      profile,
+    };
+  }
+
+  if (validation.status === 'locked' && options.allowLocked !== true) {
     return null;
   }
 
-  const profile = await getAppAuthProfile(validation.session.profile_id, validation.email);
+  return getCurrentAuthenticatedProfileFromSupabase(options);
+}
+
+export async function getCurrentAuthenticatedProfileFromSupabase(
+  options: { includeEmail?: boolean } = {}
+) {
+  const supabase = await createServerSupabaseClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
+
+  if (error || !user) {
+    return null;
+  }
+
+  const email = options.includeEmail ? user.email || null : null;
+  const profile = await getAppAuthProfile(user.id, email);
+
   return {
-    validation,
+    validation: {
+      status: 'active' as const,
+      session: null,
+      profileId: user.id,
+      email,
+      cookieValue: null,
+      cookieExpiresAt: null,
+    },
     profile,
   };
 }

@@ -29,7 +29,6 @@ export async function GET() {
     can_edit_basic_fields: canEditOwnBasicProfileFields(current.profile),
     data_token_available: Boolean(process.env.SUPABASE_JWT_SECRET),
   });
-
   applyValidationCookieIfNeeded(response, current.validation);
   return response;
 }

@@ -49,6 +49,7 @@ import {
   PlantInspectionsColumnVisibility,
   PlantInspectionsListTable,
 } from './components/PlantInspectionsListTable';
+import { NuqsClientAdapter } from '@/components/providers/NuqsClientAdapter';
 
 interface InspectionWithPlant extends PlantInspection {
   plant: {
@@ -987,8 +988,10 @@ function PlantInspectionsContent() {
 
 export default function PlantInspectionsPage() {
   return (
-    <Suspense fallback={<PageLoader message="Loading plant inspections..." />}>
-      <PlantInspectionsContent />
-    </Suspense>
+    <NuqsClientAdapter>
+      <Suspense fallback={<PageLoader message="Loading plant inspections..." />}>
+        <PlantInspectionsContent />
+      </Suspense>
+    </NuqsClientAdapter>
   );
 }

@@ -19,7 +19,7 @@ function normalizeStatus(status?: number | null): number {
 }
 
 export function shouldTripClientServiceOutage(status?: number | null): boolean {
-  return typeof status !== 'number' || status >= 500;
+  return typeof status === 'number' && status >= 500;
 }
 
 export function reportClientServiceOutage(

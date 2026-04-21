@@ -21,6 +21,7 @@ import {
   type ClientAuthSessionResponse,
   type ClientAuthSessionResult,
 } from '@/lib/app-auth/client-session';
+import { shouldDeferUnauthenticatedHandling } from '@/lib/app-auth/client-auth-policy';
 import {
   buildSessionSnapshot,
   getSessionTransition,
@@ -162,16 +163,6 @@ const BACKGROUND_AUTH_REFRESH_COOLDOWN_MS = 30_000;
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function extractErrorMessage(err: unknown): string {
-  if (!err) return '';
-  if (err instanceof Error) return err.message || '';
-  if (typeof err === 'string') return err;
-  if (typeof err === 'object' && err !== null && 'message' in err) {
-    return String((err as { message?: unknown }).message || '');
-  }
-  return '';
-}
-
 function buildSyntheticUser(payload: ClientAuthSessionResponse): User | null {
   if (!payload.user?.id) {
     return null;
@@ -181,8 +172,8 @@ function buildSyntheticUser(payload: ClientAuthSessionResponse): User | null {
     id: payload.user.id,
     email: payload.user.email || undefined,
     app_metadata: {
-      provider: 'app_session',
-      providers: ['app_session'],
+      provider: 'supabase_ssr',
+      providers: ['supabase'],
     },
     user_metadata: {},
     aud: 'authenticated',
@@ -460,18 +451,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     if (result.status === 'unauthenticated') {
+      if (shouldDeferUnauthenticatedHandling(reason, { silent: options?.silent })) {
+        setLoading(false);
+        return result;
+      }
+
       await onAuthTransition(getUnauthenticatedSessionSnapshot(), reason);
       clearLocalAuthState();
       setLoading(false);
       void redirectToLogin();
       return result;
-    }
-
-    if (!options?.silent) {
-      const errorMessage = extractErrorMessage(result.error);
-      if (errorMessage) {
-        console.warn('Failed to load auth session:', errorMessage);
-      }
     }
 
     setLoading(false);
@@ -849,8 +838,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+export function useOptionalAuth(): AuthContextValue | null {
+  return useContext(AuthContext);
+}
+
 export function useAuth(): AuthContextValue {
-  const context = useContext(AuthContext);
+  const context = useOptionalAuth();
   if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }

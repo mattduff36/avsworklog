@@ -28,8 +28,8 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: supabaseImageRemotePatterns,
   },
-  // Mark server-only packages to prevent client-side bundling
-  serverExternalPackages: ['exceljs'],
+  // Externalize packages that have been unreliable in bundled server chunks on Windows.
+  serverExternalPackages: ['exceljs', 'nuqs'],
   eslint: {
     ignoreDuringBuilds: false,
   },
