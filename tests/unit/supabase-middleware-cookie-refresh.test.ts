@@ -1,12 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
+import { APP_SESSION_COOKIE_NAME } from '@/lib/server/app-auth/constants';
 
-const { createServerClientMock } = vi.hoisted(() => ({
+const { createServerClientMock, verifyJwtHS256Mock } = vi.hoisted(() => ({
   createServerClientMock: vi.fn(),
+  verifyJwtHS256Mock: vi.fn(),
 }));
 
 vi.mock('@supabase/ssr', () => ({
   createServerClient: createServerClientMock,
+}));
+
+vi.mock('@/lib/server/app-auth/jwt', () => ({
+  verifyJwtHS256: verifyJwtHS256Mock,
 }));
 
 import { updateSession } from '@/lib/supabase/middleware';
@@ -39,11 +45,25 @@ function mockSupabaseMiddlewareAuth(options: MockMiddlewareOptions): void {
   }));
 }
 
+function createRequest(url: string, cookieHeader?: string): NextRequest {
+  return new NextRequest(url, {
+    headers: cookieHeader ? { Cookie: cookieHeader } : undefined,
+  });
+}
+
 describe('supabase middleware cookie refresh', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.supabase.co');
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'anon-key');
+    vi.stubEnv('APP_SESSION_SECRET', 'test-app-session-secret');
+    verifyJwtHS256Mock.mockResolvedValue({
+      sid: 'session-1',
+      secret: 'secret-1',
+      locked: false,
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      v: 1,
+    });
   });
 
   afterEach(() => {
@@ -52,7 +72,7 @@ describe('supabase middleware cookie refresh', () => {
 
   it('preserves refreshed cookies on root redirects for authenticated users', async () => {
     mockSupabaseMiddlewareAuth({
-      user: { id: 'user-1' },
+      user: null,
       cookiesToSet: [
         {
           name: 'sb-refresh-token',
@@ -62,7 +82,9 @@ describe('supabase middleware cookie refresh', () => {
       ],
     });
 
-    const response = await updateSession(new NextRequest('http://localhost/'));
+    const response = await updateSession(
+      createRequest('http://localhost/', `${APP_SESSION_COOKIE_NAME}=valid-app-session`)
+    );
 
     expect(response.status).toBe(307);
     expect(response.headers.get('location')).toBe('http://localhost/dashboard');
@@ -71,7 +93,7 @@ describe('supabase middleware cookie refresh', () => {
 
   it('preserves refreshed cookies on authenticated /login redirects', async () => {
     mockSupabaseMiddlewareAuth({
-      user: { id: 'user-2' },
+      user: null,
       cookiesToSet: [
         {
           name: 'sb-refresh-token',
@@ -81,7 +103,9 @@ describe('supabase middleware cookie refresh', () => {
       ],
     });
 
-    const response = await updateSession(new NextRequest('http://localhost/login'));
+    const response = await updateSession(
+      createRequest('http://localhost/login', `${APP_SESSION_COOKIE_NAME}=valid-app-session`)
+    );
 
     expect(response.status).toBe(307);
     expect(response.headers.get('location')).toBe('http://localhost/dashboard');
@@ -124,5 +148,38 @@ describe('supabase middleware cookie refresh', () => {
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
     expect(response.cookies.get('sb-refresh-token')?.value).toBe('');
+  });
+
+  it('clears legacy Supabase cookies and redirects protected pages to login', async () => {
+    mockSupabaseMiddlewareAuth({
+      user: { id: 'legacy-user' },
+    });
+    verifyJwtHS256Mock.mockResolvedValue(null);
+
+    const response = await updateSession(
+      createRequest('http://localhost/dashboard', 'sb-project-auth-token=legacy-token')
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('http://localhost/login?redirect=%2Fdashboard');
+    expect(response.cookies.get('sb-project-auth-token')?.value).toBe('');
+  });
+
+  it('returns a 401 for auth session requests that still rely on legacy cookies', async () => {
+    mockSupabaseMiddlewareAuth({
+      user: { id: 'legacy-user' },
+    });
+    verifyJwtHS256Mock.mockResolvedValue(null);
+
+    const response = await updateSession(
+      createRequest('http://localhost/api/auth/session', 'sb-project-auth-token=legacy-token')
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Legacy session expired',
+      code: 'LEGACY_SESSION_EXPIRED',
+    });
+    expect(response.cookies.get('sb-project-auth-token')?.value).toBe('');
   });
 });
