@@ -4,10 +4,8 @@
  * Automatically sends daily error summary email on first error of each day
  */
 
-import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { isClientSessionPausedMessage } from '@/lib/app-auth/session-error';
-import type { Database } from '@/types/database';
 import { getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
 
 export interface ErrorHandlingMetadata {
@@ -66,7 +64,6 @@ export interface ErrorLog {
 
 class ErrorLogger {
   private static instance: ErrorLogger;
-  private supabase = createClient();
   private queue: Omit<ErrorLog, 'id'>[] = [];
   private isProcessing = false;
   private isLogging = false; // Prevent recursive logging
@@ -632,16 +629,13 @@ class ErrorLogger {
         }
       }
       
-      // Get current user if available
-      const { data: { user } } = await this.supabase.auth.getUser();
-
       const errorLog: Omit<ErrorLog, 'id'> = {
         timestamp: new Date().toISOString(),
         error_message: errorObj.message || String(error),
         error_stack: errorObj.stack || null,
         error_type: errorObj.name || 'Error',
-        user_id: user?.id || null,
-        user_email: user?.email || null,
+        user_id: null,
+        user_email: null,
         page_url: typeof window !== 'undefined' ? window.location.href : 'N/A',
         user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A',
         component_name: componentName,
@@ -678,14 +672,21 @@ class ErrorLogger {
       const batch = [...this.queue];
       this.queue = [];
 
-      const { error } = await this.supabase
-        .from('error_logs')
-        .insert(batch as Database['public']['Tables']['error_logs']['Insert'][]);
+      const response = await fetch('/api/errors/log', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin',
+        keepalive: true,
+        body: JSON.stringify({ logs: batch }),
+      });
 
-      if (error) {
+      if (!response.ok) {
         // Put items back in queue if insert failed
         this.queue.unshift(...batch);
-        console.warn('Failed to save error logs to database:', error);
+        const payload = await response.json().catch(() => ({}));
+        console.warn('Failed to save error logs to database:', payload?.error || `HTTP ${response.status}`);
       } else {
         // After successfully logging error, check if we should send daily summary
         this.checkAndSendDailySummary();
@@ -738,12 +739,14 @@ class ErrorLogger {
    */
   public async clearAllLogs(): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await this.supabase
-        .from('error_logs')
-        .delete()
-        .gte('timestamp', '1970-01-01'); // Delete all
-
-      if (error) throw error;
+      const response = await fetch('/api/debug/error-logs', {
+        method: 'DELETE',
+        credentials: 'same-origin',
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.error || `HTTP ${response.status}`);
+      }
 
       return { success: true };
     } catch (err) {

@@ -3,8 +3,9 @@
  * Logs errors from API routes to the error_logs table
  */
 
-import { createClient } from '@/lib/supabase/server';
+import { insertErrorLogs } from '@/lib/server/error-logs';
 import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
+import type { Json } from '@/types/database';
 
 export interface ServerErrorLog {
   error_message: string;
@@ -15,7 +16,7 @@ export interface ServerErrorLog {
   page_url: string;
   user_agent: string;
   component_name: string | null;
-  additional_data: Record<string, unknown> | null;
+  additional_data: Json;
 }
 
 /**
@@ -99,7 +100,6 @@ export async function logServerError({
 }): Promise<void> {
   try {
     const errorObj = typeof error === 'string' ? new Error(error) : error;
-    const supabase = await createClient();
 
     // If user info not provided, try to get it from the app session
     let finalUserId = userId;
@@ -131,7 +131,7 @@ export async function logServerError({
         wasHandled: true,
         didShowMessage: null,
       },
-    };
+    } as Json;
 
     const errorLog: ServerErrorLog = {
       error_message: enhancedMessage,
@@ -145,18 +145,11 @@ export async function logServerError({
       additional_data: enrichedData,
     };
 
-    // Insert into database
-    const { error: insertError } = await supabase
-      .from('error_logs')
-      .insert([{
+    // Insert into database using admin access so auth failures can still be recorded.
+    await insertErrorLogs([{
         ...errorLog,
         timestamp: new Date().toISOString(),
-      }] as never);
-
-    if (insertError) {
-      // Log to console but don't throw - we don't want error logging to break the app
-      console.warn('[Server Error Logger] Failed to log error to database:', insertError);
-    }
+      }]);
   } catch (err) {
     // Silent fail - don't want error logging to break the app
     console.warn('[Server Error Logger] Failed to log error:', err);

@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,21 +40,6 @@ interface ErrorClassificationSnapshot {
   category: string;
   confidence: string;
   reason: string;
-}
-
-interface ErrorLogRow {
-  id: string;
-  timestamp: string;
-  error_message: string;
-  error_stack: string | null;
-  error_type: string;
-  user_id: string | null;
-  user_email: string | null;
-  page_url: string;
-  user_agent: string;
-  component_name: string | null;
-  additional_data: unknown;
-  created_at: string;
 }
 
 interface UserActionSnapshot {
@@ -165,11 +149,7 @@ function getErrorBadgeProps(severity: ErrorSeverity): {
   }
 }
 
-interface ErrorLogsDebugPanelProps {
-  supabase: ReturnType<typeof createClient>;
-}
-
-export function ErrorLogsDebugPanel({ supabase }: ErrorLogsDebugPanelProps) {
+export function ErrorLogsDebugPanel() {
   const [errorLogs, setErrorLogs] = useState<ErrorLogEntry[]>([]);
   const [clearingErrors, setClearingErrors] = useState(false);
   const [confirmClearAll, setConfirmClearAll] = useState(false);
@@ -214,14 +194,23 @@ export function ErrorLogsDebugPanel({ supabase }: ErrorLogsDebugPanelProps) {
 
   const fetchErrorLogs = async () => {
     try {
-      const { data: errorData, error } = await supabase
-        .from('error_logs')
-        .select('*')
-        .order('timestamp', { ascending: false })
-        .limit(200);
+      const response = await fetch('/api/debug/error-logs?limit=200', {
+        cache: 'no-store',
+      });
+      const payload = await response.json().catch(() => ({}));
 
-      if (error) {
-        if (error.message.includes('does not exist') || error.code === 'PGRST204') {
+      if (!response.ok) {
+        if (
+          payload?.error === 'Unauthorized' ||
+          payload?.error === 'Forbidden' ||
+          payload?.error === 'Debug console only available in Actual Role mode'
+        ) {
+          toast.error(payload.error);
+          setErrorLogs([]);
+          return;
+        }
+
+        if (String(payload?.error || '').includes('does not exist')) {
           setErrorLogs([]);
           return;
         }
@@ -230,24 +219,9 @@ export function ErrorLogsDebugPanel({ supabase }: ErrorLogsDebugPanelProps) {
         return;
       }
 
+      const errorData = Array.isArray(payload?.logs) ? payload.logs : [];
       if (errorData) {
-        const uniqueUserIds = [
-          ...new Set(
-            errorData
-              .map((e: { user_id: string | null }) => e.user_id)
-              .filter((userId): userId is string => Boolean(userId)),
-          ),
-        ];
-        const { data: profilesData } = await supabase.from('profiles').select('id, full_name').in('id', uniqueUserIds);
-
-        const userIdToName = new Map(profilesData?.map((p: { id: string; full_name: string }) => [p.id, p.full_name]) || []);
-
-        const enrichedErrorData = (errorData as ErrorLogRow[]).map((log) => ({
-          ...log,
-          user_name: log.user_id ? userIdToName.get(log.user_id) || null : null,
-        })) as ErrorLogEntry[];
-
-        const typedErrorData = enrichedErrorData;
+        const typedErrorData = errorData as ErrorLogEntry[];
         setErrorLogs(typedErrorData);
 
         if (typedErrorData.length > 0) {
@@ -317,9 +291,13 @@ export function ErrorLogsDebugPanel({ supabase }: ErrorLogsDebugPanelProps) {
     setConfirmClearAll(false);
     setClearingErrors(true);
     try {
-      const { error } = await supabase.from('error_logs').delete().gte('timestamp', '1970-01-01');
-
-      if (error) throw error;
+      const response = await fetch('/api/debug/error-logs', {
+        method: 'DELETE',
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Failed to clear error logs');
+      }
 
       toast.success('All error logs cleared successfully');
       setLastCheckedErrorId(null);

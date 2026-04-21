@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -36,112 +36,61 @@ const DEBUG_TAB_ALIASES: Record<string, DebugTab> = {
 };
 
 export default function DebugPage() {
-  const { profile } = useAuth();
+  const { profile, loading: authLoading, isActualSuperAdmin, isViewingAs } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = useBrowserSupabaseClient();
-  const [loading, setLoading] = useState(true);
-  const [authorized, setAuthorized] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
-  const [activeTab, setActiveTab] = useState<DebugTab>('error-log');
 
   useEffect(() => {
-    if (!supabase) {
+    if (authLoading) {
       return;
     }
 
-    async function checkAccess() {
-      const {
-        data: { user: authUser },
-        error: authError,
-      } = await supabase.auth.getUser();
-
-      if (authError || !authUser) {
-        router.push('/login');
-        return;
-      }
-
-      const { getViewAsSelection } = await import('@/lib/utils/view-as-cookie');
-      const { roleId: viewAsRoleId, teamId: viewAsTeamId } = getViewAsSelection();
-
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select(`
-          id,
-          super_admin,
-          role:roles (
-            id,
-            name,
-            is_super_admin,
-            is_manager_admin
-          )
-        `)
-        .eq('id', authUser.id)
-        .single();
-
-      if (profileError || !profileData) {
-        console.error('Error fetching user profile:', profileError);
-        toast.error('Access denied: Unable to verify permissions');
-        router.push('/dashboard');
-        return;
-      }
-
-      const isSuperAdmin =
-        profileData.super_admin === true ||
-        profileData.role?.is_super_admin === true ||
-        authUser.email === 'admin@mpdee.co.uk';
-
-      if (!isSuperAdmin) {
-        toast.error('Access denied: SuperAdmin only');
-        router.push('/dashboard');
-        return;
-      }
-
-      if (viewAsRoleId || viewAsTeamId) {
-        toast.error('Debug console only available in Actual Role mode');
-        router.push('/dashboard');
-        return;
-      }
-
-      setAuthorized(true);
-      setDebugInfo({
-        environment: process.env.NODE_ENV || 'development',
-        buildTime: new Date().toISOString(),
-        nodeVersion: typeof process !== 'undefined' ? process.version : 'N/A',
-        nextVersion: '15.5.6',
-      });
-      setLoading(false);
+    if (!profile) {
+      router.push('/login');
+      return;
     }
-    void checkAccess();
-  }, [supabase, router]);
+
+    if (!isActualSuperAdmin) {
+      toast.error('Access denied: SuperAdmin only');
+      router.push('/dashboard');
+      return;
+    }
+
+    if (isViewingAs) {
+      toast.error('Debug console only available in Actual Role mode');
+      router.push('/dashboard');
+    }
+  }, [authLoading, isActualSuperAdmin, isViewingAs, profile, router]);
+
+  const debugInfo: DebugInfo = {
+    environment: process.env.NODE_ENV || 'development',
+    buildTime: new Date().toISOString(),
+    nodeVersion: typeof process !== 'undefined' ? process.version : 'N/A',
+    nextVersion: '15.5.6',
+  };
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab');
     const normalizedTab = requestedTab ? DEBUG_TAB_ALIASES[requestedTab] : 'error-log';
 
-    if (normalizedTab) {
-      setActiveTab(normalizedTab);
-
-      if (requestedTab !== normalizedTab) {
-        router.replace(`/debug?tab=${normalizedTab}`, { scroll: false });
-      }
-      return;
+    if (!normalizedTab || requestedTab !== normalizedTab) {
+      router.replace(`/debug?tab=${normalizedTab || 'error-log'}`, { scroll: false });
     }
-
-    setActiveTab('error-log');
-    router.replace('/debug?tab=error-log', { scroll: false });
   }, [searchParams, router]);
 
+  const requestedTab = searchParams.get('tab');
+  const activeTab = (requestedTab ? DEBUG_TAB_ALIASES[requestedTab] : 'error-log') || 'error-log';
+
   function handleTabChange(value: DebugTab) {
-    setActiveTab(value);
     router.replace(`/debug?tab=${value}`, { scroll: false });
   }
 
-  if (!supabase || loading) {
+  if (authLoading || !supabase) {
     return <PageLoader message="Loading debug tools..." />;
   }
 
-  if (!authorized) {
+  if (!profile || !isActualSuperAdmin || isViewingAs) {
     return null;
   }
 
@@ -165,7 +114,7 @@ export default function DebugPage() {
               <span className="hidden md:inline">Environment</span>
               <span className="md:hidden">Env</span>
             </CardDescription>
-            <CardTitle className="text-base md:text-2xl font-bold text-foreground truncate">{debugInfo?.environment}</CardTitle>
+            <CardTitle className="text-base md:text-2xl font-bold text-foreground truncate">{debugInfo.environment}</CardTitle>
           </CardHeader>
         </Card>
 
@@ -176,7 +125,7 @@ export default function DebugPage() {
               <span className="hidden md:inline">Logged In</span>
               <span className="md:hidden">User</span>
             </CardDescription>
-            <CardTitle className="text-xs md:text-lg font-bold text-foreground truncate">{profile?.full_name}</CardTitle>
+            <CardTitle className="text-xs md:text-lg font-bold text-foreground truncate">{profile.full_name}</CardTitle>
           </CardHeader>
         </Card>
 
@@ -198,7 +147,7 @@ export default function DebugPage() {
               <span className="hidden md:inline">Next.js</span>
               <span className="md:hidden">Ver</span>
             </CardDescription>
-            <CardTitle className="text-base md:text-2xl font-bold text-foreground">{debugInfo?.nextVersion}</CardTitle>
+            <CardTitle className="text-base md:text-2xl font-bold text-foreground">{debugInfo.nextVersion}</CardTitle>
           </CardHeader>
         </Card>
       </div>
@@ -237,7 +186,7 @@ export default function DebugPage() {
         </TabsList>
 
         <TabsContent value="error-log">
-          <ErrorLogsDebugPanel supabase={supabase} />
+          <ErrorLogsDebugPanel />
         </TabsContent>
 
         <TabsContent value="audit-log">
