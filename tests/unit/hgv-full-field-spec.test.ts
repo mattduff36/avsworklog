@@ -11,7 +11,7 @@ function listAllFieldKeys(): string[] {
 describe('HGV full field spec coverage', () => {
   it('contains strict all-pages field coverage above legacy size', () => {
     expect(HGV_6_WEEK_FULL_SECTION_SPECS.length).toBeGreaterThanOrEqual(7);
-    expect(countHgv6WeekFullFields()).toBe(222);
+    expect(countHgv6WeekFullFields()).toBe(223);
   });
 
   it('contains representative page 2 and page 3 keys', () => {
@@ -31,7 +31,7 @@ describe('HGV full field spec coverage', () => {
     expect(uniqueKeyCount).toBe(keys.length);
   });
 
-  it('keeps only one rectification signature and updated sign-off labels', () => {
+  it('keeps the mandatory rectification declaration and both sign-off signatures', () => {
     const keys = new Set(listAllFieldKeys());
     const rectificationSection = HGV_6_WEEK_FULL_SECTION_SPECS.find(
       (section) => section.section_key === 'rectification_actions',
@@ -40,10 +40,16 @@ describe('HGV full field spec coverage', () => {
       (section) => section.section_key === 'road_brake_test_and_declaration',
     );
 
-    expect(keys.has('inspector_signature_rectification')).toBe(false);
+    expect(
+      rectificationSection?.fields.find((field) => field.field_key === 'vehicle_safe_roadworthy_declaration')?.is_required,
+    ).toBe(true);
     expect(
       rectificationSection?.fields.find((field) => field.field_key === 'signature_of_inspector')?.label,
     ).toBe('Signature of Inspector');
+    expect(keys.has('inspector_signature_rectification')).toBe(true);
+    expect(
+      rectificationSection?.fields.find((field) => field.field_key === 'inspector_signature_rectification')?.label,
+    ).toBe('Signature');
     expect(
       roadBrakeSection?.fields.find((field) => field.field_key === 'tester_signature')?.label,
     ).toBe('Signature of Road/Brake tester');

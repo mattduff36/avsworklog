@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { sendToolboxTalkEmail } from '@/lib/utils/email';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
@@ -15,6 +16,7 @@ import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
+    const admin = createAdminClient();
 
     // Check authentication
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -173,7 +175,7 @@ export async function POST(request: NextRequest) {
 
       // Upload to Supabase Storage
       const fileBuffer = await pdfFile.arrayBuffer();
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { data: uploadData, error: uploadError } = await admin.storage
         .from('toolbox-talk-pdfs')
         .upload(fileName, fileBuffer, {
           contentType: 'application/pdf',
@@ -182,7 +184,9 @@ export async function POST(request: NextRequest) {
 
       if (uploadError) {
         console.error('PDF upload error:', uploadError);
-        return NextResponse.json({ error: 'Failed to upload PDF file' }, { status: 500 });
+        const message = uploadError.message || 'Failed to upload PDF file';
+        const status = /bucket/i.test(message) ? 503 : 500;
+        return NextResponse.json({ error: message }, { status });
       }
 
       pdfFilePath = uploadData.path;
@@ -208,7 +212,7 @@ export async function POST(request: NextRequest) {
       
       // Clean up uploaded PDF if message creation failed
       if (pdfFilePath) {
-        await supabase.storage.from('toolbox-talk-pdfs').remove([pdfFilePath]);
+        await admin.storage.from('toolbox-talk-pdfs').remove([pdfFilePath]);
       }
       
       return NextResponse.json({ error: 'Failed to create message' }, { status: 500 });
@@ -231,7 +235,7 @@ export async function POST(request: NextRequest) {
       // Clean up message and PDF if recipients creation failed
       await supabase.from('messages').delete().eq('id', message.id);
       if (pdfFilePath) {
-        await supabase.storage.from('toolbox-talk-pdfs').remove([pdfFilePath]);
+        await admin.storage.from('toolbox-talk-pdfs').remove([pdfFilePath]);
       }
       
       return NextResponse.json({ error: 'Failed to assign recipients' }, { status: 500 });
@@ -248,16 +252,9 @@ export async function POST(request: NextRequest) {
       if (!emailError && recipientProfiles) {
         // Extract email addresses
         const recipientEmails: string[] = [];
-        
-        // Use admin client to fetch emails from auth.users
-        const { createClient: createAdminClient } = await import('@supabase/supabase-js');
-        const adminClient = createAdminClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.SUPABASE_SERVICE_ROLE_KEY!
-        );
 
         for (const userId of recipientUserIds) {
-          const { data: authUser } = await adminClient.auth.admin.getUserById(userId);
+          const { data: authUser } = await admin.auth.admin.getUserById(userId);
           if (authUser?.user?.email) {
             recipientEmails.push(authUser.user.email);
           }
