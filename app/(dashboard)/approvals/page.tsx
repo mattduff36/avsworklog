@@ -63,6 +63,10 @@ import {
 } from '@/lib/utils/absence-error-handling';
 import { isClientSessionPausedError } from '@/lib/app-auth/session-error';
 import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
+import {
+  getApprovalsDefaultStatusFilters,
+  shouldIncludeTimesheetInAllSubmittedFilter,
+} from '@/lib/utils/approvals-filters';
 
 const APPROVALS_PAGE_SIZE = 50;
 
@@ -113,24 +117,28 @@ function ApprovalsContent() {
   );
   const router = useRouter();
   const [tabParam, setTabParam] = useQueryState('tab', {
-    defaultValue: 'timesheets',
-    clearOnDefault: true,
     shallow: true,
   });
   const supabase = createClient();
   const actorProfileId = profile?.id || '';
+  const actorTeamId = absenceSecondarySnapshot?.team_id || null;
+  const actorTeamName = absenceSecondarySnapshot?.team_name || null;
   const hasAccountsVisibilityOverride = hasAccountsTimesheetFullVisibilityOverride(
     absenceSecondarySnapshot?.role_name,
     absenceSecondarySnapshot?.team_name
   );
   const isAdminTier = Boolean(isAdmin || isSuperAdmin || hasAccountsVisibilityOverride);
   const activeTab: ApprovalsTab = tabParam === 'absences' ? 'absences' : 'timesheets';
+  const defaultStatusFilters = useMemo(
+    () => getApprovalsDefaultStatusFilters(actorTeamName),
+    [actorTeamName]
+  );
   
   const [timesheets, setTimesheets] = useState<TimesheetWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasLoadedTimesheets, setHasLoadedTimesheets] = useState(false);
-  const [timesheetFilter, setTimesheetFilter] = useState<TimesheetStatusFilter>('pending');
-  const [absenceStatusFilter, setAbsenceStatusFilter] = useState<AbsenceStatusFilter>('pending');
+  const [timesheetFilter, setTimesheetFilter] = useState<TimesheetStatusFilter>(defaultStatusFilters.timesheets);
+  const [absenceStatusFilter, setAbsenceStatusFilter] = useState<AbsenceStatusFilter>(defaultStatusFilters.absences);
   const statusFilter: StatusFilter = activeTab === 'timesheets' ? timesheetFilter : absenceStatusFilter;
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('all');
   const [selectedTeamId, setSelectedTeamId] = useState('all');
@@ -218,8 +226,6 @@ function ApprovalsContent() {
       isSuperAdmin ||
       hasAccountsVisibilityOverride
   );
-  const actorTeamId = absenceSecondarySnapshot?.team_id || null;
-  const actorTeamName = absenceSecondarySnapshot?.team_name || null;
   const scopeTeamOnly = Boolean(
     !isAdminTier &&
       canAuthoriseBookings &&
@@ -229,6 +235,20 @@ function ApprovalsContent() {
   );
   const isTeamFilterLocked = scopeTeamOnly;
   const effectiveTeamFilter = scopeTeamOnly ? (actorTeamId || '__no_team_scope__') : selectedTeamId;
+
+  useEffect(() => {
+    if (tabParam === 'timesheets' || tabParam === 'absences') return;
+    void setTabParam('timesheets');
+  }, [tabParam, setTabParam]);
+
+  useEffect(() => {
+    if (activeTab === 'timesheets') {
+      setTimesheetFilter(defaultStatusFilters.timesheets);
+      return;
+    }
+
+    setAbsenceStatusFilter(defaultStatusFilters.absences);
+  }, [activeTab, defaultStatusFilters.absences, defaultStatusFilters.timesheets]);
 
   useEffect(() => {
     if (!scopeTeamOnly) {
@@ -418,8 +438,13 @@ function ApprovalsContent() {
         }
       }
 
-      if (timesheetFilter === 'pending' && timesheet.status !== 'submitted') return false;
-      if (timesheetFilter !== 'all' && timesheetFilter !== 'pending' && timesheet.status !== timesheetFilter) return false;
+      if (timesheetFilter === 'all') {
+        if (!shouldIncludeTimesheetInAllSubmittedFilter(timesheet.status)) return false;
+      } else if (timesheetFilter === 'pending') {
+        if (timesheet.status !== 'submitted') return false;
+      } else if (timesheet.status !== timesheetFilter) {
+        return false;
+      }
       if (dateFrom && timesheet.week_ending < dateFrom) return false;
       if (dateTo && timesheet.week_ending > dateTo) return false;
       return true;
@@ -677,7 +702,7 @@ function ApprovalsContent() {
       case 'adjusted':
         return 'Adjusted';
       case 'all':
-        return 'All';
+        return 'All Submitted';
       default:
         return filter;
     }
@@ -699,18 +724,26 @@ function ApprovalsContent() {
   const hasActiveFilters =
     selectedEmployeeId !== 'all' ||
     (!isTeamFilterLocked && selectedTeamId !== 'all') ||
-    (activeTab === 'timesheets' ? timesheetFilter !== 'pending' : absenceStatusFilter !== 'pending') ||
+    (activeTab === 'timesheets'
+      ? timesheetFilter !== defaultStatusFilters.timesheets
+      : absenceStatusFilter !== defaultStatusFilters.absences) ||
     Boolean(dateFrom) ||
     Boolean(dateTo);
 
   const clearFilters = () => {
     setSelectedEmployeeId('all');
     setSelectedTeamId(isTeamFilterLocked ? (actorTeamId || '__no_team_scope__') : 'all');
-    setTimesheetFilter('pending');
-    setAbsenceStatusFilter('pending');
+    setTimesheetFilter(defaultStatusFilters.timesheets);
+    setAbsenceStatusFilter(defaultStatusFilters.absences);
     setDateFrom('');
     setDateTo('');
   };
+
+  const payrollStatusHelperText =
+    (activeTab === 'timesheets' && timesheetFilter === 'pending') ||
+    (activeTab === 'absences' && absenceStatusFilter === 'approved')
+      ? 'These approvals are designed to be processed by Payroll'
+      : null;
 
   const handleTabChange = (tab: string) => {
     if (tab !== 'timesheets' && tab !== 'absences') return;
@@ -901,6 +934,13 @@ function ApprovalsContent() {
               />
             </div>
           </div>
+          {payrollStatusHelperText ? (
+            <div className="mt-4 flex justify-center">
+              <p className="inline-flex items-center rounded-full border border-border/70 bg-slate-100/80 px-4 py-1.5 text-center text-sm text-muted-foreground shadow-sm dark:bg-slate-800/60 dark:text-slate-300">
+                {payrollStatusHelperText}
+              </p>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 

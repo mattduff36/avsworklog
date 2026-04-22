@@ -869,36 +869,15 @@ export default function AdminAbsencePage() {
 
       {isAdmin && (
         <div className="rounded-lg border border-[hsl(var(--absence-primary)/0.25)] bg-[hsl(var(--absence-primary)/0.06)] p-4">
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
-              <div className="shrink-0">
-                <Label htmlFor="absence-announcement" className="text-base font-semibold text-foreground">
+          <div className="space-y-3">
+            <div className="flex flex-col gap-3 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+              <div className="hidden sm:block" aria-hidden="true" />
+              <div className="flex justify-center sm:justify-self-center">
+                <Label htmlFor="absence-announcement" className="text-center text-base font-semibold text-foreground">
                   Scrolling Absence Message:
                 </Label>
               </div>
-              <div className="flex flex-1">
-                <Input
-                  id="absence-announcement"
-                  value={absenceAnnouncementInput}
-                  onChange={(event) => setAbsenceAnnouncementInput(event.target.value)}
-                  onFocus={() => setIsAbsenceAnnouncementFocused(true)}
-                  onBlur={() => setIsAbsenceAnnouncementFocused(false)}
-                  placeholder={loadingAbsenceAnnouncement ? 'Loading current message...' : 'Enter scrolling message'}
-                  disabled={loadingAbsenceAnnouncement || savingAbsenceAnnouncement}
-                  className={`bg-background border-border ${
-                    !hasUnsavedAbsenceAnnouncement && !isAbsenceAnnouncementFocused
-                      ? '!text-muted-foreground'
-                      : '!text-foreground'
-                  }`}
-                  maxLength={500}
-                />
-              </div>
-            </div>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-xs text-muted-foreground">
-                Shown on Absence & Leave module home page. Leave blank to hide it.
-              </p>
-              <div className="flex items-center gap-2 sm:justify-end">
+              <div className="flex items-center justify-end gap-2 sm:justify-self-end">
                 <Button
                   type="button"
                   size="sm"
@@ -919,6 +898,27 @@ export default function AdminAbsencePage() {
                   Clear
                 </Button>
               </div>
+            </div>
+            <div>
+              <Input
+                id="absence-announcement"
+                value={absenceAnnouncementInput}
+                onChange={(event) => setAbsenceAnnouncementInput(event.target.value)}
+                onFocus={() => setIsAbsenceAnnouncementFocused(true)}
+                onBlur={() => setIsAbsenceAnnouncementFocused(false)}
+                placeholder={
+                  loadingAbsenceAnnouncement
+                    ? 'Loading current message...'
+                    : 'Enter scrolling message. Leave blank to hide it. Shown on Absence & Leave module home page.'
+                }
+                disabled={loadingAbsenceAnnouncement || savingAbsenceAnnouncement}
+                className={`bg-background border-border ${
+                  !hasUnsavedAbsenceAnnouncement && !isAbsenceAnnouncementFocused
+                    ? '!text-muted-foreground'
+                    : '!text-foreground'
+                }`}
+                maxLength={500}
+              />
             </div>
           </div>
         </div>

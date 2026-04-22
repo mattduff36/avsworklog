@@ -12,6 +12,14 @@ vi.mock('@/lib/supabase/server');
 vi.mock('@/lib/supabase/admin');
 vi.mock('@/lib/utils/view-as');
 vi.mock('@/lib/server/team-permissions');
+vi.mock('@/lib/server/absence-secondary-permissions', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/server/absence-secondary-permissions')>();
+
+  return {
+    ...actual,
+    getActorAbsenceSecondaryPermissions: vi.fn(),
+  };
+});
 
 function createCountQuery(count: number) {
   const resolved = { count, error: null };
@@ -21,6 +29,15 @@ function createCountQuery(count: number) {
     then: (resolve: (value: typeof resolved) => unknown) => Promise.resolve(resolved).then(resolve),
   };
   return query;
+}
+
+function createScopedRowsQuery<T extends Record<string, unknown>>(rows: T[]) {
+  return {
+    in: vi.fn(async (column: string, values: unknown[]) => ({
+      data: rows.filter((row) => values.includes(row[column])),
+      error: null,
+    })),
+  };
 }
 
 describe('GET /api/dashboard/summary', () => {
@@ -50,6 +67,7 @@ describe('GET /api/dashboard/summary', () => {
     const { createAdminClient } = await import('@/lib/supabase/admin');
     const { getEffectiveRole } = await import('@/lib/utils/view-as');
     const { getPermissionMapForUser } = await import('@/lib/server/team-permissions');
+    const { getActorAbsenceSecondaryPermissions } = await import('@/lib/server/absence-secondary-permissions');
 
     vi.mocked(getCurrentAuthenticatedProfile).mockResolvedValue({
       profile: {
@@ -95,6 +113,22 @@ describe('GET /api/dashboard/summary', () => {
       customers: false,
       quotes: true,
     });
+    vi.mocked(getActorAbsenceSecondaryPermissions).mockResolvedValue({
+      user_id: 'user-1',
+      team_id: 'team-a',
+      team_name: 'Team A',
+      role_name: 'employee',
+      role_display_name: 'Employee',
+      role_tier: 'employee',
+      defaults: {} as never,
+      overrides: {} as never,
+      effective: {
+        authorise_bookings_all: false,
+        authorise_bookings_team: true,
+        authorise_bookings_own: false,
+      } as never,
+      has_exception_row: false,
+    } as never);
 
     const supabase = {
       auth: {
@@ -104,8 +138,27 @@ describe('GET /api/dashboard/summary', () => {
         }),
       },
       from: (table: string) => {
-        if (table === 'timesheets') return { select: () => createCountQuery(4) };
-        if (table === 'absences') return { select: () => createCountQuery(2) };
+        if (table === 'timesheets') {
+          return {
+            select: () =>
+              createScopedRowsQuery([
+                { id: 'ts-1', status: 'submitted', user_id: 'user-2', employee: { team_id: 'team-a' } },
+                { id: 'ts-2', status: 'submitted', user_id: 'user-3', employee: { team_id: 'team-a' } },
+                { id: 'ts-3', status: 'approved', user_id: 'user-4', employee: { team_id: 'team-a' } },
+                { id: 'ts-4', status: 'approved', user_id: 'user-5', employee: { team_id: 'team-b' } },
+              ]),
+          };
+        }
+        if (table === 'absences') {
+          return {
+            select: () =>
+              createScopedRowsQuery([
+                { id: 'ab-1', status: 'pending', profile_id: 'user-2', employee: { team_id: 'team-a' } },
+                { id: 'ab-2', status: 'approved', profile_id: 'user-3', employee: { team_id: 'team-a' } },
+                { id: 'ab-3', status: 'pending', profile_id: 'user-9', employee: { team_id: 'team-b' } },
+              ]),
+          };
+        }
         if (table === 'actions') return { select: () => createCountQuery(3) };
         if (table === 'suggestions') {
           return {
@@ -181,16 +234,145 @@ describe('GET /api/dashboard/summary', () => {
     expect(response.status).toBe(200);
     expect(payload.metrics).toEqual({
       approvals: {
-        timesheets: 4,
-        absences: 2,
+        timesheets: 2,
+        absences: 1,
       },
       badges: {
+        approvals: 2,
         workshop_pending: 3,
         maintenance_due_soon: 0,
         maintenance_overdue: 0,
         suggestions_new: 6,
         error_reports_new: 1,
         quotes_pending_internal_approval: 6,
+        error_logs: 0,
+      },
+    });
+  });
+
+  it('uses Accounts-specific approval badge totals while preserving scoped approval visibility', async () => {
+    const { createClient } = await import('@/lib/supabase/server');
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+    const { getEffectiveRole } = await import('@/lib/utils/view-as');
+    const { getPermissionMapForUser } = await import('@/lib/server/team-permissions');
+    const { getActorAbsenceSecondaryPermissions } = await import('@/lib/server/absence-secondary-permissions');
+
+    vi.mocked(getCurrentAuthenticatedProfile).mockResolvedValue({
+      profile: {
+        id: 'user-accounts',
+      },
+      validation: {
+        cookieValue: null,
+        cookieExpiresAt: null,
+      },
+    } as never);
+    vi.mocked(getEffectiveRole).mockResolvedValue({
+      role_id: 'employee-role',
+      role_name: 'employee',
+      role_class: 'employee',
+      display_name: 'Employee',
+      is_manager_admin: false,
+      is_super_admin: false,
+      is_viewing_as: false,
+      is_actual_super_admin: false,
+      user_id: 'user-accounts',
+      team_id: 'team-accounts',
+      team_name: 'Accounts',
+    });
+    vi.mocked(getPermissionMapForUser).mockResolvedValue({
+      timesheets: false,
+      inspections: false,
+      'plant-inspections': false,
+      'hgv-inspections': false,
+      rams: false,
+      absence: false,
+      maintenance: false,
+      'toolbox-talks': false,
+      'workshop-tasks': false,
+      approvals: true,
+      actions: false,
+      reports: false,
+      suggestions: false,
+      'faq-editor': false,
+      'error-reports': false,
+      'admin-users': false,
+      'admin-settings': false,
+      'admin-vans': false,
+      customers: false,
+      quotes: false,
+    });
+    vi.mocked(getActorAbsenceSecondaryPermissions).mockResolvedValue({
+      user_id: 'user-accounts',
+      team_id: 'team-accounts',
+      team_name: 'Accounts',
+      role_name: 'employee',
+      role_display_name: 'Employee',
+      role_tier: 'employee',
+      defaults: {} as never,
+      overrides: {} as never,
+      effective: {
+        authorise_bookings_all: false,
+        authorise_bookings_team: true,
+        authorise_bookings_own: false,
+      } as never,
+      has_exception_row: false,
+    } as never);
+
+    const supabase = {
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-accounts' } },
+          error: null,
+        }),
+      },
+      from: (table: string) => {
+        if (table === 'timesheets') {
+          return {
+            select: () =>
+              createScopedRowsQuery([
+                { id: 'ts-1', status: 'submitted', user_id: 'employee-1', employee: { team_id: 'team-accounts' } },
+                { id: 'ts-2', status: 'submitted', user_id: 'employee-2', employee: { team_id: 'team-accounts' } },
+                { id: 'ts-3', status: 'submitted', user_id: 'employee-3', employee: { team_id: 'team-ops' } },
+                { id: 'ts-4', status: 'approved', user_id: 'employee-4', employee: { team_id: 'team-accounts' } },
+              ]),
+          };
+        }
+        if (table === 'absences') {
+          return {
+            select: () =>
+              createScopedRowsQuery([
+                { id: 'ab-1', status: 'pending', profile_id: 'employee-1', employee: { team_id: 'team-accounts' } },
+                { id: 'ab-2', status: 'approved', profile_id: 'employee-2', employee: { team_id: 'team-accounts' } },
+                { id: 'ab-3', status: 'approved', profile_id: 'employee-3', employee: { team_id: 'team-accounts' } },
+                { id: 'ab-4', status: 'approved', profile_id: 'employee-4', employee: { team_id: 'team-ops' } },
+              ]),
+          };
+        }
+
+        return { select: () => createCountQuery(0) };
+      },
+    };
+
+    vi.mocked(createAdminClient).mockReturnValue(supabase as never);
+    vi.mocked(createClient).mockResolvedValue(supabase as unknown as SupabaseClient);
+
+    const response = await GET();
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.metrics).toEqual({
+      approvals: {
+        timesheets: 2,
+        absences: 1,
+      },
+      badges: {
+        approvals: 4,
+        workshop_pending: 0,
+        maintenance_due_soon: 0,
+        maintenance_overdue: 0,
+        suggestions_new: 0,
+        error_reports_new: 0,
+        quotes_pending_internal_approval: 0,
         error_logs: 0,
       },
     });
@@ -354,6 +536,7 @@ describe('GET /api/dashboard/summary', () => {
     const { createAdminClient } = await import('@/lib/supabase/admin');
     const { getEffectiveRole } = await import('@/lib/utils/view-as');
     const { getPermissionMapForUser } = await import('@/lib/server/team-permissions');
+    const { getActorAbsenceSecondaryPermissions } = await import('@/lib/server/absence-secondary-permissions');
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     vi.mocked(getCurrentAuthenticatedProfile).mockResolvedValue({
@@ -400,6 +583,22 @@ describe('GET /api/dashboard/summary', () => {
       customers: false,
       quotes: false,
     });
+    vi.mocked(getActorAbsenceSecondaryPermissions).mockResolvedValue({
+      user_id: 'user-1',
+      team_id: 'team-a',
+      team_name: 'Team A',
+      role_name: 'employee',
+      role_display_name: 'Employee',
+      role_tier: 'employee',
+      defaults: {} as never,
+      overrides: {} as never,
+      effective: {
+        authorise_bookings_all: false,
+        authorise_bookings_team: true,
+        authorise_bookings_own: false,
+      } as never,
+      has_exception_row: false,
+    } as never);
 
     const supabase = {
       auth: {
@@ -412,8 +611,8 @@ describe('GET /api/dashboard/summary', () => {
         if (table === 'timesheets') {
           return {
             select: () => ({
-              eq: vi.fn().mockResolvedValue({
-                count: null,
+              in: vi.fn().mockResolvedValue({
+                data: null,
                 error: new Error('statement timeout'),
               }),
             }),
@@ -421,7 +620,12 @@ describe('GET /api/dashboard/summary', () => {
         }
 
         if (table === 'absences') {
-          return { select: () => createCountQuery(5) };
+          return {
+            select: () =>
+              createScopedRowsQuery([
+                { id: 'ab-1', status: 'pending', profile_id: 'user-2', employee: { team_id: 'team-a' } },
+              ]),
+          };
         }
 
         throw new Error(`Unexpected table: ${table}`);
@@ -438,9 +642,10 @@ describe('GET /api/dashboard/summary', () => {
     expect(payload.metrics).toEqual({
       approvals: {
         timesheets: 0,
-        absences: 5,
+        absences: 0,
       },
       badges: {
+        approvals: 0,
         workshop_pending: 0,
         maintenance_due_soon: 0,
         maintenance_overdue: 0,
@@ -451,7 +656,7 @@ describe('GET /api/dashboard/summary', () => {
       },
     });
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      'Failed to load submitted timesheets dashboard metric:',
+      'Failed to load approvals metrics dashboard metric:',
       expect.any(Error)
     );
 

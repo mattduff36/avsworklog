@@ -22,7 +22,7 @@ import {
 } from '@/lib/hooks/useAbsenceSecondaryPermissions';
 import { clearClientServiceOutage } from '@/lib/app-auth/client-service-health';
 import { fetchAbsenceMessage } from '@/lib/client/absence-message';
-import { fetchCurrentWorkShift } from '@/lib/client/work-shifts';
+import { fetchCurrentWorkShift, fetchWorkShiftMatrix } from '@/lib/client/work-shifts';
 import { canOpenAbsenceManageArea } from '@/types/absence-permissions';
 import { AppPageShell } from '@/components/layout/AppPageShell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -59,6 +59,7 @@ import {
   useCreateAbsence,
 } from '@/lib/hooks/useAbsence';
 import { formatDate, formatDateISO, calculateDurationDays, getFinancialYearMonths, getCurrentFinancialYear, getFinancialYear } from '@/lib/utils/date';
+import { getWorkingDisplayDatesForAbsence } from '@/lib/utils/absence-calendar-display';
 import { ANNUAL_LEAVE_MIN_REMAINING_DAYS } from '@/lib/utils/annual-leave';
 import { createStatusError, getErrorStatus, isServerErrorStatus } from '@/lib/utils/http-error';
 import {
@@ -213,6 +214,11 @@ export default function AbsencePage() {
   const actorProfileId = profile?.id || '';
   const isAdminTier = Boolean(isAdmin || isSuperAdmin);
   const canViewBookings = Boolean(absenceSecondarySnapshot?.flags.can_view_bookings || isAdminTier || isManager);
+  const canViewMoreThanOwnBookings = Boolean(
+    isAdminTier ||
+      absenceSecondarySnapshot?.permissions.see_bookings_all ||
+      absenceSecondarySnapshot?.permissions.see_bookings_team
+  );
   const canRequestLeave =
     isAdminTier ||
     Boolean(
@@ -244,6 +250,7 @@ export default function AbsencePage() {
   const [generationStatus, setGenerationStatus] = useState<GenerationStatus | null>(null);
   const [generationStatusLoading, setGenerationStatusLoading] = useState(true);
   const [currentWorkShiftPattern, setCurrentWorkShiftPattern] = useState<WorkShiftPattern | null>(null);
+  const [calendarWorkShiftPatterns, setCalendarWorkShiftPatterns] = useState<Record<string, WorkShiftPattern>>({});
   const [absenceAnnouncement, setAbsenceAnnouncement] = useState<string | null>(null);
   const [pageServiceErrors, setPageServiceErrors] = useState<PageServiceErrorMap<PageServiceRequestKey>>({});
   const pageServiceError = getFirstPageServiceError(
@@ -375,7 +382,7 @@ export default function AbsencePage() {
   
   const calendarAbsences = useMemo(() => {
     if (!canViewBookings) {
-      return [];
+      return userAbsences?.filter((absence) => absence.status !== 'cancelled') || [];
     }
 
     if (!actorProfileId || !absenceSecondarySnapshot) {
@@ -410,6 +417,42 @@ export default function AbsencePage() {
     userAbsences,
     allAbsencesData,
   ]);
+
+  const calendarDisplayPatternByProfileId = useMemo(() => {
+    const nextPatterns = { ...calendarWorkShiftPatterns };
+    if (actorProfileId && currentWorkShiftPattern) {
+      nextPatterns[actorProfileId] = currentWorkShiftPattern;
+    }
+    return nextPatterns;
+  }, [calendarWorkShiftPatterns, actorProfileId, currentWorkShiftPattern]);
+
+  const calendarAbsencesByDate = useMemo(() => {
+    const absencesByDate = new Map<string, typeof calendarAbsences>();
+
+    calendarAbsences.forEach((absence) => {
+      const visibleDates = getWorkingDisplayDatesForAbsence(
+        {
+          date: absence.date,
+          endDate: absence.end_date,
+          isHalfDay: Boolean(absence.is_half_day),
+          halfDaySession: absence.half_day_session,
+        },
+        calendarDisplayPatternByProfileId[absence.profile_id]
+      );
+
+      visibleDates.forEach((dateKey) => {
+        const existingAbsences = absencesByDate.get(dateKey);
+        if (existingAbsences) {
+          existingAbsences.push(absence);
+          return;
+        }
+
+        absencesByDate.set(dateKey, [absence]);
+      });
+    });
+
+    return absencesByDate;
+  }, [calendarAbsences, calendarDisplayPatternByProfileId]);
   
   const loadingAbsences = canViewBookings ? loadingAllAbsences : loadingUserAbsences;
   // Form state
@@ -564,6 +607,44 @@ export default function AbsencePage() {
       void loadCurrentWorkShift();
     }
   }, [canLoadAbsencePageData, clearUnavailableError, handleUnavailableError]);
+
+  useEffect(() => {
+    if (!canLoadAbsencePageData || !canViewMoreThanOwnBookings) {
+      setCalendarWorkShiftPatterns({});
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadCalendarWorkShifts() {
+      try {
+        const payload = await fetchWorkShiftMatrix();
+        if (cancelled) {
+          return;
+        }
+
+        const nextPatterns: Record<string, WorkShiftPattern> = {};
+        payload.employees.forEach((employee) => {
+          nextPatterns[employee.profile_id] = employee.pattern;
+        });
+        setCalendarWorkShiftPatterns(nextPatterns);
+      } catch (error) {
+        if (!cancelled) {
+          setCalendarWorkShiftPatterns({});
+        }
+        console.warn(
+          'Unable to load scoped work shifts for absence calendar display:',
+          error instanceof Error ? error.message : error
+        );
+      }
+    }
+
+    void loadCalendarWorkShifts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canLoadAbsencePageData, canViewMoreThanOwnBookings]);
 
   useEffect(() => {
     if (isSecondaryContextLoading) return;
@@ -820,11 +901,7 @@ export default function AbsencePage() {
         
         {/* Day cells */}
         {days.map(day => {
-          const dayAbsences = calendarAbsences.filter(a => {
-            const absenceStart = parseIsoDateAsLocalMidnight(a.date);
-            const absenceEnd = a.end_date ? parseIsoDateAsLocalMidnight(a.end_date) : absenceStart;
-            return day >= absenceStart && day <= absenceEnd;
-          });
+          const dayAbsences = calendarAbsencesByDate.get(formatDateISO(day)) || [];
           const hasBankHoliday = dayAbsences.some((absence) => Boolean(absence.is_bank_holiday));
           
           return (
@@ -1349,6 +1426,14 @@ export default function AbsencePage() {
                   <span className="text-muted-foreground">= rejected request</span>
                 </div>
               </div>
+              {canViewMoreThanOwnBookings ? (
+                <div className="mt-4 flex justify-center">
+                  <p className="inline-flex items-center rounded-full border border-border/70 bg-slate-100/80 px-4 py-1.5 text-center text-sm text-muted-foreground shadow-sm dark:bg-slate-800/60 dark:text-slate-300">
+                    This calendar shows absence and leave bookings only. It does not include days where the user is off
+                    shift.
+                  </p>
+                </div>
+              ) : null}
             </CardHeader>
             <CardContent>
               {renderCalendar()}
@@ -1556,11 +1641,7 @@ export default function AbsencePage() {
           
           <div className="max-h-[70vh] overflow-y-auto pr-1">
             {selectedDate && (() => {
-              const dayAbsences = (isManager || isAdmin ? calendarAbsences : userAbsences || []).filter(a => {
-                const absenceStart = parseIsoDateAsLocalMidnight(a.date);
-                const absenceEnd = a.end_date ? parseIsoDateAsLocalMidnight(a.end_date) : absenceStart;
-                return selectedDate >= absenceStart && selectedDate <= absenceEnd && a.status !== 'cancelled';
-              });
+              const dayAbsences = calendarAbsencesByDate.get(formatDateISO(selectedDate)) || [];
               
               if (dayAbsences.length > 0) {
                 return (

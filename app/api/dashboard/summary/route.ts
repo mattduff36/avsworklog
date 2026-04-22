@@ -14,6 +14,7 @@ import {
   getHoursBasedStatus,
   getMileageBasedStatus,
 } from '@/lib/utils/maintenanceCalculations';
+import { getDashboardApprovalsMetrics } from '@/lib/server/dashboard-approvals';
 
 type PermissionMap = Record<(typeof ALL_MODULES)[number], boolean>;
 
@@ -350,8 +351,7 @@ export async function GET() {
   const canViewQuotes = permissions.quotes;
 
   const [
-    timesheetsResult,
-    absencesResult,
+    approvalsMetrics,
     workshopPendingResult,
     suggestionBadgeMetrics,
     errorsNewResult,
@@ -360,17 +360,24 @@ export async function GET() {
     maintenanceCounts,
   ] = await Promise.all([
     canViewApprovals
-      ? resolveCountMetric(
-          'submitted timesheets',
-          supabase.from('timesheets').select('id', { count: 'exact', head: true }).eq('status', 'submitted')
+      ? resolveMetricValue(
+          'approvals metrics',
+          getDashboardApprovalsMetrics({
+            supabase: admin,
+            actorProfileId: userId,
+            effectiveRole,
+          }),
+          {
+            summaryTimesheets: 0,
+            summaryAbsences: 0,
+            tileTotal: 0,
+          }
         )
-      : Promise.resolve({ count: 0, error: null }),
-    canViewApprovals
-      ? resolveCountMetric(
-          'pending absences',
-          supabase.from('absences').select('id', { count: 'exact', head: true }).eq('status', 'pending')
-        )
-      : Promise.resolve({ count: 0, error: null }),
+      : Promise.resolve({
+          summaryTimesheets: 0,
+          summaryAbsences: 0,
+          tileTotal: 0,
+        }),
     canViewWorkshopTasks
       ? resolveCountMetric(
           'pending workshop actions',
@@ -427,10 +434,11 @@ export async function GET() {
     success: true,
     metrics: {
       approvals: {
-        timesheets: timesheetsResult.count || 0,
-        absences: absencesResult.count || 0,
+        timesheets: approvalsMetrics.summaryTimesheets,
+        absences: approvalsMetrics.summaryAbsences,
       },
       badges: {
+        approvals: approvalsMetrics.tileTotal,
         workshop_pending: workshopPendingResult.count || 0,
         maintenance_due_soon: maintenanceCounts.dueSoonTotal,
         maintenance_overdue: maintenanceCounts.overdueTotal,

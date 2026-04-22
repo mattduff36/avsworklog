@@ -83,6 +83,7 @@ export default function DashboardPage() {
   const [newErrorReportsCount, setNewErrorReportsCount] = useState(0);
   const [pendingQuotesCount, setPendingQuotesCount] = useState(0);
   const [errorLogsCount, setErrorLogsCount] = useState(0);
+  const [approvalsTileBadgeCount, setApprovalsTileBadgeCount] = useState(0);
   const [workshopPendingCount, setWorkshopPendingCount] = useState(0);
   const [maintenanceDueSoonCount, setMaintenanceDueSoonCount] = useState(0);
   const [maintenanceOverdueCount, setMaintenanceOverdueCount] = useState(0);
@@ -151,6 +152,7 @@ export default function DashboardPage() {
     if (!navigator.onLine) {
       return {
         pendingApprovals: canViewApprovals ? buildPendingApprovalsSummary(0, 0) : [],
+        approvalsTileBadgeCount: 0,
         newSuggestionsCount: 0,
         newErrorReportsCount: 0,
         pendingQuotesCount: 0,
@@ -167,6 +169,7 @@ export default function DashboardPage() {
       metrics?: {
         approvals?: { timesheets?: number; absences?: number };
         badges?: {
+          approvals?: number;
           workshop_pending?: number;
           maintenance_due_soon?: number;
           maintenance_overdue?: number;
@@ -184,6 +187,7 @@ export default function DashboardPage() {
 
     const timesheetsCount = payload.metrics?.approvals?.timesheets || 0;
     const absencesCount = payload.metrics?.approvals?.absences || 0;
+    const approvalsBadgeCount = payload.metrics?.badges?.approvals ?? (timesheetsCount + absencesCount);
     const suggestionsNewCount = payload.metrics?.badges?.suggestions_new || 0;
     const errorsNewCount = payload.metrics?.badges?.error_reports_new || 0;
     const workshopPendingCount = payload.metrics?.badges?.workshop_pending || 0;
@@ -192,6 +196,7 @@ export default function DashboardPage() {
 
     return {
       pendingApprovals: canViewApprovals ? buildPendingApprovalsSummary(timesheetsCount, absencesCount) : [],
+      approvalsTileBadgeCount: approvalsBadgeCount,
       newSuggestionsCount: suggestionsNewCount,
       newErrorReportsCount: errorsNewCount,
       pendingQuotesCount: payload.metrics?.badges?.quotes_pending_internal_approval || 0,
@@ -204,6 +209,7 @@ export default function DashboardPage() {
 
   const applyDashboardMetrics = useCallback((metrics: Awaited<ReturnType<typeof fetchDashboardMetrics>>) => {
     setPendingApprovals(metrics.pendingApprovals);
+    setApprovalsTileBadgeCount(metrics.approvalsTileBadgeCount);
     setNewSuggestionsCount(metrics.newSuggestionsCount);
     setNewErrorReportsCount(metrics.newErrorReportsCount);
     setPendingQuotesCount(metrics.pendingQuotesCount);
@@ -233,6 +239,7 @@ export default function DashboardPage() {
 
       if (!isAuthErrorStatus(errorStatus)) {
         setPendingApprovals(canViewApprovals ? buildPendingApprovalsSummary(0, 0) : []);
+        setApprovalsTileBadgeCount(0);
         setNewSuggestionsCount(0);
         setNewErrorReportsCount(0);
         setPendingQuotesCount(0);
@@ -332,9 +339,8 @@ export default function DashboardPage() {
   const visibleAdminTiles = getFilteredNavByPermissions(adminNavItems, userPermissions, effectiveIsAdmin);
   const renderedManagerTiles = visibleManagerTiles.filter(link => link.href !== '/absence/manage');
   const renderedManagementTiles = [...renderedManagerTiles, ...visibleAdminTiles];
-  const totalPendingApprovalsCount = pendingApprovals.reduce((sum, a) => sum + a.count, 0);
   const managementTileBadgeCountByHref: Record<string, number> = {
-    '/approvals': totalPendingApprovalsCount,
+    '/approvals': approvalsTileBadgeCount,
     '/suggestions/manage': newSuggestionsCount,
     '/admin/errors/manage': newErrorReportsCount,
     '/quotes': pendingQuotesCount,

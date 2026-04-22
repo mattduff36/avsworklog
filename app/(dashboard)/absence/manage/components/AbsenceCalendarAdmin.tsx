@@ -108,6 +108,16 @@ type WeekSegment = {
   lane: number;
 };
 
+type PositionedWeekEvent = {
+  event: CalendarEvent;
+  startCol: number;
+  endCol: number;
+  hasPriorSegment: boolean;
+  priorEndCol: number | null;
+  hasConnectedPriorSegment: boolean;
+  connectedPriorEndCol: number | null;
+};
+
 const DETAIL_VISIBILITY_STORAGE_KEY = 'absence-manage-calendar-detail-visibility';
 const DEFAULT_DETAIL_VISIBILITY: DetailVisibility = {
   requestedDate: true,
@@ -680,23 +690,86 @@ export function AbsenceCalendarAdmin() {
   function buildWeekSegments(week: Date[]): WeekSegment[] {
     const weekStart = week[0];
     const weekEnd = week[6];
-    const weekEvents = calendarEvents
+    const positionedWeekEvents: PositionedWeekEvent[] = calendarEvents
       .filter((event) => event.end >= weekStart && event.start <= weekEnd)
+      .map((event): PositionedWeekEvent => {
+        const visibleStart = event.start > weekStart ? event.start : weekStart;
+        const visibleEnd = event.end < weekEnd ? event.end : weekEnd;
+        const startCol = Math.max(0, Math.floor((visibleStart.getTime() - weekStart.getTime()) / 86400000));
+        const endCol = Math.min(6, Math.floor((visibleEnd.getTime() - weekStart.getTime()) / 86400000));
+
+        return {
+          event,
+          startCol,
+          endCol,
+          hasPriorSegment: false,
+          priorEndCol: null,
+          hasConnectedPriorSegment: false,
+          connectedPriorEndCol: null,
+        };
+      })
       .sort((a, b) => {
-        if (a.start.getTime() !== b.start.getTime()) return a.start.getTime() - b.start.getTime();
-        return a.employeeName.localeCompare(b.employeeName);
+        if (a.startCol !== b.startCol) return a.startCol - b.startCol;
+        if (a.endCol !== b.endCol) return a.endCol - b.endCol;
+        return a.event.employeeName.localeCompare(b.event.employeeName);
       });
+
+    const latestEndColByProfileId = new Map<string, number>();
+    positionedWeekEvents.forEach((positionedEvent) => {
+      const latestPriorEndCol = latestEndColByProfileId.get(positionedEvent.event.profileId);
+      if (latestPriorEndCol !== undefined && latestPriorEndCol < positionedEvent.startCol) {
+        positionedEvent.hasPriorSegment = true;
+        positionedEvent.priorEndCol = latestPriorEndCol;
+      }
+
+      if (latestPriorEndCol !== undefined && latestPriorEndCol + 1 === positionedEvent.startCol) {
+        positionedEvent.hasConnectedPriorSegment = true;
+        positionedEvent.connectedPriorEndCol = latestPriorEndCol;
+      }
+
+      latestEndColByProfileId.set(
+        positionedEvent.event.profileId,
+        Math.max(latestPriorEndCol ?? -1, positionedEvent.endCol)
+      );
+    });
+
+    positionedWeekEvents.sort((a, b) => {
+      if (a.startCol !== b.startCol) return a.startCol - b.startCol;
+      if (a.hasConnectedPriorSegment !== b.hasConnectedPriorSegment) {
+        return a.hasConnectedPriorSegment ? -1 : 1;
+      }
+      if (a.hasPriorSegment !== b.hasPriorSegment) {
+        return a.hasPriorSegment ? -1 : 1;
+      }
+      if ((a.connectedPriorEndCol ?? -1) !== (b.connectedPriorEndCol ?? -1)) {
+        return (b.connectedPriorEndCol ?? -1) - (a.connectedPriorEndCol ?? -1);
+      }
+      if ((a.priorEndCol ?? -1) !== (b.priorEndCol ?? -1)) {
+        return (b.priorEndCol ?? -1) - (a.priorEndCol ?? -1);
+      }
+      if (a.endCol !== b.endCol) return a.endCol - b.endCol;
+      return a.event.employeeName.localeCompare(b.event.employeeName);
+    });
 
     const laneEndByIndex: number[] = [];
     const segments: WeekSegment[] = [];
+    const latestSegmentByProfileId = new Map<string, WeekSegment>();
 
-    for (const event of weekEvents) {
-      const visibleStart = event.start > weekStart ? event.start : weekStart;
-      const visibleEnd = event.end < weekEnd ? event.end : weekEnd;
-      const startCol = Math.max(0, Math.floor((visibleStart.getTime() - weekStart.getTime()) / 86400000));
-      const endCol = Math.min(6, Math.floor((visibleEnd.getTime() - weekStart.getTime()) / 86400000));
+    for (const positionedEvent of positionedWeekEvents) {
+      const { event, startCol, endCol } = positionedEvent;
+      const previousSegment = latestSegmentByProfileId.get(event.profileId);
+      const preferredLane =
+        previousSegment && previousSegment.endCol < startCol
+          ? previousSegment.lane
+          : null;
 
-      let lane = laneEndByIndex.findIndex((laneEnd) => startCol > laneEnd);
+      let lane =
+        preferredLane !== null && startCol > (laneEndByIndex[preferredLane] ?? -1)
+          ? preferredLane
+          : -1;
+      if (lane === -1) {
+        lane = laneEndByIndex.findIndex((laneEnd) => startCol > laneEnd);
+      }
       if (lane === -1) {
         lane = laneEndByIndex.length;
         laneEndByIndex.push(endCol);
@@ -704,7 +777,9 @@ export function AbsenceCalendarAdmin() {
         laneEndByIndex[lane] = endCol;
       }
 
-      segments.push({ event, startCol, endCol, lane });
+      const nextSegment = { event, startCol, endCol, lane };
+      segments.push(nextSegment);
+      latestSegmentByProfileId.set(event.profileId, nextSegment);
     }
 
     return segments;
@@ -898,19 +973,14 @@ export function AbsenceCalendarAdmin() {
 
       <Card className="border-border">
         <CardHeader>
-          <div className="flex items-center justify-between mb-4">
-            <div>
+          <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-1">
               <CardTitle className="text-foreground">{format(currentMonth, 'MMMM yyyy')}</CardTitle>
               <CardDescription className="text-muted-foreground">
                 Detailed team calendar ({displayFinancialYear.label})
               </CardDescription>
-              {isSelectedFinancialYearClosed ? (
-                <p className="mt-2 text-xs text-amber-300">
-                  This financial year is closed and read-only.
-                </p>
-              ) : null}
             </div>
-            <div className="flex gap-2">
+            <div className="flex self-start gap-2">
               <Select
                 value={String(selectedFinancialYearStartYear)}
                 onValueChange={(value) => setSelectedFinancialYearStartYear(Number(value))}
@@ -967,6 +1037,18 @@ export function AbsenceCalendarAdmin() {
               </Button>
             </div>
           </div>
+
+          <div className="mb-3 flex justify-center">
+            <p className="inline-flex items-center rounded-full border border-border/70 bg-slate-100/80 px-4 py-1.5 text-center text-sm text-muted-foreground shadow-sm dark:bg-slate-800/60 dark:text-slate-300">
+              This calendar shows bookings for the full time-away, including days where the user is off shift.
+            </p>
+          </div>
+
+          {isSelectedFinancialYearClosed ? (
+            <p className="mb-1 text-center text-xs text-amber-300">
+              This financial year is closed and read-only.
+            </p>
+          ) : null}
 
           <div className="flex flex-wrap gap-4 pt-4 text-sm border-t border-border">
             {reasonLegend.map((reason) => (
