@@ -19,7 +19,7 @@ import Link from 'next/link';
 import { calculateStandardTimesheetHours, formatHours, roundTimeToNearestQuarterHour } from '@/lib/utils/time-calculations';
 import { DAY_NAMES } from '@/types/timesheet';
 import { Database } from '@/types/database';
-import { getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
+import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 import { isAdminRole } from '@/lib/utils/role-access';
 import { SignaturePad } from '@/components/forms/SignaturePad';
 import { fetchUKBankHolidays } from '@/lib/utils/bank-holidays';
@@ -1268,8 +1268,14 @@ export function CivilsTimesheet({
 
       router.push('/timesheets');
     } catch (err: unknown) {
-      console.error('Error saving timesheet:', err);
-      console.error('Error details:', JSON.stringify(err, null, 2));
+      const shouldLogError =
+        !isAuthErrorStatus(getErrorStatus(err)) &&
+        !isNetworkFetchError(err);
+
+      if (shouldLogError) {
+        console.error('Error saving timesheet:', err);
+        console.error('Error details:', JSON.stringify(err, null, 2));
+      }
       
       // Handle errors
       const error = err as { code?: string; message?: string; details?: string; hint?: string };

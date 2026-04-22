@@ -32,6 +32,7 @@ import { formatHours, roundTimeToNearestQuarterHour } from '@/lib/utils/time-cal
 import { SignaturePad } from '@/components/forms/SignaturePad';
 import { Database } from '@/types/database';
 import { isAdminRole } from '@/lib/utils/role-access';
+import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 import { Employee } from '@/types/common';
 import { toast } from 'sonner';
 import { TrainingDeclineDialog } from '../../components/TrainingDeclineDialog';
@@ -1101,7 +1102,13 @@ export function PlantTimesheetV2({
 
       router.push('/timesheets');
     } catch (saveError) {
-      console.error('Error saving plant timesheet:', saveError);
+      const shouldLogError =
+        !isAuthErrorStatus(getErrorStatus(saveError)) &&
+        !isNetworkFetchError(saveError);
+
+      if (shouldLogError) {
+        console.error('Error saving plant timesheet:', saveError);
+      }
       const typedError = saveError as { message?: string; code?: string };
 
       if (

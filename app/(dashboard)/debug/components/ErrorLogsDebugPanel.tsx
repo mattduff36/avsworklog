@@ -29,6 +29,7 @@ import { ErrorLogEntry } from '../types';
 type ErrorSeverity = 'urgent' | 'important' | 'medium' | 'low';
 
 const UNHANDLED_COMPONENTS = ['Global Error Handler', 'Unhandled Promise Rejection', 'Error Boundary'];
+const ERROR_SEVERITY_ORDER: ErrorSeverity[] = ['urgent', 'important', 'medium', 'low'];
 
 interface UserFacingMessageSnapshot {
   title: string | null;
@@ -133,19 +134,41 @@ function getErrorSeverity(log: ErrorLogEntry): ErrorSeverity {
   return 'urgent';
 }
 
-function getErrorBadgeProps(severity: ErrorSeverity): {
+function getErrorBadgeMeta(severity: ErrorSeverity): {
   variant: 'destructive' | 'warning' | 'secondary';
   className: string;
+  label: string;
+  description: string;
 } {
   switch (severity) {
     case 'urgent':
-      return { variant: 'destructive', className: 'font-mono text-xs' };
+      return {
+        variant: 'destructive',
+        className: 'font-mono text-xs',
+        label: 'Critical',
+        description: 'Unhandled or likely user-blocking. The app may not have shown a helpful recovery message.',
+      };
     case 'important':
-      return { variant: 'warning', className: 'font-mono text-xs' };
+      return {
+        variant: 'warning',
+        className: 'font-mono text-xs',
+        label: 'Handled with Message',
+        description: 'The app caught the issue and showed a toast, inline state, or modal to the user.',
+      };
     case 'medium':
-      return { variant: 'secondary', className: 'font-mono text-xs bg-yellow-500 text-black hover:bg-yellow-600' };
+      return {
+        variant: 'secondary',
+        className: 'font-mono text-xs bg-yellow-500 text-black hover:bg-yellow-600',
+        label: 'Console / Investigate',
+        description: 'Usually surfaced through console logging. Worth checking, but user impact can vary.',
+      };
     case 'low':
-      return { variant: 'secondary', className: 'font-mono text-xs bg-slate-500 text-white hover:bg-slate-600' };
+      return {
+        variant: 'secondary',
+        className: 'font-mono text-xs bg-slate-500 text-white hover:bg-slate-600',
+        label: 'Low Priority / API',
+        description: 'Often API-side, background, or lower-urgency telemetry with less direct UI impact.',
+      };
   }
 }
 
@@ -598,6 +621,36 @@ ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional
           )}
         </div>
 
+        <div className="mb-4 rounded-lg border border-border/70 bg-muted/30 px-3 py-3">
+          <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Badge Key</p>
+              <p className="text-xs text-muted-foreground">
+                Filled error badges show severity, not a different error type. Outline badges show extra context like classification, component, or device.
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+            {ERROR_SEVERITY_ORDER.map((severity) => {
+              const badgeMeta = getErrorBadgeMeta(severity);
+              return (
+                <div
+                  key={severity}
+                  className="flex items-start gap-2 rounded-md border border-border/60 bg-background/40 px-2.5 py-2"
+                >
+                  <Badge variant={badgeMeta.variant} className={`${badgeMeta.className} shrink-0`}>
+                    Error
+                  </Badge>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-foreground">{badgeMeta.label}</p>
+                    <p className="text-[11px] leading-4 text-muted-foreground">{badgeMeta.description}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
         {errorLogs.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <CheckCircle2 className="h-12 w-12 mx-auto mb-3 opacity-50 text-green-500" />
@@ -651,7 +704,7 @@ ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional
                           const browser = browserMatch ? browserMatch[0] : 'Unknown';
                           const isExpanded = expandedErrors.includes(log.id);
                           const severity = getErrorSeverity(log);
-                          const badgeProps = getErrorBadgeProps(severity);
+                          const badgeProps = getErrorBadgeMeta(severity);
                           const classification = getErrorClassification(log);
                           const userAction = getUserAction(log);
                           const userFacingMessage = getUserFacingMessage(log);
@@ -818,7 +871,7 @@ ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional
                           const browser = browserMatch ? browserMatch[0] : 'Unknown';
                           const isExpanded = expandedErrors.includes(log.id);
                           const severity = getErrorSeverity(log);
-                          const badgeProps = getErrorBadgeProps(severity);
+                          const badgeProps = getErrorBadgeMeta(severity);
                           const classification = getErrorClassification(log);
                           const userAction = getUserAction(log);
                           const userFacingMessage = getUserFacingMessage(log);

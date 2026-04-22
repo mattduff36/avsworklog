@@ -59,11 +59,10 @@ import {
 import { buildLeaveAwareTotals, formatLeaveAwareWeeklyDisplayMultiline } from '@/lib/utils/timesheet-leave-totals';
 import {
   getErrorMessage,
-  isNetworkFetchError,
   shouldLogAbsenceManageError,
 } from '@/lib/utils/absence-error-handling';
 import { isClientSessionPausedError } from '@/lib/app-auth/session-error';
-import { getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
+import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 
 const APPROVALS_PAGE_SIZE = 50;
 
