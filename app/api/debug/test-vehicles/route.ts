@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/lib/supabase/server';
-import { getProfileWithRole } from '@/lib/utils/permissions';
+import { getEffectiveRole } from '@/lib/utils/view-as';
+import { canAccessDebugConsole } from '@/lib/utils/debug-access';
 import { logServerError } from '@/lib/utils/server-error-logger';
 
 type FleetItem = {
@@ -41,13 +42,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check SuperAdmin access
-    const profile = await getProfileWithRole(user.id);
-    const isSuperAdmin = user.email === 'admin@mpdee.co.uk' || profile?.role?.is_super_admin === true;
+    const effectiveRole = await getEffectiveRole();
+    const canAccessDebugTools = canAccessDebugConsole({
+      email: user.email,
+      isActualSuperAdmin: effectiveRole.is_actual_super_admin,
+      isViewingAs: effectiveRole.is_viewing_as,
+    });
 
-    if (!isSuperAdmin) {
+    if (!canAccessDebugTools) {
       return NextResponse.json(
-        { error: 'Forbidden: SuperAdmin access required' },
+        { error: 'Forbidden: Debug access required' },
         { status: 403 }
       );
     }
@@ -155,13 +159,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check SuperAdmin access
-    const profile = await getProfileWithRole(user.id);
-    const isSuperAdmin = user.email === 'admin@mpdee.co.uk' || profile?.role?.is_super_admin === true;
+    const effectiveRole = await getEffectiveRole();
+    const canAccessDebugTools = canAccessDebugConsole({
+      email: user.email,
+      isActualSuperAdmin: effectiveRole.is_actual_super_admin,
+      isViewingAs: effectiveRole.is_viewing_as,
+    });
 
-    if (!isSuperAdmin) {
+    if (!canAccessDebugTools) {
       return NextResponse.json(
-        { error: 'Forbidden: SuperAdmin access required' },
+        { error: 'Forbidden: Debug access required' },
         { status: 403 }
       );
     }
@@ -495,13 +502,16 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check SuperAdmin access
-    const profile = await getProfileWithRole(user.id);
-    const isSuperAdmin = user.email === 'admin@mpdee.co.uk' || profile?.role?.is_super_admin === true;
+    const effectiveRole = await getEffectiveRole();
+    const canAccessDebugTools = canAccessDebugConsole({
+      email: user.email,
+      isActualSuperAdmin: effectiveRole.is_actual_super_admin,
+      isViewingAs: effectiveRole.is_viewing_as,
+    });
 
-    if (!isSuperAdmin) {
+    if (!canAccessDebugTools) {
       return NextResponse.json(
-        { error: 'Forbidden: SuperAdmin access required' },
+        { error: 'Forbidden: Debug access required' },
         { status: 403 }
       );
     }

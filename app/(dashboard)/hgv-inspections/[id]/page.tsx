@@ -162,7 +162,7 @@ export default function ViewHgvInspectionPage() {
           .eq('inspection_id', id)
           .order('item_number'),
         fetchInspectionLinks(id, 'hgv').catch((linkedTasksError) => {
-          console.error('Error fetching linked HGV inspection tasks:', linkedTasksError);
+          console.warn('Unable to load linked HGV inspection tasks:', linkedTasksError);
           return [];
         }),
       ]);

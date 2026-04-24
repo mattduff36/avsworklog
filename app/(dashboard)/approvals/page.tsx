@@ -739,11 +739,23 @@ function ApprovalsContent() {
     setDateTo('');
   };
 
-  const payrollStatusHelperText =
-    (activeTab === 'timesheets' && timesheetFilter === 'pending') ||
-    (activeTab === 'absences' && absenceStatusFilter === 'approved')
-      ? 'These approvals are designed to be processed by Payroll'
-      : null;
+  const approvalsStatusHelperText = (() => {
+    if (
+      (activeTab === 'timesheets' && timesheetFilter === 'pending') ||
+      (activeTab === 'absences' && absenceStatusFilter === 'approved')
+    ) {
+      return 'These approvals are designed to be processed by Payroll';
+    }
+
+    if (
+      (activeTab === 'timesheets' && timesheetFilter === 'approved') ||
+      (activeTab === 'absences' && absenceStatusFilter === 'pending')
+    ) {
+      return 'These approvals are designed to be processed by Team Managers';
+    }
+
+    return null;
+  })();
 
   const handleTabChange = (tab: string) => {
     if (tab !== 'timesheets' && tab !== 'absences') return;
@@ -934,10 +946,10 @@ function ApprovalsContent() {
               />
             </div>
           </div>
-          {payrollStatusHelperText ? (
+          {approvalsStatusHelperText ? (
             <div className="mt-4 flex justify-center">
               <p className="inline-flex items-center rounded-full border border-border/70 bg-slate-100/80 px-4 py-1.5 text-center text-sm text-muted-foreground shadow-sm dark:bg-slate-800/60 dark:text-slate-300">
-                {payrollStatusHelperText}
+                {approvalsStatusHelperText}
               </p>
             </div>
           ) : null}

@@ -15,6 +15,7 @@ import {
   getMileageBasedStatus,
 } from '@/lib/utils/maintenanceCalculations';
 import { getDashboardApprovalsMetrics } from '@/lib/server/dashboard-approvals';
+import { canAccessDebugConsole } from '@/lib/utils/debug-access';
 
 type PermissionMap = Record<(typeof ALL_MODULES)[number], boolean>;
 
@@ -329,7 +330,7 @@ async function getSuggestionBadgeMetrics(supabase: SupabaseClient<Database>): Pr
 }
 
 export async function GET() {
-  const current = await getCurrentAuthenticatedProfile();
+  const current = await getCurrentAuthenticatedProfile({ includeEmail: true });
   if (!current) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -349,6 +350,11 @@ export async function GET() {
   const canViewSuggestions = permissions.suggestions;
   const canViewErrorReports = permissions['error-reports'];
   const canViewQuotes = permissions.quotes;
+  const canAccessDebugTools = canAccessDebugConsole({
+    email: current.profile.email,
+    isActualSuperAdmin: effectiveRole.is_actual_super_admin,
+    isViewingAs: effectiveRole.is_viewing_as,
+  });
 
   const [
     approvalsMetrics,
@@ -407,7 +413,7 @@ export async function GET() {
           supabase.from('quotes').select('id', { count: 'exact', head: true }).eq('status', 'pending_internal_approval')
         )
       : Promise.resolve({ count: 0, error: null }),
-    effectiveRole.is_actual_super_admin
+    canAccessDebugTools
       ? resolveCountMetric(
           'error logs',
           supabase.from('error_logs').select('id', { count: 'exact', head: true })

@@ -378,6 +378,119 @@ describe('GET /api/dashboard/summary', () => {
     });
   });
 
+  it('returns error log badge counts for Charlotte debug access', async () => {
+    const { createClient } = await import('@/lib/supabase/server');
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+    const { getEffectiveRole } = await import('@/lib/utils/view-as');
+    const { getPermissionMapForUser } = await import('@/lib/server/team-permissions');
+    const { getActorAbsenceSecondaryPermissions } = await import('@/lib/server/absence-secondary-permissions');
+
+    vi.mocked(getCurrentAuthenticatedProfile).mockResolvedValue({
+      profile: {
+        id: 'charlotte-id',
+        email: 'charlotte@avsquires.co.uk',
+      },
+      validation: {
+        cookieValue: null,
+        cookieExpiresAt: null,
+      },
+    } as never);
+    vi.mocked(getEffectiveRole).mockResolvedValue({
+      role_id: 'role-admin',
+      role_name: 'admin',
+      role_class: 'admin',
+      display_name: 'Admin',
+      is_manager_admin: true,
+      is_super_admin: false,
+      is_viewing_as: false,
+      is_actual_super_admin: false,
+      user_id: 'charlotte-id',
+      team_id: 'team-accounts',
+      team_name: 'Accounts',
+    });
+    vi.mocked(getPermissionMapForUser).mockResolvedValue({
+      timesheets: false,
+      inspections: false,
+      'plant-inspections': false,
+      'hgv-inspections': false,
+      rams: false,
+      absence: false,
+      maintenance: false,
+      'toolbox-talks': false,
+      'workshop-tasks': false,
+      approvals: false,
+      actions: false,
+      reports: false,
+      suggestions: false,
+      'faq-editor': false,
+      'error-reports': false,
+      'admin-users': false,
+      'admin-settings': false,
+      'admin-vans': false,
+      customers: false,
+      quotes: false,
+    });
+    vi.mocked(getActorAbsenceSecondaryPermissions).mockResolvedValue({
+      user_id: 'charlotte-id',
+      team_id: 'team-accounts',
+      team_name: 'Accounts',
+      role_name: 'admin',
+      role_display_name: 'Admin',
+      role_tier: 'admin',
+      defaults: {} as never,
+      overrides: {} as never,
+      effective: {
+        authorise_bookings_all: true,
+        authorise_bookings_team: true,
+        authorise_bookings_own: true,
+      } as never,
+      has_exception_row: false,
+    } as never);
+
+    const supabase = {
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'charlotte-id' } },
+          error: null,
+        }),
+      },
+      from: (table: string) => {
+        if (table === 'error_logs') {
+          return { select: () => createCountQuery(7) };
+        }
+        if (table === 'suggestions') {
+          return {
+            select: () => Promise.resolve({
+              data: [],
+              error: null,
+            }),
+          };
+        }
+        if (table === 'suggestion_updates') {
+          return {
+            select: () => ({
+              order: vi.fn().mockResolvedValue({
+                data: [],
+                error: null,
+              }),
+            }),
+          };
+        }
+
+        return { select: () => createCountQuery(0) };
+      },
+    };
+
+    vi.mocked(createAdminClient).mockReturnValue(supabase as never);
+    vi.mocked(createClient).mockResolvedValue(supabase as unknown as SupabaseClient);
+
+    const response = await GET();
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.metrics.badges.error_logs).toBe(7);
+  });
+
   it('returns workshop and maintenance tile badge counts without actions permission', async () => {
     const { createClient } = await import('@/lib/supabase/server');
     const { createAdminClient } = await import('@/lib/supabase/admin');

@@ -15,6 +15,7 @@ import { RAMSErrorBoundary } from '@/components/rams/RAMSErrorBoundary';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { loadClientAuthSession } from '@/lib/app-auth/client-session';
 import { isClientSessionPausedError } from '@/lib/app-auth/session-error';
+import { isNetworkFetchError } from '@/lib/utils/http-error';
 
 interface RAMSDocument {
   id: string;
@@ -50,7 +51,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
 }
 
 function shouldLogRamSError(error: unknown): boolean {
-  return !isClientSessionPausedError(error);
+  return !isClientSessionPausedError(error) && !isNetworkFetchError(error);
 }
 
 function ReadRAMSContent() {

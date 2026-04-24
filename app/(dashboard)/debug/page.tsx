@@ -11,6 +11,7 @@ import { PageLoader } from '@/components/ui/page-loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Bug, Car, Clock, Database, History, RefreshCw, Send, ShieldAlert, Users } from 'lucide-react';
 import { toast } from 'sonner';
+import { canAccessDebugConsole } from '@/lib/utils/debug-access';
 import { DebugInfo } from './types';
 
 const AuditLogDebugPanel = dynamic(() => import('./components/AuditLogDebugPanel').then((mod) => ({ default: mod.AuditLogDebugPanel })));
@@ -41,6 +42,12 @@ export default function DebugPage() {
   const searchParams = useSearchParams();
   const supabase = useBrowserSupabaseClient();
 
+  const canAccessDebugTools = canAccessDebugConsole({
+    email: profile?.email,
+    isActualSuperAdmin,
+    isViewingAs,
+  });
+
   useEffect(() => {
     if (authLoading) {
       return;
@@ -51,17 +58,12 @@ export default function DebugPage() {
       return;
     }
 
-    if (!isActualSuperAdmin) {
-      toast.error('Access denied: SuperAdmin only');
+    if (!canAccessDebugTools) {
+      toast.error('Access denied: Debug tools access required');
       router.push('/dashboard');
       return;
     }
-
-    if (isViewingAs) {
-      toast.error('Debug console only available in Actual Role mode');
-      router.push('/dashboard');
-    }
-  }, [authLoading, isActualSuperAdmin, isViewingAs, profile, router]);
+  }, [authLoading, canAccessDebugTools, profile, router]);
 
   const debugInfo: DebugInfo = {
     environment: process.env.NODE_ENV || 'development',
@@ -90,7 +92,7 @@ export default function DebugPage() {
     return <PageLoader message="Loading debug tools..." />;
   }
 
-  if (!profile || !isActualSuperAdmin || isViewingAs) {
+  if (!profile || !canAccessDebugTools) {
     return null;
   }
 
@@ -100,7 +102,7 @@ export default function DebugPage() {
         <div className="flex items-center gap-3">
           <Bug className="h-6 md:h-8 w-6 md:w-8" />
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold mb-1 md:mb-2">SuperAdmin Debug Console</h1>
+            <h1 className="text-2xl md:text-3xl font-bold mb-1 md:mb-2">Debug Console</h1>
             <p className="text-sm md:text-base text-red-100">Developer tools and system information</p>
           </div>
         </div>
@@ -136,7 +138,7 @@ export default function DebugPage() {
               <span className="hidden md:inline">Access</span>
               <span className="md:hidden">Role</span>
             </CardDescription>
-            <CardTitle className="text-xs md:text-base font-bold text-red-600 dark:text-red-400">SuperAdmin</CardTitle>
+            <CardTitle className="text-xs md:text-base font-bold text-red-600 dark:text-red-400">Debug Access</CardTitle>
           </CardHeader>
         </Card>
 

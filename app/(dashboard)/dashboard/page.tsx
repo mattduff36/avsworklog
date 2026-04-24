@@ -25,6 +25,7 @@ import { managerNavItems, adminNavItems, getFilteredNavByPermissions } from '@/l
 import { usePermissionSnapshot } from '@/lib/hooks/usePermissionSnapshot';
 import { useRamsAssignmentSummary } from '@/lib/hooks/useNavMetrics';
 import { getErrorStatus, isAuthErrorStatus, createStatusError } from '@/lib/utils/http-error';
+import { canAccessDebugConsole } from '@/lib/utils/debug-access';
 
 type PendingApprovalCount = {
   type: 'timesheets' | 'absences';
@@ -126,6 +127,11 @@ export default function DashboardPage() {
   const headerSubtitle = dashboardTeamName ? `${dashboardTeamName} · ${roleLabel}` : roleLabel;
 
   const canViewApprovals = userPermissions.has('approvals');
+  const canAccessDebugTools = canAccessDebugConsole({
+    email: profile?.email,
+    isActualSuperAdmin,
+    isViewingAs,
+  });
 
   function buildPendingApprovalsSummary(timesheetsCount: number, absencesCount: number): PendingApprovalCount[] {
     return [
@@ -587,7 +593,7 @@ export default function DashboardPage() {
             })}
             
             {/* SuperAdmin Only - Debug Link (only when viewing as actual role) */}
-            {(isActualSuperAdmin || profile?.role?.is_super_admin) && !isViewingAs && (() => {
+            {canAccessDebugTools && (() => {
               const Icon = Bug;
               const animationIndex = renderedManagementTiles.length;
               

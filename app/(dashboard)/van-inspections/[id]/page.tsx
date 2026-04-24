@@ -160,7 +160,7 @@ export default function ViewInspectionPage() {
           .eq('inspection_id', id)
           .order('item_number'),
         fetchInspectionLinks(id, 'van').catch((linkedTasksError) => {
-          console.error('Error fetching linked van inspection tasks:', linkedTasksError);
+          console.warn('Unable to load linked van inspection tasks:', linkedTasksError);
           return [];
         }),
       ]);

@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
 import { getEffectiveRole } from '@/lib/utils/view-as';
+import { canAccessDebugConsole } from '@/lib/utils/debug-access';
 import type { Database } from '@/types/database';
 
 type ErrorLogInsertRow = Database['public']['Tables']['error_logs']['Insert'];
@@ -23,7 +24,7 @@ function clampLimit(limit: number): number {
 }
 
 export async function requireErrorLogAdminAccess(): Promise<ErrorLogAccessResult> {
-  const current = await getCurrentAuthenticatedProfile();
+  const current = await getCurrentAuthenticatedProfile({ includeEmail: true });
   if (!current) {
     return {
       ok: false,
@@ -33,19 +34,15 @@ export async function requireErrorLogAdminAccess(): Promise<ErrorLogAccessResult
   }
 
   const effectiveRole = await getEffectiveRole();
-  if (!effectiveRole.is_actual_super_admin) {
+  if (!canAccessDebugConsole({
+    email: current.profile.email,
+    isActualSuperAdmin: effectiveRole.is_actual_super_admin,
+    isViewingAs: effectiveRole.is_viewing_as,
+  })) {
     return {
       ok: false,
       status: 403,
       error: 'Forbidden',
-    };
-  }
-
-  if (effectiveRole.is_viewing_as) {
-    return {
-      ok: false,
-      status: 403,
-      error: 'Debug console only available in Actual Role mode',
     };
   }
 

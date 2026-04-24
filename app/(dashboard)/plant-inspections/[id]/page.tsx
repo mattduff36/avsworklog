@@ -191,7 +191,7 @@ export default function ViewPlantInspectionPage() {
           .eq('inspection_id', id)
           .order('item_number'),
         fetchInspectionLinks(id, 'plant').catch((linkedTasksError) => {
-          console.error('Error fetching linked plant inspection tasks:', linkedTasksError);
+          console.warn('Unable to load linked plant inspection tasks:', linkedTasksError);
           return [];
         }),
       ]);
