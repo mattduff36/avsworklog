@@ -66,6 +66,7 @@ import type { WorkShiftPattern } from '@/types/work-shifts';
 import {
   buildValidationErrors,
   createBlankEntry,
+  getMachineMirrorUpdates,
   isPlantEntryComplete,
   parseHoursInput,
   recalculateEntry,
@@ -744,9 +745,15 @@ export function PlantTimesheetV2({
     setEntries((current) => {
       const next = [...current];
       const offDayState = getOffDayForIndex(dayIndex);
+      const currentEntry = next[dayIndex];
+      const machineMirrorUpdates =
+        typeof normalizedValue === 'string' && (field === 'time_started' || field === 'time_finished')
+          ? getMachineMirrorUpdates(currentEntry, field, normalizedValue)
+          : {};
       const updated = recalculateEntry({
-        ...next[dayIndex],
+        ...currentEntry,
         [field]: normalizedValue,
+        ...machineMirrorUpdates,
       } as PlantEntryDraft, getRecalculateOptionsForOffDay(offDayState));
       next[dayIndex] = updated;
       return next;

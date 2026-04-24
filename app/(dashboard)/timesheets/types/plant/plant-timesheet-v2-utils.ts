@@ -130,6 +130,24 @@ export function recalculateEntry(entry: PlantEntryDraft, options: RecalculateEnt
   };
 }
 
+export function getMachineMirrorUpdates(
+  entry: PlantEntryDraft,
+  field: 'time_started' | 'time_finished',
+  nextValue: string
+): Partial<PlantEntryDraft> {
+  if (field === 'time_started') {
+    const shouldMirrorMachineStart =
+      entry.machine_start_time.length === 0 || entry.machine_start_time === entry.time_started;
+
+    return shouldMirrorMachineStart ? { machine_start_time: nextValue } : {};
+  }
+
+  const shouldMirrorMachineFinish =
+    entry.machine_finish_time.length === 0 || entry.machine_finish_time === entry.time_finished;
+
+  return shouldMirrorMachineFinish ? { machine_finish_time: nextValue } : {};
+}
+
 export function buildValidationErrors(entries: PlantEntryDraft[]): Record<number, string> {
   const next: Record<number, string> = {};
   entries.forEach((entry, index) => {

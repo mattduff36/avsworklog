@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildValidationErrors,
+  getMachineMirrorUpdates,
   isPlantEntryComplete,
   recalculateEntry,
   type PlantEntryDraft,
@@ -132,6 +133,45 @@ describe('PlantTimesheetV2 calculations', () => {
 
     const errors = buildValidationErrors([recalculated]);
     expect(errors).toEqual({});
+  });
+
+  it('mirrors operator start time into machine start when machine start is blank', () => {
+    const updates = getMachineMirrorUpdates(
+      createEntry({
+        time_started: '08:00',
+        machine_start_time: '',
+      }),
+      'time_started',
+      '09:00'
+    );
+
+    expect(updates).toEqual({ machine_start_time: '09:00' });
+  });
+
+  it('keeps machine start manual overrides when operator start changes later', () => {
+    const updates = getMachineMirrorUpdates(
+      createEntry({
+        time_started: '08:00',
+        machine_start_time: '07:30',
+      }),
+      'time_started',
+      '09:00'
+    );
+
+    expect(updates).toEqual({});
+  });
+
+  it('mirrors operator finish time into machine finish while values stay in sync', () => {
+    const updates = getMachineMirrorUpdates(
+      createEntry({
+        time_finished: '16:00',
+        machine_finish_time: '16:00',
+      }),
+      'time_finished',
+      '17:00'
+    );
+
+    expect(updates).toEqual({ machine_finish_time: '17:00' });
   });
 
   it('marks entries complete using civils parity rules', () => {
