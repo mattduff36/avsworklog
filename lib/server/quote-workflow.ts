@@ -1,6 +1,7 @@
 import pg from 'pg';
 import { renderToStream } from '@react-pdf/renderer';
 import { QuotePDF } from '@/lib/pdf/quote-pdf';
+import { loadSquiresLogoDataUrl } from '@/lib/pdf/squires-logo';
 import { getQuotesCustomersEmailConfig } from '@/lib/server/quotes-customers-email-config';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { Database } from '@/types/database';
@@ -384,6 +385,8 @@ function getDefaultFromEmail(): string {
 }
 
 export async function renderQuotePdfAttachment(bundle: QuoteBundle): Promise<EmailAttachment> {
+  const logoSrc = await loadSquiresLogoDataUrl();
+
   const pdfDocument = QuotePDF({
     quoteReference: bundle.quote.quote_reference,
     baseQuoteReference: bundle.quote.base_quote_reference,
@@ -408,6 +411,7 @@ export async function renderQuotePdfAttachment(bundle: QuoteBundle): Promise<Ema
     signoffTitle: bundle.quote.signoff_title || '',
     versionLabel: bundle.quote.version_label || buildVersionLabel(bundle.quote.revision_type, bundle.quote.revision_number),
     customFooterText: bundle.quote.custom_footer_text || undefined,
+    logoSrc,
   });
 
   const stream = await renderToStream(pdfDocument);

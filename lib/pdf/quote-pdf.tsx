@@ -1,204 +1,358 @@
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet, Link } from '@react-pdf/renderer';
+import { Document, Image, Link, Page, StyleSheet, Text, View } from '@react-pdf/renderer';
 import { format } from 'date-fns';
+
+const BRAND_YELLOW = '#f2cc0c';
+const BRAND_YELLOW_LIGHT = '#fff6cc';
+const BRAND_TEXT = '#111827';
+const BRAND_MUTED = '#475569';
+const BRAND_BORDER = '#cbd5e1';
+const BRAND_BORDER_DARK = '#94a3b8';
 
 const styles = StyleSheet.create({
   page: {
-    padding: 40,
-    paddingBottom: 80,
-    fontSize: 10,
+    padding: 36,
+    paddingBottom: 78,
+    fontSize: 9.5,
     fontFamily: 'Helvetica',
-    color: '#1e293b',
+    color: BRAND_TEXT,
   },
-  /* ---- Header block ---- */
+  header: {
+    marginBottom: 18,
+    borderBottom: `2pt solid ${BRAND_YELLOW}`,
+    paddingBottom: 12,
+  },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    alignItems: 'flex-start',
   },
-  contactCol: {
+  headerMeta: {
+    flex: 1,
+    paddingRight: 16,
+  },
+  eyebrow: {
     fontSize: 8,
-    color: '#475569',
-    lineHeight: 1.4,
-  },
-  companyName: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#1e293b',
-    textAlign: 'right',
-  },
-  companySubtitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#64748b',
-    textAlign: 'right',
-    marginBottom: 2,
-  },
-  addressLine: {
-    fontSize: 8,
-    color: '#475569',
-    textAlign: 'center',
-    marginTop: 6,
-    marginBottom: 12,
-  },
-  headerDivider: {
-    borderBottom: '2pt solid #1e293b',
-    marginBottom: 14,
-  },
-
-  /* ---- Quote meta row ---- */
-  metaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 4,
+    color: BRAND_MUTED,
+    letterSpacing: 1,
   },
   quoteRef: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: BRAND_TEXT,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  versionText: {
+    fontSize: 9,
+    color: BRAND_MUTED,
+    marginTop: 2,
+  },
+  dateBadge: {
+    alignSelf: 'flex-start',
+    marginTop: 10,
+    backgroundColor: BRAND_YELLOW_LIGHT,
+    border: `1pt solid ${BRAND_YELLOW}`,
+    borderRadius: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  dateLabel: {
+    fontSize: 7,
+    color: BRAND_MUTED,
+    marginBottom: 2,
+  },
+  dateValue: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: BRAND_TEXT,
+  },
+  logoWrap: {
+    width: 180,
+    alignItems: 'flex-end',
+  },
+  logo: {
+    width: 180,
+    height: 96,
+    objectFit: 'contain',
+  },
+  fallbackCompanyName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'right',
+    color: BRAND_TEXT,
+    marginBottom: 4,
+  },
+  fallbackCompanySubtitle: {
+    fontSize: 11,
+    textAlign: 'right',
+    color: BRAND_MUTED,
+  },
+  contactStrip: {
+    marginTop: 12,
+    backgroundColor: BRAND_YELLOW_LIGHT,
+    border: `1pt solid ${BRAND_YELLOW}`,
+    borderRadius: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    flexDirection: 'row',
+  },
+  contactItem: {
+    width: '33.33%',
+    paddingRight: 8,
+  },
+  contactLabel: {
+    fontSize: 7,
+    color: BRAND_MUTED,
+    marginBottom: 2,
+  },
+  contactValue: {
+    fontSize: 8.5,
+    color: BRAND_TEXT,
+    fontWeight: 'bold',
+    lineHeight: 1.4,
+  },
+  recipientCard: {
+    marginBottom: 14,
+    border: `1pt solid ${BRAND_BORDER}`,
+    borderLeft: `4pt solid ${BRAND_YELLOW}`,
+    borderRadius: 4,
+    padding: 12,
+    backgroundColor: '#ffffff',
+  },
+  sectionEyebrow: {
+    fontSize: 7.5,
+    color: BRAND_MUTED,
+    marginBottom: 4,
+    letterSpacing: 0.8,
+  },
+  recipientName: {
     fontSize: 11,
     fontWeight: 'bold',
-  },
-  quoteDate: {
-    fontSize: 10,
-    color: '#475569',
-  },
-  attentionBlock: {
-    marginBottom: 16,
-  },
-  attentionBold: {
-    fontWeight: 'bold',
-    fontSize: 10,
+    color: BRAND_TEXT,
+    marginBottom: 3,
   },
   emailLink: {
     fontSize: 9,
-    color: '#2563eb',
+    color: '#1d4ed8',
     textDecoration: 'underline',
   },
   salutation: {
-    marginTop: 14,
-    marginBottom: 14,
+    marginBottom: 12,
     fontSize: 10,
+    color: BRAND_TEXT,
   },
   introText: {
     fontSize: 10,
     marginBottom: 14,
+    lineHeight: 1.45,
+    color: BRAND_TEXT,
+  },
+  subjectCard: {
+    marginBottom: 16,
+    padding: 14,
+    backgroundColor: '#f8fafc',
+    border: `1pt solid ${BRAND_BORDER}`,
+    borderLeft: `4pt solid ${BRAND_YELLOW}`,
+    borderRadius: 4,
+  },
+  subjectTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: BRAND_TEXT,
+    marginBottom: 4,
+  },
+  subjectDescription: {
+    fontSize: 10,
+    color: BRAND_MUTED,
+    marginBottom: 10,
+    lineHeight: 1.45,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    marginTop: 4,
+  },
+  detailLabel: {
+    width: 82,
+    fontSize: 8.5,
+    fontWeight: 'bold',
+    color: BRAND_MUTED,
+  },
+  detailValue: {
+    flex: 1,
+    fontSize: 9.5,
+    color: BRAND_TEXT,
     lineHeight: 1.4,
   },
-
-  /* ---- Project/Subject ---- */
-  subjectBlock: {
-    marginBottom: 10,
+  detailLink: {
+    flex: 1,
+    fontSize: 9.5,
+    color: '#1d4ed8',
+    textDecoration: 'underline',
   },
-  subjectBold: {
+  tableLabel: {
+    fontSize: 10,
     fontWeight: 'bold',
-    fontSize: 10,
+    color: BRAND_TEXT,
+    marginBottom: 6,
   },
-  subjectNormal: {
-    fontSize: 10,
-    marginBottom: 2,
-  },
-
-  /* ---- Line items table ---- */
   table: {
-    marginTop: 4,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#1e293b',
+    marginBottom: 12,
+    border: `1pt solid ${BRAND_BORDER_DARK}`,
+    borderRadius: 4,
+    overflow: 'hidden',
   },
   tableHeader: {
     flexDirection: 'row',
-    backgroundColor: '#f1f5f9',
-    borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
+    backgroundColor: BRAND_YELLOW,
+  },
+  tableHeaderText: {
+    fontSize: 8.5,
+    fontWeight: 'bold',
+    color: BRAND_TEXT,
   },
   tableRow: {
     flexDirection: 'row',
-    borderBottomWidth: 0.5,
-    borderBottomColor: '#cbd5e1',
+    borderTop: `1pt solid ${BRAND_BORDER}`,
+    backgroundColor: '#ffffff',
   },
-  tableRowLast: {
+  tableRowAlt: {
     flexDirection: 'row',
+    borderTop: `1pt solid ${BRAND_BORDER}`,
+    backgroundColor: '#f8fafc',
   },
-  colItem: { width: '40%', padding: 6, fontWeight: 'bold', fontSize: 9 },
-  colQty: { width: '15%', padding: 6, textAlign: 'right', fontSize: 9 },
-  colRate: { width: '20%', padding: 6, textAlign: 'right', fontSize: 9 },
-  colTotal: { width: '25%', padding: 6, textAlign: 'right', fontSize: 9 },
-  colItemHeader: { width: '40%', padding: 6, fontWeight: 'bold', fontSize: 9 },
-  colQtyHeader: { width: '15%', padding: 6, textAlign: 'right', fontWeight: 'bold', fontSize: 9 },
-  colRateHeader: { width: '20%', padding: 6, textAlign: 'right', fontWeight: 'bold', fontSize: 9 },
-  colTotalHeader: { width: '25%', padding: 6, textAlign: 'right', fontWeight: 'bold', fontSize: 9 },
-
-  /* ---- Totals ---- */
+  colItemHeader: {
+    width: '40%',
+    padding: 8,
+  },
+  colQtyHeader: {
+    width: '15%',
+    padding: 8,
+    textAlign: 'right',
+  },
+  colRateHeader: {
+    width: '20%',
+    padding: 8,
+    textAlign: 'right',
+  },
+  colTotalHeader: {
+    width: '25%',
+    padding: 8,
+    textAlign: 'right',
+  },
+  colItem: {
+    width: '40%',
+    padding: 8,
+    fontSize: 9,
+    color: BRAND_TEXT,
+    fontWeight: 'bold',
+  },
+  colQty: {
+    width: '15%',
+    padding: 8,
+    textAlign: 'right',
+    fontSize: 9,
+    color: BRAND_TEXT,
+  },
+  colRate: {
+    width: '20%',
+    padding: 8,
+    textAlign: 'right',
+    fontSize: 9,
+    color: BRAND_TEXT,
+  },
+  colTotal: {
+    width: '25%',
+    padding: 8,
+    textAlign: 'right',
+    fontSize: 9,
+    color: BRAND_TEXT,
+  },
   totalRow: {
     flexDirection: 'row',
-    backgroundColor: '#f8fafc',
-    borderTopWidth: 1,
-    borderTopColor: '#1e293b',
+    borderTop: `1pt solid ${BRAND_BORDER_DARK}`,
+    backgroundColor: BRAND_YELLOW_LIGHT,
   },
   totalLabel: {
     width: '75%',
-    padding: 6,
+    padding: 9,
     fontWeight: 'bold',
-    fontSize: 10,
+    fontSize: 10.5,
+    color: BRAND_TEXT,
   },
   totalValue: {
     width: '25%',
-    padding: 6,
+    padding: 9,
     textAlign: 'right',
     fontWeight: 'bold',
-    fontSize: 10,
+    fontSize: 10.5,
+    color: BRAND_TEXT,
   },
-
-  /* ---- Footer text ---- */
-  disclaimerText: {
+  notesPanel: {
+    marginTop: 2,
+    padding: 12,
+    backgroundColor: BRAND_YELLOW_LIGHT,
+    border: `1pt solid ${BRAND_YELLOW}`,
+    borderRadius: 4,
+  },
+  notesPrimary: {
+    fontSize: 9.5,
+    color: BRAND_TEXT,
+    fontWeight: 'bold',
+    marginBottom: 6,
+  },
+  notesSecondary: {
     fontSize: 9,
-    color: '#475569',
-    marginTop: 14,
+    color: BRAND_MUTED,
     lineHeight: 1.5,
   },
   signoff: {
-    marginTop: 30,
+    marginTop: 24,
+  },
+  signoffRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
   signoffLine: {
     fontSize: 10,
-    color: '#475569',
+    color: BRAND_TEXT,
   },
   signoffName: {
-    fontSize: 10,
+    fontSize: 10.5,
     fontWeight: 'bold',
-    marginTop: 2,
+    color: BRAND_TEXT,
+    marginTop: 3,
   },
   signoffTitle: {
-    fontSize: 10,
-    color: '#475569',
+    fontSize: 9.5,
+    color: BRAND_MUTED,
+    marginTop: 2,
   },
   eAndOe: {
-    position: 'absolute',
-    right: 40,
-    fontSize: 10,
-    color: '#475569',
+    fontSize: 9,
+    color: BRAND_MUTED,
   },
-
-  /* ---- Page footer ---- */
   footer: {
     position: 'absolute',
-    bottom: 30,
-    left: 40,
-    right: 40,
-    textAlign: 'right',
-    fontSize: 8,
-    color: '#94a3b8',
-    lineHeight: 1.4,
+    bottom: 28,
+    left: 36,
+    right: 36,
+    paddingTop: 8,
+    borderTop: `1pt solid ${BRAND_BORDER}`,
   },
   footerServices: {
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: 'bold',
-    color: '#1e293b',
-    textAlign: 'right',
-    marginBottom: 2,
+    color: BRAND_TEXT,
+    textAlign: 'center',
+    marginBottom: 3,
   },
-  footerRegNo: {
-    fontSize: 7,
-    color: '#94a3b8',
-    textAlign: 'right',
+  footerDetails: {
+    fontSize: 7.5,
+    color: BRAND_MUTED,
+    textAlign: 'center',
+    lineHeight: 1.4,
   },
 });
 
@@ -232,6 +386,12 @@ interface QuotePDFProps {
   signoffTitle: string;
   versionLabel?: string;
   customFooterText?: string;
+  logoSrc?: string | null;
+}
+
+function formatQuantity(item: LineItem): string {
+  if (item.unit) return `${item.quantity} ${item.unit}`;
+  return `${item.quantity}`;
 }
 
 export function QuotePDF({
@@ -252,6 +412,7 @@ export function QuotePDF({
   signoffTitle,
   versionLabel,
   customFooterText,
+  logoSrc = null,
 }: QuotePDFProps) {
   const formattedDate = (() => {
     try {
@@ -271,41 +432,61 @@ export function QuotePDF({
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        {/* Header */}
-        <View style={styles.headerRow}>
-          <View style={styles.contactCol}>
-            <Text>01636 812227</Text>
-            <Text>OFFICE@AVSQUIRES.CO.UK</Text>
-            <Text>AVSQUIRES.CO.UK</Text>
+        <View style={styles.header}>
+          <View style={styles.headerRow}>
+            <View style={styles.headerMeta}>
+              <Text style={styles.eyebrow}>QUOTATION</Text>
+              <Text style={styles.quoteRef}>{quoteReference}</Text>
+              {versionLabel && versionLabel !== 'Original' && (
+                <Text style={styles.versionText}>Version: {versionLabel}</Text>
+              )}
+              {baseQuoteReference && baseQuoteReference !== quoteReference && (
+                <Text style={styles.versionText}>Base quote: {baseQuoteReference}</Text>
+              )}
+              <View style={styles.dateBadge}>
+                <Text style={styles.dateLabel}>Issue date</Text>
+                <Text style={styles.dateValue}>{formattedDate}</Text>
+              </View>
+            </View>
+
+            <View style={styles.logoWrap}>
+              {logoSrc ? (
+                // eslint-disable-next-line jsx-a11y/alt-text
+                <Image src={logoSrc} style={styles.logo} />
+              ) : (
+                <>
+                  <Text style={styles.fallbackCompanyName}>A&V SQUIRES</Text>
+                  <Text style={styles.fallbackCompanySubtitle}>Plant Co. Ltd.</Text>
+                </>
+              )}
+            </View>
           </View>
-          <View>
-            <Text style={styles.companyName}>A&V SQUIRES</Text>
-            <Text style={styles.companySubtitle}>PLANT CO. LTD.</Text>
+
+          <View style={styles.contactStrip}>
+            <View style={styles.contactItem}>
+              <Text style={styles.contactLabel}>Telephone</Text>
+              <Text style={styles.contactValue}>01636 812227</Text>
+            </View>
+            <View style={styles.contactItem}>
+              <Text style={styles.contactLabel}>Email / Web</Text>
+              <Text style={styles.contactValue}>office@avsquires.co.uk</Text>
+              <Text style={styles.contactValue}>avsquires.co.uk</Text>
+            </View>
+            <View style={styles.contactItem}>
+              <Text style={styles.contactLabel}>Registered Office</Text>
+              <Text style={styles.contactValue}>
+                Vivienne House, Racecourse Road, Crew Lane Ind Est, Southwell, Notts, NG25 0TX
+              </Text>
+            </View>
           </View>
         </View>
-        <Text style={styles.addressLine}>
-          VIVIENNE HOUSE   RACECOURSE ROAD   CREW LANE IND EST   SOUTHWELL   NOTTS   NG25 0TX
-        </Text>
-        <View style={styles.headerDivider} />
 
-        {/* Quote reference + date */}
-        <View style={styles.metaRow}>
-          <View>
-            <Text style={styles.quoteRef}>{quoteReference}</Text>
-            {versionLabel && versionLabel !== 'Original' && (
-              <Text style={styles.quoteDate}>Version: {versionLabel}</Text>
-            )}
-            {baseQuoteReference && baseQuoteReference !== quoteReference && (
-              <Text style={styles.quoteDate}>Base Quote: {baseQuoteReference}</Text>
-            )}
-          </View>
-          <Text style={styles.quoteDate}>{formattedDate}</Text>
-        </View>
-
-        {/* Attention */}
-        <View style={styles.attentionBlock}>
-          {attentionName && (
-            <Text style={styles.attentionBold}>For the attention of {attentionName}</Text>
+        <View style={styles.recipientCard}>
+          <Text style={styles.sectionEyebrow}>PREPARED FOR</Text>
+          {attentionName ? (
+            <Text style={styles.recipientName}>For the attention of {attentionName}</Text>
+          ) : (
+            <Text style={styles.recipientName}>For the attention of your team</Text>
           )}
           {attentionEmail && (
             <Link src={`mailto:${attentionEmail}`} style={styles.emailLink}>
@@ -314,37 +495,45 @@ export function QuotePDF({
           )}
         </View>
 
-        {/* Salutation */}
         <Text style={styles.salutation}>{salutation || 'Dear Sir/Madam,'}</Text>
-
-        {/* Intro text */}
         <Text style={styles.introText}>
           Further to your request, we are pleased to provide our quotation as follows:
         </Text>
 
-        {/* Subject / Project */}
-        <View style={styles.subjectBlock}>
-          {projectDescription && <Text style={styles.subjectBold}>{projectDescription}</Text>}
-          {subjectLine && <Text style={styles.subjectNormal}>{subjectLine}</Text>}
-          {siteAddress && <Text style={styles.subjectNormal}>Site address: {siteAddress}</Text>}
-          {managerEmail && <Text style={styles.subjectNormal}>Manager email: {managerEmail}</Text>}
+        <View style={styles.subjectCard}>
+          {subjectLine && <Text style={styles.subjectTitle}>{subjectLine}</Text>}
+          {projectDescription && <Text style={styles.subjectDescription}>{projectDescription}</Text>}
+          {siteAddress && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Site address</Text>
+              <Text style={styles.detailValue}>{siteAddress}</Text>
+            </View>
+          )}
+          {managerEmail && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Manager email</Text>
+              <Link src={`mailto:${managerEmail}`} style={styles.detailLink}>
+                {managerEmail}
+              </Link>
+            </View>
+          )}
         </View>
 
-        {/* Line items table */}
+        <Text style={styles.tableLabel}>Quoted items</Text>
         <View style={styles.table}>
           <View style={styles.tableHeader}>
-            <Text style={styles.colItemHeader}>Item</Text>
-            <Text style={styles.colQtyHeader}>Quantity</Text>
-            <Text style={styles.colRateHeader}>Unit Rate</Text>
-            <Text style={styles.colTotalHeader}>Total</Text>
+            <Text style={[styles.colItemHeader, styles.tableHeaderText]}>Item</Text>
+            <Text style={[styles.colQtyHeader, styles.tableHeaderText]}>Quantity</Text>
+            <Text style={[styles.colRateHeader, styles.tableHeaderText]}>Unit Rate</Text>
+            <Text style={[styles.colTotalHeader, styles.tableHeaderText]}>Total</Text>
           </View>
           {lineItems.map((item, idx) => (
             <View
               key={idx}
-              style={idx < lineItems.length - 1 ? styles.tableRow : styles.tableRowLast}
+              style={idx % 2 === 0 ? styles.tableRow : styles.tableRowAlt}
             >
               <Text style={styles.colItem}>{item.description}</Text>
-              <Text style={styles.colQty}>{item.quantity}</Text>
+              <Text style={styles.colQty}>{formatQuantity(item)}</Text>
               <Text style={styles.colRate}>{gbp(item.unit_rate)}</Text>
               <Text style={styles.colTotal}>{gbp(item.line_total)}</Text>
             </View>
@@ -355,34 +544,33 @@ export function QuotePDF({
           </View>
         </View>
 
-        {/* Disclaimer */}
-        <Text style={styles.disclaimerText}>
-          {customFooterText ||
-            `Quotation valid for ${validityDays} days.`}
-        </Text>
-        <Text style={styles.disclaimerText}>
-          We trust you will find this of interest and assure you of our close attention to your requirements.
-        </Text>
+        <View style={styles.notesPanel}>
+          <Text style={styles.notesPrimary}>
+            {customFooterText || `Quotation valid for ${validityDays} days.`}
+          </Text>
+          <Text style={styles.notesSecondary}>
+            We trust you will find this of interest and assure you of our close attention to your requirements.
+          </Text>
+        </View>
 
-        {/* Sign-off */}
         <View style={styles.signoff}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <View style={styles.signoffRow}>
             <View>
               <Text style={styles.signoffLine}>Yours faithfully</Text>
               {signoffName && <Text style={styles.signoffName}>{signoffName}</Text>}
               {signoffTitle && <Text style={styles.signoffTitle}>{signoffTitle}</Text>}
             </View>
-            <Text style={{ fontSize: 10, color: '#475569' }}>E & OE</Text>
+            <Text style={styles.eAndOe}>E & OE</Text>
           </View>
         </View>
 
-        {/* Page footer — services list + registration */}
         <View style={styles.footer}>
-          <Text style={styles.footerServices}>PLANT HIRE</Text>
-          <Text style={styles.footerServices}>TIPPER HIRE</Text>
-          <Text style={styles.footerServices}>CIVIL ENGINEERING</Text>
-          <Text style={styles.footerServices}>CONTRACT EARTH MOVING</Text>
-          <Text style={styles.footerRegNo}>Registered in England. 1000918</Text>
+          <Text style={styles.footerServices}>
+            PLANT HIRE | TIPPER HIRE | CIVIL ENGINEERING | CONTRACT EARTH MOVING
+          </Text>
+          <Text style={styles.footerDetails}>
+            A&V Squires Plant Co. Ltd. | Registered in England No. 1000918
+          </Text>
         </View>
       </Page>
     </Document>

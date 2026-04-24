@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { renderToStream } from '@react-pdf/renderer';
 import { QuotePDF } from '@/lib/pdf/quote-pdf';
+import { loadSquiresLogoDataUrl } from '@/lib/pdf/squires-logo';
 import { logServerError } from '@/lib/utils/server-error-logger';
 
 interface RouteParams {
@@ -39,6 +40,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       .eq('quote_id', id)
       .order('sort_order', { ascending: true });
 
+    const logoSrc = await loadSquiresLogoDataUrl();
+
     const pdfDocument = QuotePDF({
       quoteReference: quote.quote_reference,
       baseQuoteReference: quote.base_quote_reference || quote.quote_reference,
@@ -63,6 +66,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       signoffTitle: quote.signoff_title || '',
       versionLabel: quote.version_label || undefined,
       customFooterText: quote.custom_footer_text || undefined,
+      logoSrc,
     });
 
     const stream = await renderToStream(pdfDocument);
