@@ -64,6 +64,7 @@ import {
 import { isClientSessionPausedError } from '@/lib/app-auth/session-error';
 import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 import {
+  getApprovalsTimesheetStatuses,
   getApprovalsDefaultStatusFilters,
   shouldIncludeTimesheetInAllSubmittedFilter,
 } from '@/lib/utils/approvals-filters';
@@ -471,9 +472,10 @@ function ApprovalsContent() {
   const fetchApprovals = useCallback(async () => {
     try {
       setLoading(true);
+      const timesheetStatuses = getApprovalsTimesheetStatuses(timesheetFilter);
       
       // Build query for timesheets
-      const timesheetQuery = supabase
+      let timesheetQuery = supabase
         .from('timesheets')
         .select(`
           *,
@@ -493,6 +495,24 @@ function ApprovalsContent() {
             did_not_work
           )
         `);
+
+      if (timesheetStatuses.length === 1) {
+        timesheetQuery = timesheetQuery.eq('status', timesheetStatuses[0]);
+      } else {
+        timesheetQuery = timesheetQuery.in('status', [...timesheetStatuses]);
+      }
+
+      if (selectedEmployeeId !== 'all') {
+        timesheetQuery = timesheetQuery.eq('user_id', selectedEmployeeId);
+      }
+
+      if (dateFrom) {
+        timesheetQuery = timesheetQuery.gte('week_ending', dateFrom);
+      }
+
+      if (dateTo) {
+        timesheetQuery = timesheetQuery.lte('week_ending', dateTo);
+      }
 
       const { data: timesheetData, error: timesheetError } = await timesheetQuery
         .order('submitted_at', { ascending: false });
@@ -578,7 +598,7 @@ function ApprovalsContent() {
       setLoading(false);
       setHasLoadedTimesheets(true);
     }
-  }, [supabase]);
+  }, [dateFrom, dateTo, selectedEmployeeId, supabase, timesheetFilter]);
 
   useEffect(() => {
     if (!permissionLoading) {

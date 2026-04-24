@@ -1,4 +1,5 @@
 import type { AbsenceStatusFilter, TimesheetStatusFilter } from '@/types/common';
+import type { Timesheet } from '@/types/timesheet';
 
 export interface ApprovalsDefaultStatusFilters {
   timesheets: TimesheetStatusFilter;
@@ -27,4 +28,18 @@ export function getApprovalsDefaultStatusFilters(
 
 export function shouldIncludeTimesheetInAllSubmittedFilter(status: string): boolean {
   return status.trim().toLowerCase() !== 'draft';
+}
+
+const APPROVALS_TIMESHEET_STATUS_MAP: Record<TimesheetStatusFilter, readonly Timesheet['status'][]> = {
+  all: ['submitted', 'approved', 'rejected', 'processed', 'adjusted'],
+  draft: ['draft'],
+  pending: ['submitted'],
+  approved: ['approved'],
+  rejected: ['rejected'],
+  processed: ['processed'],
+  adjusted: ['adjusted'],
+};
+
+export function getApprovalsTimesheetStatuses(filter: TimesheetStatusFilter): readonly Timesheet['status'][] {
+  return APPROVALS_TIMESHEET_STATUS_MAP[filter];
 }
