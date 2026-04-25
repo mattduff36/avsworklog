@@ -48,6 +48,7 @@ import {
   TimesheetsListColumnVisibility,
   TimesheetsListTable,
 } from './components/TimesheetsListTable';
+import { isNetworkFetchError } from '@/lib/utils/http-error';
 
 interface TimesheetWithProfile extends Timesheet {
   profile?: {
@@ -329,21 +330,11 @@ export default function TimesheetsPage() {
       setTimesheets(collectedRows.slice(0, displayCount));
     } catch (error) {
       const errorContextId = 'timesheets-fetch-list-error';
-      const message = (() => {
-        if (error instanceof Error) return error.message;
-        if (typeof error === 'string') return error;
-        try {
-          return JSON.stringify(error);
-        } catch {
-          return String(error);
-        }
-      })();
-      const isNetworkFailure =
-        message.includes('Failed to fetch') || message.includes('NetworkError') || message.toLowerCase().includes('network');
+      const isNetworkFailure = isNetworkFetchError(error);
 
       // Avoid escalating common mobile/offline network failures into centralized error logs
       if (isNetworkFailure) {
-        console.error('Unable to load timesheets (network):', error, { errorContextId, network: true });
+        console.warn('Unable to load timesheets (network):', error, { errorContextId, network: true });
       } else {
         console.error('Error fetching timesheets:', error, { errorContextId });
       }

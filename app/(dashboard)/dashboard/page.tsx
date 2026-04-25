@@ -24,7 +24,7 @@ import type { ModuleName } from '@/types/roles';
 import { managerNavItems, adminNavItems, getFilteredNavByPermissions } from '@/lib/config/navigation';
 import { usePermissionSnapshot } from '@/lib/hooks/usePermissionSnapshot';
 import { useRamsAssignmentSummary } from '@/lib/hooks/useNavMetrics';
-import { getErrorStatus, isAuthErrorStatus, createStatusError } from '@/lib/utils/http-error';
+import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError, createStatusError } from '@/lib/utils/http-error';
 import { canAccessDebugConsole } from '@/lib/utils/debug-access';
 
 type PendingApprovalCount = {
@@ -237,7 +237,7 @@ export default function DashboardPage() {
     } catch (error) {
       const errorStatus = getErrorStatus(error);
       setMetricsErrorStatus(errorStatus);
-      if (!isAuthErrorStatus(errorStatus)) {
+      if (!isAuthErrorStatus(errorStatus) && !isNetworkFetchError(error)) {
         console.error('Error loading dashboard metrics:', error, {
           errorContextId: 'dashboard-load-metrics-error',
         });

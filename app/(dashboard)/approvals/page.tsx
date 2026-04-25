@@ -85,6 +85,10 @@ interface TimesheetEntry {
   did_not_work: boolean;
 }
 
+interface TimesheetEntryWithTimesheetId extends TimesheetEntry {
+  timesheet_id: string;
+}
+
 interface TimesheetWithProfile extends Timesheet {
   user: {
     full_name: string;
@@ -401,12 +405,12 @@ function ApprovalsContent() {
     });
   }, [scopedAbsences, selectedEmployeeId, effectiveTeamFilter, absenceStatusFilter, dateFrom, dateTo]);
 
-  const scopedTimesheets = useMemo(() => {
-    if (timesheets.length === 0) return [] as TimesheetWithProfile[];
-    if (isAdminTier) return timesheets;
+  const getScopedTimesheetsForCurrentActor = useCallback((rows: TimesheetWithProfile[]) => {
+    if (rows.length === 0) return [] as TimesheetWithProfile[];
+    if (isAdminTier) return rows;
     if (!canAuthoriseBookings || !actorProfileId || !absenceSecondarySnapshot) return [] as TimesheetWithProfile[];
 
-    return timesheets.filter((timesheet) =>
+    return rows.filter((timesheet) =>
       canUseScopedAbsencePermission(
         {
           permissions: absenceSecondarySnapshot.permissions,
@@ -424,10 +428,10 @@ function ApprovalsContent() {
         }
       )
     );
-  }, [timesheets, isAdminTier, canAuthoriseBookings, actorProfileId, absenceSecondarySnapshot, employeeById]);
+  }, [isAdminTier, canAuthoriseBookings, actorProfileId, absenceSecondarySnapshot, employeeById]);
 
-  const filteredTimesheets = useMemo(() => {
-    return scopedTimesheets.filter((timesheet) => {
+  const getCurrentFilteredTimesheets = useCallback((rows: TimesheetWithProfile[]) => {
+    return getScopedTimesheetsForCurrentActor(rows).filter((timesheet) => {
       if (selectedEmployeeId !== 'all' && timesheet.user_id !== selectedEmployeeId) return false;
 
       const targetTeamId = employeeById.get(timesheet.user_id)?.team_id || null;
@@ -450,7 +454,20 @@ function ApprovalsContent() {
       if (dateTo && timesheet.week_ending > dateTo) return false;
       return true;
     });
-  }, [scopedTimesheets, selectedEmployeeId, employeeById, effectiveTeamFilter, timesheetFilter, dateFrom, dateTo]);
+  }, [
+    getScopedTimesheetsForCurrentActor,
+    selectedEmployeeId,
+    employeeById,
+    effectiveTeamFilter,
+    timesheetFilter,
+    dateFrom,
+    dateTo,
+  ]);
+
+  const filteredTimesheets = useMemo(
+    () => getCurrentFilteredTimesheets(timesheets),
+    [timesheets, getCurrentFilteredTimesheets]
+  );
 
   const visibleTimesheetCards = useMemo(
     () => filteredTimesheets.slice(0, visibleTimesheetCount),
@@ -474,25 +491,19 @@ function ApprovalsContent() {
       setLoading(true);
       const timesheetStatuses = getApprovalsTimesheetStatuses(timesheetFilter);
       
-      // Build query for timesheets
+      // Build a lightweight list first; entry details are fetched only for rows currently visible.
       let timesheetQuery = supabase
         .from('timesheets')
         .select(`
-          *,
+          id,
+          user_id,
+          reg_number,
+          week_ending,
+          status,
+          submitted_at,
           user:profiles!timesheets_user_id_fkey (
             full_name,
             employee_id
-          ),
-          timesheet_entries (
-            day_of_week,
-            daily_total,
-            job_number,
-            timesheet_entry_job_codes (
-              job_number,
-              display_order
-            ),
-            working_in_yard,
-            did_not_work
           )
         `);
 
@@ -521,18 +532,21 @@ function ApprovalsContent() {
       const typedTimesheets = (timesheetData || []) as TimesheetWithProfile[];
       const timesheetsWithLeaveTotals = typedTimesheets.map((timesheet) => ({
         ...timesheet,
+        timesheet_entries: undefined,
         leave_total_display: undefined,
         leave_worked_hours: undefined,
         leave_days: undefined,
       }));
 
-      const userIds = [...new Set(typedTimesheets.map((timesheet) => timesheet.user_id).filter(Boolean))];
-      if (userIds.length === 0) {
+      const visibleTimesheets = getCurrentFilteredTimesheets(timesheetsWithLeaveTotals).slice(0, visibleTimesheetCount);
+      const visibleTimesheetIds = visibleTimesheets.map((timesheet) => timesheet.id);
+      const userIds = [...new Set(visibleTimesheets.map((timesheet) => timesheet.user_id).filter(Boolean))];
+      if (visibleTimesheetIds.length === 0 || userIds.length === 0) {
         setTimesheets(timesheetsWithLeaveTotals);
         return;
       }
 
-      const weekBounds = typedTimesheets.map((timesheet) => {
+      const weekBounds = visibleTimesheets.map((timesheet) => {
         const { startIso, endIso } = getTimesheetWeekIsoBounds(timesheet.week_ending);
         return {
           timesheetId: timesheet.id,
@@ -546,14 +560,42 @@ function ApprovalsContent() {
       const minStartIso = weekBounds.reduce((min, row) => (row.startIso < min ? row.startIso : min), weekBounds[0].startIso);
       const maxEndIso = weekBounds.reduce((max, row) => (row.endIso > max ? row.endIso : max), weekBounds[0].endIso);
 
-      const { data: absencesData, error: absencesError } = await supabase
-        .from('absences')
-        .select('profile_id, date, end_date, is_half_day, half_day_session, allow_timesheet_work_on_leave, absence_reasons(name,color,is_paid)')
-        .in('profile_id', userIds)
-        .in('status', ['approved', 'processed'])
-        .lte('date', maxEndIso)
-        .or(`end_date.gte.${minStartIso},and(end_date.is.null,date.gte.${minStartIso})`);
+      const [entriesResult, absencesResult] = await Promise.all([
+        supabase
+          .from('timesheet_entries')
+          .select(`
+            timesheet_id,
+            day_of_week,
+            daily_total,
+            job_number,
+            timesheet_entry_job_codes (
+              job_number,
+              display_order
+            ),
+            working_in_yard,
+            did_not_work
+          `)
+          .in('timesheet_id', visibleTimesheetIds),
+        supabase
+          .from('absences')
+          .select('profile_id, date, end_date, is_half_day, half_day_session, allow_timesheet_work_on_leave, absence_reasons(name,color,is_paid)')
+          .in('profile_id', userIds)
+          .in('status', ['approved', 'processed'])
+          .lte('date', maxEndIso)
+          .or(`end_date.gte.${minStartIso},and(end_date.is.null,date.gte.${minStartIso})`),
+      ]);
 
+      if (entriesResult.error) throw entriesResult.error;
+      if (absencesResult.error) throw absencesResult.error;
+
+      const entriesByTimesheet = new Map<string, TimesheetEntry[]>();
+      ((entriesResult.data || []) as TimesheetEntryWithTimesheetId[]).forEach(({ timesheet_id, ...entry }) => {
+        const existing = entriesByTimesheet.get(timesheet_id) || [];
+        existing.push(entry);
+        entriesByTimesheet.set(timesheet_id, existing);
+      });
+
+      const { data: absencesData, error: absencesError } = absencesResult;
       if (absencesError) throw absencesError;
 
       const approvedAbsences = (absencesData || []) as ApprovedAbsenceForApprovals[];
@@ -564,7 +606,7 @@ function ApprovalsContent() {
         absencesByProfile.set(absence.profile_id, existing);
       });
 
-      const enriched = timesheetsWithLeaveTotals.map((timesheet) => {
+      const enrichedVisibleTimesheets = visibleTimesheets.map((timesheet) => {
         const { startIso, endIso } = getTimesheetWeekIsoBounds(timesheet.week_ending);
         const employeeAbsences = absencesByProfile.get(timesheet.user_id) || [];
         const weekAbsences = employeeAbsences.filter((absence) => {
@@ -572,17 +614,20 @@ function ApprovalsContent() {
           return absence.date <= endIso && absenceEnd >= startIso && absenceEnd >= minStartIso;
         });
         const offDayStates = resolveTimesheetOffDayStates(timesheet.week_ending, weekAbsences, null);
-        const leaveAwareTotals = buildLeaveAwareTotals(timesheet.timesheet_entries || [], offDayStates);
+        const entries = entriesByTimesheet.get(timesheet.id) || [];
+        const leaveAwareTotals = buildLeaveAwareTotals(entries, offDayStates);
 
         return {
           ...timesheet,
+          timesheet_entries: entries,
           leave_total_display: leaveAwareTotals.weekly.display,
           leave_worked_hours: leaveAwareTotals.weekly.workedHours,
           leave_days: leaveAwareTotals.weekly.leaveDays,
         };
       });
 
-      setTimesheets(enriched);
+      const enrichedById = new Map(enrichedVisibleTimesheets.map((timesheet) => [timesheet.id, timesheet]));
+      setTimesheets(timesheetsWithLeaveTotals.map((timesheet) => enrichedById.get(timesheet.id) || timesheet));
     } catch (error) {
       const errorContextId = 'approvals-fetch-list-error';
       const shouldLogError =
@@ -598,7 +643,15 @@ function ApprovalsContent() {
       setLoading(false);
       setHasLoadedTimesheets(true);
     }
-  }, [dateFrom, dateTo, selectedEmployeeId, supabase, timesheetFilter]);
+  }, [
+    dateFrom,
+    dateTo,
+    getCurrentFilteredTimesheets,
+    selectedEmployeeId,
+    supabase,
+    timesheetFilter,
+    visibleTimesheetCount,
+  ]);
 
   useEffect(() => {
     if (!permissionLoading) {
