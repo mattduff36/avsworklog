@@ -55,9 +55,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const formData = await request.formData();
     const file = formData.get('file');
+    const isClientVisible = formData.get('is_client_visible') === 'true';
+    const requestedAttachmentPurpose = String(formData.get('attachment_purpose') || (isClientVisible ? 'client_supporting' : 'internal'));
+    const attachmentPurpose = ['internal', 'client_pricing', 'client_supporting'].includes(requestedAttachmentPurpose)
+      ? requestedAttachmentPurpose as 'internal' | 'client_pricing' | 'client_supporting'
+      : null;
 
     if (!(file instanceof File)) {
       return NextResponse.json({ error: 'Choose a file to upload.' }, { status: 400 });
+    }
+
+    if (!attachmentPurpose) {
+      return NextResponse.json({ error: 'Unsupported attachment purpose.' }, { status: 400 });
     }
 
     const sanitizedFilename = file.name.replace(/[^a-z0-9_.-]/gi, '_');
@@ -82,6 +91,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         content_type: file.type || null,
         file_size: file.size,
         uploaded_by: user.id,
+        is_client_visible: isClientVisible,
+        attachment_purpose: attachmentPurpose,
       })
       .select()
       .single();

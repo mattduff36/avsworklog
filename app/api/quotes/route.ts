@@ -263,6 +263,8 @@ export async function POST(request: NextRequest) {
       ? approver_profile_id.trim()
       : null;
     const normalizedStartAlertDays = normalizeOptionalInteger(quoteData.start_alert_days);
+    const normalizedEstimatedDurationDays = normalizeOptionalInteger(quoteData.estimated_duration_days);
+    const pricingMode = quoteData.pricing_mode === 'attachments_only' ? 'attachments_only' : 'itemized';
 
     if (!customerId) {
       fieldErrors.customer_id = 'Select a customer.';
@@ -276,6 +278,10 @@ export async function POST(request: NextRequest) {
       fieldErrors.start_alert_days = 'Alert days before start must be a whole number.';
     }
 
+    if (Number.isNaN(normalizedEstimatedDurationDays)) {
+      fieldErrors.estimated_duration_days = 'Estimated duration must be a whole number.';
+    }
+
     const normalizedItems = Array.isArray(line_items)
       ? line_items.map((item, index) => ({
         originalIndex: index,
@@ -287,11 +293,13 @@ export async function POST(request: NextRequest) {
       }))
       : [];
 
-    normalizedItems.forEach((item) => {
-      if (isMeaningfulLineItem(item) && !item.description) {
-        fieldErrors[`line_items.${item.originalIndex}.description`] = 'Enter a description for this line item.';
-      }
-    });
+    if (pricingMode === 'itemized') {
+      normalizedItems.forEach((item) => {
+        if (isMeaningfulLineItem(item) && !item.description) {
+          fieldErrors[`line_items.${item.originalIndex}.description`] = 'Enter a description for this line item.';
+        }
+      });
+    }
 
     if (Object.keys(fieldErrors).length > 0) {
       return NextResponse.json(
@@ -324,7 +332,7 @@ export async function POST(request: NextRequest) {
       fallbackInitials: initials,
     });
 
-    const items = normalizedItems
+    const items = pricingMode === 'attachments_only' ? [] : normalizedItems
       .filter(item => isMeaningfulLineItem(item))
       .map(({ originalIndex: _originalIndex, ...item }) => item);
     const totals = calculateQuoteTotals(items);
@@ -349,16 +357,19 @@ export async function POST(request: NextRequest) {
       site_address: normalizeOptionalString(quoteData.site_address),
       subject_line: normalizeOptionalString(quoteData.subject_line),
       project_description: normalizeOptionalString(quoteData.project_description),
+      scope: normalizeOptionalString(quoteData.scope),
       salutation: normalizeOptionalString(quoteData.salutation),
       manager_name: quoteData.manager_name || managerOption?.profile?.full_name || managerProfile.full_name,
       manager_email: quoteData.manager_email || managerOption?.manager_email || null,
-      approver_profile_id: normalizedApproverProfileId || managerOption?.approver_profile_id || null,
+      approver_profile_id: normalizedApproverProfileId || managerOption?.approver_profile_id || managerProfileId,
       signoff_name: quoteData.signoff_name || managerOption?.signoff_name || managerProfile.full_name,
       signoff_title: normalizeOptionalString(quoteData.signoff_title) || managerOption?.signoff_title || null,
       custom_footer_text: normalizeOptionalString(quoteData.custom_footer_text),
       version_notes: normalizeOptionalString(quoteData.version_notes),
       start_date: normalizeOptionalString(quoteData.start_date),
       start_alert_days: normalizedStartAlertDays,
+      estimated_duration_days: normalizedEstimatedDurationDays,
+      pricing_mode: pricingMode,
       subtotal: totals.subtotal,
       total: totals.total,
       status: (quoteData.status || 'draft') as QuoteStatus,

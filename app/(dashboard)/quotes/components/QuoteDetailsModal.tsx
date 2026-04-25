@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -87,6 +89,7 @@ function getTimelineEventMeta(eventType: string) {
         iconClassName: 'text-amber-300 bg-amber-500/10 border-amber-500/20',
       };
     case 'approved_and_sent':
+    case 'confirmed_and_sent':
       return {
         icon: Mail,
         iconClassName: 'text-blue-300 bg-blue-500/10 border-blue-500/20',
@@ -174,7 +177,6 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   const [actionLoading, setActionLoading] = useState(false);
   const [poNumber, setPoNumber] = useState('');
   const [poValue, setPoValue] = useState('');
-  const [returnComments, setReturnComments] = useState('');
   const [startDate, setStartDate] = useState('');
   const [startAlertDays, setStartAlertDays] = useState('');
   const [completionStatus, setCompletionStatus] = useState<QuoteCompletionStatus>('approved_in_full');
@@ -186,6 +188,8 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   const [invoiceComments, setInvoiceComments] = useState('');
   const [revisionType, setRevisionType] = useState<QuoteRevisionType>('revision');
   const [revisionNotes, setRevisionNotes] = useState('');
+  const [ramsComments, setRamsComments] = useState('');
+  const [ramsDialogOpen, setRamsDialogOpen] = useState(false);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [workflowError, setWorkflowError] = useState<string | null>(null);
@@ -201,7 +205,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   const canEditPoDetails = quote ? isLatestVersion && PO_EDITABLE_STATUSES.has(quote.status) : false;
   const canTriggerRams = Boolean(isLatestVersion && quote?.status === 'sent');
   const canManageSchedule = Boolean(isLatestVersion && quote && ['po_received', 'in_progress'].includes(quote.status));
-  const canEditQuote = Boolean(isLatestVersion && quote && ['draft', 'pending_internal_approval', 'changes_requested'].includes(quote.status));
+  const canEditQuote = Boolean(isLatestVersion && quote && ['draft', 'changes_requested', 'pending_internal_approval'].includes(quote.status));
   const canDeleteDraft = Boolean(isLatestVersion && quote?.status === 'draft');
   const canManageInvoices = isLatestVersion;
   const canManageAttachments = isLatestVersion;
@@ -322,7 +326,6 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
     setQuote(nextQuote);
     setPoNumber(nextQuote.po_number || '');
     setPoValue(nextQuote.po_value ? String(nextQuote.po_value) : '');
-    setReturnComments(nextQuote.return_comments || '');
     setStartDate(nextQuote.start_date || '');
     setStartAlertDays(nextQuote.start_alert_days ? String(nextQuote.start_alert_days) : '');
     setCompletionStatus(nextQuote.completion_status === 'approved_in_part' ? 'approved_in_part' : 'approved_in_full');
@@ -397,6 +400,8 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
       setInvoiceFieldErrors({});
       setAttachmentError(null);
       setDeleteError(null);
+      setRamsDialogOpen(false);
+      setRamsComments('');
     }
   }, [open]);
 
@@ -448,11 +453,19 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
     await updateQuote({ action, ...(payload || {}) }, scope);
   }
 
+  async function handleTriggerRams() {
+    await callAction('trigger_rams', { rams_comments: ramsComments.trim() || null });
+    setRamsDialogOpen(false);
+    setRamsComments('');
+  }
+
   async function handleAttachmentUpload(file: File) {
     if (!activeQuoteId) return;
 
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('is_client_visible', 'false');
+    formData.append('attachment_purpose', 'internal');
 
     setUploadingAttachment(true);
     setAttachmentError(null);
@@ -583,6 +596,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   if (!open) return null;
 
   return (
+    <>
     <Dialog open={open} onOpenChange={isOpen => { if (!isOpen) onClose(); }}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-slate-900 border-slate-700 text-white">
         <DialogHeader className="sr-only">
@@ -617,7 +631,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                   </Badge>
                   {quote.commercial_status === 'closed' && (
                     <Badge variant="outline" className="border-slate-300/30 text-slate-200 bg-slate-400/10">
-                      Closed
+                      Archived
                     </Badge>
                   )}
                 </DialogTitle>
@@ -652,7 +666,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                   {quote.attention_email && <p className="text-xs text-muted-foreground">{quote.attention_email}</p>}
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Subject</span>
+                  <span className="text-muted-foreground">Title</span>
                   <p className="text-white">{quote.subject_line || '—'}</p>
                 </div>
                 <div>
@@ -678,10 +692,33 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
 
               {quote.project_description && (
                 <div className="text-sm">
-                  <span className="text-muted-foreground">Description</span>
+                  <span className="text-muted-foreground">Summary</span>
                   <p className="text-slate-300 whitespace-pre-wrap">{quote.project_description}</p>
                 </div>
               )}
+
+              {quote.scope && (
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Scope</span>
+                  <p className="text-slate-300 whitespace-pre-wrap">{quote.scope}</p>
+                </div>
+              )}
+
+              {quote.rams_documents?.length ? (
+                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm">
+                  <p className="font-medium text-emerald-100">RAMS documents linked</p>
+                  <p className="text-xs text-emerald-200/80">
+                    Requested {quote.rams_requested_at ? format(new Date(quote.rams_requested_at), 'dd MMM yyyy') : 'date not recorded'}
+                  </p>
+                  <div className="mt-2 space-y-1">
+                    {quote.rams_documents.map(document => (
+                      <p key={document.id} className="text-xs text-emerald-100">
+                        {document.title} • {format(new Date(document.created_at), 'dd MMM yyyy')}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
 
               <Separator className="bg-slate-700" />
 
@@ -698,7 +735,11 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                 <TabsContent value="overview" className="space-y-4">
                   <div>
                     <h4 className="text-sm font-semibold text-muted-foreground mb-2">Line Items</h4>
-                    {quote.line_items && quote.line_items.length > 0 ? (
+                    {quote.pricing_mode === 'attachments_only' ? (
+                      <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-3 text-sm text-blue-100">
+                        Pricing/details are supplied in the client-visible attachments for this quote.
+                      </div>
+                    ) : quote.line_items && quote.line_items.length > 0 ? (
                       <div className="border border-slate-700 rounded-lg overflow-hidden">
                         <table className="w-full text-sm">
                           <thead>
@@ -828,21 +869,6 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Return / Approval Comments</Label>
-                    <Textarea
-                      value={returnComments}
-                      disabled={quote.status !== 'pending_internal_approval'}
-                      onChange={e => {
-                        clearWorkflowError('return_comments');
-                        setReturnComments(e.target.value);
-                      }}
-                      rows={3}
-                      className={getFieldClassName(workflowFieldErrors, 'return_comments')}
-                    />
-                    {renderFieldError(workflowFieldErrors, 'return_comments')}
-                  </div>
-
-                  <div className="space-y-2">
                     <Label>Completion Status</Label>
                     <Select value={completionStatus} onValueChange={(value: QuoteCompletionStatus) => setCompletionStatus(value)} disabled={!canManageSchedule}>
                       <SelectTrigger className={getSelectClassName(workflowFieldErrors, 'completion_status')}>
@@ -872,33 +898,14 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    {isLatestVersion && ['draft', 'changes_requested'].includes(quote.status) && (
+                    {isLatestVersion && ['draft', 'changes_requested', 'pending_internal_approval'].includes(quote.status) && (
                       <Button
-                        onClick={() => callAction('submit_for_approval')}
-                        disabled={actionLoading}
+                        onClick={() => callAction('confirm_and_send')}
+                        disabled={actionLoading || !recipientEmail}
                         className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90"
                       >
-                        <Send className="mr-2 h-4 w-4" /> Submit For Approval
+                        <Send className="mr-2 h-4 w-4" /> Confirm And Send
                       </Button>
-                    )}
-                    {isLatestVersion && quote.status === 'pending_internal_approval' && (
-                      <>
-                        <Button
-                          onClick={() => callAction('approve_and_send')}
-                          disabled={actionLoading || !recipientEmail}
-                          className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90"
-                        >
-                          <Send className="mr-2 h-4 w-4" /> Approve And Send
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => callAction('return_for_changes', { return_comments: returnComments })}
-                          disabled={actionLoading}
-                          className="border-slate-600 text-muted-foreground"
-                        >
-                          <Pencil className="mr-2 h-4 w-4" /> Return For Changes
-                        </Button>
-                      </>
                     )}
                     {canEditPoDetails && (
                       <Button
@@ -915,7 +922,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                     )}
                     {canTriggerRams && (
                       <Button
-                        onClick={() => callAction('trigger_rams')}
+                        onClick={() => setRamsDialogOpen(true)}
                         disabled={actionLoading}
                         className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90"
                       >
@@ -953,13 +960,13 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                       disabled={actionLoading || !isLatestVersion}
                       className="border-slate-600 text-muted-foreground"
                     >
-                      {quote.commercial_status === 'closed' ? 'Reopen Quote' : 'Close Quote'}
+                      {quote.commercial_status === 'closed' ? 'Restore Quote' : 'Archive Quote'}
                     </Button>
                   </div>
 
-                  {quote.status === 'pending_internal_approval' && !recipientEmail && (
+                  {['draft', 'changes_requested', 'pending_internal_approval'].includes(quote.status) && !recipientEmail && (
                     <p className="text-sm text-amber-300">
-                      Add a customer contact email before approving and sending this quote.
+                      Add a customer contact email before confirming and sending this quote.
                     </p>
                   )}
 
@@ -1134,7 +1141,12 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                     {quote.attachments?.length ? quote.attachments.map(attachment => (
                       <div key={attachment.id} className="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-800/30 p-3">
                         <div>
-                          <p className="text-sm font-medium text-white">{attachment.file_name}</p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-sm font-medium text-white">{attachment.file_name}</p>
+                            {attachment.is_client_visible && (
+                              <Badge variant="outline" className="border-blue-500/30 bg-blue-500/10 text-blue-200">Client</Badge>
+                            )}
+                          </div>
                           <p className="text-xs text-muted-foreground">
                             {attachment.content_type || 'File'}{attachment.file_size ? ` • ${(attachment.file_size / 1024).toFixed(1)} KB` : ''}
                           </p>
@@ -1362,5 +1374,31 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
         )}
       </DialogContent>
     </Dialog>
+    <Dialog open={ramsDialogOpen} onOpenChange={setRamsDialogOpen}>
+      <DialogContent className="bg-slate-900 border-slate-700 text-white">
+        <DialogHeader>
+          <DialogTitle>Trigger RAMS</DialogTitle>
+          <DialogDescription className="text-muted-foreground">
+            Add any extra internal comments to include with the RAMS request email.
+          </DialogDescription>
+        </DialogHeader>
+        <Textarea
+          value={ramsComments}
+          onChange={event => setRamsComments(event.target.value)}
+          rows={4}
+          placeholder="Additional RAMS notes, constraints, site details, or handover context..."
+          className="bg-slate-800 border-slate-600"
+        />
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setRamsDialogOpen(false)} className="border-slate-600 text-muted-foreground">
+            Cancel
+          </Button>
+          <Button onClick={() => void handleTriggerRams()} disabled={actionLoading} className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90">
+            {actionLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...</> : 'Send RAMS Request'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

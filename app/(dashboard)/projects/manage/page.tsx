@@ -231,6 +231,7 @@ export default function ProjectsManagePage() {
     formData.append('title', payload.title);
     if (payload.description) formData.append('description', payload.description);
     if (payload.documentTypeId) formData.append('document_type_id', payload.documentTypeId);
+    if (payload.quoteId) formData.append('quote_id', payload.quoteId);
 
     const xhr = new XMLHttpRequest();
     xhrMapRef.current.set(uploadId, xhr);

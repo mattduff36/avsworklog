@@ -3,8 +3,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { AppPageShell } from '@/components/layout/AppPageShell';
-import { Plus, Receipt, Settings } from 'lucide-react';
+import { CalendarClock, Plus, Receipt, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
 import { PageLoader } from '@/components/ui/page-loader';
@@ -39,6 +40,32 @@ function buildFormRequestError(payload: { error?: string; field_errors?: Record<
   const error = new Error(payload.error || fallback) as Error & { fieldErrors?: Record<string, string> };
   error.fieldErrors = payload.field_errors || {};
   return error;
+}
+
+function buildQuotePayload(data: QuoteFormData) {
+  const { attachment_files: _attachmentFiles, ...payload } = data;
+  return payload;
+}
+
+async function uploadClientQuoteAttachments(quoteId: string, files?: File[]) {
+  if (!files?.length) return;
+
+  await Promise.all(files.map(async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('is_client_visible', 'true');
+    formData.append('attachment_purpose', 'client_pricing');
+
+    const res = await fetch(`/api/quotes/${quoteId}/attachments`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || `Failed to upload ${file.name}`);
+    }
+  }));
 }
 
 export default function QuotesPage() {
@@ -129,12 +156,14 @@ export default function QuotesPage() {
     const res = await fetch('/api/quotes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+      body: JSON.stringify(buildQuotePayload(data)),
     });
     if (!res.ok) {
       const err = await res.json();
       throw buildFormRequestError(err, 'Failed to create quote');
     }
+    const payload = await res.json();
+    await uploadClientQuoteAttachments(payload.quote.id, data.attachment_files);
     toast.success('Quote created');
     await fetchData();
   }
@@ -144,12 +173,13 @@ export default function QuotesPage() {
     const res = await fetch(`/api/quotes/${editingQuote.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+      body: JSON.stringify(buildQuotePayload(data)),
     });
     if (!res.ok) {
       const err = await res.json();
       throw buildFormRequestError(err, 'Failed to update quote');
     }
+    await uploadClientQuoteAttachments(editingQuote.id, data.attachment_files);
     toast.success('Quote updated');
     setEditingQuote(null);
     await fetchData();
@@ -201,20 +231,28 @@ export default function QuotesPage() {
               </p>
             </div>
           </div>
-          <div className="flex flex-col items-end gap-1">
-            <Button
-              onClick={() => {
-                if (!canViewCustomers) return;
-                setEditingQuote(null);
-                setFormOpen(true);
-              }}
-              disabled={!canViewCustomers}
-              aria-describedby={!canViewCustomers ? 'quotes-customer-access-note' : undefined}
-              className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90 font-semibold disabled:bg-slate-300 disabled:text-slate-600 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              New Quote
-            </Button>
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Link href="/quotes/work-calendar">
+                <Button variant="outline" className="border-border text-muted-foreground">
+                  <CalendarClock className="h-4 w-4 mr-2" />
+                  Work Calendar
+                </Button>
+              </Link>
+              <Button
+                onClick={() => {
+                  if (!canViewCustomers) return;
+                  setEditingQuote(null);
+                  setFormOpen(true);
+                }}
+                disabled={!canViewCustomers}
+                aria-describedby={!canViewCustomers ? 'quotes-customer-access-note' : undefined}
+                className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90 font-semibold disabled:bg-slate-300 disabled:text-slate-600 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                New Quote
+              </Button>
+            </div>
             {!canViewCustomers ? (
               <p id="quotes-customer-access-note" className="text-xs text-muted-foreground">
                 Customer access is required to create quotes.

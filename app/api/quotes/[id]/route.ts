@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { ACTIVE_QUOTE_STATUS_ORDER, type QuoteStatus } from '@/app/(dashboard)/quotes/types';
+import { ACTIVE_QUOTE_STATUS_ORDER } from '@/app/(dashboard)/quotes/types';
 import type { Database } from '@/types/database';
 import {
   appendQuoteTimelineEvent,
@@ -10,7 +10,6 @@ import {
   calculateQuoteTotals,
   createQuoteNotification,
   fetchQuoteBundle,
-  sendQuoteApprovalRequestEmail,
   sendQuoteRamsRequestEmail,
   sendQuoteToCustomerEmail,
 } from '@/lib/server/quote-workflow';
@@ -65,6 +64,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
         ...bundle.quote,
         line_items: bundle.lineItems,
         attachments: bundle.attachments,
+        rams_documents: bundle.ramsDocuments,
         invoices: bundle.invoices,
         versions: bundle.versions,
         timeline: bundle.timeline,
@@ -102,6 +102,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       completion_status?: 'approved_in_full' | 'approved_in_part';
       start_date?: string | null;
       start_alert_days?: number | null;
+      estimated_duration_days?: number | null;
+      pricing_mode?: 'itemized' | 'attachments_only';
+      rams_comments?: string | null;
       [key: string]: unknown;
     };
 
@@ -119,60 +122,62 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       ? quoteUpdates.po_value
       : quoteUpdates.po_value ?? null;
     const normalizedStartAlertDays = normalizeOptionalInteger(quoteUpdates.start_alert_days);
+    const normalizedEstimatedDurationDays = normalizeOptionalInteger(quoteUpdates.estimated_duration_days);
+    const pricingMode = quoteUpdates.pricing_mode === 'attachments_only' ? 'attachments_only' : 'itemized';
 
-    if (action === 'submit_for_approval') {
-      const updates = {
-        status: 'pending_internal_approval' as QuoteStatus,
-        updated_by: user.id,
-        return_comments: null,
-      };
+    if (action === 'submit_for_approval' || action === 'confirm_and_send') {
+      const customerEmail = current.quote.attention_email?.trim() || current.quote.customer?.contact_email?.trim() || '';
+      if (!customerEmail) {
+        return NextResponse.json(
+          { error: 'Add a customer contact email before confirming this quote.' },
+          { status: 400 }
+        );
+      }
 
-      const { error } = await supabase.from('quotes').update(updates).eq('id', id);
+      if (current.quote.pricing_mode === 'attachments_only' && !current.attachments.some(attachment => attachment.is_client_visible)) {
+        return NextResponse.json(
+          { error: 'Add at least one client-visible attachment before confirming this quote.' },
+          { status: 400 }
+        );
+      }
+
+      const emailResult = await sendQuoteToCustomerEmail(current, [
+        current.quote.manager_email || '',
+        'rob@avsquires.co.uk',
+        'charlotte@avsquires.co.uk',
+      ]);
+
+      if (!emailResult.success) {
+        return NextResponse.json({ error: emailResult.error || 'Failed to send quote email' }, { status: 500 });
+      }
+
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from('quotes')
+        .update({
+          status: 'sent',
+          approved_by: user.id,
+          approved_at: now,
+          sent_at: now,
+          customer_sent_at: now,
+          customer_sent_by: user.id,
+          updated_by: user.id,
+        })
+        .eq('id', id);
+
       if (error) throw error;
-
       await appendQuoteTimelineEvent(admin, {
         quoteId: id,
         quoteThreadId: current.quote.quote_thread_id,
         quoteReference: current.quote.quote_reference,
-        eventType: 'submitted_for_approval',
-        title: 'Submitted for approval',
-        description: 'Quote moved to pending approval.',
+        eventType: 'confirmed_and_sent',
+        title: 'Confirmed and sent',
+        description: `Quote emailed to ${customerEmail}.`,
         fromStatus: current.quote.status,
-        toStatus: 'pending_internal_approval',
+        toStatus: 'sent',
         actorUserId: user.id,
+        createdAt: now,
       });
-
-      if (current.quote.approver_profile_id) {
-        const { data: approver } = await admin
-          .from('profiles')
-          .select('id, full_name')
-          .eq('id', current.quote.approver_profile_id)
-          .single();
-
-        const approverAuth = approver?.id
-          ? await admin.auth.admin.getUserById(approver.id)
-          : null;
-        const approverEmail = approverAuth?.data?.user?.email || null;
-
-        if (approver?.id) {
-          await createQuoteNotification({
-            senderId: user.id,
-            recipientIds: [approver.id],
-            subject: `Quote approval required: ${current.quote.quote_reference}`,
-            body: `${current.quote.manager_name || 'A manager'} submitted ${current.quote.quote_reference} for approval.`,
-          });
-        }
-
-        if (approverEmail) {
-          await sendQuoteApprovalRequestEmail({
-            approverEmail,
-            managerName: current.quote.manager_name || 'A manager',
-            quoteReference: current.quote.quote_reference,
-            customerName: current.quote.customer?.company_name || 'Unknown customer',
-            subjectLine: current.quote.subject_line || 'No subject provided',
-          });
-        }
-      }
     } else if (action === 'return_for_changes') {
       const { error } = await supabase
         .from('quotes')
@@ -299,8 +304,15 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         quoteReference: current.quote.quote_reference,
         customerName: current.quote.customer?.company_name || 'Unknown customer',
         subjectLine: current.quote.subject_line || 'No subject provided',
+        scope: current.quote.scope || null,
         poNumber: String(normalizedPoNumber || current.quote.po_number || 'Not supplied'),
         managerName: current.quote.manager_name || 'Unknown manager',
+        internalNotes: current.quote.version_notes || null,
+        completionComments: current.quote.completion_comments || null,
+        siteAddress: current.quote.site_address || null,
+        startDate: current.quote.start_date || null,
+        estimatedDurationDays: current.quote.estimated_duration_days || null,
+        ramsComments: normalizeOptionalString(quoteUpdates.rams_comments),
       });
       await appendQuoteTimelineEvent(admin, {
         quoteId: id,
@@ -308,7 +320,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         quoteReference: current.quote.quote_reference,
         eventType: 'rams_triggered',
         title: 'RAMS triggered',
-        description: 'Status changed to Accepted.',
+        description: normalizeOptionalString(quoteUpdates.rams_comments) || 'Status changed to Accepted.',
         fromStatus: current.quote.status,
         toStatus: 'po_received',
         actorUserId: user.id,
@@ -535,6 +547,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         fieldErrors.start_alert_days = 'Alert days before start must be a whole number.';
       }
 
+      if (Number.isNaN(normalizedEstimatedDurationDays)) {
+        fieldErrors.estimated_duration_days = 'Estimated duration must be a whole number.';
+      }
+
       const normalizedItems = Array.isArray(line_items)
         ? line_items.map((item, index) => ({
           originalIndex: index,
@@ -546,11 +562,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         }))
         : null;
 
-      normalizedItems?.forEach((item) => {
-        if (isMeaningfulLineItem(item) && !item.description) {
-          fieldErrors[`line_items.${item.originalIndex}.description`] = 'Enter a description for this line item.';
-        }
-      });
+      if (pricingMode === 'itemized') {
+        normalizedItems?.forEach((item) => {
+          if (isMeaningfulLineItem(item) && !item.description) {
+            fieldErrors[`line_items.${item.originalIndex}.description`] = 'Enter a description for this line item.';
+          }
+        });
+      }
 
       if (Object.keys(fieldErrors).length > 0) {
         return NextResponse.json(
@@ -590,6 +608,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         updates.project_description = normalizeOptionalString(quoteUpdates.project_description);
       }
 
+      if ('scope' in quoteUpdates) {
+        updates.scope = normalizeOptionalString(quoteUpdates.scope);
+      }
+
       if ('salutation' in quoteUpdates) {
         updates.salutation = normalizeOptionalString(quoteUpdates.salutation);
       }
@@ -626,6 +648,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         updates.start_alert_days = normalizedStartAlertDays;
       }
 
+      if ('estimated_duration_days' in quoteUpdates) {
+        updates.estimated_duration_days = normalizedEstimatedDurationDays;
+      }
+
+      if ('pricing_mode' in quoteUpdates) {
+        updates.pricing_mode = pricingMode;
+      }
+
       if (typeof manager_profile_id !== 'undefined' && normalizedManagerProfileId) {
         const managerOption = await admin
           .from('quote_manager_series')
@@ -657,7 +687,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           || null;
         updates.approver_profile_id = normalizedApproverProfileId
           || managerOption.data?.approver_profile_id
-          || null;
+          || normalizedManagerProfileId;
         updates.signoff_name = normalizeOptionalString(quoteUpdates.signoff_name)
           || managerOption.data?.signoff_name
           || managerProfile.full_name;
@@ -673,7 +703,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       }
 
       if (normalizedItems) {
-        const meaningfulItems = normalizedItems
+        const meaningfulItems = pricingMode === 'attachments_only' ? [] : normalizedItems
           .filter(item => isMeaningfulLineItem(item))
           .map(({ originalIndex: _originalIndex, ...item }) => item);
         const totals = calculateQuoteTotals(meaningfulItems);
@@ -691,7 +721,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           .eq('quote_id', id);
         if (deleteLineItemsError) throw deleteLineItemsError;
 
-        const meaningfulItems = normalizedItems
+        const meaningfulItems = pricingMode === 'attachments_only' ? [] : normalizedItems
           .filter(item => isMeaningfulLineItem(item))
           .map(({ originalIndex: _originalIndex, ...item }) => item);
 

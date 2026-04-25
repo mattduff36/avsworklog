@@ -22,6 +22,7 @@ export type QuoteInvoiceRow = Database['public']['Tables']['quote_invoices']['Ro
 export type QuoteInvoiceAllocationRow = Database['public']['Tables']['quote_invoice_allocations']['Row'];
 export type QuoteManagerSeriesRow = Database['public']['Tables']['quote_manager_series']['Row'];
 export type QuoteTimelineEventRow = Database['public']['Tables']['quote_timeline_events']['Row'];
+export type RamsDocumentRow = Database['public']['Tables']['rams_documents']['Row'];
 
 interface QuoteManagerOption {
   profile_id: string;
@@ -62,6 +63,7 @@ export interface QuoteBundle {
   };
   lineItems: QuoteLineItemRow[];
   attachments: QuoteAttachmentRow[];
+  ramsDocuments: RamsDocumentRow[];
   invoices: Array<QuoteInvoiceRow & { allocations: QuoteInvoiceAllocationRow[] }>;
   versions: QuoteRow[];
   timeline: Array<QuoteTimelineEventRow & { actor?: { id: string; full_name: string | null } | null }>;
@@ -279,9 +281,10 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
 
   const typedQuote = quote as QuoteBundle['quote'];
 
-  const [lineItemsResult, attachmentsResult, versionsResult, invoicesResult, timelineResult] = await Promise.all([
+  const [lineItemsResult, attachmentsResult, ramsDocumentsResult, versionsResult, invoicesResult, timelineResult] = await Promise.all([
     supabase.from('quote_line_items').select('*').eq('quote_id', quoteId).order('sort_order', { ascending: true }),
     supabase.from('quote_attachments').select('*').eq('quote_id', quoteId).order('created_at', { ascending: false }),
+    supabase.from('rams_documents').select('*').eq('quote_id', quoteId).order('created_at', { ascending: false }),
     supabase.from('quotes').select('*').eq('quote_thread_id', typedQuote.quote_thread_id).order('created_at', { ascending: false }),
     supabase.from('quote_invoices').select('*').eq('quote_id', quoteId).order('invoice_date', { ascending: false }),
     supabase
@@ -296,6 +299,7 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
 
   if (lineItemsResult.error) throw lineItemsResult.error;
   if (attachmentsResult.error) throw attachmentsResult.error;
+  if (ramsDocumentsResult.error) throw ramsDocumentsResult.error;
   if (versionsResult.error) throw versionsResult.error;
   if (invoicesResult.error) throw invoicesResult.error;
   if (timelineResult.error) throw timelineResult.error;
@@ -328,6 +332,7 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
     quote: typedQuote,
     lineItems: (lineItemsResult.data || []) as QuoteLineItemRow[],
     attachments: (attachmentsResult.data || []) as QuoteAttachmentRow[],
+    ramsDocuments: (ramsDocumentsResult.data || []) as RamsDocumentRow[],
     versions: (versionsResult.data || []) as QuoteRow[],
     timeline: (timelineResult.data || []) as QuoteBundle['timeline'],
     invoices: invoices.map(invoice => ({
@@ -396,6 +401,7 @@ export async function renderQuotePdfAttachment(bundle: QuoteBundle): Promise<Ema
     salutation: bundle.quote.salutation || '',
     projectDescription: bundle.quote.project_description || '',
     subjectLine: bundle.quote.subject_line || '',
+    scope: bundle.quote.scope || '',
     siteAddress: bundle.quote.site_address || '',
     managerEmail: bundle.quote.manager_email || '',
     lineItems: bundle.lineItems.map(item => ({
@@ -406,6 +412,7 @@ export async function renderQuotePdfAttachment(bundle: QuoteBundle): Promise<Ema
       line_total: Number(item.line_total),
     })),
     total: Number(bundle.quote.total),
+    pricingMode: bundle.quote.pricing_mode || 'itemized',
     validityDays: bundle.quote.validity_days || 30,
     signoffName: bundle.quote.signoff_name || '',
     signoffTitle: bundle.quote.signoff_title || '',
@@ -427,8 +434,32 @@ export async function renderQuotePdfAttachment(bundle: QuoteBundle): Promise<Ema
   };
 }
 
+async function renderClientVisibleQuoteAttachments(bundle: QuoteBundle): Promise<EmailAttachment[]> {
+  const admin = createAdminClient();
+  const clientVisibleAttachments = bundle.attachments.filter(attachment => attachment.is_client_visible);
+
+  const attachments = await Promise.all(clientVisibleAttachments.map(async (attachment) => {
+    const { data, error } = await admin.storage
+      .from('quote-attachments')
+      .download(attachment.file_path);
+
+    if (error || !data) {
+      throw error || new Error(`Unable to download attachment ${attachment.file_name}`);
+    }
+
+    const buffer = Buffer.from(await data.arrayBuffer());
+    return {
+      filename: attachment.file_name,
+      content: buffer.toString('base64'),
+    };
+  }));
+
+  return attachments;
+}
+
 export async function sendQuoteToCustomerEmail(bundle: QuoteBundle, cc: string[]) {
-  const attachment = await renderQuotePdfAttachment(bundle);
+  const quotePdfAttachment = await renderQuotePdfAttachment(bundle);
+  const clientAttachments = await renderClientVisibleQuoteAttachments(bundle);
   const customerEmail = bundle.quote.attention_email?.trim() || bundle.quote.customer?.contact_email?.trim() || '';
   if (!customerEmail) {
     return { success: false, error: 'Quote cannot be sent because the customer does not have a contact email.' };
@@ -436,6 +467,9 @@ export async function sendQuoteToCustomerEmail(bundle: QuoteBundle, cc: string[]
 
   const customerName = bundle.quote.attention_name || bundle.quote.customer?.contact_name || 'there';
   const subject = `Quotation ${bundle.quote.quote_reference} - ${bundle.quote.subject_line || bundle.quote.customer?.company_name || 'A&V Squires'}`;
+  const pricingCopy = bundle.quote.pricing_mode === 'attachments_only'
+    ? '<p>Pricing and supporting details are included in the attached documents.</p>'
+    : '';
   const html = `
     <!DOCTYPE html>
     <html>
@@ -443,6 +477,7 @@ export async function sendQuoteToCustomerEmail(bundle: QuoteBundle, cc: string[]
         <h2 style="margin-bottom: 16px;">Quotation ${bundle.quote.quote_reference}</h2>
         <p>Hello ${customerName},</p>
         <p>Please find attached our quotation for <strong>${bundle.quote.subject_line || 'the requested works'}</strong>.</p>
+        ${pricingCopy}
         <p>If you have any queries, please reply to this email and we will be happy to help.</p>
         <p>Kind regards,<br>${bundle.quote.signoff_name || 'A&V Squires'}${bundle.quote.signoff_title ? `<br>${bundle.quote.signoff_title}` : ''}</p>
       </body>
@@ -455,7 +490,7 @@ export async function sendQuoteToCustomerEmail(bundle: QuoteBundle, cc: string[]
     cc: cc.filter(Boolean),
     subject,
     html,
-    attachments: [attachment],
+    attachments: [quotePdfAttachment, ...clientAttachments],
   });
 }
 
@@ -487,8 +522,15 @@ export async function sendQuoteRamsRequestEmail(params: {
   quoteReference: string;
   customerName: string;
   subjectLine: string;
+  scope?: string | null;
   poNumber: string;
   managerName: string;
+  internalNotes?: string | null;
+  completionComments?: string | null;
+  siteAddress?: string | null;
+  startDate?: string | null;
+  estimatedDurationDays?: number | null;
+  ramsComments?: string | null;
 }) {
   return sendEmail({
     to: ['conway@avsquires.co.uk'],
@@ -502,8 +544,15 @@ export async function sendQuoteRamsRequestEmail(params: {
           <p><strong>Quote:</strong> ${params.quoteReference}</p>
           <p><strong>Customer:</strong> ${params.customerName}</p>
           <p><strong>PO Number:</strong> ${params.poNumber}</p>
-          <p><strong>Scope:</strong> ${params.subjectLine}</p>
+          <p><strong>Title:</strong> ${params.subjectLine}</p>
+          ${params.scope ? `<p><strong>Scope:</strong><br>${params.scope.replace(/\n/g, '<br>')}</p>` : ''}
           <p><strong>Manager:</strong> ${params.managerName}</p>
+          ${params.siteAddress ? `<p><strong>Site Address:</strong><br>${params.siteAddress.replace(/\n/g, '<br>')}</p>` : ''}
+          ${params.startDate ? `<p><strong>Start Date:</strong> ${params.startDate}</p>` : ''}
+          ${params.estimatedDurationDays !== null && typeof params.estimatedDurationDays !== 'undefined' ? `<p><strong>Estimated Duration:</strong> ${params.estimatedDurationDays} day(s)</p>` : ''}
+          ${params.internalNotes ? `<p><strong>Internal Notes:</strong><br>${params.internalNotes.replace(/\n/g, '<br>')}</p>` : ''}
+          ${params.completionComments ? `<p><strong>Completion Notes:</strong><br>${params.completionComments.replace(/\n/g, '<br>')}</p>` : ''}
+          ${params.ramsComments ? `<p><strong>Additional RAMS Comments:</strong><br>${params.ramsComments.replace(/\n/g, '<br>')}</p>` : ''}
         </body>
       </html>
     `,

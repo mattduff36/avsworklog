@@ -377,10 +377,12 @@ interface QuotePDFProps {
   salutation: string;
   projectDescription: string;
   subjectLine: string;
+  scope?: string;
   siteAddress?: string;
   managerEmail?: string;
   lineItems: LineItem[];
   total: number;
+  pricingMode?: 'itemized' | 'attachments_only';
   validityDays: number;
   signoffName: string;
   signoffTitle: string;
@@ -403,10 +405,12 @@ export function QuotePDF({
   salutation,
   projectDescription,
   subjectLine,
+  scope,
   siteAddress,
   managerEmail,
   lineItems,
   total,
+  pricingMode = 'itemized',
   validityDays,
   signoffName,
   signoffTitle,
@@ -503,6 +507,12 @@ export function QuotePDF({
         <View style={styles.subjectCard}>
           {subjectLine && <Text style={styles.subjectTitle}>{subjectLine}</Text>}
           {projectDescription && <Text style={styles.subjectDescription}>{projectDescription}</Text>}
+          {scope && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Scope</Text>
+              <Text style={styles.detailValue}>{scope}</Text>
+            </View>
+          )}
           {siteAddress && (
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Site address</Text>
@@ -519,30 +529,41 @@ export function QuotePDF({
           )}
         </View>
 
-        <Text style={styles.tableLabel}>Quoted items</Text>
-        <View style={styles.table}>
-          <View style={styles.tableHeader}>
-            <Text style={[styles.colItemHeader, styles.tableHeaderText]}>Item</Text>
-            <Text style={[styles.colQtyHeader, styles.tableHeaderText]}>Quantity</Text>
-            <Text style={[styles.colRateHeader, styles.tableHeaderText]}>Unit Rate</Text>
-            <Text style={[styles.colTotalHeader, styles.tableHeaderText]}>Total</Text>
+        {pricingMode === 'attachments_only' ? (
+          <View style={styles.notesPanel}>
+            <Text style={styles.notesPrimary}>Pricing and supporting details are supplied in the attached documents.</Text>
+            <Text style={styles.notesSecondary}>
+              Please refer to the attached pricing documents for the quoted costs and any supporting scope details.
+            </Text>
           </View>
-          {lineItems.map((item, idx) => (
-            <View
-              key={idx}
-              style={idx % 2 === 0 ? styles.tableRow : styles.tableRowAlt}
-            >
-              <Text style={styles.colItem}>{item.description}</Text>
-              <Text style={styles.colQty}>{formatQuantity(item)}</Text>
-              <Text style={styles.colRate}>{gbp(item.unit_rate)}</Text>
-              <Text style={styles.colTotal}>{gbp(item.line_total)}</Text>
+        ) : (
+          <>
+          <Text style={styles.tableLabel}>Quoted items</Text>
+          <View style={styles.table}>
+            <View style={styles.tableHeader}>
+              <Text style={[styles.colItemHeader, styles.tableHeaderText]}>Item</Text>
+              <Text style={[styles.colQtyHeader, styles.tableHeaderText]}>Quantity</Text>
+              <Text style={[styles.colRateHeader, styles.tableHeaderText]}>Unit Rate</Text>
+              <Text style={[styles.colTotalHeader, styles.tableHeaderText]}>Total</Text>
             </View>
-          ))}
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalValue}>{gbp(total)}</Text>
+            {lineItems.map((item, idx) => (
+              <View
+                key={idx}
+                style={idx % 2 === 0 ? styles.tableRow : styles.tableRowAlt}
+              >
+                <Text style={styles.colItem}>{item.description}</Text>
+                <Text style={styles.colQty}>{formatQuantity(item)}</Text>
+                <Text style={styles.colRate}>{gbp(item.unit_rate)}</Text>
+                <Text style={styles.colTotal}>{gbp(item.line_total)}</Text>
+              </View>
+            ))}
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>Total</Text>
+              <Text style={styles.totalValue}>{gbp(total)}</Text>
+            </View>
           </View>
-        </View>
+          </>
+        )}
 
         <View style={styles.notesPanel}>
           <Text style={styles.notesPrimary}>

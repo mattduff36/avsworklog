@@ -17,6 +17,17 @@ export interface QuoteAttachment {
   file_size: number | null;
   uploaded_by: string | null;
   created_at: string;
+  is_client_visible: boolean;
+  attachment_purpose: 'internal' | 'client_pricing' | 'client_supporting';
+}
+
+export interface QuoteRamsDocument {
+  id: string;
+  title: string;
+  description: string | null;
+  file_name: string;
+  created_at: string;
+  document_type_id: string | null;
 }
 
 export interface QuoteInvoiceAllocation {
@@ -97,11 +108,13 @@ export interface Quote {
   attention_email: string | null;
   subject_line: string | null;
   project_description: string | null;
+  scope: string | null;
   salutation: string | null;
   site_address: string | null;
   validity_days: number;
   subtotal: number;
   total: number;
+  pricing_mode: 'itemized' | 'attachments_only';
   status: QuoteStatus;
   accepted: boolean;
   po_number: string | null;
@@ -111,6 +124,7 @@ export interface Quote {
   start_date: string | null;
   start_alert_days: number | null;
   start_alert_sent_at: string | null;
+  estimated_duration_days: number | null;
   invoice_number: string | null;
   invoice_notes: string | null;
   last_invoice_at: string | null;
@@ -159,6 +173,7 @@ export interface Quote {
   };
   line_items?: QuoteLineItem[];
   attachments?: QuoteAttachment[];
+  rams_documents?: QuoteRamsDocument[];
   invoices?: QuoteInvoice[];
   versions?: Quote[];
   previous_versions?: Quote[];
@@ -212,10 +227,10 @@ export type QuoteStatus =
 
 export const QUOTE_STATUS_CONFIG: Record<QuoteStatus, { label: string; color: string }> = {
   draft: { label: 'Draft', color: 'border-slate-500/30 text-slate-400 bg-slate-500/10' },
-  pending_internal_approval: { label: 'Pending Approval', color: 'border-amber-500/30 text-amber-400 bg-amber-500/10' },
+  pending_internal_approval: { label: 'Pending Confirmation', color: 'border-amber-500/30 text-amber-400 bg-amber-500/10' },
   approved: { label: 'Approved', color: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' },
   changes_requested: { label: 'Changes Requested', color: 'border-orange-500/30 text-orange-400 bg-orange-500/10' },
-  sent: { label: 'Sent', color: 'border-blue-500/30 text-blue-400 bg-blue-500/10' },
+  sent: { label: 'Confirmed', color: 'border-blue-500/30 text-blue-400 bg-blue-500/10' },
   won: { label: 'Won', color: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' },
   lost: { label: 'Lost', color: 'border-rose-500/30 text-rose-400 bg-rose-500/10' },
   ready_to_invoice: { label: 'Ready To Invoice', color: 'border-violet-500/30 text-violet-400 bg-violet-500/10' },
@@ -225,7 +240,7 @@ export const QUOTE_STATUS_CONFIG: Record<QuoteStatus, { label: string; color: st
   completed_full: { label: 'Completed In Full', color: 'border-lime-500/30 text-lime-400 bg-lime-500/10' },
   partially_invoiced: { label: 'Partially Invoiced', color: 'border-fuchsia-500/30 text-fuchsia-400 bg-fuchsia-500/10' },
   invoiced: { label: 'Invoiced', color: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' },
-  closed: { label: 'Closed', color: 'border-slate-500/30 text-slate-400 bg-slate-500/10' },
+  closed: { label: 'Archived', color: 'border-slate-500/30 text-slate-400 bg-slate-500/10' },
 };
 
 export const ACTIVE_QUOTE_STATUS_ORDER: QuoteStatus[] = [
@@ -276,8 +291,10 @@ export interface QuoteFormData {
   site_address: string;
   subject_line: string;
   project_description: string;
+  scope: string;
   salutation: string;
   validity_days: number;
+  pricing_mode: 'itemized' | 'attachments_only';
   manager_name: string;
   manager_email: string;
   approver_profile_id: string;
@@ -287,5 +304,7 @@ export interface QuoteFormData {
   version_notes: string;
   start_date: string;
   start_alert_days: number | '';
+  estimated_duration_days: number | '';
   line_items: QuoteLineItem[];
+  attachment_files?: File[];
 }

@@ -206,6 +206,7 @@ describe('POST /api/quotes', () => {
       quote: { id: 'quote-1', quote_reference: '80000-MD' },
       lineItems: [],
       attachments: [],
+      ramsDocuments: [],
       invoices: [],
       versions: [],
       invoiceSummary: {
@@ -300,8 +301,12 @@ describe('POST /api/quotes', () => {
         manager_profile_id: 'manager-1',
         quote_date: '2026-03-24',
         subject_line: '',
+        project_description: 'Short summary',
+        scope: 'Install fencing',
+        pricing_mode: 'attachments_only',
         start_date: '',
         start_alert_days: '',
+        estimated_duration_days: 5,
         line_items: [
           {
             description: '',
@@ -323,7 +328,13 @@ describe('POST /api/quotes', () => {
       quote_reference: '80000-MD',
       start_alert_days: null,
       start_date: null,
+      estimated_duration_days: 5,
       subject_line: null,
+      project_description: 'Short summary',
+      scope: 'Install fencing',
+      pricing_mode: 'attachments_only',
+      subtotal: 0,
+      total: 0,
     }));
     expect(lineItemInsert).not.toHaveBeenCalled();
   });

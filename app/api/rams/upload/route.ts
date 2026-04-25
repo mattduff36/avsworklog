@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
     const title = formData.get('title') as string;
     const description = formData.get('description') as string | null;
     const documentTypeId = formData.get('document_type_id') as string | null;
+    const quoteId = formData.get('quote_id') as string | null;
 
     // Validate required fields
     if (!file || !title) {
@@ -87,6 +88,7 @@ export async function POST(request: NextRequest) {
         file_type: validation.fileType!,
         uploaded_by: user.id,
         document_type_id: documentTypeId || null,
+        quote_id: quoteId || null,
       } as never)
       .select()
       .single();

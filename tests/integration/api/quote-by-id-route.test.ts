@@ -45,6 +45,7 @@ vi.mock('@/lib/server/quote-workflow', async () => {
 describe('PATCH /api/quotes/[id]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSendQuoteToCustomerEmail.mockResolvedValue({ success: true });
     mockCreateAdminClient.mockReturnValue({
       storage: {
         from: vi.fn(() => ({
@@ -101,7 +102,7 @@ describe('PATCH /api/quotes/[id]', () => {
     });
   });
 
-  it('returns a validation error when approve_and_send has no customer email', async () => {
+  it('returns a validation error when confirm_and_send has no customer email', async () => {
     const { PATCH } = await import('@/app/api/quotes/[id]/route');
     mockFetchQuoteBundle.mockResolvedValue({
       quote: {
@@ -133,16 +134,68 @@ describe('PATCH /api/quotes/[id]', () => {
 
     const request = new NextRequest('http://localhost/api/quotes/quote-1', {
       method: 'PATCH',
-      body: JSON.stringify({ action: 'approve_and_send' }),
+      body: JSON.stringify({ action: 'confirm_and_send' }),
     });
 
     const response = await PATCH(request, { params: Promise.resolve({ id: 'quote-1' }) });
     const payload = await response.json();
 
     expect(response.status).toBe(400);
-    expect(payload.error).toBe('Add a customer contact email before sending this quote.');
+    expect(payload.error).toBe('Add a customer contact email before confirming this quote.');
     expect(mockSendQuoteToCustomerEmail).not.toHaveBeenCalled();
   }, 15000);
+
+  it('confirms and sends draft quotes in one action', async () => {
+    const { PATCH } = await import('@/app/api/quotes/[id]/route');
+    mockFetchQuoteBundle.mockResolvedValue({
+      quote: {
+        id: 'quote-1',
+        status: 'draft',
+        is_latest_version: true,
+        quote_reference: 'Q-001',
+        subject_line: 'Fence repairs',
+        pricing_mode: 'itemized',
+        manager_email: 'manager@avsquires.co.uk',
+        attention_email: 'alex@example.com',
+        customer: {
+          id: 'customer-1',
+          company_name: 'Acme Ltd',
+          contact_email: 'alex@example.com',
+          contact_name: 'Alex',
+          short_name: 'Acme',
+        },
+      },
+      lineItems: [],
+      attachments: [],
+      invoices: [],
+      versions: [],
+      invoiceSummary: {
+        invoicedTotal: 0,
+        remainingBalance: 0,
+        lastInvoiceAt: null,
+        status: 'not_invoiced',
+      },
+    });
+
+    const request = new NextRequest('http://localhost/api/quotes/quote-1', {
+      method: 'PATCH',
+      body: JSON.stringify({ action: 'confirm_and_send' }),
+    });
+
+    const response = await PATCH(request, { params: Promise.resolve({ id: 'quote-1' }) });
+
+    expect(response.status).toBe(200);
+    expect(mockSendQuoteToCustomerEmail).toHaveBeenCalled();
+    expect(mockQuoteUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'sent',
+      approved_by: 'user-1',
+      customer_sent_by: 'user-1',
+    }));
+    expect(mockAppendQuoteTimelineEvent).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      eventType: 'confirmed_and_sent',
+      toStatus: 'sent',
+    }));
+  });
 
   it('saves PO details without advancing the quote status', async () => {
     const { PATCH } = await import('@/app/api/quotes/[id]/route');
@@ -233,7 +286,7 @@ describe('PATCH /api/quotes/[id]', () => {
 
     const request = new NextRequest('http://localhost/api/quotes/quote-1', {
       method: 'PATCH',
-      body: JSON.stringify({ action: 'trigger_rams' }),
+      body: JSON.stringify({ action: 'trigger_rams', rams_comments: 'Mind the gate access.' }),
     });
 
     const response = await PATCH(request, { params: Promise.resolve({ id: 'quote-1' }) });
@@ -249,6 +302,7 @@ describe('PATCH /api/quotes/[id]', () => {
       expect.objectContaining({
         poNumber: 'Not supplied',
         quoteReference: 'Q-001',
+        ramsComments: 'Mind the gate access.',
       })
     );
   });

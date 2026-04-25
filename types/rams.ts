@@ -39,6 +39,7 @@ export interface RAMSDocument {
   is_active: boolean;
   version: number;
   document_type_id: string | null;
+  quote_id: string | null;
 }
 
 export interface RAMSAssignment {

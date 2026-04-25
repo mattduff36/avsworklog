@@ -51,6 +51,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       salutation: quote.salutation || '',
       projectDescription: quote.project_description || '',
       subjectLine: quote.subject_line || '',
+      scope: quote.scope || '',
       siteAddress: quote.site_address || '',
       managerEmail: quote.manager_email || '',
       lineItems: (lineItems || []).map((li: { description: string; quantity: number; unit: string | null; unit_rate: number; line_total: number }) => ({
@@ -61,6 +62,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         line_total: Number(li.line_total),
       })),
       total: Number(quote.total),
+      pricingMode: quote.pricing_mode || 'itemized',
       validityDays: quote.validity_days || 30,
       signoffName: quote.signoff_name || '',
       signoffTitle: quote.signoff_title || '',

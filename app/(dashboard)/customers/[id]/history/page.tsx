@@ -292,7 +292,7 @@ export default function CustomerHistoryPage({ params }: PageProps) {
                         </Badge>
                         {q.commercial_status === 'closed' && (
                           <Badge variant="outline" className="text-xs border-slate-300/30 text-slate-200 bg-slate-400/10">
-                            Closed
+                            Archived
                           </Badge>
                         )}
                       </div>

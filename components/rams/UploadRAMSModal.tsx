@@ -18,6 +18,7 @@ export interface UploadSubmitPayload {
   description: string;
   documentTypeId: string;
   documentTypeName: string;
+  quoteId: string;
 }
 
 interface UploadRAMSModalProps {
@@ -29,27 +30,45 @@ interface UploadRAMSModalProps {
   prefillTypeId?: string;
 }
 
+interface QuoteOption {
+  id: string;
+  quote_reference: string;
+  subject_line: string | null;
+  customer?: {
+    company_name?: string | null;
+  } | null;
+}
+
 export function UploadRAMSModal({ open, onClose, onSubmit, prefillTitle, prefillDescription, prefillTypeId }: UploadRAMSModalProps) {
   const [title, setTitle] = useState(prefillTitle || '');
   const [description, setDescription] = useState(prefillDescription || '');
   const [file, setFile] = useState<File | null>(null);
   const [documentTypes, setDocumentTypes] = useState<ProjectDocumentType[]>([]);
+  const [quoteOptions, setQuoteOptions] = useState<QuoteOption[]>([]);
   const [selectedTypeId, setSelectedTypeId] = useState<string>(prefillTypeId || '');
+  const [selectedQuoteId, setSelectedQuoteId] = useState('');
 
   useEffect(() => {
     if (open) {
-      fetch('/api/projects/document-types')
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) {
-            const active = data.types.filter((t: ProjectDocumentType) => t.is_active);
-            setDocumentTypes(active);
-            if (!selectedTypeId && active.length > 0) {
-              setSelectedTypeId(active[0].id);
+      void Promise.all([
+        fetch('/api/projects/document-types')
+          .then(res => res.json())
+          .then(data => {
+            if (data.success) {
+              const active = data.types.filter((t: ProjectDocumentType) => t.is_active);
+              setDocumentTypes(active);
+              if (!selectedTypeId && active.length > 0) {
+                setSelectedTypeId(active[0].id);
+              }
             }
-          }
-        })
-        .catch(err => console.error('Error loading document types:', err));
+          }),
+        fetch('/api/quotes?limit=250')
+          .then(res => res.json())
+          .then(data => {
+            const quotes = (data.quotes || []) as QuoteOption[];
+            setQuoteOptions(quotes.filter(quote => quote.quote_reference));
+          }),
+      ]).catch(err => console.error('Error loading upload modal metadata:', err));
     }
   }, [open, selectedTypeId]);
 
@@ -85,6 +104,7 @@ export function UploadRAMSModal({ open, onClose, onSubmit, prefillTitle, prefill
     setTitle(prefillTitle || '');
     setDescription(prefillDescription || '');
     setFile(null);
+    setSelectedQuoteId('');
     if (!prefillTypeId && documentTypes.length > 0) {
       setSelectedTypeId(documentTypes[0].id);
     }
@@ -106,6 +126,7 @@ export function UploadRAMSModal({ open, onClose, onSubmit, prefillTitle, prefill
       description: description.trim(),
       documentTypeId: selectedTypeId,
       documentTypeName: typeName,
+      quoteId: selectedQuoteId,
     });
 
     resetForm();
@@ -149,6 +170,25 @@ export function UploadRAMSModal({ open, onClose, onSubmit, prefillTitle, prefill
                 </Select>
               </div>
             )}
+
+            {/* Title */}
+            <div className="grid gap-2">
+              <Label htmlFor="quote-reference">Quote / Job Reference</Label>
+              <Select value={selectedQuoteId || 'none'} onValueChange={value => setSelectedQuoteId(value === 'none' ? '' : value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select quote reference" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No quote link</SelectItem>
+                  {quoteOptions.map((quote) => (
+                    <SelectItem key={quote.id} value={quote.id}>
+                      {quote.quote_reference}{quote.customer?.company_name ? ` - ${quote.customer.company_name}` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Linked RAMS documents will appear on the selected quote.</p>
+            </div>
 
             {/* Title */}
             <div className="grid gap-2">

@@ -102,7 +102,7 @@ export default function DebugPage() {
         <div className="flex items-center gap-3">
           <Bug className="h-6 md:h-8 w-6 md:w-8" />
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold mb-1 md:mb-2">Debug Console</h1>
+            <h1 className="text-2xl md:text-3xl font-bold mb-1 md:mb-2">SuperAdmin Debug Console</h1>
             <p className="text-sm md:text-base text-red-100">Developer tools and system information</p>
           </div>
         </div>

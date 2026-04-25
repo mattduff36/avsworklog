@@ -49,7 +49,7 @@ const PO_FILTER_OPTIONS = [
 const COMMERCIAL_FILTER_OPTIONS = [
   { value: 'all', label: 'All commercial' },
   { value: 'open', label: 'Open' },
-  { value: 'closed', label: 'Closed' },
+  { value: 'closed', label: 'Archived' },
 ] as const;
 
 export function QuotesTable({
@@ -342,7 +342,7 @@ export function QuotesTable({
                         <div className="flex flex-wrap gap-1">
                           <Badge variant="outline" className={cfg.color}>{cfg.label}</Badge>
                           {quote.commercial_status === 'closed' && (
-                            <Badge variant="outline" className="border-slate-300/30 text-slate-200 bg-slate-400/10">Closed</Badge>
+                            <Badge variant="outline" className="border-slate-300/30 text-slate-200 bg-slate-400/10">Archived</Badge>
                           )}
                         </div>
                       </td>
@@ -379,7 +379,7 @@ export function QuotesTable({
                             <div className="flex flex-wrap gap-1">
                               <Badge variant="outline" className={versionCfg.color}>{versionCfg.label}</Badge>
                               {version.commercial_status === 'closed' && (
-                                <Badge variant="outline" className="border-slate-300/30 text-slate-300 bg-slate-400/10">Closed</Badge>
+                                <Badge variant="outline" className="border-slate-300/30 text-slate-300 bg-slate-400/10">Archived</Badge>
                               )}
                             </div>
                           </td>
@@ -436,7 +436,7 @@ export function QuotesTable({
                   <div className="flex flex-wrap justify-end gap-1">
                     <Badge variant="outline" className={cfg.color}>{cfg.label}</Badge>
                     {quote.commercial_status === 'closed' && (
-                      <Badge variant="outline" className="border-slate-300/30 text-slate-200 bg-slate-400/10">Closed</Badge>
+                      <Badge variant="outline" className="border-slate-300/30 text-slate-200 bg-slate-400/10">Archived</Badge>
                     )}
                   </div>
                 </div>

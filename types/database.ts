@@ -3184,6 +3184,8 @@ export type Database = {
           file_size: number
           uploaded_by: string
           created_at: string
+          is_client_visible: boolean
+          attachment_purpose: 'internal' | 'client_pricing' | 'client_supporting'
         }
         Insert: {
           id?: string
@@ -3194,6 +3196,8 @@ export type Database = {
           file_size?: number | null
           uploaded_by?: string | null
           created_at?: string
+          is_client_visible?: boolean | null
+          attachment_purpose?: 'internal' | 'client_pricing' | 'client_supporting' | null
         }
         Update: {
           id?: string
@@ -3204,6 +3208,8 @@ export type Database = {
           file_size?: number | null
           uploaded_by?: string | null
           created_at?: string
+          is_client_visible?: boolean | null
+          attachment_purpose?: 'internal' | 'client_pricing' | 'client_supporting' | null
         }
         Relationships: [
           {
@@ -3566,6 +3572,9 @@ export type Database = {
           closed_at: string
           rams_requested_at: string
           last_invoice_at: string
+          scope: string | null
+          estimated_duration_days: number | null
+          pricing_mode: 'itemized' | 'attachments_only'
         }
         Insert: {
           id?: string
@@ -3628,6 +3637,9 @@ export type Database = {
           closed_at?: string | null
           rams_requested_at?: string | null
           last_invoice_at?: string | null
+          scope?: string | null
+          estimated_duration_days?: number | null
+          pricing_mode?: 'itemized' | 'attachments_only' | null
         }
         Update: {
           id?: string
@@ -3690,6 +3702,9 @@ export type Database = {
           closed_at?: string | null
           rams_requested_at?: string | null
           last_invoice_at?: string | null
+          scope?: string | null
+          estimated_duration_days?: number | null
+          pricing_mode?: 'itemized' | 'attachments_only' | null
         }
         Relationships: [
           {
@@ -3843,6 +3858,7 @@ export type Database = {
           is_active: boolean
           version: number
           document_type_id: string
+          quote_id: string | null
         }
         Insert: {
           id?: string
@@ -3858,6 +3874,7 @@ export type Database = {
           is_active?: boolean | null
           version?: number | null
           document_type_id?: string | null
+          quote_id?: string | null
         }
         Update: {
           id?: string
@@ -3873,8 +3890,16 @@ export type Database = {
           is_active?: boolean | null
           version?: number | null
           document_type_id?: string | null
+          quote_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: 'rams_documents_quote_id_fkey'
+            columns: ['quote_id']
+            isOneToOne: false
+            referencedRelation: 'quotes'
+            referencedColumns: ['id']
+          },
           {
             foreignKeyName: 'rams_documents_document_type_id_fkey'
             columns: ['document_type_id']
@@ -4986,6 +5011,67 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+        ]
+      }
+      work_calendar_entries: {
+        Row: {
+          id: string
+          quote_id: string | null
+          title: string
+          summary: string | null
+          start_date: string
+          estimated_duration_days: number
+          created_by: string | null
+          updated_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          quote_id?: string | null
+          title: string
+          summary?: string | null
+          start_date: string
+          estimated_duration_days?: number | null
+          created_by?: string | null
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          quote_id?: string | null
+          title?: string
+          summary?: string | null
+          start_date?: string
+          estimated_duration_days?: number | null
+          created_by?: string | null
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'work_calendar_entries_quote_id_fkey'
+            columns: ['quote_id']
+            isOneToOne: false
+            referencedRelation: 'quotes'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'work_calendar_entries_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'work_calendar_entries_updated_by_fkey'
+            columns: ['updated_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
         ]
       }
       workshop_attachment_field_responses: {
