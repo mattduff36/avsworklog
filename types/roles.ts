@@ -90,6 +90,7 @@ export const STANDARD_MODULES: ModuleName[] = [
   'maintenance',
   'workshop-tasks',
   'admin-vans',
+  'inventory',
 ];
 
 export const MANAGEMENT_MODULES: ModuleName[] = [
@@ -127,6 +128,7 @@ export const MODULE_SHORT_NAMES: Record<ModuleName, string> = {
   'admin-vans': 'Fleet',
   'customers': 'Customers',
   'quotes': 'Quotes',
+  'inventory': 'Inventory',
 };
 
 export const MODULE_CSS_VAR: Record<ModuleName, string> = {
@@ -150,6 +152,7 @@ export const MODULE_CSS_VAR: Record<ModuleName, string> = {
   'admin-vans': '--fleet-primary',
   'customers': '--avs-yellow',
   'quotes': '--avs-yellow',
+  'inventory': '--inventory-primary',
 };
 
 // All available modules in the system
@@ -173,7 +176,8 @@ export type ModuleName =
   | 'admin-settings'
   | 'admin-vans'
   | 'customers'
-  | 'quotes';
+  | 'quotes'
+  | 'inventory';
 
 export const ALL_MODULES: ModuleName[] = [
   'timesheets',
@@ -196,6 +200,7 @@ export const ALL_MODULES: ModuleName[] = [
   'admin-vans',
   'customers',
   'quotes',
+  'inventory',
 ];
 
 export const MODULE_DISPLAY_NAMES: Record<ModuleName, string> = {
@@ -219,6 +224,7 @@ export const MODULE_DISPLAY_NAMES: Record<ModuleName, string> = {
   'admin-vans': 'Fleet Management',
   'customers': 'Customers',
   'quotes': 'Quotes',
+  'inventory': 'Inventory',
 };
 
 export const MODULE_DESCRIPTIONS: Record<ModuleName, string> = {
@@ -242,6 +248,7 @@ export const MODULE_DESCRIPTIONS: Record<ModuleName, string> = {
   'admin-vans': 'Manage fleet assets',
   'customers': 'Manage customer directory',
   'quotes': 'Create and track customer quotations',
+  'inventory': 'Track small tools, equipment, and location buckets',
 };
 
 // For API responses

@@ -30,6 +30,7 @@ import {
   Building2,
   Receipt,
   SlidersHorizontal,
+  PackageSearch,
   LucideIcon
 } from 'lucide-react';
 import { ModuleName } from '@/types/roles';
@@ -111,6 +112,13 @@ export const employeeNavItems: NavItem[] = [
     label: 'Workshop', 
     icon: Settings, 
     module: 'workshop-tasks',
+    category: 'employee'
+  },
+  {
+    href: '/inventory',
+    label: 'Inventory',
+    icon: PackageSearch,
+    module: 'inventory',
     category: 'employee'
   },
   { 

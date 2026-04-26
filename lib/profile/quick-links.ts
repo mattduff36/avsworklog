@@ -27,6 +27,7 @@ const PATH_LABELS: Array<{ startsWith: string; label: string }> = [
   { startsWith: '/maintenance', label: 'Maintenance' },
   { startsWith: '/fleet', label: 'Fleet' },
   { startsWith: '/workshop-tasks', label: 'Workshop' },
+  { startsWith: '/inventory', label: 'Inventory' },
   { startsWith: '/reports', label: 'Reports' },
   { startsWith: '/notifications', label: 'Notifications' },
   { startsWith: '/help', label: 'Help' },

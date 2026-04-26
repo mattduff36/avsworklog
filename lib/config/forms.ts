@@ -7,6 +7,7 @@ import {
   Settings,
   HelpCircle,
   Truck,
+  PackageSearch,
   LucideIcon
 } from 'lucide-react';
 
@@ -127,6 +128,16 @@ export const FORM_TYPES: FormType[] = [
     href: '/workshop-tasks',
     listHref: '/workshop-tasks',
     color: 'workshop',
+    enabled: true,
+  },
+  {
+    id: 'inventory',
+    title: 'Inventory',
+    description: 'Small tools, equipment & locations',
+    icon: PackageSearch,
+    href: '/inventory',
+    listHref: '/inventory',
+    color: 'inventory',
     enabled: true,
   },
   {

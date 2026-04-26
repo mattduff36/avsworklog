@@ -1998,6 +1998,313 @@ export type Database = {
         Relationships: [
         ]
       }
+      inventory_import_batches: {
+        Row: {
+          id: string
+          source_files: string[]
+          import_policy: string
+          imported_count: number
+          skipped_count: number
+          duplicate_count: number
+          exception_count: number
+          started_at: string
+          completed_at: string | null
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          source_files?: string[]
+          import_policy: string
+          imported_count?: number
+          skipped_count?: number
+          duplicate_count?: number
+          exception_count?: number
+          started_at?: string
+          completed_at?: string | null
+          created_by?: string | null
+        }
+        Update: {
+          id?: string
+          source_files?: string[]
+          import_policy?: string
+          imported_count?: number
+          skipped_count?: number
+          duplicate_count?: number
+          exception_count?: number
+          started_at?: string
+          completed_at?: string | null
+          created_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'inventory_import_batches_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      inventory_import_exceptions: {
+        Row: {
+          id: string
+          batch_id: string
+          kind: string
+          item_number: string | null
+          item_name: string | null
+          source_file: string
+          source_sheet: string | null
+          source_row: number | null
+          raw_payload: Json
+          resolution: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          batch_id: string
+          kind: string
+          item_number?: string | null
+          item_name?: string | null
+          source_file: string
+          source_sheet?: string | null
+          source_row?: number | null
+          raw_payload?: Json
+          resolution?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          batch_id?: string
+          kind?: string
+          item_number?: string | null
+          item_name?: string | null
+          source_file?: string
+          source_sheet?: string | null
+          source_row?: number | null
+          raw_payload?: Json
+          resolution?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'inventory_import_exceptions_batch_id_fkey'
+            columns: ['batch_id']
+            isOneToOne: false
+            referencedRelation: 'inventory_import_batches'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      inventory_item_movements: {
+        Row: {
+          id: string
+          item_id: string
+          from_location_id: string | null
+          to_location_id: string
+          note: string | null
+          moved_by: string | null
+          moved_at: string
+        }
+        Insert: {
+          id?: string
+          item_id: string
+          from_location_id?: string | null
+          to_location_id: string
+          note?: string | null
+          moved_by?: string | null
+          moved_at?: string
+        }
+        Update: {
+          id?: string
+          item_id?: string
+          from_location_id?: string | null
+          to_location_id?: string
+          note?: string | null
+          moved_by?: string | null
+          moved_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'inventory_item_movements_from_location_id_fkey'
+            columns: ['from_location_id']
+            isOneToOne: false
+            referencedRelation: 'inventory_locations'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_item_movements_item_id_fkey'
+            columns: ['item_id']
+            isOneToOne: false
+            referencedRelation: 'inventory_items'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_item_movements_moved_by_fkey'
+            columns: ['moved_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_item_movements_to_location_id_fkey'
+            columns: ['to_location_id']
+            isOneToOne: false
+            referencedRelation: 'inventory_locations'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      inventory_items: {
+        Row: {
+          id: string
+          item_number: string
+          item_number_normalized: string
+          name: string
+          category: 'hired_plant' | 'signs' | 'minor_plant' | 'tools' | 'equipment' | 'unknown'
+          location_id: string
+          last_checked_at: string | null
+          status: 'active' | 'inactive'
+          source: string | null
+          source_reference: string | null
+          created_at: string
+          updated_at: string
+          created_by: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          item_number: string
+          item_number_normalized: string
+          name: string
+          category?: 'hired_plant' | 'signs' | 'minor_plant' | 'tools' | 'equipment' | 'unknown'
+          location_id: string
+          last_checked_at?: string | null
+          status?: 'active' | 'inactive'
+          source?: string | null
+          source_reference?: string | null
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          item_number?: string
+          item_number_normalized?: string
+          name?: string
+          category?: 'hired_plant' | 'signs' | 'minor_plant' | 'tools' | 'equipment' | 'unknown'
+          location_id?: string
+          last_checked_at?: string | null
+          status?: 'active' | 'inactive'
+          source?: string | null
+          source_reference?: string | null
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'inventory_items_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_items_location_id_fkey'
+            columns: ['location_id']
+            isOneToOne: false
+            referencedRelation: 'inventory_locations'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_items_updated_by_fkey'
+            columns: ['updated_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      inventory_locations: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          is_active: boolean
+          linked_van_id: string | null
+          linked_hgv_id: string | null
+          linked_plant_id: string | null
+          created_at: string
+          updated_at: string
+          created_by: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          is_active?: boolean
+          linked_van_id?: string | null
+          linked_hgv_id?: string | null
+          linked_plant_id?: string | null
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+          is_active?: boolean
+          linked_van_id?: string | null
+          linked_hgv_id?: string | null
+          linked_plant_id?: string | null
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'inventory_locations_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_locations_linked_hgv_id_fkey'
+            columns: ['linked_hgv_id']
+            isOneToOne: false
+            referencedRelation: 'hgvs'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_locations_linked_plant_id_fkey'
+            columns: ['linked_plant_id']
+            isOneToOne: false
+            referencedRelation: 'plant'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_locations_linked_van_id_fkey'
+            columns: ['linked_van_id']
+            isOneToOne: false
+            referencedRelation: 'vans'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_locations_updated_by_fkey'
+            columns: ['updated_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       inspection_items: {
         Row: {
           id: string

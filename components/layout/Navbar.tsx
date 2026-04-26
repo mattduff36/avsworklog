@@ -103,6 +103,10 @@ function getNavItemActiveColors(href: string): { bg: string; text: string } {
   if (href.startsWith('/reports')) {
     return { bg: 'bg-avs-yellow', text: 'text-slate-900' };
   }
+  // Inventory - Indigo
+  if (href.startsWith('/inventory')) {
+    return { bg: 'bg-inventory', text: 'text-white' };
+  }
   // Default - Brand yellow
   return { bg: 'bg-avs-yellow', text: 'text-slate-900' };
 }
@@ -122,6 +126,7 @@ function getNavItemIconColor(href: string): string {
   if (href.startsWith('/fleet')) return 'text-fleet';
   if (href.startsWith('/workshop')) return 'text-workshop';
   if (href.startsWith('/reports')) return 'text-avs-yellow';
+  if (href.startsWith('/inventory')) return 'text-inventory';
   return 'text-avs-yellow';
 }
 

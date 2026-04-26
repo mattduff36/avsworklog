@@ -442,6 +442,7 @@ export default function DashboardPage() {
                   'maintenance': 'maintenance',
                   'fleet': 'maintenance',
                   'workshop': 'workshop-tasks',
+                  'inventory': 'inventory',
                 };
                 
                 const moduleName = moduleMap[formType.id];

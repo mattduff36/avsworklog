@@ -152,6 +152,14 @@ export const MODULE_PAGES: ModulePage[] = [
     ],
   },
   {
+    module: 'inventory',
+    displayName: MODULE_DISPLAY_NAMES.inventory,
+    subPages: [
+      { value: 'inventory-overview', label: 'Inventory Overview' },
+      { value: 'inventory-locations', label: 'Location Management' },
+    ],
+  },
+  {
     module: 'other',
     displayName: 'Other',
     subPages: [
@@ -266,6 +274,10 @@ export function getPageUrl(value: string): string {
     // Admin - Vans
     'admin-vans-list': '/admin/vans',
     'admin-vans-new': '/admin/vans/new',
+
+    // Inventory
+    'inventory-overview': '/inventory',
+    'inventory-locations': '/inventory?tab=locations',
     
     // Admin - FAQ
     'admin-faq-list': '/admin/faq',

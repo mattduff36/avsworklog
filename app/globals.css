@@ -75,6 +75,10 @@
     --workshop-primary: 13 37% 48%;
     --workshop-light: 13 37% 96%;
     --workshop-dark: 13 37% 35%;
+
+    --inventory-primary: 226 68% 46%;
+    --inventory-light: 226 100% 96%;
+    --inventory-dark: 226 68% 34%;
     
     --report-primary: 150 70% 45%;
     --report-light: 150 100% 96%;
@@ -175,6 +179,12 @@
     --primary: var(--workshop-primary);
     --primary-foreground: 210 40% 98%;
     --ring: var(--workshop-primary);
+  }
+
+  [data-accent="inventory"] {
+    --primary: var(--inventory-primary);
+    --primary-foreground: 210 40% 98%;
+    --ring: var(--inventory-primary);
   }
 
   [data-accent="reports"] {
@@ -315,6 +325,14 @@
   .bg-workshop-dark { background-color: hsl(var(--workshop-dark)); }
   .text-workshop { color: hsl(var(--workshop-primary)); }
   .border-workshop { border-color: hsl(var(--workshop-primary)); }
+
+  /* Inventory */
+  .bg-inventory { background-color: hsl(var(--inventory-primary)); }
+  .bg-inventory-light { background-color: hsl(var(--inventory-light)); }
+  .bg-inventory-soft { background-color: hsl(var(--inventory-primary) / 0.12); }
+  .bg-inventory-dark { background-color: hsl(var(--inventory-dark)); }
+  .text-inventory { color: hsl(var(--inventory-primary)); }
+  .border-inventory { border-color: hsl(var(--inventory-primary)); }
   
   /* Tab styling */
   [role="tab"][data-state="active"] {

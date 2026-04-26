@@ -10,10 +10,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
+  ArrowLeft,
   Loader2, 
   Bell, 
   Search, 
@@ -25,7 +27,8 @@ import {
   Wrench,
   FileText,
   CheckSquare,
-  ClipboardCheck
+  ClipboardCheck,
+  PenLine
 } from 'lucide-react';
 import { formatDateTime } from '@/lib/utils/date';
 import { toast } from 'sonner';
@@ -46,6 +49,133 @@ const MODULE_ICONS: Record<string, React.ComponentType<{ className?: string }>> 
   'ClipboardCheck': ClipboardCheck,
 };
 
+function isDismissibleNotification(notification: NotificationItem) {
+  return notification.type === 'REMINDER' || notification.type === 'NOTIFICATION';
+}
+
+interface NotificationDetailPaneProps {
+  notification: NotificationItem | null;
+  className?: string;
+  isMarkingRead: boolean;
+  onBack: () => void;
+  onSignToolboxTalk: (notification: NotificationItem) => void;
+  getStatusBadge: (status: string) => React.ReactNode;
+}
+
+function NotificationDetailPane({
+  notification,
+  className = '',
+  isMarkingRead,
+  onBack,
+  onSignToolboxTalk,
+  getStatusBadge,
+}: NotificationDetailPaneProps) {
+  if (!notification) {
+    return (
+      <Card className={`flex min-h-[42rem] flex-col border-border bg-white dark:bg-slate-900 ${className}`}>
+        <CardContent className="flex flex-1 flex-col items-center justify-center p-8 text-center">
+          <div className="mb-4 rounded-full bg-blue-100 p-4 dark:bg-blue-950">
+            <Bell className="h-8 w-8 text-blue-600" />
+          </div>
+          <h3 className="mb-2 text-lg font-semibold text-foreground">
+            Select a notification
+          </h3>
+          <p className="max-w-md text-sm text-muted-foreground">
+            Choose a notification from the list to read it here.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const isToolboxTalk = notification.type === 'TOOLBOX_TALK';
+  const hasSigned = notification.status === 'SIGNED';
+
+  return (
+    <Card className={`flex min-h-[42rem] flex-col overflow-hidden border-border bg-white dark:bg-slate-900 ${className}`}>
+      <CardHeader className="border-b border-border">
+        <div className="mb-3 md:hidden">
+          <Button type="button" variant="outline" size="sm" onClick={onBack} className="gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Back to notifications
+          </Button>
+        </div>
+
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 space-y-2">
+            <div className="flex items-center gap-2">
+              <div className={notification.priority === 'HIGH' ? 'rounded bg-red-100 p-2 dark:bg-red-950' : 'rounded bg-blue-100 p-2 dark:bg-blue-950'}>
+                {notification.priority === 'HIGH' ? (
+                  <AlertTriangle className="h-5 w-5 text-red-600" />
+                ) : (
+                  <Bell className="h-5 w-5 text-blue-600" />
+                )}
+              </div>
+              <CardTitle className="text-xl text-foreground">
+                {notification.subject}
+              </CardTitle>
+            </div>
+            <CardDescription className="text-muted-foreground">
+              From: {notification.sender_name} &middot; {formatDateTime(notification.created_at)}
+            </CardDescription>
+          </div>
+          <div className="shrink-0">
+            {getStatusBadge(notification.status)}
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent className="flex-1 overflow-y-auto p-0">
+        <div className="space-y-6 p-6">
+          {isMarkingRead && (
+            <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin text-avs-yellow" />
+              Marking as read...
+            </div>
+          )}
+
+          {notification.priority === 'HIGH' && (
+            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
+              High priority notification
+            </div>
+          )}
+
+          <div className="rounded-md border border-border bg-muted/20 p-4 text-sm leading-6 text-foreground whitespace-pre-wrap">
+            {notification.body}
+          </div>
+
+          {isToolboxTalk && (
+            <div className="rounded-md border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/30">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h4 className="font-semibold text-red-700 dark:text-red-300">
+                    Toolbox Talk signature required
+                  </h4>
+                  <p className="text-sm text-red-700/80 dark:text-red-300/80">
+                    {hasSigned
+                      ? `Signed ${notification.signed_at ? formatDateTime(notification.signed_at) : ''}`
+                      : 'Open the signing flow to complete this required notification.'}
+                  </p>
+                </div>
+                {!hasSigned && (
+                  <Button
+                    type="button"
+                    onClick={() => onSignToolboxTalk(notification)}
+                    className="gap-2 bg-avs-yellow text-slate-900 hover:bg-avs-yellow-hover"
+                  >
+                    <PenLine className="h-4 w-4" />
+                    Read and sign
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function NotificationsContent() {
   const { isAdmin, isManager } = useAuth();
   
@@ -60,7 +190,6 @@ function NotificationsContent() {
     clearOnDefault: true,
     shallow: true,
   });
-  const hasHandledDeepLink = useRef(false);
 
   // Notifications state
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -69,8 +198,11 @@ function NotificationsContent() {
   const [isRefreshingNotifications, setIsRefreshingNotifications] = useState(false);
   const [hasLoadedNotifications, setHasLoadedNotifications] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedNotification, setSelectedNotification] = useState<NotificationItem | null>(null);
+  const [modalNotification, setModalNotification] = useState<NotificationItem | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+  const [markingReadId, setMarkingReadId] = useState<string | null>(null);
+  const dismissedNotificationIds = useRef(new Set<string>());
   
   // Preferences state
   const [preferences, setPreferences] = useState<NotificationPreference[]>([]);
@@ -178,19 +310,64 @@ function NotificationsContent() {
     }
   }, [searchQuery, notifications]);
 
-  // Deep-link: auto-open a notification when navigated from the notification panel
+  const selectedNotification = resolveNotificationToOpen(openNotificationId, notifications);
+
+  // Deep-link: select a notification in the reading pane when navigated from the notification panel.
   useEffect(() => {
-    if (loading || !openNotificationId || hasHandledDeepLink.current) return;
+    if (loading || !hasLoadedNotifications || !openNotificationId) return;
 
     const match = resolveNotificationToOpen(openNotificationId, notifications);
     if (match) {
-      handleNotificationClick(match);
+      setMobileDetailOpen(true);
+    } else {
+      void setOpenNotificationId('');
+    }
+  }, [hasLoadedNotifications, loading, notifications, openNotificationId, setOpenNotificationId]);
+
+  useEffect(() => {
+    if (
+      activeTab !== 'all'
+      || !selectedNotification
+      || selectedNotification.status !== 'PENDING'
+      || !isDismissibleNotification(selectedNotification)
+      || dismissedNotificationIds.current.has(selectedNotification.id)
+    ) {
+      return;
     }
 
-    // Clear param after processing so refresh / back doesn't re-open
-    hasHandledDeepLink.current = true;
-    setOpenNotificationId('');
-  }, [loading, openNotificationId, notifications, setOpenNotificationId]);
+    const recipientId = selectedNotification.id;
+    dismissedNotificationIds.current.add(recipientId);
+    setMarkingReadId(recipientId);
+
+    fetch(`/api/messages/${recipientId}/dismiss`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    })
+      .then((res) => {
+        if (!res.ok) {
+          dismissedNotificationIds.current.delete(recipientId);
+          return;
+        }
+
+        const firstShownAt = new Date().toISOString();
+        setNotifications((prev) => prev.map((notification) => (
+          notification.id === recipientId
+            ? {
+                ...notification,
+                status: 'DISMISSED',
+                first_shown_at: notification.first_shown_at ?? firstShownAt,
+              }
+            : notification
+        )));
+        window.dispatchEvent(new CustomEvent('notification-dismissed'));
+      })
+      .catch(() => {
+        dismissedNotificationIds.current.delete(recipientId);
+      })
+      .finally(() => {
+        setMarkingReadId((currentId) => (currentId === recipientId ? null : currentId));
+      });
+  }, [activeTab, selectedNotification]);
 
   const fetchAdminNotifications = async (userId: string) => {
     if (userId === 'all') {
@@ -273,15 +450,25 @@ function NotificationsContent() {
     }
   };
 
-  function handleNotificationClick(notification: NotificationItem) {
-    setSelectedNotification(notification);
+  function handleNotificationSelect(notification: NotificationItem) {
+    void setOpenNotificationId(notification.id);
+    setMobileDetailOpen(true);
+  }
+
+  function handleAdminNotificationClick(notification: NotificationItem) {
+    setModalNotification(notification);
+    setShowModal(true);
+  }
+
+  function handleToolboxSignClick(notification: NotificationItem) {
+    setModalNotification(notification);
     setShowModal(true);
   }
 
   function handleModalClose() {
     setShowModal(false);
-    setSelectedNotification(null);
-    // Refresh notifications after modal closes
+    setModalNotification(null);
+    // Refresh notifications after signing or dismissing in modal flows.
     fetchNotifications(true);
   }
 
@@ -329,6 +516,8 @@ function NotificationsContent() {
     return Icon;
   };
 
+  const isLoadingNotifications = loading || isRefreshingNotifications;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -371,7 +560,7 @@ function NotificationsContent() {
             {/* All Notifications Tab */}
             <TabsContent value="all" className="space-y-4 mt-4">
               {/* Search */}
-              <Card>
+              <Card className={mobileDetailOpen && selectedNotification ? 'hidden md:block' : undefined}>
                 <CardContent className="pt-6">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -382,22 +571,16 @@ function NotificationsContent() {
                       className="pl-11 bg-white dark:bg-slate-900 border-border dark:text-slate-100 text-slate-900"
                     />
                   </div>
-                  {isRefreshingNotifications && (
-                    <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      Refreshing notifications...
-                    </div>
-                  )}
                 </CardContent>
               </Card>
 
               {/* Notifications List */}
-              {loading && !hasLoadedNotifications ? (
+              {isLoadingNotifications ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  <Loader2 className="h-8 w-8 animate-spin text-avs-yellow" />
                 </div>
               ) : filteredNotifications.length === 0 ? (
-                <Card>
+                <Card className={mobileDetailOpen && selectedNotification ? 'hidden md:block' : undefined}>
                   <CardContent className="flex flex-col items-center justify-center py-12">
                     <Bell className="h-16 w-16 text-muted-foreground dark:text-slate-600 mb-3" />
                     <h3 className="text-lg font-semibold text-foreground mb-2">
@@ -409,59 +592,79 @@ function NotificationsContent() {
                   </CardContent>
                 </Card>
               ) : (
-                <div className="space-y-3">
-                  {filteredNotifications.map((notification) => (
-                    <Card
-                      key={notification.id}
-                      className="bg-white dark:bg-slate-900 border-border hover:shadow-lg transition-shadow cursor-pointer"
-                      onClick={() => handleNotificationClick(notification)}
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex items-start gap-4">
-                          {/* Priority Indicator */}
-                          <div className="mt-1">
-                            {notification.priority === 'HIGH' ? (
-                              <div className="p-2 bg-red-100 dark:bg-red-950 rounded">
-                                <AlertTriangle className="h-5 w-5 text-red-600" />
+                <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+                  <Card className={`overflow-hidden border-border bg-white dark:bg-slate-900 ${mobileDetailOpen && selectedNotification ? 'hidden md:block' : ''}`}>
+                    <CardHeader className="border-b border-border px-4 py-3">
+                      <CardTitle className="text-base text-foreground">
+                        Inbox
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        {filteredNotifications.length} notification{filteredNotifications.length === 1 ? '' : 's'}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="max-h-[42rem] overflow-y-auto p-0">
+                      <div className="divide-y divide-border">
+                        {filteredNotifications.map((notification) => {
+                          const isSelected = selectedNotification?.id === notification.id;
+                          const isUnread = notification.status === 'PENDING';
+                          const rowStateClass = isSelected
+                            ? 'border-l-avs-yellow bg-slate-200/80 shadow-inner hover:bg-slate-200 dark:bg-slate-800/90 dark:hover:bg-slate-800'
+                            : isUnread
+                              ? 'border-l-avs-yellow bg-avs-yellow/5 hover:bg-avs-yellow/10 dark:bg-avs-yellow/10 dark:hover:bg-avs-yellow/15'
+                              : 'border-l-transparent hover:bg-muted/60';
+
+                          return (
+                            <button
+                              key={notification.id}
+                              type="button"
+                              aria-pressed={isSelected}
+                              onClick={() => handleNotificationSelect(notification)}
+                              className={`relative flex w-full items-start gap-3 border-l-4 p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-avs-yellow ${rowStateClass}`}
+                            >
+                              <div className="mt-1 shrink-0">
+                                {notification.priority === 'HIGH' ? (
+                                  <div className="rounded bg-red-100 p-2 dark:bg-red-950">
+                                    <AlertTriangle className="h-4 w-4 text-red-600" />
+                                  </div>
+                                ) : (
+                                  <div className="rounded bg-blue-100 p-2 dark:bg-blue-950">
+                                    <Bell className="h-4 w-4 text-blue-600" />
+                                  </div>
+                                )}
                               </div>
-                            ) : (
-                              <div className="p-2 bg-blue-100 dark:bg-blue-950 rounded">
-                                <Bell className="h-5 w-5 text-blue-600" />
+
+                              <div className="min-w-0 flex-1">
+                                <div className="mb-1 flex items-start justify-between gap-2">
+                                  <h3 className={`truncate text-sm text-foreground ${isUnread ? 'font-bold' : 'font-semibold'}`}>
+                                    {notification.subject}
+                                  </h3>
+                                  {isUnread && (
+                                    <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-avs-yellow shadow-[0_0_0_3px_rgba(245,222,76,0.18)]" aria-label="Unread" />
+                                  )}
+                                </div>
+                                <p className={`mb-2 line-clamp-2 text-xs ${isUnread ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
+                                  {notification.body}
+                                </p>
+                                <div className={`flex flex-wrap items-center gap-x-2 gap-y-1 text-xs ${isUnread ? 'font-semibold text-foreground/85' : 'text-muted-foreground'}`}>
+                                  <span className="truncate">From: {notification.sender_name}</span>
+                                  <span>{formatDateTime(notification.created_at)}</span>
+                                </div>
                               </div>
-                            )}
-                          </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
 
-                          {/* Content */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-2 mb-2">
-                              <h3 className="font-semibold text-foreground">
-                                {notification.subject}
-                              </h3>
-                              {getStatusBadge(notification.status)}
-                            </div>
-
-                            <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
-                              {notification.body}
-                            </p>
-
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground dark:text-muted-foreground">
-                              <span>From: {notification.sender_name}</span>
-                              <span>•</span>
-                              <span>{formatDateTime(notification.created_at)}</span>
-                              {notification.signed_at && (
-                                <>
-                                  <span>•</span>
-                                  <span className="text-green-600">
-                                    Signed {formatDateTime(notification.signed_at)}
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                  <NotificationDetailPane
+                    notification={selectedNotification}
+                    isMarkingRead={Boolean(selectedNotification && markingReadId === selectedNotification.id)}
+                    onBack={() => setMobileDetailOpen(false)}
+                    onSignToolboxTalk={handleToolboxSignClick}
+                    getStatusBadge={getStatusBadge}
+                    className={mobileDetailOpen && selectedNotification ? 'block' : 'hidden md:flex'}
+                  />
                 </div>
               )}
             </TabsContent>
@@ -593,7 +796,7 @@ function NotificationsContent() {
                       <Card
                         key={notification.id}
                         className="bg-white dark:bg-slate-900 border-border hover:shadow-lg transition-shadow cursor-pointer"
-                        onClick={() => handleNotificationClick(notification)}
+                        onClick={() => handleAdminNotificationClick(notification)}
                       >
                         <CardContent className="p-4">
                           <div className="flex items-start gap-4">
@@ -639,35 +842,35 @@ function NotificationsContent() {
         </div>
 
         {/* Modals */}
-        {showModal && selectedNotification && (
+        {showModal && modalNotification && (
         <>
-          {selectedNotification.type === 'TOOLBOX_TALK' ? (
+          {modalNotification.type === 'TOOLBOX_TALK' ? (
             <BlockingMessageModal
               open={showModal}
               message={{
-                id: selectedNotification.message_id,
-                recipient_id: selectedNotification.id,
-                subject: selectedNotification.subject,
-                body: selectedNotification.body,
-                sender_name: selectedNotification.sender_name,
-                created_at: selectedNotification.created_at,
+                id: modalNotification.message_id,
+                recipient_id: modalNotification.id,
+                subject: modalNotification.subject,
+                body: modalNotification.body,
+                sender_name: modalNotification.sender_name,
+                created_at: modalNotification.created_at,
               }}
               onSigned={handleModalClose}
               totalPending={1}
               currentIndex={0}
             />
-          ) : selectedNotification.type === 'REMINDER' || selectedNotification.type === 'NOTIFICATION' ? (
+          ) : modalNotification.type === 'REMINDER' || modalNotification.type === 'NOTIFICATION' ? (
             <ReminderModal
               open={showModal}
               onClose={handleModalClose}
               message={{
-                id: selectedNotification.message_id,
-                recipient_id: selectedNotification.id,
-                created_via: selectedNotification.created_via ?? null,
-                subject: selectedNotification.subject,
-                body: selectedNotification.body,
-                sender_name: selectedNotification.sender_name,
-                created_at: selectedNotification.created_at,
+                id: modalNotification.message_id,
+                recipient_id: modalNotification.id,
+                created_via: modalNotification.created_via ?? null,
+                subject: modalNotification.subject,
+                body: modalNotification.body,
+                sender_name: modalNotification.sender_name,
+                created_at: modalNotification.created_at,
               }}
               onDismissed={handleModalClose}
             />
