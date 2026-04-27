@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { JobCodeFields } from '@/components/timesheets/JobCodeFields';
+import { QuarterHourTimeInput } from '@/components/timesheets/quarter-hour-time-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -1552,33 +1553,33 @@ export function CivilsTimesheet({
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-2">
                         <Label className="text-foreground text-xl">Start Time</Label>
-                        <Input
-                          type="time"
-                          step="900"
+                        <QuarterHourTimeInput
                           value={entry.time_started}
-                          onChange={(e) => updateEntry(index, 'time_started', e.target.value)}
+                          onChange={(value) => updateEntry(index, 'time_started', value)}
                           disabled={disableWorkingInputs}
                           min={workWindow?.start}
                           max={workWindow?.end}
-                          className={`h-16 text-3xl text-center bg-slate-900/50 border-slate-600 text-white w-full disabled:opacity-30 disabled:cursor-not-allowed ${
+                          controlClassName={`h-16 text-3xl text-center bg-slate-900/50 border-slate-600 text-white disabled:opacity-30 disabled:cursor-not-allowed ${
                             timeErrors[index] ? 'border-red-500' : ''
                           }`}
+                          minuteButtonClassName="h-12 text-lg bg-slate-900/50 border-slate-600 text-white disabled:opacity-30"
+                          ariaLabel={`${DAY_NAMES[index]} start time`}
                         />
                       </div>
 
                       <div className="space-y-2">
                         <Label className="text-foreground text-xl">Finish Time</Label>
-                        <Input
-                          type="time"
-                          step="900"
+                        <QuarterHourTimeInput
                           value={entry.time_finished}
-                          onChange={(e) => updateEntry(index, 'time_finished', e.target.value)}
+                          onChange={(value) => updateEntry(index, 'time_finished', value)}
                           disabled={disableWorkingInputs}
                           min={workWindow?.start}
                           max={workWindow?.end}
-                          className={`h-16 text-3xl text-center bg-slate-900/50 border-slate-600 text-white w-full disabled:opacity-30 disabled:cursor-not-allowed ${
+                          controlClassName={`h-16 text-3xl text-center bg-slate-900/50 border-slate-600 text-white disabled:opacity-30 disabled:cursor-not-allowed ${
                             timeErrors[index] ? 'border-red-500' : ''
                           }`}
+                          minuteButtonClassName="h-12 text-lg bg-slate-900/50 border-slate-600 text-white disabled:opacity-30"
+                          ariaLabel={`${DAY_NAMES[index]} finish time`}
                         />
                       </div>
                     </div>
@@ -1758,32 +1759,34 @@ export function CivilsTimesheet({
                   <tr key={entry.day_of_week} className="border-b border-border/50">
                     <td className="p-3 font-medium text-white">{DAY_NAMES[index]}</td>
                     <td className="p-3">
-                      <Input
-                        type="time"
-                        step="900"
+                      <QuarterHourTimeInput
                         value={entry.time_started}
-                        onChange={(e) => updateEntry(index, 'time_started', e.target.value)}
+                        onChange={(value) => updateEntry(index, 'time_started', value)}
                         disabled={disableWorkingInputs}
                         min={workWindow?.start}
                         max={workWindow?.end}
-                        className={`w-32 bg-slate-900/50 border-slate-600 text-white disabled:opacity-30 disabled:cursor-not-allowed ${
+                        className="w-32"
+                        controlClassName={`bg-slate-900/50 border-slate-600 text-white disabled:opacity-30 disabled:cursor-not-allowed ${
                           timeErrors[index] ? 'border-red-500' : ''
                         }`}
+                        minuteButtonClassName="bg-slate-900/50 border-slate-600 text-white disabled:opacity-30"
+                        ariaLabel={`${DAY_NAMES[index]} start time`}
                       />
                     </td>
                     <td className="p-3">
                       <div className="space-y-1">
-                        <Input
-                          type="time"
-                          step="900"
+                        <QuarterHourTimeInput
                           value={entry.time_finished}
-                          onChange={(e) => updateEntry(index, 'time_finished', e.target.value)}
+                          onChange={(value) => updateEntry(index, 'time_finished', value)}
                           disabled={disableWorkingInputs}
                           min={workWindow?.start}
                           max={workWindow?.end}
-                          className={`w-32 bg-slate-900/50 border-slate-600 text-white disabled:opacity-30 disabled:cursor-not-allowed ${
+                          className="w-32"
+                          controlClassName={`bg-slate-900/50 border-slate-600 text-white disabled:opacity-30 disabled:cursor-not-allowed ${
                             timeErrors[index] ? 'border-red-500' : ''
                           }`}
+                          minuteButtonClassName="bg-slate-900/50 border-slate-600 text-white disabled:opacity-30"
+                          ariaLabel={`${DAY_NAMES[index]} finish time`}
                         />
                         {timeErrors[index] && (
                           <p className="text-xs text-red-400 flex items-center gap-1">

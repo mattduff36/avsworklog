@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { JobCodeFields } from '@/components/timesheets/JobCodeFields';
+import { QuarterHourTimeInput } from '@/components/timesheets/quarter-hour-time-input';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import {
   Select,
@@ -1502,32 +1503,32 @@ export function PlantTimesheetV2({
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-2">
                           <Label className="text-foreground text-xl">Start Time</Label>
-                          <Input
-                            type="time"
-                            step="900"
+                          <QuarterHourTimeInput
                             value={entry.time_started}
-                            onChange={(event) => updateEntryField(index, 'time_started', event.target.value)}
+                            onChange={(value) => updateEntryField(index, 'time_started', value)}
                             disabled={disableInputs}
                             min={workWindow?.start}
                             max={workWindow?.end}
-                            className={`h-16 text-3xl text-center bg-slate-900/50 border-slate-600 text-white w-full disabled:opacity-30 disabled:cursor-not-allowed ${
+                            controlClassName={`h-16 text-3xl text-center bg-slate-900/50 border-slate-600 text-white disabled:opacity-30 disabled:cursor-not-allowed ${
                               timeErrors[index] ? 'border-red-500' : ''
                             }`}
+                            minuteButtonClassName="h-12 text-lg bg-slate-900/50 border-slate-600 text-white disabled:opacity-30"
+                            ariaLabel={`${DAY_NAMES[index]} start time`}
                           />
                         </div>
                         <div className="space-y-2">
                           <Label className="text-foreground text-xl">Finish Time</Label>
-                          <Input
-                            type="time"
-                            step="900"
+                          <QuarterHourTimeInput
                             value={entry.time_finished}
-                            onChange={(event) => updateEntryField(index, 'time_finished', event.target.value)}
+                            onChange={(value) => updateEntryField(index, 'time_finished', value)}
                             disabled={disableInputs}
                             min={workWindow?.start}
                             max={workWindow?.end}
-                            className={`h-16 text-3xl text-center bg-slate-900/50 border-slate-600 text-white w-full disabled:opacity-30 disabled:cursor-not-allowed ${
+                            controlClassName={`h-16 text-3xl text-center bg-slate-900/50 border-slate-600 text-white disabled:opacity-30 disabled:cursor-not-allowed ${
                               timeErrors[index] ? 'border-red-500' : ''
                             }`}
+                            minuteButtonClassName="h-12 text-lg bg-slate-900/50 border-slate-600 text-white disabled:opacity-30"
+                            ariaLabel={`${DAY_NAMES[index]} finish time`}
                           />
                         </div>
                       </div>
@@ -1690,28 +1691,28 @@ export function PlantTimesheetV2({
                               <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-1">
                                   <Label className="text-foreground text-xl">Machine Start Time</Label>
-                                  <Input
-                                    type="time"
-                                    step="900"
+                                  <QuarterHourTimeInput
                                     value={entry.machine_start_time}
-                                    onChange={(event) => updateEntryField(index, 'machine_start_time', event.target.value)}
+                                    onChange={(value) => updateEntryField(index, 'machine_start_time', value)}
                                     disabled={disableInputs}
                                     min={workWindow?.start}
                                     max={workWindow?.end}
-                                    className="h-16 text-3xl text-center bg-slate-900/50 border-slate-600 text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                                    controlClassName="h-16 text-3xl text-center bg-slate-900/50 border-slate-600 text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                                    minuteButtonClassName="h-12 text-lg bg-slate-900/50 border-slate-600 text-white disabled:opacity-30"
+                                    ariaLabel={`${DAY_NAMES[index]} machine start time`}
                                   />
                                 </div>
                                 <div className="space-y-1">
                                   <Label className="text-foreground text-xl">Machine Finish Time</Label>
-                                  <Input
-                                    type="time"
-                                    step="900"
+                                  <QuarterHourTimeInput
                                     value={entry.machine_finish_time}
-                                    onChange={(event) => updateEntryField(index, 'machine_finish_time', event.target.value)}
+                                    onChange={(value) => updateEntryField(index, 'machine_finish_time', value)}
                                     disabled={disableInputs}
                                     min={workWindow?.start}
                                     max={workWindow?.end}
-                                    className="h-16 text-3xl text-center bg-slate-900/50 border-slate-600 text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                                    controlClassName="h-16 text-3xl text-center bg-slate-900/50 border-slate-600 text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                                    minuteButtonClassName="h-12 text-lg bg-slate-900/50 border-slate-600 text-white disabled:opacity-30"
+                                    ariaLabel={`${DAY_NAMES[index]} machine finish time`}
                                   />
                                 </div>
                               </div>
@@ -1827,32 +1828,34 @@ export function PlantTimesheetV2({
                       <tr className={`${rowErrors[index] ? 'bg-red-500/5' : ''}`}>
                         <td className="p-3 font-medium text-white">{DAY_NAMES[index].substring(0, 3)}</td>
                         <td className="p-3">
-                          <Input
-                            type="time"
-                            step="900"
+                          <QuarterHourTimeInput
                             value={entry.time_started}
-                            onChange={(event) => updateEntryField(index, 'time_started', event.target.value)}
+                            onChange={(value) => updateEntryField(index, 'time_started', value)}
                             disabled={disableInputs}
                             min={workWindow?.start}
                             max={workWindow?.end}
-                            className={`w-28 bg-slate-900/50 border-slate-600 text-white disabled:opacity-30 disabled:cursor-not-allowed ${
+                            className="w-28"
+                            controlClassName={`bg-slate-900/50 border-slate-600 text-white disabled:opacity-30 disabled:cursor-not-allowed ${
                               timeErrors[index] ? 'border-red-500' : ''
                             }`}
+                            minuteButtonClassName="bg-slate-900/50 border-slate-600 text-white disabled:opacity-30"
+                            ariaLabel={`${DAY_NAMES[index]} start time`}
                           />
                         </td>
                         <td className="p-3">
                           <div className="space-y-1">
-                            <Input
-                              type="time"
-                              step="900"
+                            <QuarterHourTimeInput
                               value={entry.time_finished}
-                              onChange={(event) => updateEntryField(index, 'time_finished', event.target.value)}
+                              onChange={(value) => updateEntryField(index, 'time_finished', value)}
                               disabled={disableInputs}
                               min={workWindow?.start}
                               max={workWindow?.end}
-                              className={`w-28 bg-slate-900/50 border-slate-600 text-white disabled:opacity-30 disabled:cursor-not-allowed ${
+                              className="w-28"
+                              controlClassName={`bg-slate-900/50 border-slate-600 text-white disabled:opacity-30 disabled:cursor-not-allowed ${
                                 timeErrors[index] ? 'border-red-500' : ''
                               }`}
+                              minuteButtonClassName="bg-slate-900/50 border-slate-600 text-white disabled:opacity-30"
+                              ariaLabel={`${DAY_NAMES[index]} finish time`}
                             />
                             {timeErrors[index] && (
                               <p className="text-xs text-red-400 flex items-center gap-1">
@@ -1993,28 +1996,28 @@ export function PlantTimesheetV2({
                                   <div className="grid grid-cols-7 gap-3 items-end">
                                     <div className="space-y-1 min-w-0">
                                       <Label>Machine Start Time</Label>
-                                      <Input
-                                        type="time"
-                                        step="900"
+                                      <QuarterHourTimeInput
                                         value={entry.machine_start_time}
-                                        onChange={(event) => updateEntryField(index, 'machine_start_time', event.target.value)}
+                                        onChange={(value) => updateEntryField(index, 'machine_start_time', value)}
                                         disabled={disableInputs}
                                         min={workWindow?.start}
                                         max={workWindow?.end}
-                                        className="h-10 bg-slate-900/50 border-slate-600 text-white"
+                                        controlClassName="h-10 bg-slate-900/50 border-slate-600 text-white"
+                                        minuteButtonClassName="bg-slate-900/50 border-slate-600 text-white"
+                                        ariaLabel={`${DAY_NAMES[index]} machine start time`}
                                       />
                                     </div>
                                     <div className="space-y-1 min-w-0">
                                       <Label>Machine Finish Time</Label>
-                                      <Input
-                                        type="time"
-                                        step="900"
+                                      <QuarterHourTimeInput
                                         value={entry.machine_finish_time}
-                                        onChange={(event) => updateEntryField(index, 'machine_finish_time', event.target.value)}
+                                        onChange={(value) => updateEntryField(index, 'machine_finish_time', value)}
                                         disabled={disableInputs}
                                         min={workWindow?.start}
                                         max={workWindow?.end}
-                                        className="h-10 bg-slate-900/50 border-slate-600 text-white"
+                                        controlClassName="h-10 bg-slate-900/50 border-slate-600 text-white"
+                                        minuteButtonClassName="bg-slate-900/50 border-slate-600 text-white"
+                                        ariaLabel={`${DAY_NAMES[index]} machine finish time`}
                                       />
                                     </div>
                                     <div className="space-y-1 min-w-0">

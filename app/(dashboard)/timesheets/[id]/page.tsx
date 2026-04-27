@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Input } from '@/components/ui/input';
 import { JobCodeFields } from '@/components/timesheets/JobCodeFields';
+import { QuarterHourTimeInput } from '@/components/timesheets/quarter-hour-time-input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -966,13 +967,13 @@ export default function ViewTimesheetPage() {
                     <td className="p-2 font-medium">{DAY_NAMES[index]}</td>
                     <td className="p-2">
                       {canEdit ? (
-                        <Input
-                          type="time"
-                          step="900"
+                        <QuarterHourTimeInput
                           value={entry.time_started || ''}
-                          onChange={(e) => updateEntry(index, 'time_started', e.target.value)}
+                          onChange={(value) => updateEntry(index, 'time_started', value)}
                           disabled={entry.did_not_work}
-                          className="w-32 text-slate-900"
+                          className="w-32"
+                          controlClassName="text-slate-900"
+                          ariaLabel={`${DAY_NAMES[index]} start time`}
                         />
                       ) : (
                         <span>{entry.time_started || '-'}</span>
@@ -980,13 +981,13 @@ export default function ViewTimesheetPage() {
                     </td>
                     <td className="p-2">
                       {canEdit ? (
-                        <Input
-                          type="time"
-                          step="900"
+                        <QuarterHourTimeInput
                           value={entry.time_finished || ''}
-                          onChange={(e) => updateEntry(index, 'time_finished', e.target.value)}
+                          onChange={(value) => updateEntry(index, 'time_finished', value)}
                           disabled={entry.did_not_work}
-                          className="w-32 text-slate-900"
+                          className="w-32"
+                          controlClassName="text-slate-900"
+                          ariaLabel={`${DAY_NAMES[index]} finish time`}
                         />
                       ) : (
                         <span>{entry.time_finished || '-'}</span>
@@ -1102,12 +1103,11 @@ export default function ViewTimesheetPage() {
                     <div className="space-y-1">
                       <Label className="text-xs">Time Started</Label>
                       {canEdit ? (
-                        <Input
-                          type="time"
-                          step="900"
+                        <QuarterHourTimeInput
                           value={entry.time_started || ''}
-                          onChange={(e) => updateEntry(index, 'time_started', e.target.value)}
+                          onChange={(value) => updateEntry(index, 'time_started', value)}
                           disabled={entry.did_not_work}
+                          ariaLabel={`${DAY_NAMES[index]} start time`}
                         />
                       ) : (
                         <p className="text-sm">{entry.time_started || '-'}</p>
@@ -1116,12 +1116,11 @@ export default function ViewTimesheetPage() {
                     <div className="space-y-1">
                       <Label className="text-xs">Time Finished</Label>
                       {canEdit ? (
-                        <Input
-                          type="time"
-                          step="900"
+                        <QuarterHourTimeInput
                           value={entry.time_finished || ''}
-                          onChange={(e) => updateEntry(index, 'time_finished', e.target.value)}
+                          onChange={(value) => updateEntry(index, 'time_finished', value)}
                           disabled={entry.did_not_work}
+                          ariaLabel={`${DAY_NAMES[index]} finish time`}
                         />
                       ) : (
                         <p className="text-sm">{entry.time_finished || '-'}</p>
