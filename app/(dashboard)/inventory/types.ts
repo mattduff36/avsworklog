@@ -19,6 +19,9 @@ export interface InventoryLocation {
   updated_at: string;
   created_by: string | null;
   updated_by: string | null;
+  linked_asset_type?: FleetAssetLinkType | null;
+  linked_asset_label?: string | null;
+  linked_asset_nickname?: string | null;
 }
 
 export interface InventoryItem {
@@ -33,6 +36,8 @@ export interface InventoryItem {
   status: InventoryStatus;
   source: string | null;
   source_reference: string | null;
+  source_location_hint?: string | null;
+  source_location_rows?: string | null;
   created_at: string;
   updated_at: string;
   created_by: string | null;

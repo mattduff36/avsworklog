@@ -30,6 +30,14 @@ interface MoveInventoryDialogProps {
   onSubmit: (payload: InventoryMovePayload) => Promise<void>;
 }
 
+function getLocationOptionLabel(location: InventoryLocation): string {
+  if (location.linked_asset_type === 'van' && location.linked_asset_nickname) {
+    return `${location.name} (${location.linked_asset_nickname})`;
+  }
+
+  return location.name;
+}
+
 export function MoveInventoryDialog({
   open,
   items,
@@ -85,7 +93,9 @@ export function MoveInventoryDialog({
                 </SelectTrigger>
                 <SelectContent>
                   {locations.map((location) => (
-                    <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>
+                    <SelectItem key={location.id} value={location.id}>
+                      {getLocationOptionLabel(location)}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>

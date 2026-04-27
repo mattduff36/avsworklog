@@ -16,7 +16,7 @@ import { Save, Send, Edit2, CheckCircle2, XCircle, Download, Package, AlertTrian
 import Link from 'next/link';
 import { BackButton } from '@/components/ui/back-button';
 import { formatDate } from '@/lib/utils/date';
-import { calculateStandardTimesheetHours, formatHours } from '@/lib/utils/time-calculations';
+import { calculateStandardTimesheetHours, formatHours, roundTimeToNearestQuarterHour } from '@/lib/utils/time-calculations';
 import { DAY_NAMES, Timesheet, TimesheetEntry } from '@/types/timesheet';
 import SignaturePad from '@/components/forms/SignaturePad';
 import { Database } from '@/types/database';
@@ -258,6 +258,10 @@ export default function ViewTimesheetPage() {
   const updateEntry = (dayIndex: number, field: string, value: string | boolean | number | null | string[]) => {
     const newEntries = [...entries];
     const currentEntry = newEntries[dayIndex];
+    const normalizedValue =
+      typeof value === 'string' && (field === 'time_started' || field === 'time_finished')
+        ? roundTimeToNearestQuarterHour(value)
+        : value;
 
     if (field === 'did_not_work') {
       const nextDidNotWork = Boolean(value);
@@ -298,12 +302,12 @@ export default function ViewTimesheetPage() {
       field === 'job_numbers'
         ? {
             ...currentEntry,
-            job_numbers: Array.isArray(value) ? value.map((jobNumber) => normalizeJobNumberInput(jobNumber)) : [],
-            job_number: getPrimaryJobNumber(Array.isArray(value) ? value : []) || null,
+            job_numbers: Array.isArray(normalizedValue) ? normalizedValue.map((jobNumber) => normalizeJobNumberInput(jobNumber)) : [],
+            job_number: getPrimaryJobNumber(Array.isArray(normalizedValue) ? normalizedValue : []) || null,
           }
         : {
             ...currentEntry,
-            [field]: value,
+            [field]: normalizedValue,
           };
 
     if (field === 'working_in_yard' && value === true) {
@@ -313,8 +317,8 @@ export default function ViewTimesheetPage() {
 
     const hasMeaningfulValue =
       field === 'job_numbers'
-        ? getNormalizedJobNumbers(Array.isArray(value) ? value : []).length > 0
-        : value !== null && value !== false && value !== '';
+        ? getNormalizedJobNumbers(Array.isArray(normalizedValue) ? normalizedValue : []).length > 0
+        : normalizedValue !== null && normalizedValue !== false && normalizedValue !== '';
 
     if (
       (field === 'time_started' || field === 'time_finished' || field === 'job_number' || field === 'job_numbers' || field === 'working_in_yard') &&
@@ -964,6 +968,7 @@ export default function ViewTimesheetPage() {
                       {canEdit ? (
                         <Input
                           type="time"
+                          step="900"
                           value={entry.time_started || ''}
                           onChange={(e) => updateEntry(index, 'time_started', e.target.value)}
                           disabled={entry.did_not_work}
@@ -977,6 +982,7 @@ export default function ViewTimesheetPage() {
                       {canEdit ? (
                         <Input
                           type="time"
+                          step="900"
                           value={entry.time_finished || ''}
                           onChange={(e) => updateEntry(index, 'time_finished', e.target.value)}
                           disabled={entry.did_not_work}
@@ -1098,6 +1104,7 @@ export default function ViewTimesheetPage() {
                       {canEdit ? (
                         <Input
                           type="time"
+                          step="900"
                           value={entry.time_started || ''}
                           onChange={(e) => updateEntry(index, 'time_started', e.target.value)}
                           disabled={entry.did_not_work}
@@ -1111,6 +1118,7 @@ export default function ViewTimesheetPage() {
                       {canEdit ? (
                         <Input
                           type="time"
+                          step="900"
                           value={entry.time_finished || ''}
                           onChange={(e) => updateEntry(index, 'time_finished', e.target.value)}
                           disabled={entry.did_not_work}

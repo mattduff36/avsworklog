@@ -6,6 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   ChevronDown,
   ChevronUp,
   MapPin,
@@ -47,6 +53,32 @@ function getStatusBadgeClass(status: InventoryCheckStatus): string {
   if (status === 'due_soon') return 'border-amber-500/30 bg-amber-500/10 text-amber-300';
   if (status === 'needs_check') return 'border-blue-500/30 bg-blue-500/10 text-blue-300';
   return 'border-green-500/30 bg-green-500/10 text-green-300';
+}
+
+function isNoLocationItem(item: InventoryItem): boolean {
+  return (item.location?.name || '').toLowerCase() === 'nolocation';
+}
+
+function renderLocationWithHint(item: InventoryItem) {
+  const locationName = item.location?.name || 'NoLocation';
+  if (!isNoLocationItem(item) || !item.source_location_hint) return locationName;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="cursor-help underline decoration-slate-500 decoration-dotted underline-offset-4">
+          {locationName}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs space-y-1">
+        <div className="font-medium text-white">Spreadsheet location</div>
+        <div>{item.source_location_hint}</div>
+        {item.source_location_rows ? (
+          <div className="text-[11px] text-slate-300">COMPLETE LIST row(s): {item.source_location_rows}</div>
+        ) : null}
+      </TooltipContent>
+    </Tooltip>
+  );
 }
 
 export function InventoryTable({
@@ -128,6 +160,7 @@ export function InventoryTable({
   const allVisibleSelected = filteredItems.length > 0 && filteredItems.every((item) => selectedItemIds.has(item.id));
 
   return (
+    <TooltipProvider delayDuration={150}>
     <div className="space-y-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="relative max-w-sm flex-1">
@@ -223,7 +256,7 @@ export function InventoryTable({
                       <div className="font-medium text-white">{item.name}</div>
                       <div className="text-xs text-muted-foreground">{INVENTORY_CATEGORY_LABELS[item.category]}</div>
                     </td>
-                    <td className="px-4 py-3 text-slate-300">{item.location?.name || 'NoLocation'}</td>
+                    <td className="px-4 py-3 text-slate-300">{renderLocationWithHint(item)}</td>
                     <td className="px-4 py-3 text-slate-300">
                       <div>{formatInventoryDate(item.last_checked_at)}</div>
                       <div className="text-xs text-muted-foreground">Due {getInventoryDueDate(item.last_checked_at)}</div>
@@ -281,7 +314,7 @@ export function InventoryTable({
                   </Badge>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {item.location?.name || 'NoLocation'}</span>
+                  <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {renderLocationWithHint(item)}</span>
                   <span>Last: {formatInventoryDate(item.last_checked_at)}</span>
                   <span>Due: {getInventoryDueDate(item.last_checked_at)}</span>
                 </div>
@@ -299,5 +332,6 @@ export function InventoryTable({
         )}
       </div>
     </div>
+    </TooltipProvider>
   );
 }

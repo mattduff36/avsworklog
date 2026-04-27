@@ -16,6 +16,11 @@ describe('roundTimeToNearestQuarterHour', () => {
     expect(roundTimeToNearestQuarterHour('10:23')).toBe('10:30');
   });
 
+  it('normalizes browser time values that include seconds', () => {
+    expect(roundTimeToNearestQuarterHour('08:07:00')).toBe('08:00');
+    expect(roundTimeToNearestQuarterHour('08:08:30')).toBe('08:15');
+  });
+
   it('handles hour/day rollovers when rounding', () => {
     expect(roundTimeToNearestQuarterHour('10:53')).toBe('11:00');
     expect(roundTimeToNearestQuarterHour('23:53')).toBe('00:00');
