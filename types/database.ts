@@ -4463,6 +4463,73 @@ export type Database = {
           },
         ]
       }
+      timesheet_entry_leave_snapshots: {
+        Row: {
+          id: string
+          absence_id: string
+          timesheet_id: string
+          timesheet_entry_id: string
+          day_of_week: number
+          had_entry: boolean
+          original_entry: Json | null
+          original_job_numbers: string[]
+          applied_entry: Json
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          absence_id: string
+          timesheet_id: string
+          timesheet_entry_id: string
+          day_of_week: number
+          had_entry?: boolean
+          original_entry?: Json | null
+          original_job_numbers?: string[]
+          applied_entry: Json
+          created_by?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          absence_id?: string
+          timesheet_id?: string
+          timesheet_entry_id?: string
+          day_of_week?: number
+          had_entry?: boolean
+          original_entry?: Json | null
+          original_job_numbers?: string[]
+          applied_entry?: Json
+          created_by?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'timesheet_entry_leave_snapshots_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'timesheet_entry_leave_snapshots_timesheet_entry_id_fkey'
+            columns: ['timesheet_entry_id']
+            isOneToOne: false
+            referencedRelation: 'timesheet_entries'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'timesheet_entry_leave_snapshots_timesheet_id_fkey'
+            columns: ['timesheet_id']
+            isOneToOne: false
+            referencedRelation: 'timesheets'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       timesheet_entries: {
         Row: {
           id: string

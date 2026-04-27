@@ -22,9 +22,11 @@ import { isAdminRole } from '@/lib/utils/role-access';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { isTrainingReasonName } from '@/lib/utils/timesheet-off-days';
 import {
-  resolveTrainingTimesheetImpacts,
-  returnSubmittedTrainingTimesheetsForAmendment,
-} from '@/lib/utils/training-timesheet-impact';
+  applyApprovedAbsenceTimesheetEffects,
+  assertNoLockedAbsenceTimesheetImpacts,
+  removeAbsenceFromTimesheetRows,
+  resolveAbsenceTimesheetImpacts,
+} from '@/lib/utils/absence-timesheet-impact';
 
 const ANNUAL_LEAVE_REASON_NAME = 'annual leave';
 
@@ -276,41 +278,90 @@ async function getAnnualLeaveReasonIdByReason(
   return reason?.name?.trim().toLowerCase() === ANNUAL_LEAVE_REASON_NAME ? reason.id : null;
 }
 
-async function getAbsenceReasonNameByReason(
+async function getAbsenceReasonDetailsByReason(
   supabase: ReturnType<typeof createClient>,
   reasonId: string
-): Promise<string | null> {
+): Promise<{ reasonName: string; isPaid: boolean; isTraining: boolean }> {
   const { data: reason, error: reasonError } = await supabase
     .from('absence_reasons')
-    .select('name')
+    .select('name, is_paid')
     .eq('id', reasonId)
     .single();
 
   if (reasonError) throw reasonError;
-  return reason?.name || null;
+  const reasonName = reason?.name || 'Approved Leave';
+  return {
+    reasonName,
+    isPaid: Boolean(reason?.is_paid),
+    isTraining: isTrainingReasonName(reasonName),
+  };
 }
 
-async function applyApprovedTrainingTimesheetEffects(
+async function resolveActiveAbsenceTimesheetImpacts(
   supabase: ReturnType<typeof createClient>,
-  absence: AbsenceValidationShape,
-  actorUserId: string
-): Promise<void> {
-  if (absence.status !== 'approved') return;
+  absence: AbsenceValidationShape
+) {
+  if (!['approved', 'processed'].includes(absence.status)) return [];
 
-  const reasonName = await getAbsenceReasonNameByReason(supabase, absence.reason_id);
-  if (!isTrainingReasonName(reasonName)) return;
-
-  const impacts = await resolveTrainingTimesheetImpacts(supabase, {
+  return resolveAbsenceTimesheetImpacts(supabase, {
     profileId: absence.profile_id,
     startDate: absence.date,
     endDate: absence.end_date,
     isHalfDay: absence.is_half_day,
   });
+}
 
-  await returnSubmittedTrainingTimesheetsForAmendment(supabase, {
+async function applyApprovedLeaveTimesheetEffects(
+  supabase: ReturnType<typeof createClient>,
+  absence: AbsenceValidationShape & { id?: string; allow_timesheet_work_on_leave?: boolean | null },
+  actorUserId: string,
+  action = 'Approved'
+): Promise<void> {
+  if (absence.status !== 'approved' || !absence.id) return;
+
+  const reason = await getAbsenceReasonDetailsByReason(supabase, absence.reason_id);
+  await applyApprovedAbsenceTimesheetEffects(supabase, {
+    absenceId: absence.id,
     actorUserId,
+    profileId: absence.profile_id,
+    startDate: absence.date,
+    endDate: absence.end_date,
+    isHalfDay: absence.is_half_day,
+    halfDaySession: absence.half_day_session,
+    allowTimesheetWorkOnLeave: absence.allow_timesheet_work_on_leave,
+    returnReason: action,
+    ...reason,
+  });
+}
+
+async function assertAbsenceTimesheetChangesUnlocked(
+  supabase: ReturnType<typeof createClient>,
+  absence: AbsenceValidationShape
+): Promise<void> {
+  const impacts = await resolveActiveAbsenceTimesheetImpacts(supabase, absence);
+  assertNoLockedAbsenceTimesheetImpacts(impacts);
+}
+
+async function removeLeaveTimesheetEffects(
+  supabase: ReturnType<typeof createClient>,
+  absence: AbsenceValidationShape & { id: string; allow_timesheet_work_on_leave?: boolean | null },
+  actorUserId: string
+): Promise<void> {
+  const reason = await getAbsenceReasonDetailsByReason(supabase, absence.reason_id);
+  const impacts = await resolveActiveAbsenceTimesheetImpacts(supabase, absence);
+  assertNoLockedAbsenceTimesheetImpacts(impacts);
+
+  await removeAbsenceFromTimesheetRows(supabase, {
+    absenceId: absence.id,
+    actorUserId,
+    profileId: absence.profile_id,
+    startDate: absence.date,
+    endDate: absence.end_date,
+    isHalfDay: absence.is_half_day,
+    halfDaySession: absence.half_day_session,
+    allowTimesheetWorkOnLeave: absence.allow_timesheet_work_on_leave,
     impacts,
-    reason: 'Approved',
+    ...reason,
   });
 }
 
@@ -636,6 +687,7 @@ export function useCreateAbsence() {
       );
 
       await assertAnnualLeaveAllowanceAvailable(supabase, validatedAbsence);
+      await assertAbsenceTimesheetChangesUnlocked(supabase, validatedAbsence);
 
       const { data, error } = await supabase
         .from('absences')
@@ -654,7 +706,16 @@ export function useCreateAbsence() {
         .single();
       
       if (error) throw error;
-      await applyApprovedTrainingTimesheetEffects(supabase, validatedAbsence, user.id);
+      await applyApprovedLeaveTimesheetEffects(
+        supabase,
+        {
+          ...validatedAbsence,
+          id: data.id,
+          allow_timesheet_work_on_leave: data.allow_timesheet_work_on_leave,
+        },
+        user.id,
+        'Approved'
+      );
       return data;
     },
     onSuccess: () => {
@@ -722,6 +783,8 @@ export function useUpdateAbsence() {
       }
 
       if (hasOnlyOverrideUpdate) {
+        await assertAbsenceTimesheetChangesUnlocked(supabase, existingAbsence as AbsenceValidationShape);
+
         const { data, error } = await supabase
           .from('absences')
           .update({
@@ -732,6 +795,25 @@ export function useUpdateAbsence() {
           .single();
 
         if (error) throw error;
+        await removeLeaveTimesheetEffects(
+          supabase,
+          {
+            ...(existingAbsence as AbsenceValidationShape),
+            id,
+            allow_timesheet_work_on_leave: existingAbsence.allow_timesheet_work_on_leave,
+          },
+          user.id
+        );
+        await applyApprovedLeaveTimesheetEffects(
+          supabase,
+          {
+            ...(existingAbsence as AbsenceValidationShape),
+            id: data.id,
+            allow_timesheet_work_on_leave: data.allow_timesheet_work_on_leave,
+          },
+          user.id,
+          'Updated'
+        );
         return data;
       }
 
@@ -755,6 +837,8 @@ export function useUpdateAbsence() {
       );
 
       await assertAnnualLeaveAllowanceAvailable(supabase, validatedAbsence, id);
+      await assertAbsenceTimesheetChangesUnlocked(supabase, existingAbsence as AbsenceValidationShape);
+      await assertAbsenceTimesheetChangesUnlocked(supabase, validatedAbsence);
 
       const { data, error } = await supabase
         .from('absences')
@@ -776,7 +860,25 @@ export function useUpdateAbsence() {
         .single();
       
       if (error) throw error;
-      await applyApprovedTrainingTimesheetEffects(supabase, validatedAbsence, user.id);
+      await removeLeaveTimesheetEffects(
+        supabase,
+        {
+          ...(existingAbsence as AbsenceValidationShape),
+          id,
+          allow_timesheet_work_on_leave: existingAbsence.allow_timesheet_work_on_leave,
+        },
+        user.id
+      );
+      await applyApprovedLeaveTimesheetEffects(
+        supabase,
+        {
+          ...validatedAbsence,
+          id: data.id,
+          allow_timesheet_work_on_leave: data.allow_timesheet_work_on_leave,
+        },
+        user.id,
+        'Updated'
+      );
       return data;
     },
     onSuccess: () => {
@@ -800,6 +902,19 @@ export function useCancelAbsence() {
         // Stale UI state: record already removed or unavailable. Treat as an idempotent success.
         return { id, status: 'cancelled' } as const;
       }
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      const { data: existingAbsence, error: existingAbsenceError } = await supabase
+        .from('absences')
+        .select('profile_id, date, end_date, reason_id, duration_days, is_half_day, half_day_session, status, notes, allow_timesheet_work_on_leave')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (existingAbsenceError) throw existingAbsenceError;
+      if (existingAbsence) {
+        await assertAbsenceTimesheetChangesUnlocked(supabase, existingAbsence as AbsenceValidationShape);
+      }
+
       const { data, error } = await supabase
         .from('absences')
         .update({ status: 'cancelled' })
@@ -808,6 +923,17 @@ export function useCancelAbsence() {
         .maybeSingle();
       
       if (error) throw error;
+      if (existingAbsence) {
+        await removeLeaveTimesheetEffects(
+          supabase,
+          {
+            ...(existingAbsence as AbsenceValidationShape),
+            id,
+            allow_timesheet_work_on_leave: existingAbsence.allow_timesheet_work_on_leave,
+          },
+          user.id
+        );
+      }
       if (!data) return { id, status: 'cancelled' } as const;
       return data;
     },
@@ -828,12 +954,32 @@ export function useDeleteAbsence() {
   return useMutation({
     mutationFn: async (id: string) => {
       await assertAbsenceFinancialYearOpen(supabase, id);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      const { data: existingAbsence, error: existingAbsenceError } = await supabase
+        .from('absences')
+        .select('profile_id, date, end_date, reason_id, duration_days, is_half_day, half_day_session, status, notes, allow_timesheet_work_on_leave')
+        .eq('id', id)
+        .single();
+
+      if (existingAbsenceError) throw existingAbsenceError;
+      await assertAbsenceTimesheetChangesUnlocked(supabase, existingAbsence as AbsenceValidationShape);
+
       const { error } = await supabase
         .from('absences')
         .delete()
         .eq('id', id);
       
       if (error) throw error;
+      await removeLeaveTimesheetEffects(
+        supabase,
+        {
+          ...(existingAbsence as AbsenceValidationShape),
+          id,
+          allow_timesheet_work_on_leave: existingAbsence.allow_timesheet_work_on_leave,
+        },
+        user.id
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['absences'] });
@@ -993,6 +1139,18 @@ export function useApproveAbsence() {
       await assertAbsenceFinancialYearOpen(supabase, id);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
+      const { data: existingAbsence, error: existingAbsenceError } = await supabase
+        .from('absences')
+        .select('profile_id, date, end_date, reason_id, duration_days, is_half_day, half_day_session, status, notes, allow_timesheet_work_on_leave')
+        .eq('id', id)
+        .eq('status', 'pending')
+        .single();
+
+      if (existingAbsenceError) throw existingAbsenceError;
+      await assertAbsenceTimesheetChangesUnlocked(supabase, {
+        ...(existingAbsence as AbsenceValidationShape),
+        status: 'approved',
+      });
       
       const { data, error } = await supabase
         .from('absences')
@@ -1007,7 +1165,7 @@ export function useApproveAbsence() {
         .single();
       
       if (error) throw error;
-      await applyApprovedTrainingTimesheetEffects(
+      await applyApprovedLeaveTimesheetEffects(
         supabase,
         {
           profile_id: data.profile_id,
@@ -1019,8 +1177,11 @@ export function useApproveAbsence() {
           half_day_session: data.half_day_session,
           status: data.status,
           notes: data.notes,
+          id: data.id,
+          allow_timesheet_work_on_leave: data.allow_timesheet_work_on_leave,
         },
-        user.id
+        user.id,
+        'Approved'
       );
       return data;
     },

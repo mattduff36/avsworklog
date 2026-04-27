@@ -7,11 +7,11 @@ import { useUpdateAbsence } from '@/lib/hooks/useAbsence';
 import { createClient } from '@/lib/supabase/client';
 import { getErrorMessage, shouldLogAbsenceManageError } from '@/lib/utils/absence-error-handling';
 import { calculateDurationDays } from '@/lib/utils/date';
-import { isTrainingReasonName } from '@/lib/utils/timesheet-off-days';
 import {
-  buildTrainingTimesheetImpactMessage,
-  resolveTrainingTimesheetImpacts,
-} from '@/lib/utils/training-timesheet-impact';
+  buildAbsenceTimesheetImpactMessage,
+  getLockedAbsenceTimesheetImpacts,
+  resolveAbsenceTimesheetImpacts,
+} from '@/lib/utils/absence-timesheet-impact';
 import type { AbsenceReason, AbsenceUpdate, AbsenceWithRelations } from '@/types/absence';
 import type { WorkShiftPattern } from '@/types/work-shifts';
 import { Button } from '@/components/ui/button';
@@ -188,14 +188,18 @@ export function AbsenceEditDialog({
 
     setSubmitting(true);
     try {
-      if (mode !== 'override-only' && isTrainingReasonName(selectedReasonName)) {
-        const impacts = await resolveTrainingTimesheetImpacts(supabase, {
+      if (mode !== 'override-only' && selectedReasonName) {
+        const impacts = await resolveAbsenceTimesheetImpacts(supabase, {
           profileId: absence.profile_id,
           startDate,
           endDate: isHalfDay ? null : endDate || null,
           isHalfDay,
         });
-        const message = buildTrainingTimesheetImpactMessage(impacts);
+        const message = buildAbsenceTimesheetImpactMessage(selectedReasonName, impacts);
+        if (message && getLockedAbsenceTimesheetImpacts(impacts).length > 0) {
+          window.alert(message);
+          return;
+        }
         if (message && !window.confirm(message)) return;
       }
 

@@ -1,5 +1,5 @@
 /// <reference types="@testing-library/jest-dom/vitest" />
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { AbsenceEditDialog } from '@/app/(dashboard)/absence/manage/components/AbsenceEditDialog';
@@ -18,7 +18,21 @@ vi.mock('@/lib/client/work-shifts', () => ({
   })),
 }));
 
+vi.mock('@/lib/supabase/client', () => ({
+  createClient: vi.fn(() => ({})),
+}));
+
+vi.mock('@/lib/utils/absence-timesheet-impact', () => ({
+  buildAbsenceTimesheetImpactMessage: vi.fn(() => null),
+  getLockedAbsenceTimesheetImpacts: vi.fn(() => []),
+  resolveAbsenceTimesheetImpacts: vi.fn(async () => []),
+}));
+
 describe('AbsenceEditDialog', () => {
+  beforeEach(() => {
+    mutateAsync.mockReset();
+  });
+
   it('submits an edited end date without recreating the booking', async () => {
     render(
       <AbsenceEditDialog
