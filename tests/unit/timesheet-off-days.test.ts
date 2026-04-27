@@ -216,6 +216,33 @@ describe('timesheet off-day resolver', () => {
     expect(tuesday?.trainingReasonColor).toBe('#22c55e');
   });
 
+  it('shows pending training separately without relaxing approved training rules', () => {
+    const states = resolveTimesheetOffDayStates(
+      '2026-03-29',
+      [
+        {
+          id: 'pending-training-id',
+          date: '2026-03-24',
+          end_date: null,
+          status: 'pending',
+          is_half_day: false,
+          absence_reasons: { name: 'Training', color: '#38bdf8', is_paid: true },
+        },
+      ],
+      STANDARD_WORK_SHIFT_PATTERN
+    );
+
+    const tuesday = states.find((row) => row.day_of_week === 2);
+    expect(tuesday?.hasTrainingBooking).toBe(false);
+    expect(tuesday?.trainingLabels).toEqual([]);
+    expect(tuesday?.trainingAbsenceIds).toEqual([]);
+    expect(tuesday?.hasPendingTrainingBooking).toBe(true);
+    expect(tuesday?.pendingTrainingLabels.map((row) => row.label)).toEqual(['Training']);
+    expect(tuesday?.pendingTrainingAbsenceIds).toEqual(['pending-training-id']);
+    expect(tuesday?.pendingTrainingDisplayRemarks).toBe('Training (pending)');
+    expect(tuesday?.paidLeaveHours).toBe(0);
+  });
+
   it('supports overnight work windows when validating time bounds', () => {
     const overnightWindow = { start: '17:00', end: '05:00' };
 
@@ -569,9 +596,13 @@ describe('timesheet off-day normalization', () => {
         paidLeaveHours: 0,
         leaveLabels: [],
         trainingLabels: [],
+        pendingTrainingLabels: [],
         hasTrainingBooking: false,
+        hasPendingTrainingBooking: false,
         trainingAbsenceIds: [],
+        pendingTrainingAbsenceIds: [],
         trainingDisplayRemarks: '',
+        pendingTrainingDisplayRemarks: '',
         displayRemarks: '',
         leaveReasonName: null,
         leaveReasonColor: null,

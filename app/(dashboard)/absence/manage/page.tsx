@@ -55,6 +55,11 @@ import { AllowanceDetailsPanel } from '@/app/(dashboard)/absence/components/Allo
 import { ManageOverviewAdminActions } from '@/app/(dashboard)/absence/manage/components/ManageOverviewAdminActions';
 import { WorkShiftsContent } from '@/app/(dashboard)/absence/manage/components/WorkShiftsContent';
 import { getErrorMessage, shouldLogAbsenceManageError } from '@/lib/utils/absence-error-handling';
+import { isTrainingReasonName } from '@/lib/utils/timesheet-off-days';
+import {
+  buildTrainingTimesheetImpactMessage,
+  resolveTrainingTimesheetImpacts,
+} from '@/lib/utils/training-timesheet-impact';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import {
   canUseScopedAbsencePermission,
@@ -739,6 +744,22 @@ export default function AdminAbsencePage() {
     );
   }
 
+  async function confirmTrainingTimesheetImpactBeforeSave(): Promise<boolean> {
+    const selectedReasonName = reasons?.find((reason) => reason.id === selectedReasonId)?.name || '';
+    if (!isTrainingReasonName(selectedReasonName) || !selectedProfileId || !startDate) return true;
+
+    const impacts = await resolveTrainingTimesheetImpacts(supabase, {
+      profileId: selectedProfileId,
+      startDate,
+      endDate: isHalfDay ? null : endDate || null,
+      isHalfDay,
+    });
+    const message = buildTrainingTimesheetImpactMessage(impacts);
+    if (!message) return true;
+
+    return window.confirm(message);
+  }
+
   // Handle create
   async function handleCreate() {
     if (!selectedProfileId || !selectedReasonId || !startDate) {
@@ -761,6 +782,9 @@ export default function AdminAbsencePage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
+
+      const canContinue = await confirmTrainingTimesheetImpactBeforeSave();
+      if (!canContinue) return;
       
       await createAbsence.mutateAsync({
         profile_id: selectedProfileId,

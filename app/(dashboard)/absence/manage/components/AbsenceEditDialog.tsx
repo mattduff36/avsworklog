@@ -4,8 +4,14 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { fetchEmployeeWorkShift } from '@/lib/client/work-shifts';
 import { useUpdateAbsence } from '@/lib/hooks/useAbsence';
+import { createClient } from '@/lib/supabase/client';
 import { getErrorMessage, shouldLogAbsenceManageError } from '@/lib/utils/absence-error-handling';
 import { calculateDurationDays } from '@/lib/utils/date';
+import { isTrainingReasonName } from '@/lib/utils/timesheet-off-days';
+import {
+  buildTrainingTimesheetImpactMessage,
+  resolveTrainingTimesheetImpacts,
+} from '@/lib/utils/training-timesheet-impact';
 import type { AbsenceReason, AbsenceUpdate, AbsenceWithRelations } from '@/types/absence';
 import type { WorkShiftPattern } from '@/types/work-shifts';
 import { Button } from '@/components/ui/button';
@@ -53,6 +59,7 @@ export function AbsenceEditDialog({
   mode = 'full',
 }: AbsenceEditDialogProps) {
   const updateAbsence = useUpdateAbsence();
+  const supabase = useMemo(() => createClient(), []);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [reasonId, setReasonId] = useState('');
@@ -181,6 +188,17 @@ export function AbsenceEditDialog({
 
     setSubmitting(true);
     try {
+      if (mode !== 'override-only' && isTrainingReasonName(selectedReasonName)) {
+        const impacts = await resolveTrainingTimesheetImpacts(supabase, {
+          profileId: absence.profile_id,
+          startDate,
+          endDate: isHalfDay ? null : endDate || null,
+          isHalfDay,
+        });
+        const message = buildTrainingTimesheetImpactMessage(impacts);
+        if (message && !window.confirm(message)) return;
+      }
+
       await updateAbsence.mutateAsync({
         id: absence.id,
         updates,

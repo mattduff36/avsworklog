@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     const message = error instanceof Error ? error.message : 'Internal server error';
     const status =
       /permission|unauthorized|forbidden/i.test(message) ? 403 :
-      /not found|required|must belong|only training/i.test(message) ? 400 :
+      /not found|required|must belong|only training|processed|adjusted/i.test(message) ? 400 :
       500;
 
     console.error('Error declining training booking:', error);

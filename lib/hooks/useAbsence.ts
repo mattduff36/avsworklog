@@ -20,6 +20,11 @@ import { getCrossFinancialYearAbsenceError } from '@/lib/utils/absence-financial
 import { ANNUAL_LEAVE_MIN_REMAINING_DAYS } from '@/lib/utils/annual-leave';
 import { isAdminRole } from '@/lib/utils/role-access';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { isTrainingReasonName } from '@/lib/utils/timesheet-off-days';
+import {
+  resolveTrainingTimesheetImpacts,
+  returnSubmittedTrainingTimesheetsForAmendment,
+} from '@/lib/utils/training-timesheet-impact';
 
 const ANNUAL_LEAVE_REASON_NAME = 'annual leave';
 
@@ -269,6 +274,44 @@ async function getAnnualLeaveReasonIdByReason(
   }
 
   return reason?.name?.trim().toLowerCase() === ANNUAL_LEAVE_REASON_NAME ? reason.id : null;
+}
+
+async function getAbsenceReasonNameByReason(
+  supabase: ReturnType<typeof createClient>,
+  reasonId: string
+): Promise<string | null> {
+  const { data: reason, error: reasonError } = await supabase
+    .from('absence_reasons')
+    .select('name')
+    .eq('id', reasonId)
+    .single();
+
+  if (reasonError) throw reasonError;
+  return reason?.name || null;
+}
+
+async function applyApprovedTrainingTimesheetEffects(
+  supabase: ReturnType<typeof createClient>,
+  absence: AbsenceValidationShape,
+  actorUserId: string
+): Promise<void> {
+  if (absence.status !== 'approved') return;
+
+  const reasonName = await getAbsenceReasonNameByReason(supabase, absence.reason_id);
+  if (!isTrainingReasonName(reasonName)) return;
+
+  const impacts = await resolveTrainingTimesheetImpacts(supabase, {
+    profileId: absence.profile_id,
+    startDate: absence.date,
+    endDate: absence.end_date,
+    isHalfDay: absence.is_half_day,
+  });
+
+  await returnSubmittedTrainingTimesheetsForAmendment(supabase, {
+    actorUserId,
+    impacts,
+    reason: 'Approved',
+  });
 }
 
 async function assertAnnualLeaveAllowanceAvailable(
@@ -611,6 +654,7 @@ export function useCreateAbsence() {
         .single();
       
       if (error) throw error;
+      await applyApprovedTrainingTimesheetEffects(supabase, validatedAbsence, user.id);
       return data;
     },
     onSuccess: () => {
@@ -641,6 +685,7 @@ export function useUpdateAbsence() {
       if (existingAbsenceError) throw existingAbsenceError;
 
       const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
       const hasUpdateField = <K extends keyof AbsenceUpdate>(key: K) =>
         Object.prototype.hasOwnProperty.call(updates, key);
       const resolveUpdatedField = <
@@ -731,6 +776,7 @@ export function useUpdateAbsence() {
         .single();
       
       if (error) throw error;
+      await applyApprovedTrainingTimesheetEffects(supabase, validatedAbsence, user.id);
       return data;
     },
     onSuccess: () => {
@@ -961,6 +1007,21 @@ export function useApproveAbsence() {
         .single();
       
       if (error) throw error;
+      await applyApprovedTrainingTimesheetEffects(
+        supabase,
+        {
+          profile_id: data.profile_id,
+          date: data.date,
+          end_date: data.end_date,
+          reason_id: data.reason_id,
+          duration_days: data.duration_days,
+          is_half_day: data.is_half_day,
+          half_day_session: data.half_day_session,
+          status: data.status,
+          notes: data.notes,
+        },
+        user.id
+      );
       return data;
     },
     onSuccess: () => {

@@ -12,6 +12,7 @@ export interface ApprovedAbsenceForTimesheet {
   id?: string;
   date: string;
   end_date: string | null;
+  status?: 'pending' | 'approved' | 'processed' | 'rejected' | 'cancelled' | string | null;
   is_half_day?: boolean | null;
   half_day_session?: LeaveSession | null;
   allow_timesheet_work_on_leave?: boolean | null;
@@ -26,6 +27,7 @@ export interface TimesheetLeaveLabel {
   color: string | null;
   isPaid: boolean;
   isTraining: boolean;
+  isPending: boolean;
   blocksWorkingEntry: boolean;
 }
 
@@ -47,9 +49,13 @@ export interface TimesheetOffDayState {
   paidLeaveHours: number;
   leaveLabels: TimesheetLeaveLabel[];
   trainingLabels: TimesheetLeaveLabel[];
+  pendingTrainingLabels: TimesheetLeaveLabel[];
   hasTrainingBooking: boolean;
+  hasPendingTrainingBooking: boolean;
   trainingAbsenceIds: string[];
+  pendingTrainingAbsenceIds: string[];
   trainingDisplayRemarks: string;
+  pendingTrainingDisplayRemarks: string;
   displayRemarks: string;
   leaveReasonName: string | null;
   leaveReasonColor: string | null;
@@ -187,6 +193,7 @@ function toLeaveLabel(row: ApprovedAbsenceForTimesheet): TimesheetLeaveLabel {
   const session: LeaveSession | 'FULL' = isHalf && row.half_day_session ? row.half_day_session : 'FULL';
   const isAnnualLeave = normalizeReasonName(reasonName) === 'annual leave';
   const isTraining = isTrainingReasonName(reasonName);
+  const isPending = normalizeReasonName(row.status) === 'pending';
   const allowsTimesheetWork = isAnnualLeave && Boolean(row.allow_timesheet_work_on_leave);
 
   return {
@@ -197,6 +204,7 @@ function toLeaveLabel(row: ApprovedAbsenceForTimesheet): TimesheetLeaveLabel {
     color: row.absence_reasons?.color || null,
     isPaid: Boolean(row.absence_reasons?.is_paid),
     isTraining,
+    isPending,
     blocksWorkingEntry: !allowsTimesheetWork,
   };
 }
@@ -234,8 +242,9 @@ export function resolveTimesheetOffDayStates(
       if (label.session === 'AM') return sessions.am;
       return sessions.pm;
     });
-    const effectiveTrainingLabels = effectiveLabels.filter((label) => label.isTraining);
-    const effectiveLeaveLabels = effectiveLabels.filter((label) => !label.isTraining);
+    const effectiveTrainingLabels = effectiveLabels.filter((label) => label.isTraining && !label.isPending);
+    const effectivePendingTrainingLabels = effectiveLabels.filter((label) => label.isTraining && label.isPending);
+    const effectiveLeaveLabels = effectiveLabels.filter((label) => !label.isTraining && !label.isPending);
 
     const hasAmCoverage = sessions.am && effectiveLeaveLabels.some(
       (label) => label.session === 'FULL' || label.session === 'AM'
@@ -273,11 +282,18 @@ export function resolveTimesheetOffDayStates(
     const displayRemarks = effectiveLeaveLabels.map((label) => label.label).join('\n');
     const firstLabel = effectiveLeaveLabels[0];
     const trainingDisplayRemarks = effectiveTrainingLabels.map((label) => label.label).join('\n');
+    const pendingTrainingDisplayRemarks = effectivePendingTrainingLabels
+      .map((label) => `${label.label} (pending)`)
+      .join('\n');
     const trainingReasonColor = effectiveTrainingLabels[0]?.color || null;
     const trainingAbsenceIds = effectiveTrainingLabels
       .map((label) => label.absenceId)
       .filter((value): value is string => Boolean(value));
+    const pendingTrainingAbsenceIds = effectivePendingTrainingLabels
+      .map((label) => label.absenceId)
+      .filter((value): value is string => Boolean(value));
     const hasTrainingBooking = trainingAbsenceIds.length > 0 || effectiveTrainingLabels.length > 0;
+    const hasPendingTrainingBooking = pendingTrainingAbsenceIds.length > 0 || effectivePendingTrainingLabels.length > 0;
     const isAnnualLeave =
       isOnApprovedLeave && effectiveLeaveLabels.some((label) => normalizeReasonName(label.reasonName) === 'annual leave');
 
@@ -294,9 +310,13 @@ export function resolveTimesheetOffDayStates(
       paidLeaveHours,
       leaveLabels: effectiveLeaveLabels,
       trainingLabels: effectiveTrainingLabels,
+      pendingTrainingLabels: effectivePendingTrainingLabels,
       hasTrainingBooking,
+      hasPendingTrainingBooking,
       trainingAbsenceIds,
+      pendingTrainingAbsenceIds,
       trainingDisplayRemarks,
+      pendingTrainingDisplayRemarks,
       displayRemarks,
       leaveReasonName: firstLabel?.reasonName || null,
       leaveReasonColor: firstLabel?.color || null,

@@ -4,6 +4,10 @@ import { sendTrainingBookingDeclinedEmail } from '@/lib/utils/email';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { isAdminRole } from '@/lib/utils/role-access';
 import { isTrainingReasonName } from '@/lib/utils/timesheet-off-days';
+import {
+  resolveTrainingTimesheetImpacts,
+  returnSubmittedTrainingTimesheetsForAmendment,
+} from '@/lib/utils/training-timesheet-impact';
 import type { Database } from '@/types/database';
 
 type AdminClient = SupabaseClient<Database>;
@@ -27,6 +31,8 @@ interface OrgTeamRow {
 interface AbsenceRow {
   id: string;
   date: string;
+  end_date: string | null;
+  is_half_day: boolean | null;
   profile_id: string;
   absence_reasons: {
     name: string | null;
@@ -37,6 +43,8 @@ interface AbsenceRow {
 interface AbsenceQueryRow {
   id: string;
   date: string;
+  end_date: string | null;
+  is_half_day: boolean | null;
   profile_id: string;
   absence_reasons: AbsenceRow['absence_reasons'] | AbsenceRow['absence_reasons'][];
   profile: ProfileRow | ProfileRow[] | null;
@@ -53,6 +61,7 @@ export interface DeclineTrainingBookingsResult {
   employeeName: string;
   trainingDate: string;
   notifiedProfileIds: string[];
+  returnedTimesheetIds: string[];
 }
 
 function formatTrainingDate(dateIso: string): string {
@@ -224,6 +233,8 @@ export async function declineTrainingBookings(
     .select(`
       id,
       date,
+      end_date,
+      is_half_day,
       profile_id,
       absence_reasons(name),
       profile:profiles!absences_profile_id_fkey(
@@ -243,6 +254,8 @@ export async function declineTrainingBookings(
   const rows = ((data || []) as unknown as AbsenceQueryRow[]).map<AbsenceRow>((row) => ({
     id: row.id,
     date: row.date,
+    end_date: row.end_date,
+    is_half_day: row.is_half_day,
     profile_id: row.profile_id,
     absence_reasons: pickSingleRelation(row.absence_reasons),
     profile: pickSingleRelation(row.profile),
@@ -272,10 +285,26 @@ export async function declineTrainingBookings(
     throw new Error('You do not have permission to decline this training booking');
   }
 
+  const timesheetImpacts = await resolveTrainingTimesheetImpacts(admin, {
+    profileId: firstRow.profile_id,
+    startDate: firstRow.date,
+    endDate: firstRow.end_date,
+    isHalfDay: firstRow.is_half_day,
+  });
+  if (timesheetImpacts.some((impact) => impact.status === 'processed' || impact.status === 'adjusted')) {
+    throw new Error('Training bookings linked to processed or adjusted timesheets cannot be removed from the timesheet flow');
+  }
+
   const { error: deleteError } = await admin.from('absences').delete().in('id', uniqueAbsenceIds);
   if (deleteError) {
     throw new Error(deleteError.message || 'Failed to delete training booking');
   }
+
+  const returnedTimesheetIds = await returnSubmittedTrainingTimesheetsForAmendment(admin, {
+    actorUserId,
+    impacts: timesheetImpacts,
+    reason: 'Removed',
+  });
 
   const employeeName = profile.full_name || 'Employee';
   const actorName = actorProfile.full_name || 'a colleague';
@@ -324,5 +353,6 @@ export async function declineTrainingBookings(
     employeeName,
     trainingDate,
     notifiedProfileIds: recipients.map((recipient) => recipient.profileId),
+    returnedTimesheetIds,
   };
 }

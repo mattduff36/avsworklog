@@ -578,9 +578,9 @@ function ApprovalsContent() {
           .in('timesheet_id', visibleTimesheetIds),
         supabase
           .from('absences')
-          .select('profile_id, date, end_date, is_half_day, half_day_session, allow_timesheet_work_on_leave, absence_reasons(name,color,is_paid)')
+          .select('profile_id, date, end_date, status, is_half_day, half_day_session, allow_timesheet_work_on_leave, absence_reasons(name,color,is_paid)')
           .in('profile_id', userIds)
-          .in('status', ['approved', 'processed'])
+          .in('status', ['pending', 'approved', 'processed'])
           .lte('date', maxEndIso)
           .or(`end_date.gte.${minStartIso},and(end_date.is.null,date.gte.${minStartIso})`),
       ]);

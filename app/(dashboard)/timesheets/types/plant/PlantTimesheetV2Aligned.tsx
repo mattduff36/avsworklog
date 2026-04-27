@@ -138,6 +138,10 @@ function getTrainingLabel(dayOffState: TimesheetOffDayState | undefined): string
   return dayOffState?.trainingDisplayRemarks || dayOffState?.trainingLabels[0]?.label || 'Training';
 }
 
+function getPendingTrainingLabel(dayOffState: TimesheetOffDayState | undefined): string {
+  return dayOffState?.pendingTrainingDisplayRemarks || dayOffState?.pendingTrainingLabels[0]?.label || 'Training pending approval';
+}
+
 function toMinutes(time: string): number {
   const [hours, minutes] = time.split(':').map(Number);
   return hours * 60 + minutes;
@@ -593,9 +597,9 @@ export function PlantTimesheetV2({
         const { startIso, endIso } = getTimesheetWeekIsoBounds(weekEnding);
         const absenceResult = await supabase
           .from('absences')
-          .select('id, date, end_date, is_half_day, half_day_session, allow_timesheet_work_on_leave, absence_reasons(name,color,is_paid)')
+          .select('id, date, end_date, status, is_half_day, half_day_session, allow_timesheet_work_on_leave, absence_reasons(name,color,is_paid)')
           .eq('profile_id', selectedEmployeeId)
-          .in('status', ['approved', 'processed'])
+          .in('status', ['pending', 'approved', 'processed'])
           .lte('date', endIso);
 
         if (absenceResult.error) throw absenceResult.error;
@@ -1440,6 +1444,7 @@ export function PlantTimesheetV2({
                 const isLeaveLocked = Boolean(dayOffState?.isLeaveLocked);
                 const isLeaveDayForRow = Boolean(dayOffState?.isOnApprovedLeave);
                 const hasTrainingBooking = Boolean(dayOffState?.hasTrainingBooking);
+                const hasPendingTrainingBooking = Boolean(dayOffState?.hasPendingTrainingBooking);
                 const isPartialLeave = Boolean(dayOffState?.isPartialLeave);
                 const disableForDidNotWork = entry.did_not_work && !isPartialLeave;
                 const disableInputs = isLeaveLocked || disableForDidNotWork;
@@ -1461,7 +1466,7 @@ export function PlantTimesheetV2({
                       </p>
                     </div>
 
-                    {(hasTrainingBooking || dayOffState?.leaveLabels.length) ? (
+                    {(hasTrainingBooking || hasPendingTrainingBooking || dayOffState?.leaveLabels.length) ? (
                       <div className="space-y-1 text-center">
                         {hasTrainingBooking && (
                           <p
@@ -1469,6 +1474,11 @@ export function PlantTimesheetV2({
                             style={getLeaveLabelStyle(dayOffState?.trainingReasonColor)}
                           >
                             {getTrainingLabel(dayOffState)}
+                          </p>
+                        )}
+                        {hasPendingTrainingBooking && (
+                          <p className="text-sm font-semibold text-sky-400">
+                            {getPendingTrainingLabel(dayOffState)}
                           </p>
                         )}
                         {dayOffState?.leaveLabels.map((label, labelIndex) => (
@@ -1608,9 +1618,9 @@ export function PlantTimesheetV2({
                             </button>
                           )}
                         </div>
-                        {(hasTrainingBooking || dayOffState?.leaveLabels.length || entry.did_not_work) ? (
+                        {(hasTrainingBooking || hasPendingTrainingBooking || dayOffState?.leaveLabels.length || entry.did_not_work) ? (
                           <div className="flex justify-center">
-                            {(dayOffState?.leaveLabels.length || hasTrainingBooking) ? (
+                            {(dayOffState?.leaveLabels.length || hasTrainingBooking || hasPendingTrainingBooking) ? (
                               <div className="space-y-1 text-center">
                                 {hasTrainingBooking && (
                                   <p
@@ -1618,6 +1628,11 @@ export function PlantTimesheetV2({
                                     style={getLeaveLabelStyle(dayOffState?.trainingReasonColor)}
                                   >
                                     {getTrainingLabel(dayOffState)}
+                                  </p>
+                                )}
+                                {hasPendingTrainingBooking && (
+                                  <p className="text-sm font-semibold text-sky-400">
+                                    {getPendingTrainingLabel(dayOffState)}
                                   </p>
                                 )}
                                 {dayOffState?.leaveLabels.map((label, labelIndex) => (
@@ -1794,6 +1809,7 @@ export function PlantTimesheetV2({
                   const isLeaveLocked = Boolean(dayOffState?.isLeaveLocked);
                   const isLeaveDayForRow = Boolean(dayOffState?.isOnApprovedLeave);
                   const hasTrainingBooking = Boolean(dayOffState?.hasTrainingBooking);
+                  const hasPendingTrainingBooking = Boolean(dayOffState?.hasPendingTrainingBooking);
                   const isPartialLeave = Boolean(dayOffState?.isPartialLeave);
                   const disableForDidNotWork = entry.did_not_work && !isPartialLeave;
                   const disableInputs = isLeaveLocked || disableForDidNotWork;
@@ -1910,9 +1926,9 @@ export function PlantTimesheetV2({
                                 </button>
                               )}
                             </div>
-                            {(hasTrainingBooking || dayOffState?.leaveLabels.length || entry.did_not_work) ? (
+                            {(hasTrainingBooking || hasPendingTrainingBooking || dayOffState?.leaveLabels.length || entry.did_not_work) ? (
                               <div className="flex justify-center">
-                                {(dayOffState?.leaveLabels.length || hasTrainingBooking) ? (
+                                {(dayOffState?.leaveLabels.length || hasTrainingBooking || hasPendingTrainingBooking) ? (
                                   <div className="space-y-1 text-center">
                                     {hasTrainingBooking && (
                                       <p
@@ -1920,6 +1936,11 @@ export function PlantTimesheetV2({
                                         style={getLeaveLabelStyle(dayOffState?.trainingReasonColor)}
                                       >
                                         {getTrainingLabel(dayOffState)}
+                                      </p>
+                                    )}
+                                    {hasPendingTrainingBooking && (
+                                      <p className="text-[10px] font-semibold text-sky-400">
+                                        {getPendingTrainingLabel(dayOffState)}
                                       </p>
                                     )}
                                     {dayOffState?.leaveLabels.map((label, labelIndex) => (

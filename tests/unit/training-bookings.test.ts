@@ -144,6 +144,19 @@ describe('training booking decline helper', () => {
           };
         }
 
+        if (table === 'timesheets') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                in: vi.fn(async () => ({
+                  data: [],
+                  error: null,
+                })),
+              })),
+            })),
+          };
+        }
+
         if (table === 'org_teams') {
           return {
             select: vi.fn(() => ({
@@ -236,6 +249,88 @@ describe('training booking decline helper', () => {
 
     await expect(declineTrainingBookings('employee-1', ['absence-1'])).rejects.toThrow(
       'Only Training bookings can be declined from the timesheet'
+    );
+  });
+
+  it('blocks removing training linked to processed timesheets', async () => {
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+
+    const adminClient = {
+      auth: {
+        admin: {
+          getUserById: vi.fn(),
+        },
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'absences') {
+          return {
+            select: vi.fn(() => ({
+              in: vi.fn(async () => ({
+                data: [
+                  {
+                    id: 'absence-1',
+                    date: '2026-04-15',
+                    end_date: null,
+                    is_half_day: false,
+                    profile_id: 'employee-1',
+                    absence_reasons: { name: 'Training' },
+                    profile: {
+                      id: 'employee-1',
+                      full_name: 'Alice Employee',
+                      team_id: 'team-1',
+                      line_manager_id: 'manager-1',
+                      secondary_manager_id: null,
+                    },
+                  },
+                ],
+                error: null,
+              })),
+            })),
+            delete: vi.fn(() => ({
+              in: vi.fn(async () => ({ error: null })),
+            })),
+          };
+        }
+
+        if (table === 'timesheets') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                in: vi.fn(async () => ({
+                  data: [
+                    {
+                      id: 'timesheet-1',
+                      week_ending: '2026-04-19',
+                      status: 'processed',
+                      manager_comments: null,
+                    },
+                  ],
+                  error: null,
+                })),
+              })),
+            })),
+          };
+        }
+
+        if (table === 'timesheet_entries') {
+          return {
+            select: vi.fn(() => ({
+              in: vi.fn(async () => ({
+                data: [],
+                error: null,
+              })),
+            })),
+          };
+        }
+
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    };
+
+    vi.mocked(createAdminClient).mockReturnValue(adminClient as never);
+
+    await expect(declineTrainingBookings('employee-1', ['absence-1'])).rejects.toThrow(
+      'Training bookings linked to processed or adjusted timesheets cannot be removed from the timesheet flow'
     );
   });
 });

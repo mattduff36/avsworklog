@@ -83,9 +83,9 @@ export async function GET(
     const { startIso, endIso } = getTimesheetWeekIsoBounds(typedTimesheetData.week_ending);
     const { data: absenceData, error: absenceError } = await db
       .from('absences')
-      .select('date, end_date, is_half_day, half_day_session, allow_timesheet_work_on_leave, absence_reasons(name,color,is_paid)')
+      .select('id, date, end_date, status, is_half_day, half_day_session, allow_timesheet_work_on_leave, absence_reasons(name,color,is_paid)')
       .eq('profile_id', typedTimesheet.user_id)
-      .in('status', ['approved', 'processed'])
+      .in('status', ['pending', 'approved', 'processed'])
       .lte('date', endIso);
 
     if (absenceError) {

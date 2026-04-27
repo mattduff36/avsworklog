@@ -241,9 +241,9 @@ export function CivilsTimesheet({
         const { startIso, endIso } = getTimesheetWeekIsoBounds(weekEnding);
         const absenceResult = await supabase
           .from('absences')
-          .select('id, date, end_date, is_half_day, half_day_session, allow_timesheet_work_on_leave, absence_reasons(name,color,is_paid)')
+          .select('id, date, end_date, status, is_half_day, half_day_session, allow_timesheet_work_on_leave, absence_reasons(name,color,is_paid)')
           .eq('profile_id', selectedEmployeeId)
-          .in('status', ['approved', 'processed'])
+          .in('status', ['pending', 'approved', 'processed'])
           .lte('date', endIso);
 
         if (absenceResult.error) throw absenceResult.error;
@@ -365,6 +365,9 @@ export function CivilsTimesheet({
 
   const getTrainingLabel = (dayOffState: TimesheetOffDayState | undefined): string =>
     dayOffState?.trainingDisplayRemarks || dayOffState?.trainingLabels[0]?.label || 'Training';
+
+  const getPendingTrainingLabel = (dayOffState: TimesheetOffDayState | undefined): string =>
+    dayOffState?.pendingTrainingDisplayRemarks || dayOffState?.pendingTrainingLabels[0]?.label || 'Training pending approval';
 
   const handleTrainingStatusToggle = (dayIndex: number) => {
     const dayOffState = getOffDayForIndex(dayIndex);
@@ -1522,6 +1525,7 @@ export function CivilsTimesheet({
                 const isLeaveLocked = Boolean(dayOffState?.isLeaveLocked);
                 const isLeaveDayForRow = Boolean(dayOffState?.isOnApprovedLeave);
                 const hasTrainingBooking = Boolean(dayOffState?.hasTrainingBooking);
+                const hasPendingTrainingBooking = Boolean(dayOffState?.hasPendingTrainingBooking);
                 const isPartialLeave = Boolean(dayOffState?.isPartialLeave);
                 const workWindow = dayOffState?.workWindow ?? null;
                 const disableForDidNotWork = entry.did_not_work && !isPartialLeave;
@@ -1656,9 +1660,9 @@ export function CivilsTimesheet({
                         )}
                       </div>
                       
-                      {(hasTrainingBooking || dayOffState?.leaveLabels.length || entry.did_not_work) ? (
+                      {(hasTrainingBooking || hasPendingTrainingBooking || dayOffState?.leaveLabels.length || entry.did_not_work) ? (
                         <div className="flex justify-center">
-                          {(dayOffState?.leaveLabels.length || hasTrainingBooking) ? (
+                          {(dayOffState?.leaveLabels.length || hasTrainingBooking || hasPendingTrainingBooking) ? (
                             <div className="space-y-1 text-center">
                               {hasTrainingBooking && (
                                 <p
@@ -1666,6 +1670,11 @@ export function CivilsTimesheet({
                                   style={getLeaveLabelStyle(dayOffState?.trainingReasonColor)}
                                 >
                                   {getTrainingLabel(dayOffState)}
+                                </p>
+                              )}
+                              {hasPendingTrainingBooking && (
+                                <p className="text-sm font-semibold text-sky-400">
+                                  {getPendingTrainingLabel(dayOffState)}
                                 </p>
                               )}
                               {dayOffState?.leaveLabels.map((label, labelIndex) => (
@@ -1732,6 +1741,7 @@ export function CivilsTimesheet({
                   const isLeaveLocked = Boolean(dayOffState?.isLeaveLocked);
                   const isLeaveDayForRow = Boolean(dayOffState?.isOnApprovedLeave);
                   const hasTrainingBooking = Boolean(dayOffState?.hasTrainingBooking);
+                  const hasPendingTrainingBooking = Boolean(dayOffState?.hasPendingTrainingBooking);
                   const isPartialLeave = Boolean(dayOffState?.isPartialLeave);
                   const workWindow = dayOffState?.workWindow ?? null;
                   const disableForDidNotWork = entry.did_not_work && !isPartialLeave;
@@ -1840,9 +1850,9 @@ export function CivilsTimesheet({
                           )}
                         </div>
                         
-                        {(hasTrainingBooking || dayOffState?.leaveLabels.length || entry.did_not_work) ? (
+                        {(hasTrainingBooking || hasPendingTrainingBooking || dayOffState?.leaveLabels.length || entry.did_not_work) ? (
                           <div className="flex justify-center">
-                            {(dayOffState?.leaveLabels.length || hasTrainingBooking) ? (
+                            {(dayOffState?.leaveLabels.length || hasTrainingBooking || hasPendingTrainingBooking) ? (
                               <div className="space-y-1 text-center">
                                 {hasTrainingBooking && (
                                   <p
@@ -1850,6 +1860,11 @@ export function CivilsTimesheet({
                                     style={getLeaveLabelStyle(dayOffState?.trainingReasonColor)}
                                   >
                                     {getTrainingLabel(dayOffState)}
+                                  </p>
+                                )}
+                                {hasPendingTrainingBooking && (
+                                  <p className="text-[10px] font-semibold text-sky-400">
+                                    {getPendingTrainingLabel(dayOffState)}
                                   </p>
                                 )}
                                 {dayOffState?.leaveLabels.map((label, labelIndex) => (

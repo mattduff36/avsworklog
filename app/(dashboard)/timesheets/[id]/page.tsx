@@ -21,6 +21,8 @@ import { DAY_NAMES, Timesheet, TimesheetEntry } from '@/types/timesheet';
 import SignaturePad from '@/components/forms/SignaturePad';
 import { Database } from '@/types/database';
 import { TimesheetAdjustmentModal } from '@/components/timesheets/TimesheetAdjustmentModal';
+import { TrainingDeclineDialog } from '@/app/(dashboard)/timesheets/components/TrainingDeclineDialog';
+import { declineTrainingBookingsClient } from '@/lib/client/training-bookings';
 import { toast } from 'sonner';
 import {
   type ApprovedAbsenceForTimesheet,
@@ -72,6 +74,8 @@ export default function ViewTimesheetPage() {
   const [dataChanged, setDataChanged] = useState(false);
   const [manuallyEditedDays, setManuallyEditedDays] = useState<Set<number>>(new Set());
   const [offDayStates, setOffDayStates] = useState<TimesheetOffDayState[]>([]);
+  const [trainingDeclineDayOfWeek, setTrainingDeclineDayOfWeek] = useState<number | null>(null);
+  const [decliningTraining, setDecliningTraining] = useState(false);
 
   const getActionErrorMessage = (err: unknown, fallback: string) => {
     return err instanceof Error && err.message.trim().length > 0 ? err.message : fallback;
@@ -85,6 +89,12 @@ export default function ViewTimesheetPage() {
       normalized.includes('only approved timesheets can be marked as adjusted')
     );
   };
+
+  const getTrainingLabel = (dayOffState: TimesheetOffDayState | undefined): string =>
+    dayOffState?.trainingDisplayRemarks || dayOffState?.trainingLabels[0]?.label || 'Training';
+
+  const getPendingTrainingLabel = (dayOffState: TimesheetOffDayState | undefined): string =>
+    dayOffState?.pendingTrainingDisplayRemarks || dayOffState?.pendingTrainingLabels[0]?.label || 'Training pending approval';
 
   const fetchTimesheet = useCallback(async (id: string) => {
     try {
@@ -164,9 +174,9 @@ export default function ViewTimesheetPage() {
         const { startIso, endIso } = getTimesheetWeekIsoBounds(timesheetData.week_ending);
         const { data: absenceData, error: absenceError } = await supabase
           .from('absences')
-          .select('date, end_date, is_half_day, half_day_session, allow_timesheet_work_on_leave, absence_reasons(name,color,is_paid)')
+          .select('id, date, end_date, status, is_half_day, half_day_session, allow_timesheet_work_on_leave, absence_reasons(name,color,is_paid)')
           .eq('profile_id', timesheetData.user_id)
-          .in('status', ['approved', 'processed'])
+          .in('status', ['pending', 'approved', 'processed'])
           .lte('date', endIso);
 
         if (absenceError) throw absenceError;
@@ -703,6 +713,41 @@ export default function ViewTimesheetPage() {
     }
   };
 
+  const handleCancelTrainingDecline = () => {
+    if (decliningTraining) return;
+    setTrainingDeclineDayOfWeek(null);
+  };
+
+  const handleConfirmTrainingDecline = async () => {
+    if (!timesheet || trainingDeclineDayOfWeek === null) return;
+    const dayOffState = offDayStates.find((state) => state.day_of_week === trainingDeclineDayOfWeek);
+    if (!dayOffState?.trainingAbsenceIds.length) {
+      setTrainingDeclineDayOfWeek(null);
+      return;
+    }
+
+    setDecliningTraining(true);
+    try {
+      const result = await declineTrainingBookingsClient({
+        absenceIds: dayOffState.trainingAbsenceIds,
+      });
+      const returnedCount = result.returnedTimesheetIds?.length || 0;
+      toast.success(
+        returnedCount > 0
+          ? 'Training booking removed and submitted timesheet returned for amendment.'
+          : 'Training booking removed and notifications sent.'
+      );
+      setTrainingDeclineDayOfWeek(null);
+      await fetchTimesheet(timesheet.id);
+    } catch (trainingError) {
+      const message =
+        trainingError instanceof Error ? trainingError.message : 'Failed to remove training booking';
+      toast.error(message);
+    } finally {
+      setDecliningTraining(false);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const variants = {
       draft: { variant: 'secondary' as const, label: 'Draft' },
@@ -752,6 +797,13 @@ export default function ViewTimesheetPage() {
   const canMarkAsProcessed = hasElevatedAccess && timesheet.status === 'approved';
   const canEditApproved = hasElevatedAccess && timesheet.status === 'approved';
   const isEndState = timesheet.status === 'processed' || timesheet.status === 'adjusted';
+  const trainingOffDayStates = offDayStates.filter(
+    (state) => state.hasTrainingBooking || state.hasPendingTrainingBooking
+  );
+  const selectedTrainingDeclineState = trainingDeclineDayOfWeek === null
+    ? undefined
+    : offDayStates.find((state) => state.day_of_week === trainingDeclineDayOfWeek);
+  const canDeclineTrainingFromDetails = !isEndState && (hasElevatedAccess || timesheet.user_id === user?.id);
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -812,6 +864,52 @@ export default function ViewTimesheetPage() {
           </CardHeader>
           <CardContent>
             <p className="text-amber-800 dark:text-amber-300">{timesheet.manager_comments}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {trainingOffDayStates.length > 0 && (
+        <Card className="border-emerald-500/30 bg-emerald-500/5">
+          <CardHeader>
+            <CardTitle className="text-emerald-700 dark:text-emerald-300">Training Bookings</CardTitle>
+            <CardDescription>
+              Approved Training uses entered hours. Pending Training is shown for information only.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {trainingOffDayStates.map((state) => (
+              <div
+                key={state.day_of_week}
+                className="flex flex-col gap-3 rounded-md border border-border bg-white/60 p-3 dark:bg-slate-950/40 md:flex-row md:items-center md:justify-between"
+              >
+                <div>
+                  <p className="font-medium text-foreground">{DAY_NAMES[state.day_of_week - 1]}</p>
+                  {state.hasTrainingBooking && (
+                    <p className="text-sm text-emerald-700 dark:text-emerald-300">{getTrainingLabel(state)}</p>
+                  )}
+                  {state.hasPendingTrainingBooking && (
+                    <p className="text-sm text-sky-700 dark:text-sky-300">{getPendingTrainingLabel(state)}</p>
+                  )}
+                  {isEndState && state.hasTrainingBooking && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      This timesheet is locked, so Training is informational only.
+                    </p>
+                  )}
+                </div>
+                {state.hasTrainingBooking && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setTrainingDeclineDayOfWeek(state.day_of_week)}
+                    disabled={!canDeclineTrainingFromDetails || decliningTraining}
+                    className="border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300"
+                  >
+                    Remove Training
+                  </Button>
+                )}
+              </div>
+            ))}
           </CardContent>
         </Card>
       )}
@@ -1344,6 +1442,15 @@ export default function ViewTimesheetPage() {
           weekEnding={formatDate(timesheet.week_ending)}
         />
       )}
+
+      <TrainingDeclineDialog
+        open={trainingDeclineDayOfWeek !== null}
+        dayLabel={trainingDeclineDayOfWeek === null ? '' : DAY_NAMES[trainingDeclineDayOfWeek - 1]}
+        trainingLabel={getTrainingLabel(selectedTrainingDeclineState)}
+        pending={decliningTraining}
+        onCancel={handleCancelTrainingDecline}
+        onConfirm={handleConfirmTrainingDecline}
+      />
     </div>
   );
 }
