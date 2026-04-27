@@ -9,7 +9,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { QuarterHourTimeInput } from '@/components/timesheets/quarter-hour-time-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -598,21 +597,23 @@ export function PlantTimesheetV2({
                         />
                       </TableCell>
                       <TableCell>
-                        <QuarterHourTimeInput
+                        <Input
+                          type="time"
+                          step="900"
                           value={entry.time_started}
-                          onChange={(value) => updateEntryField(index, 'time_started', value)}
+                          onChange={(event) => updateEntryField(index, 'time_started', event.target.value)}
                           disabled={disableFields}
-                          className="w-28"
-                          ariaLabel={`${DAY_NAMES[index]} start time`}
+                          className="h-9"
                         />
                       </TableCell>
                       <TableCell>
-                        <QuarterHourTimeInput
+                        <Input
+                          type="time"
+                          step="900"
                           value={entry.time_finished}
-                          onChange={(value) => updateEntryField(index, 'time_finished', value)}
+                          onChange={(event) => updateEntryField(index, 'time_finished', event.target.value)}
                           disabled={disableFields}
-                          className="w-28"
-                          ariaLabel={`${DAY_NAMES[index]} finish time`}
+                          className="h-9"
                         />
                       </TableCell>
                       <TableCell>
@@ -644,21 +645,23 @@ export function PlantTimesheetV2({
                         />
                       </TableCell>
                       <TableCell>
-                        <QuarterHourTimeInput
+                        <Input
+                          type="time"
+                          step="900"
                           value={entry.machine_start_time}
-                          onChange={(value) => updateEntryField(index, 'machine_start_time', value)}
+                          onChange={(event) => updateEntryField(index, 'machine_start_time', event.target.value)}
                           disabled={disableFields}
-                          className="w-28"
-                          ariaLabel={`${DAY_NAMES[index]} machine start time`}
+                          className="h-9"
                         />
                       </TableCell>
                       <TableCell>
-                        <QuarterHourTimeInput
+                        <Input
+                          type="time"
+                          step="900"
                           value={entry.machine_finish_time}
-                          onChange={(value) => updateEntryField(index, 'machine_finish_time', value)}
+                          onChange={(event) => updateEntryField(index, 'machine_finish_time', event.target.value)}
                           disabled={disableFields}
-                          className="w-28"
-                          ariaLabel={`${DAY_NAMES[index]} machine finish time`}
+                          className="h-9"
                         />
                       </TableCell>
                       <TableCell>
