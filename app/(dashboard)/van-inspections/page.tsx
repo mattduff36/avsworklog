@@ -50,6 +50,7 @@ import {
   VanInspectionsListTable,
 } from './components/VanInspectionsListTable';
 import { NuqsClientAdapter } from '@/components/providers/NuqsClientAdapter';
+import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 
 interface InspectionWithVehicle extends VanInspection {
   vans: {
@@ -190,12 +191,9 @@ function InspectionsContent() {
             }))
           );
         } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          const isNetworkFailure =
-            message.includes('Failed to fetch') || message.includes('NetworkError') || message.toLowerCase().includes('network');
-          if (isNetworkFailure) {
+          if (isNetworkFetchError(err)) {
             console.warn('Unable to load employees (network):', err);
-          } else {
+          } else if (!isAuthErrorStatus(getErrorStatus(err))) {
             console.error('Error fetching employees:', err);
           }
         }
@@ -205,6 +203,11 @@ function InspectionsContent() {
       setEmployees([]);
       setScopedEmployeeIds([user.id]);
     }
+
+    if (!user || authLoading || permissionLoading || !canAccessInspectionModule) {
+      return;
+    }
+
     const fetchVehicles = async () => {
       try {
         const { data, error } = await supabase
@@ -221,11 +224,9 @@ function InspectionsContent() {
         if (error) throw error;
         setVehicles(data || []);
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        const isNetworkErr = msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.toLowerCase().includes('network');
-        if (isNetworkErr) {
+        if (isNetworkFetchError(err)) {
           console.warn('Unable to load vans (network):', err);
-        } else {
+        } else if (!isAuthErrorStatus(getErrorStatus(err))) {
           console.error('Error fetching vehicles:', err);
         }
       }
@@ -235,7 +236,7 @@ function InspectionsContent() {
     if (user?.id) {
       setRecentVehicleIds(getRecentVehicleIds(user.id));
     }
-  }, [user, canAccessInspectionModule, permissionLoading, canViewCrossUserInspections, supabase]);
+  }, [user, authLoading, canAccessInspectionModule, permissionLoading, canViewCrossUserInspections, supabase]);
 
   const fetchInspections = useCallback(async () => {
     if (!user || authLoading || permissionLoading || !canAccessInspectionModule) return;
@@ -388,22 +389,13 @@ function InspectionsContent() {
       setInspections(enrichedRows.slice(0, displayCount));
     } catch (error) {
       const errorContextId = 'van-inspections-fetch-list-error';
-      const message = (() => {
-        if (error instanceof Error) return error.message;
-        if (typeof error === 'string') return error;
-        try {
-          return JSON.stringify(error);
-        } catch {
-          return String(error);
-        }
-      })();
-      const isNetworkFailure =
-        message.includes('Failed to fetch') || message.includes('NetworkError') || message.toLowerCase().includes('network');
+      const isNetworkFailure = isNetworkFetchError(error);
+      const isAuthFailure = isAuthErrorStatus(getErrorStatus(error));
 
       // Avoid escalating common mobile/offline network failures into centralized error logs
       if (isNetworkFailure) {
-        console.error('Unable to load inspections (network):', error, { errorContextId, network: true });
-      } else {
+        console.warn('Unable to load inspections (network):', error, { errorContextId, network: true });
+      } else if (!isAuthFailure) {
         console.error('Error fetching inspections:', error, { errorContextId });
       }
 

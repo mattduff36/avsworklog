@@ -48,7 +48,7 @@ import {
   type VanInspectionOverlapConflict,
 } from '@/lib/utils/van-inspection-overlap';
 import { isClientSessionPausedError } from '@/lib/app-auth/session-error';
-import { getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
+import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 
 // Dynamic imports for heavy components - loaded only when needed
 const PhotoUpload = dynamic(() => import('@/components/forms/PhotoUpload'), { ssr: false });
@@ -113,6 +113,8 @@ type LoadPreviousDefectsOptions = {
 const STICKY_NAV_OFFSET_PX = 96;
 
 function isTransientNetworkError(error: unknown): boolean {
+  if (isNetworkFetchError(error)) return true;
+
   const message = getInspectionErrorMessage(error, '').toLowerCase();
   if (!message) return false;
 
@@ -132,7 +134,7 @@ function NewInspectionContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const draftId = searchParams.get('id'); // Get draft ID from URL if editing
-  const { user, profile, effectiveRole, isManager, isAdmin, isSuperAdmin } = useAuth();
+  const { user, profile, effectiveRole, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
   const { loading: permissionLoading } = usePermissionCheck('inspections');
   const { canManageInspections: canManageCrossUserInspections } = getInspectionVisibilityFlags({
     teamName: effectiveRole?.team_name ?? profile?.team?.name,
@@ -434,6 +436,10 @@ function NewInspectionContent() {
   const isAddVehicleFormDirty = Boolean(newVehicleReg.trim() || newVehicleCategoryId);
 
   const fetchVehicles = useCallback(async () => {
+    if (!user || authLoading || permissionLoading) {
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('vans')
@@ -449,12 +455,20 @@ function NewInspectionContent() {
       if (error) throw error;
       setVehicles(data || []);
     } catch (err) {
-      console.error('Error fetching vehicles:', err);
-      setError('Failed to load vehicles');
+      if (isTransientNetworkError(err)) {
+        console.warn('Unable to load vehicles (network):', err);
+      } else if (!isAuthErrorStatus(getErrorStatus(err)) && !isClientSessionPausedError(err)) {
+        console.error('Error fetching vehicles:', err);
+        setError('Failed to load vehicles');
+      }
     }
-  }, [supabase]);
+  }, [authLoading, permissionLoading, supabase, user]);
 
   useEffect(() => {
+    if (!user || authLoading || permissionLoading) {
+      return;
+    }
+
     fetchVehicles();
     const fetchCategories = async () => {
       try {
@@ -466,11 +480,15 @@ function NewInspectionContent() {
         if (error) throw error;
         setCategories(data || []);
       } catch (err) {
-        console.error('Error fetching categories:', err);
+        if (isTransientNetworkError(err)) {
+          console.warn('Unable to load van categories (network):', err);
+        } else if (!isAuthErrorStatus(getErrorStatus(err)) && !isClientSessionPausedError(err)) {
+          console.error('Error fetching categories:', err);
+        }
       }
     };
     fetchCategories();
-  }, [fetchVehicles, supabase]);
+  }, [authLoading, fetchVehicles, permissionLoading, supabase, user]);
 
   const loadDraftInspection = useCallback(async (id: string) => {
     if (activeDraftLoadIdRef.current === id || loadedDraftIdRef.current === id) {
@@ -725,8 +743,17 @@ function NewInspectionContent() {
     const { data: inspections, error: inspectionsError } = await inspectionsQuery;
 
     if (inspectionsError) {
-      if (!isAuthErrorStatus(getErrorStatus(inspectionsError)) && !isClientSessionPausedError(inspectionsError)) {
+      const shouldLogError =
+        !isAuthErrorStatus(getErrorStatus(inspectionsError)) &&
+        !isClientSessionPausedError(inspectionsError) &&
+        !isTransientNetworkError(inspectionsError);
+
+      if (shouldLogError) {
         console.error('Failed to check for overlapping van inspections:', inspectionsError, {
+          errorContextId: 'van-inspections-new-check-existing-error',
+        });
+      } else if (isTransientNetworkError(inspectionsError)) {
+        console.warn('Unable to check overlapping van inspections (network):', inspectionsError, {
           errorContextId: 'van-inspections-new-check-existing-error',
         });
       }
