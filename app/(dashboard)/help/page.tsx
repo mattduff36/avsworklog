@@ -47,6 +47,7 @@ import { MODULE_PAGES, getPageLabel, getPageUrl } from '@/lib/config/module-page
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PageLoader } from '@/components/ui/page-loader';
 import { forceAppRefresh } from '@/lib/client/force-app-refresh';
+import { createStatusError, getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -278,12 +279,14 @@ export default function HelpPage() {
         const response = await fetch('/api/me/permissions', { cache: 'no-store' });
         const data = await response.json();
         if (!response.ok) {
-          throw new Error(data.error || 'Failed to load permissions');
+          throw createStatusError(data.error || 'Failed to load permissions', response.status);
         }
 
         setUserPermissions(new Set<ModuleName>((data.enabled_modules || []) as ModuleName[]));
       } catch (error) {
-        console.error('Error fetching permissions:', error);
+        if (!isAuthErrorStatus(getErrorStatus(error)) && !isNetworkFetchError(error)) {
+          console.error('Error fetching permissions:', error);
+        }
         setUserPermissions(new Set());
       }
     }

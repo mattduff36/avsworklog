@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { subscribeToAuthStateChange } from '@/lib/app-auth/client';
 import { loadClientAuthSession } from '@/lib/app-auth/client-session';
 import { fetchWithAuth } from '@/lib/utils/fetch-with-auth';
-import { getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
+import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 import { BlockingMessageModal } from './BlockingMessageModal';
 import { ReminderModal } from './ReminderModal';
 import { Loader2 } from 'lucide-react';
@@ -95,7 +95,7 @@ export function MessageBlockingCheck() {
       if (signal.aborted) {
         return;
       }
-      if (!isAuthErrorStatus(getErrorStatus(error))) {
+      if (!isAuthErrorStatus(getErrorStatus(error)) && !isNetworkFetchError(error)) {
         console.error('Error checking pending messages:', error);
       }
     } finally {

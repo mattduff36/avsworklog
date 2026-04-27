@@ -48,6 +48,31 @@ interface ToastErrorMetadata {
   shownAt: number;
 }
 
+export function shouldIgnoreRuntimeErrorForLogging(message: string, filename?: string): boolean {
+  const msg = (message || '').trim();
+  const file = filename || '';
+
+  // Browser reports this generic cross-origin/script failure without useful code context.
+  if (msg === 'Script error.' && !file) return true;
+
+  // Mobile Safari noise seen in production logs (no repo reference found).
+  if (msg.includes("Can't find variable: gmo") || msg.includes('gmo is not defined')) return true;
+
+  // Ignore obvious extension / injected script failures (best-effort, keep narrow).
+  if (file.includes('chrome-extension://') || file.includes('safari-extension://')) return true;
+
+  return false;
+}
+
+export function shouldIgnoreConsoleErrorForLogging(errorMessage: string): boolean {
+  const normalized = errorMessage.toLowerCase();
+
+  return (
+    normalized.includes('failed to fetch rsc payload') &&
+    normalized.includes('falling back to browser navigation')
+  );
+}
+
 export interface ErrorLog {
   id: string;
   timestamp: string;
@@ -294,16 +319,7 @@ class ErrorLogger {
    * We don't want these to pollute centralized logging (especially on mobile Safari).
    */
   private shouldIgnoreRuntimeError(message: string, filename?: string): boolean {
-    const msg = (message || '').trim();
-    const file = filename || '';
-
-    // Mobile Safari noise seen in production logs (no repo reference found).
-    if (msg.includes("Can't find variable: gmo") || msg.includes('gmo is not defined')) return true;
-
-    // Ignore obvious extension / injected script failures (best-effort, keep narrow).
-    if (file.includes('chrome-extension://') || file.includes('safari-extension://')) return true;
-
-    return false;
+    return shouldIgnoreRuntimeErrorForLogging(message, filename);
   }
 
   private shouldIgnoreUnhandledPromiseRejection(reason: unknown): boolean {
@@ -476,6 +492,10 @@ class ErrorLogger {
         if (errorMessage.includes('Error fetching error logs') || 
             errorMessage.includes('error_logs') ||
             errorMessage.includes('Failed to log error')) {
+          return;
+        }
+
+        if (shouldIgnoreConsoleErrorForLogging(errorMessage)) {
           return;
         }
 
