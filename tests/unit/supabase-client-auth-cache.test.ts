@@ -92,7 +92,7 @@ describe('supabase browser client', () => {
 
     const client = createClient() as typeof baseClient & {
       options: {
-        accessToken: () => Promise<string>;
+        accessToken: () => Promise<string | null>;
       };
     };
 
@@ -184,14 +184,21 @@ describe('supabase browser client', () => {
     vi.stubGlobal('fetch', fetchSpy);
 
     const { createClient, getLastDataTokenFailureStatus } = await import('@/lib/supabase/client');
-    const client = createClient();
+    const client = createClient() as typeof baseClient & {
+      options: {
+        accessToken: () => Promise<string | null>;
+      };
+    };
 
     const {
       data: { session },
     } = await client.auth.getSession();
 
-    expect(session?.access_token).toBe('');
+    expect(session).toBeNull();
     expect(getLastDataTokenFailureStatus()).toBe(503);
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    await expect(client.options.accessToken()).resolves.toBeNull();
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 });

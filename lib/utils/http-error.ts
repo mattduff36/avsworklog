@@ -45,6 +45,14 @@ export function getErrorStatus(error: unknown): number | null {
     return error.status;
   }
 
+  if ('statusCode' in error && typeof error.statusCode === 'number') {
+    return error.statusCode;
+  }
+
+  if ('code' in error && typeof error.code === 'number') {
+    return error.code;
+  }
+
   const message = getErrorMessageText(error).toLowerCase();
   if (message.includes('empty jwt is sent in authorization header')) return 401;
   if (message.includes('unauthorized')) return 401;

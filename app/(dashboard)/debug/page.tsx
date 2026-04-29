@@ -93,7 +93,18 @@ export default function DebugPage() {
   }
 
   if (!profile || !canAccessDebugTools) {
-    return null;
+    return (
+      <AppPageShell>
+        <Card className="border-border">
+          <CardHeader>
+            <CardTitle className="text-foreground">Access denied</CardTitle>
+            <CardDescription>
+              Super admin permission is required to access debug tools.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </AppPageShell>
+    );
   }
 
   return (

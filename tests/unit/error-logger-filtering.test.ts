@@ -10,7 +10,19 @@ describe('error logger filtering', () => {
   });
 
   it('keeps script errors that include a source location', () => {
-    expect(shouldIgnoreRuntimeErrorForLogging('Script error.', '/_next/static/chunk.js')).toBe(false);
+    expect(shouldIgnoreRuntimeErrorForLogging('Script error.', '/third-party/widget.js')).toBe(false);
+  });
+
+  it('ignores generic script errors from minified Next assets', () => {
+    expect(shouldIgnoreRuntimeErrorForLogging('Script error.', '/_next/static/chunks/app/page.js')).toBe(true);
+  });
+
+  it('ignores stale Next chunk load failures', () => {
+    expect(
+      shouldIgnoreRuntimeErrorForLogging(
+        'Loading chunk 2773 failed.\n(error: https://www.squiresapp.com/_next/static/chunks/2773.js)'
+      )
+    ).toBe(true);
   });
 
   it('ignores Next router RSC fetch fallback console noise', () => {

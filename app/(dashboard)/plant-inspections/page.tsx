@@ -23,7 +23,7 @@ import { PlantInspection } from '@/types/inspection';
 import { Employee, InspectionStatusFilter } from '@/types/common';
 import { useQueryState } from 'nuqs';
 import { canEditDraftInspection, getInspectionVisibilityFlags } from '@/lib/utils/inspection-access';
-import { getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
+import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -411,20 +411,13 @@ function PlantInspectionsContent() {
       );
     } catch (error) {
       const errorContextId = 'plant-inspections-fetch-list-error';
-      const message = (() => {
-        if (error instanceof Error) return error.message;
-        if (typeof error === 'string') return error;
-        try {
-          return JSON.stringify(error);
-        } catch {
-          return String(error);
-        }
-      })();
-      const isNetworkFailure =
-        message.includes('Failed to fetch') || message.includes('NetworkError') || message.toLowerCase().includes('network');
+      const isNetworkFailure = isNetworkFetchError(error);
+      const isAuthFailure = isAuthErrorStatus(getErrorStatus(error));
 
       if (isNetworkFailure) {
-        console.error('Unable to load plant inspections (network):', error, { errorContextId, network: true });
+        console.warn('Unable to load plant inspections (network):', error, { errorContextId, network: true });
+      } else if (isAuthFailure) {
+        console.warn('Unable to load plant inspections (auth):', error, { errorContextId, auth: true });
       } else {
         console.error('Error fetching plant inspections:', error, { errorContextId });
       }

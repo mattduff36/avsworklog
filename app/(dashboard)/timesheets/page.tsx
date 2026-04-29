@@ -48,7 +48,7 @@ import {
   TimesheetsListColumnVisibility,
   TimesheetsListTable,
 } from './components/TimesheetsListTable';
-import { isNetworkFetchError } from '@/lib/utils/http-error';
+import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 
 interface TimesheetWithProfile extends Timesheet {
   profile?: {
@@ -331,16 +331,21 @@ export default function TimesheetsPage() {
     } catch (error) {
       const errorContextId = 'timesheets-fetch-list-error';
       const isNetworkFailure = isNetworkFetchError(error);
+      const isAuthFailure = isAuthErrorStatus(getErrorStatus(error));
 
-      // Avoid escalating common mobile/offline network failures into centralized error logs
+      // Avoid escalating common mobile/offline and auth refresh races into centralized error logs.
       if (isNetworkFailure) {
         console.warn('Unable to load timesheets (network):', error, { errorContextId, network: true });
+      } else if (isAuthFailure) {
+        console.warn('Unable to load timesheets (auth):', error, { errorContextId, auth: true });
       } else {
         console.error('Error fetching timesheets:', error, { errorContextId });
       }
 
       // Always set inline error state so the UI shows feedback even if toast fails
-      if (!navigator.onLine || isNetworkFailure) {
+      if (isAuthFailure) {
+        setFetchError('Unable to load timesheets while your session refreshes. Please try again.');
+      } else if (!navigator.onLine || isNetworkFailure) {
         setFetchError('Unable to load timesheets. Please check your internet connection.');
         toast.error('Unable to load timesheets', {
           id: errorContextId,

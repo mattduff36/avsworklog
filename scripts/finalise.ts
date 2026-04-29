@@ -448,6 +448,10 @@ async function waitForServerReady(managedProcess: ManagedProcess, url: string, t
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < timeoutMs) {
+    if (/\bready in\b/iu.test(getManagedProcessOutput(managedProcess))) {
+      return;
+    }
+
     if (managedProcess.child.exitCode !== null) {
       const details = getManagedProcessOutput(managedProcess);
       throw new Error(

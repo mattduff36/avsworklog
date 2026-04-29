@@ -5,16 +5,17 @@ import {
   type User,
 } from '@supabase/supabase-js'
 import { loadClientAuthSession, type ClientAuthSessionResponse } from '@/lib/app-auth/client-session'
+import { handleAuthFailureStatus } from '@/lib/app-auth/recovery-bridge'
 import { getViewAsRoleId, getViewAsTeamId } from '@/lib/utils/view-as-cookie'
 import { withAuthOverrides } from '@/lib/supabase/with-auth-overrides'
-import { createStatusError, getErrorStatus } from '@/lib/utils/http-error'
+import { createStatusError, getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error'
 import type { Database } from '@/types/database'
 
 type BrowserSupabaseClient = SupabaseClient<Database>
 
 let client: BrowserSupabaseClient | null = null
 let cachedDataToken: { token: string; expiresAt: number } | null = null
-let pendingDataTokenPromise: Promise<string> | null = null
+let pendingDataTokenPromise: Promise<string | null> | null = null
 let lastDataTokenFailureStatus: number | null = null
 
 async function fetchJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
@@ -66,7 +67,7 @@ async function getCurrentAuthSessionResponse(): Promise<ClientAuthSessionRespons
   }
 }
 
-async function getDataToken(): Promise<string> {
+async function getDataToken(): Promise<string | null> {
   if (cachedDataToken && cachedDataToken.expiresAt * 1000 > Date.now() + 30_000) {
     return cachedDataToken.token
   }
@@ -87,7 +88,7 @@ async function getDataToken(): Promise<string> {
     } catch (error) {
       cachedDataToken = null
       lastDataTokenFailureStatus = getErrorStatus(error)
-      return ''
+      return null
     } finally {
       pendingDataTokenPromise = null
     }
@@ -140,9 +141,11 @@ export function createClient(): BrowserSupabaseClient {
         detectSessionInUrl: false,
       },
       global: {
-        fetch: (input, init) => {
+        fetch: async (input, init) => {
           const viewAsRoleId = getViewAsRoleId()
           const viewAsTeamId = getViewAsTeamId()
+          let response: Response
+
           if (viewAsRoleId || viewAsTeamId) {
             const headers = new Headers(init?.headers)
             if (viewAsRoleId) {
@@ -151,10 +154,16 @@ export function createClient(): BrowserSupabaseClient {
             if (viewAsTeamId) {
               headers.set('x-view-as-team-id', viewAsTeamId)
             }
-            return globalThis.fetch(input, { ...init, headers })
+            response = await globalThis.fetch(input, { ...init, headers })
+          } else {
+            response = await globalThis.fetch(input, init)
           }
 
-          return globalThis.fetch(input, init)
+          if (isAuthErrorStatus(response.status)) {
+            void handleAuthFailureStatus(response.status, { fallbackToRedirect: false })
+          }
+
+          return response
         },
       },
     }
@@ -183,6 +192,15 @@ export function createClient(): BrowserSupabaseClient {
       }
 
       const token = await getDataToken()
+      if (!token) {
+        return {
+          data: {
+            session: null,
+          },
+          error: null,
+        }
+      }
+
       const expiresAt = cachedDataToken?.expiresAt ?? Math.floor(Date.now() / 1000)
       return {
         data: {

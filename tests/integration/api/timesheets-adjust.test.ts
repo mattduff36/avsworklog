@@ -11,6 +11,9 @@ vi.mock('@/lib/utils/view-as');
 vi.mock('@/lib/utils/rbac', () => ({
   canEffectiveRoleAccessModule: vi.fn(),
 }));
+vi.mock('@/lib/server/processed-absence-notifications', () => ({
+  notifyProcessedAbsenceTimesheetAdjustment: vi.fn().mockResolvedValue(['accounts-supervisor']),
+}));
 vi.mock('@/lib/utils/email', () => ({
   sendTimesheetAdjustmentEmail: vi.fn().mockResolvedValue({ success: true }),
 }));
@@ -64,8 +67,10 @@ describe('POST /api/timesheets/[id]/adjust', () => {
     await setupAdminClientMock();
     const rbac = await import('@/lib/utils/rbac');
     const email = await import('@/lib/utils/email');
+    const processedAbsenceNotifications = await import('@/lib/server/processed-absence-notifications');
     vi.mocked(email.sendTimesheetAdjustmentEmail).mockResolvedValue({ success: true });
     vi.mocked(rbac.canEffectiveRoleAccessModule).mockResolvedValue(true);
+    vi.mocked(processedAbsenceNotifications.notifyProcessedAbsenceTimesheetAdjustment).mockResolvedValue(['accounts-supervisor']);
     const logger = await import('@/lib/utils/server-error-logger');
     vi.mocked(logger.logServerError).mockResolvedValue(undefined);
   });
@@ -155,7 +160,18 @@ describe('POST /api/timesheets/[id]/adjust', () => {
 
       const response = await POST(request as NextRequest, { params: Promise.resolve({ id: 'test-id' }) });
       
+      const processedAbsenceNotifications = await import('@/lib/server/processed-absence-notifications');
       expect(response.status).toBe(200);
+      expect(processedAbsenceNotifications.notifyProcessedAbsenceTimesheetAdjustment).toHaveBeenCalledWith(
+        expect.objectContaining({ auth: expect.any(Object) }),
+        expect.objectContaining({
+          actorUserId: manager.id,
+          employeeProfileId: 'test-user-id',
+          employeeName: 'Employee',
+          weekEnding: '2024-12-01',
+          adjustmentComments: 'Adjusted hours',
+        })
+      );
     });
 
     it('should allow admins to adjust timesheets', async () => {

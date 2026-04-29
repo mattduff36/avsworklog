@@ -6,6 +6,7 @@ import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type { Database } from '@/types/database';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { notifyProcessedAbsenceTimesheetAdjustment } from '@/lib/server/processed-absence-notifications';
 
 function getSupabaseAdmin() {
   return createSupabaseAdmin<Database>(
@@ -245,6 +246,18 @@ export async function POST(
           .from('message_recipients')
           .insert(recipients as never);
       }
+    }
+
+    try {
+      await notifyProcessedAbsenceTimesheetAdjustment(supabaseAdmin, {
+        actorUserId: effectiveRole.user_id!,
+        employeeProfileId: typedTimesheet.user_id,
+        employeeName: employeeProfile.full_name,
+        weekEnding: typedTimesheet.week_ending,
+        adjustmentComments: comments.trim(),
+      });
+    } catch (notificationError) {
+      console.error('Failed to notify Accounts about processed absence timesheet adjustment:', notificationError);
     }
 
     return NextResponse.json({

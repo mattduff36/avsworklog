@@ -51,9 +51,15 @@ interface ToastErrorMetadata {
 export function shouldIgnoreRuntimeErrorForLogging(message: string, filename?: string): boolean {
   const msg = (message || '').trim();
   const file = filename || '';
+  const normalized = msg.toLowerCase();
 
   // Browser reports this generic cross-origin/script failure without useful code context.
   if (msg === 'Script error.' && !file) return true;
+
+  // Minified Next chunk script failures usually indicate a stale/interrupted deploy asset.
+  if (msg === 'Script error.' && file.includes('/_next/static/')) return true;
+  if (normalized.includes('chunkloaderror')) return true;
+  if (normalized.includes('loading chunk') && normalized.includes('failed')) return true;
 
   // Mobile Safari noise seen in production logs (no repo reference found).
   if (msg.includes("Can't find variable: gmo") || msg.includes('gmo is not defined')) return true;
@@ -336,6 +342,10 @@ class ErrorLogger {
 
     if (!message) {
       return false;
+    }
+
+    if (this.shouldIgnoreRuntimeError(message, stack)) {
+      return true;
     }
 
     if (message.includes('We could not verify your session, so data loading has been paused.')) {

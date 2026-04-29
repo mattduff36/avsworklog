@@ -20,7 +20,7 @@ import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { canEditDraftInspection, getInspectionVisibilityFlags } from '@/lib/utils/inspection-access';
 import { formatDate } from '@/lib/utils/date';
 import { isUuid } from '@/lib/utils/uuid';
-import { getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
+import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 import type { Employee } from '@/types/common';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import {
@@ -311,8 +311,17 @@ function HgvInspectionsContent() {
       );
     } catch (error) {
       const errorContextId = 'hgv-inspections-fetch-list-error';
-      console.error('Error fetching HGV inspections:', error, { errorContextId });
-      toast.error('Failed to load HGV inspections', { id: errorContextId });
+      const isNetworkFailure = isNetworkFetchError(error);
+      const isAuthFailure = isAuthErrorStatus(getErrorStatus(error));
+
+      if (isNetworkFailure) {
+        console.warn('Unable to load HGV inspections (network):', error, { errorContextId, network: true });
+      } else if (isAuthFailure) {
+        console.warn('Unable to load HGV inspections (auth):', error, { errorContextId, auth: true });
+      } else {
+        console.error('Error fetching HGV inspections:', error, { errorContextId });
+        toast.error('Failed to load HGV inspections', { id: errorContextId });
+      }
     } finally {
       setLoading(false);
     }
