@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Save, Archive } from 'lucide-react';
-import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
+import type { CustomMaintenanceItemUpdate, VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { useUpdateMaintenance, useCreateMaintenance } from '@/lib/hooks/useMaintenance';
 import { formatDateForInput } from '@/lib/utils/maintenanceCalculations';
 import { triggerShakeAnimation } from '@/lib/utils/animations';
@@ -75,6 +75,11 @@ const editMaintenanceSchema = z.object({
 
 type EditMaintenanceFormData = z.infer<typeof editMaintenanceSchema>;
 
+interface CustomItemFormValue extends CustomMaintenanceItemUpdate {
+  category_name: string;
+  category_type: 'date' | 'mileage' | 'hours';
+}
+
 // ============================================================================
 // Component
 // ============================================================================
@@ -98,6 +103,8 @@ export function EditMaintenanceDialog({
   const updateMutation = useUpdateMaintenance();
   const createMutation = useCreateMaintenance();
   const [isMileageFocused, setIsMileageFocused] = useState(false);
+  const [customItemValues, setCustomItemValues] = useState<CustomItemFormValue[]>([]);
+  const [customItemsDirty, setCustomItemsDirty] = useState(false);
   const dialogContentRef = useRef<HTMLDivElement>(null);
   const assetTypeLabel = vehicle?.vehicle?.asset_type === 'plant' ? 'Plant' : vehicle?.vehicle?.asset_type === 'hgv' ? 'HGV' : 'Van';
   const isHgvAsset = vehicle?.vehicle?.asset_type === 'hgv';
@@ -106,6 +113,10 @@ export function EditMaintenanceDialog({
   
   // Check if this is a new maintenance record (vehicle.id is null for vans without maintenance records)
   const isNewRecord = !vehicle?.id;
+  const maintenanceItems = vehicle?.maintenance_items || [];
+  const hasSystemItem = (fieldKey: string) =>
+    maintenanceItems.some(item => item.category_field_key === fieldKey);
+  const customItems = customItemValues.filter(item => !item.category_name.startsWith('__'));
 
   // Initialize form
   const {
@@ -143,13 +154,29 @@ export function EditMaintenanceDialog({
         tracker_id: vehicle.tracker_id || '',
         comment: '',
       });
+      setCustomItemValues(
+        (vehicle.maintenance_items || [])
+          .filter(item => item.source === 'custom')
+          .map(item => ({
+            category_id: item.category_id,
+            category_name: item.category_name,
+            category_type: item.category_type,
+            due_date: formatDateForInput(item.due_date),
+            due_mileage: item.due_mileage,
+            last_mileage: item.last_mileage,
+            due_hours: item.due_hours,
+            last_hours: item.last_hours,
+            notes: null,
+          }))
+      );
+      setCustomItemsDirty(false);
     }
   }, [vehicle, reset]);
 
   // Handle modal close attempts
   const handleOpenChange = (newOpen: boolean) => {
     // If trying to close and form has unsaved changes, prevent close and shake
-    if (!newOpen && isDirty) {
+    if (!newOpen && (isDirty || customItemsDirty)) {
       triggerShakeAnimation(dialogContentRef.current);
       return;
     }
@@ -161,7 +188,30 @@ export function EditMaintenanceDialog({
   // Handle explicit close button click - discard changes
   const handleDiscardChanges = () => {
     reset(); // Reset form to original values
+    setCustomItemsDirty(false);
     onOpenChange(false);
+  };
+
+  const updateCustomItemValue = (
+    categoryId: string,
+    field: keyof Omit<CustomItemFormValue, 'category_id' | 'category_name' | 'category_type'>,
+    value: string
+  ) => {
+    setCustomItemValues(prev => prev.map(item => {
+      if (item.category_id !== categoryId) return item;
+
+      const parsedValue = field === 'due_date' || field === 'notes'
+        ? (value || null)
+        : value === ''
+          ? null
+          : Number(value);
+
+      return {
+        ...item,
+        [field]: parsedValue,
+      };
+    }));
+    setCustomItemsDirty(true);
   };
 
   // Submit handler
@@ -209,6 +259,15 @@ export function EditMaintenanceDialog({
       last_service_hours: data.last_service_hours || null,
       next_service_hours: data.next_service_hours || null,
       tracker_id: data.tracker_id || null,
+      custom_items: customItems.map(item => ({
+        category_id: item.category_id,
+        due_date: item.category_type === 'date' ? item.due_date || null : null,
+        due_mileage: item.category_type === 'mileage' ? item.due_mileage ?? null : null,
+        last_mileage: item.category_type === 'mileage' ? item.last_mileage ?? null : null,
+        due_hours: item.category_type === 'hours' ? item.due_hours ?? null : null,
+        last_hours: item.category_type === 'hours' ? item.last_hours ?? null : null,
+        notes: item.notes || null,
+      })),
       // notes field intentionally omitted - kept in DB/backend for future use but hidden from UI
       comment: data.comment.trim(), // Mandatory comment for audit trail (not a DB column)
     };
@@ -233,6 +292,7 @@ export function EditMaintenanceDialog({
     }
     
     onSuccess?.();
+    setCustomItemsDirty(false);
   };
 
   if (!vehicle) return null;
@@ -332,7 +392,7 @@ export function EditMaintenanceDialog({
               </h3>
               
               <div className="grid md:grid-cols-3 gap-4">
-                {/* Tax Due Date */}
+                {hasSystemItem('tax_due_date') && (
                 <div className="space-y-2">
                   <Label htmlFor="tax_due_date">Tax Due Date</Label>
                   <Input
@@ -345,8 +405,10 @@ export function EditMaintenanceDialog({
                     <p className="text-sm text-red-400">{errors.tax_due_date.message}</p>
                   )}
                 </div>
+                )}
 
                 {/* MOT Due Date */}
+                {hasSystemItem('mot_due_date') && (
                 <div className="space-y-2">
                   <Label htmlFor="mot_due_date">MOT Due Date</Label>
                   <Input
@@ -359,8 +421,10 @@ export function EditMaintenanceDialog({
                     <p className="text-sm text-red-400">{errors.mot_due_date.message}</p>
                   )}
                 </div>
+                )}
 
                 {/* First Aid Expiry */}
+                {hasSystemItem('first_aid_kit_expiry') && (
                 <div className="space-y-2">
                   <Label htmlFor="first_aid_kit_expiry">First Aid Kit Expiry</Label>
                   <Input
@@ -373,9 +437,10 @@ export function EditMaintenanceDialog({
                     <p className="text-sm text-red-400">{errors.first_aid_kit_expiry.message}</p>
                   )}
                 </div>
+                )}
 
                 {/* HGV: 6 Weekly Inspection Due */}
-                {vehicle.vehicle?.asset_type === 'hgv' && (
+                {hasSystemItem('six_weekly_inspection_due_date') && (
                   <div className="space-y-2">
                     <Label htmlFor="six_weekly_inspection_due_date">6 Weekly Inspection Due</Label>
                     <Input
@@ -391,7 +456,7 @@ export function EditMaintenanceDialog({
                 )}
 
                 {/* HGV: Fire Extinguisher Due */}
-                {vehicle.vehicle?.asset_type === 'hgv' && (
+                {hasSystemItem('fire_extinguisher_due_date') && (
                   <div className="space-y-2">
                     <Label htmlFor="fire_extinguisher_due_date">Fire Extinguisher Due</Label>
                     <Input
@@ -407,7 +472,7 @@ export function EditMaintenanceDialog({
                 )}
 
                 {/* HGV: Taco Calibration Due */}
-                {vehicle.vehicle?.asset_type === 'hgv' && (
+                {hasSystemItem('taco_calibration_due_date') && (
                   <div className="space-y-2">
                     <Label htmlFor="taco_calibration_due_date">Taco Calibration Due</Label>
                     <Input
@@ -421,6 +486,20 @@ export function EditMaintenanceDialog({
                     )}
                   </div>
                 )}
+                {customItems
+                  .filter(item => item.category_type === 'date')
+                  .map(item => (
+                    <div key={item.category_id} className="space-y-2">
+                      <Label htmlFor={`custom-${item.category_id}`}>{item.category_name}</Label>
+                      <Input
+                        id={`custom-${item.category_id}`}
+                        type="date"
+                        value={item.due_date || ''}
+                        onChange={(event) => updateCustomItemValue(item.category_id, 'due_date', event.target.value)}
+                        className="bg-input border-border text-white"
+                      />
+                    </div>
+                  ))}
               </div>
             </div>
           )}
@@ -434,6 +513,7 @@ export function EditMaintenanceDialog({
               
               <div className="grid md:grid-cols-3 gap-4">
                 {/* Service Due */}
+                {hasSystemItem('next_service_mileage') && (
                 <div className="space-y-2">
                   <Label htmlFor="next_service_mileage">Next Service ({distanceUnitLabel})</Label>
                   <Input
@@ -447,8 +527,10 @@ export function EditMaintenanceDialog({
                     <p className="text-sm text-red-400">{errors.next_service_mileage.message}</p>
                   )}
                 </div>
+                )}
 
                 {/* Last Service */}
+                {hasSystemItem('next_service_mileage') && (
                 <div className="space-y-2">
                   <Label htmlFor="last_service_mileage">Last Service ({distanceUnitLabel})</Label>
                   <Input
@@ -462,8 +544,10 @@ export function EditMaintenanceDialog({
                     <p className="text-sm text-red-400">{errors.last_service_mileage.message}</p>
                   )}
                 </div>
+                )}
 
                 {/* Cambelt Due */}
+                {hasSystemItem('cambelt_due_mileage') && (
                 <div className="space-y-2">
                   <Label htmlFor="cambelt_due_mileage">Cambelt Due ({distanceUnitLabel})</Label>
                   <Input
@@ -477,6 +561,35 @@ export function EditMaintenanceDialog({
                     <p className="text-sm text-red-400">{errors.cambelt_due_mileage.message}</p>
                   )}
                 </div>
+                )}
+                {customItems
+                  .filter(item => item.category_type === 'mileage')
+                  .map(item => (
+                    <div key={item.category_id} className="grid md:grid-cols-2 gap-4 md:col-span-3">
+                      <div className="space-y-2">
+                        <Label htmlFor={`custom-last-${item.category_id}`}>Last {item.category_name} ({distanceUnitLabel})</Label>
+                        <Input
+                          id={`custom-last-${item.category_id}`}
+                          type="number"
+                          value={item.last_mileage ?? ''}
+                          onChange={(event) => updateCustomItemValue(item.category_id, 'last_mileage', event.target.value)}
+                          placeholder="e.g., 25000"
+                          className="bg-input border-border text-white"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`custom-due-${item.category_id}`}>Next {item.category_name} ({distanceUnitLabel})</Label>
+                        <Input
+                          id={`custom-due-${item.category_id}`}
+                          type="number"
+                          value={item.due_mileage ?? ''}
+                          onChange={(event) => updateCustomItemValue(item.category_id, 'due_mileage', event.target.value)}
+                          placeholder="e.g., 50000"
+                          className="bg-input border-border text-white"
+                        />
+                      </div>
+                    </div>
+                  ))}
               </div>
 
             </div>
@@ -511,6 +624,7 @@ export function EditMaintenanceDialog({
                 </div>
 
                 {/* Next Service Hours */}
+                {hasSystemItem('next_service_hours') && (
                 <div className="space-y-2">
                   <Label htmlFor="next_service_hours">Next Service (Hours)</Label>
                   <Input
@@ -524,8 +638,10 @@ export function EditMaintenanceDialog({
                     <p className="text-sm text-red-400">{errors.next_service_hours.message}</p>
                   )}
                 </div>
+                )}
 
                 {/* Last Service Hours */}
+                {hasSystemItem('next_service_hours') && (
                 <div className="space-y-2">
                   <Label htmlFor="last_service_hours">Last Service (Hours)</Label>
                   <Input
@@ -539,6 +655,33 @@ export function EditMaintenanceDialog({
                     <p className="text-sm text-red-400">{errors.last_service_hours.message}</p>
                   )}
                 </div>
+                )}
+                {customItems
+                  .filter(item => item.category_type === 'hours')
+                  .map(item => (
+                    <div key={item.category_id} className="grid md:grid-cols-2 gap-4 md:col-span-3">
+                      <div className="space-y-2">
+                        <Label htmlFor={`custom-last-hours-${item.category_id}`}>Last {item.category_name} (Hours)</Label>
+                        <Input
+                          id={`custom-last-hours-${item.category_id}`}
+                          type="number"
+                          value={item.last_hours ?? ''}
+                          onChange={(event) => updateCustomItemValue(item.category_id, 'last_hours', event.target.value)}
+                          className="bg-input border-border text-white"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`custom-due-hours-${item.category_id}`}>Next {item.category_name} (Hours)</Label>
+                        <Input
+                          id={`custom-due-hours-${item.category_id}`}
+                          type="number"
+                          value={item.due_hours ?? ''}
+                          onChange={(event) => updateCustomItemValue(item.category_id, 'due_hours', event.target.value)}
+                          className="bg-input border-border text-white"
+                        />
+                      </div>
+                    </div>
+                  ))}
               </div>
             </div>
           )}

@@ -115,16 +115,12 @@ describe('Conditional KM labels in shared components', () => {
     expect(src).toMatch(/formatMilesUntil\([^)]*distanceUnit/);
   });
 
-  it('MaintenanceOverview shows the full HGV fleet maintenance category strip', () => {
+  it('MaintenanceOverview shows the HGV fleet maintenance category strip from category items', () => {
     const src = readSource('app/(dashboard)/maintenance/components/MaintenanceOverview.tsx');
     expect(src).toContain('getHgvMaintenanceSummaryItems');
-    expect(src).toContain("label: 'Tax Due'");
-    expect(src).toContain("label: 'MOT Due'");
-    expect(src).toContain("label: 'Service Due'");
-    expect(src).toContain("label: 'First Aid'");
-    expect(src).toContain("label: '6 Weekly'");
-    expect(src).toContain("label: 'Fire Ext.'");
-    expect(src).toContain("label: 'Taco Cal.'");
+    expect(src).toContain('vehicle.maintenance_items');
+    expect(src).toContain('item.category_name');
+    expect(src).toContain('item.display_value');
   });
 
   it('MaintenanceHistoryDialog handles HGV KM labels', () => {

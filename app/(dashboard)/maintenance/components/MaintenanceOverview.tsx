@@ -121,10 +121,6 @@ function formatDistanceReading(
   return `${formattedValue} ${unit}`;
 }
 
-function isAttentionStatus(status: VehicleMaintenanceWithStatus['tax_status']): boolean {
-  return status?.status === 'overdue' || status?.status === 'due_soon';
-}
-
 interface WorkshopTask {
   id: string;
   created_at: string;
@@ -196,9 +192,14 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   } | null>(null);
   
   // Helper to get category responsibility
+  const getCategoryForAlert = (alertType: string): MaintenanceCategory | undefined => {
+    const categoryName = ALERT_TO_CATEGORY_NAME[alertType] || alertType;
+    const category = getMaintenanceCategory(maintenanceCategoryMap, categoryName);
+    return category?.id ? category as MaintenanceCategory : undefined;
+  };
+
   const getCategoryResponsibility = (alertType: string): CategoryResponsibility => {
-    const categoryName = ALERT_TO_CATEGORY_NAME[alertType];
-    const category = categoryName ? getMaintenanceCategory(maintenanceCategoryMap, categoryName) : undefined;
+    const category = getCategoryForAlert(alertType);
     return category?.responsibility || 'workshop';
   };
   
@@ -549,6 +550,28 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         });
       }
     }
+
+    (vehicle.maintenance_items || [])
+      .filter(item => item.source === 'custom')
+      .filter(item => item.status.status === 'overdue' || item.status.status === 'due_soon')
+      .forEach(item => {
+        const sortValue = item.status.days_until
+          ?? (item.status.miles_until != null ? Math.round(item.status.miles_until / ESTIMATED_DAILY_MILES) : undefined)
+          ?? item.status.hours_until
+          ?? 0;
+        const detail = item.status.days_until != null
+          ? formatDaysUntil(item.status.days_until)
+          : item.status.miles_until != null
+            ? formatMilesUntil(item.status.miles_until, distanceUnit)
+            : formatHoursUntil(item.status.hours_until ?? 0);
+
+        alerts.push({
+          type: item.category_name,
+          detail,
+          severity: item.status.status as Alert['severity'],
+          sortValue,
+        });
+      });
     
     return {
       ...vehicle,
@@ -558,7 +581,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
 
   const handleCreateTask = (vehicleId: string, alert: Alert) => {
     setCreateTaskVehicleId(vehicleId);
-    setCreateTaskCategoryId(maintenanceCategoryId);
+    setCreateTaskCategoryId(getCategoryForAlert(alert.type)?.id || maintenanceCategoryId);
     setCreateTaskAlertType(alert.type as AlertType);
     setShowCreateTaskDialog(true);
   };
@@ -1066,50 +1089,18 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   const getHgvMaintenanceSummaryItems = (vehicle: VehicleWithAlerts): AlertSummaryItem[] => {
     const distanceUnit = getDistanceUnitLabel(vehicle.vehicle?.asset_type);
 
+    const categoryItems = (vehicle.maintenance_items || []).map(item => ({
+      label: item.category_name,
+      value: item.display_value,
+      isHighlighted: item.status.status === 'overdue' || item.status.status === 'due_soon',
+    }));
+
     return [
       {
         label: 'KM',
         value: formatDistanceReading(vehicle.current_mileage, distanceUnit),
       },
-      {
-        label: 'Tax Due',
-        value: formatMaintenanceDate(vehicle.tax_due_date),
-        isHighlighted: isAttentionStatus(vehicle.tax_status),
-      },
-      {
-        label: 'MOT Due',
-        value: formatMaintenanceDate(vehicle.mot_due_date),
-        isHighlighted: isAttentionStatus(vehicle.mot_status),
-      },
-      {
-        label: 'Service Due',
-        value: formatDistanceReading(vehicle.next_service_mileage, distanceUnit),
-        isHighlighted: isAttentionStatus(vehicle.service_status),
-      },
-      {
-        label: 'Last Service',
-        value: formatDistanceReading(vehicle.last_service_mileage, distanceUnit),
-      },
-      {
-        label: 'First Aid',
-        value: formatMaintenanceDate(vehicle.first_aid_kit_expiry),
-        isHighlighted: isAttentionStatus(vehicle.first_aid_status),
-      },
-      {
-        label: '6 Weekly',
-        value: formatMaintenanceDate(vehicle.six_weekly_inspection_due_date),
-        isHighlighted: isAttentionStatus(vehicle.six_weekly_status),
-      },
-      {
-        label: 'Fire Ext.',
-        value: formatMaintenanceDate(vehicle.fire_extinguisher_due_date),
-        isHighlighted: isAttentionStatus(vehicle.fire_extinguisher_status),
-      },
-      {
-        label: 'Taco Cal.',
-        value: formatMaintenanceDate(vehicle.taco_calibration_due_date),
-        isHighlighted: isAttentionStatus(vehicle.taco_calibration_status),
-      },
+      ...categoryItems,
     ];
   };
   

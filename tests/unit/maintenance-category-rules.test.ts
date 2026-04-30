@@ -29,8 +29,8 @@ describe('maintenance category rules', () => {
   it('respects category visibility and applicability for overview statuses', () => {
     const categoryMap = createMaintenanceCategoryMap([
       category({
-        name: 'Service Due',
-        applies_to: ['van', 'hgv'],
+        name: 'Engine Service',
+        applies_to: ['hgv'],
         show_on_overview: true,
       }),
       category({
@@ -46,7 +46,7 @@ describe('maintenance category rules', () => {
     ]);
 
     const visibleStatuses = getVisibleMaintenanceStatuses('hgv', categoryMap, [
-      { categoryName: MAINTENANCE_CATEGORY_NAMES.service, status: { status: 'due_soon' } },
+      { categoryName: MAINTENANCE_CATEGORY_NAMES.engineService, status: { status: 'due_soon' } },
       { categoryName: MAINTENANCE_CATEGORY_NAMES.cambelt, status: { status: 'overdue' } },
       { categoryName: MAINTENANCE_CATEGORY_NAMES.firstAid, status: { status: 'overdue' } },
     ]);
@@ -59,6 +59,13 @@ describe('maintenance category rules', () => {
 
     expect(isMaintenanceCategoryVisibleOnOverview(legacyCategory, 'van', 'Service Due')).toBe(true);
     expect(isMaintenanceCategoryVisibleOnOverview(legacyCategory, 'hgv', 'Service Due')).toBe(false);
+  });
+
+  it('keeps shared Service Due off HGVs while allowing HGV-only service categories', () => {
+    expect(categoryAppliesToAsset(undefined, 'hgv', MAINTENANCE_CATEGORY_NAMES.service)).toBe(false);
+    expect(categoryAppliesToAsset(undefined, 'van', MAINTENANCE_CATEGORY_NAMES.service)).toBe(true);
+    expect(categoryAppliesToAsset(undefined, 'hgv', MAINTENANCE_CATEGORY_NAMES.engineService)).toBe(true);
+    expect(categoryAppliesToAsset(undefined, 'hgv', MAINTENANCE_CATEGORY_NAMES.fullService)).toBe(true);
   });
 
   it('returns contextual distance labels for vans and HGVs', () => {

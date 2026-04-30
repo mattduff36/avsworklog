@@ -2,6 +2,7 @@
 
 export type CategoryResponsibility = 'workshop' | 'office';
 export type MaintenancePeriodUnit = 'weeks' | 'months' | 'miles' | 'hours';
+export type MaintenanceCategorySource = 'system' | 'custom';
 
 export interface MaintenanceCategory {
   id: string;
@@ -17,6 +18,9 @@ export interface MaintenanceCategory {
   applies_to: string[];
   is_active: boolean;
   sort_order: number;
+  field_key?: string | null;
+  is_system?: boolean;
+  is_delete_protected?: boolean;
   created_at: string;
   updated_at: string;
   
@@ -206,10 +210,43 @@ export interface VehicleMaintenanceWithStatus extends VehicleMaintenance {
   taco_calibration_status?: MaintenanceItemStatus;
   loler_status?: MaintenanceItemStatus; // For plant machinery
   service_hours_status?: MaintenanceItemStatus; // For plant machinery (hours-based service)
+  maintenance_items?: MaintenanceItem[];
   
   // Overall counts
   overdue_count: number;
   due_soon_count: number;
+}
+
+export interface MaintenanceItem {
+  id: string;
+  category_id: string;
+  category_name: string;
+  category_type: MaintenanceCategory['type'];
+  category_field_key: string | null;
+  source: MaintenanceCategorySource;
+  is_system: boolean;
+  is_delete_protected: boolean;
+  sort_order: number;
+  asset_type: 'van' | 'hgv' | 'plant';
+  status: MaintenanceItemStatus;
+  due_date: string | null;
+  due_mileage: number | null;
+  last_mileage: number | null;
+  due_hours: number | null;
+  last_hours: number | null;
+  display_value: string;
+  display_unit: 'date' | 'miles' | 'km' | 'hours';
+  value_id?: string | null;
+}
+
+export interface CustomMaintenanceItemUpdate {
+  category_id: string;
+  due_date?: string | null;
+  due_mileage?: number | null;
+  last_mileage?: number | null;
+  due_hours?: number | null;
+  last_hours?: number | null;
+  notes?: string | null;
 }
 
 // ============================================================================
@@ -232,6 +269,7 @@ export interface UpdateMaintenanceRequest {
   next_service_hours?: number | null; // For plant machinery
   tracker_id?: string | null;
   notes?: string | null;
+  custom_items?: CustomMaintenanceItemUpdate[];
   comment: string; // Mandatory for audit trail (min 10 chars)
 }
 

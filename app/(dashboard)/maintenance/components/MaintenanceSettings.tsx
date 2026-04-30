@@ -17,6 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { CategoryDialog } from './CategoryDialog';
 import { CategoryRecipientsDialog } from './CategoryRecipientsDialog';
 import type { MaintenanceCategory } from '@/types/maintenance';
@@ -243,16 +244,39 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                             >
                               <Edit className="h-3 w-3" />
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openDeleteDialog(category)}
-                              disabled={!canModifySettings}
-                              className="text-red-400 hover:text-red-300 hover:bg-slate-800 disabled:opacity-30"
-                              title="Delete Category"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
+                            {category.is_delete_protected || category.is_system ? (
+                              <TooltipProvider delayDuration={150}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="inline-flex">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        disabled
+                                        className="text-red-400 hover:text-red-300 hover:bg-slate-800 disabled:opacity-30"
+                                        aria-label="Delete disabled for protected category"
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </Button>
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="text-xs">
+                                    This category is linked to system data and cannot be deleted.
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openDeleteDialog(category)}
+                                disabled={!canModifySettings}
+                                className="text-red-400 hover:text-red-300 hover:bg-slate-800 disabled:opacity-30"
+                                title="Delete Category"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -337,7 +361,7 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
               Delete Category
             </AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
-              Are you sure you want to delete this maintenance category? This action cannot be undone.
+              Are you sure you want to delete this maintenance category? This hides the fleet column while preserving historical values.
             </AlertDialogDescription>
           </AlertDialogHeader>
           

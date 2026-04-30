@@ -28,13 +28,15 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { AddAssetFlowDialog } from './add-asset/AddAssetFlowDialog';
-import { formatMaintenanceDate, getStatusColorClass } from '@/lib/utils/maintenanceCalculations';
+import { getStatusColorClass } from '@/lib/utils/maintenanceCalculations';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { Undo2, XCircle } from 'lucide-react';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { cn } from '@/lib/utils/cn';
+import { useMaintenance } from '@/lib/hooks/useMaintenance';
+import type { MaintenanceItem } from '@/types/maintenance';
 
 type PlantAsset = {
   id: string;
@@ -55,6 +57,7 @@ type PlantMaintenanceWithStatus = {
   plant: PlantAsset;
   current_hours: number | null;
   next_service_hours: number | null;
+  maintenance_items?: MaintenanceItem[];
 };
 
 interface PlantTableProps {
@@ -63,7 +66,7 @@ interface PlantTableProps {
   onVehicleAdded?: () => void;
 }
 
-type SortField = 'plant_id' | 'nickname' | 'serial_number' | 'category' | 'current_hours' | 'next_service_hours' | 'loler_due';
+type SortField = 'plant_id' | 'nickname' | 'serial_number' | 'category' | 'current_hours' | `category:${string}`;
 type SortDirection = 'asc' | 'desc';
 
 interface ColumnVisibility {
@@ -71,8 +74,7 @@ interface ColumnVisibility {
   serial_number: boolean;
   category: boolean;
   current_hours: boolean;
-  service_due: boolean;
-  loler_due: boolean;
+  [categoryColumnId: string]: boolean;
 }
 
 export function PlantTable({ 
@@ -82,6 +84,7 @@ export function PlantTable({
 }: PlantTableProps) {
   const router = useRouter();
   const { tabletModeEnabled } = useTabletMode();
+  const { data: maintenanceData, isLoading: maintenanceLoading } = useMaintenance();
   // ✅ Create supabase client using useMemo to avoid recreating on every render
   const supabase = useMemo(() => createClient(), []);
   const [sortField, setSortField] = useState<SortField>('plant_id');
@@ -102,8 +105,6 @@ export function PlantTable({
     serial_number: true,
     category: false,
     current_hours: true,
-    service_due: true,
-    loler_due: true,
   };
 
   // Initialise with defaults; useEffect below will hydrate from localStorage
@@ -116,7 +117,7 @@ export function PlantTable({
       if (saved) {
         const parsed = JSON.parse(saved) as Partial<ColumnVisibility>;
         // Merge with defaults so any newly-added columns get their default value
-        setColumnVisibility(prev => ({ ...prev, ...parsed }));
+        setColumnVisibility(prev => ({ ...prev, ...parsed } as ColumnVisibility));
       }
     } catch (e) {
       console.error('Failed to parse saved column visibility:', e);
@@ -139,43 +140,6 @@ export function PlantTable({
     try {
       setLoading(true);
       
-      // Fetch active plant assets with maintenance data
-      const { data: plantData, error: plantError} = await supabase
-        .from('plant')
-        .select(`
-          *,
-          van_categories (
-            id,
-            name
-          )
-        `)
-        .eq('status', 'active')
-        .order('plant_id');
-
-      if (plantError) throw plantError;
-
-      // Fetch maintenance records for plant
-      const { data: maintenanceData, error: maintenanceError } = await supabase
-        .from('vehicle_maintenance')
-        .select('*')
-        .not('plant_id', 'is', null);
-
-      if (maintenanceError) throw maintenanceError;
-
-      // Combine plant data with maintenance data
-      const combined: PlantMaintenanceWithStatus[] = (plantData || []).map((plant: PlantAsset) => {
-        const maintenance = maintenanceData?.find((m: { plant_id: string | null }) => m.plant_id === plant.id);
-        
-        return {
-          plant_id: plant.plant_id, // Human-readable identifier (P001, P002, etc.)
-          plant: plant as PlantAsset,
-          current_hours: maintenance?.current_hours || plant.current_hours || null,
-          next_service_hours: maintenance?.next_service_hours || null,
-        };
-      });
-
-      setActivePlantAssets(combined);
-
       // Fetch retired plant assets
       const { data: retiredData, error: retiredError } = await supabase
         .from('plant')
@@ -209,6 +173,67 @@ export function PlantTable({
   useEffect(() => {
     fetchPlantData();
   }, [fetchPlantData]);
+
+  useEffect(() => {
+    const plantAssets = (maintenanceData?.vehicles || [])
+      .filter(vehicle => vehicle.vehicle?.asset_type === 'plant')
+      .map((vehicle): PlantMaintenanceWithStatus => ({
+        plant_id: vehicle.vehicle?.plant_id || 'Unknown',
+        plant: {
+          id: vehicle.plant_id || vehicle.vehicle?.id || vehicle.id,
+          plant_id: vehicle.vehicle?.plant_id || 'Unknown',
+          reg_number: vehicle.vehicle?.reg_number || null,
+          nickname: vehicle.vehicle?.nickname || null,
+          serial_number: vehicle.vehicle?.serial_number || null,
+          loler_due_date: vehicle.loler_due_date || null,
+          current_hours: vehicle.current_hours || null,
+          status: vehicle.vehicle?.status || 'active',
+          retired_at: null,
+          retire_reason: null,
+          van_categories: null,
+        },
+        current_hours: vehicle.current_hours || null,
+        next_service_hours: vehicle.next_service_hours || null,
+        maintenance_items: vehicle.maintenance_items || [],
+      }));
+
+    setActivePlantAssets(plantAssets);
+  }, [maintenanceData]);
+
+  const isLoading = loading || maintenanceLoading;
+
+  const maintenanceColumns = useMemo(() => {
+    const columnsByCategoryId = new Map<string, MaintenanceItem>();
+
+    activePlantAssets.forEach(asset => {
+      (asset.maintenance_items || []).forEach(item => {
+        if (!columnsByCategoryId.has(item.category_id)) {
+          columnsByCategoryId.set(item.category_id, item);
+        }
+      });
+    });
+
+    return Array.from(columnsByCategoryId.values())
+      .sort((a, b) => a.sort_order - b.sort_order || a.category_name.localeCompare(b.category_name));
+  }, [activePlantAssets]);
+
+  useEffect(() => {
+    setColumnVisibility(prev => {
+      const next: ColumnVisibility = {
+        nickname: prev.nickname ?? true,
+        serial_number: prev.serial_number ?? true,
+        category: prev.category ?? false,
+        current_hours: prev.current_hours ?? true,
+      };
+
+      maintenanceColumns.forEach(column => {
+        next[`category:${column.category_id}`] = prev[`category:${column.category_id}`] ?? true;
+      });
+
+      localStorage.setItem('plant-table-column-visibility', JSON.stringify(next));
+      return next;
+    });
+  }, [maintenanceColumns]);
 
   // Filter based on search
   const filteredPlant = activePlantAssets.filter(asset => {
@@ -246,16 +271,22 @@ export function PlantTable({
       case 'current_hours':
         return multiplier * ((a.current_hours || 0) - (b.current_hours || 0));
       
-      case 'next_service_hours':
-        return multiplier * ((a.next_service_hours || 0) - (b.next_service_hours || 0));
-      
-      case 'loler_due':
-        if (!a.plant?.loler_due_date && !b.plant?.loler_due_date) return 0;
-        if (!a.plant?.loler_due_date) return 1;
-        if (!b.plant?.loler_due_date) return -1;
-        return multiplier * (new Date(a.plant.loler_due_date).getTime() - new Date(b.plant.loler_due_date).getTime());
-      
       default:
+        if (sortField.startsWith('category:')) {
+          const categoryId = sortField.replace('category:', '');
+          const getSortValue = (item?: MaintenanceItem) => {
+            if (!item) return Number.POSITIVE_INFINITY;
+            if (item.category_type === 'date') return item.due_date ? new Date(item.due_date).getTime() : Number.POSITIVE_INFINITY;
+            if (item.category_type === 'hours') return item.due_hours ?? Number.POSITIVE_INFINITY;
+            return item.due_mileage ?? Number.POSITIVE_INFINITY;
+          };
+
+          return multiplier * (
+            getSortValue(a.maintenance_items?.find(item => item.category_id === categoryId))
+            - getSortValue(b.maintenance_items?.find(item => item.category_id === categoryId))
+          );
+        }
+
         return 0;
     }
   });
@@ -433,18 +464,15 @@ export function PlantTable({
                 >
                   Hours
                 </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={columnVisibility.service_due}
-                  onCheckedChange={() => toggleColumn('service_due')}
-                >
-                  Service Due
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={columnVisibility.loler_due}
-                  onCheckedChange={() => toggleColumn('loler_due')}
-                >
-                  LOLOR / Inspection Due
-                </DropdownMenuCheckboxItem>
+                {maintenanceColumns.map(column => (
+                  <DropdownMenuCheckboxItem
+                    key={column.category_id}
+                    checked={columnVisibility[`category:${column.category_id}`] ?? true}
+                    onCheckedChange={() => toggleColumn(`category:${column.category_id}`)}
+                  >
+                    {column.category_name}
+                  </DropdownMenuCheckboxItem>
+                ))}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -517,30 +545,21 @@ export function PlantTable({
                           </div>
                         </TableHead>
                       )}
-                      {columnVisibility.service_due && (
-                        <TableHead 
-                          className="sticky z-30 bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
-                          style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
-                          onClick={() => handleSort('next_service_hours')}
-                        >
-                          <div className="flex items-center gap-2">
-                            Service Due
-                            <ArrowUpDown className="h-3 w-3" />
-                          </div>
-                        </TableHead>
-                      )}
-                      {columnVisibility.loler_due && (
-                        <TableHead 
-                          className="sticky z-30 bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
-                          style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
-                          onClick={() => handleSort('loler_due')}
-                        >
-                          <div className="flex items-center gap-2">
-                            LOLOR / Inspection Due
-                            <ArrowUpDown className="h-3 w-3" />
-                          </div>
-                        </TableHead>
-                      )}
+                      {maintenanceColumns
+                        .filter(column => columnVisibility[`category:${column.category_id}`] ?? true)
+                        .map(column => (
+                          <TableHead
+                            key={column.category_id}
+                            className="sticky z-30 bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
+                            style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
+                            onClick={() => handleSort(`category:${column.category_id}`)}
+                          >
+                            <div className="flex items-center gap-2">
+                              {column.category_name}
+                              <ArrowUpDown className="h-3 w-3" />
+                            </div>
+                          </TableHead>
+                        ))}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -591,29 +610,19 @@ export function PlantTable({
                           </TableCell>
                         )}
                         
-                        {/* Service Due */}
-                        {columnVisibility.service_due && (
-                          <TableCell>
-                            {asset.next_service_hours ? (
-                              <Badge className={`font-medium ${getStatusColorClass('ok')}`}>
-                                {asset.next_service_hours.toLocaleString()}h
-                              </Badge>
-                            ) : (
-                              <Badge className={`font-medium ${getStatusColorClass('not_set')}`}>
-                                Not set
-                              </Badge>
-                            )}
-                          </TableCell>
-                        )}
-                        
-                        {/* LOLER Due */}
-                        {columnVisibility.loler_due && (
-                          <TableCell>
-                            <Badge className={`font-medium ${getStatusColorClass(asset.plant?.loler_due_date ? 'ok' : 'not_set')}`}>
-                              {formatMaintenanceDate(asset.plant?.loler_due_date || null)}
-                            </Badge>
-                          </TableCell>
-                        )}
+                        {maintenanceColumns
+                          .filter(column => columnVisibility[`category:${column.category_id}`] ?? true)
+                          .map(column => {
+                            const item = asset.maintenance_items?.find(maintenanceItem => maintenanceItem.category_id === column.category_id);
+
+                            return (
+                              <TableCell key={column.category_id}>
+                                <Badge className={`font-medium ${getStatusColorClass(item?.status.status || 'not_set')}`}>
+                                  {item?.display_value || 'Not Set'}
+                                </Badge>
+                              </TableCell>
+                            );
+                          })}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -688,10 +697,14 @@ export function PlantTable({
                                 {asset.current_hours ? <>{asset.current_hours.toLocaleString()}h</> : 'Not set'}
                               </span>
                             </div>
-                            <div className="flex justify-between">
-                              <span>LOLOR / Inspection Due:</span>
-                              <span className="text-white">{formatMaintenanceDate(asset.plant?.loler_due_date || null)}</span>
-                            </div>
+                            {asset.maintenance_items?.find(item => item.category_field_key === 'loler_due_date') && (
+                              <div className="flex justify-between">
+                                <span>LOLER / Inspection Due:</span>
+                                <span className="text-white">
+                                  {asset.maintenance_items.find(item => item.category_field_key === 'loler_due_date')?.display_value}
+                                </span>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -727,24 +740,20 @@ export function PlantTable({
                                 )}
                               </span>
                             </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm text-muted-foreground">Service Due:</span>
-                              {asset.next_service_hours ? (
-                                <Badge className={`font-medium ${getStatusColorClass('ok')}`}>
-                                  {asset.next_service_hours.toLocaleString()}h
-                                </Badge>
-                              ) : (
-                                <Badge className={`font-medium ${getStatusColorClass('not_set')}`}>
-                                  Not set
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm text-muted-foreground">LOLOR / Inspection Due:</span>
-                              <Badge className={`font-medium ${getStatusColorClass(asset.plant?.loler_due_date ? 'ok' : 'not_set')}`}>
-                                {formatMaintenanceDate(asset.plant?.loler_due_date || null)}
-                              </Badge>
-                            </div>
+                            {maintenanceColumns
+                              .filter(column => columnVisibility[`category:${column.category_id}`] ?? true)
+                              .map(column => {
+                                const item = asset.maintenance_items?.find(maintenanceItem => maintenanceItem.category_id === column.category_id);
+
+                                return (
+                                  <div key={column.category_id} className="flex items-center justify-between">
+                                    <span className="text-sm text-muted-foreground">{column.category_name}:</span>
+                                    <Badge className={`font-medium ${getStatusColorClass(item?.status.status || 'not_set')}`}>
+                                      {item?.display_value || 'Not Set'}
+                                    </Badge>
+                                  </div>
+                                );
+                              })}
                           </div>
 
                           {/* Actions - Single History Button */}
@@ -784,7 +793,7 @@ export function PlantTable({
                 />
               </div>
 
-              {loading ? (
+              {isLoading ? (
                 <div className="text-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto mb-3" />
                   <p className="text-muted-foreground">Loading retired plant...</p>

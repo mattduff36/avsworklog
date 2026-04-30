@@ -145,6 +145,9 @@ export async function POST(request: NextRequest) {
         show_on_overview: body.show_on_overview !== false, // Default true
         reminder_in_app_enabled: body.reminder_in_app_enabled || false,
         reminder_email_enabled: body.reminder_email_enabled || false,
+        field_key: null,
+        is_system: false,
+        is_delete_protected: false,
       })
       .select()
       .single();
