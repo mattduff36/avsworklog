@@ -6,7 +6,7 @@
  * HGV inspection delete route.
  */
 import { describe, it, expect } from 'vitest';
-import { formatMilesUntil, formatMileage } from '@/lib/utils/maintenanceCalculations';
+import { formatMilesUntil } from '@/lib/utils/maintenanceCalculations';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -113,6 +113,18 @@ describe('Conditional KM labels in shared components', () => {
     const src = readSource('app/(dashboard)/maintenance/components/MaintenanceOverview.tsx');
     expect(src).toContain("distanceUnit");
     expect(src).toMatch(/formatMilesUntil\([^)]*distanceUnit/);
+  });
+
+  it('MaintenanceOverview shows the full HGV fleet maintenance category strip', () => {
+    const src = readSource('app/(dashboard)/maintenance/components/MaintenanceOverview.tsx');
+    expect(src).toContain('getHgvMaintenanceSummaryItems');
+    expect(src).toContain("label: 'Tax Due'");
+    expect(src).toContain("label: 'MOT Due'");
+    expect(src).toContain("label: 'Service Due'");
+    expect(src).toContain("label: 'First Aid'");
+    expect(src).toContain("label: '6 Weekly'");
+    expect(src).toContain("label: 'Fire Ext.'");
+    expect(src).toContain("label: 'Taco Cal.'");
   });
 
   it('MaintenanceHistoryDialog handles HGV KM labels', () => {

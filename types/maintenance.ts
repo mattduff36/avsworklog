@@ -7,6 +7,7 @@ export interface MaintenanceCategory {
   id: string;
   name: string;
   description: string | null;
+  // 'mileage' is the stored distance type. HGV screens label the same readings as kilometres.
   type: 'date' | 'mileage' | 'hours';
   period_value: number;
   period_unit: MaintenancePeriodUnit;

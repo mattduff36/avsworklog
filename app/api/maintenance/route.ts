@@ -16,6 +16,12 @@ import {
   getHoursBasedStatus,
   calculateAlertCounts
 } from '@/lib/utils/maintenanceCalculations';
+import {
+  MAINTENANCE_CATEGORY_NAMES,
+  createMaintenanceCategoryMap,
+  getMaintenanceCategory,
+  getVisibleMaintenanceStatuses,
+} from '@/lib/utils/maintenanceCategoryRules';
 
 interface InspectionLookupRow {
   inspection_date: string | null;
@@ -83,11 +89,10 @@ export async function GET() {
 
     const admin = createAdminClient();
     
-    // Get all maintenance categories (for threshold values)
+    // Get all maintenance categories so disabled/hidden rows can suppress alerts.
     const { data: categories, error: categoriesError } = await admin
       .from('maintenance_categories')
       .select('*')
-      .eq('is_active', true)
       .order('sort_order');
     
     if (categoriesError) {
@@ -95,23 +100,19 @@ export async function GET() {
       throw categoriesError;
     }
     
-    // Create lookup for categories
-    const categoryMap = new Map<string, MaintenanceCategory>();
-    (categories || []).forEach(cat => {
-      categoryMap.set(cat.name.toLowerCase(), cat);
-    });
+    const categoryMap = createMaintenanceCategoryMap((categories || []) as MaintenanceCategory[]);
     
     // Get thresholds (with defaults)
-    const taxThreshold = categoryMap.get('tax due date')?.alert_threshold_days || 30;
-    const motThreshold = categoryMap.get('mot due date')?.alert_threshold_days || 30;
-    const serviceThreshold = categoryMap.get('service due')?.alert_threshold_miles || 1000;
-    const cambeltThreshold = categoryMap.get('cambelt replacement')?.alert_threshold_miles || 5000;
-    const firstAidThreshold = categoryMap.get('first aid kit expiry')?.alert_threshold_days || 30;
-    const sixWeeklyThreshold = categoryMap.get('6 weekly inspection due')?.alert_threshold_days || 7;
-    const fireExtinguisherThreshold = categoryMap.get('fire extinguisher due')?.alert_threshold_days || 30;
-    const tacoCalibrationThreshold = categoryMap.get('taco calibration due')?.alert_threshold_days || 60;
-    const lolerThreshold = categoryMap.get('loler due')?.alert_threshold_days || 30;
-    const serviceHoursThreshold = categoryMap.get('service due (hours)')?.alert_threshold_hours || 50;
+    const taxThreshold = getMaintenanceCategory(categoryMap, MAINTENANCE_CATEGORY_NAMES.tax)?.alert_threshold_days || 30;
+    const motThreshold = getMaintenanceCategory(categoryMap, MAINTENANCE_CATEGORY_NAMES.mot)?.alert_threshold_days || 30;
+    const serviceThreshold = getMaintenanceCategory(categoryMap, MAINTENANCE_CATEGORY_NAMES.service)?.alert_threshold_miles || 1000;
+    const cambeltThreshold = getMaintenanceCategory(categoryMap, MAINTENANCE_CATEGORY_NAMES.cambelt)?.alert_threshold_miles || 5000;
+    const firstAidThreshold = getMaintenanceCategory(categoryMap, MAINTENANCE_CATEGORY_NAMES.firstAid)?.alert_threshold_days || 30;
+    const sixWeeklyThreshold = getMaintenanceCategory(categoryMap, MAINTENANCE_CATEGORY_NAMES.sixWeekly)?.alert_threshold_days || 7;
+    const fireExtinguisherThreshold = getMaintenanceCategory(categoryMap, MAINTENANCE_CATEGORY_NAMES.fireExtinguisher)?.alert_threshold_days || 30;
+    const tacoCalibrationThreshold = getMaintenanceCategory(categoryMap, MAINTENANCE_CATEGORY_NAMES.tacoCalibration)?.alert_threshold_days || 60;
+    const lolerThreshold = getMaintenanceCategory(categoryMap, MAINTENANCE_CATEGORY_NAMES.loler)?.alert_threshold_days || 30;
+    const serviceHoursThreshold = getMaintenanceCategory(categoryMap, MAINTENANCE_CATEGORY_NAMES.serviceHours)?.alert_threshold_hours || 50;
     
     // ---------------------------------------------------------------
     // Fetch all three asset tables with their maintenance records
@@ -242,7 +243,9 @@ export async function GET() {
 
       if (!maintenance) {
         const noMaintenanceAlertCounts = assetType === 'plant'
-          ? calculateAlertCounts([loler_status])
+          ? calculateAlertCounts(getVisibleMaintenanceStatuses(assetType, categoryMap, [
+              { categoryName: MAINTENANCE_CATEGORY_NAMES.loler, status: loler_status },
+            ]))
           : { overdue: 0, due_soon: 0 };
 
         return {
@@ -326,18 +329,18 @@ export async function GET() {
           )
         : { status: 'not_set' as const };
 
-      const alertCounts = calculateAlertCounts([
-        tax_status,
-        mot_status,
-        service_status,
-        cambelt_status,
-        first_aid_status,
-        six_weekly_status,
-        fire_extinguisher_status,
-        taco_calibration_status,
-        loler_status,
-        service_hours_status,
-      ]);
+      const alertCounts = calculateAlertCounts(getVisibleMaintenanceStatuses(assetType, categoryMap, [
+        { categoryName: MAINTENANCE_CATEGORY_NAMES.tax, status: tax_status },
+        { categoryName: MAINTENANCE_CATEGORY_NAMES.mot, status: mot_status },
+        { categoryName: MAINTENANCE_CATEGORY_NAMES.service, status: service_status },
+        { categoryName: MAINTENANCE_CATEGORY_NAMES.cambelt, status: cambelt_status },
+        { categoryName: MAINTENANCE_CATEGORY_NAMES.firstAid, status: first_aid_status },
+        { categoryName: MAINTENANCE_CATEGORY_NAMES.sixWeekly, status: six_weekly_status },
+        { categoryName: MAINTENANCE_CATEGORY_NAMES.fireExtinguisher, status: fire_extinguisher_status },
+        { categoryName: MAINTENANCE_CATEGORY_NAMES.tacoCalibration, status: taco_calibration_status },
+        { categoryName: MAINTENANCE_CATEGORY_NAMES.loler, status: loler_status },
+        { categoryName: MAINTENANCE_CATEGORY_NAMES.serviceHours, status: service_hours_status },
+      ]));
 
       return {
         ...maintenance,

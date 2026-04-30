@@ -21,6 +21,7 @@ import { CategoryDialog } from './CategoryDialog';
 import { CategoryRecipientsDialog } from './CategoryRecipientsDialog';
 import type { MaintenanceCategory } from '@/types/maintenance';
 import { formatCategoryPeriod } from '@/lib/utils/maintenancePeriods';
+import { getDistanceTypeLabel } from '@/lib/utils/maintenanceCategoryRules';
 
 interface MaintenanceSettingsProps {
   isAdmin: boolean;
@@ -129,7 +130,9 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                         
                         <TableCell>
                           <Badge variant="outline" className="capitalize">
-                            {category.type}
+                            {category.type === 'mileage'
+                              ? getDistanceTypeLabel(category.applies_to)
+                              : category.type}
                           </Badge>
                         </TableCell>
                         
@@ -159,7 +162,9 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                         </TableCell>
                         
                         <TableCell className="text-muted-foreground">
-                          {formatCategoryPeriod(category)}
+                          {category.type === 'mileage'
+                            ? `${category.period_value.toLocaleString()} ${getDistanceTypeLabel(category.applies_to).toLowerCase()}`
+                            : formatCategoryPeriod(category)}
                         </TableCell>
                         
                         <TableCell className="text-muted-foreground">
@@ -167,7 +172,7 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
                             ? `${category.alert_threshold_days} days`
                             : category.type === 'hours'
                             ? `${category.alert_threshold_hours} hours`
-                            : `${category.alert_threshold_miles?.toLocaleString()} miles`
+                            : `${category.alert_threshold_miles?.toLocaleString()} ${getDistanceTypeLabel(category.applies_to).toLowerCase()}`
                           }
                         </TableCell>
                         
@@ -274,7 +279,7 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
               </p>
               <ul className="list-disc list-inside mt-1 space-y-1">
                 <li><strong>Date-based</strong> (Tax, MOT, LOLOR / Inspection) - Alert X days before due, with periods in weeks or months</li>
-                <li><strong>Mileage-based</strong> (Service, Cambelt) - Alert X miles before due (displayed as KM for HGV frontend)</li>
+                <li><strong>Distance-based</strong> (Service, Cambelt) - Alert X miles for vans or kilometres for HGVs before due</li>
                 <li><strong>Hours-based</strong> (Plant Service) - Alert X engine hours before due</li>
               </ul>
               <p className="mt-2">

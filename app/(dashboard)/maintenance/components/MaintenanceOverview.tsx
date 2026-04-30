@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -24,19 +24,26 @@ import { appendStatusHistory, buildStatusHistoryEvent } from '@/lib/utils/worksh
 import { inferMaintenanceLink } from '@/lib/utils/workshopMaintenanceSync';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
+import {
+  MAINTENANCE_CATEGORY_NAMES,
+  createMaintenanceCategoryMap,
+  getDistanceUnitLabel,
+  getMaintenanceCategory,
+  isMaintenanceCategoryVisibleOnOverview,
+} from '@/lib/utils/maintenanceCategoryRules';
 
 // Map alert type to category name for lookup
 const ALERT_TO_CATEGORY_NAME: Record<string, string> = {
-  'Tax': 'tax due date',
-  'MOT': 'mot due date',
-  'Service': 'service due',
-  'Cambelt': 'cambelt replacement',
-  'First Aid Kit': 'first aid kit expiry',
-  'LOLER': 'loler due',
-  '6 Weekly Inspection': '6 weekly inspection due',
-  'Fire Extinguisher': 'fire extinguisher due',
-  'Taco Calibration': 'taco calibration due',
-  'Service (Hours)': 'service due (hours)',
+  'Tax': MAINTENANCE_CATEGORY_NAMES.tax,
+  'MOT': MAINTENANCE_CATEGORY_NAMES.mot,
+  'Service': MAINTENANCE_CATEGORY_NAMES.service,
+  'Cambelt': MAINTENANCE_CATEGORY_NAMES.cambelt,
+  'First Aid Kit': MAINTENANCE_CATEGORY_NAMES.firstAid,
+  'LOLER': MAINTENANCE_CATEGORY_NAMES.loler,
+  '6 Weekly Inspection': MAINTENANCE_CATEGORY_NAMES.sixWeekly,
+  'Fire Extinguisher': MAINTENANCE_CATEGORY_NAMES.fireExtinguisher,
+  'Taco Calibration': MAINTENANCE_CATEGORY_NAMES.tacoCalibration,
+  'Service (Hours)': MAINTENANCE_CATEGORY_NAMES.serviceHours,
 };
 
 interface MaintenanceOverviewProps {
@@ -82,6 +89,12 @@ interface AlertEntry {
   isPlant: boolean;
 }
 
+interface AlertSummaryItem {
+  label: string;
+  value: string;
+  isHighlighted?: boolean;
+}
+
 interface HistoryEntry {
   id: string;
   created_at: string;
@@ -97,6 +110,19 @@ interface StatusHistoryEvent {
   userId: string;
   userName: string;
   comment?: string;
+}
+
+function formatDistanceReading(
+  value: number | null | undefined,
+  unit: 'miles' | 'km'
+): string {
+  const formattedValue = formatMileage(value);
+  if (formattedValue === 'Not Set') return formattedValue;
+  return `${formattedValue} ${unit}`;
+}
+
+function isAttentionStatus(status: VehicleMaintenanceWithStatus['tax_status']): boolean {
+  return status?.status === 'overdue' || status?.status === 'due_soon';
 }
 
 interface WorkshopTask {
@@ -152,6 +178,10 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   
   // Maintenance categories (for checking responsibility)
   const [maintenanceCategories, setMaintenanceCategories] = useState<MaintenanceCategory[]>([]);
+  const maintenanceCategoryMap = useMemo(
+    () => createMaintenanceCategoryMap(maintenanceCategories),
+    [maintenanceCategories]
+  );
   
   // Office Action Dialog state
   const [showOfficeActionDialog, setShowOfficeActionDialog] = useState(false);
@@ -167,10 +197,8 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   
   // Helper to get category responsibility
   const getCategoryResponsibility = (alertType: string): CategoryResponsibility => {
-    const categoryName = ALERT_TO_CATEGORY_NAME[alertType]?.toLowerCase();
-    const category = maintenanceCategories.find(
-      c => c.name.toLowerCase() === categoryName
-    );
+    const categoryName = ALERT_TO_CATEGORY_NAME[alertType];
+    const category = categoryName ? getMaintenanceCategory(maintenanceCategoryMap, categoryName) : undefined;
     return category?.responsibility || 'workshop';
   };
   
@@ -181,8 +209,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       try {
         const { data: categories } = await supabase
           .from('maintenance_categories')
-          .select('*')
-          .eq('is_active', true);
+          .select('*');
         
         if (categories) {
           setMaintenanceCategories(categories);
@@ -319,24 +346,16 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     const alerts: Alert[] = [];
     const isPlant = 'is_plant' in vehicle && vehicle.is_plant === true;
     const rawAssetType = (vehicle.vehicle?.asset_type || (isPlant ? 'plant' : 'vehicle')).toLowerCase();
-    const distanceUnit = rawAssetType === 'hgv' ? 'km' : 'miles';
+    const distanceUnit = getDistanceUnitLabel(rawAssetType);
     
-    // Helper to check if category applies to this asset
-    const categoryApplies = (categoryName: string): boolean => {
-      const category = maintenanceCategories.find(
-        c => c.name.toLowerCase() === categoryName.toLowerCase()
-      );
-      if (!category) return true;
-      if (!category.applies_to || category.applies_to.length === 0) return true;
-      const normalizedAppliesTo = category.applies_to.map(t => t.toLowerCase());
-      if (rawAssetType === 'vehicle' || rawAssetType === 'van') {
-        return normalizedAppliesTo.includes('vehicle') || normalizedAppliesTo.includes('van');
-      }
-      return normalizedAppliesTo.includes(rawAssetType);
+    // Helper to check if this category should be shown for this asset.
+    const categoryVisible = (categoryName: string): boolean => {
+      const category = getMaintenanceCategory(maintenanceCategoryMap, categoryName);
+      return isMaintenanceCategoryVisibleOnOverview(category, rawAssetType, categoryName);
     };
     
     // Check Tax (only if category applies to this asset type)
-    if (categoryApplies('tax due date')) {
+    if (categoryVisible(MAINTENANCE_CATEGORY_NAMES.tax)) {
       if (vehicle.tax_status?.status === 'overdue') {
         alerts.push({
           type: 'Tax',
@@ -355,7 +374,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     }
     
     // Check MOT (only if category applies to this asset type)
-    if (categoryApplies('mot due date')) {
+    if (categoryVisible(MAINTENANCE_CATEGORY_NAMES.mot)) {
       if (vehicle.mot_status?.status === 'overdue') {
         alerts.push({
           type: 'MOT',
@@ -374,7 +393,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     }
     
     // Check Service (normalize miles to days equivalent for sorting - only if category applies)
-    if (categoryApplies('service due')) {
+    if (categoryVisible(MAINTENANCE_CATEGORY_NAMES.service)) {
       if (vehicle.service_status?.status === 'overdue') {
         const milesUntil = vehicle.service_status.miles_until ?? 0;
         alerts.push({
@@ -395,7 +414,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     }
     
     // Check Cambelt (normalize miles to days equivalent for sorting - only if category applies)
-    if (categoryApplies('cambelt replacement')) {
+    if (categoryVisible(MAINTENANCE_CATEGORY_NAMES.cambelt)) {
       if (vehicle.cambelt_status?.status === 'overdue') {
         const milesUntil = vehicle.cambelt_status.miles_until ?? 0;
         alerts.push({
@@ -416,7 +435,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     }
     
     // Check First Aid (only if category applies to this asset type)
-    if (categoryApplies('first aid kit expiry')) {
+    if (categoryVisible(MAINTENANCE_CATEGORY_NAMES.firstAid)) {
       if (vehicle.first_aid_status?.status === 'overdue') {
         alerts.push({
           type: 'First Aid Kit',
@@ -435,7 +454,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     }
     
     // Check LOLER (for plant machinery - only if category applies)
-    if (categoryApplies('loler due')) {
+    if (categoryVisible(MAINTENANCE_CATEGORY_NAMES.loler)) {
       if (vehicle.loler_status?.status === 'overdue') {
         alerts.push({
           type: 'LOLER',
@@ -454,7 +473,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     }
     
     // Check 6 Weekly Inspection (HGV - only if category applies)
-    if (categoryApplies('6 weekly inspection due')) {
+    if (categoryVisible(MAINTENANCE_CATEGORY_NAMES.sixWeekly)) {
       if (vehicle.six_weekly_status?.status === 'overdue') {
         alerts.push({
           type: '6 Weekly Inspection',
@@ -473,7 +492,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     }
     
     // Check Fire Extinguisher (HGV - only if category applies)
-    if (categoryApplies('fire extinguisher due')) {
+    if (categoryVisible(MAINTENANCE_CATEGORY_NAMES.fireExtinguisher)) {
       if (vehicle.fire_extinguisher_status?.status === 'overdue') {
         alerts.push({
           type: 'Fire Extinguisher',
@@ -492,7 +511,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     }
     
     // Check Taco Calibration (HGV - only if category applies)
-    if (categoryApplies('taco calibration due')) {
+    if (categoryVisible(MAINTENANCE_CATEGORY_NAMES.tacoCalibration)) {
       if (vehicle.taco_calibration_status?.status === 'overdue') {
         alerts.push({
           type: 'Taco Calibration',
@@ -511,7 +530,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     }
     
     // Check Service Due (Hours) (plant machinery - only if category applies)
-    if (categoryApplies('service due (hours)')) {
+    if (categoryVisible(MAINTENANCE_CATEGORY_NAMES.serviceHours)) {
       if (vehicle.service_hours_status?.status === 'overdue') {
         const hoursUntil = vehicle.service_hours_status.hours_until ?? 0;
         alerts.push({
@@ -1043,6 +1062,56 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       toggleEntry(entry.entryKey, entry.vehicleId, entry.isPlant);
     }
   };
+
+  const getHgvMaintenanceSummaryItems = (vehicle: VehicleWithAlerts): AlertSummaryItem[] => {
+    const distanceUnit = getDistanceUnitLabel(vehicle.vehicle?.asset_type);
+
+    return [
+      {
+        label: 'KM',
+        value: formatDistanceReading(vehicle.current_mileage, distanceUnit),
+      },
+      {
+        label: 'Tax Due',
+        value: formatMaintenanceDate(vehicle.tax_due_date),
+        isHighlighted: isAttentionStatus(vehicle.tax_status),
+      },
+      {
+        label: 'MOT Due',
+        value: formatMaintenanceDate(vehicle.mot_due_date),
+        isHighlighted: isAttentionStatus(vehicle.mot_status),
+      },
+      {
+        label: 'Service Due',
+        value: formatDistanceReading(vehicle.next_service_mileage, distanceUnit),
+        isHighlighted: isAttentionStatus(vehicle.service_status),
+      },
+      {
+        label: 'Last Service',
+        value: formatDistanceReading(vehicle.last_service_mileage, distanceUnit),
+      },
+      {
+        label: 'First Aid',
+        value: formatMaintenanceDate(vehicle.first_aid_kit_expiry),
+        isHighlighted: isAttentionStatus(vehicle.first_aid_status),
+      },
+      {
+        label: '6 Weekly',
+        value: formatMaintenanceDate(vehicle.six_weekly_inspection_due_date),
+        isHighlighted: isAttentionStatus(vehicle.six_weekly_status),
+      },
+      {
+        label: 'Fire Ext.',
+        value: formatMaintenanceDate(vehicle.fire_extinguisher_due_date),
+        isHighlighted: isAttentionStatus(vehicle.fire_extinguisher_status),
+      },
+      {
+        label: 'Taco Cal.',
+        value: formatMaintenanceDate(vehicle.taco_calibration_due_date),
+        isHighlighted: isAttentionStatus(vehicle.taco_calibration_status),
+      },
+    ];
+  };
   
   // Flatten to one entry per alert so each alert gets its own card
   const allAlertEntries: AlertEntry[] = vehiclesWithAlerts.flatMap(v => {
@@ -1204,84 +1273,81 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                     </div>
                   </>
                 ) : (
-                  <>
-                    <div className="space-y-0">
-                      <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">
-                        {vehicle.vehicle?.asset_type === 'hgv' ? 'KM' : 'Mileage'}
+                  vehicle.vehicle?.asset_type === 'hgv' ? (
+                    <>
+                      {getHgvMaintenanceSummaryItems(vehicle).map(item => (
+                        <div key={item.label} className="space-y-0">
+                          <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">
+                            {item.label}
+                          </div>
+                          <div className={`text-sm font-medium ${item.isHighlighted ? 'text-red-400' : 'text-white'}`}>
+                            {item.value}
+                          </div>
+                        </div>
+                      ))}
+                      {vehicle.tracker_id && (
+                        <div className="space-y-0">
+                          <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">GPS Tracker</div>
+                          <div className="text-sm font-medium text-white">
+                            {vehicle.tracker_id}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className="space-y-0">
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Mileage</div>
+                        <div className="text-sm font-medium text-white">
+                          {formatMileage(vehicle.current_mileage)}
+                        </div>
                       </div>
-                      <div className="text-sm font-medium text-white">
-                        {formatMileage(vehicle.current_mileage)}
+                      <div className="space-y-0">
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Tax Due</div>
+                        <div className={`text-sm font-medium ${vehicle.tax_status?.status === 'overdue' || vehicle.tax_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
+                          {formatMaintenanceDate(vehicle.tax_due_date)}
+                        </div>
                       </div>
-                    </div>
-                    <div className="space-y-0">
-                      <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Tax Due</div>
-                      <div className={`text-sm font-medium ${vehicle.tax_status?.status === 'overdue' || vehicle.tax_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
-                        {formatMaintenanceDate(vehicle.tax_due_date)}
+                      <div className="space-y-0">
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">MOT Due</div>
+                        <div className={`text-sm font-medium ${vehicle.mot_status?.status === 'overdue' || vehicle.mot_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
+                          {formatMaintenanceDate(vehicle.mot_due_date)}
+                        </div>
                       </div>
-                    </div>
-                    <div className="space-y-0">
-                      <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">MOT Due</div>
-                      <div className={`text-sm font-medium ${vehicle.mot_status?.status === 'overdue' || vehicle.mot_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
-                        {formatMaintenanceDate(vehicle.mot_due_date)}
+                      <div className="space-y-0">
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">First Aid</div>
+                        <div className={`text-sm font-medium ${vehicle.first_aid_status?.status === 'overdue' || vehicle.first_aid_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
+                          {formatMaintenanceDate(vehicle.first_aid_kit_expiry)}
+                        </div>
                       </div>
-                    </div>
-                    <div className="space-y-0">
-                      <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">First Aid</div>
-                      <div className={`text-sm font-medium ${vehicle.first_aid_status?.status === 'overdue' || vehicle.first_aid_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
-                        {formatMaintenanceDate(vehicle.first_aid_kit_expiry)}
+                      <div className="space-y-0">
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Service Due</div>
+                        <div className={`text-sm font-medium ${vehicle.service_status?.status === 'overdue' || vehicle.service_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
+                          {vehicle.next_service_mileage ? formatMileage(vehicle.next_service_mileage) : 'Not Set'}
+                        </div>
                       </div>
-                    </div>
-                    <div className="space-y-0">
-                      <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Service Due</div>
-                      <div className={`text-sm font-medium ${vehicle.service_status?.status === 'overdue' || vehicle.service_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
-                        {vehicle.next_service_mileage ? formatMileage(vehicle.next_service_mileage) : 'Not Set'}
+                      <div className="space-y-0">
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Last Service</div>
+                        <div className="text-sm font-medium text-white">
+                          {vehicle.last_service_mileage ? formatMileage(vehicle.last_service_mileage) : 'Not Set'}
+                        </div>
                       </div>
-                    </div>
-                    <div className="space-y-0">
-                      <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Last Service</div>
-                      <div className="text-sm font-medium text-white">
-                        {vehicle.last_service_mileage ? formatMileage(vehicle.last_service_mileage) : 'Not Set'}
-                      </div>
-                    </div>
-                    {vehicle.vehicle?.asset_type !== 'hgv' && (
                       <div className="space-y-0">
                         <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Cambelt</div>
                         <div className={`text-sm font-medium ${vehicle.cambelt_status?.status === 'overdue' || vehicle.cambelt_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
                           {vehicle.cambelt_due_mileage ? formatMileage(vehicle.cambelt_due_mileage) : 'Not Set'}
                         </div>
                       </div>
-                    )}
-                    {vehicle.vehicle?.asset_type === 'hgv' && (
-                      <>
+                      {vehicle.tracker_id && (
                         <div className="space-y-0">
-                          <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">6 Weekly</div>
-                          <div className={`text-sm font-medium ${vehicle.six_weekly_status?.status === 'overdue' || vehicle.six_weekly_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
-                            {formatMaintenanceDate(vehicle.six_weekly_inspection_due_date)}
+                          <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">GPS Tracker</div>
+                          <div className="text-sm font-medium text-white">
+                            {vehicle.tracker_id}
                           </div>
                         </div>
-                        <div className="space-y-0">
-                          <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Fire Ext.</div>
-                          <div className={`text-sm font-medium ${vehicle.fire_extinguisher_status?.status === 'overdue' || vehicle.fire_extinguisher_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
-                            {formatMaintenanceDate(vehicle.fire_extinguisher_due_date)}
-                          </div>
-                        </div>
-                        <div className="space-y-0">
-                          <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Taco Cal.</div>
-                          <div className={`text-sm font-medium ${vehicle.taco_calibration_status?.status === 'overdue' || vehicle.taco_calibration_status?.status === 'due_soon' ? 'text-red-400' : 'text-white'}`}>
-                            {formatMaintenanceDate(vehicle.taco_calibration_due_date)}
-                          </div>
-                        </div>
-                      </>
-                    )}
-                    {vehicle.tracker_id && (
-                      <div className="space-y-0">
-                        <div className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">GPS Tracker</div>
-                        <div className="text-sm font-medium text-white">
-                          {vehicle.tracker_id}
-                        </div>
-                      </div>
-                    )}
-                  </>
+                      )}
+                    </>
+                  )
                 )}
               </div>
               

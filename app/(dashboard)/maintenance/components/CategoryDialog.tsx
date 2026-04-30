@@ -25,6 +25,7 @@ import {
   formatPeriodValue,
   normalizePeriodUnit,
 } from '@/lib/utils/maintenancePeriods';
+import { getDistanceTypeLabel } from '@/lib/utils/maintenanceCategoryRules';
 
 // ============================================================================
 // Zod Validation Schema
@@ -81,7 +82,7 @@ const createCategorySchema = z.object({
     if (data.alert_threshold_miles == null || data.alert_threshold_miles <= 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Mileage-based categories need miles threshold',
+        message: 'Distance-based categories need a threshold',
         path: ['alert_threshold_miles']
       });
     }
@@ -157,6 +158,7 @@ export function CategoryDialog({
   const reminderEmail = useWatch({ control, name: 'reminder_email_enabled' });
   const appliesTo = useWatch({ control, name: 'applies_to' });
   const selectedPeriodUnit = useWatch({ control, name: 'period_unit' });
+  const distanceTypeLabel = getDistanceTypeLabel(appliesTo);
 
   // Reset form when dialog opens/closes or category changes
   useEffect(() => {
@@ -276,8 +278,8 @@ export function CategoryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-border text-white max-w-2xl">
-        <DialogHeader>
+      <DialogContent className="border-border text-white max-w-5xl max-h-[90vh] overflow-hidden flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b border-border">
           <DialogTitle className="text-2xl">
             {mode === 'create' ? 'Add New Category' : 'Edit Category'}
           </DialogTitle>
@@ -289,8 +291,11 @@ export function CategoryDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="min-h-0 flex-1 flex flex-col">
           <input type="hidden" {...register('period_unit')} />
+          <div className="flex-1 overflow-y-auto px-6 py-5">
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] gap-6">
+              <div className="space-y-5">
 
           {/* Category Name */}
           <div className="space-y-2">
@@ -328,7 +333,7 @@ export function CategoryDialog({
             <Label>
               Type <span className="text-red-400">*</span>
             </Label>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <button
                 type="button"
                 disabled={mode === 'edit'}
@@ -380,7 +385,7 @@ export function CategoryDialog({
                     )}
                   </div>
                   <p className={`font-medium ${selectedType === 'mileage' ? 'text-blue-400' : 'text-white'}`}>
-                    Mileage
+                    Miles / KM
                   </p>
                 </div>
               </button>
@@ -442,7 +447,7 @@ export function CategoryDialog({
             ) : selectedType === 'mileage' ? (
               <>
                 <Label htmlFor="alert_threshold_miles">
-                  Alert Threshold (Miles) <span className="text-red-400">*</span>
+                  Alert Threshold ({distanceTypeLabel}) <span className="text-red-400">*</span>
                 </Label>
                 <Input
                   id="alert_threshold_miles"
@@ -452,7 +457,7 @@ export function CategoryDialog({
                   className="bg-input border-border text-white"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Show &quot;Due Soon&quot; alert when this many miles before the due mileage
+                  Show &quot;Due Soon&quot; alert when this many {distanceTypeLabel.toLowerCase()} before the due reading.
                 </p>
                 {errors.alert_threshold_miles && (
                   <p className="text-sm text-red-400">{errors.alert_threshold_miles.message}</p>
@@ -517,7 +522,7 @@ export function CategoryDialog({
               {selectedType === 'date'
                 ? `Period (${selectedPeriodUnit === 'weeks' ? 'Weeks' : 'Months'})`
                 : selectedType === 'mileage'
-                ? 'Period (Miles)'
+                ? `Period (${distanceTypeLabel})`
                 : 'Period (Hours)'} <span className="text-red-400">*</span>
             </Label>
             <Input
@@ -539,7 +544,7 @@ export function CategoryDialog({
               {selectedType === 'date'
                 ? `How often this is due, in ${selectedPeriodUnit === 'weeks' ? 'weeks' : 'months'} (e.g. ${selectedPeriodUnit === 'weeks' ? formatPeriodValue(6, 'weeks') : formatPeriodValue(12, 'months')})`
                 : selectedType === 'mileage'
-                ? 'How often this is due, in miles (e.g. 10,000 = every 10,000 miles)'
+                ? `How often this is due, in ${distanceTypeLabel.toLowerCase()} (e.g. 10,000 = every 10,000 ${distanceTypeLabel.toLowerCase()})`
                 : 'How often this is due, in engine hours (e.g. 250 = every 250 hours)'}
             </p>
             {errors.period_value && (
@@ -613,15 +618,17 @@ export function CategoryDialog({
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              {selectedType === 'mileage' && 'Mileage-based categories apply to vans and HGVs (HGV frontend displays KM).'}
+              {selectedType === 'mileage' && 'Distance-based categories apply to vans and HGVs. Vans display miles; HGVs display kilometres.'}
               {selectedType === 'hours' && 'Hours-based categories only apply to plant machinery.'}
               {selectedType === 'date' && 'Select which asset types this category applies to (at least one required).'}
             </p>
           </div>
 
+              </div>
+              <div className="space-y-5">
           {/* Divider */}
-          <div className="border-t border-slate-700 pt-4 mt-4">
-            <h3 className="text-lg font-medium text-white mb-4">Duty & Notification Settings</h3>
+          <div className="border-b border-slate-700 pb-3">
+            <h3 className="text-lg font-medium text-white">Duty & Notification Settings</h3>
           </div>
 
           {/* Responsibility */}
@@ -820,7 +827,11 @@ export function CategoryDialog({
             </div>
           )}
 
-          <DialogFooter>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="px-6 py-4 border-t border-border bg-background/95">
             <Button
               type="button"
               variant="outline"

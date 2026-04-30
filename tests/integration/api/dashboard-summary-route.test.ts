@@ -192,11 +192,9 @@ describe('GET /api/dashboard/summary', () => {
         if (table === 'error_logs') return { select: () => createCountQuery(0) };
         if (table === 'maintenance_categories') {
           return {
-            select: () => ({
-              eq: vi.fn().mockResolvedValue({
+            select: () => Promise.resolve({
                 data: [],
                 error: null,
-              }),
             }),
           };
         }
@@ -553,11 +551,9 @@ describe('GET /api/dashboard/summary', () => {
         if (table === 'actions') return { select: () => createCountQuery(4) };
         if (table === 'maintenance_categories') {
           return {
-            select: () => ({
-              eq: vi.fn().mockResolvedValue({
+            select: () => Promise.resolve({
                 data: [],
                 error: null,
-              }),
             }),
           };
         }

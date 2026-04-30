@@ -14,6 +14,14 @@ import {
   getHoursBasedStatus,
   getMileageBasedStatus,
 } from '@/lib/utils/maintenanceCalculations';
+import {
+  MAINTENANCE_CATEGORY_NAMES,
+  createMaintenanceCategoryMap,
+  getMaintenanceCategory,
+  getVisibleMaintenanceStatuses,
+  type MaintenanceCategoryConfig,
+  type MaintenanceCategoryMap,
+} from '@/lib/utils/maintenanceCategoryRules';
 import { getDashboardApprovalsMetrics } from '@/lib/server/dashboard-approvals';
 import { canAccessDebugConsole } from '@/lib/utils/debug-access';
 
@@ -83,31 +91,25 @@ function createFullAccessPermissionMap(): PermissionMap {
   }, createEmptyModulePermissionRecord() as PermissionMap);
 }
 
-function getThresholds(categories: Array<Record<string, unknown>>) {
-  const categoryMap = new Map<string, Record<string, unknown>>();
-  categories.forEach((category) => {
-    const name = typeof category.name === 'string' ? category.name.toLowerCase() : '';
-    categoryMap.set(name, category);
-  });
-
+function getThresholds(categoryMap: MaintenanceCategoryMap) {
   const getDays = (name: string, fallback: number) =>
-    Number(categoryMap.get(name)?.alert_threshold_days ?? fallback);
+    Number(getMaintenanceCategory(categoryMap, name)?.alert_threshold_days ?? fallback);
   const getMiles = (name: string, fallback: number) =>
-    Number(categoryMap.get(name)?.alert_threshold_miles ?? fallback);
+    Number(getMaintenanceCategory(categoryMap, name)?.alert_threshold_miles ?? fallback);
   const getHours = (name: string, fallback: number) =>
-    Number(categoryMap.get(name)?.alert_threshold_hours ?? fallback);
+    Number(getMaintenanceCategory(categoryMap, name)?.alert_threshold_hours ?? fallback);
 
   return {
-    taxThreshold: getDays('tax due date', 30),
-    motThreshold: getDays('mot due date', 30),
-    serviceThreshold: getMiles('service due', 1000),
-    cambeltThreshold: getMiles('cambelt replacement', 5000),
-    firstAidThreshold: getDays('first aid kit expiry', 30),
-    sixWeeklyThreshold: getDays('6 weekly inspection due', 7),
-    fireExtinguisherThreshold: getDays('fire extinguisher due', 30),
-    tacoCalibrationThreshold: getDays('taco calibration due', 60),
-    lolerThreshold: getDays('loler due', 30),
-    serviceHoursThreshold: getHours('service due (hours)', 50),
+    taxThreshold: getDays(MAINTENANCE_CATEGORY_NAMES.tax, 30),
+    motThreshold: getDays(MAINTENANCE_CATEGORY_NAMES.mot, 30),
+    serviceThreshold: getMiles(MAINTENANCE_CATEGORY_NAMES.service, 1000),
+    cambeltThreshold: getMiles(MAINTENANCE_CATEGORY_NAMES.cambelt, 5000),
+    firstAidThreshold: getDays(MAINTENANCE_CATEGORY_NAMES.firstAid, 30),
+    sixWeeklyThreshold: getDays(MAINTENANCE_CATEGORY_NAMES.sixWeekly, 7),
+    fireExtinguisherThreshold: getDays(MAINTENANCE_CATEGORY_NAMES.fireExtinguisher, 30),
+    tacoCalibrationThreshold: getDays(MAINTENANCE_CATEGORY_NAMES.tacoCalibration, 60),
+    lolerThreshold: getDays(MAINTENANCE_CATEGORY_NAMES.loler, 30),
+    serviceHoursThreshold: getHours(MAINTENANCE_CATEGORY_NAMES.serviceHours, 50),
   };
 }
 
@@ -116,6 +118,7 @@ function getMaintenanceCountsForAsset(params: {
   maintenance: MaintenanceRow | null;
   lolerDueDate?: string | null;
   thresholds: ReturnType<typeof getThresholds>;
+  categoryMap: MaintenanceCategoryMap;
 }): MaintenanceCounts {
   const lolerStatus = params.assetType === 'plant'
     ? getDateBasedStatus(params.lolerDueDate || null, params.thresholds.lolerThreshold)
@@ -123,7 +126,9 @@ function getMaintenanceCountsForAsset(params: {
 
   if (!params.maintenance) {
     const counts = params.assetType === 'plant'
-      ? calculateAlertCounts([lolerStatus])
+      ? calculateAlertCounts(getVisibleMaintenanceStatuses(params.assetType, params.categoryMap, [
+          { categoryName: MAINTENANCE_CATEGORY_NAMES.loler, status: lolerStatus },
+        ]))
       : { overdue: 0, due_soon: 0 };
     return {
       attentionTotal: counts.overdue + counts.due_soon,
@@ -132,43 +137,51 @@ function getMaintenanceCountsForAsset(params: {
     };
   }
 
-  const statuses = [
-    getDateBasedStatus(params.maintenance.tax_due_date, params.thresholds.taxThreshold),
-    getDateBasedStatus(params.maintenance.mot_due_date, params.thresholds.motThreshold),
-    getMileageBasedStatus(
+  const taxStatus = getDateBasedStatus(params.maintenance.tax_due_date, params.thresholds.taxThreshold);
+  const motStatus = getDateBasedStatus(params.maintenance.mot_due_date, params.thresholds.motThreshold);
+  const serviceStatus = getMileageBasedStatus(
       params.maintenance.current_mileage,
       params.maintenance.next_service_mileage,
       params.thresholds.serviceThreshold
-    ),
-    getMileageBasedStatus(
+    );
+  const cambeltStatus = getMileageBasedStatus(
       params.maintenance.current_mileage,
       params.maintenance.cambelt_due_mileage,
       params.thresholds.cambeltThreshold
-    ),
-    getDateBasedStatus(params.maintenance.first_aid_kit_expiry, params.thresholds.firstAidThreshold),
-    getDateBasedStatus(
+    );
+  const firstAidStatus = getDateBasedStatus(params.maintenance.first_aid_kit_expiry, params.thresholds.firstAidThreshold);
+  const sixWeeklyStatus = getDateBasedStatus(
       params.maintenance.six_weekly_inspection_due_date,
       params.thresholds.sixWeeklyThreshold
-    ),
-    getDateBasedStatus(
+    );
+  const fireExtinguisherStatus = getDateBasedStatus(
       params.maintenance.fire_extinguisher_due_date,
       params.thresholds.fireExtinguisherThreshold
-    ),
-    getDateBasedStatus(
+    );
+  const tacoCalibrationStatus = getDateBasedStatus(
       params.maintenance.taco_calibration_due_date,
       params.thresholds.tacoCalibrationThreshold
-    ),
-    lolerStatus,
-    params.assetType === 'plant'
+    );
+  const serviceHoursStatus = params.assetType === 'plant'
       ? getHoursBasedStatus(
           params.maintenance.current_hours,
           params.maintenance.next_service_hours,
           params.thresholds.serviceHoursThreshold
         )
-      : { status: 'not_set' as const },
-  ];
+      : { status: 'not_set' as const };
 
-  const counts = calculateAlertCounts(statuses);
+  const counts = calculateAlertCounts(getVisibleMaintenanceStatuses(params.assetType, params.categoryMap, [
+    { categoryName: MAINTENANCE_CATEGORY_NAMES.tax, status: taxStatus },
+    { categoryName: MAINTENANCE_CATEGORY_NAMES.mot, status: motStatus },
+    { categoryName: MAINTENANCE_CATEGORY_NAMES.service, status: serviceStatus },
+    { categoryName: MAINTENANCE_CATEGORY_NAMES.cambelt, status: cambeltStatus },
+    { categoryName: MAINTENANCE_CATEGORY_NAMES.firstAid, status: firstAidStatus },
+    { categoryName: MAINTENANCE_CATEGORY_NAMES.sixWeekly, status: sixWeeklyStatus },
+    { categoryName: MAINTENANCE_CATEGORY_NAMES.fireExtinguisher, status: fireExtinguisherStatus },
+    { categoryName: MAINTENANCE_CATEGORY_NAMES.tacoCalibration, status: tacoCalibrationStatus },
+    { categoryName: MAINTENANCE_CATEGORY_NAMES.loler, status: lolerStatus },
+    { categoryName: MAINTENANCE_CATEGORY_NAMES.serviceHours, status: serviceHoursStatus },
+  ]));
   return {
     attentionTotal: counts.overdue + counts.due_soon,
     dueSoonTotal: counts.due_soon,
@@ -181,8 +194,7 @@ async function getMaintenanceCounts(): Promise<MaintenanceCounts> {
   const [{ data: categories, error: categoriesError }, vansResult, hgvsResult, plantResult] = await Promise.all([
     supabase
       .from('maintenance_categories')
-      .select('name, alert_threshold_days, alert_threshold_miles, alert_threshold_hours')
-      .eq('is_active', true),
+      .select('name, alert_threshold_days, alert_threshold_miles, alert_threshold_hours, applies_to, is_active, show_on_overview'),
     supabase
       .from('vans')
       .select(`
@@ -248,7 +260,8 @@ async function getMaintenanceCounts(): Promise<MaintenanceCounts> {
   if (hgvsResult.error) throw hgvsResult.error;
   if (plantResult.error) throw plantResult.error;
 
-  const thresholds = getThresholds((categories || []) as Array<Record<string, unknown>>);
+  const categoryMap = createMaintenanceCategoryMap((categories || []) as MaintenanceCategoryConfig[]);
+  const thresholds = getThresholds(categoryMap);
   const totals: MaintenanceCounts = {
     attentionTotal: 0,
     dueSoonTotal: 0,
@@ -260,6 +273,7 @@ async function getMaintenanceCounts(): Promise<MaintenanceCounts> {
       assetType: 'van',
       maintenance: (Array.isArray(row.maintenance) ? row.maintenance[0] : row.maintenance) as MaintenanceRow | null,
       thresholds,
+      categoryMap,
     });
     totals.attentionTotal += counts.attentionTotal;
     totals.dueSoonTotal += counts.dueSoonTotal;
@@ -271,6 +285,7 @@ async function getMaintenanceCounts(): Promise<MaintenanceCounts> {
       assetType: 'hgv',
       maintenance: (Array.isArray(row.maintenance) ? row.maintenance[0] : row.maintenance) as MaintenanceRow | null,
       thresholds,
+      categoryMap,
     });
     totals.attentionTotal += counts.attentionTotal;
     totals.dueSoonTotal += counts.dueSoonTotal;
@@ -283,6 +298,7 @@ async function getMaintenanceCounts(): Promise<MaintenanceCounts> {
       maintenance: (Array.isArray(row.maintenance) ? row.maintenance[0] : row.maintenance) as MaintenanceRow | null,
       lolerDueDate: row.loler_due_date,
       thresholds,
+      categoryMap,
     });
     totals.attentionTotal += counts.attentionTotal;
     totals.dueSoonTotal += counts.dueSoonTotal;
