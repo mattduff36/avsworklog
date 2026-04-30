@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -18,7 +18,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Save, Archive } from 'lucide-react';
 import type { CustomMaintenanceItemUpdate, VehicleMaintenanceWithStatus } from '@/types/maintenance';
-import { useUpdateMaintenance, useCreateMaintenance } from '@/lib/hooks/useMaintenance';
+import { useUpdateMaintenance, useCreateMaintenance, useMaintenance } from '@/lib/hooks/useMaintenance';
 import { formatDateForInput } from '@/lib/utils/maintenanceCalculations';
 import { triggerShakeAnimation } from '@/lib/utils/animations';
 import { createClient } from '@/lib/supabase/client';
@@ -102,6 +102,7 @@ export function EditMaintenanceDialog({
   const supabase = createClient();
   const updateMutation = useUpdateMaintenance();
   const createMutation = useCreateMaintenance();
+  const { data: maintenanceData } = useMaintenance();
   const [isMileageFocused, setIsMileageFocused] = useState(false);
   const [customItemValues, setCustomItemValues] = useState<CustomItemFormValue[]>([]);
   const [customItemsDirty, setCustomItemsDirty] = useState(false);
@@ -113,9 +114,51 @@ export function EditMaintenanceDialog({
   
   // Check if this is a new maintenance record (vehicle.id is null for vans without maintenance records)
   const isNewRecord = !vehicle?.id;
-  const maintenanceItems = vehicle?.maintenance_items || [];
-  const hasSystemItem = (fieldKey: string) =>
-    maintenanceItems.some(item => item.category_field_key === fieldKey);
+
+  const assetId = vehicle?.hgv_id || vehicle?.van_id || vehicle?.plant_id || vehicle?.vehicle?.id || null;
+  const dynamicMaintenanceRecord = useMemo(() => {
+    if (!assetId) return null;
+
+    return maintenanceData?.vehicles.find(record =>
+      record.hgv_id === assetId
+      || record.van_id === assetId
+      || record.plant_id === assetId
+      || record.vehicle?.id === assetId
+    ) || null;
+  }, [assetId, maintenanceData?.vehicles]);
+  const effectiveMaintenanceItems = useMemo(() => {
+    if ((vehicle?.maintenance_items?.length ?? 0) > 0) return vehicle?.maintenance_items || [];
+    return dynamicMaintenanceRecord?.maintenance_items || [];
+  }, [dynamicMaintenanceRecord?.maintenance_items, vehicle?.maintenance_items]);
+  const defaultSystemFieldKeys = useMemo(() => {
+    if (vehicle?.vehicle?.asset_type === 'hgv') {
+      return new Set([
+        'tax_due_date',
+        'mot_due_date',
+        'first_aid_kit_expiry',
+        'six_weekly_inspection_due_date',
+        'fire_extinguisher_due_date',
+        'taco_calibration_due_date',
+      ]);
+    }
+
+    if (vehicle?.vehicle?.asset_type === 'plant') {
+      return new Set(['next_service_hours']);
+    }
+
+    return new Set([
+      'tax_due_date',
+      'mot_due_date',
+      'first_aid_kit_expiry',
+      'next_service_mileage',
+      'cambelt_due_mileage',
+    ]);
+  }, [vehicle?.vehicle?.asset_type]);
+  const hasSystemItem = (fieldKey: string) => {
+    if (effectiveMaintenanceItems.some(item => item.category_field_key === fieldKey)) return true;
+    if (effectiveMaintenanceItems.length > 0) return false;
+    return defaultSystemFieldKeys.has(fieldKey);
+  };
   const customItems = customItemValues.filter(item => !item.category_name.startsWith('__'));
 
   // Initialize form
@@ -155,7 +198,7 @@ export function EditMaintenanceDialog({
         comment: '',
       });
       setCustomItemValues(
-        (vehicle.maintenance_items || [])
+        effectiveMaintenanceItems
           .filter(item => item.source === 'custom')
           .map(item => ({
             category_id: item.category_id,
@@ -171,7 +214,7 @@ export function EditMaintenanceDialog({
       );
       setCustomItemsDirty(false);
     }
-  }, [vehicle, reset]);
+  }, [effectiveMaintenanceItems, vehicle, reset]);
 
   // Handle modal close attempts
   const handleOpenChange = (newOpen: boolean) => {
