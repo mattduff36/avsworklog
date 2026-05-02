@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { QuotesTable } from './components/QuotesTable';
 import { QuoteDetailsModal } from './components/QuoteDetailsModal';
 import { QuoteFormDialog } from './components/QuoteFormDialog';
+import { uploadQuoteAttachment } from './quote-attachment-client';
 import type { Quote, QuoteFormData, QuoteListSummary, QuoteManagerOption, QuoteStatus } from './types';
 
 interface CustomerOption {
@@ -50,22 +51,12 @@ function buildQuotePayload(data: QuoteFormData) {
 async function uploadClientQuoteAttachments(quoteId: string, files?: File[]) {
   if (!files?.length) return;
 
-  await Promise.all(files.map(async (file) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('is_client_visible', 'true');
-    formData.append('attachment_purpose', 'client_pricing');
-
-    const res = await fetch(`/api/quotes/${quoteId}/attachments`, {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || `Failed to upload ${file.name}`);
-    }
-  }));
+  await Promise.all(files.map(file => uploadQuoteAttachment({
+    quoteId,
+    file,
+    isClientVisible: true,
+    attachmentPurpose: 'client_pricing',
+  })));
 }
 
 export default function QuotesPage() {
@@ -183,6 +174,19 @@ export default function QuotesPage() {
     toast.success('Quote updated');
     setEditingQuote(null);
     await fetchData();
+  }
+
+  async function handleEditingQuoteAttachmentsChange(quoteId: string) {
+    const res = await fetch(`/api/quotes/${quoteId}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => null) as { error?: string } | null;
+      throw new Error(err?.error || 'Unable to refresh quote attachments.');
+    }
+
+    const payload = await res.json() as { quote: Quote };
+    setEditingQuote(current => current?.id === quoteId ? payload.quote : current);
+    await fetchData();
+    return payload.quote;
   }
 
   async function handleSubmit(data: QuoteFormData, isEdit: boolean) {
@@ -307,6 +311,7 @@ export default function QuotesPage() {
         open={formOpen}
         onClose={() => { setFormOpen(false); setEditingQuote(null); }}
         onSubmit={handleSubmit}
+        onAttachmentsChange={handleEditingQuoteAttachmentsChange}
         quote={editingQuote}
         customers={customers}
         managerOptions={managerOptions}

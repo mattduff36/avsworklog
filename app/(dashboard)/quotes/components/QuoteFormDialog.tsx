@@ -20,11 +20,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, Plus, Trash2, GripVertical, Upload, X } from 'lucide-react';
+import { ExternalLink, Loader2, Plus, RefreshCw, Trash2, GripVertical, Upload, X } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
-import type { Quote, QuoteFormData, QuoteLineItem, QuoteManagerOption } from '../types';
+import {
+  deleteQuoteAttachment,
+  getQuoteAttachmentUrl,
+  replaceQuoteAttachment,
+} from '../quote-attachment-client';
+import type { Quote, QuoteAttachment, QuoteFormData, QuoteLineItem, QuoteManagerOption } from '../types';
 
 interface Customer {
   id: string;
@@ -50,6 +55,7 @@ interface QuoteFormDialogProps {
   open: boolean;
   onClose: () => void;
   onSubmit: (data: QuoteFormData, isEdit: boolean) => Promise<void>;
+  onAttachmentsChange?: (quoteId: string) => Promise<Quote | void>;
   quote?: Quote | null;
   customers: Customer[];
   managerOptions: QuoteManagerOption[];
@@ -84,6 +90,7 @@ export function QuoteFormDialog({
   open,
   onClose,
   onSubmit,
+  onAttachmentsChange,
   quote,
   customers,
   managerOptions,
@@ -124,6 +131,10 @@ export function QuoteFormDialog({
     line_items: [{ ...EMPTY_LINE_ITEM }],
   });
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
+  const [existingAttachments, setExistingAttachments] = useState<QuoteAttachment[]>([]);
+  const [removingAttachmentId, setRemovingAttachmentId] = useState<string | null>(null);
+  const [replacingAttachmentId, setReplacingAttachmentId] = useState<string | null>(null);
+  const [attachmentActionError, setAttachmentActionError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<QuoteFieldErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -191,7 +202,7 @@ export function QuoteFormDialog({
     }
 
     if (currentForm.pricing_mode === 'attachments_only') {
-      const hasExistingClientAttachment = quote?.attachments?.some(attachment => attachment.is_client_visible) ?? false;
+      const hasExistingClientAttachment = existingAttachments.some(attachment => attachment.is_client_visible);
       if (!hasExistingClientAttachment && attachmentFiles.length === 0) {
         nextErrors.attachment_files = 'Add at least one client-visible attachment when pricing is supplied by attachment.';
       }
@@ -229,7 +240,9 @@ export function QuoteFormDialog({
 
     setFieldErrors({});
     setSubmitError(null);
+    setAttachmentActionError(null);
     setAttachmentFiles([]);
+    setExistingAttachments(quote?.attachments || []);
     if (quote) {
       setForm({
         customer_id: quote.customer_id,
@@ -380,7 +393,69 @@ export function QuoteFormDialog({
     setAttachmentFiles(prev => prev.filter((_, i) => i !== index));
   }
 
+  async function refreshExistingAttachments(quoteId: string, fallbackAttachments: QuoteAttachment[]) {
+    const updatedQuote = await onAttachmentsChange?.(quoteId);
+    const nextAttachments = updatedQuote?.attachments || fallbackAttachments;
+    setExistingAttachments(nextAttachments);
+  }
+
+  function openSavedAttachment(attachment: QuoteAttachment) {
+    if (!quote?.id) return;
+    window.open(getQuoteAttachmentUrl(quote.id, attachment.id), '_blank', 'noopener,noreferrer');
+  }
+
+  async function removeSavedAttachment(attachment: QuoteAttachment) {
+    if (!quote?.id) return;
+
+    setRemovingAttachmentId(attachment.id);
+    setAttachmentActionError(null);
+    clearFieldError('attachment_files');
+    try {
+      await deleteQuoteAttachment(quote.id, attachment.id);
+      const fallbackAttachments = existingAttachments.filter(item => item.id !== attachment.id);
+      await refreshExistingAttachments(quote.id, fallbackAttachments);
+      toast.success('Attachment removed');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to remove this attachment right now.';
+      setAttachmentActionError(message);
+      toast.error(message);
+    } finally {
+      setRemovingAttachmentId(null);
+    }
+  }
+
+  async function replaceSavedAttachment(attachment: QuoteAttachment, file: File) {
+    if (!quote?.id) return;
+
+    setReplacingAttachmentId(attachment.id);
+    setAttachmentActionError(null);
+    clearFieldError('attachment_files');
+    try {
+      const replacement = await replaceQuoteAttachment({
+        quoteId: quote.id,
+        attachmentId: attachment.id,
+        file,
+        isClientVisible: attachment.is_client_visible,
+        attachmentPurpose: attachment.attachment_purpose,
+      });
+      const fallbackAttachments = [
+        replacement,
+        ...existingAttachments.filter(item => item.id !== attachment.id),
+      ];
+      await refreshExistingAttachments(quote.id, fallbackAttachments);
+      toast.success('Attachment replaced');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to replace this attachment right now.';
+      setAttachmentActionError(message);
+      toast.error(message);
+    } finally {
+      setReplacingAttachmentId(null);
+    }
+  }
+
   const subtotal = form.line_items.reduce((sum, li) => sum + Number(li.quantity) * Number(li.unit_rate), 0);
+  const clientVisibleAttachments = existingAttachments.filter(attachment => attachment.is_client_visible);
+  const canManageSavedAttachments = Boolean(quote?.id && quote.is_latest_version);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -743,12 +818,64 @@ export function QuoteFormDialog({
                 />
               </label>
               {renderFieldError('attachment_files')}
-              {quote?.attachments?.some(attachment => attachment.is_client_visible) && (
-                <div className="space-y-1">
+              {attachmentActionError ? (
+                <p className="rounded border border-red-700 bg-red-900/20 p-2 text-xs text-red-300">{attachmentActionError}</p>
+              ) : null}
+              {clientVisibleAttachments.length > 0 && (
+                <div className="space-y-2">
                   <p className="text-xs font-medium text-slate-300">Existing client-visible attachments</p>
-                  {quote.attachments.filter(attachment => attachment.is_client_visible).map(attachment => (
-                    <p key={attachment.id} className="text-xs text-muted-foreground">{attachment.file_name}</p>
+                  {clientVisibleAttachments.map(attachment => (
+                    <div key={attachment.id} className="flex flex-col gap-2 rounded-md border border-slate-700 bg-slate-800/40 px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between">
+                      <span className="truncate text-slate-200">{attachment.file_name}</span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openSavedAttachment(attachment)}
+                          className="h-8 border-slate-600 text-muted-foreground"
+                        >
+                          <ExternalLink className="mr-1 h-3 w-3" />
+                          Open
+                        </Button>
+                        <label
+                          className={cn(
+                            'inline-flex h-8 cursor-pointer items-center gap-1 rounded-md border border-slate-600 px-3 text-xs text-muted-foreground hover:bg-slate-800',
+                            (!canManageSavedAttachments || replacingAttachmentId === attachment.id) && 'pointer-events-none opacity-50'
+                          )}
+                        >
+                          {replacingAttachmentId === attachment.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                          Replace
+                          <input
+                            type="file"
+                            className="hidden"
+                            disabled={!canManageSavedAttachments || replacingAttachmentId === attachment.id}
+                            onChange={event => {
+                              const file = event.target.files?.[0];
+                              if (file) {
+                                void replaceSavedAttachment(attachment, file);
+                                event.target.value = '';
+                              }
+                            }}
+                          />
+                        </label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          disabled={!canManageSavedAttachments || removingAttachmentId === attachment.id}
+                          onClick={() => void removeSavedAttachment(attachment)}
+                          className="h-8 text-muted-foreground hover:text-red-300"
+                        >
+                          {removingAttachmentId === attachment.id ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Trash2 className="mr-1 h-3 w-3" />}
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
                   ))}
+                  {!canManageSavedAttachments ? (
+                    <p className="text-xs text-muted-foreground">Only the latest quote version can have attachments changed.</p>
+                  ) : null}
                 </div>
               )}
               {attachmentFiles.length > 0 && (

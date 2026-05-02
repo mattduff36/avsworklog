@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import { QuoteFormDialog } from '@/app/(dashboard)/quotes/components/QuoteFormDialog';
+import type { Quote } from '@/app/(dashboard)/quotes/types';
 
 const mockUseAuth = vi.fn();
 
@@ -107,5 +108,51 @@ describe('QuoteFormDialog', () => {
     expect(screen.queryByText('Requester Initials')).not.toBeInTheDocument();
     expect(screen.queryByText('Approver')).not.toBeInTheDocument();
     expect(screen.queryByText('Manager Email')).not.toBeInTheDocument();
+  });
+
+  it('shows open, replace, and remove controls for saved client attachments', () => {
+    mockUseAuth.mockReturnValue({
+      profile: {
+        id: 'manager-1',
+        full_name: 'Manager Example',
+      },
+    });
+
+    const quote = {
+      id: 'quote-1',
+      customer_id: 'customer-1',
+      requester_id: 'manager-1',
+      requester_initials: 'ME',
+      quote_date: '2026-05-02',
+      subject_line: 'Fence repairs',
+      project_description: 'Repair damaged fence panels',
+      scope: 'Replace broken bays',
+      validity_days: 30,
+      pricing_mode: 'attachments_only',
+      is_latest_version: true,
+      attachments: [
+        {
+          id: 'attachment-1',
+          quote_id: 'quote-1',
+          file_name: 'pricing-sheet.pdf',
+          file_path: 'quote-1/pricing-sheet.pdf',
+          content_type: 'application/pdf',
+          file_size: 1024,
+          uploaded_by: 'manager-1',
+          created_at: '2026-05-02T08:00:00.000Z',
+          is_client_visible: true,
+          attachment_purpose: 'client_pricing',
+        },
+      ],
+      line_items: [],
+    } as Quote;
+
+    render(<QuoteFormDialog {...baseProps} quote={quote} />);
+
+    expect(screen.getByText('Existing client-visible attachments')).toBeInTheDocument();
+    expect(screen.getByText('pricing-sheet.pdf')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /open/i })).toBeInTheDocument();
+    expect(screen.getByText('Replace')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /remove/i })).toBeInTheDocument();
   });
 });

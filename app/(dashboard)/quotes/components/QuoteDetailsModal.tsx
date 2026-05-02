@@ -43,11 +43,19 @@ import {
   GitBranch,
   CircleDot,
   ArrowRight,
+  ExternalLink,
+  RefreshCw,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
-import type { Quote, QuoteCompletionStatus, QuoteRevisionType } from '../types';
+import {
+  deleteQuoteAttachment,
+  getQuoteAttachmentUrl,
+  replaceQuoteAttachment,
+  uploadQuoteAttachment,
+} from '../quote-attachment-client';
+import type { Quote, QuoteAttachment, QuoteCompletionStatus, QuoteRevisionType } from '../types';
 import { getQuoteStatusConfig } from '../types';
 
 const PO_EDITABLE_STATUSES = new Set([
@@ -198,6 +206,8 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   const [invoiceFieldErrors, setInvoiceFieldErrors] = useState<DetailFieldErrors>({});
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [removingAttachmentId, setRemovingAttachmentId] = useState<string | null>(null);
+  const [replacingAttachmentId, setReplacingAttachmentId] = useState<string | null>(null);
   const activeQuoteId = currentQuoteId || quoteId || quote?.id || null;
   const recipientEmail = quote?.attention_email || quote?.customer?.contact_email || '';
   const isLatestVersion = Boolean(quote?.is_latest_version);
@@ -341,6 +351,8 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
     setInvoiceFieldErrors({});
     setAttachmentError(null);
     setDeleteError(null);
+    setRemovingAttachmentId(null);
+    setReplacingAttachmentId(null);
   }, []);
 
   const selectQuoteVersion = useCallback((nextQuoteId: string) => {
@@ -400,6 +412,8 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
       setInvoiceFieldErrors({});
       setAttachmentError(null);
       setDeleteError(null);
+      setRemovingAttachmentId(null);
+      setReplacingAttachmentId(null);
       setRamsDialogOpen(false);
       setRamsComments('');
     }
@@ -462,22 +476,15 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   async function handleAttachmentUpload(file: File) {
     if (!activeQuoteId) return;
 
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('is_client_visible', 'false');
-    formData.append('attachment_purpose', 'internal');
-
     setUploadingAttachment(true);
     setAttachmentError(null);
     try {
-      const res = await fetch(`/api/quotes/${activeQuoteId}/attachments`, {
-        method: 'POST',
-        body: formData,
+      await uploadQuoteAttachment({
+        quoteId: activeQuoteId,
+        file,
+        isClientVisible: false,
+        attachmentPurpose: 'internal',
       });
-
-      if (!res.ok) {
-        throw await buildResponseError(res, 'Unable to upload this attachment right now.');
-      }
 
       toast.success('Attachment uploaded');
       await fetchQuote();
@@ -494,11 +501,9 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   async function deleteAttachment(attachmentId: string) {
     if (!activeQuoteId) return;
 
+    setRemovingAttachmentId(attachmentId);
     try {
-      const res = await fetch(`/api/quotes/${activeQuoteId}/attachments/${attachmentId}`, { method: 'DELETE' });
-      if (!res.ok) {
-        throw await buildResponseError(res, 'Unable to remove this attachment right now.');
-      }
+      await deleteQuoteAttachment(activeQuoteId, attachmentId);
       toast.success('Attachment removed');
       await fetchQuote();
       onRefresh();
@@ -506,6 +511,38 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
       const message = error instanceof Error ? error.message : 'Unable to remove this attachment right now.';
       setAttachmentError(message);
       toast.error(message);
+    } finally {
+      setRemovingAttachmentId(null);
+    }
+  }
+
+  function openAttachment(attachmentId: string) {
+    if (!activeQuoteId) return;
+    window.open(getQuoteAttachmentUrl(activeQuoteId, attachmentId), '_blank', 'noopener,noreferrer');
+  }
+
+  async function replaceAttachment(attachment: QuoteAttachment, file: File) {
+    if (!activeQuoteId) return;
+
+    setReplacingAttachmentId(attachment.id);
+    setAttachmentError(null);
+    try {
+      await replaceQuoteAttachment({
+        quoteId: activeQuoteId,
+        attachmentId: attachment.id,
+        file,
+        isClientVisible: attachment.is_client_visible,
+        attachmentPurpose: attachment.attachment_purpose,
+      });
+      toast.success('Attachment replaced');
+      await fetchQuote();
+      onRefresh();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to replace this attachment right now.';
+      setAttachmentError(message);
+      toast.error(message);
+    } finally {
+      setReplacingAttachmentId(null);
     }
   }
 
@@ -1151,15 +1188,50 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                             {attachment.content_type || 'File'}{attachment.file_size ? ` • ${(attachment.file_size / 1024).toFixed(1)} KB` : ''}
                           </p>
                         </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={!canManageAttachments}
-                          className="border-slate-600 text-muted-foreground"
-                          onClick={() => deleteAttachment(attachment.id)}
-                        >
-                          Remove
-                        </Button>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="border-slate-600 text-muted-foreground"
+                            onClick={() => openAttachment(attachment.id)}
+                          >
+                            <ExternalLink className="mr-1 h-3 w-3" />
+                            Open
+                          </Button>
+                          <label
+                            className={cn(
+                              'inline-flex h-8 cursor-pointer items-center gap-1 rounded-md border border-slate-600 px-3 text-xs text-muted-foreground hover:bg-slate-800',
+                              (!canManageAttachments || replacingAttachmentId === attachment.id) && 'pointer-events-none opacity-50'
+                            )}
+                          >
+                            {replacingAttachmentId === attachment.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                            Replace
+                            <input
+                              type="file"
+                              className="hidden"
+                              disabled={!canManageAttachments || replacingAttachmentId === attachment.id}
+                              onChange={event => {
+                                const file = event.target.files?.[0];
+                                if (file) {
+                                  setAttachmentError(null);
+                                  void replaceAttachment(attachment, file);
+                                  event.target.value = '';
+                                }
+                              }}
+                            />
+                          </label>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={!canManageAttachments || removingAttachmentId === attachment.id}
+                            className="border-slate-600 text-muted-foreground"
+                            onClick={() => deleteAttachment(attachment.id)}
+                          >
+                            {removingAttachmentId === attachment.id ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+                            Remove
+                          </Button>
+                        </div>
                       </div>
                     )) : (
                       <p className="text-sm text-muted-foreground">No supporting files attached yet.</p>
