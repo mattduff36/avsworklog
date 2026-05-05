@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DidNotWorkReasonDialog } from '@/components/timesheets/DidNotWorkReasonDialog';
 import { JobCodeFields } from '@/components/timesheets/JobCodeFields';
+import { MobileNumericTimeInput } from '@/components/timesheets/MobileNumericTimeInput';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import {
   Select,
@@ -1494,7 +1495,6 @@ export function PlantTimesheetV2({
                 const isPartialLeave = Boolean(dayOffState?.isPartialLeave);
                 const disableForDidNotWork = entry.did_not_work && !isPartialLeave;
                 const disableInputs = isLeaveLocked || disableForDidNotWork;
-                const workWindow = dayOffState?.workWindow ?? null;
                 const disableStatusForTraining = hasTrainingBooking;
                 const disableJobNumberInput = disableInputs || entry.working_in_yard || hasTrainingBooking;
                 const jobNumberPlaceholder = hasTrainingBooking
@@ -1548,14 +1548,11 @@ export function PlantTimesheetV2({
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-2">
                           <Label className="text-foreground text-xl">Start Time</Label>
-                          <Input
-                            type="time"
-                            step="900"
+                          <MobileNumericTimeInput
                             value={entry.time_started}
-                            onChange={(event) => updateEntryField(index, 'time_started', event.target.value)}
+                            onChange={(value) => updateEntryField(index, 'time_started', value)}
                             disabled={disableInputs}
-                            min={workWindow?.start}
-                            max={workWindow?.end}
+                            ariaLabel={`${DAY_NAMES[index]} start time`}
                             className={`h-16 text-3xl text-center bg-slate-900/50 border-slate-600 text-white w-full disabled:opacity-30 disabled:cursor-not-allowed ${
                               timeErrors[index] ? 'border-red-500' : ''
                             }`}
@@ -1563,14 +1560,11 @@ export function PlantTimesheetV2({
                         </div>
                         <div className="space-y-2">
                           <Label className="text-foreground text-xl">Finish Time</Label>
-                          <Input
-                            type="time"
-                            step="900"
+                          <MobileNumericTimeInput
                             value={entry.time_finished}
-                            onChange={(event) => updateEntryField(index, 'time_finished', event.target.value)}
+                            onChange={(value) => updateEntryField(index, 'time_finished', value)}
                             disabled={disableInputs}
-                            min={workWindow?.start}
-                            max={workWindow?.end}
+                            ariaLabel={`${DAY_NAMES[index]} finish time`}
                             className={`h-16 text-3xl text-center bg-slate-900/50 border-slate-600 text-white w-full disabled:opacity-30 disabled:cursor-not-allowed ${
                               timeErrors[index] ? 'border-red-500' : ''
                             }`}
@@ -1736,27 +1730,21 @@ export function PlantTimesheetV2({
                               <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-1">
                                   <Label className="text-foreground text-xl">Machine Start Time</Label>
-                                  <Input
-                                    type="time"
-                                    step="900"
+                                  <MobileNumericTimeInput
                                     value={entry.machine_start_time}
-                                    onChange={(event) => updateEntryField(index, 'machine_start_time', event.target.value)}
+                                    onChange={(value) => updateEntryField(index, 'machine_start_time', value)}
                                     disabled={disableInputs}
-                                    min={workWindow?.start}
-                                    max={workWindow?.end}
+                                    ariaLabel={`${DAY_NAMES[index]} machine start time`}
                                     className="h-16 text-3xl text-center bg-slate-900/50 border-slate-600 text-white disabled:opacity-30 disabled:cursor-not-allowed"
                                   />
                                 </div>
                                 <div className="space-y-1">
                                   <Label className="text-foreground text-xl">Machine Finish Time</Label>
-                                  <Input
-                                    type="time"
-                                    step="900"
+                                  <MobileNumericTimeInput
                                     value={entry.machine_finish_time}
-                                    onChange={(event) => updateEntryField(index, 'machine_finish_time', event.target.value)}
+                                    onChange={(value) => updateEntryField(index, 'machine_finish_time', value)}
                                     disabled={disableInputs}
-                                    min={workWindow?.start}
-                                    max={workWindow?.end}
+                                    ariaLabel={`${DAY_NAMES[index]} machine finish time`}
                                     className="h-16 text-3xl text-center bg-slate-900/50 border-slate-600 text-white disabled:opacity-30 disabled:cursor-not-allowed"
                                   />
                                 </div>

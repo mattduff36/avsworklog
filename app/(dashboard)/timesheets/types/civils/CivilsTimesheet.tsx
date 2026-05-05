@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DidNotWorkReasonDialog } from '@/components/timesheets/DidNotWorkReasonDialog';
 import { JobCodeFields } from '@/components/timesheets/JobCodeFields';
+import { MobileNumericTimeInput } from '@/components/timesheets/MobileNumericTimeInput';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -1586,7 +1587,6 @@ export function CivilsTimesheet({
                 const hasTrainingBooking = Boolean(dayOffState?.hasTrainingBooking);
                 const hasPendingTrainingBooking = Boolean(dayOffState?.hasPendingTrainingBooking);
                 const isPartialLeave = Boolean(dayOffState?.isPartialLeave);
-                const workWindow = dayOffState?.workWindow ?? null;
                 const disableForDidNotWork = entry.did_not_work && !isPartialLeave;
                 const disableWorkingInputs = isLeaveLocked || disableForDidNotWork;
                 const disableStatusForTraining = hasTrainingBooking;
@@ -1611,14 +1611,11 @@ export function CivilsTimesheet({
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-2">
                         <Label className="text-foreground text-xl">Start Time</Label>
-                        <Input
-                          type="time"
-                          step="900"
+                        <MobileNumericTimeInput
                           value={entry.time_started}
-                          onChange={(e) => updateEntry(index, 'time_started', e.target.value)}
+                          onChange={(value) => updateEntry(index, 'time_started', value)}
                           disabled={disableWorkingInputs}
-                          min={workWindow?.start}
-                          max={workWindow?.end}
+                          ariaLabel={`${DAY_NAMES[index]} start time`}
                           className={`h-16 text-3xl text-center bg-slate-900/50 border-slate-600 text-white w-full disabled:opacity-30 disabled:cursor-not-allowed ${
                             timeErrors[index] ? 'border-red-500' : ''
                           }`}
@@ -1627,14 +1624,11 @@ export function CivilsTimesheet({
 
                       <div className="space-y-2">
                         <Label className="text-foreground text-xl">Finish Time</Label>
-                        <Input
-                          type="time"
-                          step="900"
+                        <MobileNumericTimeInput
                           value={entry.time_finished}
-                          onChange={(e) => updateEntry(index, 'time_finished', e.target.value)}
+                          onChange={(value) => updateEntry(index, 'time_finished', value)}
                           disabled={disableWorkingInputs}
-                          min={workWindow?.start}
-                          max={workWindow?.end}
+                          ariaLabel={`${DAY_NAMES[index]} finish time`}
                           className={`h-16 text-3xl text-center bg-slate-900/50 border-slate-600 text-white w-full disabled:opacity-30 disabled:cursor-not-allowed ${
                             timeErrors[index] ? 'border-red-500' : ''
                           }`}

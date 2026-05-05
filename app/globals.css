@@ -231,6 +231,74 @@
   /* Grid pattern removed - keeping plain gradient background */
 }
 
+/* Mobile text size preference. Step 2 is the existing default size. */
+@media (max-width: 767px) {
+  html[data-mobile-text-size="1"] {
+    font-size: 93.75%;
+  }
+
+  html[data-mobile-text-size="2"] {
+    font-size: 100%;
+  }
+
+  html[data-mobile-text-size="3"] {
+    font-size: 106.25%;
+  }
+
+  html[data-mobile-text-size="4"] {
+    font-size: 112.5%;
+  }
+
+  html[data-mobile-text-size="5"] {
+    font-size: 118.75%;
+  }
+}
+
+.mobile-text-size-slider {
+  width: 100%;
+  height: 2rem;
+  cursor: pointer;
+  appearance: none;
+  background: transparent;
+}
+
+.mobile-text-size-slider::-webkit-slider-runnable-track {
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: rgb(161 161 170);
+}
+
+.mobile-text-size-slider::-webkit-slider-thumb {
+  width: 2.75rem;
+  height: 1.75rem;
+  margin-top: -0.625rem;
+  appearance: none;
+  border-radius: 9999px;
+  background: white;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.35);
+}
+
+.mobile-text-size-slider::-moz-range-track {
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: rgb(161 161 170);
+}
+
+.mobile-text-size-slider::-moz-range-progress {
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: rgb(161 161 170);
+}
+
+.mobile-text-size-slider::-moz-range-thumb {
+  width: 2.75rem;
+  height: 1.75rem;
+  border: 0;
+  border-radius: 9999px;
+  background: white;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.35);
+}
+
 /* Module-specific color utilities */
 @layer utilities {
   .bg-avs-yellow {

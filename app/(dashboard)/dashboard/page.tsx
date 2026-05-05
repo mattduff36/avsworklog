@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { AppPageShell } from '@/components/layout/AppPageShell';
 import { TabletModeToggleActions } from '@/components/layout/TabletModeToggleActions';
+import { MobileTextSizeDialog } from '@/components/layout/MobileTextSizeDialog';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -108,6 +109,7 @@ export default function DashboardPage() {
   
   // Intro animation state (all devices)
   const [showIntro, setShowIntro] = useState(true);
+  const [mobileTextSizeDialogOpen, setMobileTextSizeDialogOpen] = useState(false);
   
   // Hide intro after 3 seconds
   useEffect(() => {
@@ -403,7 +405,7 @@ export default function DashboardPage() {
                   </div>
                 )}
               </Link>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <h1 className="truncate text-3xl font-bold text-white">
                   Welcome back, {profile?.full_name}
                 </h1>
@@ -411,6 +413,18 @@ export default function DashboardPage() {
                   {headerSubtitle}
                 </p>
               </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="Change mobile text size"
+                onClick={() => setMobileTextSizeDialogOpen(true)}
+                className="h-11 w-11 shrink-0 rounded-full border border-slate-600 bg-slate-800/80 text-avs-yellow shadow-sm hover:bg-slate-700 hover:text-avs-yellow focus-visible:ring-avs-yellow md:hidden"
+              >
+                <span aria-hidden className="text-base font-black tracking-tight">
+                  Aa
+                </span>
+              </Button>
             </div>
             <div className="hidden md:flex items-center justify-end">
               <TabletModeToggleActions size="dashboard" />
@@ -418,6 +432,7 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+      <MobileTextSizeDialog open={mobileTextSizeDialogOpen} onOpenChange={setMobileTextSizeDialogOpen} />
 
       {/* Quick Actions - Square Button Grid */}
       <div>

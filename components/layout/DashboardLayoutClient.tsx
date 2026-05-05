@@ -14,6 +14,11 @@ import { TabletModeProvider, useTabletMode } from '@/components/layout/tablet-mo
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useClientServiceOutage } from '@/lib/hooks/useClientServiceOutage';
 import { fetchWithAuth } from '@/lib/utils/fetch-with-auth';
+import {
+  MOBILE_TEXT_SIZE_CHANGED_EVENT,
+  applyMobileTextSizePreference,
+  readMobileTextSizePreference,
+} from '@/lib/config/mobile-text-size-preference';
 
 const PAGE_VISIT_DEBOUNCE_MS = 250;
 const PAGE_VISIT_HEARTBEAT_MS = 5 * 60_000;
@@ -224,6 +229,22 @@ function DashboardLayoutShell({
       releaseHeartbeatOwnership();
     };
   }, [releaseHeartbeatOwnership, sendHeartbeat, startHeartbeat, stopHeartbeat]);
+
+  useEffect(() => {
+    const syncMobileTextSizePreference = () => {
+      applyMobileTextSizePreference(readMobileTextSizePreference());
+    };
+
+    syncMobileTextSizePreference();
+    window.addEventListener('storage', syncMobileTextSizePreference);
+    window.addEventListener(MOBILE_TEXT_SIZE_CHANGED_EVENT, syncMobileTextSizePreference);
+
+    return () => {
+      window.removeEventListener('storage', syncMobileTextSizePreference);
+      window.removeEventListener(MOBILE_TEXT_SIZE_CHANGED_EVENT, syncMobileTextSizePreference);
+      document.documentElement.removeAttribute('data-mobile-text-size');
+    };
+  }, []);
 
   return (
     <div 
