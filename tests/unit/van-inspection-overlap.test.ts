@@ -17,6 +17,20 @@ describe('van inspection overlap helpers', () => {
     ).toEqual([1, 4]);
   });
 
+  it('ignores read-only locked defect items when collecting started days', () => {
+    expect(
+      getStartedVanInspectionDays(
+        {
+          '1-2': 'attention',
+          '2-2': 'attention',
+          '3-2': 'attention',
+          '3-4': 'ok',
+        },
+        { ignoredItemNumbers: [2] }
+      )
+    ).toEqual([3]);
+  });
+
   it('groups unique day rows by inspection id', () => {
     const result = getInspectionDaysFromRows([
       { inspection_id: 'a', day_of_week: 3 },

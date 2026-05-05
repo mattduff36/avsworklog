@@ -137,6 +137,10 @@ interface WorkshopTask {
     name: string;
     completion_updates?: CompletionUpdatesArray | null;
   } | null;
+  workshop_task_subcategories?: {
+    id?: string;
+    name: string;
+  } | null;
   profiles?: { full_name: string | null } | null;
 }
 
@@ -857,6 +861,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         title: completingTask.title,
         description: completingTask.description,
         workshopCategoryName: completingTask.workshop_task_categories?.name,
+        workshopSubcategoryName: completingTask.workshop_task_subcategories?.name,
       });
 
       // Update maintenance if there are explicit updates or a linked maintenance task.
@@ -874,6 +879,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                 task_title: completingTask.title,
                 task_description: completingTask.description,
                 task_category_name: completingTask.workshop_task_categories?.name,
+                task_subcategory_name: completingTask.workshop_task_subcategories?.name,
                 comment: `Updated from workshop task completion: ${completingTask.title || 'Task'}`,
               }),
             }

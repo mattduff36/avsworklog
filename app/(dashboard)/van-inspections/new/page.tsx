@@ -674,11 +674,35 @@ function NewInspectionContent() {
     }
   }, [user?.id]);
 
+  const getLoggedDefectItemNumbers = useCallback(() => {
+    const itemNumbers = new Set<number>();
+
+    loggedDefects.forEach((_, key) => {
+      const [itemNumberValue] = key.split('-');
+      const itemNumber = Number(itemNumberValue);
+      if (Number.isInteger(itemNumber)) {
+        itemNumbers.add(itemNumber);
+      }
+    });
+
+    return itemNumbers;
+  }, [loggedDefects]);
+
+  const getCurrentStartedDays = useCallback(
+    () => getStartedVanInspectionDays(checkboxStates, {
+      ignoredItemNumbers: getLoggedDefectItemNumbers(),
+    }),
+    [checkboxStates, getLoggedDefectItemNumbers]
+  );
+
   const buildCurrentInspectionItemsPayload = useCallback((inspectionId: string) => {
     type InspectionItemInsert = Database['public']['Tables']['inspection_items']['Insert'];
     const items: InspectionItemInsert[] = [];
+    const startedDays = new Set(getCurrentStartedDays());
 
     for (let dayOfWeek = 1; dayOfWeek <= 7; dayOfWeek++) {
+      if (!startedDays.has(dayOfWeek)) continue;
+
       currentChecklist.forEach((item, index) => {
         const itemNumber = index + 1;
         const key = `${dayOfWeek}-${itemNumber}`;
@@ -696,9 +720,7 @@ function NewInspectionContent() {
     }
 
     return items;
-  }, [checkboxStates, comments, currentChecklist]);
-
-  const getCurrentStartedDays = useCallback(() => getStartedVanInspectionDays(checkboxStates), [checkboxStates]);
+  }, [checkboxStates, comments, currentChecklist, getCurrentStartedDays]);
 
   const hasExactMatchingDays = useCallback((left: number[], right: number[]) => {
     if (left.length !== right.length) return false;
@@ -1266,20 +1288,33 @@ function NewInspectionContent() {
     // Validate: at least 1 day must be fully completed, and any started day must be finished
     const { completedDays, partiallyCompleteDayKey } = (() => {
       let completed = 0;
+      const loggedDefectItemNumbers = getLoggedDefectItemNumbers();
       for (let dayOfWeek = 1; dayOfWeek <= 7; dayOfWeek += 1) {
-        let dayItemCount = 0;
+        let userEditableItemCount = 0;
+        let completedItemCount = 0;
         let firstMissingKey: string | null = null;
         for (let itemNumber = 1; itemNumber <= currentChecklist.length; itemNumber += 1) {
           const key = `${dayOfWeek}-${itemNumber}`;
+          const isLoggedDefectItem = loggedDefectItemNumbers.has(itemNumber);
           if (checkboxStates[key]) {
-            dayItemCount++;
+            completedItemCount++;
+            if (!isLoggedDefectItem) {
+              userEditableItemCount++;
+            }
           } else if (!firstMissingKey) {
             firstMissingKey = key;
           }
         }
-        if (dayItemCount === currentChecklist.length) {
+
+        // Locked/read-only defects are prefilled for every day. They should not
+        // make an otherwise empty day count as started.
+        if (userEditableItemCount === 0) {
+          continue;
+        }
+
+        if (completedItemCount === currentChecklist.length) {
           completed++;
-        } else if (dayItemCount > 0 && firstMissingKey) {
+        } else if (firstMissingKey) {
           return { completedDays: completed, partiallyCompleteDayKey: firstMissingKey };
         }
       }
@@ -1304,9 +1339,16 @@ function NewInspectionContent() {
     // Validate: all defects must have comments
     const defectsWithoutComments: string[] = [];
     let firstDefectWithoutCommentKey: string | null = null;
+    const loggedDefectItemNumbers = getLoggedDefectItemNumbers();
     Object.entries(checkboxStates).forEach(([key, status]) => {
       const keyStr = String(key);
-      if (status === 'attention' && !comments[keyStr]) {
+      const [, itemNumberValue] = keyStr.split('-');
+      const itemNumberFromKey = Number(itemNumberValue);
+      if (
+        status === 'attention' &&
+        !loggedDefectItemNumbers.has(itemNumberFromKey) &&
+        !comments[keyStr]
+      ) {
         if (!firstDefectWithoutCommentKey) firstDefectWithoutCommentKey = keyStr;
         const [dayOfWeek, itemNumber] = keyStr.split('-').map(Number);
         const dayName = DAY_NAMES[dayOfWeek - 1] || `Day ${dayOfWeek}`;
@@ -1927,16 +1969,15 @@ function NewInspectionContent() {
     }
   };
 
-  // Calculate progress based on started days only
-  const startedDayCount = (() => {
-    let count = 0;
-    for (let d = 1; d <= 7; d++) {
-      if (currentChecklist.some((_, i) => checkboxStates[`${d}-${i + 1}`])) count++;
-    }
-    return count;
-  })();
+  // Calculate progress based on user-started days only. Locked/read-only defects
+  // are shown on every day, but they should not make empty days count as started.
+  const startedDaySet = new Set(getCurrentStartedDays());
+  const startedDayCount = startedDaySet.size;
   const totalItems = currentChecklist.length * (startedDayCount || 7);
-  const completedItems = Object.keys(checkboxStates).length;
+  const completedItems = Object.keys(checkboxStates).filter((key) => {
+    const [dayValue] = key.split('-');
+    return startedDaySet.has(Number(dayValue));
+  }).length;
   const progressPercent = Math.round((completedItems / totalItems) * 100);
 
   if (showPermissionLoader) {
@@ -2231,12 +2272,12 @@ function NewInspectionContent() {
             <TabsList className="grid w-full grid-cols-7 bg-slate-900/50 p-1 rounded-lg mb-4">
               {DAY_NAMES.map((day, index) => {
                 const dayOfWeek = index + 1;
-                // Check if all items for this day have a status
-                const isComplete = currentChecklist.every((_, itemIndex) => {
-                  const itemNumber = itemIndex + 1;
-                  const key = `${dayOfWeek}-${itemNumber}`;
-                  return checkboxStates[key] !== undefined;
-                });
+                const isComplete = startedDaySet.has(dayOfWeek) &&
+                  currentChecklist.every((_, itemIndex) => {
+                    const itemNumber = itemIndex + 1;
+                    const key = `${dayOfWeek}-${itemNumber}`;
+                    return checkboxStates[key] !== undefined;
+                  });
                 
                 return (
                   <TabsTrigger 

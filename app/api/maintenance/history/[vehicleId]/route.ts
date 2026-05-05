@@ -8,6 +8,10 @@ interface WorkshopTaskCategoryShape {
   name: string;
 }
 
+interface WorkshopTaskSubcategoryShape {
+  name: string;
+}
+
 interface WorkshopTaskShape {
   id: string;
   created_at: string;
@@ -25,6 +29,7 @@ interface WorkshopTaskShape {
   hgv_id: string | null;
   plant_id: string | null;
   workshop_task_categories?: WorkshopTaskCategoryShape[] | WorkshopTaskCategoryShape | null;
+  workshop_task_subcategories?: WorkshopTaskSubcategoryShape[] | WorkshopTaskSubcategoryShape | null;
   profiles?: { full_name: string | null } | null;
 }
 
@@ -167,6 +172,9 @@ export async function GET(
         plant_id,
         workshop_task_categories (
           name
+        ),
+        workshop_task_subcategories (
+          name
         )
       `)
       .eq(fkColumn, vehicleId)
@@ -218,6 +226,9 @@ export async function GET(
       workshop_task_categories: Array.isArray(task.workshop_task_categories)
         ? task.workshop_task_categories[0] ?? null
         : task.workshop_task_categories ?? null,
+      workshop_task_subcategories: Array.isArray(task.workshop_task_subcategories)
+        ? task.workshop_task_subcategories[0] ?? null
+        : task.workshop_task_subcategories ?? null,
       profiles: task.profiles?.full_name
         ? { full_name: task.profiles.full_name }
         : null,

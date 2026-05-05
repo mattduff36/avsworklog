@@ -40,13 +40,17 @@ function normalizeDays(days: number[]): number[] {
 }
 
 export function getStartedVanInspectionDays(
-  checkboxStates: Record<string, InspectionStatus | undefined>
+  checkboxStates: Record<string, InspectionStatus | undefined>,
+  options: { ignoredItemNumbers?: Iterable<number> } = {}
 ): number[] {
   const days: number[] = [];
+  const ignoredItemNumbers = new Set(options.ignoredItemNumbers || []);
 
   Object.entries(checkboxStates).forEach(([key, status]) => {
     if (!status) return;
-    const [dayValue] = key.split('-');
+    const [dayValue, itemValue] = key.split('-');
+    const itemNumber = Number(itemValue);
+    if (ignoredItemNumbers.has(itemNumber)) return;
     const day = Number(dayValue);
     if (Number.isInteger(day)) {
       days.push(day);

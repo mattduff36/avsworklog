@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logger } from '@/lib/utils/logger';
-import type { MaintenanceCategory, UpdateMaintenanceRequest } from '@/types/maintenance';
+import type {
+  CustomMaintenanceItemUpdate,
+  MaintenanceCategory,
+  UpdateMaintenanceRequest,
+} from '@/types/maintenance';
 import { buildAutomaticMaintenancePlan } from '@/lib/utils/workshopMaintenanceSync';
 
 type AssetType = 'van' | 'hgv' | 'plant';
@@ -17,6 +21,17 @@ type ExtendedUpdateMaintenanceRequest = UpdateMaintenanceRequest & {
   task_subcategory_name?: string | null;
   loler_due_date?: string | null;
 };
+
+interface CustomCategoryValueRow {
+  id: string;
+  maintenance_category_id: string;
+  due_date: string | null;
+  due_mileage: number | null;
+  last_mileage: number | null;
+  due_hours: number | null;
+  last_hours: number | null;
+  notes: string | null;
+}
 
 function fkColumnForAssetType(assetType: AssetType): FkColumn {
   if (assetType === 'hgv') return 'hgv_id';
@@ -38,6 +53,25 @@ const FIELD_TO_CATEGORY_NAME: Record<string, string> = {
   last_service_hours: 'Service Due (Hours)',
   loler_due_date: 'LOLER Due',
 };
+
+function serializeCustomValue(value?: CustomCategoryValueRow | CustomMaintenanceItemUpdate | null): string | null {
+  if (!value) return null;
+  const dueValue = value.due_date ?? value.due_mileage ?? value.due_hours ?? null;
+  const lastValue = value.last_mileage ?? value.last_hours ?? null;
+  if (lastValue != null && dueValue != null) return `${lastValue} -> ${dueValue}`;
+  if (dueValue != null) return String(dueValue);
+  if (lastValue != null) return String(lastValue);
+  return value.notes ? value.notes.slice(0, 50) : null;
+}
+
+function isEmptyCustomValue(value: CustomMaintenanceItemUpdate): boolean {
+  return value.due_date == null
+    && value.due_mileage == null
+    && value.last_mileage == null
+    && value.due_hours == null
+    && value.last_hours == null
+    && !value.notes;
+}
 
 function buildCategoryIdByField(categories: MaintenanceCategory[]): Map<string, string> {
   const categoryIdByName = new Map(
@@ -196,6 +230,7 @@ export async function POST(
 
     const maintenanceCategories = (categories || []) as MaintenanceCategory[];
     const categoryIdByField = buildCategoryIdByField(maintenanceCategories);
+    const assetType = fkColumn === 'hgv_id' ? 'hgv' : fkColumn === 'plant_id' ? 'plant' : 'van';
 
     const autoPlan = buildAutomaticMaintenancePlan({
       context: {
@@ -206,15 +241,24 @@ export async function POST(
       },
       categories: maintenanceCategories,
       state: {
-        currentMileage: existingRecord?.current_mileage ?? null,
-        currentHours: existingRecord?.current_hours ?? null,
+        currentMileage: body.current_mileage ?? existingRecord?.current_mileage ?? null,
+        currentHours: body.current_hours ?? existingRecord?.current_hours ?? null,
       },
       completedAt: body.completed_at || new Date().toISOString(),
+      assetType,
     });
 
     const requestedUpdates: Partial<UpdateMaintenanceRequest> = {
       ...(autoPlan?.maintenanceUpdates || {}),
     };
+
+    const requestedCustomItemsByCategoryId = new Map<string, CustomMaintenanceItemUpdate>();
+    for (const item of autoPlan?.customItems || []) {
+      requestedCustomItemsByCategoryId.set(item.category_id, item);
+    }
+    for (const item of body.custom_items || []) {
+      requestedCustomItemsByCategoryId.set(item.category_id, item);
+    }
 
     const requestedPlantUpdates: { loler_due_date?: string | null } = {
       ...(autoPlan?.plantUpdates || {}),
@@ -479,6 +523,105 @@ export async function POST(
           requestedUpdates.notes,
           'text'
         );
+      }
+    }
+
+    const requestedCustomItems = Array.from(requestedCustomItemsByCategoryId.values());
+    if (requestedCustomItems.length > 0) {
+      const categoryIds = requestedCustomItems.map((item) => item.category_id);
+      const customCategories = maintenanceCategories.filter((category) =>
+        categoryIds.includes(category.id)
+      );
+      const customCategoriesById = new Map(customCategories.map((category) => [category.id, category]));
+
+      const { data: existingCustomValues, error: existingCustomValuesError } = await (supabase as never as {
+        from: (table: string) => {
+          select: (columns: string) => {
+            in: (column: string, values: string[]) => {
+              eq: (column: string, value: string) => Promise<{ data: unknown; error: unknown }>;
+            };
+          };
+        };
+      })
+        .from('asset_maintenance_category_values')
+        .select('id, maintenance_category_id, due_date, due_mileage, last_mileage, due_hours, last_hours, notes')
+        .in('maintenance_category_id', categoryIds)
+        .eq(fkColumn, vehicleId);
+
+      if (existingCustomValuesError) {
+        logger.error('Failed to fetch custom maintenance category values', existingCustomValuesError);
+        throw existingCustomValuesError;
+      }
+
+      const existingValuesByCategoryId = new Map(
+        ((existingCustomValues || []) as CustomCategoryValueRow[]).map((value) => [
+          value.maintenance_category_id,
+          value,
+        ])
+      );
+
+      for (const item of requestedCustomItems) {
+        const category = customCategoriesById.get(item.category_id);
+        if (!category || category.field_key) continue;
+
+        const existingValue = existingValuesByCategoryId.get(item.category_id) || null;
+        const oldValue = serializeCustomValue(existingValue);
+        const newValue = serializeCustomValue(item);
+        if (oldValue === newValue) continue;
+
+        if (isEmptyCustomValue(item)) {
+          if (existingValue) {
+            const { error: deleteValueError } = await (supabase as never as {
+              from: (table: string) => {
+                delete: () => {
+                  eq: (column: string, value: string) => Promise<{ error: unknown }>;
+                };
+              };
+            })
+              .from('asset_maintenance_category_values')
+              .delete()
+              .eq('id', existingValue.id);
+
+            if (deleteValueError) {
+              logger.error('Failed to clear custom maintenance category value', deleteValueError);
+              throw deleteValueError;
+            }
+          }
+        } else {
+          const { error: upsertValueError } = await (supabase as never as {
+            from: (table: string) => {
+              upsert: (row: unknown, options: { onConflict: string }) => Promise<{ error: unknown }>;
+            };
+          })
+            .from('asset_maintenance_category_values')
+            .upsert({
+              maintenance_category_id: item.category_id,
+              van_id: fkColumn === 'van_id' ? vehicleId : null,
+              hgv_id: fkColumn === 'hgv_id' ? vehicleId : null,
+              plant_id: fkColumn === 'plant_id' ? vehicleId : null,
+              due_date: item.due_date ?? null,
+              due_mileage: item.due_mileage ?? null,
+              last_mileage: item.last_mileage ?? null,
+              due_hours: item.due_hours ?? null,
+              last_hours: item.last_hours ?? null,
+              notes: item.notes ?? null,
+              last_updated_by: user.id,
+              last_updated_at: new Date().toISOString(),
+            }, { onConflict: 'maintenance_category_id,asset_type,asset_id' });
+
+          if (upsertValueError) {
+            logger.error('Failed to upsert custom maintenance category value', upsertValueError);
+            throw upsertValueError;
+          }
+        }
+
+        changedFields.push({
+          field_name: `category:${category.name}`,
+          old_value: oldValue,
+          new_value: newValue,
+          value_type: category.type === 'date' ? 'date' : category.type === 'mileage' ? 'mileage' : 'text',
+          maintenance_category_id: category.id,
+        });
       }
     }
 

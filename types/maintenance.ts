@@ -349,6 +349,9 @@ export interface WorkshopTaskHistoryItem {
   workshop_task_categories?: {
     name: string;
   } | null;
+  workshop_task_subcategories?: {
+    name: string;
+  } | null;
   profiles?: {
     full_name: string;
   } | null;
