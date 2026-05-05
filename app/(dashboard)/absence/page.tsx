@@ -61,6 +61,10 @@ import {
 import { formatDate, formatDateISO, calculateDurationDays, getFinancialYearMonths, getCurrentFinancialYear, getFinancialYear } from '@/lib/utils/date';
 import { getWorkingDisplayDatesForAbsence } from '@/lib/utils/absence-calendar-display';
 import { ANNUAL_LEAVE_MIN_REMAINING_DAYS } from '@/lib/utils/annual-leave';
+import {
+  canEmployeeSelfBookAbsenceRange,
+  getEmployeeAbsenceSelfServiceDeadlineForRange,
+} from '@/lib/utils/absence-self-service-deadline';
 import { createStatusError, getErrorStatus, isServerErrorStatus } from '@/lib/utils/http-error';
 import {
   clearPageServiceError,
@@ -728,6 +732,14 @@ export default function AbsencePage() {
       });
       return;
     }
+
+    if (!isAdminTier && !isManager && !canEmployeeSelfBookAbsenceRange(startDate, endDate || null)) {
+      const deadline = getEmployeeAbsenceSelfServiceDeadlineForRange(startDate, endDate || null);
+      toast.error(`Absences can only be booked until the Monday after that week (${formatDate(deadline)}). Please contact your manager.`, {
+        id: 'absence-submit-validation-self-service-deadline',
+      });
+      return;
+    }
     
     if (requestedDays <= 0) {
       toast.error('Selected dates do not include a working day', {
@@ -803,6 +815,13 @@ export default function AbsencePage() {
       if (isClosedFinancialYearRequest(formatDateISO(selectedDate))) {
         toast.error('This financial year is closed for bookings.', {
           id: 'absence-day-request-validation-financial-year-closed',
+        });
+        return;
+      }
+      if (!isAdminTier && !isManager && !canEmployeeSelfBookAbsenceRange(formatDateISO(selectedDate))) {
+        const deadline = getEmployeeAbsenceSelfServiceDeadlineForRange(formatDateISO(selectedDate));
+        toast.error(`Absences can only be booked until the Monday after that week (${formatDate(deadline)}). Please contact your manager.`, {
+          id: 'absence-day-request-validation-self-service-deadline',
         });
         return;
       }

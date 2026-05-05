@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { DidNotWorkReasonDialog } from '@/components/timesheets/DidNotWorkReasonDialog';
 import { JobCodeFields } from '@/components/timesheets/JobCodeFields';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import {
@@ -37,6 +38,7 @@ import { Employee } from '@/types/common';
 import { toast } from 'sonner';
 import { TrainingDeclineDialog } from '../../components/TrainingDeclineDialog';
 import { declineTrainingBookingsClient } from '@/lib/client/training-bookings';
+import { notifyTimesheetDidNotWorkExceptions } from '@/lib/client/timesheet-did-not-work-notifications';
 import {
   getRecentVehicleIds,
   recordRecentVehicleId,
@@ -54,6 +56,12 @@ import {
   resolveTimesheetOffDayStates,
 } from '@/lib/utils/timesheet-off-days';
 import { buildLeaveAwareTotals, formatLeaveAwareWeeklyDisplayMultiline } from '@/lib/utils/timesheet-leave-totals';
+import {
+  formatDidNotWorkReasonRemark,
+  getMissingScheduledDidNotWorkReasonException,
+  isScheduledWorkingDayDidNotWork,
+  parseDidNotWorkReasonRemark,
+} from '@/lib/utils/timesheet-did-not-work-exceptions';
 import {
   getEntryJobNumbers,
   getNormalizedJobNumbers,
@@ -303,6 +311,7 @@ export function PlantTimesheetV2({
   const [offDayRefreshToken, setOffDayRefreshToken] = useState(0);
   const [trainingDeclineDayIndex, setTrainingDeclineDayIndex] = useState<number | null>(null);
   const [decliningTraining, setDecliningTraining] = useState(false);
+  const [didNotWorkReasonDayIndex, setDidNotWorkReasonDayIndex] = useState<number | null>(null);
 
   const currentOffDayKey = selectedEmployeeId && weekEnding ? `${selectedEmployeeId}:${weekEnding}` : '';
   const offDayMap = useMemo(
@@ -830,45 +839,64 @@ export function PlantTimesheetV2({
     });
   };
 
+  const applyDidNotWorkSelection = (dayIndex: number, reason?: string) => {
+    const trimmedReason = reason?.trim();
+    setEntries((current) => {
+      const next = [...current];
+      const clearedEntry = recalculateEntry({
+        ...next[dayIndex],
+        did_not_work: true,
+        didNotWorkReason: trimmedReason ? 'Other' : next[dayIndex].didNotWorkReason || 'Other',
+        working_in_yard: false,
+        time_started: '',
+        time_finished: '',
+        job_number: '',
+        job_numbers: [],
+        operator_travel_hours: '',
+        operator_yard_hours: '',
+        machine_travel_hours: '',
+        machine_start_time: '',
+        machine_finish_time: '',
+        machine_standing_hours: '',
+        machine_operator_hours: '',
+        maintenance_breakdown_hours: '',
+        remarks: trimmedReason ? formatDidNotWorkReasonRemark(trimmedReason) : next[dayIndex].remarks,
+      });
+      next[dayIndex] = {
+        ...clearedEntry,
+        daily_total: 0,
+      };
+      return next;
+    });
+  };
+
   const toggleDidNotWork = (dayIndex: number) => {
     const currentEntry = entries[dayIndex];
     const nextDidNotWork = !currentEntry.did_not_work;
 
     if (nextDidNotWork) {
-      setEntries((current) => {
-        const next = [...current];
-        const clearedEntry = recalculateEntry({
-          ...next[dayIndex],
-          did_not_work: true,
-          didNotWorkReason: next[dayIndex].didNotWorkReason || 'Other',
-          working_in_yard: false,
-          time_started: '',
-          time_finished: '',
-          job_number: '',
-          job_numbers: [],
-          operator_travel_hours: '',
-          operator_yard_hours: '',
-          machine_travel_hours: '',
-          machine_start_time: '',
-          machine_finish_time: '',
-          machine_standing_hours: '',
-          machine_operator_hours: '',
-          maintenance_breakdown_hours: '',
-        });
-        next[dayIndex] = {
-          ...clearedEntry,
-          daily_total: 0,
-        };
-        return next;
-      });
+      if (isScheduledWorkingDayDidNotWork({ did_not_work: true }, getOffDayForIndex(dayIndex))) {
+        setDidNotWorkReasonDayIndex(dayIndex);
+        return;
+      }
+
+      applyDidNotWorkSelection(dayIndex);
       return;
     }
 
+    const existingRemarks = currentEntry.remarks;
     updateEntry(dayIndex, {
       did_not_work: false,
       didNotWorkReason: null,
       daily_total: currentEntry.time_started && currentEntry.time_finished ? currentEntry.daily_total : null,
+      remarks: parseDidNotWorkReasonRemark(existingRemarks) === existingRemarks ? existingRemarks : '',
     });
+  };
+
+  const handleDidNotWorkReasonConfirm = (reason: string) => {
+    if (didNotWorkReasonDayIndex === null) return;
+    applyDidNotWorkSelection(didNotWorkReasonDayIndex, reason);
+    setDidNotWorkReasonDayIndex(null);
   };
 
   const handleSelectedEmployeeChange = (nextEmployeeId: string) => {
@@ -919,6 +947,18 @@ export function PlantTimesheetV2({
   const validateBeforeSave = (): boolean => {
     if (!selectedEmployeeId) {
       setError('Please select an employee before saving.');
+      return false;
+    }
+
+    const missingReason = getMissingScheduledDidNotWorkReasonException(
+      entries as unknown as TimesheetEntryLike[],
+      offDayStates,
+      weekEnding
+    );
+    if (missingReason) {
+      setRowErrors({ [missingReason.dayOfWeek - 1]: `${missingReason.dayName}: reason required for Did Not Work` });
+      setError(`${missingReason.dayName}: please add a reason before selecting Did Not Work on a scheduled day.`);
+      setActiveDay(String(missingReason.dayOfWeek - 1));
       return false;
     }
 
@@ -1101,6 +1141,12 @@ export function PlantTimesheetV2({
           .insert(jobCodesToInsert);
 
         if (jobCodesError) throw jobCodesError;
+      }
+
+      try {
+        await notifyTimesheetDidNotWorkExceptions(timesheetId);
+      } catch (notificationError) {
+        console.warn('Did Not Work notification was not sent:', notificationError);
       }
 
       commitRecentHeaderValues();
@@ -1786,7 +1832,7 @@ export function PlantTimesheetV2({
                 <col style={{ width: '132px' }} />
                 <col style={{ width: '132px' }} />
                 <col style={{ width: '110px' }} />
-                <col style={{ width: '136px' }} />
+                <col style={{ width: '160px' }} />
                 <col style={{ width: '132px' }} />
                 <col style={{ width: '84px' }} />
                 <col />
@@ -1881,7 +1927,7 @@ export function PlantTimesheetV2({
                             onRemove={(jobIndex) => handleRemoveJobNumberField(index, jobIndex)}
                             placeholder={jobNumberPlaceholder}
                             disabled={disableJobNumberInput}
-                            inputClassName="w-28 bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground uppercase disabled:opacity-30 disabled:cursor-not-allowed"
+                            inputClassName="w-32 bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground uppercase disabled:opacity-30 disabled:cursor-not-allowed"
                           />
                         </td>
                         <td className="p-3">
@@ -2187,6 +2233,19 @@ export function PlantTimesheetV2({
         pending={decliningTraining}
         onCancel={handleCancelTrainingDecline}
         onConfirm={handleConfirmTrainingDecline}
+      />
+
+      <DidNotWorkReasonDialog
+        key={didNotWorkReasonDayIndex ?? 'closed'}
+        open={didNotWorkReasonDayIndex !== null}
+        dayName={didNotWorkReasonDayIndex === null ? '' : DAY_NAMES[didNotWorkReasonDayIndex]}
+        initialReason={
+          didNotWorkReasonDayIndex === null ? '' : parseDidNotWorkReasonRemark(entries[didNotWorkReasonDayIndex]?.remarks)
+        }
+        onOpenChange={(open) => {
+          if (!open) setDidNotWorkReasonDayIndex(null);
+        }}
+        onConfirm={handleDidNotWorkReasonConfirm}
       />
 
       <Dialog open={showSignatureDialog} onOpenChange={setShowSignatureDialog}>

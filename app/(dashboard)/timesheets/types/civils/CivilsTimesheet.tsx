@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { DidNotWorkReasonDialog } from '@/components/timesheets/DidNotWorkReasonDialog';
 import { JobCodeFields } from '@/components/timesheets/JobCodeFields';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -28,6 +29,7 @@ import { toast } from 'sonner';
 import { ConfirmationModal } from '../../components/ConfirmationModal';
 import { TrainingDeclineDialog } from '../../components/TrainingDeclineDialog';
 import { declineTrainingBookingsClient } from '@/lib/client/training-bookings';
+import { notifyTimesheetDidNotWorkExceptions } from '@/lib/client/timesheet-did-not-work-notifications';
 import { fetchCurrentWorkShift, fetchEmployeeWorkShift } from '@/lib/client/work-shifts';
 import type { WorkShiftPattern } from '@/types/work-shifts';
 import {
@@ -42,6 +44,12 @@ import {
   resolveTimesheetOffDayStates,
 } from '@/lib/utils/timesheet-off-days';
 import { buildLeaveAwareTotals, formatLeaveAwareWeeklyDisplayMultiline } from '@/lib/utils/timesheet-leave-totals';
+import {
+  formatDidNotWorkReasonRemark,
+  getMissingScheduledDidNotWorkReasonException,
+  isScheduledWorkingDayDidNotWork,
+  parseDidNotWorkReasonRemark,
+} from '@/lib/utils/timesheet-did-not-work-exceptions';
 import {
   getEntryJobNumbers,
   getNormalizedJobNumbers,
@@ -137,6 +145,7 @@ export function CivilsTimesheet({
   const [offDayRefreshToken, setOffDayRefreshToken] = useState(0);
   const [trainingDeclineDayIndex, setTrainingDeclineDayIndex] = useState<number | null>(null);
   const [decliningTraining, setDecliningTraining] = useState(false);
+  const [didNotWorkReasonDayIndex, setDidNotWorkReasonDayIndex] = useState<number | null>(null);
   
   // Track time validation errors per day
   const [timeErrors, setTimeErrors] = useState<Record<number, string>>({});
@@ -770,7 +779,12 @@ export function CivilsTimesheet({
   };
 
   // Calculate hours when times change
-  const updateEntry = (dayIndex: number, field: string, value: string | boolean | string[]) => {
+  const updateEntry = (
+    dayIndex: number,
+    field: string,
+    value: string | boolean | string[],
+    options?: { didNotWorkReason?: string }
+  ) => {
     if (isLeaveLockedDay(dayIndex)) return;
     const workWindow = getWorkWindowForDay(dayIndex);
 
@@ -780,24 +794,28 @@ export function CivilsTimesheet({
     if (field === 'did_not_work') {
       if (isLeaveDay(dayIndex)) return;
       if (value === true) {
+        const requiredReason = options?.didNotWorkReason?.trim();
         // Setting did_not_work to true
         newEntries[dayIndex] = {
           ...newEntries[dayIndex],
           did_not_work: true,
-          didNotWorkReason: null, // Clear any previous reason
+          didNotWorkReason: requiredReason ? 'Other' : null,
           time_started: '',
           time_finished: '',
           job_number: '',
           job_numbers: [],
           working_in_yard: false,
           daily_total: 0,
+          remarks: requiredReason ? formatDidNotWorkReasonRemark(requiredReason) : '',
         };
       } else {
+        const currentRemarks = newEntries[dayIndex].remarks;
         // Setting did_not_work to false - reset daily_total if times are empty
         newEntries[dayIndex] = {
           ...newEntries[dayIndex],
           did_not_work: false,
           didNotWorkReason: null, // Clear reason when re-enabling work
+          remarks: parseDidNotWorkReasonRemark(currentRemarks) === currentRemarks ? currentRemarks : '',
         };
         // Recalculate daily_total if times are present, otherwise set to null
         const entry = newEntries[dayIndex];
@@ -930,6 +948,39 @@ export function CivilsTimesheet({
     setEntries(normalizedEntries);
   };
 
+  function handleDidNotWorkToggle(dayIndex: number) {
+    const entry = entries[dayIndex];
+    if (entry.did_not_work) {
+      updateEntry(dayIndex, 'did_not_work', false);
+      return;
+    }
+
+    const offDay = getOffDayForIndex(dayIndex);
+    if (isScheduledWorkingDayDidNotWork({ did_not_work: true }, offDay)) {
+      setDidNotWorkReasonDayIndex(dayIndex);
+      return;
+    }
+
+    updateEntry(dayIndex, 'did_not_work', true);
+  }
+
+  function handleDidNotWorkReasonConfirm(reason: string) {
+    if (didNotWorkReasonDayIndex === null) return;
+    updateEntry(didNotWorkReasonDayIndex, 'did_not_work', true, { didNotWorkReason: reason });
+    setDidNotWorkReasonDayIndex(null);
+  }
+
+  function validateScheduledDidNotWorkReasons(entriesToValidate: TimesheetEntryDraft[]): boolean {
+    const missingReason = getMissingScheduledDidNotWorkReasonException(entriesToValidate, offDayStates, weekEnding);
+    if (!missingReason) return true;
+
+    const dayIndex = missingReason.dayOfWeek - 1;
+    setError(`${missingReason.dayName}: please add a reason before selecting Did Not Work on a scheduled day.`);
+    setShowErrorDialog(true);
+    setActiveDay(String(dayIndex));
+    return false;
+  }
+
   const leaveAwareTotals = useMemo(
     () => buildLeaveAwareTotals(entries, offDayStates),
     [entries, offDayStates]
@@ -972,6 +1023,7 @@ export function CivilsTimesheet({
             applyNonShiftDefaults: true,
           }) as TimesheetEntryDraft[])
         : entries;
+    if (!validateScheduledDidNotWorkReasons(entriesForValidation)) return;
     const offDayByDay = new Map(offDayStates.map((state) => [state.day_of_week, state] as const));
     
     // Validate that ALL days have either hours OR "did not work" marked
@@ -1106,6 +1158,7 @@ export function CivilsTimesheet({
               applyNonShiftDefaults: true,
             }) as TimesheetEntryDraft[])
           : entries;
+      if (!validateScheduledDidNotWorkReasons(entriesForPersistence)) return;
       const offDayByDay = new Map(offDayStates.map((state) => [state.day_of_week, state] as const));
       const invalidHalfDayWindow = entriesForPersistence.find((entry) => {
         const offDay = offDayByDay.get(entry.day_of_week);
@@ -1256,6 +1309,12 @@ export function CivilsTimesheet({
           console.error('Error inserting timesheet entry job codes:', jobCodesError);
           throw new Error(`Failed to insert timesheet job codes: ${jobCodesError.message}`);
         }
+      }
+
+      try {
+        await notifyTimesheetDidNotWorkExceptions(timesheetId);
+      } catch (notificationError) {
+        console.warn('Did Not Work notification was not sent:', notificationError);
       }
 
       // Show success message
@@ -1631,7 +1690,7 @@ export function CivilsTimesheet({
                         {/* Did Not Work Button */}
                         <button
                           type="button"
-                          onClick={() => updateEntry(index, 'did_not_work', !entry.did_not_work)}
+                          onClick={() => handleDidNotWorkToggle(index)}
                           disabled={isLeaveDayForRow || disableStatusForTraining}
                           className={`flex flex-col items-center justify-center h-24 rounded-lg border-2 transition-all ${
                             entry.did_not_work
@@ -1825,7 +1884,7 @@ export function CivilsTimesheet({
                           {/* Did Not Work Button */}
                           <button
                             type="button"
-                            onClick={() => updateEntry(index, 'did_not_work', !entry.did_not_work)}
+                            onClick={() => handleDidNotWorkToggle(index)}
                             disabled={isLeaveDayForRow || disableStatusForTraining}
                             className={`flex items-center justify-center w-10 h-10 rounded-lg border-2 transition-all ${
                               entry.did_not_work
@@ -2026,6 +2085,19 @@ export function CivilsTimesheet({
         pending={decliningTraining}
         onCancel={handleCancelTrainingDecline}
         onConfirm={handleConfirmTrainingDecline}
+      />
+
+      <DidNotWorkReasonDialog
+        key={didNotWorkReasonDayIndex ?? 'closed'}
+        open={didNotWorkReasonDayIndex !== null}
+        dayName={didNotWorkReasonDayIndex === null ? '' : DAY_NAMES[didNotWorkReasonDayIndex]}
+        initialReason={
+          didNotWorkReasonDayIndex === null ? '' : parseDidNotWorkReasonRemark(entries[didNotWorkReasonDayIndex]?.remarks)
+        }
+        onOpenChange={(open) => {
+          if (!open) setDidNotWorkReasonDayIndex(null);
+        }}
+        onConfirm={handleDidNotWorkReasonConfirm}
       />
 
       {/* Signature Dialog */}

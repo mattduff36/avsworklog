@@ -386,9 +386,13 @@ export function AbsenceEditDialog({
           </div>
 
           {startDate && (
-            <div className="bg-slate-800/30 p-3 rounded-lg">
+            <div className="space-y-2 bg-slate-800/30 p-3 rounded-lg">
               <p className="text-sm text-muted-foreground">
                 Duration: <span className="text-white font-medium">{duration} {duration === 1 ? 'day' : 'days'}</span>
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Draft/submitted timesheets update from approved absence changes where allowed. Processed or adjusted
+                timesheets remain locked for payroll history.
               </p>
             </div>
           )}

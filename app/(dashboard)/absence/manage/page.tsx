@@ -57,7 +57,6 @@ import { WorkShiftsContent } from '@/app/(dashboard)/absence/manage/components/W
 import { getErrorMessage, shouldLogAbsenceManageError } from '@/lib/utils/absence-error-handling';
 import {
   buildAbsenceTimesheetImpactMessage,
-  getLockedAbsenceTimesheetImpacts,
   resolveAbsenceTimesheetImpacts,
 } from '@/lib/utils/absence-timesheet-impact';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
@@ -756,10 +755,6 @@ export default function AdminAbsencePage() {
     });
     const message = buildAbsenceTimesheetImpactMessage(selectedReasonName, impacts);
     if (!message) return true;
-    if (getLockedAbsenceTimesheetImpacts(impacts).length > 0) {
-      window.alert(message);
-      return false;
-    }
 
     return window.confirm(message);
   }
@@ -1578,9 +1573,13 @@ export default function AdminAbsencePage() {
             
             
             {startDate && (
-              <div className="bg-slate-800/30 p-3 rounded-lg">
+              <div className="space-y-2 bg-slate-800/30 p-3 rounded-lg">
                 <p className="text-sm text-muted-foreground">
                   Duration: <span className="text-white font-medium">{formatDuration(duration)}</span>
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Approved bookings will update matching draft/submitted timesheet rows immediately. Processed or adjusted
+                  timesheets stay locked and the absence is recorded without changing payroll history.
                 </p>
               </div>
             )}

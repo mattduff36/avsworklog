@@ -18,6 +18,10 @@ import { isClosedFinancialYearDate } from '@/lib/services/absence-archive';
 import { getErrorMessage, shouldLogAbsenceManageError } from '@/lib/utils/absence-error-handling';
 import { getCrossFinancialYearAbsenceError } from '@/lib/utils/absence-financial-year';
 import { ANNUAL_LEAVE_MIN_REMAINING_DAYS } from '@/lib/utils/annual-leave';
+import {
+  canEmployeeSelfBookAbsenceRange,
+  getEmployeeAbsenceSelfServiceDeadlineForRange,
+} from '@/lib/utils/absence-self-service-deadline';
 import { isAdminRole } from '@/lib/utils/role-access';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { isTrainingReasonName } from '@/lib/utils/timesheet-off-days';
@@ -746,6 +750,13 @@ export function useCreateAbsence() {
       if (isClosedFinancialYearDate(absence.date) && !actorIsManagerOrHigher) {
         throw new Error('This absence is in a closed financial year and is read-only');
       }
+      if (
+        !actorIsManagerOrHigher &&
+        !canEmployeeSelfBookAbsenceRange(absence.date, absence.end_date ?? null)
+      ) {
+        const deadline = getEmployeeAbsenceSelfServiceDeadlineForRange(absence.date, absence.end_date ?? null);
+        throw new Error(`Absences can only be self-booked until the Monday after the affected week (${deadline}). Please contact your manager.`);
+      }
 
       const validatedAbsence = await buildValidatedAbsence(
         supabase,
@@ -764,7 +775,9 @@ export function useCreateAbsence() {
       );
 
       await assertAnnualLeaveAllowanceAvailable(supabase, validatedAbsence);
-      await assertAbsenceTimesheetChangesUnlocked(supabase, validatedAbsence);
+      if (!actorIsManagerOrHigher) {
+        await assertAbsenceTimesheetChangesUnlocked(supabase, validatedAbsence);
+      }
 
       const { data, error } = await supabase
         .from('absences')
@@ -1325,10 +1338,6 @@ export function useApproveAbsence() {
 
       if (existingAbsenceError) throw existingAbsenceError;
       if (!existingAbsence) return { id, status: 'approved' } as const;
-      await assertAbsenceTimesheetChangesUnlocked(supabase, {
-        ...(existingAbsence as AbsenceValidationShape),
-        status: 'approved',
-      });
       
       const { data, error } = await supabase
         .from('absences')
