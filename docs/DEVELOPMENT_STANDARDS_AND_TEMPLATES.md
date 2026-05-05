@@ -111,6 +111,25 @@ const [itemToDelete, setItemToDelete] = useState<Item | null>(null);
 </AlertDialog>
 ```
 
+### Modal Primary CTA Contrast
+Primary action buttons inside dark `Dialog` / `AlertDialog` surfaces must use explicit foreground and background classes. Do not rely on the default `Button` theme tokens in modals, because page-level themes can make the CTA dark-on-dark.
+
+```tsx
+<DialogFooter>
+  <Button type="button" variant="outline">
+    Cancel
+  </Button>
+  <Button
+    type="submit"
+    className="bg-emerald-600 text-white hover:bg-emerald-500 disabled:bg-emerald-700 disabled:text-white disabled:opacity-70"
+  >
+    Save
+  </Button>
+</DialogFooter>
+```
+
+Before shipping a new modal, check the primary CTA in enabled and disabled states against the actual dark dialog background.
+
 ### Action Notifications (with buttons)
 ```typescript
 toast.error('Failed to sync data', {

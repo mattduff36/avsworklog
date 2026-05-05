@@ -56,7 +56,12 @@ export function DidNotWorkReasonDialog({
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button type="button" onClick={handleConfirm} disabled={!trimmedReason}>
+          <Button
+            type="button"
+            onClick={handleConfirm}
+            disabled={!trimmedReason}
+            className="min-w-28 bg-emerald-600 text-white shadow-sm hover:bg-emerald-500 disabled:bg-emerald-700 disabled:text-white disabled:opacity-70"
+          >
             Save Reason
           </Button>
         </DialogFooter>
