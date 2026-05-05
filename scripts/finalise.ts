@@ -3,6 +3,7 @@ import { config } from 'dotenv';
 import { existsSync, readFileSync, rmSync } from 'fs';
 import path from 'path';
 import pg from 'pg';
+import { summarizeFinaliseChanges } from './finalise-summary';
 
 config({ path: path.resolve(process.cwd(), '.env.local') });
 
@@ -10,8 +11,6 @@ const { Client } = pg;
 const REPO_ROOT = process.cwd();
 const NEXT_BUILD_DIR = path.join(REPO_ROOT, '.next');
 const DEV_SERVER_PORT = 4000;
-const DEFAULT_COMMIT_MESSAGE = 'chore(finalise): repo finalisation';
-const FULL_COMMIT_MESSAGE = 'chore(finalise): full repo finalisation';
 
 interface FinaliseOptions {
   full: boolean;
@@ -583,7 +582,7 @@ async function main(): Promise<void> {
   const shouldRunDbValidate = pendingMigrationFiles.some((relativePath) => migrationNeedsDbValidate(relativePath));
   const devServerProcesses = getRepoDevServerProcesses();
   const branch = getCurrentBranch();
-  const commitMessage = options.full ? FULL_COMMIT_MESSAGE : DEFAULT_COMMIT_MESSAGE;
+  const initialChangeSummary = summarizeFinaliseChanges(changedFiles);
 
   if (options.dryRun) {
     console.log(`Mode: ${getPushModeDescription(options)}`);
@@ -605,7 +604,13 @@ async function main(): Promise<void> {
           : 'skipped'
       }`
     );
-    console.log(`Commit: ${hasUncommittedChanges() ? `would commit with "${commitMessage}"` : 'no changes to commit'}`);
+    console.log(
+      `Commit: ${
+        hasUncommittedChanges()
+          ? `would commit ${initialChangeSummary.fileCount} file(s) with "${initialChangeSummary.commitMessage}"`
+          : 'no changes to commit'
+      }`
+    );
     console.log(`Push: ${options.push ? 'would push current branch' : 'skipped'}`);
     return;
   }
@@ -664,9 +669,21 @@ async function main(): Promise<void> {
     console.log('Skipped for non-full finalise.');
   }
 
+  console.log('\n==> Summarise workspace changes');
+  const changeSummary = summarizeFinaliseChanges(getChangedFiles());
+  if (changeSummary.fileCount > 0) {
+    console.log(`Changed files: ${changeSummary.fileCount}`);
+    console.log(`Areas: ${changeSummary.areas.join(', ')}`);
+    console.log(`Commit message: ${changeSummary.commitMessage}`);
+  } else {
+    console.log('No workspace changes to summarise.');
+  }
+
   console.log('\n==> Commit workspace changes');
-  const committed = commitAllChanges(commitMessage);
-  console.log(committed ? `Created commit: ${commitMessage}` : 'No uncommitted changes, so no commit was created.');
+  const committed = commitAllChanges(changeSummary.commitMessage);
+  console.log(
+    committed ? `Created commit: ${changeSummary.commitMessage}` : 'No uncommitted changes, so no commit was created.'
+  );
 
   let pushedBranch: string | null = null;
   if (options.push) {
