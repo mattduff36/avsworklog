@@ -1,5 +1,6 @@
 import type { ModuleName } from '@/types/roles';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
+import { createStatusError } from '@/lib/utils/http-error';
 
 export interface DirectoryUserRole {
   id?: string | null;
@@ -77,7 +78,7 @@ export async function fetchUserDirectory(
     };
 
     if (!response.ok) {
-      throw new Error(payload.error || 'Failed to load users');
+      throw createStatusError(payload.error || 'Failed to load users', response.status, payload);
     }
 
     return payload.users || [];

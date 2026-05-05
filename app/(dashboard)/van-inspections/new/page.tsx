@@ -654,6 +654,8 @@ function NewInspectionContent() {
           if (isTransientNetworkError(err)) {
             console.warn('Employee directory fetch skipped due transient network error');
           } else {
+            const status = getErrorStatus(err);
+            if (isAuthErrorStatus(status) || status === 403 || isClientSessionPausedError(err)) return;
             console.error('Error fetching employees:', err);
           }
         }

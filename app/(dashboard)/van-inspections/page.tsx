@@ -193,7 +193,9 @@ function InspectionsContent() {
         } catch (err) {
           if (isNetworkFetchError(err)) {
             console.warn('Unable to load employees (network):', err);
-          } else if (!isAuthErrorStatus(getErrorStatus(err))) {
+          } else {
+            const status = getErrorStatus(err);
+            if (isAuthErrorStatus(status) || status === 403) return;
             console.error('Error fetching employees:', err);
           }
         }
