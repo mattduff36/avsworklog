@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Expand } from 'lucide-react';
+import { Expand, Loader2 } from 'lucide-react';
 import * as maptilersdk from '@maptiler/sdk';
 import '@maptiler/sdk/dist/maptiler-sdk.css';
 
@@ -21,16 +21,32 @@ interface AssetLocationMapProps {
   plantId?: string;
   regNumber?: string;
   assetLabel: string;
+  locationProvider?: 'fleetsmart' | 'velocityfleet';
+  loadingVariant?: 'skeleton' | 'compact';
   className?: string;
   onMatchResult?: (hasMatch: boolean) => void;
   onLocationData?: (data: LocationData) => void;
   onClick?: () => void;
 }
 
+function getLocationEndpoint(locationProvider: 'fleetsmart' | 'velocityfleet'): string {
+  return locationProvider === 'velocityfleet'
+    ? '/api/velocityfleet/location'
+    : '/api/fleetsmart/location';
+}
+
+function getAllLocationsEndpoint(locationProvider: 'fleetsmart' | 'velocityfleet'): string {
+  return locationProvider === 'velocityfleet'
+    ? '/api/velocityfleet/all-locations'
+    : '/api/fleetsmart/all-locations';
+}
+
 export function AssetLocationMap({
   plantId,
   regNumber,
   assetLabel,
+  locationProvider = 'fleetsmart',
+  loadingVariant = 'skeleton',
   className = '',
   onMatchResult,
   onLocationData,
@@ -49,7 +65,15 @@ export function AssetLocationMap({
   useEffect(() => { onLocationDataRef.current = onLocationData; }, [onLocationData]);
 
   useEffect(() => {
-    if (!plantId && !regNumber) {
+    setLoading(true);
+    setLocationData(null);
+    setHasMatch(null);
+
+    const hasLookupValue = locationProvider === 'velocityfleet'
+      ? Boolean(regNumber)
+      : Boolean(plantId || regNumber);
+
+    if (!hasLookupValue) {
       setHasMatch(false);
       onMatchResultRef.current?.(false);
       setLoading(false);
@@ -61,10 +85,10 @@ export function AssetLocationMap({
     async function fetchLocation() {
       try {
         const params = new URLSearchParams();
-        if (plantId) params.set('plantId', plantId);
+        if (locationProvider === 'fleetsmart' && plantId) params.set('plantId', plantId);
         if (regNumber) params.set('regNumber', regNumber);
 
-        const res = await fetch(`/api/fleetsmart/location?${params.toString()}`);
+        const res = await fetch(`${getLocationEndpoint(locationProvider)}?${params.toString()}`);
 
         if (!res.ok) {
           if (!cancelled) {
@@ -105,7 +129,7 @@ export function AssetLocationMap({
 
           // Pre-warm the all-locations cache in the background so the
           // modal map has data ready when the user clicks to expand.
-          fetch('/api/fleetsmart/all-locations').catch(() => {});
+          fetch(getAllLocationsEndpoint(locationProvider)).catch(() => {});
         } else {
           setHasMatch(false);
           onMatchResultRef.current?.(false);
@@ -125,7 +149,7 @@ export function AssetLocationMap({
     fetchLocation();
 
     return () => { cancelled = true; };
-  }, [plantId, regNumber]);
+  }, [plantId, regNumber, locationProvider]);
 
   // Initialise map once we have location
   useEffect(() => {
@@ -163,6 +187,15 @@ export function AssetLocationMap({
   }, [locationData]);
 
   if (loading) {
+    if (loadingVariant === 'compact') {
+      return (
+        <div className="flex items-center gap-2 rounded-lg border border-slate-700/40 bg-slate-900/20 px-3 py-2 text-xs text-slate-400">
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-300" />
+          <span>Loading tracker location...</span>
+        </div>
+      );
+    }
+
     return (
       <div className={`rounded-lg overflow-hidden ${className}`}>
         <Skeleton className="w-full h-full min-h-[265px]" />

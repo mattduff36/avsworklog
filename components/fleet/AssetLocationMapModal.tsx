@@ -40,6 +40,13 @@ interface AssetLocationMapModalProps {
   onOpenChange: (open: boolean) => void;
   assetLabel: string;
   location: LocationData | null;
+  locationProvider?: 'fleetsmart' | 'velocityfleet';
+}
+
+function getAllLocationsEndpoint(locationProvider: 'fleetsmart' | 'velocityfleet'): string {
+  return locationProvider === 'velocityfleet'
+    ? '/api/velocityfleet/all-locations'
+    : '/api/fleetsmart/all-locations';
 }
 
 /** Extract a short display label from a FleetSmart vehicle name */
@@ -61,6 +68,7 @@ export function AssetLocationMapModal({
   onOpenChange,
   assetLabel,
   location,
+  locationProvider = 'fleetsmart',
 }: AssetLocationMapModalProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maptilersdk.Map | null>(null);
@@ -84,7 +92,7 @@ export function AssetLocationMapModal({
 
     async function fetchAll() {
       try {
-        const res = await fetch('/api/fleetsmart/all-locations');
+        const res = await fetch(getAllLocationsEndpoint(locationProvider));
         if (!res.ok) {
           if (!cancelled) setFetchDone(true);
           return;
@@ -115,7 +123,7 @@ export function AssetLocationMapModal({
       cancelled = true;
       if (pollTimer) clearTimeout(pollTimer);
     };
-  }, [open]);
+  }, [open, locationProvider]);
 
   // Initialize map ONLY after fetch is done (or at least attempted)
   useEffect(() => {

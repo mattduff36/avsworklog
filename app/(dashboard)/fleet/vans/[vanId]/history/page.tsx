@@ -789,6 +789,8 @@ export default function VanHistoryPage({
                 plantId={vehicle.plant_id ?? undefined}
                 regNumber={vehicle.reg_number ?? undefined}
                 assetLabel={vehicle.plant_id || vehicle.reg_number || 'Unknown'}
+                locationProvider="velocityfleet"
+                loadingVariant="compact"
                 className="h-full min-h-[265px]"
                 onMatchResult={setHasMapMatch}
                 onLocationData={setMapLocationData}
@@ -888,6 +890,8 @@ export default function VanHistoryPage({
                   regNumber={vehicle?.reg_number ?? undefined}
                   plantId={vehicle?.plant_id ?? undefined}
                   assetLabel={vehicle?.reg_number || vehicle?.plant_id || 'Unknown'}
+                  locationProvider="velocityfleet"
+                  loadingVariant="compact"
                   className="h-full min-h-[265px]"
                   onMatchResult={setHasMapMatch}
                   onLocationData={setMapLocationData}
@@ -903,6 +907,8 @@ export default function VanHistoryPage({
               regNumber={vehicle.reg_number ?? undefined}
               plantId={vehicle.plant_id ?? undefined}
               assetLabel={vehicle.reg_number || vehicle.plant_id || 'Unknown'}
+              locationProvider="velocityfleet"
+              loadingVariant="compact"
               className="h-[180px] rounded-lg"
               onMatchResult={setHasMapMatch}
               onLocationData={setMapLocationData}
@@ -917,6 +923,7 @@ export default function VanHistoryPage({
         open={mapModalOpen}
         onOpenChange={setMapModalOpen}
         assetLabel={vehicle?.reg_number || vehicle?.plant_id || 'Unknown'}
+        locationProvider="velocityfleet"
         location={mapLocationData}
       />
 
