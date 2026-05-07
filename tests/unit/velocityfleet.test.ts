@@ -1,11 +1,65 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   findVelocityfleetLocationByRegistration,
+  getVelocityfleetLocations,
   normalizeVelocityfleetRegistration,
   parseVelocityfleetCustomerIds,
   parseVelocityfleetPositions,
   resolveVelocityfleetBaseUrl,
 } from '@/lib/services/velocityfleet';
+
+interface TestVelocityfleetCache {
+  accessToken: string | null;
+  accessTokenCachedAt: number;
+  customerIds: string[] | null;
+  customerIdsCachedAt: number;
+  positions: unknown[] | null;
+  positionsCachedAt: number;
+  lastRequestAt: number;
+}
+
+const originalEnv = {
+  VELOCITYFLEET_API_KEY: process.env.VELOCITYFLEET_API_KEY,
+  VELOCITYFLEET_BASE_URL: process.env.VELOCITYFLEET_BASE_URL,
+  VELOCITYFLEET_CLIENT_ID: process.env.VELOCITYFLEET_CLIENT_ID,
+};
+
+function getTestCache(): TestVelocityfleetCache {
+  return (globalThis as unknown as { __velocityfleetCache: TestVelocityfleetCache }).__velocityfleetCache;
+}
+
+function resetTestCache(): void {
+  const cache = getTestCache();
+  cache.accessToken = null;
+  cache.accessTokenCachedAt = 0;
+  cache.customerIds = null;
+  cache.customerIdsCachedAt = 0;
+  cache.positions = null;
+  cache.positionsCachedAt = 0;
+  cache.lastRequestAt = 0;
+}
+
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+beforeEach(() => {
+  resetTestCache();
+  process.env.VELOCITYFLEET_API_KEY = 'test-api-key';
+  process.env.VELOCITYFLEET_BASE_URL = 'https://velocity.example';
+  process.env.VELOCITYFLEET_CLIENT_ID = '';
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  process.env.VELOCITYFLEET_API_KEY = originalEnv.VELOCITYFLEET_API_KEY;
+  process.env.VELOCITYFLEET_BASE_URL = originalEnv.VELOCITYFLEET_BASE_URL;
+  process.env.VELOCITYFLEET_CLIENT_ID = originalEnv.VELOCITYFLEET_CLIENT_ID;
+  resetTestCache();
+});
 
 describe('Velocityfleet service helpers', () => {
   it('normalizes vehicle registrations for matching', () => {
@@ -84,5 +138,55 @@ describe('Velocityfleet service helpers', () => {
 
     expect(findVelocityfleetLocationByRegistration([location], 'ab12cde')).toBe(location);
     expect(findVelocityfleetLocationByRegistration([location], 'zz99 zzz')).toBeNull();
+  });
+
+  it('invalidates a stale cached access token and retries once after downstream auth failure', async () => {
+    const cache = getTestCache();
+    cache.accessToken = 'stale-token';
+    cache.accessTokenCachedAt = Date.now();
+    cache.customerIds = ['customer-1'];
+    cache.customerIdsCachedAt = Date.now();
+
+    const fetchMock = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      const requestUrl = String(url);
+
+      if (requestUrl.includes('/api/mobile/kinesis/device-live-positions/') && init?.headers) {
+        const headers = init.headers as Record<string, string>;
+        if (headers.Authorization === 'Bearer stale-token') return jsonResponse({ detail: 'expired' }, 401);
+      }
+
+      if (requestUrl.includes('/vapi/v1/accounts/users/oauth2/refresh/')) {
+        return jsonResponse({ token: 'fresh-token' });
+      }
+
+      if (requestUrl.includes('/vapi/v1/accounts/users/customers')) {
+        return jsonResponse({ 'customer-1': { name: 'Customer 1', product: 'telematics' } });
+      }
+
+      if (requestUrl.includes('/api/mobile/kinesis/device-live-positions/')) {
+        return jsonResponse({
+          devices: [
+            {
+              id: 123,
+              lat: 52.1,
+              lon: -1.2,
+              vehicle_registration: 'AB12 CDE',
+              timestamp: '2026-05-07T18:35:00Z',
+            },
+          ],
+        });
+      }
+
+      return jsonResponse({ detail: 'unexpected request' }, 500);
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const locations = await getVelocityfleetLocations();
+
+    expect(locations).toHaveLength(1);
+    expect(locations[0].vrn).toBe('AB12 CDE');
+    expect(cache.accessToken).toBe('fresh-token');
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 });

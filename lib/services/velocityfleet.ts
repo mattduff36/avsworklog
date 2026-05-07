@@ -140,6 +140,21 @@ export function isVelocityfleetError(error: unknown): error is VelocityfleetErro
   return error instanceof Error && isRecord(error) && isRecord(error.velocityfleet);
 }
 
+function isInvalidAccessTokenError(error: unknown): boolean {
+  return isVelocityfleetError(error)
+    && error.velocityfleet?.code === 'auth_error'
+    && error.velocityfleet.status === 401;
+}
+
+function invalidateVelocityfleetAuthCache(): void {
+  cache.accessToken = null;
+  cache.accessTokenCachedAt = 0;
+  cache.customerIds = null;
+  cache.customerIdsCachedAt = 0;
+  cache.positions = null;
+  cache.positionsCachedAt = 0;
+}
+
 export async function getVelocityfleetLocationByRegistration(
   registration: string
 ): Promise<VelocityfleetVehicleLocation | null> {
@@ -152,18 +167,32 @@ export async function getVelocityfleetLocations(): Promise<VelocityfleetVehicleL
     return cache.positions;
   }
 
-  const token = await getAccessToken();
-  const customerIds = await getCustomerIds(token);
-  const allLocations: VelocityfleetVehicleLocation[] = [];
+  return getVelocityfleetLocationsWithAuthRetry(false);
+}
 
-  for (const customerId of customerIds) {
-    const locations = await fetchCustomerPositions(token, customerId);
-    allLocations.push(...locations);
+async function getVelocityfleetLocationsWithAuthRetry(
+  hasRetried: boolean
+): Promise<VelocityfleetVehicleLocation[]> {
+  try {
+    const token = await getAccessToken();
+    const customerIds = await getCustomerIds(token);
+    const allLocations: VelocityfleetVehicleLocation[] = [];
+
+    for (const customerId of customerIds) {
+      const locations = await fetchCustomerPositions(token, customerId);
+      allLocations.push(...locations);
+    }
+
+    cache.positions = dedupeLocationsByRegistration(allLocations);
+    cache.positionsCachedAt = Date.now();
+    return cache.positions;
+  } catch (error) {
+    if (!hasRetried && isInvalidAccessTokenError(error)) {
+      invalidateVelocityfleetAuthCache();
+      return getVelocityfleetLocationsWithAuthRetry(true);
+    }
+    throw error;
   }
-
-  cache.positions = dedupeLocationsByRegistration(allLocations);
-  cache.positionsCachedAt = Date.now();
-  return cache.positions;
 }
 
 function isUsableEnvValue(value: string | undefined): value is string {
@@ -361,6 +390,7 @@ async function requestJson<T>(url: string, init: RequestInit): Promise<T> {
 
   if (!res.ok) {
     if (res.status === 401 || res.status === 403) {
+      invalidateVelocityfleetAuthCache();
       throw createVelocityfleetError('auth_error', 'Velocityfleet authentication failed', 401);
     }
     if (res.status === 429) {
