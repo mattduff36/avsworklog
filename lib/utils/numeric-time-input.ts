@@ -1,6 +1,6 @@
 import { roundTimeToNearestQuarterHour } from '@/lib/utils/time-calculations';
 
-const TIME_VALUE_PATTERN = /^(\d{2}):([0-5]\d)$/;
+const TIME_VALUE_PATTERN = /^(\d{2}):([0-5]\d)(?::[0-5]\d(?:\.\d+)?)?$/;
 
 export function formatTimeForNumericInput(value: string | null | undefined): string {
   const match = (value || '').match(TIME_VALUE_PATTERN);

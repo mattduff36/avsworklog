@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import {
   formatNumericTimeDraft,
@@ -27,6 +27,10 @@ export function MobileNumericTimeInput({
   ariaLabel,
 }: MobileNumericTimeInputProps) {
   const [draftValue, setDraftValue] = useState(() => formatTimeForNumericInput(value));
+
+  useEffect(() => {
+    setDraftValue(formatTimeForNumericInput(value));
+  }, [value]);
 
   function handleChange(nextValue: string) {
     const digits = getNumericTimeInputDigits(nextValue);

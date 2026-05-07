@@ -14,6 +14,11 @@ describe('numeric time input helpers', () => {
     expect(formatTimeForNumericInput('invalid')).toBe('');
   });
 
+  it('formats persisted database TIME values with seconds as readable input text', () => {
+    expect(formatTimeForNumericInput('06:00:00')).toBe('06:00');
+    expect(formatTimeForNumericInput('17:45:00')).toBe('17:45');
+  });
+
   it('formats partial draft input without treating 164 as 01:45', () => {
     expect(formatNumericTimeDraft('16')).toBe('16');
     expect(formatNumericTimeDraft('164')).toBe('16:4');
