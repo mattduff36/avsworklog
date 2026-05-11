@@ -27,11 +27,13 @@ import {
   CheckCircle2,
   Eye,
   User,
-  Clock
+  Clock,
+  ImageIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDateTime } from '@/lib/utils/date';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
+import { getErrorReportScreenshots } from '@/lib/utils/error-report-screenshots';
 import type { 
   ErrorReportWithUser, 
   ErrorReportStatus, 
@@ -41,6 +43,10 @@ import {
   ERROR_REPORT_STATUS_LABELS, 
   ERROR_REPORT_STATUS_COLORS 
 } from '@/types/error-reports';
+
+function buildErrorReportScreenshotUrl(reportId: string, screenshotId: string): string {
+  return `/api/error-reports/${encodeURIComponent(reportId)}/screenshots/${encodeURIComponent(screenshotId)}`;
+}
 
 export default function ErrorReportsManagePage() {
   const router = useRouter();
@@ -319,6 +325,12 @@ export default function ErrorReportsManagePage() {
                             {report.error_code}
                           </code>
                         )}
+                        {getErrorReportScreenshots(report.additional_context).length > 0 && (
+                          <span className="flex items-center gap-1">
+                            <ImageIcon className="h-3 w-3" />
+                            {getErrorReportScreenshots(report.additional_context).length} screenshot{getErrorReportScreenshots(report.additional_context).length === 1 ? '' : 's'}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -385,6 +397,25 @@ export default function ErrorReportsManagePage() {
                   {selectedReport.user_agent && (
                     <div className="text-xs text-muted-foreground">
                       User Agent: {selectedReport.user_agent}
+                    </div>
+                  )}
+                  {getErrorReportScreenshots(selectedReport.additional_context).length > 0 && (
+                    <div className="text-xs">
+                      <span className="text-muted-foreground">Screenshots:</span>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {getErrorReportScreenshots(selectedReport.additional_context).map((screenshot, index) => (
+                          <a
+                            key={screenshot.id}
+                            href={buildErrorReportScreenshotUrl(selectedReport.id, screenshot.id)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 font-medium text-foreground transition-colors hover:bg-slate-100 dark:hover:bg-slate-700"
+                          >
+                            <ImageIcon className="h-3.5 w-3.5 text-red-500" />
+                            Screenshot {index + 1}
+                          </a>
+                        ))}
+                      </div>
                     </div>
                   )}
                   {Boolean(selectedReport.additional_context) && (

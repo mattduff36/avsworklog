@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, type ChangeEvent, type ComponentType } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
 import {
   Dialog,
   DialogContent,
@@ -25,7 +25,6 @@ import {
   BookOpen, 
   Loader2,
   Send,
-  CheckCircle2,
   ChevronRight,
   AlertTriangle,
   Settings,
@@ -34,6 +33,8 @@ import {
   LogOut,
   Smartphone,
   Monitor,
+  ImageIcon,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePermissionSnapshot } from '@/lib/hooks/usePermissionSnapshot';
@@ -45,10 +46,26 @@ import Link from 'next/link';
 import { MODULE_PAGES, getPageLabel, getPageUrl } from '@/lib/config/module-pages';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { forceAppRefresh } from '@/lib/client/force-app-refresh';
+import {
+  MAX_ERROR_REPORT_SCREENSHOT_SIZE_BYTES,
+  MAX_ERROR_REPORT_SCREENSHOTS,
+  getErrorReportScreenshots,
+  isAllowedErrorReportScreenshot,
+} from '@/lib/utils/error-report-screenshots';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+}
+
+interface HelpTileConfig {
+  value: 'faq' | 'install' | 'errors' | 'suggest';
+  label: string;
+  helper: string;
+  icon: ComponentType<{ className?: string }>;
+  tileClassName: string;
+  activeClassName: string;
+  iconClassName: string;
 }
 
 function checkStandaloneMode(): boolean {
@@ -57,6 +74,54 @@ function checkStandaloneMode(): boolean {
   const isIOSStandalone = (window.navigator as { standalone?: boolean }).standalone === true;
   return isStandalone || isIOSStandalone;
 }
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))}KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+}
+
+function buildErrorReportScreenshotUrl(reportId: string, screenshotId: string): string {
+  return `/api/error-reports/${encodeURIComponent(reportId)}/screenshots/${encodeURIComponent(screenshotId)}`;
+}
+
+const HELP_NAV_TILES: HelpTileConfig[] = [
+  {
+    value: 'faq',
+    label: 'FAQ',
+    helper: 'Find answers',
+    icon: BookOpen,
+    tileClassName: 'border-blue-200 bg-blue-50 hover:bg-blue-100 dark:border-blue-500/30 dark:bg-blue-950/30 dark:hover:bg-blue-950/50',
+    activeClassName: 'border-blue-500 ring-blue-500/30 dark:border-blue-400',
+    iconClassName: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300',
+  },
+  {
+    value: 'install',
+    label: 'Install App',
+    helper: 'Device setup',
+    icon: Download,
+    tileClassName: 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-950/30 dark:hover:bg-emerald-950/50',
+    activeClassName: 'border-emerald-500 ring-emerald-500/30 dark:border-emerald-400',
+    iconClassName: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300',
+  },
+  {
+    value: 'errors',
+    label: 'Errors',
+    helper: 'Report bugs',
+    icon: AlertTriangle,
+    tileClassName: 'border-red-200 bg-red-50 hover:bg-red-100 dark:border-red-500/30 dark:bg-red-950/30 dark:hover:bg-red-950/50',
+    activeClassName: 'border-red-500 ring-red-500/30 dark:border-red-400',
+    iconClassName: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300',
+  },
+  {
+    value: 'suggest',
+    label: 'Suggest',
+    helper: 'Share ideas',
+    icon: Lightbulb,
+    tileClassName: 'border-amber-200 bg-amber-50 hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-950/30 dark:hover:bg-amber-950/50',
+    activeClassName: 'border-amber-500 ring-amber-500/30 dark:border-amber-400',
+    iconClassName: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300',
+  },
+];
 
 export default function HelpPage() {
   const router = useRouter();
@@ -90,6 +155,8 @@ export default function HelpPage() {
   const [submittingError, setSubmittingError] = useState(false);
   const [myErrors, setMyErrors] = useState<ErrorReport[]>([]);
   const [loadingErrors, setLoadingErrors] = useState(false);
+  const [errorScreenshots, setErrorScreenshots] = useState<File[]>([]);
+  const errorScreenshotInputRef = useRef<HTMLInputElement>(null);
   
   // Active tab
   const [activeTab, setActiveTab] = useState('faq');
@@ -102,7 +169,12 @@ export default function HelpPage() {
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab') || 'faq';
-    const validTabs = ['faq', 'install', 'errors', 'suggest', 'my-suggestions'];
+    const validTabs = ['faq', 'install', 'errors', 'suggest'];
+    if (requestedTab === 'my-suggestions') {
+      setActiveTab('suggest');
+      router.replace('/help?tab=suggest', { scroll: false });
+      return;
+    }
     if (validTabs.includes(requestedTab)) {
       setActiveTab(requestedTab);
       return;
@@ -268,9 +340,9 @@ export default function HelpPage() {
     fetchFAQ('', null, true);
   }, [fetchFAQ]);
 
-  // Fetch user's suggestions when tab changes
+  // Fetch user's suggestions when the suggestion tab is shown
   useEffect(() => {
-    if (activeTab === 'my-suggestions') {
+    if (activeTab === 'suggest') {
       fetchMySuggestions();
     }
   }, [activeTab, fetchMySuggestions]);
@@ -360,8 +432,8 @@ export default function HelpPage() {
         setSuggestionTitle('');
         setSuggestionBody('');
         setSuggestionPageHint('');
-        // Refresh suggestions list if on that tab
-        if (activeTab === 'my-suggestions') {
+        // Refresh the list below the form when the submitted item is saved.
+        if (activeTab === 'suggest') {
           fetchMySuggestions();
         }
       } else {
@@ -375,6 +447,36 @@ export default function HelpPage() {
       setSubmittingSuggestion(false);
     }
   };
+
+  function handleErrorScreenshotChange(event: ChangeEvent<HTMLInputElement>) {
+    const selectedFiles = Array.from(event.target.files || []);
+    event.target.value = '';
+    if (selectedFiles.length === 0) return;
+
+    const nextFiles = [...errorScreenshots, ...selectedFiles];
+    if (nextFiles.length > MAX_ERROR_REPORT_SCREENSHOTS) {
+      toast.error(`You can attach up to ${MAX_ERROR_REPORT_SCREENSHOTS} screenshots.`);
+      return;
+    }
+
+    const oversizedFile = selectedFiles.find((file) => file.size > MAX_ERROR_REPORT_SCREENSHOT_SIZE_BYTES);
+    if (oversizedFile) {
+      toast.error(`${oversizedFile.name} is too large. Screenshots must be 5MB or smaller.`);
+      return;
+    }
+
+    const unsupportedFile = selectedFiles.find((file) => !isAllowedErrorReportScreenshot(file));
+    if (unsupportedFile) {
+      toast.error(`${unsupportedFile.name} is not a supported image file.`);
+      return;
+    }
+
+    setErrorScreenshots(nextFiles);
+  }
+
+  function removeErrorScreenshot(indexToRemove: number) {
+    setErrorScreenshots((currentFiles) => currentFiles.filter((_, index) => index !== indexToRemove));
+  }
 
   // Handle error report submission
   const handleSubmitError = async () => {
@@ -390,20 +492,21 @@ export default function HelpPage() {
 
     try {
       setSubmittingError(true);
+      const formData = new FormData();
+      formData.append('title', errorTitle.trim());
+      formData.append('description', errorDescription.trim());
+      formData.append('page_url', getPageUrl(errorPageSelection));
+      formData.append('user_agent', typeof navigator !== 'undefined' ? navigator.userAgent : '');
+      formData.append('additional_context', JSON.stringify({
+        current_url: typeof window !== 'undefined' ? window.location.href : undefined,
+        selected_page: errorPageSelection,
+        selected_page_label: getPageLabel(errorPageSelection),
+      }));
+      errorScreenshots.forEach((file) => formData.append('screenshots', file));
+
       const response = await fetch('/api/errors/report', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: errorTitle.trim(),
-          description: errorDescription.trim(),
-          page_url: getPageUrl(errorPageSelection),
-          user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
-          additional_context: {
-            current_url: typeof window !== 'undefined' ? window.location.href : undefined,
-            selected_page: errorPageSelection,
-            selected_page_label: getPageLabel(errorPageSelection),
-          },
-        }),
+        body: formData,
       });
 
       // Parse response body once, regardless of status
@@ -426,6 +529,10 @@ export default function HelpPage() {
         setErrorTitle('');
         setErrorDescription('');
         setErrorPageSelection('');
+        setErrorScreenshots([]);
+        if (errorScreenshotInputRef.current) {
+          errorScreenshotInputRef.current.value = '';
+        }
         // Refresh error reports list if on that tab
         if (activeTab === 'errors') {
           fetchMyErrors();
@@ -501,60 +608,66 @@ export default function HelpPage() {
     <div className="mx-auto w-full max-w-6xl space-y-6">
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">
-              Help & FAQ
-            </h1>
-            <p className="text-muted-foreground">
-              Find answers to common questions and submit suggestions
-            </p>
-          </div>
-          <div className="hidden md:flex items-center justify-end">
-            <Button
-              type="button"
-              onClick={() => void handleRefreshAppNow()}
-              disabled={isRefreshingApp}
-              title="Refresh App Now"
-              className="h-16 w-24 md:h-[4.5rem] md:w-[6.75rem] flex-col items-center justify-center gap-1 border border-avs-yellow bg-avs-yellow p-1.5 text-slate-900 transition-colors hover:bg-avs-yellow-hover hover:text-slate-900 disabled:opacity-60"
-            >
-              {isRefreshingApp ? (
-                <Loader2 className="h-5 w-5 md:h-6 md:w-6 animate-spin" />
-              ) : (
-                <RefreshCw className="h-5 w-5 md:h-6 md:w-6" />
-              )}
-              <span className="text-[10px] md:text-[11px] font-semibold leading-tight text-center">
-                {isRefreshingApp ? 'Refreshing...' : 'Refresh App'}
-              </span>
-            </Button>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold text-foreground mb-2">
+            Help & FAQ
+          </h1>
+          <p className="text-muted-foreground">
+            Find answers to common questions and submit suggestions
+          </p>
         </div>
       </div>
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList className="grid w-full max-w-4xl grid-cols-5 bg-slate-100 dark:bg-slate-800 p-0">
-          <TabsTrigger value="faq" className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900">
-            <BookOpen className="h-4 w-4" />
-            FAQ
-          </TabsTrigger>
-          <TabsTrigger value="install" className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900">
-            <Download className="h-4 w-4" />
-            Install App
-          </TabsTrigger>
-          <TabsTrigger value="errors" className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900">
-            <AlertTriangle className="h-4 w-4" />
-            Errors
-          </TabsTrigger>
-          <TabsTrigger value="suggest" className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900">
-            <Lightbulb className="h-4 w-4" />
-            Suggest
-          </TabsTrigger>
-          <TabsTrigger value="my-suggestions" className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900">
-            <CheckCircle2 className="h-4 w-4" />
-            My Suggestions
-          </TabsTrigger>
-        </TabsList>
+        <div className="mb-6 grid grid-cols-5 gap-1.5 sm:gap-2 md:gap-3">
+          {HELP_NAV_TILES.map((tile) => {
+            const TileIcon = tile.icon;
+            const isActiveTile = activeTab === tile.value;
+
+            return (
+              <button
+                key={tile.value}
+                type="button"
+                aria-pressed={isActiveTile}
+                onClick={() => handleTabChange(tile.value)}
+                className={`group relative flex h-16 min-w-0 flex-col items-center justify-center overflow-hidden rounded-xl border px-1 py-2 text-center shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-avs-yellow sm:h-20 sm:px-2 md:h-24 md:gap-1 ${tile.tileClassName} ${isActiveTile ? `${tile.activeClassName} ring-2` : 'ring-0'}`}
+              >
+                <span className={`flex h-7 w-7 items-center justify-center rounded-lg transition-transform group-hover:scale-105 sm:h-8 sm:w-8 md:h-10 md:w-10 ${tile.iconClassName}`}>
+                  <TileIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5" />
+                </span>
+                <span className="mt-1 w-full truncate pb-0.5 text-[10px] font-bold leading-normal text-foreground sm:text-xs md:text-sm">
+                  {tile.label}
+                </span>
+                <span className="hidden max-w-full truncate pb-0.5 text-[11px] leading-normal text-muted-foreground md:block">
+                  {tile.helper}
+                </span>
+              </button>
+            );
+          })}
+
+          <button
+            type="button"
+            onClick={() => void handleRefreshAppNow()}
+            disabled={isRefreshingApp}
+            title="Refresh App Now"
+            className="group relative flex h-16 min-w-0 flex-col items-center justify-center overflow-hidden rounded-xl border border-violet-200 bg-violet-50 px-1 py-2 text-center shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-violet-100 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:pointer-events-none disabled:opacity-60 sm:h-20 sm:px-2 md:h-24 md:gap-1 dark:border-violet-500/30 dark:bg-violet-950/30 dark:hover:bg-violet-950/50"
+          >
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-100 text-violet-700 transition-transform group-hover:scale-105 sm:h-8 sm:w-8 md:h-10 md:w-10 dark:bg-violet-500/20 dark:text-violet-300">
+              {isRefreshingApp ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin sm:h-4 sm:w-4 md:h-5 md:w-5" />
+              ) : (
+                <RefreshCw className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5" />
+              )}
+            </span>
+            <span className="mt-1 w-full truncate pb-0.5 text-[10px] font-bold leading-normal text-foreground sm:text-xs md:text-sm">
+              {isRefreshingApp ? 'Refreshing' : 'Refresh App'}
+            </span>
+            <span className="hidden max-w-full truncate pb-0.5 text-[11px] leading-normal text-muted-foreground md:block">
+              Reload safely
+            </span>
+          </button>
+        </div>
 
         {/* FAQ Tab */}
         <TabsContent value="faq" className="space-y-6">
@@ -926,6 +1039,49 @@ export default function HelpPage() {
                 </Select>
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="error-screenshots">
+                  Screenshots (optional)
+                </Label>
+                <Input
+                  ref={errorScreenshotInputRef}
+                  id="error-screenshots"
+                  type="file"
+                  accept="image/gif,image/heic,image/heif,image/jpeg,image/png,image/webp"
+                  multiple
+                  onChange={handleErrorScreenshotChange}
+                  className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900 file:mr-3 file:rounded-md file:border-0 file:bg-avs-yellow file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-slate-900"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Attach up to {MAX_ERROR_REPORT_SCREENSHOTS} screenshots. Each image must be {formatFileSize(MAX_ERROR_REPORT_SCREENSHOT_SIZE_BYTES)} or smaller.
+                </p>
+                {errorScreenshots.length > 0 && (
+                  <div className="space-y-2 rounded-lg border border-border bg-slate-50 p-3 dark:bg-slate-800">
+                    {errorScreenshots.map((file, index) => (
+                      <div key={`${file.name}-${file.lastModified}-${index}`} className="flex items-center justify-between gap-3 text-sm">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <ImageIcon className="h-4 w-4 shrink-0 text-avs-yellow" />
+                          <span className="truncate text-foreground">{file.name}</span>
+                          <span className="shrink-0 text-xs text-muted-foreground">
+                            {formatFileSize(file.size)}
+                          </span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeErrorScreenshot(index)}
+                          className="h-8 shrink-0 px-2"
+                          aria-label={`Remove ${file.name}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-lg p-3">
                 <p className="text-sm text-blue-900 dark:text-blue-300">
                   <strong>Tip:</strong> Include any error messages, codes, or screenshots you saw. The more detail you provide, the faster we can fix it!
@@ -986,34 +1142,54 @@ export default function HelpPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {myErrors.map((error) => (
-                    <div 
-                      key={error.id}
-                      className="p-4 rounded-lg border border-border bg-slate-50 dark:bg-slate-800"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <h3 className="font-medium text-foreground">
-                            {error.title}
-                          </h3>
-                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                            {error.description}
-                          </p>
-                          {error.page_url && (
-                            <p className="text-xs text-muted-foreground mt-2">
-                              Page: {error.page_url}
+                  {myErrors.map((error) => {
+                    const screenshots = getErrorReportScreenshots(error.additional_context);
+
+                    return (
+                      <div 
+                        key={error.id}
+                        className="p-4 rounded-lg border border-border bg-slate-50 dark:bg-slate-800"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <h3 className="font-medium text-foreground">
+                              {error.title}
+                            </h3>
+                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                              {error.description}
                             </p>
-                          )}
+                            {error.page_url && (
+                              <p className="text-xs text-muted-foreground mt-2">
+                                Page: {error.page_url}
+                              </p>
+                            )}
+                            {screenshots.length > 0 && (
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {screenshots.map((screenshot, index) => (
+                                  <a
+                                    key={screenshot.id}
+                                    href={buildErrorReportScreenshotUrl(error.id, screenshot.id)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-slate-100 dark:hover:bg-slate-700"
+                                  >
+                                    <ImageIcon className="h-3.5 w-3.5 text-avs-yellow" />
+                                    Screenshot {index + 1}
+                                  </a>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <Badge className={`${getErrorStatusColor(error.status)} text-white`}>
+                            {getErrorStatusLabel(error.status)}
+                          </Badge>
                         </div>
-                        <Badge className={`${getErrorStatusColor(error.status)} text-white`}>
-                          {getErrorStatusLabel(error.status)}
-                        </Badge>
+                        <p className="text-xs text-muted-foreground mt-3">
+                          Reported {new Date(error.created_at).toLocaleDateString()}
+                        </p>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-3">
-                        Reported {new Date(error.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
@@ -1021,7 +1197,7 @@ export default function HelpPage() {
         </TabsContent>
 
         {/* Submit Suggestion Tab */}
-        <TabsContent value="suggest">
+        <TabsContent value="suggest" className="space-y-6">
           <Card className="">
             <CardHeader>
               <CardTitle className="text-foreground flex items-center gap-2">
@@ -1089,10 +1265,8 @@ export default function HelpPage() {
               </Button>
             </CardContent>
           </Card>
-        </TabsContent>
 
-        {/* My Suggestions Tab */}
-        <TabsContent value="my-suggestions">
+          {/* My Suggestions */}
           <Card className="">
             <CardHeader>
               <CardTitle className="text-foreground">
@@ -1111,13 +1285,6 @@ export default function HelpPage() {
                 <div className="text-center py-8 text-muted-foreground">
                   <Lightbulb className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                   <p>You haven&apos;t submitted any suggestions yet.</p>
-                  <Button
-                    variant="link"
-                    onClick={() => setActiveTab('suggest')}
-                    className="mt-2"
-                  >
-                    Submit your first suggestion
-                  </Button>
                 </div>
               ) : (
                 <div className="space-y-4">
