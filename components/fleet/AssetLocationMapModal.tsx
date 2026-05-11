@@ -13,34 +13,13 @@ import { X } from 'lucide-react';
 import * as maptilersdk from '@maptiler/sdk';
 import '@maptiler/sdk/dist/maptiler-sdk.css';
 import { formatTrackerTimestamp } from '@/lib/utils/tracker-dates';
-
-interface LocationData {
-  lat: number;
-  lng: number;
-  speed: number;
-  heading: number;
-  updatedAt: string;
-  name: string;
-  vrn: string;
-  vehicleId: string;
-}
-
-interface OtherVehicle {
-  vehicleId: string;
-  name: string;
-  vrn: string;
-  lat: number;
-  lng: number;
-  speed: number;
-  heading: number;
-  updatedAt: string;
-}
+import type { TrackerLocationData } from '@/types/fleet-tracker';
 
 interface AssetLocationMapModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   assetLabel: string;
-  location: LocationData | null;
+  location: TrackerLocationData | null;
   locationProvider?: 'fleetsmart' | 'velocityfleet';
 }
 
@@ -73,7 +52,7 @@ export function AssetLocationMapModal({
 }: AssetLocationMapModalProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maptilersdk.Map | null>(null);
-  const [otherVehicles, setOtherVehicles] = useState<OtherVehicle[]>([]);
+  const [otherVehicles, setOtherVehicles] = useState<TrackerLocationData[]>([]);
   const [fetchDone, setFetchDone] = useState(false);
 
   // Fetch all vehicle locations when modal opens.

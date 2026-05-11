@@ -5,17 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Expand, Loader2 } from 'lucide-react';
 import * as maptilersdk from '@maptiler/sdk';
 import '@maptiler/sdk/dist/maptiler-sdk.css';
-
-interface LocationData {
-  lat: number;
-  lng: number;
-  speed: number;
-  heading: number;
-  updatedAt: string;
-  name: string;
-  vrn: string;
-  vehicleId: string;
-}
+import type { TrackerLocationData } from '@/types/fleet-tracker';
 
 interface AssetLocationMapProps {
   plantId?: string;
@@ -25,7 +15,7 @@ interface AssetLocationMapProps {
   loadingVariant?: 'skeleton' | 'compact';
   className?: string;
   onMatchResult?: (hasMatch: boolean) => void;
-  onLocationData?: (data: LocationData) => void;
+  onLocationData?: (data: TrackerLocationData) => void;
   onClick?: () => void;
 }
 
@@ -55,7 +45,7 @@ export function AssetLocationMap({
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maptilersdk.Map | null>(null);
   const [loading, setLoading] = useState(true);
-  const [locationData, setLocationData] = useState<LocationData | null>(null);
+  const [locationData, setLocationData] = useState<TrackerLocationData | null>(null);
   const [hasMatch, setHasMatch] = useState<boolean | null>(null);
 
   // Stable refs for callbacks to avoid re-triggering the fetch
@@ -112,7 +102,7 @@ export function AssetLocationMap({
         const lat = typeof data.lat === 'number' ? data.lat : parseFloat(data.lat);
         const lng = typeof data.lng === 'number' ? data.lng : parseFloat(data.lng);
         if (!isNaN(lat) && !isNaN(lng)) {
-          const loc: LocationData = {
+          const loc: TrackerLocationData = {
             lat,
             lng,
             speed: data.speed,

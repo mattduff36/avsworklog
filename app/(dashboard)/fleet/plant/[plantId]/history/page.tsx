@@ -28,6 +28,7 @@ import { usePlantMaintenanceHistory } from '@/lib/hooks/useMaintenance';
 import { useWorkshopTaskComments } from '@/lib/hooks/useWorkshopTaskComments';
 import { useTaskInspectionPhotos } from '@/lib/hooks/useTaskInspectionPhotos';
 import { AttachmentHistoryViewer } from '@/components/workshop-tasks/AttachmentHistoryViewer';
+import type { TrackerLocationData } from '@/types/fleet-tracker';
 
 // Dynamic imports for dialog components
 const EditPlantRecordDialog = dynamic(() => import('@/app/(dashboard)/maintenance/components/EditPlantRecordDialog').then(m => ({ default: m.EditPlantRecordDialog })), { ssr: false });
@@ -329,10 +330,7 @@ export default function PlantHistoryPage({
   const [showRecordUpdates, setShowRecordUpdates] = useState(true);
   const [hasMapMatch, setHasMapMatch] = useState(false);
   const [mapModalOpen, setMapModalOpen] = useState(false);
-  const [mapLocationData, setMapLocationData] = useState<{
-    lat: number; lng: number; speed: number; heading: number;
-    updatedAt: string; name: string; vrn: string; vehicleId: string;
-  } | null>(null);
+  const [mapLocationData, setMapLocationData] = useState<TrackerLocationData | null>(null);
 
   // Use the plant history hook
   const { data: historyData, refetch: refetchHistory } = usePlantMaintenanceHistory(unwrappedParams.plantId);
@@ -526,6 +524,7 @@ export default function PlantHistoryPage({
                 plantId={plant.plant_id}
                 regNumber={plant.reg_number ?? undefined}
                 assetLabel={plant.plant_id || 'Unknown'}
+                locationProvider="fleetsmart"
                 loadingVariant="compact"
                 className="h-full min-h-[265px]"
                 onMatchResult={setHasMapMatch}
@@ -542,6 +541,7 @@ export default function PlantHistoryPage({
         open={mapModalOpen}
         onOpenChange={setMapModalOpen}
         assetLabel={plant?.plant_id || 'Unknown'}
+        locationProvider="fleetsmart"
         location={mapLocationData}
       />
 
