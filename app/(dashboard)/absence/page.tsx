@@ -189,7 +189,11 @@ function isExpectedAbsenceSubmissionError(message: string): boolean {
     normalized.includes('half-day conflicts') ||
     normalized.includes('half-day is already booked') ||
     normalized.includes('financial year is closed for employee bookings') ||
-    normalized.includes('could not be submitted with your current permissions')
+    normalized.includes('could not be submitted with your current permissions') ||
+    normalized.includes('not authenticated') ||
+    normalized.includes('unauthorized') ||
+    normalized.includes('session is locked') ||
+    normalized.includes('jwt expired')
   );
 }
 

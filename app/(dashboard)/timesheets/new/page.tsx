@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { TimesheetRouter } from '../components/TimesheetRouter';
 import { WeekSelector } from '../components/WeekSelector';
 import { createClient } from '@/lib/supabase/client';
-import { getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
+import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 import { PageLoader } from '@/components/ui/page-loader';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { Employee } from '@/types/common';
@@ -98,9 +98,15 @@ function NewTimesheetContent() {
             .from('timesheets')
             .select('week_ending, timesheet_type, template_version, user_id')
             .eq('id', existingId)
-            .single();
+            .maybeSingle();
           
           if (error) throw error;
+          if (!data) {
+            setExistingTimesheetType(null);
+            setExistingTemplateVersion(null);
+            setShowForm(false);
+            return;
+          }
           
           setLoadedWeek(data.week_ending);
           setExistingTimesheetType(data.timesheet_type || null);
@@ -109,7 +115,7 @@ function NewTimesheetContent() {
           setShowForm(true);
           setTimesheetId(existingId);
         } catch (err) {
-          if (!isAuthErrorStatus(getErrorStatus(err))) {
+          if (!isAuthErrorStatus(getErrorStatus(err)) && !isNetworkFetchError(err)) {
             console.error('Error loading existing timesheet:', err);
           }
           // Fall back to showing week selector
@@ -148,16 +154,21 @@ function NewTimesheetContent() {
         .from('timesheets')
         .select('timesheet_type, template_version, week_ending, user_id')
         .eq('id', existingTimesheetId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
+      if (!data) {
+        setExistingTimesheetType(null);
+        setExistingTemplateVersion(null);
+        return;
+      }
 
       setExistingTimesheetType(data.timesheet_type || null);
       setExistingTemplateVersion(data.template_version ?? null);
       setLoadedWeek(data.week_ending || weekEnding);
       setSelectedEmployeeId(data.user_id || user?.id || '');
     } catch (err) {
-      if (!isAuthErrorStatus(getErrorStatus(err))) {
+      if (!isAuthErrorStatus(getErrorStatus(err)) && !isNetworkFetchError(err)) {
         console.error('Error loading timesheet metadata from week selector:', err);
       }
       // Fallback keeps current behavior but avoids stale metadata.

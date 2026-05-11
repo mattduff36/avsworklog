@@ -683,9 +683,14 @@ export function CivilsTimesheet({
         .from('timesheets')
         .select('*')
         .eq('id', timesheetId)
-        .single();
+        .maybeSingle();
       
       if (timesheetError) throw timesheetError;
+      if (!timesheetData) {
+        setError('Timesheet could not be found or is no longer available');
+        setShowErrorDialog(true);
+        return;
+      }
       
       // Check if user has access and timesheet is draft or rejected
       // Calculate permissions dynamically from current profile state (not stale closure values)
@@ -760,7 +765,7 @@ export function CivilsTimesheet({
       
       setEntries(fullWeek);
     } catch (err) {
-      if (!isAuthErrorStatus(getErrorStatus(err))) {
+      if (!isAuthErrorStatus(getErrorStatus(err)) && !isNetworkFetchError(err)) {
         console.error('Error loading existing timesheet:', err);
       }
       setError(err instanceof Error ? err.message : 'Failed to load timesheet');

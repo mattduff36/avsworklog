@@ -366,6 +366,13 @@ export function CreateWorkshopTaskDialog({
 
     const readingValue = parseInt(newMeterReading);
     const selectedVehicleForValidation = vehicles.find(v => v.id === selectedVehicleId);
+    const selectedCategoryIsValid = filteredCategories.some(category => category.id === selectedCategoryId);
+    const selectedSubcategoryIsValid = !categoryHasSubcategories || filteredSubcategories.some(subcategory => subcategory.id === selectedSubcategoryId);
+    if (!selectedCategoryIsValid || !selectedSubcategoryIsValid) {
+      toast.error('Please select a valid workshop category for this asset');
+      return;
+    }
+
     const isHgvSelection = selectedVehicleForValidation?.asset_type === 'hgv';
     const readingDescriptor = meterReadingType === 'hours' ? 'hours' : isHgvSelection ? 'KM' : 'mileage';
     const readingLabel = meterReadingType === 'hours' ? 'Hours' : isHgvSelection ? 'KM' : 'Mileage';

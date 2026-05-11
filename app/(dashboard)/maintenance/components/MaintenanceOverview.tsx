@@ -585,7 +585,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
 
   const handleCreateTask = (vehicleId: string, alert: Alert) => {
     setCreateTaskVehicleId(vehicleId);
-    setCreateTaskCategoryId(getCategoryForAlert(alert.type)?.id || maintenanceCategoryId);
+    setCreateTaskCategoryId(maintenanceCategoryId);
     setCreateTaskAlertType(alert.type as AlertType);
     setShowCreateTaskDialog(true);
   };

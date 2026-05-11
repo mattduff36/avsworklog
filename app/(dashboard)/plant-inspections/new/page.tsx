@@ -659,9 +659,13 @@ function NewPlantInspectionContent() {
           )
         `)
         .eq('id', id)
-        .single();
+        .maybeSingle();
 
       if (inspectionError) throw inspectionError;
+      if (!inspection) {
+        setError('Draft inspection could not be found or is no longer available');
+        return;
+      }
 
       if (!canManageCrossUserInspections && inspection.user_id !== user?.id) {
         setError('You do not have permission to edit this inspection');
