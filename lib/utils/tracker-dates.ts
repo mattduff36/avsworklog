@@ -12,11 +12,11 @@ export function parseTrackerTimestamp(value: unknown): Date | null {
     return parseEpochTimestamp(numericValue);
   }
 
-  const isoLikeDate = parseIsoLikeTimestamp(trimmed);
-  if (isoLikeDate) return isoLikeDate;
-
   const ukDate = parseUkTimestamp(trimmed);
   if (ukDate) return ukDate;
+
+  const isoLikeDate = parseIsoLikeTimestamp(trimmed);
+  if (isoLikeDate) return isoLikeDate;
 
   const parsed = Date.parse(trimmed);
   if (!Number.isFinite(parsed)) return null;
@@ -41,6 +41,8 @@ function parseEpochTimestamp(value: number): Date | null {
 }
 
 function parseIsoLikeTimestamp(value: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}/.test(value)) return null;
+
   const normalized = value.replace(
     /^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)(.*)$/,
     '$1T$2$3'
