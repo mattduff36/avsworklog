@@ -526,6 +526,7 @@ export default function PlantHistoryPage({
                 plantId={plant.plant_id}
                 regNumber={plant.reg_number ?? undefined}
                 assetLabel={plant.plant_id || 'Unknown'}
+                loadingVariant="compact"
                 className="h-full min-h-[265px]"
                 onMatchResult={setHasMapMatch}
                 onLocationData={setMapLocationData}

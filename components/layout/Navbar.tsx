@@ -75,9 +75,9 @@ function getNavItemActiveColors(href: string): { bg: string; text: string } {
   if (href.startsWith('/plant-inspections')) {
     return { bg: 'bg-plant-inspection', text: 'text-white' };
   }
-  // HGV Inspections - Orange
+  // HGV Inspections - Dark Orange
   if (href.startsWith('/hgv-inspections')) {
-    return { bg: 'bg-inspection', text: 'text-white' };
+    return { bg: 'bg-hgv-inspection', text: 'text-white' };
   }
   // Projects (formerly RAMS) - Green
   if (href.startsWith('/projects') || href.startsWith('/rams')) {
@@ -119,7 +119,7 @@ function getNavItemIconColor(href: string): string {
   if (href.startsWith('/timesheets')) return 'text-timesheet';
   if (href.startsWith('/van-inspections')) return 'text-inspection';
   if (href.startsWith('/plant-inspections')) return 'text-plant-inspection';
-  if (href.startsWith('/hgv-inspections')) return 'text-inspection';
+  if (href.startsWith('/hgv-inspections')) return 'text-hgv-inspection';
   if (href.startsWith('/projects') || href.startsWith('/rams')) return 'text-rams';
   if (href.startsWith('/absence')) return 'text-absence';
   if (href.startsWith('/maintenance')) return 'text-maintenance';

@@ -881,6 +881,7 @@ export default function HgvHistoryPage({
                 <AssetLocationMap
                   regNumber={vehicle?.reg_number ?? undefined}
                   assetLabel={vehicle?.reg_number || 'Unknown'}
+                  loadingVariant="compact"
                   className="h-full min-h-[265px]"
                   onMatchResult={setHasMapMatch}
                   onLocationData={setMapLocationData}
@@ -894,6 +895,7 @@ export default function HgvHistoryPage({
             <AssetLocationMap
               regNumber={vehicle.reg_number ?? undefined}
               assetLabel={vehicle.reg_number || 'Unknown'}
+              loadingVariant="compact"
               className="h-[180px] rounded-lg"
               onMatchResult={setHasMapMatch}
               onLocationData={setMapLocationData}

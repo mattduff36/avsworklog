@@ -1,16 +1,33 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { AppPageShell } from '@/components/layout/AppPageShell';
-import { CalendarClock, Plus, Receipt, Settings } from 'lucide-react';
+import { CalendarClock, Plus, Receipt, Settings, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { QuotesTable } from './components/QuotesTable';
 import { QuoteDetailsModal } from './components/QuoteDetailsModal';
 import { QuoteFormDialog } from './components/QuoteFormDialog';
@@ -37,10 +54,21 @@ interface ApproverOption {
   email: string | null;
 }
 
+type QuotePageTab = 'overview' | 'settings';
+
+function isQuotePageTab(value: string): value is QuotePageTab {
+  return value === 'overview' || value === 'settings';
+}
+
 function buildFormRequestError(payload: { error?: string; field_errors?: Record<string, string> }, fallback: string) {
   const error = new Error(payload.error || fallback) as Error & { fieldErrors?: Record<string, string> };
   error.fieldErrors = payload.field_errors || {};
   return error;
+}
+
+async function buildResponseError(response: Response, fallback: string) {
+  const payload = await response.json().catch(() => null) as { error?: string } | null;
+  return new Error(payload?.error || fallback);
 }
 
 function buildQuotePayload(data: QuoteFormData) {
@@ -85,7 +113,9 @@ export default function QuotesPage() {
   const [approvers, setApprovers] = useState<ApproverOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<QuoteStatus | 'all'>('all');
-  const [pageTab, setPageTab] = useState<'overview' | 'settings'>('overview');
+  const [deleteQuoteId, setDeleteQuoteId] = useState('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Modals
   const [detailQuoteId, setDetailQuoteId] = useState<string | null>(null);
@@ -94,6 +124,15 @@ export default function QuotesPage() {
 
   const customerId = searchParams.get('customer_id');
   const quoteIdFromQuery = searchParams.get('quote_id');
+  const tabParam = searchParams.get('tab') || 'overview';
+  const pageTab: QuotePageTab = isQuotePageTab(tabParam) ? tabParam : 'overview';
+  const deletableQuotes = useMemo(
+    () => [...quotes]
+      .filter(quote => quote.is_latest_version && quote.status === 'draft')
+      .sort((a, b) => a.quote_reference.localeCompare(b.quote_reference)),
+    [quotes]
+  );
+  const selectedDeleteQuote = deletableQuotes.find(quote => quote.id === deleteQuoteId) || null;
 
   const fetchData = useCallback(async () => {
     try {
@@ -142,6 +181,12 @@ export default function QuotesPage() {
   useEffect(() => {
     setDetailQuoteId(quoteIdFromQuery);
   }, [quoteIdFromQuery]);
+
+  useEffect(() => {
+    if (deleteQuoteId && !deletableQuotes.some(quote => quote.id === deleteQuoteId)) {
+      setDeleteQuoteId('');
+    }
+  }, [deletableQuotes, deleteQuoteId]);
 
   async function handleCreate(data: QuoteFormData) {
     const res = await fetch('/api/quotes', {
@@ -216,6 +261,37 @@ export default function QuotesPage() {
     setFormOpen(true);
   }
 
+  function handlePageTabChange(nextTab: QuotePageTab) {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set('tab', nextTab);
+    router.replace(`${pathname}?${nextParams.toString()}`, { scroll: false });
+  }
+
+  async function handleDeleteSelectedQuote() {
+    if (!selectedDeleteQuote || deleteLoading) return;
+
+    setDeleteLoading(true);
+    try {
+      const res = await fetch(`/api/quotes/${selectedDeleteQuote.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        throw await buildResponseError(res, 'Unable to delete this quote right now.');
+      }
+
+      toast.success(`Quote ${selectedDeleteQuote.quote_reference} deleted`);
+      if (detailQuoteId === selectedDeleteQuote.id) {
+        handleCloseQuoteDetails();
+      }
+      setDeleteDialogOpen(false);
+      setDeleteQuoteId('');
+      await fetchData();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to delete this quote right now.';
+      toast.error(message);
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
+
   if (permissionLoading || customerPermissionLoading || loading) {
     return <PageLoader message="Loading quotes..." />;
   }
@@ -266,7 +342,12 @@ export default function QuotesPage() {
         </div>
       </div>
 
-      <Tabs value={pageTab} onValueChange={(value) => setPageTab(value as 'overview' | 'settings')}>
+      <Tabs
+        value={pageTab}
+        onValueChange={(value) => {
+          if (isQuotePageTab(value)) handlePageTabChange(value);
+        }}
+      >
         <TabsList>
           <TabsTrigger value="overview" className="gap-2">
             <Receipt className="h-4 w-4" />
@@ -290,13 +371,87 @@ export default function QuotesPage() {
 
         <TabsContent value="settings" className="space-y-6 mt-0">
           <div className="rounded-lg border border-slate-700 bg-slate-900/70 p-6">
-            <h2 className="text-xl font-semibold text-white">Quote Settings</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Quote settings will be added here in a later update.
-            </p>
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/10">
+                <Trash2 className="h-5 w-5 text-red-300" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-white">Delete Draft Quote</h2>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Select a latest draft quote to permanently delete it. Confirmed, invoiced, archived, or older quote versions are protected.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+              <div className="space-y-2">
+                <label htmlFor="delete-quote-select" className="text-sm font-medium text-slate-200">
+                  Quote reference
+                </label>
+                <Select
+                  value={deleteQuoteId}
+                  onValueChange={setDeleteQuoteId}
+                  disabled={deletableQuotes.length === 0 || deleteLoading}
+                >
+                  <SelectTrigger id="delete-quote-select" className="bg-slate-800 border-slate-600 text-white">
+                    <SelectValue placeholder={deletableQuotes.length > 0 ? 'Select a draft quote' : 'No draft quotes available'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {deletableQuotes.map((quote) => (
+                      <SelectItem key={quote.id} value={quote.id}>
+                        {quote.quote_reference}{quote.customer?.company_name ? ` - ${quote.customer.company_name}` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Button
+                variant="destructive"
+                onClick={() => setDeleteDialogOpen(true)}
+                disabled={!selectedDeleteQuote || deleteLoading}
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete Quote
+              </Button>
+            </div>
           </div>
         </TabsContent>
       </Tabs>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent className="border-border text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete draft quote?</AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              {selectedDeleteQuote ? (
+                <>
+                  This will permanently delete quote{' '}
+                  <span className="font-semibold text-white">{selectedDeleteQuote.quote_reference}</span>.
+                  {selectedDeleteQuote.previous_versions?.length
+                    ? ' The previous quote version will become the latest version again. This action cannot be undone.'
+                    : ' This action cannot be undone.'}
+                </>
+              ) : (
+                'Select a draft quote before deleting.'
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                void handleDeleteSelectedQuote();
+              }}
+              disabled={!selectedDeleteQuote || deleteLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteLoading ? 'Deleting...' : 'Delete Quote'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <QuoteDetailsModal
         open={!!detailQuoteId}

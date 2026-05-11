@@ -46,11 +46,17 @@ const PO_FILTER_OPTIONS = [
   { value: 'without_po', label: 'No PO' },
 ] as const;
 
-const COMMERCIAL_FILTER_OPTIONS = [
-  { value: 'all', label: 'All commercial' },
-  { value: 'open', label: 'Open' },
-  { value: 'closed', label: 'Archived' },
-] as const;
+function formatCurrency(value: number | null | undefined) {
+  return `£${Number(value ?? 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`;
+}
+
+function quoteMatchesStatus(quote: Quote, status: QuoteStatus) {
+  if (status === 'closed') {
+    return quote.status === 'closed' || quote.commercial_status === 'closed';
+  }
+
+  return quote.status === status;
+}
 
 export function QuotesTable({
   quotes,
@@ -62,7 +68,6 @@ export function QuotesTable({
   const [search, setSearch] = useState('');
   const [poFilter, setPoFilter] = useState<'all' | 'with_po' | 'without_po'>('all');
   const [invoiceFilter, setInvoiceFilter] = useState<'all' | 'not_invoiced' | 'partially_invoiced' | 'invoiced'>('all');
-  const [commercialFilter, setCommercialFilter] = useState<'all' | 'open' | 'closed'>('all');
   const [sortField, setSortField] = useState<SortField>('quote_date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [expandedThreads, setExpandedThreads] = useState<Record<string, boolean>>({});
@@ -84,7 +89,7 @@ export function QuotesTable({
     let list = quotes;
 
     if (statusFilter !== 'all') {
-      list = list.filter(q => q.status === statusFilter);
+      list = list.filter(q => quoteMatchesStatus(q, statusFilter));
     }
 
     if (poFilter === 'with_po') {
@@ -95,10 +100,6 @@ export function QuotesTable({
 
     if (invoiceFilter !== 'all') {
       list = list.filter(q => q.invoice_summary?.status === invoiceFilter);
-    }
-
-    if (commercialFilter !== 'all') {
-      list = list.filter(q => q.commercial_status === commercialFilter);
     }
 
     if (search.trim()) {
@@ -132,7 +133,7 @@ export function QuotesTable({
     });
 
     return list;
-  }, [quotes, search, statusFilter, poFilter, invoiceFilter, commercialFilter, sortField, sortDir]);
+  }, [quotes, search, statusFilter, poFilter, invoiceFilter, sortField, sortDir]);
 
   function toggleSort(field: SortField) {
     if (sortField === field) {
@@ -151,14 +152,32 @@ export function QuotesTable({
   }
 
   const statusCounts = useMemo(() => {
+    const localCounts = ACTIVE_QUOTE_STATUS_ORDER.reduce<Record<QuoteStatus | 'all', number>>(
+      (acc, status) => ({ ...acc, [status]: 0 }),
+      { all: quotes.length } as Record<QuoteStatus | 'all', number>
+    );
+
+    quotes.forEach((quote) => {
+      localCounts[quote.status] = (localCounts[quote.status] || 0) + 1;
+      if (quote.commercial_status === 'closed' && quote.status !== 'closed') {
+        localCounts.closed = (localCounts.closed || 0) + 1;
+      }
+    });
+
     if (providedStatusCounts) {
-      return providedStatusCounts;
+      return {
+        ...providedStatusCounts,
+        closed: Math.max(providedStatusCounts.closed || 0, localCounts.closed || 0),
+      };
     }
 
-    const counts: Partial<Record<QuoteStatus | 'all', number>> = { all: quotes.length };
-    quotes.forEach(q => { counts[q.status] = (counts[q.status] || 0) + 1; });
-    return counts;
+    return localCounts;
   }, [providedStatusCounts, quotes]);
+
+  const statusFilterOptions = useMemo(
+    () => (['all', ...ACTIVE_QUOTE_STATUS_ORDER] as const).filter(s => s === 'all' || (statusCounts[s] || 0) > 0),
+    [statusCounts]
+  );
 
   function toggleThread(threadId: string) {
     setExpandedThreads(prev => ({
@@ -167,7 +186,7 @@ export function QuotesTable({
     }));
   }
 
-  const hasSecondaryFilters = poFilter !== 'all' || invoiceFilter !== 'all' || commercialFilter !== 'all';
+  const hasSecondaryFilters = poFilter !== 'all' || invoiceFilter !== 'all';
 
   return (
     <div className="space-y-6">
@@ -208,17 +227,6 @@ export function QuotesTable({
             </SelectContent>
           </Select>
 
-          <Select value={commercialFilter} onValueChange={(value: 'all' | 'open' | 'closed') => setCommercialFilter(value)}>
-            <SelectTrigger className="w-full bg-slate-800 border-slate-600 text-white sm:w-[165px]">
-              <SelectValue placeholder="Commercial" />
-            </SelectTrigger>
-            <SelectContent>
-              {COMMERCIAL_FILTER_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
           {hasSecondaryFilters ? (
             <Button
               variant="outline"
@@ -226,7 +234,6 @@ export function QuotesTable({
               onClick={() => {
                 setPoFilter('all');
                 setInvoiceFilter('all');
-                setCommercialFilter('all');
               }}
               className="border-slate-600 text-muted-foreground hover:bg-slate-700/50"
             >
@@ -240,7 +247,7 @@ export function QuotesTable({
       <div className="space-y-2">
         <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Workflow Status</p>
         <div className="flex flex-wrap gap-2">
-        {(['all', ...ACTIVE_QUOTE_STATUS_ORDER] as const).map(s => {
+        {statusFilterOptions.map(s => {
           const cfg = s === 'all' ? { label: 'All', color: '' } : getQuoteStatusConfig(s);
           const count = statusCounts[s] || 0;
           const isActive = statusFilter === s;
@@ -285,7 +292,7 @@ export function QuotesTable({
               <th className="text-left px-4 py-3 font-semibold text-muted-foreground cursor-pointer hover:text-white" onClick={() => toggleSort('status')}>
                 Status {renderSortIcon('status')}
               </th>
-              <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Invoice</th>
+              <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Invoiced</th>
               <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Balance</th>
             </tr>
           </thead>
@@ -346,9 +353,9 @@ export function QuotesTable({
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-xs text-slate-300">{quote.invoice_summary?.status.replace(/_/g, ' ') || quote.invoice_number || '—'}</td>
+                      <td className="px-4 py-3 text-xs text-slate-300">{formatCurrency(quote.invoice_summary?.invoicedTotal)}</td>
                       <td className="px-4 py-3 text-xs text-slate-300">
-                        £{Number(quote.invoice_summary?.remainingBalance ?? quote.total ?? 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                        {formatCurrency(quote.invoice_summary?.remainingBalance ?? quote.total)}
                       </td>
                     </tr>
                     {isExpanded ? previousVersions.map(version => {
@@ -383,9 +390,9 @@ export function QuotesTable({
                               )}
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-xs">{version.invoice_summary?.status.replace(/_/g, ' ') || version.invoice_number || '—'}</td>
+                          <td className="px-4 py-3 text-xs">{formatCurrency(version.invoice_summary?.invoicedTotal)}</td>
                           <td className="px-4 py-3 text-xs">
-                            £{Number(version.invoice_summary?.remainingBalance ?? version.total ?? 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                            {formatCurrency(version.invoice_summary?.remainingBalance ?? version.total)}
                           </td>
                         </tr>
                       );
@@ -448,11 +455,14 @@ export function QuotesTable({
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>{format(new Date(quote.quote_date), 'dd/MM/yyyy')}</span>
                   <span className="font-semibold text-white">
-                    £{Number(quote.total || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                    {formatCurrency(quote.total)}
                   </span>
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Remaining: £{Number(quote.invoice_summary?.remainingBalance ?? quote.total ?? 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                  Invoiced: {formatCurrency(quote.invoice_summary?.invoicedTotal)}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Remaining: {formatCurrency(quote.invoice_summary?.remainingBalance ?? quote.total)}
                 </div>
                 {isExpanded && previousVersions.length > 0 ? (
                   <div className="space-y-2 border-t border-slate-700/60 pt-3">
