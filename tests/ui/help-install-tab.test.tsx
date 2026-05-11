@@ -31,6 +31,12 @@ vi.mock('@/lib/hooks/useAuth', () => ({
   }),
 }));
 
+vi.mock('@/lib/hooks/usePermissionSnapshot', () => ({
+  usePermissionSnapshot: () => ({
+    enabledModuleSet: new Set(),
+  }),
+}));
+
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({}),
 }));

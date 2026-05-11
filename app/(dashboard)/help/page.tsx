@@ -36,18 +36,15 @@ import {
   Monitor,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useBrowserSupabaseClient } from '@/lib/hooks/useBrowserSupabaseClient';
+import { usePermissionSnapshot } from '@/lib/hooks/usePermissionSnapshot';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
 import type { FAQArticleWithCategory, FAQCategory, Suggestion } from '@/types/faq';
 import type { ErrorReport } from '@/types/error-reports';
 import type { ModuleName } from '@/types/roles';
-import { ALL_MODULES } from '@/types/roles';
 import Link from 'next/link';
 import { MODULE_PAGES, getPageLabel, getPageUrl } from '@/lib/config/module-pages';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PageLoader } from '@/components/ui/page-loader';
 import { forceAppRefresh } from '@/lib/client/force-app-refresh';
-import { createStatusError, getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -64,8 +61,8 @@ function checkStandaloneMode(): boolean {
 export default function HelpPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { profile, isAdmin, signOut } = useAuth(); // Get user info
-  const supabase = useBrowserSupabaseClient();
+  const { isAdmin, signOut } = useAuth();
+  const { enabledModuleSet: userPermissions } = usePermissionSnapshot();
   
   // FAQ state
   const [articles, setArticles] = useState<FAQArticleWithCategory[]>([]);
@@ -199,9 +196,6 @@ export default function HelpPage() {
     }
   }, []);
   
-  // User permissions
-  const [userPermissions, setUserPermissions] = useState<Set<ModuleName>>(new Set());
-
   const fetchFAQ = useCallback(async (query: string, category: string | null, isInitialLoad = false) => {
     try {
       if (isInitialLoad) {
@@ -264,35 +258,6 @@ export default function HelpPage() {
     }
   }, []);
 
-  // Fetch user permissions
-  useEffect(() => {
-    async function fetchPermissions() {
-      if (!profile?.id) return;
-      
-      // Admin has full access by definition.
-      if (isAdmin) {
-        setUserPermissions(new Set(ALL_MODULES));
-        return;
-      }
-      
-      try {
-        const response = await fetch('/api/me/permissions', { cache: 'no-store' });
-        const data = await response.json();
-        if (!response.ok) {
-          throw createStatusError(data.error || 'Failed to load permissions', response.status);
-        }
-
-        setUserPermissions(new Set<ModuleName>((data.enabled_modules || []) as ModuleName[]));
-      } catch (error) {
-        if (!isAuthErrorStatus(getErrorStatus(error)) && !isNetworkFetchError(error)) {
-          console.error('Error fetching permissions:', error);
-        }
-        setUserPermissions(new Set());
-      }
-    }
-    fetchPermissions();
-  }, [profile?.id, isAdmin, supabase]);
-
   // Fetch FAQ data on mount
   useEffect(() => {
     // Guard initial FAQ bootstrap from React StrictMode double-invocation in dev.
@@ -312,7 +277,7 @@ export default function HelpPage() {
 
   // Fetch user's error reports when tab changes
   useEffect(() => {
-    if (activeTab === 'my-errors') {
+    if (activeTab === 'errors') {
       fetchMyErrors();
     }
   }, [activeTab, fetchMyErrors]);
@@ -462,7 +427,7 @@ export default function HelpPage() {
         setErrorDescription('');
         setErrorPageSelection('');
         // Refresh error reports list if on that tab
-        if (activeTab === 'my-errors') {
+        if (activeTab === 'errors') {
           fetchMyErrors();
         }
       } else {
@@ -531,10 +496,6 @@ export default function HelpPage() {
       default: return status;
     }
   };
-
-  if (!supabase) {
-    return <PageLoader message="Loading help..." />;
-  }
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6">
