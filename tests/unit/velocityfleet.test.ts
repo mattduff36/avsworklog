@@ -115,10 +115,26 @@ describe('Velocityfleet service helpers', () => {
         lng: -1.2,
         speed: 31,
         heading: 180,
-        updatedAt: '2026-05-07T18:35:00Z',
+        updatedAt: '2026-05-07T18:35:00.000Z',
         customerId: 'customer-1',
       },
     ]);
+  });
+
+  it('normalizes Velocityfleet numeric timestamps before exposing map data', () => {
+    const [location] = parseVelocityfleetPositions({
+      devices: [
+        {
+          id: 123,
+          lat: 52.1,
+          lon: -1.2,
+          vehicle_registration: 'AB12 CDE',
+          timestamp: 1_778_178_900,
+        },
+      ],
+    });
+
+    expect(location.updatedAt).toBe('2026-05-07T18:35:00.000Z');
   });
 
   it('matches locations by normalized registration', () => {

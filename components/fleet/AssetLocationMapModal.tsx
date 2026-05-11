@@ -12,6 +12,7 @@ import {
 import { X } from 'lucide-react';
 import * as maptilersdk from '@maptiler/sdk';
 import '@maptiler/sdk/dist/maptiler-sdk.css';
+import { formatTrackerTimestamp } from '@/lib/utils/tracker-dates';
 
 interface LocationData {
   lat: number;
@@ -164,6 +165,7 @@ export function AssetLocationMapModal({
         if (isNaN(v.lat) || isNaN(v.lng)) continue;
 
         const label = extractLabel(v.name, v.vrn);
+        const lastSeen = formatTrackerTimestamp(v.updatedAt);
         otherCount++;
 
         new maptilersdk.Marker({ color: '#3b82f6' })
@@ -174,7 +176,7 @@ export function AssetLocationMapModal({
                 <strong>${label}</strong><br/>
                 ${v.vrn ? `VRN: ${v.vrn}<br/>` : ''}
                 Speed: ${v.speed ?? 0} mph<br/>
-                Last seen: ${new Date(v.updatedAt).toLocaleString('en-GB')}
+                Last seen: ${lastSeen}
               </div>`
             )
           )
@@ -184,6 +186,7 @@ export function AssetLocationMapModal({
       console.log(`[MapModal] Added ${otherCount} other vehicle markers`);
 
       // Add main asset marker (red) – on top
+      const assetLastSeen = formatTrackerTimestamp(location!.updatedAt);
       const marker = new maptilersdk.Marker({ color: '#ef4444' })
         .setLngLat([location!.lng, location!.lat])
         .setPopup(
@@ -192,7 +195,7 @@ export function AssetLocationMapModal({
               <strong>${assetLabel}</strong><br/>
               ${location!.vrn ? `VRN: ${location!.vrn}<br/>` : ''}
               Speed: ${location!.speed ?? 0} mph<br/>
-              Last seen: ${new Date(location!.updatedAt).toLocaleString('en-GB')}
+              Last seen: ${assetLastSeen}
             </div>`
           )
         )
@@ -214,6 +217,8 @@ export function AssetLocationMapModal({
     };
   }, [open, fetchDone, location, assetLabel, otherVehicles]);
 
+  const lastReported = formatTrackerTimestamp(location?.updatedAt);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[90vw] w-[90vw] max-h-[85vh] p-0 gap-0 flex flex-col [&>button:last-of-type]:hidden">
@@ -226,7 +231,7 @@ export function AssetLocationMapModal({
           <DialogTitle>Location – {assetLabel}</DialogTitle>
           <DialogDescription>
             {location
-              ? `Last reported: ${new Date(location.updatedAt).toLocaleString('en-GB')} · Speed: ${location.speed ?? 0} mph`
+              ? `Last reported: ${lastReported} · Speed: ${location.speed ?? 0} mph`
               : 'No location data available'}
           </DialogDescription>
           <div className="flex items-center gap-4 pt-1 text-xs text-muted-foreground">
