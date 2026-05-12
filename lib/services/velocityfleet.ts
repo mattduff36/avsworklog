@@ -1,3 +1,5 @@
+import { normalizeTrackerTimestamp } from '@/lib/utils/tracker-dates';
+
 const DEFAULT_BASE_URL = 'https://www.velocityfleet.com';
 const TOKEN_TTL_MS = 50 * 60_000;
 const CUSTOMER_IDS_TTL_MS = 15 * 60_000;
@@ -253,7 +255,7 @@ function mapVelocityfleetDevicePosition(
     lng,
     speed: numberValue(row.speed) ?? 0,
     heading: numberValue(row.direction) ?? 0,
-    updatedAt: stringValue(row.timestamp) || stringValue(row.time) || new Date().toISOString(),
+    updatedAt: normalizeTrackerTimestamp(row.timestamp) || normalizeTrackerTimestamp(row.time) || new Date().toISOString(),
     customerId,
   };
 }

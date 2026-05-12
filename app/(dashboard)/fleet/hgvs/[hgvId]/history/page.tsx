@@ -32,6 +32,7 @@ import { formatMileage, formatMaintenanceDate } from '@/lib/utils/maintenanceCal
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { useWorkshopTaskComments } from '@/lib/hooks/useWorkshopTaskComments';
 import { useTaskInspectionPhotos } from '@/lib/hooks/useTaskInspectionPhotos';
+import type { TrackerLocationData } from '@/types/fleet-tracker';
 
 // Dynamic imports for dialog components
 const EditMaintenanceDialog = dynamic(() => import('@/app/(dashboard)/maintenance/components/EditMaintenanceDialog').then(m => ({ default: m.EditMaintenanceDialog })), { ssr: false });
@@ -384,10 +385,7 @@ export default function HgvHistoryPage({
   const [showRecordUpdates, setShowRecordUpdates] = useState(true);
   const [hasMapMatch, setHasMapMatch] = useState(false);
   const [mapModalOpen, setMapModalOpen] = useState(false);
-  const [mapLocationData, setMapLocationData] = useState<{
-    lat: number; lng: number; speed: number; heading: number;
-    updatedAt: string; name: string; vrn: string; vehicleId: string;
-  } | null>(null);
+  const [mapLocationData, setMapLocationData] = useState<TrackerLocationData | null>(null);
 
   // Fetch comments for all workshop tasks
   const { comments: taskComments } = useWorkshopTaskComments({
@@ -881,6 +879,7 @@ export default function HgvHistoryPage({
                 <AssetLocationMap
                   regNumber={vehicle?.reg_number ?? undefined}
                   assetLabel={vehicle?.reg_number || 'Unknown'}
+                  locationProvider="fleetsmart"
                   loadingVariant="compact"
                   className="h-full min-h-[265px]"
                   onMatchResult={setHasMapMatch}
@@ -895,6 +894,7 @@ export default function HgvHistoryPage({
             <AssetLocationMap
               regNumber={vehicle.reg_number ?? undefined}
               assetLabel={vehicle.reg_number || 'Unknown'}
+              locationProvider="fleetsmart"
               loadingVariant="compact"
               className="h-[180px] rounded-lg"
               onMatchResult={setHasMapMatch}
@@ -910,6 +910,7 @@ export default function HgvHistoryPage({
         open={mapModalOpen}
         onOpenChange={setMapModalOpen}
         assetLabel={vehicle?.reg_number || 'Unknown'}
+        locationProvider="fleetsmart"
         location={mapLocationData}
       />
 
