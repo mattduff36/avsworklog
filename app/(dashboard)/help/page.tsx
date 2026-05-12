@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/ui/search-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -19,7 +20,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { 
-  Search, 
   HelpCircle, 
   Lightbulb, 
   BookOpen, 
@@ -674,15 +674,11 @@ export default function HelpPage() {
           {/* Search Bar */}
           <Card className="">
             <CardContent className="pt-6">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search FAQ articles..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+              <SearchInput
+                placeholder="Search FAQ articles..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
               {isFaqRefreshing && (
                 <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />

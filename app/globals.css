@@ -536,11 +536,11 @@ input[type="date"]::-webkit-datetime-edit-year-field {
   .px-4 { padding-left: 0.8rem !important; padding-right: 0.8rem !important; }
   .px-6 { padding-left: 1.2rem !important; padding-right: 1.2rem !important; }
 
-  /* Preserve leading-icon input clearance when base px-* padding is compacted. */
-  .pl-9 { padding-left: 1.8rem !important; }
-  .pl-10 { padding-left: 2rem !important; }
-  .pl-11 { padding-left: 2.2rem !important; }
-  .pl-12 { padding-left: 2.4rem !important; }
+  /* Preserve full leading-icon input clearance when base px-* padding is compacted. */
+  .pl-9 { padding-left: 2.25rem !important; }
+  .pl-10 { padding-left: 2.5rem !important; }
+  .pl-11 { padding-left: 2.75rem !important; }
+  .pl-12 { padding-left: 3rem !important; }
   
   .gap-2 { gap: 0.4rem !important; }
   .gap-3 { gap: 0.6rem !important; }
