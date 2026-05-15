@@ -44,7 +44,7 @@ import { getInspectionPhotoKey } from '@/lib/inspection-photos';
 import { getRecentVehicleIds, recordRecentVehicleId, splitVehiclesByRecent } from '@/lib/utils/recentVehicles';
 import { getReadingDigitGrowthWarning } from '@/lib/utils/readingDigitGrowthWarning';
 import { getInspectionErrorMessage, isDuplicateInspectionError } from '@/lib/utils/inspection-error-handling';
-import { getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
+import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 
 // Dynamic imports for heavy components
 const PhotoUpload = dynamic(() => import('@/components/forms/PhotoUpload'), { ssr: false });
@@ -229,9 +229,12 @@ function NewPlantInspectionContent() {
     const { data, error } = await query.maybeSingle();
 
     if (error) {
-      console.error('Failed to check for existing plant inspection:', error, {
-        errorContextId: 'plant-inspections-new-check-existing-error',
-      });
+      const status = getErrorStatus(error);
+      if (!isAuthErrorStatus(status) && !isNetworkFetchError(error)) {
+        console.error('Failed to check for existing plant inspection:', error, {
+          errorContextId: 'plant-inspections-new-check-existing-error',
+        });
+      }
       return null;
     }
 
@@ -872,7 +875,10 @@ function NewPlantInspectionContent() {
             setSelectedEmployeeId(user.id);
           }
         } catch (err) {
-          console.error('Error fetching employees:', err);
+          const status = getErrorStatus(err);
+          if (!isAuthErrorStatus(status) && !isNetworkFetchError(err)) {
+            console.error('Error fetching employees:', err);
+          }
         }
       };
 

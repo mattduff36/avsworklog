@@ -217,7 +217,10 @@ function PlantInspectionsContent() {
             }))
           );
         } catch (err) {
-          console.error('Error fetching employees:', err);
+          const status = getErrorStatus(err);
+          if (!isAuthErrorStatus(status) && !isNetworkFetchError(err)) {
+            console.error('Error fetching employees:', err);
+          }
         }
       };
 

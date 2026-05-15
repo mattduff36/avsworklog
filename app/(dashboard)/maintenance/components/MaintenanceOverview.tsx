@@ -46,6 +46,8 @@ const ALERT_TO_CATEGORY_NAME: Record<string, string> = {
   'Service (Hours)': MAINTENANCE_CATEGORY_NAMES.serviceHours,
 };
 
+const HISTORY_PREFETCH_CONCURRENCY = 4;
+
 interface MaintenanceOverviewProps {
   vehicles: VehicleMaintenanceWithStatus[];
   summary: {
@@ -152,6 +154,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   
   // Track which vehicles we've started fetching (prevents duplicate requests)
   const fetchingVehicles = useRef<Set<string>>(new Set());
+  const fetchedVehicleHistory = useRef<Set<string>>(new Set());
   
   // Create Workshop Task Dialog state
   const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false);
@@ -252,12 +255,13 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   
   const fetchVehicleHistory = useCallback(async (vehicleId: string, isPlant: boolean = false, force: boolean = false) => {
     // Check if already fetching or already have data (unless forced)
-    if (!force && (fetchingVehicles.current.has(vehicleId) || vehicleHistory[vehicleId])) {
+    if (!force && (fetchingVehicles.current.has(vehicleId) || fetchedVehicleHistory.current.has(vehicleId))) {
       return; // Already fetching or already fetched
     }
     
     // Mark as fetching
     fetchingVehicles.current.add(vehicleId);
+    fetchedVehicleHistory.current.add(vehicleId);
     
     setVehicleHistory(prev => ({ ...prev, [vehicleId]: { history: [], workshopTasks: [], loading: true } }));
     
@@ -310,7 +314,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       // Always remove from fetching set after completion
       fetchingVehicles.current.delete(vehicleId);
     }
-  }, [vehicleHistory]);
+  }, []);
   
   // Helper to determine if a vehicle ID corresponds to a plant asset
   const isPlantAsset = useCallback((vehicleId: string) => {
@@ -335,15 +339,31 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         v.loler_status?.status === 'overdue' || v.loler_status?.status === 'due_soon';
     });
     
-    vehiclesWithAlerts.forEach(vehicle => {
-      const isPlant = 'is_plant' in vehicle && vehicle.is_plant === true;
-      const vehicleId = isPlant
-        ? (vehicle.plant_id ?? vehicle.id)
-        : (vehicle.van_id ?? vehicle.hgv_id ?? vehicle.id);
-      if (vehicleId) {
-        fetchVehicleHistory(vehicleId, isPlant);
+    const historyRequests = vehiclesWithAlerts
+      .map(vehicle => {
+        const isPlant = 'is_plant' in vehicle && vehicle.is_plant === true;
+        const vehicleId = isPlant
+          ? (vehicle.plant_id ?? vehicle.id)
+          : (vehicle.van_id ?? vehicle.hgv_id ?? vehicle.id);
+
+        return vehicleId ? { vehicleId, isPlant } : null;
+      })
+      .filter((request): request is { vehicleId: string; isPlant: boolean } => request !== null);
+
+    let isCancelled = false;
+
+    const prefetchHistory = async () => {
+      for (let index = 0; index < historyRequests.length && !isCancelled; index += HISTORY_PREFETCH_CONCURRENCY) {
+        const batch = historyRequests.slice(index, index + HISTORY_PREFETCH_CONCURRENCY);
+        await Promise.all(batch.map(({ vehicleId, isPlant }) => fetchVehicleHistory(vehicleId, isPlant)));
       }
-    });
+    };
+
+    void prefetchHistory();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [vehicles, fetchVehicleHistory]); // Note: isPlantAsset not needed here since we check inline
   
   // Group vehicles by their most severe alert status

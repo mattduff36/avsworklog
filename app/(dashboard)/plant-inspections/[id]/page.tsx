@@ -26,6 +26,7 @@ import { InformWorkshopSummary } from '@/components/inspections/InformWorkshopSu
 import { useInspectionPhotos } from '@/lib/hooks/useInspectionPhotos';
 import { getInspectionPhotoKey } from '@/lib/inspection-photos';
 import { formatReferenceId, getReferenceIdSuffix, getWorkshopTaskHref } from '@/lib/utils/reference-ids';
+import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 import { toast } from 'sonner';
 
 interface PlantInspectionWithDetails {
@@ -163,9 +164,13 @@ export default function ViewPlantInspectionPage() {
           profiles!plant_inspections_user_id_fkey (full_name)
         `)
         .eq('id', id)
-        .single();
+        .maybeSingle();
 
       if (inspectionError) throw inspectionError;
+      if (!inspectionData) {
+        setError('Inspection not found');
+        return;
+      }
       
       if (
         inspectionData &&
@@ -228,7 +233,10 @@ export default function ViewPlantInspectionPage() {
       // Draft edits are handled on /plant-inspections/new?id=...
     } catch (err) {
       const errorContextId = 'plant-inspection-details-fetch-error';
-      console.error('Error fetching inspection:', err, { errorContextId });
+      const status = getErrorStatus(err);
+      if (!isAuthErrorStatus(status) && !isNetworkFetchError(err)) {
+        console.error('Error fetching inspection:', err, { errorContextId });
+      }
       const message = err instanceof Error ? err.message : 'Failed to load inspection';
       setError(message);
       toast.error(message, { id: errorContextId });
