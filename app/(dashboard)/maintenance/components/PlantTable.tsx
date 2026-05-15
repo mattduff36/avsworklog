@@ -699,7 +699,7 @@ export function PlantTable({
                             </div>
                             {asset.maintenance_items?.find(item => item.category_field_key === 'loler_due_date') && (
                               <div className="flex justify-between">
-                                <span>LOLER / Inspection Due:</span>
+                                <span>LOLER THOROUGH EXAMINATION Due:</span>
                                 <span className="text-white">
                                   {asset.maintenance_items.find(item => item.category_field_key === 'loler_due_date')?.display_value}
                                 </span>

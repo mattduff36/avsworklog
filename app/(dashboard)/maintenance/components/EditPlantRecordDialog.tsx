@@ -640,7 +640,7 @@ export function EditPlantRecordDialog({
           <DialogDescription className="text-muted-foreground">
             {isNewRecord 
               ? 'Set up maintenance schedule for this plant machinery. A comment is required to explain the initial setup.' 
-              : 'Update maintenance schedules and LOLOR / Inspection information. A comment is required to explain changes.'
+              : 'Update maintenance schedules and LOLER THOROUGH EXAMINATION information. A comment is required to explain changes.'
             }
           </DialogDescription>
         </DialogHeader>
@@ -812,16 +812,16 @@ export function EditPlantRecordDialog({
             </div>
           </div>
 
-          {/* LOLOR / Inspection Compliance */}
+          {/* LOLER THOROUGH EXAMINATION Compliance */}
           <div className="space-y-4">
             <h3 className="font-semibold text-lg border-b border-slate-700 pb-2">
-              LOLOR / Inspection Compliance
+              LOLER THOROUGH EXAMINATION Compliance
             </h3>
             
             <div className="grid md:grid-cols-2 gap-4">
-              {/* LOLOR / Inspection Due Date */}
+              {/* LOLER THOROUGH EXAMINATION Due Date */}
               <div className="space-y-2">
-                <Label htmlFor="loler_due_date">LOLOR / Inspection Due Date</Label>
+                <Label htmlFor="loler_due_date">LOLER THOROUGH EXAMINATION Due Date</Label>
                 <Input
                   id="loler_due_date"
                   type="date"
@@ -904,7 +904,7 @@ export function EditPlantRecordDialog({
             <Textarea
               id="comment"
               {...register('comment')}
-              placeholder="e.g., LOLER inspection completed on 15 Dec 2025, all checks passed. Certificate issued."
+              placeholder="e.g., LOLER THOROUGH EXAMINATION completed on 15 Dec 2025, all checks passed. Certificate issued."
               className="bg-input border-border text-white"
               rows={3}
             />

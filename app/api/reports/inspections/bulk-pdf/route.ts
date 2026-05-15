@@ -32,6 +32,7 @@ interface PlantShape {
   plant_id?: string | null;
   nickname?: string | null;
   serial_number?: string | null;
+  loler_due_date?: string | null;
   van_categories?: { name: string } | null;
 }
 
@@ -165,6 +166,7 @@ function resolvePlantTemplate(
           plant_id: inspection.hired_plant_id_serial || 'Unknown',
           nickname: inspection.hired_plant_description || null,
           serial_number: null,
+          loler_due_date: null,
           van_categories: null,
           isHired: true,
           hiringCompany: inspection.hired_plant_hiring_company || null,
@@ -173,6 +175,7 @@ function resolvePlantTemplate(
           plant_id: inspection.plant?.plant_id || 'Unknown',
           nickname: inspection.plant?.nickname || null,
           serial_number: inspection.plant?.serial_number || null,
+          loler_due_date: inspection.plant?.loler_due_date || null,
           van_categories: inspection.plant?.van_categories || null,
         },
     operator: {
@@ -335,6 +338,7 @@ async function fetchScopedInspections(
                 plant_id,
                 nickname,
                 serial_number,
+                loler_due_date,
                 van_categories(name)
               ),
               profile:profiles!plant_inspections_user_id_fkey(full_name)

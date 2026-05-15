@@ -22,6 +22,7 @@ interface PlantInspectionWithRelations {
     plant_id: string;
     nickname: string | null;
     serial_number: string | null;
+    loler_due_date: string | null;
     van_categories: { name: string } | null;
   } | null;
   profile?: {
@@ -52,6 +53,7 @@ export async function GET(
           plant_id,
           nickname,
           serial_number,
+          loler_due_date,
           van_categories(name)
         ),
         profile:profiles!plant_inspections_user_id_fkey(full_name)
@@ -122,6 +124,7 @@ export async function GET(
             plant_id: inspectionWithRelations.hired_plant_id_serial || 'Unknown',
             nickname: inspectionWithRelations.hired_plant_description || null,
             serial_number: null,
+            loler_due_date: null,
             van_categories: null,
             isHired: true,
             hiringCompany: inspectionWithRelations.hired_plant_hiring_company || null,
@@ -130,6 +133,7 @@ export async function GET(
             plant_id: inspectionWithRelations.plant?.plant_id || 'Unknown',
             nickname: inspectionWithRelations.plant?.nickname || null,
             serial_number: inspectionWithRelations.plant?.serial_number || null,
+            loler_due_date: inspectionWithRelations.plant?.loler_due_date || null,
             van_categories: inspectionWithRelations.plant?.van_categories || null,
           },
       operator: {

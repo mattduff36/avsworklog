@@ -19,8 +19,15 @@ const styles = StyleSheet.create({
   companyPhone: { fontSize: 8, fontWeight: 'bold' },
   registeredNo: { fontSize: 6, fontStyle: 'italic', marginTop: 1, marginBottom: 2 },
   pageTitle: { fontSize: 11, fontWeight: 'bold', marginTop: 2 },
+  certificateTitle: { fontSize: 10, fontWeight: 'bold', marginTop: 2 },
   topTable: { borderWidth: 1, borderColor: '#000' },
   topRow: { flexDirection: 'row', minHeight: 30 },
+  topRowDivider: {
+    flexDirection: 'row',
+    minHeight: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#000',
+  },
   topCell: {
     padding: 4,
     justifyContent: 'center',
@@ -130,6 +137,7 @@ interface PlantInspectionPDFProps {
     nickname: string | null;
     serial_number?: string | null;
     van_categories: { name: string } | null;
+    loler_due_date?: string | null;
     isHired?: boolean;
     hiringCompany?: string | null;
   };
@@ -147,6 +155,11 @@ interface PlantInspectionPDFProps {
     day_of_week: number;
     hours: number | null;
   }>;
+}
+
+function formatOptionalDate(value?: string | null) {
+  const formatted = formatDate(value);
+  return formatted || '-';
 }
 
 export function PlantInspectionPDF({
@@ -196,6 +209,7 @@ export function PlantInspectionPDF({
   const machineText = plant.isHired
     ? `${plant.plant_id}${plant.nickname ? ` (${plant.nickname})` : ''}`
     : `${plant.plant_id}${plant.nickname ? ` (${plant.nickname})` : ''}${plant.serial_number ? ` (SN: ${plant.serial_number})` : ''}`;
+  const lolerExpiryText = formatOptionalDate(plant.loler_due_date);
 
   return (
     <Document>
@@ -212,6 +226,7 @@ export function PlantInspectionPDF({
           <Text style={styles.companyPhone}>Telephone: SOUTHWELL (01636) 812227</Text>
           <Text style={styles.registeredNo}>Registered in England No. 1000918</Text>
           <Text style={styles.pageTitle}>OPERATED PLANT INSPECTION PAD</Text>
+          <Text style={styles.certificateTitle}>LOLER THOROUGH EXAMINATION</Text>
         </View>
 
         <View style={styles.topTable}>
@@ -225,8 +240,22 @@ export function PlantInspectionPDF({
               <Text style={styles.topValue}>{inspection.current_mileage != null ? `${inspection.current_mileage}` : '-'}</Text>
             </View>
             <View style={[styles.topCellLast, { width: '38%' }]}>
-              <Text style={styles.topLabel}>OPERATOR&apos;S NAME</Text>
+              <Text style={styles.topLabel}>INSPECTOR NAME</Text>
               <Text style={styles.topValue}>{operator.full_name}</Text>
+            </View>
+          </View>
+          <View style={styles.topRowDivider}>
+            <View style={[styles.topCell, { width: '44%' }]}>
+              <Text style={styles.topLabel}>EXAMINATION</Text>
+              <Text style={styles.topValue}>LOLER THOROUGH EXAMINATION</Text>
+            </View>
+            <View style={[styles.topCell, { width: '18%' }]}>
+              <Text style={styles.topLabel}>INTERVAL</Text>
+              <Text style={styles.topValue}>YEARLY</Text>
+            </View>
+            <View style={[styles.topCellLast, { width: '38%' }]}>
+              <Text style={styles.topLabel}>EXPIRY</Text>
+              <Text style={styles.topValue}>{lolerExpiryText}</Text>
             </View>
           </View>
         </View>

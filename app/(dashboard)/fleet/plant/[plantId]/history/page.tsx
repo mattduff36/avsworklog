@@ -414,10 +414,10 @@ export default function PlantHistoryPage({
       tax_due_date: 'Tax Due Date',
       mot_due_date: 'MOT Due Date',
       current_mileage: 'Current Mileage',
-      loler_due_date: 'LOLOR / Inspection Due Date',
-      loler_last_inspection_date: 'LOLOR / Inspection Last Inspection',
-      loler_certificate_number: 'LOLOR / Inspection Certificate',
-      loler_inspection_interval_months: 'LOLOR / Inspection Interval',
+      loler_due_date: 'LOLER THOROUGH EXAMINATION Due Date',
+      loler_last_inspection_date: 'LOLER THOROUGH EXAMINATION Last Inspection',
+      loler_certificate_number: 'LOLER THOROUGH EXAMINATION Certificate',
+      loler_inspection_interval_months: 'LOLER THOROUGH EXAMINATION Interval',
       tracker_id: 'GPS Tracker',
       no_changes: 'Update (No Field Changes)',
     };
@@ -601,9 +601,9 @@ export default function PlantHistoryPage({
                     </p>
                   </div>
 
-                  {/* LOLOR / Inspection Due Date */}
+                  {/* LOLER THOROUGH EXAMINATION Due Date */}
                   <div className="space-y-1">
-                    <span className="text-xs text-slate-400 uppercase tracking-wide">LOLOR / Inspection Due</span>
+                    <span className="text-xs text-slate-400 uppercase tracking-wide">LOLER THOROUGH EXAMINATION Due</span>
                     <p className="text-lg font-semibold text-white">
                       {formatMaintenanceDate(plant?.loler_due_date)}
                     </p>
