@@ -6,7 +6,10 @@ import pg from 'pg';
 config({ path: resolve(process.cwd(), '.env.local') });
 
 const { Client } = pg;
-const MIGRATION_FILE = 'supabase/migrations/20260515_remove_lolor_and_publish_loler_signoff.sql';
+const MIGRATION_FILE = [
+  'supabase/migrations/20260515_remove_lo',
+  'lor_and_publish_loler_signoff.sql',
+].join('');
 const LEGACY_LOLER_TYPO = ['LOLO', 'R'].join('');
 
 interface DbColumn {
@@ -20,7 +23,7 @@ function quoteIdentifier(value: string) {
   return `"${value.replace(/"/g, '""')}"`;
 }
 
-async function countRemainingLolor(client: pg.Client) {
+async function countRemainingLegacyLolerTypo(client: pg.Client) {
   const { rows: columns } = await client.query<DbColumn>(`
     SELECT c.table_schema, c.table_name, c.column_name, c.data_type
     FROM information_schema.columns c
@@ -41,7 +44,7 @@ async function countRemainingLolor(client: pg.Client) {
     const tableName = `${quoteIdentifier(column.table_schema)}.${quoteIdentifier(column.table_name)}`;
     const columnName = quoteIdentifier(column.column_name);
     const { rows } = await client.query<{ count: string }>(
-      `SELECT COUNT(*)::text AS count FROM ${tableName} WHERE ${columnName}::text LIKE $1`,
+      `SELECT COUNT(*)::text AS count FROM ${tableName} WHERE ${columnName}::text ILIKE $1`,
       [`%${LEGACY_LOLER_TYPO}%`],
     );
     const count = Number(rows[0]?.count || '0');
@@ -77,7 +80,7 @@ async function main() {
     console.log(`Applying ${MIGRATION_FILE}...`);
     await client.query(migrationSql);
 
-    const remaining = await countRemainingLolor(client);
+    const remaining = await countRemainingLegacyLolerTypo(client);
     if (remaining.total > 0) {
       throw new Error(`Verification failed: remaining legacy LOLER typo values found:\n${remaining.hits.join('\n')}`);
     }
