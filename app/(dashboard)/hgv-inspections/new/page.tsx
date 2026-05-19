@@ -29,7 +29,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { PageLoader } from '@/components/ui/page-loader';
 import { AlertCircle, AlertTriangle, ArrowLeft, Camera, CheckCircle2, Info, Send, Timer, User, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { TRUCK_CHECKLIST_ITEMS } from '@/lib/checklists/vehicle-checklists';
+import {
+  HGV_ARTIC_ONLY_END_ITEM,
+  HGV_ARTIC_ONLY_START_ITEM,
+  TRUCK_CHECKLIST_ITEMS,
+} from '@/lib/checklists/vehicle-checklists';
 import { formatDate, formatDateISO, getDayOfWeek } from '@/lib/utils/date';
 import { getRecentVehicleIds, recordRecentVehicleId, splitVehiclesByRecent } from '@/lib/utils/recentVehicles';
 import { getInspectionVisibilityFlags } from '@/lib/utils/inspection-access';
@@ -63,13 +67,35 @@ type ExistingInspectionConflict = { id: string; status: 'draft' | 'submitted' };
 
 const MIN_HGV_INSPECTION_SECONDS = 10 * 60;
 const STICKY_NAV_OFFSET_PX = 96;
-const ARTIC_ONLY_START_ITEM = 22;
-const ARTIC_ONLY_END_ITEM = 25;
 const getInspectionTimerStorageKey = (inspectionId: string): string => `hgv-inspection-timer-start:${inspectionId}`;
 type RecentCompletedDefect = { completedAt: string };
 
 function isArticOnlyItem(itemNumber: number): boolean {
-  return itemNumber >= ARTIC_ONLY_START_ITEM && itemNumber <= ARTIC_ONLY_END_ITEM;
+  return itemNumber >= HGV_ARTIC_ONLY_START_ITEM && itemNumber <= HGV_ARTIC_ONLY_END_ITEM;
+}
+
+function normalizeChecklistLabel(label?: string | null): string {
+  return (label || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function resolveCurrentHgvChecklistItemNumber(itemDescription?: string | null, fallbackItemNumber?: number): number {
+  const normalizedDescription = normalizeChecklistLabel(itemDescription);
+  const currentIndex = TRUCK_CHECKLIST_ITEMS.findIndex(
+    (checklistItem) => normalizeChecklistLabel(checklistItem) === normalizedDescription
+  );
+
+  return currentIndex >= 0 ? currentIndex + 1 : fallbackItemNumber || 0;
+}
+
+function resolveCurrentHgvDefectSignature(signature: string): string {
+  const match = signature.match(/^\s*(\d+)\s*-\s*(.+?)\s*$/);
+  if (!match) return signature;
+
+  const itemDescription = match[2];
+  return buildInspectionDefectSignature({
+    item_number: resolveCurrentHgvChecklistItemNumber(itemDescription, Number(match[1])),
+    item_description: itemDescription,
+  });
 }
 
 function NewHgvInspectionContent() {
@@ -581,13 +607,14 @@ function NewHgvInspectionContent() {
 
       const { data: items } = await supabase
         .from('inspection_items')
-        .select('item_number, status, comments')
+        .select('item_number, item_description, status, comments')
         .eq('inspection_id', id);
 
       const restoredStates: Record<string, InspectionStatus> = {};
       const restoredComments: Record<string, string> = {};
-      for (const item of (items || []) as Array<{ item_number: number; status: InspectionStatus; comments: string | null }>) {
-        const key = `${item.item_number}`;
+      for (const item of (items || []) as Array<{ item_number: number; item_description: string | null; status: InspectionStatus; comments: string | null }>) {
+        const itemNumber = resolveCurrentHgvChecklistItemNumber(item.item_description, item.item_number);
+        const key = `${itemNumber}`;
         restoredStates[key] = item.status;
         if (item.comments) restoredComments[key] = item.comments;
       }
@@ -830,8 +857,9 @@ function NewHgvInspectionContent() {
       const initialStates: Record<string, InspectionStatus> = {};
       const initialComments: Record<string, string> = {};
 
-      for (const item of lockedItems as Array<{ item_number: number; status?: string; comment: string; actionId: string }>) {
-        const key = `${item.item_number}`;
+      for (const item of lockedItems as Array<{ item_number: number; item_description?: string | null; status?: string; comment: string; actionId: string }>) {
+        const itemNumber = resolveCurrentHgvChecklistItemNumber(item.item_description, item.item_number);
+        const key = `${itemNumber}`;
         const statusLabel =
           item.status === 'pending' ? 'pending' :
           item.status === 'on_hold' ? 'on hold' :
@@ -845,7 +873,7 @@ function NewHgvInspectionContent() {
 
       const recentCompletedMap = new Map<string, RecentCompletedDefect>();
       recentCompletedItems.forEach((item) => {
-        recentCompletedMap.set(item.signature, { completedAt: item.completedAt });
+        recentCompletedMap.set(resolveCurrentHgvDefectSignature(item.signature), { completedAt: item.completedAt });
       });
 
       setRecentlyCompletedDefects(recentCompletedMap);
@@ -1560,9 +1588,9 @@ function NewHgvInspectionContent() {
       {checklistStarted && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-foreground">25-Point HGV Safety Check</CardTitle>
+            <CardTitle className="text-foreground">{TRUCK_CHECKLIST_ITEMS.length}-Point HGV Safety Check</CardTitle>
             <CardDescription className="text-muted-foreground">
-              Mark each item as Pass or Fail (items 22-25 also allow N/A)
+              Mark each item as Pass or Fail (items {HGV_ARTIC_ONLY_START_ITEM}-{HGV_ARTIC_ONLY_END_ITEM} also allow N/A)
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 p-4 md:p-6">
@@ -1585,7 +1613,7 @@ function NewHgvInspectionContent() {
                     const statusOptions = getStatusOptions(itemNumber);
                     return (
                       <Fragment key={itemNumber}>
-                        {itemNumber === ARTIC_ONLY_START_ITEM && (
+                        {itemNumber === HGV_ARTIC_ONLY_START_ITEM && (
                           <tr className="bg-blue-500/10 border-y border-blue-400/40">
                             <td colSpan={4} className="p-2 text-center text-xs font-semibold tracking-wide text-blue-200 uppercase">
                               Artics only
@@ -1668,7 +1696,7 @@ function NewHgvInspectionContent() {
                 const statusOptions = getStatusOptions(itemNumber);
                 return (
                   <Fragment key={itemNumber}>
-                    {itemNumber === ARTIC_ONLY_START_ITEM && (
+                    {itemNumber === HGV_ARTIC_ONLY_START_ITEM && (
                       <div className="rounded-md border border-blue-400/50 bg-blue-500/10 px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-blue-200">
                         Artics only
                       </div>

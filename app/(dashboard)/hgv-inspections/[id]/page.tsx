@@ -348,7 +348,7 @@ export default function ViewHgvInspectionPage() {
       <Card className="">
         <CardHeader>
           <CardTitle>Checklist Items</CardTitle>
-          <CardDescription>25-point HGV checklist results</CardDescription>
+          <CardDescription>HGV checklist results</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="hidden md:block overflow-x-auto">

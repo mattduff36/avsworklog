@@ -476,7 +476,7 @@ function HgvInspectionsContent() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
           <div>
             <h1 className="text-3xl font-bold text-white mb-2">HGV Daily Checks</h1>
-            <p className="text-muted-foreground">Daily 25-point HGV safety checks</p>
+            <p className="text-muted-foreground">Daily 26-point HGV safety checks</p>
           </div>
           <Link href="/hgv-inspections/new">
             <Button className={`bg-hgv-inspection hover:bg-hgv-inspection-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg ${tabletModeEnabled ? 'min-h-11 text-base px-4 [&_svg]:size-5' : ''}`}>

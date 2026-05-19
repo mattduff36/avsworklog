@@ -73,7 +73,7 @@ export const FORM_TYPES: FormType[] = [
   {
     id: 'hgv-inspection',
     title: 'HGV Daily Checks',
-    description: 'Daily 25-point safety checklist',
+    description: 'Daily 26-point safety checklist',
     icon: ClipboardCheck,
     href: '/hgv-inspections',
     listHref: '/hgv-inspections',

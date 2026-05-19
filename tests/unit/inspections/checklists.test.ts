@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   getChecklistForCategory,
+  HGV_ARTIC_ONLY_START_ITEM,
   isVanCategory,
   TRUCK_CHECKLIST_ITEMS,
   VAN_CHECKLIST_ITEMS,
@@ -14,24 +15,36 @@ import {
 
 describe('Vehicle Checklists', () => {
   describe('getChecklistForCategory', () => {
-    it('returns 14-item checklist for Van', () => {
+    it('returns 15-item checklist for Van', () => {
       const items = getChecklistForCategory('Van');
-      expect(items).toHaveLength(14);
+      expect(items).toHaveLength(15);
       expect(items).toBe(VAN_CHECKLIST_ITEMS);
     });
 
-    it('returns 25-item checklist for Truck', () => {
+    it('returns 26-item checklist for Truck', () => {
       const items = getChecklistForCategory('Truck');
-      expect(items).toHaveLength(25);
+      expect(items).toHaveLength(26);
       expect(items).toBe(TRUCK_CHECKLIST_ITEMS);
     });
 
-    it('returns 25-item checklist for Artic', () => {
+    it('returns 26-item checklist for Artic', () => {
       expect(getChecklistForCategory('Artic')).toBe(TRUCK_CHECKLIST_ITEMS);
     });
 
-    it('returns 25-item checklist for Trailer', () => {
+    it('returns 26-item checklist for Trailer', () => {
       expect(getChecklistForCategory('Trailer')).toBe(TRUCK_CHECKLIST_ITEMS);
+    });
+
+    it('adds Transmission to vans after the existing 14 items', () => {
+      expect(VAN_CHECKLIST_ITEMS[13]).toBe('Brake Test');
+      expect(VAN_CHECKLIST_ITEMS[14]).toBe('Transmission');
+    });
+
+    it('adds HGV Transmission before artic-only items', () => {
+      expect(TRUCK_CHECKLIST_ITEMS[20]).toBe('Side underbar/Rails');
+      expect(TRUCK_CHECKLIST_ITEMS[21]).toBe('Transmission');
+      expect(HGV_ARTIC_ONLY_START_ITEM).toBe(23);
+      expect(TRUCK_CHECKLIST_ITEMS[HGV_ARTIC_ONLY_START_ITEM - 1]).toBe('Brake Hoses');
     });
 
     it('falls back to truck checklist for unknown category', () => {
