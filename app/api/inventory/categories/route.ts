@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireInventoryAccess, requireInventoryManagerAccess } from '@/lib/server/inventory-auth';
+import { loadCategoryItemCounts } from '@/lib/server/inventory-category-counts';
 
 interface CreateInventoryCategoryBody {
   name?: string;
@@ -22,21 +23,6 @@ function isValidSlug(value: string): boolean {
   return /^[a-z0-9]+(_[a-z0-9]+)*$/.test(value);
 }
 
-async function loadCategoryItemCounts(admin: ReturnType<typeof createAdminClient>) {
-  const { data, error } = await admin
-    .from('inventory_items')
-    .select('category');
-
-  if (error) throw error;
-
-  return (data || []).reduce<Record<string, number>>((counts, item) => {
-    const category = item.category as string | null;
-    if (!category) return counts;
-    counts[category] = (counts[category] || 0) + 1;
-    return counts;
-  }, {});
-}
-
 export async function GET() {
   try {
     const access = await requireInventoryAccess();
@@ -45,16 +31,14 @@ export async function GET() {
     }
 
     const admin = createAdminClient();
-    const [{ data: categories, error: categoriesError }, itemCounts] = await Promise.all([
-      admin
-        .from('inventory_item_categories')
-        .select('*')
-        .order('sort_order', { ascending: true })
-        .order('name', { ascending: true }),
-      loadCategoryItemCounts(admin),
-    ]);
+    const { data: categories, error: categoriesError } = await admin
+      .from('inventory_item_categories')
+      .select('*')
+      .order('sort_order', { ascending: true })
+      .order('name', { ascending: true });
 
     if (categoriesError) throw categoriesError;
+    const itemCounts = await loadCategoryItemCounts(admin, categories || []);
 
     return NextResponse.json({
       categories: (categories || []).map((category) => ({

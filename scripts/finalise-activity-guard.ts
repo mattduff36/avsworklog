@@ -49,9 +49,10 @@ function hasExitFooter(content: string): boolean {
 }
 
 function isTerminalCommandRunning(header: string, content: string): boolean {
+  if (hasExitFooter(content)) return false;
   if (/^running_for_ms:/imu.test(header)) return true;
   if (/^active_command:/imu.test(header)) return true;
-  return /^started_at:/imu.test(header) && !hasExitFooter(content);
+  return /^started_at:/imu.test(header);
 }
 
 export function parseTerminalActivity(filePath: string, content: string): TerminalActivity | null {
