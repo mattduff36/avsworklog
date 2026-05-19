@@ -81,6 +81,24 @@ function renderLocationWithHint(item: InventoryItem) {
   );
 }
 
+function getVanLocationNickname(item: InventoryItem): string | null {
+  if (item.location?.linked_asset_type !== 'van') return null;
+  return item.location.linked_asset_nickname?.trim() || null;
+}
+
+function renderLocationDetails(item: InventoryItem) {
+  const linkedVanNickname = getVanLocationNickname(item);
+
+  return (
+    <div>
+      <div>{renderLocationWithHint(item)}</div>
+      {linkedVanNickname ? (
+        <div className="text-xs text-muted-foreground">{linkedVanNickname}</div>
+      ) : null}
+    </div>
+  );
+}
+
 export function InventoryTable({
   items,
   selectedItemIds,
@@ -97,6 +115,7 @@ export function InventoryTable({
     const query = search.trim().toLowerCase();
     const filtered = items.filter((item) => {
       const locationName = item.location?.name || '';
+      const linkedVanNickname = getVanLocationNickname(item) || '';
       const checkStatus = getInventoryCheckStatus(item);
 
       if (filter === 'yard' && locationName.toLowerCase() !== 'yard') return false;
@@ -107,7 +126,8 @@ export function InventoryTable({
       return (
         item.item_number.toLowerCase().includes(query) ||
         item.name.toLowerCase().includes(query) ||
-        locationName.toLowerCase().includes(query)
+        locationName.toLowerCase().includes(query) ||
+        linkedVanNickname.toLowerCase().includes(query)
       );
     });
 
@@ -256,7 +276,7 @@ export function InventoryTable({
                       <div className="font-medium text-white">{item.name}</div>
                       <div className="text-xs text-muted-foreground">{INVENTORY_CATEGORY_LABELS[item.category]}</div>
                     </td>
-                    <td className="px-4 py-3 text-slate-300">{renderLocationWithHint(item)}</td>
+                    <td className="px-4 py-3 text-slate-300">{renderLocationDetails(item)}</td>
                     <td className="px-4 py-3 text-slate-300">
                       <div>{formatInventoryDate(item.last_checked_at)}</div>
                       <div className="text-xs text-muted-foreground">Due {getInventoryDueDate(item.last_checked_at)}</div>
@@ -314,7 +334,10 @@ export function InventoryTable({
                   </Badge>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {renderLocationWithHint(item)}</span>
+                  <div className="flex items-start gap-1">
+                    <MapPin className="mt-0.5 h-3 w-3" />
+                    {renderLocationDetails(item)}
+                  </div>
                   <span>Last: {formatInventoryDate(item.last_checked_at)}</span>
                   <span>Due: {getInventoryDueDate(item.last_checked_at)}</span>
                 </div>

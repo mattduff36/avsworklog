@@ -21,6 +21,24 @@ interface SourceLocationHint {
   rows: number[];
 }
 
+interface InventoryLocationRow {
+  linked_van_id?: string | null;
+  name?: string | null;
+  [key: string]: unknown;
+}
+
+interface InventoryItemRow {
+  item_number_normalized: string;
+  location?: InventoryLocationRow | null;
+  [key: string]: unknown;
+}
+
+interface LinkedVanSummary {
+  id: string;
+  reg_number: string;
+  nickname: string | null;
+}
+
 function cleanOptionalDate(value: string | null | undefined): string | null {
   if (!value) return null;
   return value;
@@ -72,6 +90,45 @@ async function readCompleteListLocationHints(): Promise<Map<string, SourceLocati
   return hints;
 }
 
+function getLinkedVanIds(items: InventoryItemRow[]): string[] {
+  return Array.from(new Set(items
+    .map((item) => item.location?.linked_van_id)
+    .filter((linkedVanId): linkedVanId is string => Boolean(linkedVanId))
+  ));
+}
+
+async function loadLinkedVans(
+  admin: ReturnType<typeof createAdminClient>,
+  linkedVanIds: string[]
+): Promise<Map<string, LinkedVanSummary>> {
+  if (linkedVanIds.length === 0) return new Map();
+
+  const { data, error } = await admin
+    .from('vans')
+    .select('id, reg_number, nickname')
+    .in('id', linkedVanIds);
+
+  if (error) throw error;
+
+  return new Map((data || []).map((van) => [van.id, van]));
+}
+
+function addLinkedVanDisplay(item: InventoryItemRow, vanById: Map<string, LinkedVanSummary>): InventoryItemRow {
+  const linkedVanId = item.location?.linked_van_id;
+  if (!linkedVanId) return item;
+
+  const van = vanById.get(linkedVanId);
+  return {
+    ...item,
+    location: {
+      ...item.location,
+      linked_asset_type: 'van',
+      linked_asset_label: van?.reg_number || null,
+      linked_asset_nickname: van?.nickname || null,
+    },
+  };
+}
+
 export async function GET(request: NextRequest) {
   try {
     const access = await requireInventoryAccess();
@@ -83,7 +140,8 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(Math.max(Number.parseInt(searchParams.get('limit') || '500', 10) || 500, 1), 1000);
     const offset = Math.max(Number.parseInt(searchParams.get('offset') || '0', 10) || 0, 0);
 
-    const { data, error } = await createAdminClient()
+    const admin = createAdminClient();
+    const { data, error } = await admin
       .from('inventory_items')
       .select(`
         *,
@@ -93,6 +151,9 @@ export async function GET(request: NextRequest) {
       .range(offset, offset + limit - 1);
 
     if (error) throw error;
+    const items = (data || []) as InventoryItemRow[];
+    const vanById = await loadLinkedVans(admin, getLinkedVanIds(items));
+
     let sourceLocationHints = new Map<string, SourceLocationHint>();
     try {
       sourceLocationHints = await readCompleteListLocationHints();
@@ -100,14 +161,15 @@ export async function GET(request: NextRequest) {
       console.warn('Unable to read inventory spreadsheet location hints:', hintError);
     }
 
-    const inventory = (data || []).map((item) => {
-      if (item.location?.name?.toLowerCase() !== 'nolocation') return item;
+    const inventory = items.map((item) => {
+      const itemWithLinkedVan = addLinkedVanDisplay(item, vanById);
+      if (itemWithLinkedVan.location?.name?.toLowerCase() !== 'nolocation') return itemWithLinkedVan;
 
-      const hint = sourceLocationHints.get(item.item_number_normalized);
-      if (!hint) return item;
+      const hint = sourceLocationHints.get(itemWithLinkedVan.item_number_normalized);
+      if (!hint) return itemWithLinkedVan;
 
       return {
-        ...item,
+        ...itemWithLinkedVan,
         source_location_hint: hint.locations.join(' | '),
         source_location_rows: hint.rows.join(', '),
       };

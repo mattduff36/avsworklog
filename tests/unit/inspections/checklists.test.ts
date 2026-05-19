@@ -82,16 +82,21 @@ describe('Vehicle Checklists', () => {
 });
 
 describe('Plant Checklists', () => {
-  it('has exactly 22 items', () => {
-    expect(PLANT_INSPECTION_ITEMS).toHaveLength(22);
+  it('has exactly 23 items', () => {
+    expect(PLANT_INSPECTION_ITEMS).toHaveLength(23);
   });
 
   it('getPlantChecklist returns the items array', () => {
     expect(getPlantChecklist()).toBe(PLANT_INSPECTION_ITEMS);
   });
 
-  it('getPlantChecklistCount returns 22', () => {
-    expect(getPlantChecklistCount()).toBe(22);
+  it('getPlantChecklistCount returns 23', () => {
+    expect(getPlantChecklistCount()).toBe(23);
+  });
+
+  it('adds Transmission after the existing 22 items', () => {
+    expect(PLANT_INSPECTION_ITEMS[21]).toBe('Greased');
+    expect(PLANT_INSPECTION_ITEMS[22]).toBe('Transmission');
   });
 
   it('all items are non-empty strings', () => {
