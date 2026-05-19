@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, AlertCircle, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import dynamic from 'next/dynamic';
+import { isNetworkFetchError } from '@/lib/utils/http-error';
 
 // Dynamically import PDF viewer component (client-side only)
 const PDFViewer = dynamic(
@@ -107,6 +108,13 @@ export function BlockingMessageModal({
       onSigned();
 
     } catch (error) {
+      if (isNetworkFetchError(error)) {
+        const message = error instanceof Error ? error.message : 'network request failed';
+        console.warn('Message signing skipped due transient network error:', message);
+        toast.error('Network error - please check your connection and try again');
+        return;
+      }
+
       console.error('Error signing message:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to sign message');
     } finally {

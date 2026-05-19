@@ -8,14 +8,17 @@ function makeNotification(overrides: Partial<NotificationItem> = {}): Notificati
     message_id: 'msg-1',
     type: 'REMINDER',
     priority: 'LOW',
+    created_via: null,
     subject: 'Test notification',
     body: 'Body text',
+    pdf_file_path: null,
     sender_name: 'Alice',
     sender_id: 'user-1',
     status: 'PENDING',
     created_at: '2026-02-01T10:00:00Z',
     signed_at: null,
     first_shown_at: null,
+    signature_data: null,
     ...overrides,
   };
 }

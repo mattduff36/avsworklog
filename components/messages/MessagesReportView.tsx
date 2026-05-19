@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Loader2, Search, Filter, CheckCircle2, Clock, AlertTriangle, Trash2, FileDown } from 'lucide-react';
+import { Loader2, Search, Filter, CheckCircle2, Clock, AlertTriangle, Trash2, FileDown, ExternalLink } from 'lucide-react';
 import { formatDateTime } from '@/lib/utils/date';
 import { toast } from 'sonner';
 import type { MessageReportData } from '@/types/messages';
@@ -28,6 +28,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+
+function buildToolboxTalkPdfUrl(pdfFilePath: string) {
+  return `/api/toolbox-talk-pdf/${pdfFilePath}`;
+}
 
 export function MessagesReportView() {
   const [messages, setMessages] = useState<MessageReportData[]>([]);
@@ -129,6 +133,10 @@ export function MessagesReportView() {
       toast.dismiss();
       toast.error(error instanceof Error ? error.message : 'Failed to export PDF');
     }
+  }
+
+  function handleViewAttachedPDF(pdfFilePath: string) {
+    window.open(buildToolboxTalkPdfUrl(pdfFilePath), '_blank', 'noopener,noreferrer');
   }
 
   const filteredMessages = messages.filter(msg =>
@@ -235,14 +243,27 @@ export function MessagesReportView() {
                     <Trash2 className="h-4 w-4" />
                   </Button>
                   {selectedMessage.message.type === 'TOOLBOX_TALK' && (
-                    <Button
-                      size="sm"
-                      onClick={() => handleExportPDF(selectedMessage.message.id, selectedMessage.message.subject)}
-                      className="bg-red-600 hover:bg-red-700 text-white gap-2"
-                    >
-                      <FileDown className="h-4 w-4" />
-                      Download Report
-                    </Button>
+                    <>
+                      <Button
+                        size="sm"
+                        onClick={() => handleExportPDF(selectedMessage.message.id, selectedMessage.message.subject)}
+                        className="bg-red-600 hover:bg-red-700 text-white gap-2"
+                      >
+                        <FileDown className="h-4 w-4" />
+                        Download Report
+                      </Button>
+                      {selectedMessage.message.pdf_file_path && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewAttachedPDF(selectedMessage.message.pdf_file_path as string)}
+                          className="gap-2"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          View Attached PDF
+                        </Button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -416,17 +437,33 @@ export function MessagesReportView() {
                     <Trash2 className="h-4 w-4" />
                   </Button>
                   {msg.message.type === 'TOOLBOX_TALK' && (
-                    <Button
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleExportPDF(msg.message.id, msg.message.subject);
-                      }}
-                      className="bg-red-600 hover:bg-red-700 text-white gap-2"
-                    >
-                      <FileDown className="h-4 w-4" />
-                      Download Report
-                    </Button>
+                    <>
+                      <Button
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleExportPDF(msg.message.id, msg.message.subject);
+                        }}
+                        className="bg-red-600 hover:bg-red-700 text-white gap-2"
+                      >
+                        <FileDown className="h-4 w-4" />
+                        Download Report
+                      </Button>
+                      {msg.message.pdf_file_path && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewAttachedPDF(msg.message.pdf_file_path as string);
+                          }}
+                          className="gap-2"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          View Attached PDF
+                        </Button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

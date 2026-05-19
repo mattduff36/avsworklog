@@ -68,12 +68,14 @@ export interface NotificationItem {
   created_via: string | null;
   subject: string;
   body: string;
+  pdf_file_path: string | null;
   sender_name: string;
   sender_id: string | null;
   status: MessageRecipientStatus;
   created_at: string;
   signed_at: string | null;
   first_shown_at: string | null;
+  signature_data: string | null;
 }
 
 // Form input types

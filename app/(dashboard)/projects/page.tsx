@@ -15,6 +15,7 @@ import { formatFileSize } from '@/lib/utils/file-validation';
 import { RecordVisitorSignatureModal } from '@/components/rams/RecordVisitorSignatureModal';
 import { RAMSErrorBoundary } from '@/components/rams/RAMSErrorBoundary';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
+import { isNetworkFetchError } from '@/lib/utils/http-error';
 
 interface RAMSDocument {
   id: string;
@@ -74,7 +75,11 @@ export default function RAMSPage() {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      if (!errorMessage.includes('HTTP 401') && !errorMessage.includes('HTTP 403')) {
+      if (
+        !errorMessage.includes('HTTP 401') &&
+        !errorMessage.includes('HTTP 403') &&
+        !isNetworkFetchError(error)
+      ) {
         console.error('Error fetching RAMS documents:', {
           message: errorMessage,
           timestamp: new Date().toISOString(),

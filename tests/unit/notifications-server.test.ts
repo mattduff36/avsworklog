@@ -1,9 +1,35 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   countUnreadNotificationsForUser,
+  listNotificationsForUser,
   normalizeNotificationError,
   parseNotificationLimit,
 } from '@/lib/server/notifications';
+
+function createNotificationsSupabaseMock(
+  data: unknown[] | null,
+  error: { message?: string | null } | null = null
+) {
+  const response = { data, error };
+  const query = {
+    select: vi.fn(() => query),
+    eq: vi.fn(() => query),
+    gte: vi.fn(() => query),
+    is: vi.fn(() => query),
+    order: vi.fn(() => query),
+    limit: vi.fn(() => query),
+    then(onFulfilled?: (value: typeof response) => unknown, onRejected?: (reason: unknown) => unknown) {
+      return Promise.resolve(response).then(onFulfilled, onRejected);
+    },
+  };
+
+  return {
+    supabase: {
+      from: vi.fn(() => query),
+    },
+    query,
+  };
+}
 
 function createNotificationCountSupabaseMock(count: number | null, error: { message?: string | null } | null = null) {
   const response = { count, error };
@@ -55,6 +81,46 @@ describe('normalizeNotificationError', () => {
 
   it('falls back to an unknown error message', () => {
     expect(normalizeNotificationError({ detail: 'no message' }).message).toBe('Unknown error');
+  });
+});
+
+describe('listNotificationsForUser', () => {
+  it('preserves toolbox talk PDF paths for notification detail links', async () => {
+    const { supabase, query } = createNotificationsSupabaseMock([
+      {
+        id: 'recipient-1',
+        message_id: 'message-1',
+        status: 'SIGNED',
+        signed_at: '2026-05-19T09:00:00.000Z',
+        first_shown_at: '2026-05-19T08:00:00.000Z',
+        signature_data: 'data:image/png;base64,signature',
+        messages: {
+          type: 'TOOLBOX_TALK',
+          priority: 'HIGH',
+          created_via: 'web',
+          subject: 'Harness safety',
+          body: 'Read the attached document.',
+          pdf_file_path: 'sender-1/1716111111111_harness.pdf',
+          sender_id: 'sender-1',
+          created_at: '2026-05-19T07:00:00.000Z',
+          sender: {
+            full_name: 'Site Manager',
+          },
+        },
+      },
+    ]);
+
+    await expect(listNotificationsForUser(supabase as never, 'user-1')).resolves.toMatchObject([
+      {
+        id: 'recipient-1',
+        message_id: 'message-1',
+        type: 'TOOLBOX_TALK',
+        pdf_file_path: 'sender-1/1716111111111_harness.pdf',
+        signature_data: 'data:image/png;base64,signature',
+      },
+    ]);
+
+    expect(query.select).toHaveBeenCalledWith(expect.stringContaining('pdf_file_path'));
   });
 });
 

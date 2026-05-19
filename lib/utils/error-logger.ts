@@ -73,10 +73,29 @@ export function shouldIgnoreRuntimeErrorForLogging(message: string, filename?: s
 export function shouldIgnoreConsoleErrorForLogging(errorMessage: string): boolean {
   const normalized = errorMessage.toLowerCase();
 
-  return (
+  if (
     normalized.includes('failed to fetch rsc payload') &&
     normalized.includes('falling back to browser navigation')
-  );
+  ) {
+    return true;
+  }
+
+  const hasTransientNetworkMarker = [
+    'typeerror: load failed',
+    'error: load failed',
+    'unknownerrorexception: load failed',
+    'failed to fetch',
+    'networkerror',
+    'network request failed',
+  ].some((marker) => normalized.includes(marker));
+
+  if (!hasTransientNetworkMarker) return false;
+
+  return [
+    'error signing message:',
+    'failed to load pdf document:',
+    'error fetching rams documents:',
+  ].some((context) => normalized.includes(context));
 }
 
 export interface ErrorLog {
@@ -186,6 +205,7 @@ class ErrorLogger {
       'network request failed',
       'network error',
       'authretryablefetcherror',
+      'load failed',
       'err_internet_disconnected',
       'err_network_changed',
       'timeout',

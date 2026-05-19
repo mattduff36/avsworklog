@@ -14,6 +14,7 @@ interface MessageShape {
   created_via?: string | null;
   subject?: string | null;
   body?: string | null;
+  pdf_file_path?: string | null;
   sender_id?: string | null;
   created_at?: string | null;
   sender?: SenderShape | SenderShape[] | null;
@@ -25,6 +26,7 @@ interface RecipientShape {
   status?: NotificationItem['status'];
   signed_at?: string | null;
   first_shown_at?: string | null;
+  signature_data?: string | null;
   messages?: MessageShape | MessageShape[] | null;
 }
 
@@ -103,6 +105,7 @@ export async function GET(request: NextRequest) {
         status,
         signed_at,
         first_shown_at,
+        signature_data,
         created_at,
         messages!inner(
           id,
@@ -110,6 +113,7 @@ export async function GET(request: NextRequest) {
           created_via,
           subject,
           body,
+          pdf_file_path,
           priority,
           sender_id,
           created_at,
@@ -147,12 +151,14 @@ export async function GET(request: NextRequest) {
           created_via: message.created_via ?? null,
           subject: message.subject ?? '',
           body: message.body ?? '',
+          pdf_file_path: message.pdf_file_path ?? null,
           sender_name: sender?.full_name ?? 'Deleted User',
           sender_id: message.sender_id ?? null,
           status: item.status ?? 'PENDING',
           created_at: message.created_at,
           signed_at: item.signed_at ?? null,
           first_shown_at: item.first_shown_at ?? null,
+          signature_data: item.signature_data ?? null,
         };
       })
       .filter((item): item is NotificationItem => item !== null);

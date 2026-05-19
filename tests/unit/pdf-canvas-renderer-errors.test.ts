@@ -52,4 +52,12 @@ describe('isExpectedPdfLoadError', () => {
     expect(isExpectedPdfLoadError(error)).toBe(true);
     expect(getPdfLoadMessage(error)).toBe('This PDF link has expired or is unavailable. Please reopen the document and try again.');
   });
+
+  it('returns true for transient browser PDF network failures', () => {
+    const error = new Error('Load failed');
+    error.name = 'UnknownErrorException';
+
+    expect(isExpectedPdfLoadError(error)).toBe(true);
+    expect(getPdfLoadMessage(error)).toBe('Unable to load PDF. Please check your connection and try again.');
+  });
 });

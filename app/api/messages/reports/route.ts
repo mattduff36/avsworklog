@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
         body,
         priority,
         sender_id,
+        pdf_file_path,
         created_at,
         updated_at,
         deleted_at,
@@ -151,7 +152,7 @@ export async function GET(request: NextRequest) {
         message: {
           ...message,
           created_via: 'api',
-          pdf_file_path: null,
+          pdf_file_path: message.pdf_file_path ?? null,
           sender: sender
             ? {
                 id: sender.id ?? '',

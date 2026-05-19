@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
+import Image from 'next/image';
 import { useQueryState } from 'nuqs';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
@@ -28,7 +29,8 @@ import {
   FileText,
   CheckSquare,
   ClipboardCheck,
-  PenLine
+  PenLine,
+  ExternalLink
 } from 'lucide-react';
 import { formatDateTime } from '@/lib/utils/date';
 import { toast } from 'sonner';
@@ -51,6 +53,10 @@ const MODULE_ICONS: Record<string, React.ComponentType<{ className?: string }>> 
 
 function isDismissibleNotification(notification: NotificationItem) {
   return notification.type === 'REMINDER' || notification.type === 'NOTIFICATION';
+}
+
+function buildToolboxTalkPdfUrl(pdfFilePath: string) {
+  return `/api/toolbox-talk-pdf/${pdfFilePath}`;
 }
 
 interface NotificationDetailPaneProps {
@@ -90,6 +96,7 @@ function NotificationDetailPane({
 
   const isToolboxTalk = notification.type === 'TOOLBOX_TALK';
   const hasSigned = notification.status === 'SIGNED';
+  const pdfUrl = notification.pdf_file_path ? buildToolboxTalkPdfUrl(notification.pdf_file_path) : null;
 
   return (
     <Card className={`flex min-h-[42rem] flex-col overflow-hidden border-border bg-white dark:bg-slate-900 ${className}`}>
@@ -138,7 +145,61 @@ function NotificationDetailPane({
             {notification.body}
           </div>
 
-          {isToolboxTalk && (
+          {isToolboxTalk && pdfUrl && (
+            <div className="rounded-md border border-border bg-white p-4 dark:bg-slate-900">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h4 className="font-semibold text-foreground">
+                    Attached PDF
+                  </h4>
+                  <p className="text-sm text-muted-foreground">
+                    Open the original toolbox talk document uploaded with this message.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => window.open(pdfUrl, '_blank', 'noopener,noreferrer')}
+                  className="gap-2"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  View Attached PDF
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {isToolboxTalk && hasSigned && (
+            <div className="rounded-md border border-green-200 bg-green-50 p-4 dark:border-green-900 dark:bg-green-950/30">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <h4 className="font-semibold text-green-700 dark:text-green-300">
+                    Signed on {notification.signed_at ? formatDateTime(notification.signed_at) : 'recorded date unavailable'}
+                  </h4>
+                  <p className="text-sm text-green-700/80 dark:text-green-300/80">
+                    Toolbox talk complete. No further action is required.
+                  </p>
+                </div>
+                {notification.signature_data && (
+                  <div className="w-full rounded-md border border-green-200 bg-white p-3 dark:border-green-900 dark:bg-slate-950 sm:w-56">
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-green-700/80 dark:text-green-300/80">
+                      Signature
+                    </p>
+                    <Image
+                      src={notification.signature_data}
+                      alt="Your saved signature"
+                      width={224}
+                      height={80}
+                      unoptimized
+                      className="max-h-20 w-full object-contain"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {isToolboxTalk && !hasSigned && (
             <div className="rounded-md border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/30">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
@@ -146,12 +207,9 @@ function NotificationDetailPane({
                     Toolbox Talk signature required
                   </h4>
                   <p className="text-sm text-red-700/80 dark:text-red-300/80">
-                    {hasSigned
-                      ? `Signed ${notification.signed_at ? formatDateTime(notification.signed_at) : ''}`
-                      : 'Open the signing flow to complete this required notification.'}
+                    Open the signing flow to complete this required notification.
                   </p>
                 </div>
-                {!hasSigned && (
                   <Button
                     type="button"
                     onClick={() => onSignToolboxTalk(notification)}
@@ -160,7 +218,6 @@ function NotificationDetailPane({
                     <PenLine className="h-4 w-4" />
                     Read and sign
                   </Button>
-                )}
               </div>
             </div>
           )}
@@ -848,6 +905,7 @@ function NotificationsContent() {
                 body: modalNotification.body,
                 sender_name: modalNotification.sender_name,
                 created_at: modalNotification.created_at,
+                pdf_file_path: modalNotification.pdf_file_path,
               }}
               onSigned={handleModalClose}
               totalPending={1}

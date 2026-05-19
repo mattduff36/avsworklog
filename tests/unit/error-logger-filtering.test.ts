@@ -32,4 +32,36 @@ describe('error logger filtering', () => {
       )
     ).toBe(true);
   });
+
+  it('ignores handled message signing network failures', () => {
+    expect(
+      shouldIgnoreConsoleErrorForLogging(
+        'Error signing message: TypeError: Load failed'
+      )
+    ).toBe(true);
+  });
+
+  it('ignores handled PDF load network failures', () => {
+    expect(
+      shouldIgnoreConsoleErrorForLogging(
+        'Failed to load PDF document: UnknownErrorException: Load failed'
+      )
+    ).toBe(true);
+  });
+
+  it('ignores handled RAMS document fetch network failures', () => {
+    expect(
+      shouldIgnoreConsoleErrorForLogging(
+        'Error fetching RAMS documents: Error: Load failed'
+      )
+    ).toBe(true);
+  });
+
+  it('keeps application type errors without a transient network marker', () => {
+    expect(
+      shouldIgnoreConsoleErrorForLogging(
+        'Error signing message: TypeError: Cannot read properties of undefined'
+      )
+    ).toBe(false);
+  });
 });
