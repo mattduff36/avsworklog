@@ -4,10 +4,11 @@ import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { Loader2, AlertCircle, ExternalLink } from 'lucide-react';
+import { Loader2, AlertCircle, Maximize2 } from 'lucide-react';
 import { toast } from 'sonner';
 import dynamic from 'next/dynamic';
 import { isNetworkFetchError } from '@/lib/utils/http-error';
+import { ToolboxTalkPdfDialog } from '@/components/messages/ToolboxTalkPdfDialog';
 
 // Dynamically import PDF viewer component (client-side only)
 const PDFViewer = dynamic(
@@ -62,6 +63,7 @@ export function BlockingMessageModal({
 }: BlockingMessageModalProps) {
   const [signing, setSigning] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [isPdfDialogOpen, setIsPdfDialogOpen] = useState(false);
 
   // Set PDF URL if pdf_file_path exists
   useEffect(() => {
@@ -124,82 +126,90 @@ export function BlockingMessageModal({
 
   // This modal cannot be closed by user - they must sign
   return (
-    <Dialog open={open} onOpenChange={() => {}}>
-      <DialogContent 
-        className="max-w-2xl max-h-[90vh] bg-white dark:bg-slate-900 border-red-600 dark:border-red-600 flex flex-col"
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
-      >
-        <DialogHeader className="space-y-1">
-          <DialogTitle className="text-lg text-red-600">
-            Toolbox Talk - {message.subject}
-          </DialogTitle>
-          {totalPending > 1 && (
-            <DialogDescription className="text-xs text-muted-foreground">
-              Message {currentIndex + 1} of {totalPending}
-            </DialogDescription>
-          )}
-        </DialogHeader>
-
-        {/* Warning - compact */}
-        <div className="flex items-center gap-2 px-6 -mt-2 mb-2">
-          <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
-          <p className="text-xs text-slate-700 dark:text-muted-foreground">
-            Read and sign to continue
-          </p>
-        </div>
-
-        <ScrollArea className="flex-1 px-6">
-          <div className="pb-6 space-y-4">
-            {/* Message Body - No border, no padding */}
-            {message.body && (
-              <div className="text-sm text-foreground whitespace-pre-wrap">
-                {message.body}
-              </div>
+    <>
+      <Dialog open={open} onOpenChange={() => {}}>
+        <DialogContent
+          className="max-w-2xl max-h-[90vh] bg-white dark:bg-slate-900 border-red-600 dark:border-red-600 flex flex-col"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <DialogHeader className="space-y-1">
+            <DialogTitle className="text-lg text-red-600">
+              Toolbox Talk - {message.subject}
+            </DialogTitle>
+            {totalPending > 1 && (
+              <DialogDescription className="text-xs text-muted-foreground">
+                Message {currentIndex + 1} of {totalPending}
+              </DialogDescription>
             )}
+          </DialogHeader>
 
-            {/* PDF Viewer - Render each page separately */}
-            {pdfUrl && <PDFViewer url={pdfUrl} />}
+          {/* Warning - compact */}
+          <div className="flex items-center gap-2 px-6 -mt-2 mb-2">
+            <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
+            <p className="text-xs text-slate-700 dark:text-muted-foreground">
+              Read and sign to continue
+            </p>
+          </div>
 
-            {/* Open in Browser Button (if PDF attached) */}
-            {pdfUrl && (
-              <div className="flex justify-center pt-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.open(pdfUrl, '_blank')}
-                  className="gap-2"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  Open PDF in Browser
-                </Button>
-              </div>
-            )}
-
-            {/* Signature Section - At the BOTTOM so users must scroll */}
-            <div className="space-y-3 pt-4 border-t border-border">
-              <label className="text-sm font-medium text-foreground">
-                Your Signature <span className="text-destructive">*</span>
-              </label>
-              
-              <SignaturePad
-                onSave={handleSign}
-                onCancel={() => {}}
-                disabled={signing}
-                variant="toolbox-talk"
-              />
-
-              {signing && (
-                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Recording signature...
+          <ScrollArea className="flex-1 px-6">
+            <div className="pb-6 space-y-4">
+              {/* Message Body - No border, no padding */}
+              {message.body && (
+                <div className="text-sm text-foreground whitespace-pre-wrap">
+                  {message.body}
                 </div>
               )}
+
+              {/* PDF Viewer - Render each page separately */}
+              {pdfUrl && <PDFViewer url={pdfUrl} />}
+
+              {pdfUrl && (
+                <div className="flex justify-center pt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsPdfDialogOpen(true)}
+                    className="gap-2"
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                    View PDF Full Screen
+                  </Button>
+                </div>
+              )}
+
+              {/* Signature Section - At the BOTTOM so users must scroll */}
+              <div className="space-y-3 pt-4 border-t border-border">
+                <label className="text-sm font-medium text-foreground">
+                  Your Signature <span className="text-destructive">*</span>
+                </label>
+
+                <SignaturePad
+                  onSave={handleSign}
+                  onCancel={() => {}}
+                  disabled={signing}
+                  variant="toolbox-talk"
+                />
+
+                {signing && (
+                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Recording signature...
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        </ScrollArea>
-      </DialogContent>
-    </Dialog>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      <ToolboxTalkPdfDialog
+        open={isPdfDialogOpen}
+        onOpenChange={setIsPdfDialogOpen}
+        url={pdfUrl}
+        title={message.subject}
+      />
+    </>
   );
 }
 

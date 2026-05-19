@@ -14,10 +14,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Loader2, Search, Filter, CheckCircle2, Clock, AlertTriangle, Trash2, FileDown, ExternalLink } from 'lucide-react';
+import { Loader2, Search, Filter, CheckCircle2, Clock, AlertTriangle, Trash2, FileDown, FileText } from 'lucide-react';
 import { formatDateTime } from '@/lib/utils/date';
 import { toast } from 'sonner';
 import type { MessageReportData } from '@/types/messages';
+import { ToolboxTalkPdfDialog } from '@/components/messages/ToolboxTalkPdfDialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,6 +45,7 @@ export function MessagesReportView() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [messageToDelete, setMessageToDelete] = useState<{id: string; subject: string} | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [pdfDialog, setPdfDialog] = useState<{ url: string; title: string } | null>(null);
 
   const fetchReports = useCallback(async () => {
     setLoading(true);
@@ -136,7 +138,11 @@ export function MessagesReportView() {
   }
 
   function handleViewAttachedPDF(pdfFilePath: string) {
-    window.open(buildToolboxTalkPdfUrl(pdfFilePath), '_blank', 'noopener,noreferrer');
+    const report = messages.find((item) => item.message.pdf_file_path === pdfFilePath);
+    setPdfDialog({
+      url: buildToolboxTalkPdfUrl(pdfFilePath),
+      title: report?.message.subject ?? 'Attached toolbox talk PDF',
+    });
   }
 
   const filteredMessages = messages.filter(msg =>
@@ -259,7 +265,7 @@ export function MessagesReportView() {
                           onClick={() => handleViewAttachedPDF(selectedMessage.message.pdf_file_path as string)}
                           className="gap-2"
                         >
-                          <ExternalLink className="h-4 w-4" />
+                          <FileText className="h-4 w-4" />
                           View Attached PDF
                         </Button>
                       )}
@@ -459,7 +465,7 @@ export function MessagesReportView() {
                           }}
                           className="gap-2"
                         >
-                          <ExternalLink className="h-4 w-4" />
+                          <FileText className="h-4 w-4" />
                           View Attached PDF
                         </Button>
                       )}
@@ -495,6 +501,15 @@ export function MessagesReportView() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ToolboxTalkPdfDialog
+        open={Boolean(pdfDialog)}
+        onOpenChange={(open) => {
+          if (!open) setPdfDialog(null);
+        }}
+        url={pdfDialog?.url ?? null}
+        title={pdfDialog?.title ?? 'Attached toolbox talk PDF'}
+      />
     </div>
   );
 }

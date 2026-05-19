@@ -29,8 +29,7 @@ import {
   FileText,
   CheckSquare,
   ClipboardCheck,
-  PenLine,
-  ExternalLink
+  PenLine
 } from 'lucide-react';
 import { formatDateTime } from '@/lib/utils/date';
 import { toast } from 'sonner';
@@ -38,6 +37,7 @@ import type { NotificationItem } from '@/types/messages';
 import type { NotificationPreference, NotificationModuleKey } from '@/types/notifications';
 import { NOTIFICATION_MODULES } from '@/types/notifications';
 import { NuqsClientAdapter } from '@/components/providers/NuqsClientAdapter';
+import { ToolboxTalkPdfDialog } from '@/components/messages/ToolboxTalkPdfDialog';
 
 // Dynamic imports for modal components
 const BlockingMessageModal = dynamic(() => import('@/components/messages/BlockingMessageModal').then(m => ({ default: m.BlockingMessageModal })), { ssr: false });
@@ -65,6 +65,7 @@ interface NotificationDetailPaneProps {
   isMarkingRead: boolean;
   onBack: () => void;
   onSignToolboxTalk: (notification: NotificationItem) => void;
+  onViewAttachedPDF: (url: string, title: string) => void;
   getStatusBadge: (status: string) => React.ReactNode;
 }
 
@@ -74,6 +75,7 @@ function NotificationDetailPane({
   isMarkingRead,
   onBack,
   onSignToolboxTalk,
+  onViewAttachedPDF,
   getStatusBadge,
 }: NotificationDetailPaneProps) {
   if (!notification) {
@@ -159,10 +161,10 @@ function NotificationDetailPane({
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => window.open(pdfUrl, '_blank', 'noopener,noreferrer')}
+                  onClick={() => onViewAttachedPDF(pdfUrl, notification.subject)}
                   className="gap-2"
                 >
-                  <ExternalLink className="h-4 w-4" />
+                  <FileText className="h-4 w-4" />
                   View Attached PDF
                 </Button>
               </div>
@@ -251,6 +253,7 @@ function NotificationsContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [modalNotification, setModalNotification] = useState<NotificationItem | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [pdfDialog, setPdfDialog] = useState<{ url: string; title: string } | null>(null);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const [markingReadId, setMarkingReadId] = useState<string | null>(null);
   const dismissedNotificationIds = useRef(new Set<string>());
@@ -713,6 +716,7 @@ function NotificationsContent() {
                     isMarkingRead={Boolean(selectedNotification && markingReadId === selectedNotification.id)}
                     onBack={() => setMobileDetailOpen(false)}
                     onSignToolboxTalk={handleToolboxSignClick}
+                    onViewAttachedPDF={(url, title) => setPdfDialog({ url, title })}
                     getStatusBadge={getStatusBadge}
                     className={mobileDetailOpen && selectedNotification ? 'block' : 'hidden md:flex'}
                   />
@@ -929,6 +933,15 @@ function NotificationsContent() {
           ) : null}
         </>
       )}
+
+      <ToolboxTalkPdfDialog
+        open={Boolean(pdfDialog)}
+        onOpenChange={(open) => {
+          if (!open) setPdfDialog(null);
+        }}
+        url={pdfDialog?.url ?? null}
+        title={pdfDialog?.title ?? 'Attached toolbox talk PDF'}
+      />
     </div>
   );
 }
