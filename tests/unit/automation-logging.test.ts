@@ -13,7 +13,7 @@ function createRunLog(overrides: Partial<AutomationRunLog> = {}): AutomationRunL
     id: overrides.id ?? 'run-1',
     scriptName: overrides.scriptName ?? 'test-script',
     mode: overrides.mode ?? 'test',
-    args: [],
+    args: overrides.args ?? [],
     startedAt: overrides.startedAt ?? '2026-05-01T00:00:00.000Z',
     endedAt: overrides.endedAt ?? '2026-05-01T00:00:01.000Z',
     durationMs: overrides.durationMs ?? 1000,
@@ -83,8 +83,10 @@ describe('automation logging helpers', () => {
       expect(summary.recentFailureCount).toBe(3);
       expect(summary.monthlyReviewGenerated).toBe(true);
       expect(summary.monthlyReviewPath).toBeTruthy();
+      expect(summary.monthlyPromptPath).toBeTruthy();
       expect(summary.advisorReviewPath).toBeTruthy();
       expect(summary.suggestions.some((suggestion) => suggestion.severity === 'action')).toBe(true);
+      expect(existsSync(summary.monthlyPromptPath!)).toBe(true);
       expect(existsSync(path.join(path.dirname(summary.monthlyReviewPath!), 'review-prompt.md'))).toBe(true);
       expect(existsSync(path.join(path.dirname(summary.monthlyReviewPath!), 'metrics.json'))).toBe(true);
       expect(existsSync(path.join(path.dirname(summary.monthlyReviewPath!), 'suggestions.json'))).toBe(true);
@@ -118,12 +120,22 @@ describe('automation logging helpers', () => {
             },
           ],
         }),
+        createRunLog({
+          id: 'finalise-2',
+          scriptName: 'finalise',
+          mode: 'dry-run',
+          args: ['--dry-run'],
+          startedAt: '2026-05-19T00:05:00.000Z',
+          durationMs: 1000,
+          steps: [],
+        }),
       ],
     });
 
     expect(review).toContain('## Executive Summary');
     expect(review).toContain('## Suggested Script Improvements');
     expect(review).toContain('standard: 1 run(s)');
+    expect(review).toContain('dry-run: 1 run(s)');
     expect(review).toContain('Builds average 3.0m');
     expect(review).toContain('## Copy/Paste Cursor Prompt');
   });

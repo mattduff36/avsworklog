@@ -66,6 +66,7 @@ export interface AutomationReviewSummary {
   slowestStepName: string | null;
   suggestions: AutomationReviewSuggestion[];
   monthlyReviewPath?: string;
+  monthlyPromptPath?: string;
   advisorReviewPath?: string;
   monthlyReviewGenerated: boolean;
 }

@@ -228,6 +228,7 @@ export function reviewAutomationRun(params: {
   return {
     ...summary,
     monthlyReviewPath: monthlyReview?.reviewPath,
+    monthlyPromptPath: monthlyReview?.promptPath,
     advisorReviewPath: monthlyReview?.advisorReviewPath,
     monthlyReviewGenerated: Boolean(monthlyReview),
   };
@@ -248,6 +249,9 @@ export function formatReviewForConsole(summary: AutomationReviewSummary): string
 
   if (summary.monthlyReviewGenerated && summary.monthlyReviewPath) {
     lines.push(`- Monthly review written: ${path.relative(process.cwd(), summary.monthlyReviewPath)}`);
+  }
+  if (summary.monthlyReviewGenerated && summary.monthlyPromptPath) {
+    lines.push(`- Review prompt written: ${path.relative(process.cwd(), summary.monthlyPromptPath)}`);
   }
   if (summary.advisorReviewPath) {
     lines.push(`- Advisor review written: ${path.relative(process.cwd(), summary.advisorReviewPath)}`);

@@ -44,11 +44,16 @@ function formatCommand(command: string, args: string[]): string {
   return [command, ...args.map(quoteArg)].join(' ');
 }
 
+function shouldUseShell(command: string): boolean {
+  if (process.platform !== 'win32') return false;
+  return !['git', 'powershell.exe', 'pwsh.exe'].includes(command.toLowerCase());
+}
+
 function runMetadataCommand(command: string, args: string[]): string {
   const result = spawnSync(getExecutable(command), args, {
     cwd: REPO_ROOT,
     env: process.env,
-    shell: process.platform === 'win32' && command !== 'git',
+    shell: shouldUseShell(command),
     encoding: 'utf8',
     maxBuffer: 1024 * 1024,
   });
@@ -166,6 +171,9 @@ function renderMarkdown(log: AutomationRunLog): string {
       lines.push('');
       lines.push(`Monthly review: ${path.relative(REPO_ROOT, log.review.monthlyReviewPath)}`);
     }
+    if (log.review.monthlyReviewGenerated && log.review.monthlyPromptPath) {
+      lines.push(`Review prompt: ${path.relative(REPO_ROOT, log.review.monthlyPromptPath)}`);
+    }
     if (log.review.advisorReviewPath) {
       lines.push(`Advisor review: ${path.relative(REPO_ROOT, log.review.advisorReviewPath)}`);
     }
@@ -241,7 +249,7 @@ export class AutomationRun {
     const result = spawnSync(getExecutable(command), args, {
       cwd: REPO_ROOT,
       env: options.env ?? process.env,
-      shell: process.platform === 'win32' && command !== 'git',
+      shell: shouldUseShell(command),
       encoding: 'utf8',
       maxBuffer: 1024 * 1024 * 50,
     });
@@ -255,9 +263,10 @@ export class AutomationRun {
     }
 
     const limitedOutput = limitOutput(output);
+    const commandPassed = result.status === 0 || options.allowFailure === true;
     this.recordStep({
       name: formattedCommand,
-      status: result.status === 0 ? 'passed' : 'failed',
+      status: commandPassed ? 'passed' : 'failed',
       startedAt: startedAt.toISOString(),
       endedAt: new Date().toISOString(),
       durationMs: Date.now() - startedAt.getTime(),
@@ -265,7 +274,7 @@ export class AutomationRun {
       exitCode: result.status,
       output: limitedOutput.output,
       outputTruncated: limitedOutput.truncated,
-      error: result.error instanceof Error ? redactSensitiveText(result.error.message) : undefined,
+      error: !commandPassed && result.error instanceof Error ? redactSensitiveText(result.error.message) : undefined,
     });
 
     if (!options.allowFailure && result.status !== 0) {

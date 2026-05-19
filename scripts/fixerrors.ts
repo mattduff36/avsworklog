@@ -8,12 +8,13 @@
  * 4. Groups errors into patterns (by type + normalized message + component)
  * 5. Writes a structured markdown report to docs_private/error-analysis.md
  * 6. Updates the JSON tracking data in docs_private/error-fix-log.md
- * 7. Prints a concise terminal summary
+ * 7. Clears the production error_logs table after successful analysis
+ * 8. Prints a concise terminal summary
  *
  * Usage: npm run fixerrors
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import { resolve } from 'path';
 import * as fs from 'fs';
@@ -81,6 +82,10 @@ type ErrorPattern = {
   affectedUsers: string[];
   firstSeen: string;
   lastSeen: string;
+};
+
+type ErrorLogClearResult = {
+  clearedCount: number | null;
 };
 
 function getPatternReviewMetadata(patterns: ErrorPattern[]) {
@@ -612,6 +617,33 @@ function updateFixLog(errors: ErrorLogEntry[]): FixLogStats {
   };
 }
 
+// ─── Error Log Cleanup ───────────────────────────────────────────────
+
+async function clearProductionErrorLogs(supabase: SupabaseClient): Promise<ErrorLogClearResult> {
+  const { count, error: countError } = await supabase
+    .from('error_logs')
+    .select('id', { count: 'exact', head: true });
+
+  if (countError) {
+    throw new Error(`Failed to count error logs before clearing: ${countError.message}`);
+  }
+
+  if (count === 0) {
+    return { clearedCount: 0 };
+  }
+
+  const { error: deleteError } = await supabase
+    .from('error_logs')
+    .delete()
+    .gte('timestamp', '1970-01-01');
+
+  if (deleteError) {
+    throw new Error(`Failed to clear production error logs: ${deleteError.message}`);
+  }
+
+  return { clearedCount: count };
+}
+
 // ─── Main ────────────────────────────────────────────────────────────
 
 async function main() {
@@ -640,6 +672,14 @@ async function main() {
       }
     );
 
+    const clearErrorLogsAfterSuccessfulAnalysis = async (): Promise<ErrorLogClearResult> => {
+      console.log('Clearing production error log...');
+      const clearResult = await run.step('Clear production error log', () => clearProductionErrorLogs(supabase));
+      const clearedLabel = clearResult.clearedCount === null ? 'all' : clearResult.clearedCount;
+      console.log(`  Cleared ${clearedLabel} error log entr${clearResult.clearedCount === 1 ? 'y' : 'ies'}`);
+      return clearResult;
+    };
+
     // 1. Fetch errors
     console.log('Fetching errors from error_logs...');
     const { data: rawErrors, error: fetchError } = await run.step('Fetch production error logs', () =>
@@ -661,6 +701,7 @@ async function main() {
         fs.writeFileSync(ERROR_ANALYSIS_PATH, report, 'utf-8');
       }, { totalFetched: 0, afterFiltering: 0, patternsFound: 0 });
       console.log(`\nReport written to: docs_private/error-analysis.md`);
+      await clearErrorLogsAfterSuccessfulAnalysis();
       run.finish('passed');
       return;
     }
@@ -679,6 +720,7 @@ async function main() {
         fs.writeFileSync(ERROR_ANALYSIS_PATH, report, 'utf-8');
       }, { totalFetched: rawErrors.length, filteredOut, afterFiltering: 0, patternsFound: 0 });
       console.log(`\nReport written to: docs_private/error-analysis.md`);
+      await clearErrorLogsAfterSuccessfulAnalysis();
       run.finish('passed');
       return;
     }
@@ -723,13 +765,17 @@ async function main() {
     });
     console.log(`  Updated: docs_private/error-fix-log.md`);
 
-    // 6. Terminal summary
+    // 6. Clear the production error log after the analysis artifacts are safely written.
+    const clearResult = await clearErrorLogsAfterSuccessfulAnalysis();
+
+    // 7. Terminal summary
     console.log('\n=============================================');
     console.log('SUMMARY');
     console.log('=============================================');
     console.log(`  Errors fetched:      ${rawErrors.length}`);
     console.log(`  After filtering:     ${errors.length}`);
     console.log(`  Patterns found:      ${patterns.length}`);
+    console.log(`  Error logs cleared:  ${clearResult.clearedCount === null ? 'all' : clearResult.clearedCount}`);
     console.log('');
 
     // Top 5 patterns

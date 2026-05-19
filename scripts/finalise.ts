@@ -88,6 +88,11 @@ function getExecutable(command: string): string {
   return command;
 }
 
+function shouldUseShell(command: string): boolean {
+  if (process.platform !== 'win32') return false;
+  return !['git', 'powershell.exe', 'pwsh.exe'].includes(command.toLowerCase());
+}
+
 function appendManagedOutput(managedProcess: ManagedProcess, chunk: string | Buffer | null | undefined): void {
   if (!chunk) {
     return;
@@ -109,11 +114,10 @@ function runCommand(command: string, args: string[], options: RunCommandOptions 
     return automationRun.runCommand(command, args, options);
   }
 
-  const useShell = process.platform === 'win32' && command !== 'git';
   const result = spawnSync(getExecutable(command), args, {
     cwd: REPO_ROOT,
     env: process.env,
-    shell: useShell,
+    shell: shouldUseShell(command),
     encoding: 'utf8',
     stdio: options.captureOutput ? 'pipe' : 'inherit',
   });
@@ -178,6 +182,10 @@ function getCurrentBranch(): string {
 }
 
 function getPushModeDescription(options: FinaliseOptions): string {
+  if (options.dryRun) {
+    return 'dry-run';
+  }
+
   if (options.full && options.push) {
     return 'full + push';
   }
@@ -191,6 +199,22 @@ function getPushModeDescription(options: FinaliseOptions): string {
   }
 
   return 'standard';
+}
+
+function runUnloggedCommand(command: string, args: string[]): CommandResult {
+  const result = spawnSync(getExecutable(command), args, {
+    cwd: REPO_ROOT,
+    env: process.env,
+    shell: shouldUseShell(command),
+    encoding: 'utf8',
+    maxBuffer: 1024 * 1024 * 50,
+  });
+
+  return {
+    status: result.status,
+    stdout: typeof result.stdout === 'string' ? result.stdout : '',
+    stderr: typeof result.stderr === 'string' ? result.stderr : '',
+  };
 }
 
 function collectMigrationFilesFromScript(filePath: string): string[] {
@@ -301,10 +325,7 @@ function listProcesses(): ProcessInfo[] {
       '$items | ConvertTo-Json -Compress',
     ].join('; ');
 
-    const result = runCommand('powershell.exe', ['-NoProfile', '-Command', command], {
-      captureOutput: true,
-      allowFailure: true,
-    });
+    const result = runUnloggedCommand('powershell.exe', ['-NoProfile', '-Command', command]);
 
     if (result.status !== 0 || result.stdout.trim().length === 0) {
       return [];
@@ -324,10 +345,7 @@ function listProcesses(): ProcessInfo[] {
       .filter((item) => item.pid > 0 && item.commandLine.trim().length > 0);
   }
 
-  const result = runCommand('ps', ['-Ao', 'pid=,ppid=,command='], {
-    captureOutput: true,
-    allowFailure: true,
-  });
+  const result = runUnloggedCommand('ps', ['-Ao', 'pid=,ppid=,command=']);
 
   if (result.status !== 0) {
     return [];
