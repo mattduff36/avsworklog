@@ -25,24 +25,9 @@
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import pg from 'pg';
+import { AutomationRun } from './automation/logger';
 
 config({ path: resolve(process.cwd(), '.env.local') });
-
-const connectionString: string | undefined = process.env.POSTGRES_URL_NON_POOLING;
-if (!connectionString) {
-  console.error('❌ POSTGRES_URL_NON_POOLING not found in .env.local');
-  process.exit(1);
-}
-
-const url = new URL(connectionString);
-const client = new pg.Client({
-  host: url.hostname,
-  port: parseInt(url.port) || 5432,
-  database: url.pathname.slice(1),
-  user: url.username,
-  password: url.password ? decodeURIComponent(url.password) : undefined,
-  ssl: { rejectUnauthorized: false },
-});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Column expectations: tables → columns that MUST exist for the app to work.
@@ -71,9 +56,40 @@ const REQUIRED_FKS: Array<{ table: string; column: string; referencesTable: stri
 
 type Issue = { severity: 'ERROR' | 'WARN'; message: string };
 
-async function main() {
+async function main(): Promise<number> {
+  const run = new AutomationRun({
+    scriptName: 'db-validate',
+    mode: 'schema-health',
+    args: process.argv.slice(2),
+  });
+
   console.log('🔍 DB Validate — Post-Migration Schema Health Check\n');
-  await client.connect();
+  let client: pg.Client | null = null;
+  let hasDisconnected = false;
+  try {
+  const connectionString: string | undefined = process.env.POSTGRES_URL_NON_POOLING;
+  if (!connectionString) {
+    const error = new Error('POSTGRES_URL_NON_POOLING not found in .env.local');
+    console.error('❌ POSTGRES_URL_NON_POOLING not found in .env.local');
+    run.finish('failed', error);
+    return 1;
+  }
+
+  const url = new URL(connectionString);
+  const dbClient = new pg.Client({
+    host: url.hostname,
+    port: parseInt(url.port) || 5432,
+    database: url.pathname.slice(1),
+    user: url.username,
+    password: url.password ? decodeURIComponent(url.password) : undefined,
+    ssl: { rejectUnauthorized: false },
+  });
+  client = dbClient;
+
+  await run.step('Connect to database', () => dbClient.connect(), {
+    database: url.pathname.slice(1),
+    host: url.hostname,
+  });
 
   const issues: Issue[] = [];
 
@@ -81,7 +97,7 @@ async function main() {
   console.log('Checking trigger function bodies against live schema...');
 
   // Get all trigger functions with their attached tables
-  const triggerRows = await client.query<{
+  const triggerRows = await run.step('Load public trigger functions', () => dbClient.query<{
     fn_name: string;
     fn_body: string;
     table_name: string;
@@ -97,14 +113,14 @@ async function main() {
     WHERE n.nspname = 'public'
       AND NOT t.tgisinternal
     ORDER BY p.proname, c.relname
-  `);
+  `));
 
   // Get all columns for all tables in public schema
-  const colRows = await client.query<{ table_name: string; column_name: string }>(`
+  const colRows = await run.step('Load public table columns', () => dbClient.query<{ table_name: string; column_name: string }>(`
     SELECT table_name, column_name
     FROM information_schema.columns
     WHERE table_schema = 'public'
-  `);
+  `));
   const colsByTable = new Map<string, Set<string>>();
   for (const r of colRows.rows) {
     if (!colsByTable.has(r.table_name)) colsByTable.set(r.table_name, new Set());
@@ -132,7 +148,7 @@ async function main() {
   }
 
   // ── 2. UPDATE OF column list in trigger definitions ────────────────────────
-  const tgColRows = await client.query<{
+  const tgColRows = await run.step('Load trigger update column lists', () => dbClient.query<{
     trigger_name: string;
     table_name: string;
     col_name: string;
@@ -152,7 +168,7 @@ async function main() {
     WHERE n.nspname = 'public'
       AND NOT t.tgisinternal
       AND array_length(t.tgattr, 1) > 0
-  `);
+  `));
 
   for (const { trigger_name, table_name, col_name } of tgColRows.rows) {
     const tableCols = colsByTable.get(table_name);
@@ -184,7 +200,7 @@ async function main() {
 
   // ── 4. FK expectations check ───────────────────────────────────────────────
   console.log('Checking critical FK relationships...');
-  const fkRows = await client.query<{
+  const fkRows = await run.step('Load public foreign keys', () => dbClient.query<{
     table_name: string;
     column_name: string;
     foreign_table_name: string;
@@ -200,7 +216,7 @@ async function main() {
       ON tc.constraint_name = ccu.constraint_name AND tc.table_schema = ccu.table_schema
     WHERE tc.table_schema = 'public'
       AND tc.constraint_type = 'FOREIGN KEY'
-  `);
+  `));
 
   for (const expected of REQUIRED_FKS) {
     const found = fkRows.rows.find(
@@ -222,7 +238,10 @@ async function main() {
   }
 
   // ── Summary ────────────────────────────────────────────────────────────────
-  await client.end();
+  await run.step('Disconnect from database', async () => {
+    await dbClient.end();
+    hasDisconnected = true;
+  });
   console.log('');
 
   const errors = issues.filter((i) => i.severity === 'ERROR');
@@ -230,7 +249,8 @@ async function main() {
 
   if (issues.length === 0) {
     console.log('✅ All checks passed — DB schema is healthy.\n');
-    process.exit(0);
+    run.finish('passed');
+    return 0;
   }
 
   if (errors.length > 0) {
@@ -245,13 +265,24 @@ async function main() {
 
   if (errors.length > 0) {
     console.log('Run "npm run db:validate" after fixing the issues above.\n');
-    process.exit(1);
-  } else {
-    process.exit(0);
+    run.finish('failed', `${errors.length} schema validation error(s) found`);
+    return 1;
+  }
+
+  run.finish('passed');
+  return 0;
+  } catch (error) {
+    if (client && !hasDisconnected) {
+      await client.end().catch(() => undefined);
+    }
+    run.finish('failed', error);
+    throw error;
   }
 }
 
 main().catch((err: unknown) => {
   console.error('💥 Unexpected error:', err);
   process.exit(1);
+}).then((exitCode) => {
+  if (typeof exitCode === 'number') process.exit(exitCode);
 });

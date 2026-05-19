@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { resolve } from 'path';
 import ExcelJS from 'exceljs';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { normalizeInventoryItemNumber, requireInventoryAccess } from '@/lib/server/inventory-auth';
+import { normalizeInventoryItemNumber, requireInventoryAccess, requireInventoryManagerAccess } from '@/lib/server/inventory-auth';
 import type { InventoryCategory, InventoryStatus } from '@/app/(dashboard)/inventory/types';
 
 const completeListPath = 'data/COMPLETE LIST 2023.xlsx';
@@ -13,6 +13,7 @@ interface InventoryItemRequestBody {
   category?: InventoryCategory;
   location_id?: string;
   last_checked_at?: string | null;
+  check_interval_days?: number | null;
   status?: InventoryStatus;
 }
 
@@ -28,9 +29,21 @@ interface InventoryLocationRow {
 }
 
 interface InventoryItemRow {
+  id: string;
   item_number_normalized: string;
   location?: InventoryLocationRow | null;
   [key: string]: unknown;
+}
+
+interface InventoryItemGroupSummary {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
+interface InventoryItemGroupMemberRow {
+  item_id: string;
+  group?: InventoryItemGroupSummary | InventoryItemGroupSummary[] | null;
 }
 
 interface LinkedVanSummary {
@@ -129,6 +142,34 @@ function addLinkedVanDisplay(item: InventoryItemRow, vanById: Map<string, Linked
   };
 }
 
+async function loadItemGroups(
+  admin: ReturnType<typeof createAdminClient>,
+  itemIds: string[]
+): Promise<Map<string, InventoryItemGroupSummary>> {
+  if (itemIds.length === 0) return new Map();
+
+  const { data, error } = await admin
+    .from('inventory_item_group_members')
+    .select(`
+      item_id,
+      group:inventory_item_groups(id, name, description)
+    `)
+    .in('item_id', itemIds);
+
+  if (error) throw error;
+
+  function pickGroup(group: InventoryItemGroupMemberRow['group']): InventoryItemGroupSummary | null {
+    if (!group) return null;
+    return Array.isArray(group) ? group[0] ?? null : group;
+  }
+
+  return new Map(
+    ((data || []) as unknown as InventoryItemGroupMemberRow[])
+      .map((member) => [member.item_id, pickGroup(member.group)] as const)
+      .filter((entry): entry is readonly [string, InventoryItemGroupSummary] => Boolean(entry[1]))
+  );
+}
+
 export async function GET(request: NextRequest) {
   try {
     const access = await requireInventoryAccess();
@@ -153,6 +194,7 @@ export async function GET(request: NextRequest) {
     if (error) throw error;
     const items = (data || []) as InventoryItemRow[];
     const vanById = await loadLinkedVans(admin, getLinkedVanIds(items));
+    const groupByItemId = await loadItemGroups(admin, items.map((item) => item.id));
 
     let sourceLocationHints = new Map<string, SourceLocationHint>();
     try {
@@ -162,8 +204,11 @@ export async function GET(request: NextRequest) {
     }
 
     const inventory = items.map((item) => {
-      const itemWithLinkedVan = addLinkedVanDisplay(item, vanById);
-      if (itemWithLinkedVan.location?.name?.toLowerCase() !== 'nolocation') return itemWithLinkedVan;
+      const itemWithLinkedVan = {
+        ...addLinkedVanDisplay(item, vanById),
+        group: groupByItemId.get(item.id) || null,
+      };
+      if (itemWithLinkedVan.location) return itemWithLinkedVan;
 
       const hint = sourceLocationHints.get(itemWithLinkedVan.item_number_normalized);
       if (!hint) return itemWithLinkedVan;
@@ -191,7 +236,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const access = await requireInventoryAccess();
+    const access = await requireInventoryManagerAccess();
     if (!access.allowed || !access.userId) {
       return NextResponse.json({ error: access.error }, { status: access.status });
     }
@@ -199,7 +244,7 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as InventoryItemRequestBody;
     const itemNumber = body.item_number?.trim();
     const name = body.name?.trim();
-    const locationId = body.location_id?.trim();
+    const locationId = body.location_id?.trim() || null;
 
     if (!itemNumber) {
       return NextResponse.json({ error: 'Item number is required' }, { status: 400 });
@@ -207,10 +252,6 @@ export async function POST(request: NextRequest) {
     if (!name) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
     }
-    if (!locationId) {
-      return NextResponse.json({ error: 'Location is required' }, { status: 400 });
-    }
-
     const { data, error } = await createAdminClient()
       .from('inventory_items')
       .insert({
@@ -220,6 +261,7 @@ export async function POST(request: NextRequest) {
         category: body.category || 'minor_plant',
         location_id: locationId,
         last_checked_at: cleanOptionalDate(body.last_checked_at),
+        check_interval_days: body.check_interval_days || null,
         status: body.status || 'active',
         created_by: access.userId,
         updated_by: access.userId,

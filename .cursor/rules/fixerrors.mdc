@@ -17,6 +17,7 @@ npm run fixerrors
 ```
 
 Wait for it to complete. It fetches production errors from the `error_logs` database table (excluding localhost and admin errors), groups them into patterns, and writes a structured report.
+It also writes a private automation run log and self-review summary under `docs_private/automation`.
 
 ## Step 2: Read the analysis report
 

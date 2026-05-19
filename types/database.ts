@@ -2164,7 +2164,7 @@ export type Database = {
           item_number_normalized: string
           name: string
           category: 'hired_plant' | 'signs' | 'minor_plant' | 'tools' | 'equipment' | 'unknown'
-          location_id: string
+          location_id: string | null
           last_checked_at: string | null
           status: 'active' | 'inactive'
           source: string | null
@@ -2180,7 +2180,7 @@ export type Database = {
           item_number_normalized: string
           name: string
           category?: 'hired_plant' | 'signs' | 'minor_plant' | 'tools' | 'equipment' | 'unknown'
-          location_id: string
+          location_id?: string | null
           last_checked_at?: string | null
           status?: 'active' | 'inactive'
           source?: string | null
@@ -2196,7 +2196,7 @@ export type Database = {
           item_number_normalized?: string
           name?: string
           category?: 'hired_plant' | 'signs' | 'minor_plant' | 'tools' | 'equipment' | 'unknown'
-          location_id?: string
+          location_id?: string | null
           last_checked_at?: string | null
           status?: 'active' | 'inactive'
           source?: string | null

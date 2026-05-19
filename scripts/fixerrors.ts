@@ -17,19 +17,9 @@ import { createClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import { resolve } from 'path';
 import * as fs from 'fs';
+import { AutomationRun } from './automation/logger';
 
 dotenv.config({ path: resolve(process.cwd(), '.env.local') });
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  }
-);
 
 const ERROR_ANALYSIS_PATH = resolve(process.cwd(), 'docs_private', 'error-analysis.md');
 const ERROR_FIX_LOG_PATH = resolve(process.cwd(), 'docs_private', 'error-fix-log.md');
@@ -69,6 +59,11 @@ type FixLogData = {
   entries: FixLogEntry[];
 };
 
+type FixLogStats = {
+  totalEntries: number;
+  statusCounts: Record<FixLogEntry['status'], number>;
+};
+
 type SourceFileRef = {
   file: string;
   line?: number;
@@ -87,6 +82,20 @@ type ErrorPattern = {
   firstSeen: string;
   lastSeen: string;
 };
+
+function getPatternReviewMetadata(patterns: ErrorPattern[]) {
+  return {
+    topPatterns: patterns.slice(0, 10).map((pattern) => ({
+      errorType: pattern.errorType,
+      component: pattern.component,
+      normalizedMessage: pattern.normalizedMessage,
+      occurrences: pattern.occurrences.length,
+      affectedPages: pattern.affectedPages.slice(0, 10),
+      sourceFiles: pattern.sourceFiles.slice(0, 10).map((sourceFile) => sourceFile.file),
+    })),
+    patternsWithoutSourceFiles: patterns.filter((pattern) => pattern.sourceFiles.length === 0).length,
+  };
+}
 
 // ─── Filtering ───────────────────────────────────────────────────────
 
@@ -538,7 +547,7 @@ function createLegacySignature(error: ErrorLogEntry): string {
   return `${type}::${component}::${page}::${message}`;
 }
 
-function updateFixLog(errors: ErrorLogEntry[]): void {
+function updateFixLog(errors: ErrorLogEntry[]): FixLogStats {
   const fixLog = loadFixLog();
   const seenSignatures = new Set<string>();
 
@@ -581,88 +590,166 @@ function updateFixLog(errors: ErrorLogEntry[]): void {
   }
 
   saveFixLog(fixLog);
+
+  const statusCounts = fixLog.entries.reduce<FixLogStats['statusCounts']>(
+    (acc, entry) => {
+      acc[entry.status] += 1;
+      return acc;
+    },
+    {
+      untriaged: 0,
+      investigating: 0,
+      fix_applied: 0,
+      resolved: 0,
+      wontfix: 0,
+      stale: 0,
+    }
+  );
+
+  return {
+    totalEntries: fixLog.entries.length,
+    statusCounts,
+  };
 }
 
 // ─── Main ────────────────────────────────────────────────────────────
 
 async function main() {
+  const run = new AutomationRun({
+    scriptName: 'fixerrors',
+    mode: 'analysis',
+    args: process.argv.slice(2),
+    expectedArtifacts: [
+      { path: 'docs_private/error-analysis.md' },
+      { path: 'docs_private/error-fix-log.md', required: false },
+    ],
+  });
+
   console.log('FIXERRORS - Error Analysis & Report Generator');
   console.log('=============================================\n');
 
-  // 1. Fetch errors
-  console.log('Fetching errors from error_logs...');
-  const { data: rawErrors, error: fetchError } = await supabase
-    .from('error_logs')
-    .select('*')
-    .order('timestamp', { ascending: false })
-    .limit(200);
+  try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    );
 
-  if (fetchError) {
-    console.error(`FAILED: ${fetchError.message}`);
-    process.exit(1);
+    // 1. Fetch errors
+    console.log('Fetching errors from error_logs...');
+    const { data: rawErrors, error: fetchError } = await run.step('Fetch production error logs', () =>
+      supabase
+        .from('error_logs')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(200)
+    );
+
+    if (fetchError) {
+      throw new Error(`Failed to fetch production errors: ${fetchError.message}`);
+    }
+
+    if (!rawErrors || rawErrors.length === 0) {
+      console.log('No errors in database. Writing empty report.');
+      const report = generateReport([], 0, 0);
+      await run.step('Write empty error analysis report', () => {
+        fs.writeFileSync(ERROR_ANALYSIS_PATH, report, 'utf-8');
+      }, { totalFetched: 0, afterFiltering: 0, patternsFound: 0 });
+      console.log(`\nReport written to: docs_private/error-analysis.md`);
+      run.finish('passed');
+      return;
+    }
+
+    console.log(`  Fetched ${rawErrors.length} error(s) from database`);
+
+    // 2. Filter
+    const errors = filterErrors(rawErrors);
+    const filteredOut = rawErrors.length - errors.length;
+    console.log(`  Filtered out ${filteredOut} (localhost/admin) -> ${errors.length} remaining`);
+
+    if (errors.length === 0) {
+      console.log('All errors were filtered out. Writing empty report.');
+      const report = generateReport([], rawErrors.length, 0);
+      await run.step('Write filtered-empty error analysis report', () => {
+        fs.writeFileSync(ERROR_ANALYSIS_PATH, report, 'utf-8');
+      }, { totalFetched: rawErrors.length, filteredOut, afterFiltering: 0, patternsFound: 0 });
+      console.log(`\nReport written to: docs_private/error-analysis.md`);
+      run.finish('passed');
+      return;
+    }
+
+    // 3. Group into patterns
+    console.log('Grouping errors into patterns...');
+    const patterns = await run.step('Group errors into patterns', () => groupIntoPatterns(errors), {
+      totalFetched: rawErrors.length,
+      filteredOut,
+      afterFiltering: errors.length,
+      patternsFound: 0,
+    });
+    console.log(`  Found ${patterns.length} distinct pattern(s)`);
+    const patternReviewMetadata = getPatternReviewMetadata(patterns);
+
+    // 4. Generate report
+    console.log('Generating analysis report...');
+    await run.step('Write error analysis report', () => {
+      const report = generateReport(patterns, rawErrors.length, errors.length);
+      fs.writeFileSync(ERROR_ANALYSIS_PATH, report, 'utf-8');
+    }, {
+      totalFetched: rawErrors.length,
+      filteredOut,
+      afterFiltering: errors.length,
+      patternsFound: patterns.length,
+      ...patternReviewMetadata,
+    });
+    console.log(`  Written to: docs_private/error-analysis.md`);
+
+    // 5. Update historical fix log (JSON only, no run summaries)
+    console.log('Updating historical fix log...');
+    const fixLogStats = await run.step('Update historical error fix log', () => updateFixLog(errors), {
+      entriesProcessed: errors.length,
+    });
+    run.recordStep({
+      name: 'Summarise historical error fix log',
+      status: 'passed',
+      startedAt: new Date().toISOString(),
+      endedAt: new Date().toISOString(),
+      durationMs: 0,
+      metadata: fixLogStats,
+    });
+    console.log(`  Updated: docs_private/error-fix-log.md`);
+
+    // 6. Terminal summary
+    console.log('\n=============================================');
+    console.log('SUMMARY');
+    console.log('=============================================');
+    console.log(`  Errors fetched:      ${rawErrors.length}`);
+    console.log(`  After filtering:     ${errors.length}`);
+    console.log(`  Patterns found:      ${patterns.length}`);
+    console.log('');
+
+    // Top 5 patterns
+    console.log('Top patterns:');
+    patterns.slice(0, 5).forEach((p, i) => {
+      console.log(`  ${i + 1}. [${p.occurrences.length}x] ${p.errorType} in ${p.component}: ${p.normalizedMessage.substring(0, 60)}`);
+    });
+
+    if (patterns.length > 5) {
+      console.log(`  ...and ${patterns.length - 5} more`);
+    }
+
+    console.log('\n=============================================');
+    console.log('Report ready: docs_private/error-analysis.md');
+    console.log('=============================================\n');
+    run.finish('passed');
+  } catch (error) {
+    run.finish('failed', error);
+    throw error;
   }
-
-  if (!rawErrors || rawErrors.length === 0) {
-    console.log('No errors in database. Writing empty report.');
-    const report = generateReport([], 0, 0);
-    fs.writeFileSync(ERROR_ANALYSIS_PATH, report, 'utf-8');
-    console.log(`\nReport written to: docs_private/error-analysis.md`);
-    process.exit(0);
-  }
-
-  console.log(`  Fetched ${rawErrors.length} error(s) from database`);
-
-  // 2. Filter
-  const errors = filterErrors(rawErrors);
-  const filteredOut = rawErrors.length - errors.length;
-  console.log(`  Filtered out ${filteredOut} (localhost/admin) -> ${errors.length} remaining`);
-
-  if (errors.length === 0) {
-    console.log('All errors were filtered out. Writing empty report.');
-    const report = generateReport([], rawErrors.length, 0);
-    fs.writeFileSync(ERROR_ANALYSIS_PATH, report, 'utf-8');
-    console.log(`\nReport written to: docs_private/error-analysis.md`);
-    process.exit(0);
-  }
-
-  // 3. Group into patterns
-  console.log('Grouping errors into patterns...');
-  const patterns = groupIntoPatterns(errors);
-  console.log(`  Found ${patterns.length} distinct pattern(s)`);
-
-  // 4. Generate report
-  console.log('Generating analysis report...');
-  const report = generateReport(patterns, rawErrors.length, errors.length);
-  fs.writeFileSync(ERROR_ANALYSIS_PATH, report, 'utf-8');
-  console.log(`  Written to: docs_private/error-analysis.md`);
-
-  // 5. Update historical fix log (JSON only, no run summaries)
-  console.log('Updating historical fix log...');
-  updateFixLog(errors);
-  console.log(`  Updated: docs_private/error-fix-log.md`);
-
-  // 6. Terminal summary
-  console.log('\n=============================================');
-  console.log('SUMMARY');
-  console.log('=============================================');
-  console.log(`  Errors fetched:      ${rawErrors.length}`);
-  console.log(`  After filtering:     ${errors.length}`);
-  console.log(`  Patterns found:      ${patterns.length}`);
-  console.log('');
-
-  // Top 5 patterns
-  console.log('Top patterns:');
-  patterns.slice(0, 5).forEach((p, i) => {
-    console.log(`  ${i + 1}. [${p.occurrences.length}x] ${p.errorType} in ${p.component}: ${p.normalizedMessage.substring(0, 60)}`);
-  });
-
-  if (patterns.length > 5) {
-    console.log(`  ...and ${patterns.length - 5} more`);
-  }
-
-  console.log('\n=============================================');
-  console.log('Report ready: docs_private/error-analysis.md');
-  console.log('=============================================\n');
 }
 
 main()

@@ -13,7 +13,8 @@ If the user message is exactly one of these phrases, do not re-plan the workflow
 
 Before running the repo command:
 - Check terminal headers in `C:\Users\mattd\.cursor\projects\d-Websites-avsworklog\terminals`.
-- If an active terminal command appears to be an Agent Review, wait for it to finish.
+- If an active terminal command appears to be an Agent Review or another finalise run, wait for it to finish.
+- Cursor's source-control Agent Review UI may not appear in terminal metadata. If the Agent Review panel is visibly reviewing changes, wait for it to finish even if terminal headers do not show it.
 - Do not ask follow-up questions unless there is a real blocking error.
 
 Command map:
@@ -43,4 +44,5 @@ When retrying:
 
 After the command finishes:
 - Return a short summary only.
+- The command writes a private automation run log and self-review summary under `docs_private/automation`.
 - Do not do extra repo analysis unless the command fails and needs diagnosis.

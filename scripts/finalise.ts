@@ -3,6 +3,8 @@ import { config } from 'dotenv';
 import { existsSync, readFileSync, rmSync } from 'fs';
 import path from 'path';
 import pg from 'pg';
+import { AutomationRun } from './automation/logger';
+import { checkFinaliseBlockingActivity, formatBlockingActivity } from './finalise-activity-guard';
 import { summarizeFinaliseChanges } from './finalise-summary';
 
 config({ path: path.resolve(process.cwd(), '.env.local') });
@@ -11,6 +13,7 @@ const { Client } = pg;
 const REPO_ROOT = process.cwd();
 const NEXT_BUILD_DIR = path.join(REPO_ROOT, '.next');
 const DEV_SERVER_PORT = 4000;
+let automationRun: AutomationRun | null = null;
 
 interface FinaliseOptions {
   full: boolean;
@@ -102,6 +105,10 @@ function appendManagedOutput(managedProcess: ManagedProcess, chunk: string | Buf
 }
 
 function runCommand(command: string, args: string[], options: RunCommandOptions = {}): CommandResult {
+  if (automationRun) {
+    return automationRun.runCommand(command, args, options);
+  }
+
   const useShell = process.platform === 'win32' && command !== 'git';
   const result = spawnSync(getExecutable(command), args, {
     cwd: REPO_ROOT,
@@ -565,142 +572,179 @@ Variants:
 `);
 }
 
+function assertNoBlockingCursorActivity(): void {
+  const activityCheck = checkFinaliseBlockingActivity(REPO_ROOT);
+  if (activityCheck.blockingActivities.length === 0) return;
+
+  throw new Error([
+    'Blocking Cursor activity detected before finalise:',
+    ...activityCheck.blockingActivities.map((activity) => `- ${formatBlockingActivity(activity)}`),
+    `Terminal directory checked: ${activityCheck.terminalDirectory}`,
+    'Wait for the active Agent Review/finalise run to finish, then rerun finalise.',
+  ].join('\n'));
+}
+
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
-  if (options.help) {
-    printHelp();
-    return;
-  }
+  const run = new AutomationRun({
+    scriptName: 'finalise',
+    mode: getPushModeDescription(options),
+    args: process.argv.slice(2),
+  });
+  automationRun = run;
 
-  const unmergedFiles = getUnmergedFiles();
-  if (unmergedFiles.length > 0) {
-    throw new Error(`Resolve merge conflicts before finalising: ${unmergedFiles.join(', ')}`);
-  }
-
-  const changedFiles = getChangedFiles();
-  const pendingMigrationFiles = getPendingMigrationFiles(changedFiles);
-  const shouldRunDbValidate = pendingMigrationFiles.some((relativePath) => migrationNeedsDbValidate(relativePath));
-  const devServerProcesses = getRepoDevServerProcesses();
-  const branch = getCurrentBranch();
-  const initialChangeSummary = summarizeFinaliseChanges(changedFiles);
-
-  if (options.dryRun) {
-    console.log(`Mode: ${getPushModeDescription(options)}`);
-    console.log(`Branch: ${branch || '(detached HEAD)'}`);
-    console.log(`Dev server: ${devServerProcesses.length > 0 ? `would stop ${devServerProcesses.length} process(es)` : 'none running'}`);
-    console.log(
-      `Migrations: ${
-        pendingMigrationFiles.length > 0
-          ? `would run ${pendingMigrationFiles.join(', ')}`
-          : 'none pending'
-      }`
-    );
-    console.log(`DB validate: ${shouldRunDbValidate ? 'would run' : 'not needed'}`);
-    console.log('Build: would remove .next and run npm run build');
-    console.log(
-      `Tests: ${
-        options.full
-          ? `would run npm run test:run, start a local production server on ${DEV_SERVER_PORT}, then run npm run testsuite`
-          : 'skipped'
-      }`
-    );
-    console.log(
-      `Commit: ${
-        hasUncommittedChanges()
-          ? `would commit ${initialChangeSummary.fileCount} file(s) with "${initialChangeSummary.commitMessage}"`
-          : 'no changes to commit'
-      }`
-    );
-    console.log(`Push: ${options.push ? 'would push current branch' : 'skipped'}`);
-    return;
-  }
-
-  console.log(`Starting finalise workflow (${getPushModeDescription(options)})`);
-
-  if (devServerProcesses.length > 0) {
-    console.log(`\n==> Stop dev server (${devServerProcesses.length} process${devServerProcesses.length === 1 ? '' : 'es'})`);
-    await stopRepoDevServer();
-  } else {
-    console.log('\n==> Stop dev server');
-    console.log('No repo dev server detected.');
-  }
-
-  if (pendingMigrationFiles.length > 0) {
-    console.log(`\n==> Run pending local migrations (${pendingMigrationFiles.length})`);
-    await runPendingMigrations(pendingMigrationFiles);
-  } else {
-    console.log('\n==> Run pending local migrations');
-    console.log('No pending local migration files detected.');
-  }
-
-  if (shouldRunDbValidate) {
-    console.log('\n==> Validate database after schema-risk migration');
-    runCommand('npm', ['run', 'db:validate']);
-  } else {
-    console.log('\n==> Validate database after schema-risk migration');
-    console.log('No rename/drop migration detected.');
-  }
-
-  console.log('\n==> Remove clean build output');
-  const removedBuildOutput = removeNextBuildOutput();
-  console.log(removedBuildOutput ? 'Removed .next build output.' : 'No .next build output to remove.');
-
-  console.log('\n==> Run clean production build');
-  runCommand('npm', ['run', 'build']);
-
-  if (options.full) {
-    console.log('\n==> Run full automated test suite');
-    runCommand('npm', ['run', 'test:run']);
-    console.log(`Starting local production server on port ${DEV_SERVER_PORT} for testsuite...`);
-    const testServer = startManagedProcess(
-      'npm',
-      ['run', 'start', '--', '--port', String(DEV_SERVER_PORT)],
-      'Local production server'
-    );
-
-    try {
-      await waitForServerReady(testServer, `http://127.0.0.1:${DEV_SERVER_PORT}`);
-      runCommand('npm', ['run', 'testsuite']);
-    } finally {
-      await stopManagedProcess(testServer);
+  try {
+    if (options.help) {
+      printHelp();
+      run.finish('passed');
+      return;
     }
-  } else {
-    console.log('\n==> Run full automated test suite');
-    console.log('Skipped for non-full finalise.');
+
+    await run.step('Check for blocking Cursor activity', () => assertNoBlockingCursorActivity());
+
+    const unmergedFiles = getUnmergedFiles();
+    if (unmergedFiles.length > 0) {
+      throw new Error(`Resolve merge conflicts before finalising: ${unmergedFiles.join(', ')}`);
+    }
+
+    const changedFiles = getChangedFiles();
+    const pendingMigrationFiles = getPendingMigrationFiles(changedFiles);
+    const shouldRunDbValidate = pendingMigrationFiles.some((relativePath) => migrationNeedsDbValidate(relativePath));
+    const devServerProcesses = getRepoDevServerProcesses();
+    const branch = getCurrentBranch();
+    const initialChangeSummary = summarizeFinaliseChanges(changedFiles);
+
+    if (options.dryRun) {
+      console.log(`Mode: ${getPushModeDescription(options)}`);
+      console.log(`Branch: ${branch || '(detached HEAD)'}`);
+      console.log(`Dev server: ${devServerProcesses.length > 0 ? `would stop ${devServerProcesses.length} process(es)` : 'none running'}`);
+      console.log(
+        `Migrations: ${
+          pendingMigrationFiles.length > 0
+            ? `would run ${pendingMigrationFiles.join(', ')}`
+            : 'none pending'
+        }`
+      );
+      console.log(`DB validate: ${shouldRunDbValidate ? 'would run' : 'not needed'}`);
+      console.log('Build: would remove .next and run npm run build');
+      console.log(
+        `Tests: ${
+          options.full
+            ? `would run npm run test:run, start a local production server on ${DEV_SERVER_PORT}, then run npm run testsuite`
+            : 'skipped'
+        }`
+      );
+      console.log(
+        `Commit: ${
+          hasUncommittedChanges()
+            ? `would commit ${initialChangeSummary.fileCount} file(s) with "${initialChangeSummary.commitMessage}"`
+            : 'no changes to commit'
+        }`
+      );
+      console.log(`Push: ${options.push ? 'would push current branch' : 'skipped'}`);
+      run.finish('passed');
+      return;
+    }
+
+    console.log(`Starting finalise workflow (${getPushModeDescription(options)})`);
+
+    if (devServerProcesses.length > 0) {
+      console.log(`\n==> Stop dev server (${devServerProcesses.length} process${devServerProcesses.length === 1 ? '' : 'es'})`);
+      await run.step('Stop repo dev server', () => stopRepoDevServer(), {
+        processCount: devServerProcesses.length,
+      });
+    } else {
+      console.log('\n==> Stop dev server');
+      console.log('No repo dev server detected.');
+    }
+
+    if (pendingMigrationFiles.length > 0) {
+      console.log(`\n==> Run pending local migrations (${pendingMigrationFiles.length})`);
+      await run.step('Run pending local migrations', () => runPendingMigrations(pendingMigrationFiles), {
+        migrationFiles: pendingMigrationFiles,
+      });
+    } else {
+      console.log('\n==> Run pending local migrations');
+      console.log('No pending local migration files detected.');
+    }
+
+    if (shouldRunDbValidate) {
+      console.log('\n==> Validate database after schema-risk migration');
+      runCommand('npm', ['run', 'db:validate']);
+    } else {
+      console.log('\n==> Validate database after schema-risk migration');
+      console.log('No rename/drop migration detected.');
+    }
+
+    console.log('\n==> Remove clean build output');
+    const removedBuildOutput = await run.step('Remove clean build output', () => removeNextBuildOutput());
+    console.log(removedBuildOutput ? 'Removed .next build output.' : 'No .next build output to remove.');
+
+    console.log('\n==> Run clean production build');
+    runCommand('npm', ['run', 'build']);
+
+    if (options.full) {
+      console.log('\n==> Run full automated test suite');
+      runCommand('npm', ['run', 'test:run']);
+      console.log(`Starting local production server on port ${DEV_SERVER_PORT} for testsuite...`);
+      const testServer = startManagedProcess(
+        'npm',
+        ['run', 'start', '--', '--port', String(DEV_SERVER_PORT)],
+        'Local production server'
+      );
+
+      try {
+        await run.step('Wait for local production server', () =>
+          waitForServerReady(testServer, `http://127.0.0.1:${DEV_SERVER_PORT}`)
+        );
+        runCommand('npm', ['run', 'testsuite']);
+      } finally {
+        await run.step('Stop local production server', () => stopManagedProcess(testServer));
+      }
+    } else {
+      console.log('\n==> Run full automated test suite');
+      console.log('Skipped for non-full finalise.');
+    }
+
+    console.log('\n==> Summarise workspace changes');
+    const changeSummary = summarizeFinaliseChanges(getChangedFiles());
+    if (changeSummary.fileCount > 0) {
+      console.log(`Changed files: ${changeSummary.fileCount}`);
+      console.log(`Areas: ${changeSummary.areas.join(', ')}`);
+      console.log(`Commit message: ${changeSummary.commitMessage}`);
+    } else {
+      console.log('No workspace changes to summarise.');
+    }
+
+    console.log('\n==> Commit workspace changes');
+    const committed = commitAllChanges(changeSummary.commitMessage);
+    console.log(
+      committed ? `Created commit: ${changeSummary.commitMessage}` : 'No uncommitted changes, so no commit was created.'
+    );
+
+    let pushedBranch: string | null = null;
+    if (options.push) {
+      console.log('\n==> Push current branch');
+      pushedBranch = pushCurrentBranch();
+    } else {
+      console.log('\n==> Push current branch');
+      console.log('Skipped for non-push finalise.');
+    }
+
+    console.log('\nFinalise complete.');
+    console.log(`- Branch: ${branch || '(detached HEAD)'}`);
+    console.log(`- Migrations run: ${pendingMigrationFiles.length}`);
+    console.log(`- Build: passed`);
+    console.log(`- Tests: ${options.full ? 'passed' : 'skipped'}`);
+    console.log(`- Commit: ${committed ? 'created' : 'skipped'}`);
+    console.log(`- Push: ${pushedBranch ? `pushed ${pushedBranch}` : 'skipped'}`);
+    run.finish('passed');
+  } catch (error) {
+    run.finish('failed', error);
+    throw error;
+  } finally {
+    automationRun = null;
   }
-
-  console.log('\n==> Summarise workspace changes');
-  const changeSummary = summarizeFinaliseChanges(getChangedFiles());
-  if (changeSummary.fileCount > 0) {
-    console.log(`Changed files: ${changeSummary.fileCount}`);
-    console.log(`Areas: ${changeSummary.areas.join(', ')}`);
-    console.log(`Commit message: ${changeSummary.commitMessage}`);
-  } else {
-    console.log('No workspace changes to summarise.');
-  }
-
-  console.log('\n==> Commit workspace changes');
-  const committed = commitAllChanges(changeSummary.commitMessage);
-  console.log(
-    committed ? `Created commit: ${changeSummary.commitMessage}` : 'No uncommitted changes, so no commit was created.'
-  );
-
-  let pushedBranch: string | null = null;
-  if (options.push) {
-    console.log('\n==> Push current branch');
-    pushedBranch = pushCurrentBranch();
-  } else {
-    console.log('\n==> Push current branch');
-    console.log('Skipped for non-push finalise.');
-  }
-
-  console.log('\nFinalise complete.');
-  console.log(`- Branch: ${branch || '(detached HEAD)'}`);
-  console.log(`- Migrations run: ${pendingMigrationFiles.length}`);
-  console.log(`- Build: passed`);
-  console.log(`- Tests: ${options.full ? 'passed' : 'skipped'}`);
-  console.log(`- Commit: ${committed ? 'created' : 'skipped'}`);
-  console.log(`- Push: ${pushedBranch ? `pushed ${pushedBranch}` : 'skipped'}`);
 }
 
 main().catch((error: unknown) => {

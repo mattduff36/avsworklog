@@ -31,18 +31,13 @@ Run the commands for the chosen tier **from the project root** in a terminal:
 ### Tier 1 — Quick
 
 ```bash
-npm run lint
-npm run lint:fast
-npm run deps:check
+npm run audit:quick
 ```
 
 ### Tier 2 — Medium
 
 ```bash
-npm run lint
-npm run lint:fast
-npm run deps:check
-npm run build
+npm run audit:medium
 ```
 
 ### Tier 3 — Full
@@ -61,7 +56,7 @@ npm run audit:all
 
 This runs: ESLint → oxlint → depcheck → bundle-analyzed build → linkinator → Lighthouse CI.
 
-Capture the **complete console output** from every stage.
+The audit wrapper stores a private run log and self-review summary under `docs_private/automation`.
 
 ---
 
@@ -119,7 +114,7 @@ Present the full report and **wait for user approval** before editing any files.
 
 ## Important notes
 
-- The audit scripts are defined in `package.json` under `scripts` (`lint`, `lint:fast`, `deps:check`, `build:analyze`, `test:links`, `test:lighthouse`, `audit:all`).
+- The audit scripts are defined in `package.json` under `scripts` (`audit:quick`, `audit:medium`, `audit:all`, plus the lower-level commands they run).
 - ESLint config lives in `eslint.config.mjs` (flat config, ESLint 9+). There is no legacy `.eslintrc.*`.
 - TypeScript strict flags (`noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`) are already enabled in `tsconfig.json`.
 - Do **not** push to GitHub unless the user explicitly says "push to GitHub".
