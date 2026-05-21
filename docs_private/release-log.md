@@ -2,6 +2,18 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0526.1.0
+
+**GIT COMMIT MESSAGE**
+`feat(maintenance): update maintenance workflow`
+
+**WHAT CHANGED**
+Update maintenance workflow. Add production release version display and bump automation.
+
+**COMMITS IN THIS RELEASE**
+- `feat(maintenance): update maintenance workflow`
+- `feat(help): add production release version display and bump automation`
+
 ## 0526.0.0
 
 **GIT COMMIT MESSAGE**
