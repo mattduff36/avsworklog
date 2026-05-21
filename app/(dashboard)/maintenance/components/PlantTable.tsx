@@ -487,7 +487,7 @@ export function PlantTable({
                 <Table className="min-w-full">
                   <TableHeader>
                     <TableRow className="border-border">
-                      <TableHead 
+                        <TableHead 
                         className="sticky z-30 bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
                         style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
                         onClick={() => handleSort('plant_id')}
@@ -511,7 +511,7 @@ export function PlantTable({
                       )}
                       {columnVisibility.serial_number && (
                         <TableHead 
-                          className="sticky z-30 bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
+                          className="sticky z-30 bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border whitespace-nowrap"
                           style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
                           onClick={() => handleSort('serial_number')}
                         >
@@ -523,7 +523,7 @@ export function PlantTable({
                       )}
                       {columnVisibility.category && (
                         <TableHead 
-                          className="sticky z-30 bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
+                          className="sticky z-30 bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border whitespace-nowrap"
                           style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
                           onClick={() => handleSort('category')}
                         >
@@ -535,7 +535,7 @@ export function PlantTable({
                       )}
                       {columnVisibility.current_hours && (
                         <TableHead 
-                          className="sticky z-30 bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
+                          className="sticky z-30 bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border whitespace-nowrap"
                           style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
                           onClick={() => handleSort('current_hours')}
                         >
@@ -550,12 +550,12 @@ export function PlantTable({
                         .map(column => (
                           <TableHead
                             key={column.category_id}
-                            className="sticky z-30 bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
+                            className="sticky z-30 bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border whitespace-nowrap"
                             style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
                             onClick={() => handleSort(`category:${column.category_id}`)}
                           >
                             <div className="flex items-center gap-2">
-                              {column.category_name}
+                              {column.category_name === 'Service Due (Hours)' ? 'Service Due' : column.category_name}
                               <ArrowUpDown className="h-3 w-3" />
                             </div>
                           </TableHead>
@@ -570,14 +570,32 @@ export function PlantTable({
                         className="border-slate-700 hover:bg-slate-800/50 cursor-pointer"
                       >
                         {/* Plant ID */}
-                        <TableCell className="font-medium text-white">
-                          {asset.plant?.plant_id || 'Unknown'}
+                        <TableCell className="align-top font-medium text-white">
+                          <div className="space-y-1">
+                            <span className="block">{asset.plant?.plant_id || 'Unknown'}</span>
+                            {asset.plant?.reg_number ? (
+                              <span className="block text-xs font-normal text-muted-foreground">
+                                {asset.plant.reg_number}
+                              </span>
+                            ) : null}
+                          </div>
                         </TableCell>
                         
                         {/* Nickname */}
                         {columnVisibility.nickname && (
-                          <TableCell className="text-muted-foreground">
-                            {asset.plant?.nickname || (
+                          <TableCell className="align-top text-muted-foreground">
+                            {asset.plant?.nickname ? (
+                              <span
+                                className="block max-w-[18rem] overflow-hidden break-words text-sm leading-5 text-muted-foreground"
+                                style={{
+                                  display: '-webkit-box',
+                                  WebkitBoxOrient: 'vertical',
+                                  WebkitLineClamp: 2,
+                                }}
+                              >
+                                {asset.plant.nickname}
+                              </span>
+                            ) : (
                               <span className="text-slate-400 italic">No nickname</span>
                             )}
                           </TableCell>
@@ -585,7 +603,7 @@ export function PlantTable({
                         
                         {/* Serial Number */}
                         {columnVisibility.serial_number && (
-                          <TableCell className="text-muted-foreground">
+                          <TableCell className="align-top whitespace-nowrap text-muted-foreground">
                             {asset.plant?.serial_number || (
                               <span className="text-slate-400 italic">Not set</span>
                             )}
@@ -594,18 +612,18 @@ export function PlantTable({
                         
                         {/* Category */}
                         {columnVisibility.category && (
-                          <TableCell className="text-muted-foreground">
+                          <TableCell className="align-top whitespace-nowrap text-muted-foreground">
                             {asset.plant?.van_categories?.name || 'All plant'}
                           </TableCell>
                         )}
                         
                         {/* Hours */}
                         {columnVisibility.current_hours && (
-                          <TableCell>
+                          <TableCell className="align-top whitespace-nowrap">
                             {asset.current_hours != null ? (
                               <span className="text-muted-foreground">{asset.current_hours.toLocaleString()}h</span>
                             ) : (
-                              <Badge className={`font-medium ${getStatusColorClass('not_set')}`}>Not Set</Badge>
+                              <Badge className={`whitespace-nowrap font-medium ${getStatusColorClass('not_set')}`}>Not Set</Badge>
                             )}
                           </TableCell>
                         )}
@@ -616,8 +634,8 @@ export function PlantTable({
                             const item = asset.maintenance_items?.find(maintenanceItem => maintenanceItem.category_id === column.category_id);
 
                             return (
-                              <TableCell key={column.category_id}>
-                                <Badge className={`font-medium ${getStatusColorClass(item?.status.status || 'not_set')}`}>
+                              <TableCell key={column.category_id} className="align-top whitespace-nowrap">
+                                <Badge className={`whitespace-nowrap font-medium ${getStatusColorClass(item?.status.status || 'not_set')}`}>
                                   {item?.display_value || 'Not Set'}
                                 </Badge>
                               </TableCell>

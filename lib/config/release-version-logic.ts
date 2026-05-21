@@ -16,7 +16,7 @@ export interface ParsedCommit {
 export type VersionBumpKind = 'major' | 'minor' | 'month_reset' | 'none';
 
 const CONVENTIONAL_COMMIT_PATTERN =
-  /^(?<type>[a-z]+)(?<breaking>!)?(?:\((?<scope>[^)]+)\))?:\s*(?<subject>.+)$/iu;
+  /^([a-z]+)(!)?(?:\(([^)]+)\))?:\s*(.+)$/iu;
 
 const MAJOR_TYPES = new Set(['feat']);
 const MINOR_TYPES = new Set(['fix', 'chore', 'docs', 'test', 'refactor', 'perf', 'style']);
@@ -45,12 +45,13 @@ export function parseConventionalCommit(message: string): ParsedCommit | null {
   }
 
   const match = CONVENTIONAL_COMMIT_PATTERN.exec(firstLine);
-  if (!match?.groups) {
+  if (!match) {
     return null;
   }
 
-  const type = (match.groups.type ?? '').toLowerCase();
-  const subject = (match.groups.subject ?? '').trim();
+  const [, rawType, breaking, rawScope, rawSubject] = match;
+  const type = (rawType ?? '').toLowerCase();
+  const subject = (rawSubject ?? '').trim();
   if (!type || !subject) {
     return null;
   }
@@ -58,9 +59,9 @@ export function parseConventionalCommit(message: string): ParsedCommit | null {
   return {
     raw: firstLine,
     type,
-    scope: match.groups.scope?.trim() || null,
+    scope: rawScope?.trim() || null,
     subject,
-    isBreaking: Boolean(match.groups.breaking),
+    isBreaking: Boolean(breaking),
   };
 }
 
