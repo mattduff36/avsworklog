@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { AppPageShell } from '@/components/layout/AppPageShell';
-import { TabletModeToggleActions } from '@/components/layout/TabletModeToggleActions';
 import { MobileTextSizeDialog } from '@/components/layout/MobileTextSizeDialog';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import Link from 'next/link';
@@ -27,6 +26,7 @@ import { usePermissionSnapshot } from '@/lib/hooks/usePermissionSnapshot';
 import { useRamsAssignmentSummary } from '@/lib/hooks/useNavMetrics';
 import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError, createStatusError } from '@/lib/utils/http-error';
 import { canAccessDebugConsole } from '@/lib/utils/debug-access';
+import { getPublicReleaseVersionLabel } from '@/lib/config/release-version';
 
 type PendingApprovalCount = {
   type: 'timesheets' | 'absences';
@@ -412,6 +412,9 @@ export default function DashboardPage() {
                 <p className="mt-1 text-slate-400">
                   {headerSubtitle}
                 </p>
+                <p className="mt-2 text-xs text-muted-foreground tabular-nums md:hidden">
+                  {getPublicReleaseVersionLabel()}
+                </p>
               </div>
               <Button
                 type="button"
@@ -427,7 +430,9 @@ export default function DashboardPage() {
               </Button>
             </div>
             <div className="hidden md:flex items-center justify-end">
-              <TabletModeToggleActions size="dashboard" />
+              <p className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                {getPublicReleaseVersionLabel()}
+              </p>
             </div>
           </div>
         </div>

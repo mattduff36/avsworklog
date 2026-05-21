@@ -188,6 +188,7 @@ export async function GET(request: NextRequest) {
         *,
         location:inventory_locations(*)
       `)
+      .eq('status', 'active')
       .order('name', { ascending: true })
       .range(offset, offset + limit - 1);
 

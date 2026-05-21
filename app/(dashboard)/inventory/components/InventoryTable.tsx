@@ -24,6 +24,7 @@ import {
   MapPin,
   PackageSearch,
   Search,
+  Trash2,
   Truck,
 } from 'lucide-react';
 import {
@@ -47,6 +48,7 @@ interface InventoryTableProps {
   selectedItemIds: Set<string>;
   onSelectedItemIdsChange: (selectedItemIds: Set<string>) => void;
   onEdit?: (item: InventoryItem) => void;
+  onDelete?: (item: InventoryItem) => void;
   onMove: (items: InventoryItem[]) => void;
   onOpenDetails?: (item: InventoryItem) => void;
   locationFilterLocations?: InventoryLocation[];
@@ -121,6 +123,7 @@ export function InventoryTable({
   selectedItemIds,
   onSelectedItemIdsChange,
   onEdit,
+  onDelete,
   onMove,
   onOpenDetails,
   locationFilterLocations,
@@ -370,6 +373,18 @@ export function InventoryTable({
                             Edit
                           </Button>
                         ) : null}
+                        {onDelete ? (
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            onClick={(event) => { event.stopPropagation(); onDelete(item); }}
+                            className="h-9 w-9 border-red-500/50 text-red-300 hover:bg-red-500/10 hover:text-red-200"
+                            aria-label={`Delete ${item.name}`}
+                            title="Delete item"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>
@@ -434,6 +449,17 @@ export function InventoryTable({
                   {onEdit ? (
                     <Button size="sm" onClick={(event) => { event.stopPropagation(); onEdit(item); }} className="flex-1 bg-inventory text-white hover:bg-inventory-dark">
                       Edit
+                    </Button>
+                  ) : null}
+                  {onDelete ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(event) => { event.stopPropagation(); onDelete(item); }}
+                      className="border-red-500/50 text-red-300 hover:bg-red-500/10 hover:text-red-200"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
                     </Button>
                   ) : null}
                 </div>

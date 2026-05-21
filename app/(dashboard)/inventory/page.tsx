@@ -223,6 +223,22 @@ export default function InventoryPage() {
     await fetchInventoryData();
   }
 
+  async function handleRemoveItem(item: InventoryItem) {
+    if (!window.confirm(`Delete inventory item ${item.item_number} - ${item.name}?`)) return;
+
+    const response = await fetch(`/api/inventory/${item.id}`, {
+      method: 'DELETE',
+    });
+    await parseJsonResponse(response, 'Failed to delete inventory item');
+    toast.success('Inventory item deleted');
+    setSelectedItemIds((current) => {
+      const next = new Set(current);
+      next.delete(item.id);
+      return next;
+    });
+    await fetchInventoryData();
+  }
+
   async function handleCreateLocation(data: InventoryLocationFormData) {
     const response = await fetch('/api/inventory/locations', {
       method: 'POST',
@@ -561,6 +577,7 @@ export default function InventoryPage() {
             selectedItemIds={selectedItemIds}
             onSelectedItemIdsChange={setSelectedItemIds}
             onEdit={(item) => { setEditingItem(item); setItemDialogOpen(true); }}
+            onDelete={handleRemoveItem}
             onMove={setMovingItems}
             onOpenDetails={(item) => router.push('/inventory/items/' + item.id + '?fromTab=overview')}
             locationFilterLocations={locations}
