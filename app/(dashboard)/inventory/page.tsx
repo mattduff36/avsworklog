@@ -4,14 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
-import { AlertTriangle, CheckCircle2, Construction, MapPin, PackageSearch, Plus, Settings, Truck } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, MapPin, PackageSearch, Plus, Settings, Truck } from 'lucide-react';
 import { toast } from 'sonner';
 import { ChangeInventoryLocationDialog } from './components/ChangeInventoryLocationDialog';
 import { InventoryCategoriesPanel } from './components/InventoryCategoriesPanel';
@@ -419,15 +418,6 @@ export default function InventoryPage() {
   if (!isManagerOrAdmin) {
     return (
       <AppPageShell width="wide">
-        <Badge
-          variant="outline"
-          className="mx-auto flex w-fit gap-2 whitespace-nowrap border-amber-400/25 bg-amber-500/10 px-3 py-1 text-amber-200 shadow-sm shadow-amber-950/20"
-        >
-          <Construction className="h-3.5 w-3.5" />
-          Inventory module is in active development; features may change
-          <Construction className="h-3.5 w-3.5" />
-        </Badge>
-
         <AppPageHeader
           title="Inventory"
           description={employeeLocationName ? `Current location: ${employeeLocationName}` : 'Set your location, view assigned inventory, and claim or move items.'}
@@ -471,15 +461,6 @@ export default function InventoryPage() {
 
   return (
     <AppPageShell width="wide">
-      <Badge
-        variant="outline"
-        className="mx-auto flex w-fit gap-2 whitespace-nowrap border-amber-400/25 bg-amber-500/10 px-3 py-1 text-amber-200 shadow-sm shadow-amber-950/20"
-      >
-        <Construction className="h-3.5 w-3.5" />
-        Inventory module is in active development; features may change
-        <Construction className="h-3.5 w-3.5" />
-      </Badge>
-
       <AppPageHeader
         title="Inventory"
         description={employeeLocationName

@@ -375,10 +375,10 @@ export function InventoryTable({
                         ) : null}
                         {onDelete ? (
                           <Button
-                            size="icon"
-                            variant="outline"
                             onClick={(event) => { event.stopPropagation(); onDelete(item); }}
-                            className="h-9 w-9 border-red-500/50 text-red-300 hover:bg-red-500/10 hover:text-red-200"
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950"
                             aria-label={`Delete ${item.name}`}
                             title="Delete item"
                           >
@@ -453,13 +453,14 @@ export function InventoryTable({
                   ) : null}
                   {onDelete ? (
                     <Button
-                      size="sm"
-                      variant="outline"
                       onClick={(event) => { event.stopPropagation(); onDelete(item); }}
-                      className="border-red-500/50 text-red-300 hover:bg-red-500/10 hover:text-red-200"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950"
+                      aria-label={`Delete ${item.name}`}
+                      title="Delete item"
                     >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   ) : null}
                 </div>
