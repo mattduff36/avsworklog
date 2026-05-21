@@ -22,6 +22,7 @@
     "audit:contrast": "tsx scripts/audit-input-contrast.ts",
     "fix:contrast": "tsx scripts/fix-input-contrast.ts",
     "fixerrors": "tsx scripts/fixerrors.ts",
+    "version:bump": "tsx scripts/bump-release-version.ts",
     "db:validate": "tsx scripts/db-validate.ts",
     "permissions:migrate:team-matrix": "tsx scripts/run-team-permission-matrix-migration.ts",
     "hierarchy:preflight": "tsx scripts/hierarchy/preflight-organogram-check.ts",

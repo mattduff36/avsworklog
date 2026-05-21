@@ -52,6 +52,7 @@ import {
   getErrorReportScreenshots,
   isAllowedErrorReportScreenshot,
 } from '@/lib/utils/error-report-screenshots';
+import { getPublicReleaseVersionLabel } from '@/lib/config/release-version';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -612,9 +613,14 @@ export default function HelpPage() {
           <h1 className="text-3xl font-bold text-foreground mb-2">
             Help & FAQ
           </h1>
-          <p className="text-muted-foreground">
-            Find answers to common questions and submit suggestions
-          </p>
+          <div className="flex items-baseline justify-between gap-4">
+            <p className="text-muted-foreground">
+              Find answers to common questions and submit suggestions
+            </p>
+            <p className="shrink-0 text-xs text-muted-foreground tabular-nums">
+              {getPublicReleaseVersionLabel()}
+            </p>
+          </div>
         </div>
       </div>
 
