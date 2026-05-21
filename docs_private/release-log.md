@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0526.3.0
+
+**GIT COMMIT MESSAGE**
+`feat(fleet): update fleet workflow`
+
+**WHAT CHANGED**
+Update fleet workflow.
+
+**COMMITS IN THIS RELEASE**
+- `feat(fleet): update fleet workflow`
+
 ## 0526.2.3
 
 **GIT COMMIT MESSAGE**
