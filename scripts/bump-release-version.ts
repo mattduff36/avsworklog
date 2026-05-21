@@ -9,7 +9,7 @@ import {
   formatReleaseVersion,
   parseCommitsFromMessages,
   prependReleaseLogEntry,
-  selectPrimaryCommitMessage,
+  selectReleasePrimaryCommitMessage,
   shouldSkipVersionBumpCommit,
   type ReleaseVersionState,
 } from '../lib/config/release-version-logic';
@@ -135,7 +135,7 @@ function main(): void {
   };
 
   const versionLabel = formatReleaseVersion(nextState);
-  const primaryCommitMessage = selectPrimaryCommitMessage(commits);
+  const primaryCommitMessage = selectReleasePrimaryCommitMessage(commits, bumpKind, nextState);
 
   if (!primaryCommitMessage) {
     throw new Error('Version bump required but no eligible commit message was found.');

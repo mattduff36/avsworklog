@@ -16,7 +16,7 @@ export interface ParsedCommit {
 export type VersionBumpKind = 'major' | 'minor' | 'month_reset' | 'none';
 
 const CONVENTIONAL_COMMIT_PATTERN =
-  /^([a-z]+)(!)?(?:\(([^)]+)\))?:\s*(.+)$/iu;
+  /^([a-z]+)(?:\(([^)]+)\))?(!)?:\s*(.+)$/iu;
 
 const MAJOR_TYPES = new Set(['feat']);
 const MINOR_TYPES = new Set(['fix', 'chore', 'docs', 'test', 'refactor', 'perf', 'style']);
@@ -49,7 +49,7 @@ export function parseConventionalCommit(message: string): ParsedCommit | null {
     return null;
   }
 
-  const [, rawType, breaking, rawScope, rawSubject] = match;
+  const [, rawType, rawScope, breaking, rawSubject] = match;
   const type = (rawType ?? '').toLowerCase();
   const subject = (rawSubject ?? '').trim();
   if (!type || !subject) {
@@ -99,6 +99,17 @@ export function selectPrimaryCommitMessage(commits: ParsedCommit[]): string | nu
   }
 
   return commits[commits.length - 1].raw;
+}
+
+export function selectReleasePrimaryCommitMessage(
+  commits: ParsedCommit[],
+  bumpKind: VersionBumpKind,
+  state: Pick<ReleaseVersionState, 'mmyy'>
+): string | null {
+  return (
+    selectPrimaryCommitMessage(commits) ??
+    (bumpKind === 'month_reset' ? `chore(release): reset release version for ${state.mmyy}` : null)
+  );
 }
 
 export function determineBumpKind(commits: ParsedCommit[]): VersionBumpKind {

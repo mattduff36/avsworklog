@@ -10,6 +10,7 @@ import {
   parseCommitsFromMessages,
   prependReleaseLogEntry,
   selectPrimaryCommitMessage,
+  selectReleasePrimaryCommitMessage,
   shouldSkipVersionBumpCommit,
 } from '@/lib/config/release-version-logic';
 
@@ -36,12 +37,24 @@ describe('release version logic', () => {
     expect(parseConventionalCommit('chore(release): bump to 0526.1.0 [skip version]')).toBeNull();
   });
 
+  it('parses scoped breaking changes with bang after the scope', () => {
+    expect(parseConventionalCommit('fix(api)!: remove endpoint')).toEqual({
+      raw: 'fix(api)!: remove endpoint',
+      type: 'fix',
+      scope: 'api',
+      subject: 'remove endpoint',
+      isBreaking: true,
+    });
+  });
+
   it('treats feat as major and fix as minor', () => {
     const featOnly = parseCommitsFromMessages(['feat(ui): new dashboard']);
     const fixOnly = parseCommitsFromMessages(['fix(api): handle timeout']);
+    const scopedBreakingFix = parseCommitsFromMessages(['fix(api)!: remove endpoint']);
 
     expect(determineBumpKind(featOnly)).toBe('major');
     expect(determineBumpKind(fixOnly)).toBe('minor');
+    expect(determineBumpKind(scopedBreakingFix)).toBe('major');
   });
 
   it('prefers feat commit for primary git commit message', () => {
@@ -82,6 +95,19 @@ describe('release version logic', () => {
     const { next, bumpKind } = computeNextVersionState(current, commits, june);
     expect(bumpKind).toBe('month_reset');
     expect(next).toEqual({ mmyy: '0626', major: 0, minor: 0, lastProcessedSha: 'abc' });
+  });
+
+  it('still resets the month when no conventional commits were parsed', () => {
+    const current = { mmyy: '0526', major: 2, minor: 4, lastProcessedSha: 'abc' };
+    const june = new Date('2026-06-02T12:00:00Z');
+
+    const { next, bumpKind } = computeNextVersionState(current, [], june);
+    expect(bumpKind).toBe('month_reset');
+    expect(next).toEqual({ mmyy: '0626', major: 0, minor: 0, lastProcessedSha: 'abc' });
+    expect(selectPrimaryCommitMessage([])).toBeNull();
+    expect(selectReleasePrimaryCommitMessage([], bumpKind, next)).toBe(
+      'chore(release): reset release version for 0626'
+    );
   });
 
   it('returns none when no eligible commits', () => {
