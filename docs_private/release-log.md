@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0526.5.0
+
+**GIT COMMIT MESSAGE**
+`feat(mobile): add mobile text size controls`
+
+**WHAT CHANGED**
+Add mobile text size controls.
+
+**COMMITS IN THIS RELEASE**
+- `feat(mobile): add mobile text size controls`
+
 ## 0526.4.0
 
 **GIT COMMIT MESSAGE**
