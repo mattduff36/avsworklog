@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0526.2.0
+
+**GIT COMMIT MESSAGE**
+`feat(mobile): update mobile text size controls and API routes`
+
+**WHAT CHANGED**
+Update mobile text size controls and API routes.
+
+**COMMITS IN THIS RELEASE**
+- `feat(mobile): update mobile text size controls and API routes`
+
 ## 0526.1.1
 
 **GIT COMMIT MESSAGE**
