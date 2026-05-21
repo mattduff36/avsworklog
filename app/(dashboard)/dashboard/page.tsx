@@ -555,108 +555,128 @@ export default function DashboardPage() {
       </div>
 
       {/* Manager/Admin Quick Access - Smaller Tiles */}
-      {renderedManagementTiles.length > 0 && (
-        <div>
-          <h3 className="text-lg font-semibold text-white mb-3">
-            Management Tools
-          </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            {/* Manager Links - Using shared navigation config */}
-            {renderedManagerTiles.map((link, index) => {
-              const Icon = link.icon;
-              const canHaveBadge = hasManagementTileBadge(link.href);
-              const badgeCount = getManagementTileBadgeCount(link.href);
-              
-              return (
-                <Link key={link.href} href={link.href}>
-                  <div 
-                    className="relative bg-slate-800 dark:bg-slate-900 border-4 border-slate-600 hover:border-slate-500 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer animate-tile-pop"
-                    style={{ height: '100px', animationDelay: `${index * 75}ms` }}
-                  >
-                    {badgesLoading && canHaveBadge ? (
-                      <div className="absolute top-2 right-2 bg-slate-500/80 rounded-full h-6 w-6 flex items-center justify-center shadow-lg ring-2 ring-slate-700 animate-pulse">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
+      {(renderedManagementTiles.length > 0 || canAccessDebugTools) && (
+        <div className="space-y-6">
+          {renderedManagerTiles.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold text-white mb-3">
+                Management
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                {/* Manager Links - Using shared navigation config */}
+                {renderedManagerTiles.map((link, index) => {
+                  const Icon = link.icon;
+                  const canHaveBadge = hasManagementTileBadge(link.href);
+                  const badgeCount = getManagementTileBadgeCount(link.href);
+                  
+                  return (
+                    <Link key={link.href} href={link.href}>
+                      <div 
+                        className="relative bg-slate-800 dark:bg-slate-900 border-4 border-slate-600 hover:border-slate-500 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer animate-tile-pop"
+                        style={{ height: '100px', animationDelay: `${index * 75}ms` }}
+                      >
+                        {badgesLoading && canHaveBadge ? (
+                          <div className="absolute top-2 right-2 bg-slate-500/80 rounded-full h-6 w-6 flex items-center justify-center shadow-lg ring-2 ring-slate-700 animate-pulse">
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
+                          </div>
+                        ) : badgeCount > 0 ? (
+                          <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full h-6 w-6 flex items-center justify-center text-xs font-bold shadow-lg ring-2 ring-slate-800">
+                            {badgeCount > 99 ? '99+' : badgeCount}
+                          </div>
+                        ) : null}
+                        <div className="flex flex-col items-start justify-between h-full">
+                          <Icon className="h-6 w-6 text-muted-foreground" />
+                          <span className="text-white font-semibold text-base leading-tight">
+                            {link.label}
+                          </span>
+                        </div>
                       </div>
-                    ) : badgeCount > 0 ? (
-                      <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full h-6 w-6 flex items-center justify-center text-xs font-bold shadow-lg ring-2 ring-slate-800">
-                        {badgeCount > 99 ? '99+' : badgeCount}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {visibleAdminTiles.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold text-white mb-3">
+                Administration
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                {/* Admin Links - Using shared navigation config */}
+                {visibleAdminTiles.map((link, index) => {
+                  const Icon = link.icon;
+                  const animationIndex = renderedManagerTiles.length + index;
+                  const canHaveBadge = hasManagementTileBadge(link.href);
+                  const badgeCount = getManagementTileBadgeCount(link.href);
+                  
+                  return (
+                    <Link key={link.href} href={link.href}>
+                      <div 
+                        className="relative bg-slate-800 dark:bg-slate-900 border-4 border-slate-600 hover:border-slate-500 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer animate-tile-pop"
+                        style={{ height: '100px', animationDelay: `${animationIndex * 75}ms` }}
+                      >
+                        {badgesLoading && canHaveBadge ? (
+                          <div className="absolute top-2 right-2 bg-slate-500/80 rounded-full h-6 w-6 flex items-center justify-center shadow-lg ring-2 ring-slate-700 animate-pulse">
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
+                          </div>
+                        ) : badgeCount > 0 ? (
+                          <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full h-6 w-6 flex items-center justify-center text-xs font-bold shadow-lg ring-2 ring-slate-800">
+                            {badgeCount > 99 ? '99+' : badgeCount}
+                          </div>
+                        ) : null}
+                        <div className="flex flex-col items-start justify-between h-full">
+                          <Icon className="h-6 w-6 text-muted-foreground" />
+                          <span className="text-white font-semibold text-base leading-tight">
+                            {link.label}
+                          </span>
+                        </div>
                       </div>
-                    ) : null}
-                    <div className="flex flex-col items-start justify-between h-full">
-                      <Icon className="h-6 w-6 text-muted-foreground" />
-                      <span className="text-white font-semibold text-base leading-tight">
-                        {link.label}
-                      </span>
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* SuperAdmin Only - Debug Link (only when viewing as actual role) */}
+          {canAccessDebugTools && (() => {
+            const Icon = Bug;
+            const animationIndex = renderedManagementTiles.length;
             
-            {/* Admin Links - Using shared navigation config */}
-            {visibleAdminTiles.map((link, index) => {
-              const Icon = link.icon;
-              const animationIndex = renderedManagerTiles.length + index;
-              const canHaveBadge = hasManagementTileBadge(link.href);
-              const badgeCount = getManagementTileBadgeCount(link.href);
-              
-              return (
-                <Link key={link.href} href={link.href}>
-                  <div 
-                    className="relative bg-slate-800 dark:bg-slate-900 border-4 border-slate-600 hover:border-slate-500 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer animate-tile-pop"
-                    style={{ height: '100px', animationDelay: `${animationIndex * 75}ms` }}
-                  >
-                    {badgesLoading && canHaveBadge ? (
-                      <div className="absolute top-2 right-2 bg-slate-500/80 rounded-full h-6 w-6 flex items-center justify-center shadow-lg ring-2 ring-slate-700 animate-pulse">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
+            return (
+              <div>
+                <h3 className="text-lg font-semibold text-red-500 mb-3">
+                  Developer
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                  <Link key="/debug" href="/debug">
+                    <div 
+                      className="relative bg-slate-800 dark:bg-slate-900 border-4 border-red-600 hover:border-red-500 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer animate-tile-pop"
+                      style={{ height: '100px', animationDelay: `${animationIndex * 75}ms` }}
+                    >
+                      {badgesLoading ? (
+                        <div className="absolute top-2 right-2 bg-slate-500/80 rounded-full h-6 w-6 flex items-center justify-center shadow-lg ring-2 ring-slate-700 animate-pulse">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
+                        </div>
+                      ) : getManagementTileBadgeCount('/debug') > 0 ? (
+                        <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full h-6 w-6 flex items-center justify-center text-xs font-bold shadow-lg ring-2 ring-slate-800">
+                          {getManagementTileBadgeCount('/debug') > 99 ? '99+' : getManagementTileBadgeCount('/debug')}
+                        </div>
+                      ) : null}
+                      <div className="flex flex-col items-start justify-between h-full">
+                        <Icon className="h-6 w-6 text-red-500" />
+                        <span className="font-semibold text-base leading-tight text-red-500">
+                          Debug
+                        </span>
                       </div>
-                    ) : badgeCount > 0 ? (
-                      <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full h-6 w-6 flex items-center justify-center text-xs font-bold shadow-lg ring-2 ring-slate-800">
-                        {badgeCount > 99 ? '99+' : badgeCount}
-                      </div>
-                    ) : null}
-                    <div className="flex flex-col items-start justify-between h-full">
-                      <Icon className="h-6 w-6 text-muted-foreground" />
-                      <span className="text-white font-semibold text-base leading-tight">
-                        {link.label}
-                      </span>
                     </div>
-                  </div>
-                </Link>
-              );
-            })}
-            
-            {/* SuperAdmin Only - Debug Link (only when viewing as actual role) */}
-            {canAccessDebugTools && (() => {
-              const Icon = Bug;
-              const animationIndex = renderedManagementTiles.length;
-              
-              return (
-                <Link key="/debug" href="/debug">
-                  <div 
-                    className="relative bg-slate-800 dark:bg-slate-900 border-4 border-red-600 hover:border-red-500 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer animate-tile-pop"
-                    style={{ height: '100px', animationDelay: `${animationIndex * 75}ms` }}
-                  >
-                    {badgesLoading ? (
-                      <div className="absolute top-2 right-2 bg-slate-500/80 rounded-full h-6 w-6 flex items-center justify-center shadow-lg ring-2 ring-slate-700 animate-pulse">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
-                      </div>
-                    ) : getManagementTileBadgeCount('/debug') > 0 ? (
-                      <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full h-6 w-6 flex items-center justify-center text-xs font-bold shadow-lg ring-2 ring-slate-800">
-                        {getManagementTileBadgeCount('/debug') > 99 ? '99+' : getManagementTileBadgeCount('/debug')}
-                      </div>
-                    ) : null}
-                    <div className="flex flex-col items-start justify-between h-full">
-                      <Icon className="h-6 w-6 text-red-500" />
-                      <span className="font-semibold text-base leading-tight text-red-500">
-                        Debug
-                      </span>
-                    </div>
-                  </div>
-                </Link>
-              );
-            })()}
-          </div>
+                  </Link>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
