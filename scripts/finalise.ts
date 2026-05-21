@@ -12,6 +12,8 @@ config({ path: path.resolve(process.cwd(), '.env.local') });
 const { Client } = pg;
 const REPO_ROOT = process.cwd();
 const NEXT_BUILD_DIR = path.join(REPO_ROOT, '.next');
+const RELEASE_VERSION_JSON_PATH = path.join(REPO_ROOT, 'lib/config/release-version.json');
+const RELEASE_VERSION_FILES = ['lib/config/release-version.json', 'docs_private/release-log.md'] as const;
 const DEV_SERVER_PORT = 4000;
 let automationRun: AutomationRun | null = null;
 
@@ -43,6 +45,13 @@ interface ManagedProcess {
   child: ChildProcess;
   label: string;
   output: string[];
+}
+
+interface ReleaseVersionState {
+  mmyy: string;
+  major: number;
+  minor: number;
+  lastProcessedSha: string;
 }
 
 function parseArgs(argv: string[]): FinaliseOptions {
@@ -179,6 +188,41 @@ function getCurrentBranch(): string {
   return runCommand('git', ['branch', '--show-current'], {
     captureOutput: true,
   }).stdout.trim();
+}
+
+function getHeadSha(): string {
+  return runCommand('git', ['rev-parse', 'HEAD'], {
+    captureOutput: true,
+  }).stdout.trim();
+}
+
+function readReleaseVersionState(): ReleaseVersionState {
+  const raw = readFileSync(RELEASE_VERSION_JSON_PATH, 'utf8');
+  return JSON.parse(raw) as ReleaseVersionState;
+}
+
+function formatReleaseVersionLabel(state: Pick<ReleaseVersionState, 'mmyy' | 'major' | 'minor'>): string {
+  return `${state.mmyy}.${state.major}.${state.minor}`;
+}
+
+function hasReleaseVersionChanges(): boolean {
+  const status = runCommand('git', ['status', '--porcelain', '--', ...RELEASE_VERSION_FILES], {
+    captureOutput: true,
+  });
+
+  return status.stdout.trim().length > 0;
+}
+
+function commitReleaseVersionChanges(): string | null {
+  if (!hasReleaseVersionChanges()) {
+    return null;
+  }
+
+  const version = formatReleaseVersionLabel(readReleaseVersionState());
+  runCommand('git', ['add', ...RELEASE_VERSION_FILES]);
+  runCommand('git', ['commit', '-m', `chore(release): bump to ${version} [skip version]`]);
+
+  return version;
 }
 
 function getPushModeDescription(options: FinaliseOptions): string {
@@ -659,6 +703,7 @@ async function main(): Promise<void> {
             : 'no changes to commit'
         }`
       );
+      console.log('Release version: would update locally before push if a bump is due');
       console.log(`Push: ${options.push ? 'would push current branch' : 'skipped'}`);
       run.finish('passed');
       return;
@@ -740,6 +785,17 @@ async function main(): Promise<void> {
       committed ? `Created commit: ${changeSummary.commitMessage}` : 'No uncommitted changes, so no commit was created.'
     );
 
+    console.log('\n==> Bump release version locally');
+    const releaseBeforeSha = readReleaseVersionState().lastProcessedSha;
+    const releaseAfterSha = getHeadSha();
+    runCommand('npm', ['run', 'version:bump', '--', releaseBeforeSha, releaseAfterSha]);
+    const releaseVersion = commitReleaseVersionChanges();
+    console.log(
+      releaseVersion
+        ? `Created release version commit: chore(release): bump to ${releaseVersion} [skip version]`
+        : 'No release version bump required.'
+    );
+
     let pushedBranch: string | null = null;
     if (options.push) {
       console.log('\n==> Push current branch');
@@ -755,6 +811,7 @@ async function main(): Promise<void> {
     console.log(`- Build: passed`);
     console.log(`- Tests: ${options.full ? 'passed' : 'skipped'}`);
     console.log(`- Commit: ${committed ? 'created' : 'skipped'}`);
+    console.log(`- Release version: ${releaseVersion ? `bumped to ${releaseVersion}` : 'unchanged'}`);
     console.log(`- Push: ${pushedBranch ? `pushed ${pushedBranch}` : 'skipped'}`);
     run.finish('passed');
   } catch (error) {
