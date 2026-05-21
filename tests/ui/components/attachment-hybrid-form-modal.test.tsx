@@ -270,4 +270,58 @@ describe('AttachmentHybridFormModal', () => {
     expect(noteResponse).toBeDefined();
     expect(noteResponse?.response_json).toMatchObject({ note: 'all four tyres' });
   });
+
+  it('restores a locally saved attachment draft on reopen', async () => {
+    const originalIndexedDb = window.indexedDB;
+    Object.defineProperty(window, 'indexedDB', {
+      value: undefined,
+      configurable: true,
+    });
+
+    const updatedAt = Date.now();
+    localStorage.setItem('avs_workshop_task_draft:workshop-attachment:attachment-restore', JSON.stringify({
+      id: 'workshop-attachment:attachment-restore',
+      ownerId: null,
+      route: '/workshop-tasks?taskId=task-1',
+      kind: 'workshop-attachment',
+      encrypted: false,
+      iv: null,
+      updatedAt,
+      expiresAt: updatedAt + 60_000,
+      payload: JSON.stringify({
+        responses: {
+          'inside_cab::engine_mil': {
+            response_value: 'attention',
+            response_json: null,
+            field_id: 'field-a1',
+          },
+        },
+        signatureNames: {},
+        activeSectionKey: 'inside_cab',
+      }),
+    }));
+
+    render(
+      <TabletModeProvider>
+        <AttachmentHybridFormModal
+          open
+          onOpenChange={vi.fn()}
+          templateName="6 Week Inspection - HGV"
+          snapshot={snapshot}
+          existingResponses={[]}
+          attachmentId="attachment-restore"
+          onSave={vi.fn(async () => undefined)}
+        />
+      </TabletModeProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Fail' })).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    Object.defineProperty(window, 'indexedDB', {
+      value: originalIndexedDb,
+      configurable: true,
+    });
+  });
 });

@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { APP_SESSION_COOKIE_VERSION } from '@/lib/server/app-auth/constants';
+import {
+  APP_SESSION_ABSOLUTE_HOURS,
+  APP_SESSION_COOKIE_VERSION,
+  APP_SESSION_IDLE_HOURS,
+  APP_SESSION_REMEMBER_IDLE_DAYS,
+} from '@/lib/server/app-auth/constants';
 
 const {
   maybeSingleMock,
@@ -158,6 +163,12 @@ describe('app auth session helpers', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it('keeps the standard app session idle timeout at no less than 24 hours', () => {
+    expect(APP_SESSION_IDLE_HOURS).toBeGreaterThanOrEqual(24);
+    expect(APP_SESSION_ABSOLUTE_HOURS).toBeGreaterThanOrEqual(APP_SESSION_IDLE_HOURS);
+    expect(APP_SESSION_REMEMBER_IDLE_DAYS).toBeGreaterThanOrEqual(1);
   });
 
   it('returns null for locked sessions unless explicitly allowed', async () => {

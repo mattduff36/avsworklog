@@ -272,13 +272,22 @@ export async function updateSession(request: NextRequest) {
 
     const url = request.nextUrl.clone()
     url.pathname = '/login'
-    url.searchParams.set('redirect', request.nextUrl.pathname)
+    url.search = ''
+    url.searchParams.set('redirect', `${request.nextUrl.pathname}${request.nextUrl.search}`)
     return redirectWithMiddlewareCookies(response, url)
   }
 
   if (request.nextUrl.pathname === '/login' && isAuthenticated && !isLocked) {
     const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
+    const redirectTarget = request.nextUrl.searchParams.get('redirect')
+    if (redirectTarget?.startsWith('/') && !redirectTarget.startsWith('//') && !redirectTarget.startsWith('/lock')) {
+      const targetUrl = new URL(redirectTarget, request.nextUrl.origin)
+      url.pathname = targetUrl.pathname
+      url.search = targetUrl.search
+    } else {
+      url.pathname = '/dashboard'
+      url.search = ''
+    }
     return redirectWithMiddlewareCookies(response, url)
   }
 

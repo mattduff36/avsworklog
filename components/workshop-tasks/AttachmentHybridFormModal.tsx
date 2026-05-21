@@ -13,6 +13,7 @@ import { Switch } from '@/components/ui/switch';
 import { TabletActionBar } from '@/components/ui/tablet-action-bar';
 import { SignaturePad } from '@/components/forms/SignaturePad';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
+import { useWorkshopDraftPersistence } from '@/lib/hooks/useWorkshopDraftPersistence';
 import { Download, Loader2, X } from 'lucide-react';
 import type {
   AttachmentSchemaField,
@@ -294,6 +295,28 @@ export function AttachmentHybridFormModal({
       && getResponsesFingerprint(responses) !== initialResponsesFingerprint,
     [initialResponsesFingerprint, responses],
   );
+  const { clearDraft } = useWorkshopDraftPersistence({
+    enabled: open && !readOnly && !isCompleted && Boolean(attachmentId),
+    draftId: `workshop-attachment:${attachmentId || 'none'}`,
+    kind: 'workshop-attachment',
+    value: {
+      responses,
+      signatureNames,
+      activeSectionKey,
+    },
+    isDirty,
+    onRestore: (draft) => {
+      setResponses(draft.responses || {});
+      setSignatureNames(draft.signatureNames || {});
+      setActiveSectionKey(draft.activeSectionKey || sections[0]?.section_key || '');
+    },
+    onServerAutosave: async (draft) => {
+      await onSave(buildResponsesPayload(draft.responses || {}), false);
+      setInitialResponsesFingerprint(getResponsesFingerprint(draft.responses || {}));
+    },
+    clearLocalDraftAfterServerAutosave: true,
+    autosaveDelayMs: 5_000,
+  });
 
   function setFieldResponse(
     sectionKey: string,
@@ -337,20 +360,12 @@ export function AttachmentHybridFormModal({
     return { requiredCount, requiredComplete };
   }
 
-  async function handleSave(markComplete: boolean) {
-    if (saving || readOnly) return;
-    const invalidField = markComplete ? findFirstInvalidRequired(sections, responses) : null;
-    if (invalidField) {
-      setActiveSectionKey(invalidField.sectionKey);
-      toast.error(`Complete required field: ${invalidField.label}`);
-      return;
-    }
-
+  function buildResponsesPayload(nextResponses: Record<string, LocalResponseValue>): AttachmentSchemaResponse[] {
     const payload: AttachmentSchemaResponse[] = [];
     sections.forEach((section) => {
       section.fields.forEach((field) => {
         const key = toResponseKey(section.section_key, field.field_key);
-        const response = responses[key];
+        const response = nextResponses[key];
         payload.push({
           field_id: response?.field_id || field.id || null,
           section_key: section.section_key,
@@ -360,11 +375,25 @@ export function AttachmentHybridFormModal({
         });
       });
     });
+    return payload;
+  }
+
+  async function handleSave(markComplete: boolean) {
+    if (saving || readOnly) return;
+    const invalidField = markComplete ? findFirstInvalidRequired(sections, responses) : null;
+    if (invalidField) {
+      setActiveSectionKey(invalidField.sectionKey);
+      toast.error(`Complete required field: ${invalidField.label}`);
+      return;
+    }
+
+    const payload = buildResponsesPayload(responses);
 
     setSaving(true);
     try {
       await onSave(payload, markComplete);
       setInitialResponsesFingerprint(getResponsesFingerprint(responses));
+      void clearDraft();
       toast.success(markComplete ? 'Attachment completed' : 'Draft saved');
       if (markComplete) onOpenChange(false);
     } catch (error) {
@@ -659,6 +688,11 @@ export function AttachmentHybridFormModal({
     onOpenChange(nextOpen);
   }
 
+  function discardDraftAndClose() {
+    void clearDraft();
+    onOpenChange(false);
+  }
+
   return (
     <Dialog
       open={open}
@@ -819,7 +853,7 @@ export function AttachmentHybridFormModal({
                   statusText={`${completedRequired}/${totalRequired} required complete`}
                   tertiaryAction={{
                     label: isDirty ? 'Discard Changes' : 'Close',
-                    onClick: () => onOpenChange(false),
+                    onClick: discardDraftAndClose,
                     disabled: saving,
                     variant: 'outline',
                   }}
@@ -839,7 +873,7 @@ export function AttachmentHybridFormModal({
               </div>
             ) : (
               <DialogFooter className="px-5 py-4 border-t border-border">
-                <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+                <Button variant="outline" onClick={discardDraftAndClose} disabled={saving}>
                   {isDirty ? 'Discard Changes' : 'Cancel'}
                 </Button>
                 <Button variant="outline" onClick={() => { void handleSave(false); }} disabled={saving}>

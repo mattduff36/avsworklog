@@ -112,6 +112,37 @@ describe('supabase middleware cookie refresh', () => {
     expect(response.cookies.get('sb-refresh-token')?.value).toBe('rotated-login-token');
   });
 
+  it('preserves full workshop task route and query when redirecting to login', async () => {
+    mockSupabaseMiddlewareAuth({
+      user: null,
+    });
+
+    const response = await updateSession(
+      new NextRequest('http://localhost/workshop-tasks?taskId=task-123&tab=all')
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe(
+      'http://localhost/login?redirect=%2Fworkshop-tasks%3FtaskId%3Dtask-123%26tab%3Dall'
+    );
+  });
+
+  it('returns authenticated users from login to the requested workshop task route', async () => {
+    mockSupabaseMiddlewareAuth({
+      user: null,
+    });
+
+    const response = await updateSession(
+      createRequest(
+        'http://localhost/login?redirect=%2Fworkshop-tasks%3FtaskId%3Dtask-123%26tab%3Dall',
+        `${APP_SESSION_COOKIE_NAME}=valid-app-session`
+      )
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('http://localhost/workshop-tasks?taskId=task-123&tab=all');
+  });
+
   it('preserves refreshed cookies on protected page redirects to login', async () => {
     mockSupabaseMiddlewareAuth({
       user: null,

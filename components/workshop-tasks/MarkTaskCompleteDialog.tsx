@@ -17,6 +17,7 @@ import { SignaturePad } from '@/components/forms/SignaturePad';
 import { CheckCircle2, Info } from 'lucide-react';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { triggerShakeAnimation } from '@/lib/utils/animations';
+import { useWorkshopDraftPersistence } from '@/lib/hooks/useWorkshopDraftPersistence';
 import type { CompletionUpdateConfig, CompletionFieldValues } from '@/types/workshop-completion';
 
 export interface TaskForCompletion {
@@ -45,8 +46,9 @@ interface MarkTaskCompleteDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   task: TaskForCompletion | null;
-  onConfirm: (data: CompletionData) => Promise<void>;
+  onConfirm: (data: CompletionData) => Promise<boolean | void>;
   isSubmitting?: boolean;
+  userId?: string | null;
 }
 
 export function MarkTaskCompleteDialog({
@@ -55,6 +57,7 @@ export function MarkTaskCompleteDialog({
   task,
   onConfirm,
   isSubmitting = false,
+  userId = null,
 }: MarkTaskCompleteDialogProps) {
   const { tabletModeEnabled } = useTabletMode();
   const contentRef = useRef<HTMLDivElement>(null);
@@ -140,7 +143,7 @@ export function MarkTaskCompleteDialog({
       }
     }
 
-    await onConfirm({
+    const completed = await onConfirm({
       intermediateComment: intermediateComment.trim(),
       completedComment: completedComment.trim(),
       completedSignatureData: completedSignatureData || undefined,
@@ -149,9 +152,13 @@ export function MarkTaskCompleteDialog({
         ? processedMaintenanceUpdates 
         : undefined,
     });
+    if (completed !== false) {
+      await clearDraft();
+    }
   };
 
   const handleCancel = () => {
+    void clearDraft();
     setIntermediateComment('');
     setCompletedComment('');
     setCompletedSignatureData(null);
@@ -175,6 +182,27 @@ export function MarkTaskCompleteDialog({
       Object.values(maintenanceFields).some((value) => value !== undefined && value !== null && `${value}`.trim() !== ''),
     [intermediateComment, completedComment, completedSignatureData, maintenanceFields]
   );
+  const { clearDraft } = useWorkshopDraftPersistence({
+    enabled: open && Boolean(task),
+    draftId: `workshop-task-complete:${userId || 'anonymous'}:${task?.id || 'none'}`,
+    kind: 'workshop-task-complete',
+    ownerId: userId,
+    value: {
+      intermediateComment,
+      completedComment,
+      completedSignatureData,
+      completedSignedAt,
+      maintenanceFields,
+    },
+    isDirty,
+    onRestore: (draft) => {
+      setIntermediateComment(draft.intermediateComment || '');
+      setCompletedComment(draft.completedComment || '');
+      setCompletedSignatureData(draft.completedSignatureData || null);
+      setCompletedSignedAt(draft.completedSignedAt || null);
+      setMaintenanceFields(draft.maintenanceFields || {});
+    },
+  });
 
   if (!task) return null;
 

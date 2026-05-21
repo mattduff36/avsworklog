@@ -243,7 +243,7 @@ export function useWorkshopTaskLifecycleActions({
   };
 
   const confirmMarkComplete = async (data: CompletionData) => {
-    if (!completingTask) return;
+    if (!completingTask) return false;
 
     const taskId = completingTask.id;
     const requiresIntermediateStep = completingTask.status === 'pending' || completingTask.status === 'on_hold';
@@ -383,6 +383,7 @@ export function useWorkshopTaskLifecycleActions({
         newSet.delete(taskId);
         return newSet;
       });
+      return true;
     } catch (err) {
       console.error('Error marking complete:', err instanceof Error ? err.message : JSON.stringify(err));
       toast.error('Failed to mark complete');
@@ -391,6 +392,7 @@ export function useWorkshopTaskLifecycleActions({
         newSet.delete(taskId);
         return newSet;
       });
+      return false;
     }
   };
 
