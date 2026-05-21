@@ -4089,6 +4089,182 @@ export type Database = {
           },
         ]
       }
+      reminder_actions: {
+        Row: {
+          id: string
+          workflow_key: string
+          source_type: 'system_generated' | 'manager_created'
+          dedupe_key: string
+          status: 'open' | 'resolved' | 'cancelled'
+          priority: 'low' | 'medium' | 'high' | 'urgent'
+          title: string
+          description: string | null
+          asset_type: 'van' | 'plant' | 'hgv' | null
+          van_id: string | null
+          plant_id: string | null
+          hgv_id: string | null
+          metadata: Json
+          created_by: string | null
+          resolved_by: string | null
+          first_detected_at: string
+          last_detected_at: string
+          resolved_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workflow_key: string
+          source_type?: 'system_generated' | 'manager_created'
+          dedupe_key: string
+          status?: 'open' | 'resolved' | 'cancelled'
+          priority?: 'low' | 'medium' | 'high' | 'urgent'
+          title: string
+          description?: string | null
+          asset_type?: 'van' | 'plant' | 'hgv' | null
+          van_id?: string | null
+          plant_id?: string | null
+          hgv_id?: string | null
+          metadata?: Json
+          created_by?: string | null
+          resolved_by?: string | null
+          first_detected_at?: string
+          last_detected_at?: string
+          resolved_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          workflow_key?: string
+          source_type?: 'system_generated' | 'manager_created'
+          dedupe_key?: string
+          status?: 'open' | 'resolved' | 'cancelled'
+          priority?: 'low' | 'medium' | 'high' | 'urgent'
+          title?: string
+          description?: string | null
+          asset_type?: 'van' | 'plant' | 'hgv' | null
+          van_id?: string | null
+          plant_id?: string | null
+          hgv_id?: string | null
+          metadata?: Json
+          created_by?: string | null
+          resolved_by?: string | null
+          first_detected_at?: string
+          last_detected_at?: string
+          resolved_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'reminder_actions_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'reminder_actions_hgv_id_fkey'
+            columns: ['hgv_id']
+            isOneToOne: false
+            referencedRelation: 'hgvs'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'reminder_actions_plant_id_fkey'
+            columns: ['plant_id']
+            isOneToOne: false
+            referencedRelation: 'plant'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'reminder_actions_resolved_by_fkey'
+            columns: ['resolved_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'reminder_actions_van_id_fkey'
+            columns: ['van_id']
+            isOneToOne: false
+            referencedRelation: 'vans'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      reminders: {
+        Row: {
+          id: string
+          action_id: string
+          assigned_to: string
+          assigned_by: string | null
+          status: 'pending' | 'actioned' | 'cancelled'
+          action_note: string | null
+          actioned_at: string | null
+          actioned_by: string | null
+          cancelled_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          action_id: string
+          assigned_to: string
+          assigned_by?: string | null
+          status?: 'pending' | 'actioned' | 'cancelled'
+          action_note?: string | null
+          actioned_at?: string | null
+          actioned_by?: string | null
+          cancelled_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          action_id?: string
+          assigned_to?: string
+          assigned_by?: string | null
+          status?: 'pending' | 'actioned' | 'cancelled'
+          action_note?: string | null
+          actioned_at?: string | null
+          actioned_by?: string | null
+          cancelled_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'reminders_action_id_fkey'
+            columns: ['action_id']
+            isOneToOne: false
+            referencedRelation: 'reminder_actions'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'reminders_actioned_by_fkey'
+            columns: ['actioned_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'reminders_assigned_by_fkey'
+            columns: ['assigned_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'reminders_assigned_to_fkey'
+            columns: ['assigned_to']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       rams_assignments: {
         Row: {
           id: string
@@ -5946,6 +6122,11 @@ export type Database = {
       check__quotes__completion_status: 'not_completed' | 'approved_in_full' | 'approved_in_part'
       check__quotes__revision_type: 'original' | 'revision' | 'extra' | 'variation' | 'future_work' | 'duplicate'
       check__quotes__status: 'draft' | 'pending_internal_approval' | 'changes_requested' | 'approved' | 'sent' | 'won' | 'lost' | 'ready_to_invoice' | 'po_received' | 'in_progress' | 'completed_part' | 'completed_full' | 'partially_invoiced' | 'invoiced' | 'closed'
+      check__reminder_actions__asset_type: 'van' | 'plant' | 'hgv'
+      check__reminder_actions__priority: 'low' | 'medium' | 'high' | 'urgent'
+      check__reminder_actions__source_type: 'system_generated' | 'manager_created'
+      check__reminder_actions__status: 'open' | 'resolved' | 'cancelled'
+      check__reminders__status: 'pending' | 'actioned' | 'cancelled'
       check__roles__role_class: 'admin' | 'manager' | 'employee'
       check__roles__timesheet_type: 'civils' | 'plant'
       check__suggestions__status: 'new' | 'under_review' | 'planned' | 'completed' | 'declined'

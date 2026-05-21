@@ -160,6 +160,13 @@ export const MODULE_PAGES: ModulePage[] = [
     ],
   },
   {
+    module: 'reminders',
+    displayName: MODULE_DISPLAY_NAMES.reminders,
+    subPages: [
+      { value: 'reminders-list', label: 'Reminders List' },
+    ],
+  },
+  {
     module: 'other',
     displayName: 'Other',
     subPages: [
@@ -278,6 +285,9 @@ export function getPageUrl(value: string): string {
     // Inventory
     'inventory-overview': '/inventory',
     'inventory-locations': '/inventory?tab=locations',
+
+    // Reminders
+    'reminders-list': '/reminders',
     
     // Admin - FAQ
     'admin-faq-list': '/admin/faq',

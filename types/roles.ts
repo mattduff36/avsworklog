@@ -91,6 +91,7 @@ export const STANDARD_MODULES: ModuleName[] = [
   'workshop-tasks',
   'admin-vans',
   'inventory',
+  'reminders',
 ];
 
 export const MANAGEMENT_MODULES: ModuleName[] = [
@@ -129,6 +130,7 @@ export const MODULE_SHORT_NAMES: Record<ModuleName, string> = {
   'customers': 'Customers',
   'quotes': 'Quotes',
   'inventory': 'Inventory',
+  'reminders': 'Reminders',
 };
 
 export const MODULE_CSS_VAR: Record<ModuleName, string> = {
@@ -153,6 +155,7 @@ export const MODULE_CSS_VAR: Record<ModuleName, string> = {
   'customers': '--avs-yellow',
   'quotes': '--avs-yellow',
   'inventory': '--inventory-primary',
+  'reminders': '--reminders-primary',
 };
 
 // All available modules in the system
@@ -177,7 +180,8 @@ export type ModuleName =
   | 'admin-vans'
   | 'customers'
   | 'quotes'
-  | 'inventory';
+  | 'inventory'
+  | 'reminders';
 
 export const ALL_MODULES: ModuleName[] = [
   'timesheets',
@@ -201,6 +205,7 @@ export const ALL_MODULES: ModuleName[] = [
   'customers',
   'quotes',
   'inventory',
+  'reminders',
 ];
 
 export const MODULE_DISPLAY_NAMES: Record<ModuleName, string> = {
@@ -225,6 +230,7 @@ export const MODULE_DISPLAY_NAMES: Record<ModuleName, string> = {
   'customers': 'Customers',
   'quotes': 'Quotes',
   'inventory': 'Inventory',
+  'reminders': 'Reminders',
 };
 
 export const MODULE_DESCRIPTIONS: Record<ModuleName, string> = {
@@ -249,6 +255,7 @@ export const MODULE_DESCRIPTIONS: Record<ModuleName, string> = {
   'customers': 'Manage customer directory',
   'quotes': 'Create and track customer quotations',
   'inventory': 'Track small tools, equipment, and location buckets',
+  'reminders': 'View and action assigned reminders',
 };
 
 // For API responses

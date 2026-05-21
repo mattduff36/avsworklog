@@ -1,5 +1,6 @@
 import { 
   FileText, 
+  BellRing,
   ClipboardCheck,
   Wrench,
   FileCheck2,
@@ -138,6 +139,16 @@ export const FORM_TYPES: FormType[] = [
     href: '/inventory',
     listHref: '/inventory',
     color: 'inventory',
+    enabled: true,
+  },
+  {
+    id: 'reminders',
+    title: 'Reminders',
+    description: 'Assigned reminders that need actioning',
+    icon: BellRing,
+    href: '/reminders',
+    listHref: '/reminders',
+    color: 'reminders',
     enabled: true,
   },
   {

@@ -24,10 +24,12 @@ vi.mock('@/lib/server/absence-secondary-permissions', async (importOriginal) => 
 function createCountQuery(count: number) {
   const resolved = { count, error: null };
   const query = {
-    eq: vi.fn().mockResolvedValue({ count, error: null }),
-    in: vi.fn().mockReturnThis(),
+    eq: vi.fn(),
+    in: vi.fn(),
     then: (resolve: (value: typeof resolved) => unknown) => Promise.resolve(resolved).then(resolve),
   };
+  query.eq.mockReturnValue(query);
+  query.in.mockReturnValue(query);
   return query;
 }
 
@@ -240,6 +242,7 @@ describe('GET /api/dashboard/summary', () => {
         workshop_pending: 3,
         maintenance_due_soon: 0,
         maintenance_overdue: 0,
+        reminders_pending: 0,
         suggestions_new: 6,
         error_reports_new: 1,
         quotes_pending_internal_approval: 6,
@@ -368,6 +371,7 @@ describe('GET /api/dashboard/summary', () => {
         workshop_pending: 0,
         maintenance_due_soon: 0,
         maintenance_overdue: 0,
+        reminders_pending: 0,
         suggestions_new: 0,
         error_reports_new: 0,
         quotes_pending_internal_approval: 0,
@@ -758,6 +762,7 @@ describe('GET /api/dashboard/summary', () => {
         workshop_pending: 0,
         maintenance_due_soon: 0,
         maintenance_overdue: 0,
+        reminders_pending: 0,
         suggestions_new: 0,
         error_reports_new: 0,
         quotes_pending_internal_approval: 0,

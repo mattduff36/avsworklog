@@ -363,6 +363,7 @@ export async function GET() {
   const canViewApprovals = permissions.approvals;
   const canViewWorkshopTasks = permissions['workshop-tasks'];
   const canViewMaintenance = permissions.maintenance;
+  const canViewReminders = permissions.reminders;
   const canViewSuggestions = permissions.suggestions;
   const canViewErrorReports = permissions['error-reports'];
   const canViewQuotes = permissions.quotes;
@@ -380,6 +381,7 @@ export async function GET() {
     quotesResult,
     errorLogsResult,
     maintenanceCounts,
+    remindersPendingResult,
   ] = await Promise.all([
     canViewApprovals
       ? resolveMetricValue(
@@ -450,6 +452,16 @@ export async function GET() {
           dueSoonTotal: 0,
           overdueTotal: 0,
         }),
+    canViewReminders
+      ? resolveCountMetric(
+          'pending reminders',
+          supabase
+            .from('reminders')
+            .select('id', { count: 'exact', head: true })
+            .eq('assigned_to', userId)
+            .eq('status', 'pending')
+        )
+      : Promise.resolve({ count: 0, error: null }),
   ]);
 
   return NextResponse.json({
@@ -464,6 +476,7 @@ export async function GET() {
         workshop_pending: workshopPendingResult.count || 0,
         maintenance_due_soon: maintenanceCounts.dueSoonTotal,
         maintenance_overdue: maintenanceCounts.overdueTotal,
+        reminders_pending: remindersPendingResult.count || 0,
         suggestions_new: suggestionBadgeMetrics.newCount + suggestionBadgeMetrics.awaitingAdminReplyCount,
         error_reports_new: errorsNewResult.count || 0,
         quotes_pending_internal_approval: quotesResult.count || 0,

@@ -89,6 +89,7 @@ export default function DashboardPage() {
   const [workshopPendingCount, setWorkshopPendingCount] = useState(0);
   const [maintenanceDueSoonCount, setMaintenanceDueSoonCount] = useState(0);
   const [maintenanceOverdueCount, setMaintenanceOverdueCount] = useState(0);
+  const [remindersPendingCount, setRemindersPendingCount] = useState(0);
   const [badgesLoading, setBadgesLoading] = useState(true);
   const [metricsErrorStatus, setMetricsErrorStatus] = useState<number | null>(null);
   const {
@@ -168,6 +169,7 @@ export default function DashboardPage() {
         workshopPendingCount: 0,
         maintenanceDueSoonCount: 0,
         maintenanceOverdueCount: 0,
+        remindersPendingCount: 0,
       };
     }
     const response = await fetch('/api/dashboard/summary', { cache: 'no-store' });
@@ -181,6 +183,7 @@ export default function DashboardPage() {
           workshop_pending?: number;
           maintenance_due_soon?: number;
           maintenance_overdue?: number;
+          reminders_pending?: number;
           suggestions_new?: number;
           error_reports_new?: number;
           quotes_pending_internal_approval?: number;
@@ -201,6 +204,7 @@ export default function DashboardPage() {
     const workshopPendingCount = payload.metrics?.badges?.workshop_pending || 0;
     const maintenanceDueSoonCount = payload.metrics?.badges?.maintenance_due_soon || 0;
     const maintenanceOverdueCount = payload.metrics?.badges?.maintenance_overdue || 0;
+    const remindersPendingCount = payload.metrics?.badges?.reminders_pending || 0;
 
     return {
       pendingApprovals: canViewApprovals ? buildPendingApprovalsSummary(timesheetsCount, absencesCount) : [],
@@ -212,6 +216,7 @@ export default function DashboardPage() {
       workshopPendingCount,
       maintenanceDueSoonCount,
       maintenanceOverdueCount,
+      remindersPendingCount,
     };
   }, [canViewApprovals]);
 
@@ -225,6 +230,7 @@ export default function DashboardPage() {
     setWorkshopPendingCount(metrics.workshopPendingCount);
     setMaintenanceDueSoonCount(metrics.maintenanceDueSoonCount);
     setMaintenanceOverdueCount(metrics.maintenanceOverdueCount);
+    setRemindersPendingCount(metrics.remindersPendingCount);
   }, []);
 
   const loadDashboardMetrics = useCallback(async (): Promise<number | null> => {
@@ -255,6 +261,7 @@ export default function DashboardPage() {
         setWorkshopPendingCount(0);
         setMaintenanceDueSoonCount(0);
         setMaintenanceOverdueCount(0);
+        setRemindersPendingCount(0);
       }
 
       return errorStatus;
@@ -463,6 +470,7 @@ export default function DashboardPage() {
                   'fleet': 'maintenance',
                   'workshop': 'workshop-tasks',
                   'inventory': 'inventory',
+                  'reminders': 'reminders',
                 };
                 
                 const moduleName = moduleMap[formType.id];
@@ -476,6 +484,10 @@ export default function DashboardPage() {
                 if (formType.id === 'rams' && !effectiveIsManager && !effectiveIsAdmin && !hasRAMSAssignments) {
                   return false;
                 }
+
+                if (formType.id === 'reminders' && remindersPendingCount === 0) {
+                  return false;
+                }
                 return true;
               })
               .map((formType, index) => {
@@ -483,6 +495,7 @@ export default function DashboardPage() {
               const tileBadgeCountById: Partial<Record<string, number>> = {
                 rams: pendingRAMSCount,
                 workshop: workshopPendingCount,
+                reminders: remindersPendingCount,
               };
               const badgeCount = tileBadgeCountById[formType.id] || 0;
               const showBadge = formType.id === 'rams'

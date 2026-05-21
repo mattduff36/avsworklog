@@ -18,6 +18,7 @@ interface MiddlewareSessionPayload extends Record<string, unknown> {
 
 const CRON_ROUTE_PATHS = new Set([
   '/api/maintenance/sync-dvla-scheduled',
+  '/api/actions/generate-fleet-inspection-reminders',
   '/api/quotes/start-alerts-scheduled',
   '/api/absence/bank-holidays/seed-scheduled',
 ])
