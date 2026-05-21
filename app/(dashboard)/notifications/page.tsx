@@ -32,6 +32,7 @@ import {
   PenLine
 } from 'lucide-react';
 import { formatDateTime } from '@/lib/utils/date';
+import { isNetworkFetchError } from '@/lib/utils/http-error';
 import { toast } from 'sonner';
 import type { NotificationItem } from '@/types/messages';
 import type { NotificationPreference, NotificationModuleKey } from '@/types/notifications';
@@ -324,7 +325,11 @@ function NotificationsContent() {
           setPreferences(data.preferences || []);
         }
       } catch (error) {
-        console.error('Error fetching preferences:', error);
+        if (isNetworkFetchError(error)) {
+          console.warn('Notification preferences temporarily unavailable:', error);
+        } else {
+          console.error('Error fetching preferences:', error);
+        }
       } finally {
         setLoadingPrefs(false);
       }

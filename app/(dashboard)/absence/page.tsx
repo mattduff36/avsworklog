@@ -65,7 +65,7 @@ import {
   canEmployeeSelfBookAbsenceRange,
   getEmployeeAbsenceSelfServiceDeadlineForRange,
 } from '@/lib/utils/absence-self-service-deadline';
-import { createStatusError, getErrorStatus, isServerErrorStatus } from '@/lib/utils/http-error';
+import { createStatusError, getErrorStatus, isAuthErrorStatus, isServerErrorStatus } from '@/lib/utils/http-error';
 import {
   clearPageServiceError,
   getFirstPageServiceError,
@@ -195,6 +195,10 @@ function isExpectedAbsenceSubmissionError(message: string): boolean {
     normalized.includes('session is locked') ||
     normalized.includes('jwt expired')
   );
+}
+
+function isExpectedAccessStatus(status: number | null): boolean {
+  return isAuthErrorStatus(status) || status === 403;
 }
 
 export default function AbsencePage() {
@@ -604,6 +608,13 @@ export default function AbsencePage() {
       } catch (error) {
         if (handleUnavailableError('currentWorkShift', error, 'Work shift data is temporarily unavailable.')) {
           setCurrentWorkShiftPattern(null);
+          return;
+        }
+
+        const status = getErrorStatus(error);
+        if (isExpectedAccessStatus(status)) {
+          setCurrentWorkShiftPattern(null);
+          console.warn('Skipping current work shift load due to access state:', error);
           return;
         }
 

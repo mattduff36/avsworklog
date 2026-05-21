@@ -24,6 +24,7 @@ import { TimesheetAdjustmentModal } from '@/components/timesheets/TimesheetAdjus
 import { TrainingDeclineDialog } from '@/app/(dashboard)/timesheets/components/TrainingDeclineDialog';
 import { declineTrainingBookingsClient } from '@/lib/client/training-bookings';
 import { toast } from 'sonner';
+import { isNetworkFetchError } from '@/lib/utils/http-error';
 import {
   type ApprovedAbsenceForTimesheet,
   type TimesheetOffDayState,
@@ -206,7 +207,11 @@ export default function ViewTimesheetPage() {
       }
     } catch (err) {
       const errorContextId = 'timesheet-details-fetch-error';
-      console.error('Error fetching timesheet:', err, { errorContextId });
+      if (isNetworkFetchError(err)) {
+        console.warn('Timesheet details temporarily unavailable:', err, { errorContextId });
+      } else {
+        console.error('Error fetching timesheet:', err, { errorContextId });
+      }
       setError(err instanceof Error ? err.message : 'Failed to load timesheet');
     } finally {
       setLoading(false);

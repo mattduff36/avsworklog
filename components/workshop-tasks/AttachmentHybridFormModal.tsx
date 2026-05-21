@@ -21,6 +21,7 @@ import type {
   AttachmentSchemaSection,
   AttachmentSchemaSnapshot,
 } from '@/types/workshop-attachments-v2';
+import { getErrorStatus } from '@/lib/utils/http-error';
 import { toast } from 'sonner';
 
 interface AttachmentHybridFormModalProps {
@@ -116,6 +117,21 @@ const SUPPRESSED_FIELD_HELP_TEXTS = new Set([
 function shouldRenderFieldHelpText(helpText: string): boolean {
   const normalized = helpText.toLowerCase().replace(/\s+/g, ' ').trim();
   return normalized.length > 0 && !SUPPRESSED_FIELD_HELP_TEXTS.has(normalized);
+}
+
+function isExpectedAttachmentPersistenceError(error: unknown): boolean {
+  const status = getErrorStatus(error);
+  return status === 404 || status === 409;
+}
+
+function getAttachmentPersistenceErrorMessage(error: unknown): string {
+  if (getErrorStatus(error) === 404) {
+    return 'This attachment is no longer available. Refreshing the task attachments.';
+  }
+  if (getErrorStatus(error) === 409) {
+    return error instanceof Error ? error.message : 'This attachment can no longer be edited.';
+  }
+  return 'Failed to save attachment';
 }
 
 function getValidationRequiredNoteValues(field: AttachmentSchemaField): string[] {
@@ -397,8 +413,12 @@ export function AttachmentHybridFormModal({
       toast.success(markComplete ? 'Attachment completed' : 'Draft saved');
       if (markComplete) onOpenChange(false);
     } catch (error) {
-      console.error('Error saving schema attachment responses:', error);
-      toast.error('Failed to save attachment');
+      if (isExpectedAttachmentPersistenceError(error)) {
+        console.warn('Attachment save was rejected:', error);
+      } else {
+        console.error('Error saving schema attachment responses:', error);
+      }
+      toast.error(getAttachmentPersistenceErrorMessage(error));
     } finally {
       setSaving(false);
     }
