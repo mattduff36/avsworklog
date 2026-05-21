@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0526.4.0
+
+**GIT COMMIT MESSAGE**
+`feat(mobile): update mobile text size controls, inspection workflows, and 4 more areas`
+
+**WHAT CHANGED**
+Update mobile text size controls, inspection workflows, and 4 more areas.
+
+**COMMITS IN THIS RELEASE**
+- `feat(mobile): update mobile text size controls, inspection workflows, and 4 more areas`
+
 ## 0526.3.0
 
 **GIT COMMIT MESSAGE**
