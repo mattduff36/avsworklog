@@ -33,6 +33,7 @@ import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { useWorkshopTaskComments } from '@/lib/hooks/useWorkshopTaskComments';
 import { useTaskInspectionPhotos } from '@/lib/hooks/useTaskInspectionPhotos';
 import type { TrackerLocationData } from '@/types/fleet-tracker';
+import { DailyChecksHistoryTab } from '@/components/fleet/DailyChecksHistoryTab';
 
 // Dynamic imports for dialog components
 const EditMaintenanceDialog = dynamic(() => import('@/app/(dashboard)/maintenance/components/EditMaintenanceDialog').then(m => ({ default: m.EditMaintenanceDialog })), { ssr: false });
@@ -927,7 +928,7 @@ export default function VanHistoryPage({
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
+        <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
           <TabsTrigger value="maintenance" className="gap-2">
             <Wrench className="h-4 w-4" />
             History
@@ -939,6 +940,10 @@ export default function VanHistoryPage({
               MOT
             </TabsTrigger>
           )}
+          <TabsTrigger value="inspections" className="gap-2">
+            <ClipboardCheck className="h-4 w-4" />
+            Daily Checks
+          </TabsTrigger>
           <TabsTrigger value="documents" className="gap-2">
             <FileText className="h-4 w-4" />
             Documents
@@ -1219,6 +1224,8 @@ export default function VanHistoryPage({
             </CardContent>
           </Card>
         </TabsContent>
+
+        <DailyChecksHistoryTab assetType="van" assetId={resolvedParams.vanId} />
 
         {/* MOT Tab */}
         <TabsContent value="mot" className="space-y-6">

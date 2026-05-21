@@ -33,6 +33,7 @@ import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { useWorkshopTaskComments } from '@/lib/hooks/useWorkshopTaskComments';
 import { useTaskInspectionPhotos } from '@/lib/hooks/useTaskInspectionPhotos';
 import type { TrackerLocationData } from '@/types/fleet-tracker';
+import { DailyChecksHistoryTab } from '@/components/fleet/DailyChecksHistoryTab';
 
 // Dynamic imports for dialog components
 const EditMaintenanceDialog = dynamic(() => import('@/app/(dashboard)/maintenance/components/EditMaintenanceDialog').then(m => ({ default: m.EditMaintenanceDialog })), { ssr: false });
@@ -147,15 +148,6 @@ type TaskAttachment = {
     name: string;
     description: string | null;
   } | null;
-};
-
-type HgvInspectionHistoryItem = {
-  id: string;
-  inspection_date: string;
-  submitted_at: string | null;
-  status: string;
-  current_mileage: number | null;
-  profiles: { full_name: string } | null;
 };
 
 function DocumentsTabContent({ hgvId, workshopTasks }: { hgvId: string; workshopTasks: WorkshopTask[] }) {
@@ -355,7 +347,6 @@ export default function HgvHistoryPage({
   const [loading, setLoading] = useState(true);
   const [maintenanceHistory, setMaintenanceHistory] = useState<MaintenanceHistoryEntry[]>([]);
   const [workshopTasks, setWorkshopTasks] = useState<WorkshopTask[]>([]);
-  const [inspections, setInspections] = useState<HgvInspectionHistoryItem[]>([]);
   const [activeTab, setActiveTab] = useState('maintenance');
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [motData, setMotData] = useState<{
@@ -614,39 +605,14 @@ export default function HgvHistoryPage({
     }
   }, [supabase, resolvedParams.hgvId]);
 
-  const fetchInspections = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('hgv_inspections')
-        .select(`
-          id,
-          inspection_date,
-          submitted_at,
-          status,
-          current_mileage,
-          profiles!hgv_inspections_user_id_fkey(full_name)
-        `)
-        .eq('hgv_id', resolvedParams.hgvId)
-        .eq('status', 'submitted')
-        .order('inspection_date', { ascending: false })
-        .limit(50);
-
-      if (error) throw error;
-      setInspections((data || []) as HgvInspectionHistoryItem[]);
-    } catch (error) {
-      console.error('Error fetching hgv inspections:', error);
-    }
-  }, [resolvedParams.hgvId, supabase]);
-
   useEffect(() => {
     if (user && resolvedParams.hgvId) {
       fetchVehicleData();
       fetchMaintenanceRecord();
       fetchMaintenanceHistory();
       fetchWorkshopTasks();
-      fetchInspections();
     }
-  }, [user, resolvedParams.hgvId, fetchVehicleData, fetchMaintenanceRecord, fetchMaintenanceHistory, fetchWorkshopTasks, fetchInspections]);
+  }, [user, resolvedParams.hgvId, fetchVehicleData, fetchMaintenanceRecord, fetchMaintenanceHistory, fetchWorkshopTasks]);
 
   useEffect(() => {
     if (activeTab === 'mot' && !motData && vehicle?.reg_number) {
@@ -1129,45 +1095,7 @@ export default function HgvHistoryPage({
           </Card>
         </TabsContent>
 
-        <TabsContent value="inspections" className="space-y-6">
-          <Card className="bg-slate-800/50 border-border">
-            <CardHeader>
-              <CardTitle>HGV Daily Check History</CardTitle>
-              <CardDescription>Daily check submissions for this HGV</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {inspections.length === 0 ? (
-                <div className="text-center py-10 text-muted-foreground">No daily checks recorded yet.</div>
-              ) : (
-                <div className="space-y-3">
-                  {inspections.map((inspection) => (
-                    <button
-                      key={inspection.id}
-                      type="button"
-                      onClick={() => router.push(`/hgv-inspections/${inspection.id}`)}
-                      className="w-full text-left p-4 rounded-lg border border-border hover:bg-slate-700/40 transition-colors"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <div className="text-sm font-semibold text-white">
-                            {formatDate(inspection.inspection_date)}
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            {inspection.profiles?.full_name ? `${inspection.profiles.full_name} • ` : ''}
-                            {inspection.current_mileage != null ? `${inspection.current_mileage.toLocaleString()} km` : 'KM not set'}
-                          </div>
-                        </div>
-                        <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30">
-                          {inspection.status}
-                        </Badge>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+        <DailyChecksHistoryTab assetType="hgv" assetId={resolvedParams.hgvId} />
 
         {/* MOT Tab */}
         <TabsContent value="mot" className="space-y-6">

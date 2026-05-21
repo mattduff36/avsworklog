@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Wrench, 
+  ClipboardCheck,
   FileText, 
   MessageSquare,
   Calendar,
@@ -29,6 +30,7 @@ import { useWorkshopTaskComments } from '@/lib/hooks/useWorkshopTaskComments';
 import { useTaskInspectionPhotos } from '@/lib/hooks/useTaskInspectionPhotos';
 import { AttachmentHistoryViewer } from '@/components/workshop-tasks/AttachmentHistoryViewer';
 import type { TrackerLocationData } from '@/types/fleet-tracker';
+import { DailyChecksHistoryTab } from '@/components/fleet/DailyChecksHistoryTab';
 
 // Dynamic imports for dialog components
 const EditPlantRecordDialog = dynamic(() => import('@/app/(dashboard)/maintenance/components/EditPlantRecordDialog').then(m => ({ default: m.EditPlantRecordDialog })), { ssr: false });
@@ -547,10 +549,14 @@ export default function PlantHistoryPage({
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid">
+        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
           <TabsTrigger value="maintenance" className="gap-2">
             <Wrench className="h-4 w-4" />
             History
+          </TabsTrigger>
+          <TabsTrigger value="inspections" className="gap-2">
+            <ClipboardCheck className="h-4 w-4" />
+            Daily Checks
           </TabsTrigger>
           <TabsTrigger value="documents" className="gap-2">
             <FileText className="h-4 w-4" />
@@ -745,6 +751,8 @@ export default function PlantHistoryPage({
             </CardContent>
           </Card>
         </TabsContent>
+
+        <DailyChecksHistoryTab assetType="plant" assetId={unwrappedParams.plantId} />
 
         {/* Documents Tab */}
         <TabsContent value="documents" className="space-y-4">
