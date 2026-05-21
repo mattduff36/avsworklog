@@ -22,7 +22,7 @@ import { InventoryLocationDialog } from './components/InventoryLocationDialog';
 import { InventoryLocationsPanel } from './components/InventoryLocationsPanel';
 import { InventoryTable } from './components/InventoryTable';
 import { MoveInventoryDialog } from './components/MoveInventoryDialog';
-import { getInventoryCheckStatus } from './utils';
+import { checkIntervalMonthsToDays, getInventoryCheckStatus } from './utils';
 import type {
   FleetAssetOption,
   InventoryContext,
@@ -189,10 +189,13 @@ export default function InventoryPage() {
   }
 
   function buildInventoryItemPayload(data: InventoryItemFormData) {
-    const interval = Number.parseInt(data.check_interval_days, 10);
+    const { check_interval_months: checkIntervalMonths, ...payload } = data;
+    const intervalMonths = Number.parseInt(checkIntervalMonths, 10);
     return {
-      ...data,
-      check_interval_days: Number.isFinite(interval) && interval > 0 ? interval : null,
+      ...payload,
+      check_interval_days: checkIntervalMonthsToDays(
+        Number.isFinite(intervalMonths) && intervalMonths > 0 ? intervalMonths : null
+      ),
     };
   }
 
@@ -465,7 +468,7 @@ export default function InventoryPage() {
         title="Inventory"
         description={employeeLocationName
           ? `Current location: ${employeeLocationName}`
-          : 'Track small tools, plant, signs, equipment, locations, and six-week check status.'
+          : 'Track small tools, plant, signs, equipment, locations, and check status.'
         }
         icon={<PackageSearch className="h-5 w-5" />}
         actions={(

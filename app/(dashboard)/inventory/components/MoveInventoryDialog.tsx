@@ -22,6 +22,7 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Loader2 } from 'lucide-react';
 import type { InventoryItem, InventoryLocation, InventoryMovePayload } from '../types';
+import { formatInventoryLocationOptionLabel } from '../utils';
 
 interface MoveInventoryDialogProps {
   open: boolean;
@@ -29,14 +30,6 @@ interface MoveInventoryDialogProps {
   locations: InventoryLocation[];
   onClose: () => void;
   onSubmit: (payload: InventoryMovePayload) => Promise<void>;
-}
-
-function getLocationOptionLabel(location: InventoryLocation): string {
-  if (location.linked_asset_type === 'van' && location.linked_asset_nickname) {
-    return `${location.name} (${location.linked_asset_nickname})`;
-  }
-
-  return location.name;
 }
 
 export function MoveInventoryDialog({
@@ -123,7 +116,7 @@ export function MoveInventoryDialog({
                 <SelectContent>
                   {locations.map((location) => (
                     <SelectItem key={location.id} value={location.id}>
-                      {getLocationOptionLabel(location)}
+                      {formatInventoryLocationOptionLabel(location)}
                     </SelectItem>
                   ))}
                 </SelectContent>

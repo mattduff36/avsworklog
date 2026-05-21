@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import type { InventoryLocation, InventoryUserLocation } from '../types';
+import { formatInventoryLocationOptionLabel } from '../utils';
 
 interface ChangeInventoryLocationDialogProps {
   open: boolean;
@@ -101,7 +102,9 @@ export function ChangeInventoryLocationDialog({
                 </SelectTrigger>
                 <SelectContent>
                   {locations.map((location) => (
-                    <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>
+                    <SelectItem key={location.id} value={location.id}>
+                      {formatInventoryLocationOptionLabel(location)}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>

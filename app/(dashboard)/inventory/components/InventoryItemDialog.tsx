@@ -30,6 +30,7 @@ import {
   type InventoryLocation,
   type InventoryStatus,
 } from '../types';
+import { CHECK_INTERVAL_MONTHS, formatInventoryLocationOptionLabel, getInventoryCheckIntervalMonths } from '../utils';
 
 interface InventoryItemDialogProps {
   open: boolean;
@@ -60,7 +61,7 @@ export function InventoryItemDialog({
         category: item.category,
         location_id: item.location_id || '',
         last_checked_at: item.last_checked_at || '',
-        check_interval_days: item.check_interval_days ? String(item.check_interval_days) : '',
+        check_interval_months: item.check_interval_days ? String(getInventoryCheckIntervalMonths(item)) : '',
         status: item.status,
       });
       return;
@@ -103,7 +104,7 @@ export function InventoryItemDialog({
           <DialogHeader>
             <DialogTitle>{isEditing ? 'Edit Inventory Item' : 'Add Inventory Item'}</DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              Track item identity, location, and the last six-week check date.
+              Track item identity, location, and the last check date.
             </DialogDescription>
           </DialogHeader>
 
@@ -165,7 +166,9 @@ export function InventoryItemDialog({
                   <SelectContent>
                     <SelectItem value="unassigned" className="text-muted-foreground">No location assigned</SelectItem>
                     {locations.map((location) => (
-                      <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>
+                      <SelectItem key={location.id} value={location.id}>
+                        {formatInventoryLocationOptionLabel(location)}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -184,15 +187,15 @@ export function InventoryItemDialog({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="check_interval_days">Check Interval Days</Label>
+                <Label htmlFor="check_interval_months">Check Interval Months</Label>
                 <Input
-                  id="check_interval_days"
+                  id="check_interval_months"
                   type="number"
                   min={1}
-                  max={3650}
-                  value={form.check_interval_days}
-                  onChange={(event) => updateField('check_interval_days', event.target.value)}
-                  placeholder="Default 42"
+                  max={120}
+                  value={form.check_interval_months}
+                  onChange={(event) => updateField('check_interval_months', event.target.value)}
+                  placeholder={`Default ${CHECK_INTERVAL_MONTHS}`}
                   className="bg-slate-800 border-slate-600"
                 />
               </div>

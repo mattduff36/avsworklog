@@ -10,6 +10,11 @@ interface LocationRequestBody {
   linked_asset_id?: string | null;
 }
 
+interface InventoryLocationAssigneeRow {
+  location_id: string | null;
+  user?: { full_name: string | null } | { full_name: string | null }[] | null;
+}
+
 function buildLinkedAssetColumns(body: LocationRequestBody) {
   const linkedAssetType = body.linked_asset_type || 'none';
   const linkedAssetId = body.linked_asset_id?.trim() || null;
@@ -21,6 +26,29 @@ function buildLinkedAssetColumns(body: LocationRequestBody) {
   };
 }
 
+function pickAssigneeProfile(
+  user: InventoryLocationAssigneeRow['user']
+): { full_name: string | null } | null {
+  if (!user) return null;
+  return Array.isArray(user) ? user[0] ?? null : user;
+}
+
+function getAssignedUserNamesByLocationId(rows: InventoryLocationAssigneeRow[]): Map<string, string[]> {
+  const namesByLocationId = new Map<string, string[]>();
+
+  rows.forEach((row) => {
+    const fullName = pickAssigneeProfile(row.user)?.full_name?.trim();
+    if (!row.location_id || !fullName) return;
+
+    const names = namesByLocationId.get(row.location_id) || [];
+    names.push(fullName);
+    namesByLocationId.set(row.location_id, names);
+  });
+
+  namesByLocationId.forEach((names) => names.sort((a, b) => a.localeCompare(b)));
+  return namesByLocationId;
+}
+
 export async function GET() {
   try {
     const access = await requireInventoryAccess();
@@ -29,7 +57,7 @@ export async function GET() {
     }
 
     const admin = createAdminClient();
-    const [locationsResult, itemsResult, vansResult, hgvsResult, plantResult] = await Promise.all([
+    const [locationsResult, itemsResult, vansResult, hgvsResult, plantResult, assignedUsersResult] = await Promise.all([
       admin
         .from('inventory_locations')
         .select('*')
@@ -48,6 +76,12 @@ export async function GET() {
       admin
         .from('plant')
         .select('id, plant_id, reg_number, nickname'),
+      admin
+        .from('inventory_user_locations')
+        .select(`
+          location_id,
+          user:profiles!inventory_user_locations_user_id_fkey(full_name)
+        `),
     ]);
 
     if (locationsResult.error) throw locationsResult.error;
@@ -55,6 +89,7 @@ export async function GET() {
     if (vansResult.error) throw vansResult.error;
     if (hgvsResult.error) throw hgvsResult.error;
     if (plantResult.error) throw plantResult.error;
+    if (assignedUsersResult.error) throw assignedUsersResult.error;
 
     const countByLocationId = new Map<string, number>();
     (itemsResult.data || []).forEach((item) => {
@@ -64,10 +99,14 @@ export async function GET() {
     const vanById = new Map((vansResult.data || []).map((van) => [van.id, van]));
     const hgvById = new Map((hgvsResult.data || []).map((hgv) => [hgv.id, hgv]));
     const plantById = new Map((plantResult.data || []).map((asset) => [asset.id, asset]));
+    const assignedUserNamesByLocationId = getAssignedUserNamesByLocationId(
+      (assignedUsersResult.data || []) as unknown as InventoryLocationAssigneeRow[]
+    );
 
     const locations = (locationsResult.data || []).map((location) => ({
       ...location,
       item_count: countByLocationId.get(location.id) || 0,
+      assigned_user_names: assignedUserNamesByLocationId.get(location.id) || [],
       ...getLinkedAssetDisplay(location, vanById, hgvById, plantById),
     }));
 

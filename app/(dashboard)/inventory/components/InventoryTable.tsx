@@ -27,8 +27,10 @@ import {
   Truck,
 } from 'lucide-react';
 import {
+  formatInventoryLocationOptionLabel,
   formatInventoryDate,
   getCheckStatusLabel,
+  getInventoryCheckIntervalMonths,
   getInventoryCheckStatus,
   getInventoryDueDate,
 } from '../utils';
@@ -278,7 +280,7 @@ export function InventoryTable({
                 <SelectItem value={ALL_LOCATIONS_FILTER}>All</SelectItem>
                 {(locationFilterLocations || []).map((location) => (
                   <SelectItem key={location.id} value={location.id}>
-                    {location.name}
+                    {formatInventoryLocationOptionLabel(location)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -351,7 +353,7 @@ export function InventoryTable({
                     <td className="px-4 py-3 text-slate-300">{renderLocationDetails(item)}</td>
                     <td className="px-4 py-3 text-slate-300">
                       <div>{formatInventoryDate(item.last_checked_at)}</div>
-                      <div className="text-xs text-muted-foreground">Due {getInventoryDueDate(item.last_checked_at, item.check_interval_days || undefined)}</div>
+                      <div className="text-xs text-muted-foreground">Due {getInventoryDueDate(item.last_checked_at, getInventoryCheckIntervalMonths(item))}</div>
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant="outline" className={getStatusBadgeClass(checkStatus)}>
@@ -423,7 +425,7 @@ export function InventoryTable({
                     {renderLocationDetails(item)}
                   </div>
                   <span>Last: {formatInventoryDate(item.last_checked_at)}</span>
-                  <span>Due: {getInventoryDueDate(item.last_checked_at, item.check_interval_days || undefined)}</span>
+                  <span>Due: {getInventoryDueDate(item.last_checked_at, getInventoryCheckIntervalMonths(item))}</span>
                 </div>
                 <div className="mt-4 flex gap-2">
                   <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); onMove([item]); }} className="flex-1 border-slate-600">

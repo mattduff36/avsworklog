@@ -15,6 +15,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { MapPin, PackageSearch, Send } from 'lucide-react';
 import type { InventoryItem, InventoryLocation, InventoryMovePayload, InventoryUserLocation } from '../types';
+import { formatInventoryLocationOptionLabel } from '../utils';
 import { InventoryTable } from './InventoryTable';
 
 const LOCATION_NOT_SHOWN_VALUE = '__location_not_shown__';
@@ -102,7 +103,9 @@ export function InventoryEmployeeView({
     return (
       <>
         {locations.map((location) => (
-          <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>
+          <SelectItem key={location.id} value={location.id}>
+            {formatInventoryLocationOptionLabel(location)}
+          </SelectItem>
         ))}
         <SelectItem
           value={LOCATION_NOT_SHOWN_VALUE}

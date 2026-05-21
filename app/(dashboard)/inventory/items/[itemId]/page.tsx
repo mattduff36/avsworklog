@@ -17,10 +17,12 @@ import { AlertTriangle, CalendarCheck, Clock, MapPin, PackageSearch } from 'luci
 import { toast } from 'sonner';
 import type { InventoryItem, InventoryItemGroupSummary } from '../../types';
 import {
-  CHECK_INTERVAL_DAYS,
+  CHECK_INTERVAL_MONTHS,
+  checkIntervalMonthsToDays,
+  formatInventoryCheckIntervalMonths,
   formatInventoryDate,
   getCheckStatusLabel,
-  getInventoryCheckIntervalDays,
+  getInventoryCheckIntervalMonths,
   getInventoryCheckStatus,
   getInventoryDueDate,
 } from '../../utils';
@@ -85,7 +87,7 @@ export default function InventoryItemDetailPage() {
   const itemId = params.itemId;
   const [payload, setPayload] = useState<InventoryHistoryPayload | null>(null);
   const [loading, setLoading] = useState(true);
-  const [intervalDays, setIntervalDays] = useState('');
+  const [intervalMonths, setIntervalMonths] = useState('');
   const [checkedAt, setCheckedAt] = useState(new Date().toISOString().slice(0, 10));
   const [checkNote, setCheckNote] = useState('');
   const [savingInterval, setSavingInterval] = useState(false);
@@ -98,7 +100,7 @@ export default function InventoryItemDetailPage() {
       if (!response.ok) throw new Error(data.error || 'Failed to fetch inventory item history');
 
       setPayload(data);
-      setIntervalDays(data.item.check_interval_days ? String(data.item.check_interval_days) : '');
+      setIntervalMonths(data.item.check_interval_days ? String(getInventoryCheckIntervalMonths(data.item)) : '');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to load inventory item');
     } finally {
@@ -120,12 +122,14 @@ export default function InventoryItemDetailPage() {
     event.preventDefault();
     setSavingInterval(true);
     try {
-      const parsedInterval = Number.parseInt(intervalDays, 10);
+      const parsedInterval = Number.parseInt(intervalMonths, 10);
       const response = await fetch(`/api/inventory/${itemId}/check-interval`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          check_interval_days: Number.isFinite(parsedInterval) && parsedInterval > 0 ? parsedInterval : null,
+          check_interval_days: checkIntervalMonthsToDays(
+            Number.isFinite(parsedInterval) && parsedInterval > 0 ? parsedInterval : null
+          ),
         }),
       });
       await parseResponse(response, 'Failed to update check interval');
@@ -175,7 +179,7 @@ export default function InventoryItemDetailPage() {
 
   const { item, movements, checks, group } = payload;
   const checkStatus = getInventoryCheckStatus(item);
-  const interval = getInventoryCheckIntervalDays(item);
+  const intervalMonthsValue = getInventoryCheckIntervalMonths(item);
 
   return (
     <AppPageShell width="wide">
@@ -212,13 +216,13 @@ export default function InventoryItemDetailPage() {
         <Card className="border-slate-700 bg-slate-900/70">
           <CardContent className="p-4">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">Due Date</div>
-            <div className="mt-2 font-semibold text-white">{getInventoryDueDate(item.last_checked_at, interval)}</div>
+            <div className="mt-2 font-semibold text-white">{getInventoryDueDate(item.last_checked_at, intervalMonthsValue)}</div>
           </CardContent>
         </Card>
         <Card className="border-slate-700 bg-slate-900/70">
           <CardContent className="p-4">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">Check Interval</div>
-            <div className="mt-2 font-semibold text-white">{interval} days</div>
+            <div className="mt-2 font-semibold text-white">{formatInventoryCheckIntervalMonths(intervalMonthsValue)}</div>
             {!item.check_interval_days ? <div className="text-xs text-muted-foreground">Default cadence</div> : null}
           </CardContent>
         </Card>
@@ -255,15 +259,15 @@ export default function InventoryItemDetailPage() {
             <CardContent className="space-y-6">
               <form className="space-y-3" onSubmit={handleSaveInterval}>
                 <div className="space-y-2">
-                  <Label htmlFor="interval_days">Item Check Interval</Label>
+                  <Label htmlFor="interval_months">Item Check Interval (months)</Label>
                   <Input
-                    id="interval_days"
+                    id="interval_months"
                     type="number"
                     min={1}
-                    max={3650}
-                    value={intervalDays}
-                    onChange={(event) => setIntervalDays(event.target.value)}
-                    placeholder={`Default ${CHECK_INTERVAL_DAYS}`}
+                    max={120}
+                    value={intervalMonths}
+                    onChange={(event) => setIntervalMonths(event.target.value)}
+                    placeholder={`Default ${CHECK_INTERVAL_MONTHS}`}
                     className="bg-slate-800 border-slate-600"
                   />
                 </div>
@@ -330,7 +334,7 @@ export default function InventoryItemDetailPage() {
               <TimelineEntry
                 key={check.id}
                 title={`Checked ${formatInventoryDate(check.checked_at)}`}
-                meta={`${check.checked_by_profile?.full_name || 'Unknown user'} · interval ${check.interval_days} days`}
+                meta={`${check.checked_by_profile?.full_name || 'Unknown user'} · interval ${formatInventoryCheckIntervalMonths(getInventoryCheckIntervalMonths({ check_interval_days: check.interval_days }))}`}
                 note={check.note}
               />
             ))}

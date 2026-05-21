@@ -22,6 +22,7 @@ export interface InventoryLocation {
   linked_asset_type?: FleetAssetLinkType | null;
   linked_asset_label?: string | null;
   linked_asset_nickname?: string | null;
+  assigned_user_names?: string[];
 }
 
 export interface InventoryItemCategory {
@@ -71,7 +72,7 @@ export interface InventoryItemFormData {
   category: InventoryCategory;
   location_id: string;
   last_checked_at: string;
-  check_interval_days: string;
+  check_interval_months: string;
   status: InventoryStatus;
 }
 
@@ -155,7 +156,7 @@ export const EMPTY_INVENTORY_ITEM_FORM: InventoryItemFormData = {
   category: 'minor_plant',
   location_id: '',
   last_checked_at: '',
-  check_interval_days: '',
+  check_interval_months: '',
   status: 'active',
 };
 
