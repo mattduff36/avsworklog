@@ -460,6 +460,15 @@
 ::-webkit-scrollbar-thumb { background: #F1D64A; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #d1b82f; }
 
+.scrollbar-hidden {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+
 /* Smooth scrolling */
 html { scroll-behavior: smooth; }
 

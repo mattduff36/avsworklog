@@ -549,7 +549,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
         </div>
 
         {/* Navigation */}
-        <div className={`overflow-y-auto overflow-x-hidden py-4 ${isSuperAdmin ? 'h-[calc(100vh-10rem)]' : 'h-[calc(100vh-8.25rem)]'}`}>
+        <div className={`scrollbar-hidden overflow-y-auto overflow-x-hidden py-4 ${isSuperAdmin ? 'h-[calc(100vh-10rem)]' : 'h-[calc(100vh-8.25rem)]'}`}>
           {/* Manager Links */}
           {(isManager || isAdmin) && sidebarManagerLinks.length > 0 && (
           <div className="px-3 mb-6">
