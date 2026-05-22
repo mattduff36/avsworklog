@@ -4,9 +4,11 @@ export interface FinaliseChangeSummary {
   areas: string[];
 }
 
+const SKIP_VERSION_MARKER = '[skip version]';
+
 interface ChangeDescriptor {
   scope: string;
-  type: 'chore' | 'docs' | 'feat' | 'test';
+  type: 'chore' | 'docs' | 'feat' | 'fix' | 'test';
   label: string;
   subject: string;
   priority: number;
@@ -21,6 +23,14 @@ const CHANGE_DESCRIPTORS: ChangeDescriptor[] = [
     subject: 'improve finalise commit summaries',
     priority: 10,
     patterns: [/^scripts\/finalise(?:-summary)?\.ts$/u],
+  },
+  {
+    scope: 'layout',
+    type: 'fix',
+    label: 'sidebar navigation styling',
+    subject: 'improve sidebar navigation styling',
+    priority: 15,
+    patterns: [/^components\/layout\/SidebarNav\.tsx$/u, /^app\/globals\.css$/u],
   },
   {
     scope: 'mobile',
@@ -214,4 +224,14 @@ export function summarizeFinaliseChanges(changedFiles: string[]): FinaliseChange
     fileCount: normalizedFiles.length,
     areas: coreAreas.length > 0 ? coreAreas : [primaryDescriptor.label],
   };
+}
+
+export function formatReleaseVersionCommitMessage(primaryCommitMessage: string | null, version: string): string {
+  const primarySubject = primaryCommitMessage
+    ?.replace(new RegExp(`\\s*${SKIP_VERSION_MARKER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*`, 'giu'), ' ')
+    .replace(/\s+/gu, ' ')
+    .trim();
+  const subject = primarySubject || `chore(release): publish ${version}`;
+
+  return `${subject} ${SKIP_VERSION_MARKER}\n\nRelease version: ${version}`;
 }

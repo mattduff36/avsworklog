@@ -3,9 +3,10 @@ import { config } from 'dotenv';
 import { existsSync, readFileSync, rmSync } from 'fs';
 import path from 'path';
 import pg from 'pg';
+import { parseCommitsFromMessages, selectPrimaryCommitMessage } from '../lib/config/release-version-logic';
 import { AutomationRun } from './automation/logger';
 import { checkFinaliseBlockingActivity, formatBlockingActivity } from './finalise-activity-guard';
-import { summarizeFinaliseChanges } from './finalise-summary';
+import { formatReleaseVersionCommitMessage, summarizeFinaliseChanges } from './finalise-summary';
 
 config({ path: path.resolve(process.cwd(), '.env.local') });
 
@@ -213,14 +214,27 @@ function hasReleaseVersionChanges(): boolean {
   return status.stdout.trim().length > 0;
 }
 
-function commitReleaseVersionChanges(): string | null {
+function getReleaseCommitPrimaryMessage(beforeSha: string, afterSha: string): string | null {
+  if (!beforeSha || beforeSha === '0000000000000000000000000000000000000000') {
+    return null;
+  }
+
+  const log = runCommand('git', ['log', '--format=%s', `${beforeSha}..${afterSha}`], {
+    captureOutput: true,
+  });
+  const commits = parseCommitsFromMessages(getTrimmedLines(log.stdout));
+
+  return selectPrimaryCommitMessage(commits);
+}
+
+function commitReleaseVersionChanges(primaryCommitMessage: string | null): string | null {
   if (!hasReleaseVersionChanges()) {
     return null;
   }
 
   const version = formatReleaseVersionLabel(readReleaseVersionState());
   runCommand('git', ['add', ...RELEASE_VERSION_FILES]);
-  runCommand('git', ['commit', '-m', `chore(release): bump to ${version} [skip version]`]);
+  runCommand('git', ['commit', '-m', formatReleaseVersionCommitMessage(primaryCommitMessage, version)]);
 
   return version;
 }
@@ -788,11 +802,14 @@ async function main(): Promise<void> {
     console.log('\n==> Bump release version locally');
     const releaseBeforeSha = readReleaseVersionState().lastProcessedSha;
     const releaseAfterSha = getHeadSha();
+    const releasePrimaryCommitMessage =
+      getReleaseCommitPrimaryMessage(releaseBeforeSha, releaseAfterSha) ??
+      (committed ? changeSummary.commitMessage : null);
     runCommand('npm', ['run', 'version:bump', '--', releaseBeforeSha, releaseAfterSha]);
-    const releaseVersion = commitReleaseVersionChanges();
+    const releaseVersion = commitReleaseVersionChanges(releasePrimaryCommitMessage);
     console.log(
       releaseVersion
-        ? `Created release version commit: chore(release): bump to ${releaseVersion} [skip version]`
+        ? `Created release version commit: ${formatReleaseVersionCommitMessage(releasePrimaryCommitMessage, releaseVersion).split(/\r?\n/u)[0]}`
         : 'No release version bump required.'
     );
 
