@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0526.5.2
+
+**GIT COMMIT MESSAGE**
+`chore(finalise): improve finalise commit summaries`
+
+**WHAT CHANGED**
+Improve finalise commit summaries.
+
+**COMMITS IN THIS RELEASE**
+- `chore(finalise): improve finalise commit summaries`
+
 ## 0526.5.1
 
 **GIT COMMIT MESSAGE**
