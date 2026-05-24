@@ -1001,6 +1001,9 @@ export function Navbar() {
 
               {/* Mobile menu button */}
               <button
+                type="button"
+                aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+                aria-expanded={mobileMenuOpen}
                 onClick={() => {
                   const nextOpen = !mobileMenuOpen;
                   if (nextOpen) {

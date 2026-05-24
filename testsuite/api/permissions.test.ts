@@ -35,6 +35,13 @@ interface UnreachableRouteResult {
 
 type RouteResult = ReachableRouteResult | UnreachableRouteResult;
 
+function requireTestUsers(testUsers: TestUsers | null): TestUsers {
+  if (!testUsers) {
+    throw new Error('Test users not provisioned. Run npm run testsuite:setup before authenticated permission tests.');
+  }
+  return testUsers;
+}
+
 function loadTestUsers(): TestUsers | null {
   const stateFile = resolve(process.cwd(), 'testsuite', '.state', 'test-users.json');
   if (!existsSync(stateFile)) return null;
@@ -75,7 +82,6 @@ describe('@permissions API Endpoint Access Control', () => {
   beforeAll(async () => {
     testUsers = loadTestUsers();
     if (!testUsers) {
-      console.warn('Test users not provisioned. Skipping authenticated tests.');
       return;
     }
 
@@ -86,7 +92,7 @@ describe('@permissions API Endpoint Access Control', () => {
       password: testUsers.employee.password,
     });
     if (error) {
-      console.warn('Could not authenticate employee for API tests:', error.message);
+      throw new Error(`Could not authenticate employee for API tests: ${error.message}`);
     }
   });
 
@@ -109,10 +115,10 @@ describe('@permissions API Endpoint Access Control', () => {
 
   describe('Employee cannot access admin-only endpoints', () => {
     it('employee cannot list users via API', async () => {
-      if (!testUsers || !employeeClient) return;
+      requireTestUsers(testUsers);
 
       const { data: session } = await employeeClient.auth.getSession();
-      if (!session?.session?.access_token) return;
+      expect(session?.session?.access_token, 'Employee session token should be available').toBeTruthy();
 
       const res = expectReachable(await fetchRoute('/api/admin/users', {
         headers: {

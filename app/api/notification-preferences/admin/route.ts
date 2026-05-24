@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { filterHiddenSystemTestAccountProfiles } from '@/lib/server/system-test-accounts';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type {
@@ -35,6 +36,8 @@ export async function GET(request: NextRequest) {
       .select(`
         id,
         full_name,
+        employee_id,
+        is_placeholder,
         role:roles(name)
       `)
       .order('full_name');
@@ -53,7 +56,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Build response with users and their preferences
-    const users = (profiles || []).map(p => ({
+    const visibleProfiles = await filterHiddenSystemTestAccountProfiles(adminClient, profiles || []);
+
+    const users = visibleProfiles.map(p => ({
       user_id: p.id,
       full_name: p.full_name,
       role_name: (p.role as { name?: string } | null)?.name || 'unknown',

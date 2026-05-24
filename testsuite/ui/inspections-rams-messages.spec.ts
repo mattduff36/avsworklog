@@ -1,6 +1,6 @@
 /**
- * @tags @inspections @rams @messages
- * Tests page loading for daily checks, RAMS, and messages.
+ * @tags @inspections @messages
+ * Tests page loading for daily checks and messages.
  * Auth: employee storage state (via employee project).
  * NON-DESTRUCTIVE: read-only.
  */

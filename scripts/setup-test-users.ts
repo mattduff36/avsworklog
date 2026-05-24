@@ -129,6 +129,7 @@ async function ensureUser(userDef: typeof TEST_USERS[number]): Promise<{ email: 
       employee_id: userDef.employeeId,
       role_id: roleId,
       super_admin: userDef.superAdmin,
+      is_placeholder: true,
       must_change_password: false,
     }, { onConflict: 'id' });
 
@@ -138,6 +139,7 @@ async function ensureUser(userDef: typeof TEST_USERS[number]): Promise<{ email: 
     .update({
       must_change_password: false,
       super_admin: userDef.superAdmin,
+      is_placeholder: true,
     })
     .eq('id', userId);
 

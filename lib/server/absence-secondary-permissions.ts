@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { filterHiddenSystemTestAccounts } from '@/lib/utils/system-test-accounts';
 import {
   ABSENCE_SECONDARY_PERMISSION_HEADERS,
   ABSENCE_SECONDARY_PERMISSION_KEYS,
@@ -258,7 +259,7 @@ export async function getAbsenceSecondaryExceptionMatrix(): Promise<AbsenceSecon
   if (profilesError) throw profilesError;
 
   const profileById = new Map<string, ProfileWithRoleRow>();
-  ((profilesData || []) as ProfileWithRoleRow[]).forEach((profile) => {
+  filterHiddenSystemTestAccounts((profilesData || []) as ProfileWithRoleRow[]).forEach((profile) => {
     profileById.set(profile.id, profile);
   });
 

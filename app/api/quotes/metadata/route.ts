@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { filterHiddenSystemTestAccountProfiles } from '@/lib/server/system-test-accounts';
 import { listQuoteManagerOptions } from '@/lib/server/quote-workflow';
 
 export async function GET() {
@@ -15,11 +16,12 @@ export async function GET() {
       return NextResponse.json({ error: 'You must be signed in to use quotes.' }, { status: 401 });
     }
 
+    const admin = createAdminClient();
     const [managerOptions, approversResult] = await Promise.all([
       listQuoteManagerOptions(),
-      createAdminClient()
+      admin
         .from('profiles')
-        .select('id, full_name')
+        .select('id, full_name, employee_id, is_placeholder')
         .order('full_name'),
     ]);
 
@@ -27,9 +29,11 @@ export async function GET() {
       throw approversResult.error;
     }
 
+    const approvers = await filterHiddenSystemTestAccountProfiles(admin, approversResult.data || []);
+
     return NextResponse.json({
       managerOptions,
-      approvers: (approversResult.data || []).map(approver => ({
+      approvers: approvers.map(approver => ({
         ...approver,
         email: null,
       })),

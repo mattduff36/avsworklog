@@ -2,6 +2,7 @@
 
 import { Fragment, useState, useEffect, useMemo, useCallback, useLayoutEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
+import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { AppPageShell } from '@/components/layout/AppPageShell';
@@ -58,6 +59,7 @@ import { getRoleSortPriority } from '@/lib/config/roles-core';
 import { calculateNewUserRemainingLeaveDefault, roundToNearestHalfDay } from '@/lib/utils/absence-onboarding';
 import { isClientSessionPausedError } from '@/lib/app-auth/session-error';
 import { formatDateTime } from '@/lib/utils/date';
+import { filterHiddenSystemTestAccounts } from '@/lib/utils/system-test-accounts';
 import {
   computeQuickEditFloatingPosition,
   type FloatingPositionResult,
@@ -225,6 +227,28 @@ function normalizeHalfDayString(rawValue: string): string {
 
 function isDeletedUserProfile(user: { full_name?: string | null }): boolean {
   return Boolean(user.full_name?.includes('(Deleted User)'));
+}
+
+function UserTableAvatar({ user }: { user: ProfileWithEmail }) {
+  const displayName = user.full_name || user.email || 'User';
+
+  return (
+    <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+      <div className="absolute inset-0 flex items-center justify-center">
+        <User className="h-4 w-4 text-slate-600 dark:text-muted-foreground" />
+      </div>
+      {user.avatar_url ? (
+        <Image
+          src={user.avatar_url}
+          alt={`${displayName} avatar`}
+          fill
+          sizes="32px"
+          className="object-cover"
+          loading="lazy"
+        />
+      ) : null}
+    </div>
+  );
 }
 
 function isExpectedUserAdminError(error: unknown): boolean {
@@ -462,6 +486,7 @@ export default function UsersAdminPage() {
       .select(`
         id,
         full_name,
+        avatar_url,
         phone_number,
         employee_id,
         created_at,
@@ -496,12 +521,12 @@ export default function UsersAdminPage() {
     );
 
     // Merge profiles with emails
-    return (profiles as unknown as ProfileWithRole[])?.map(profile => ({
+    return filterHiddenSystemTestAccounts((profiles as unknown as ProfileWithRole[])?.map(profile => ({
       ...profile,
       email: authUserMap.get(profile.id)?.email || '',
       last_sign_in_at: authUserMap.get(profile.id)?.last_sign_in_at || null,
       last_active_at: authUserMap.get(profile.id)?.last_active_at || null,
-    })) || [] as ProfileWithEmail[];
+    })) || [] as ProfileWithEmail[]);
   }
 
   // Fetch available roles
@@ -1436,9 +1461,7 @@ export default function UsersAdminPage() {
                             <TableRow key={user.id} className="border-slate-700 hover:bg-slate-800/50">
                         <TableCell className="font-medium text-white">
                           <div className="flex items-center gap-2 w-full cursor-default">
-                            <div className="h-8 w-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
-                              <User className="h-4 w-4 text-slate-600 dark:text-muted-foreground" />
-                            </div>
+                            <UserTableAvatar user={user} />
                             {user.full_name || 'Unnamed User'}
                           </div>
                         </TableCell>

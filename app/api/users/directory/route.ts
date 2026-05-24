@@ -5,6 +5,7 @@ import { hasWorkshopInspectionFullVisibilityOverride } from '@/lib/utils/inspect
 import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { getUsersWithModuleAccess } from '@/lib/server/team-permissions';
+import { filterHiddenSystemTestAccountProfiles } from '@/lib/server/system-test-accounts';
 import { ALL_MODULES, type ModuleName } from '@/types/roles';
 
 function isTruthy(value: string | null): boolean {
@@ -69,7 +70,7 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(Math.max(Number.parseInt(request.nextUrl.searchParams.get('limit') || '200', 10) || 200, 1), 500);
   const offset = Math.max(Number.parseInt(request.nextUrl.searchParams.get('offset') || '0', 10) || 0, 0);
 
-  const fields = ['id', 'full_name', 'employee_id', 'super_admin', 'team:org_teams!profiles_team_id_fkey(id, name)'];
+  const fields = ['id', 'full_name', 'employee_id', 'is_placeholder', 'super_admin', 'team:org_teams!profiles_team_id_fkey(id, name)'];
 
   if (includeAllowance) {
     fields.push('annual_holiday_allowance_days');
@@ -111,9 +112,10 @@ export async function GET(request: NextRequest) {
     : null;
 
   const userRows = ((data || []) as unknown) as Array<Record<string, unknown>>;
+  const visibleUserRows = await filterHiddenSystemTestAccountProfiles(admin, userRows);
   const filtered = includeDeleted
-    ? userRows
-    : userRows.filter((row) => !isDeletedUserName(String(row.full_name || '')));
+    ? visibleUserRows
+    : visibleUserRows.filter((row) => !isDeletedUserName(String(row.full_name || '')));
   const users = filtered.map((userRow) => ({
     ...userRow,
     has_module_access: allowedUserIds ? allowedUserIds.has(String(userRow.id || '')) : undefined,

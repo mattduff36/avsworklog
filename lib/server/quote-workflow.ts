@@ -4,6 +4,7 @@ import { QuotePDF } from '@/lib/pdf/quote-pdf';
 import { loadSquiresLogoDataUrl } from '@/lib/pdf/squires-logo';
 import { getQuotesCustomersEmailConfig } from '@/lib/server/quotes-customers-email-config';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getHiddenSystemTestAccountIds } from '@/lib/server/system-test-accounts';
 import type { Database } from '@/types/database';
 import {
   buildVersionLabel,
@@ -138,7 +139,10 @@ export async function listQuoteManagerOptions(): Promise<QuoteManagerOption[]> {
     throw error;
   }
 
-  return (data || []) as QuoteManagerOption[];
+  const hiddenIds = await getHiddenSystemTestAccountIds(admin);
+  return ((data || []) as QuoteManagerOption[]).filter(
+    (option) => !hiddenIds.has(option.profile_id) && (!option.approver_profile_id || !hiddenIds.has(option.approver_profile_id))
+  );
 }
 
 export async function getQuoteManagerOption(profileId: string): Promise<QuoteManagerOption | null> {

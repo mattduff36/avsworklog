@@ -7,6 +7,7 @@ import { logServerError } from '@/lib/utils/server-error-logger';
 import type { CreateMessageInput, CreateMessageResponse, MessagePriority, MessageType } from '@/types/messages';
 import { normalizeRoleInternalName } from '@/lib/utils/role-name';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { filterHiddenSystemTestAccountProfiles } from '@/lib/server/system-test-accounts';
 
 /**
  * POST /api/messages
@@ -130,21 +131,23 @@ export async function POST(request: NextRequest) {
       } else {
         const { data: roleUsers, error: roleUsersError } = await supabase
           .from('profiles')
-          .select('id')
+          .select('id, full_name, employee_id, is_placeholder')
           .in('role_id', roleIds);
         if (roleUsersError) throw roleUsersError;
-        recipientUserIds = roleUsers?.map((u) => u.id) || [];
+        const visibleRoleUsers = await filterHiddenSystemTestAccountProfiles(admin, roleUsers || []);
+        recipientUserIds = visibleRoleUsers.map((u) => u.id);
       }
 
     } else if (recipient_type === 'all_staff') {
       // Fetch all active users
       const { data: allUsers, error: allError } = await supabase
         .from('profiles')
-        .select('id');
+        .select('id, full_name, employee_id, is_placeholder');
 
       if (allError) throw allError;
-      
-      recipientUserIds = allUsers?.map(u => u.id) || [];
+
+      const visibleAllUsers = await filterHiddenSystemTestAccountProfiles(admin, allUsers || []);
+      recipientUserIds = visibleAllUsers.map(u => u.id);
     }
 
     if (recipientUserIds.length === 0) {

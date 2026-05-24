@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import pg from 'pg';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { isHiddenSystemTestAccountEmail } from '@/lib/utils/system-test-accounts';
 
 // Helper to create admin client with service role key
 function getSupabaseAdmin() {
@@ -101,7 +102,7 @@ export async function GET() {
       }
 
       authUsers.push(
-        ...data.users.map((user) => ({
+        ...data.users.filter((user) => !isHiddenSystemTestAccountEmail(user.email)).map((user) => ({
           id: user.id,
           email: user.email,
           last_sign_in_at: user.last_sign_in_at || null,

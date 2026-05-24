@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getHiddenSystemTestAccountIds } from '@/lib/server/system-test-accounts';
+import { isHiddenSystemTestAccountProfile } from '@/lib/utils/system-test-accounts';
 import { hasRoleFullAccess } from '@/lib/utils/role-access';
 import {
   ALL_MODULES,
@@ -459,7 +461,7 @@ export async function getUsersWithModuleAccess(
     return new Set<string>();
   }
 
-  const profilesQuery = supabaseAdmin.from('profiles').select('id, team_id, role_id');
+  const profilesQuery = supabaseAdmin.from('profiles').select('id, team_id, role_id, employee_id, full_name, is_placeholder');
   const scopedProfilesQuery = userIds?.length ? profilesQuery.in('id', userIds) : profilesQuery;
 
   const [{ data: profiles, error: profilesError }, { data: roles, error: rolesError }, modules] =
@@ -487,14 +489,22 @@ export async function getUsersWithModuleAccess(
     id: string;
     team_id: string | null;
     role_id: string | null;
+    employee_id?: string | null;
+    full_name?: string | null;
+    is_placeholder?: boolean | null;
   }>;
 
-  if (typedProfiles.length === 0) {
+  const hiddenIds = await getHiddenSystemTestAccountIds(supabaseAdmin as Parameters<typeof getHiddenSystemTestAccountIds>[0]);
+  const visibleProfiles = typedProfiles.filter(
+    (profile) => !hiddenIds.has(profile.id) && !isHiddenSystemTestAccountProfile(profile)
+  );
+
+  if (visibleProfiles.length === 0) {
     return new Set<string>();
   }
 
   const teamIds = Array.from(
-    new Set(typedProfiles.map((profile) => profile.team_id).filter((teamId): teamId is string => Boolean(teamId)))
+    new Set(visibleProfiles.map((profile) => profile.team_id).filter((teamId): teamId is string => Boolean(teamId)))
   );
 
   const enabledByTeam = new Map<string, Map<ModuleName, boolean>>();
@@ -521,7 +531,7 @@ export async function getUsersWithModuleAccess(
   const rolesById = new Map(((roles || []) as RoleRow[]).map((role) => [role.id, role]));
   const allowedUsers = new Set<string>();
 
-  typedProfiles.forEach((profile) => {
+  visibleProfiles.forEach((profile) => {
     if (!profile.role_id) {
       return;
     }

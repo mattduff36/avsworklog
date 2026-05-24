@@ -11,6 +11,7 @@ import {
   validateTeamManagerSelection,
 } from '@/lib/server/team-managers';
 import { ensureTeamPermissionRows } from '@/lib/server/team-permissions';
+import { filterHiddenSystemTestAccounts } from '@/lib/utils/system-test-accounts';
 
 function getSupabaseAdmin() {
   return createSupabaseClient(
@@ -97,7 +98,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Failed to load teams' }, { status: 500 });
   }
 
-  const rows = ((data || []) as Array<{
+  const rows = filterHiddenSystemTestAccounts(((data || []) as Array<{
     id: string;
     full_name?: string | null;
     employee_id?: string | null;
@@ -113,7 +114,7 @@ export async function GET() {
     team_id: row.team_id ?? null,
     line_manager_id: row.line_manager_id ?? null,
     role: row.role ?? null,
-  }));
+  })));
 
   const teamStats = new Map<string, {
     team_id: string;

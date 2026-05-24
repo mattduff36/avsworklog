@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { filterHiddenSystemTestAccounts } from '@/lib/utils/system-test-accounts';
 
 const DEVICE_ID_MIN_LENGTH = 16;
 const DEVICE_ID_MAX_LENGTH = 200;
@@ -52,6 +53,7 @@ interface AccountSwitchProfileRow {
   id: string;
   full_name: string | null;
   avatar_url: string | null;
+  employee_id?: string | null;
   role_id?: string | null;
 }
 
@@ -308,14 +310,14 @@ export async function listAccountSwitchDeviceProfiles(
   const profileIds = Array.from(new Set(normalizedDeviceRows.map((row) => row.profile_id).filter(Boolean)));
   const { data: profileRows, error: profileError } = await supabaseAdmin
     .from('profiles')
-    .select('id, full_name, avatar_url, role_id')
+    .select('id, full_name, avatar_url, employee_id, role_id')
     .in('id', profileIds);
 
   if (profileError) {
     throw new Error(profileError.message);
   }
 
-  const normalizedProfileRows = (profileRows as AccountSwitchProfileRow[] | null) || [];
+  const normalizedProfileRows = filterHiddenSystemTestAccounts((profileRows as AccountSwitchProfileRow[] | null) || []);
   const roleIds = Array.from(
     new Set(normalizedProfileRows.map((row) => row.role_id).filter((value): value is string => Boolean(value)))
   );
