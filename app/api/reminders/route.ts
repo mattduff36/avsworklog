@@ -4,6 +4,13 @@ import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { mapReminderActionWithAsset } from '@/lib/server/reminders/generate-fleet-inspection-actions';
+import { getReminderActionRequiredModule } from '@/lib/utils/reminder-action-permissions';
+import { getReminderTaskLink, getReminderTaskName } from '@/lib/utils/reminder-task-links';
+import type { ReminderWithAction } from '@/types/reminders';
+
+function uniqueValues(values: Array<string | null | undefined>): string[] {
+  return Array.from(new Set(values.filter((value): value is string => Boolean(value))));
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -50,6 +57,10 @@ export async function GET(request: NextRequest) {
           metadata,
           created_by,
           resolved_by,
+          ignored_until,
+          ignored_forever,
+          ignored_at,
+          ignored_by,
           first_detected_at,
           last_detected_at,
           resolved_at,
@@ -69,20 +80,56 @@ export async function GET(request: NextRequest) {
       throw error;
     }
 
-    const reminders = (data || []).flatMap((row) => {
+    const assignerIds = uniqueValues((data || []).map((row) => row.assigned_by));
+    const assignersById = new Map<string, string>();
+
+    if (assignerIds.length > 0) {
+      const { data: assigners, error: assignersError } = await admin
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', assignerIds);
+
+      if (assignersError) throw assignersError;
+
+      (assigners || []).forEach((assigner) => {
+        assignersById.set(assigner.id, assigner.full_name || 'Unknown user');
+      });
+    }
+
+    const moduleAccessByName = new Map<string, boolean>();
+    const reminders: ReminderWithAction[] = [];
+
+    for (const row of data || []) {
       const actionRow = Array.isArray(row.action) ? row.action[0] : row.action;
       if (!actionRow) {
-        return [];
+        continue;
       }
 
-      return [{
+      const action = mapReminderActionWithAsset({
+        ...actionRow,
+        reminders: [],
+      });
+      const requiredModule = getReminderActionRequiredModule(action.asset_type);
+      let hasTaskAccess = moduleAccessByName.get(requiredModule);
+      if (typeof hasTaskAccess !== 'boolean') {
+        hasTaskAccess = await canEffectiveRoleAccessModule(requiredModule);
+        moduleAccessByName.set(requiredModule, hasTaskAccess);
+      }
+
+      const taskLink = hasTaskAccess ? getReminderTaskLink(action.asset_type) : null;
+
+      reminders.push({
         ...row,
-        action: mapReminderActionWithAsset({
-          ...actionRow,
-          reminders: [],
-        }),
-      }];
-    });
+        assigned_by_name: row.assigned_by ? assignersById.get(row.assigned_by) || null : null,
+        task_href: taskLink?.href || null,
+        task_label: taskLink?.label || null,
+        task_name: getReminderTaskName(action.asset_type),
+        action: {
+          ...action,
+          asset_route: null,
+        },
+      });
+    }
 
     return NextResponse.json({
       success: true,

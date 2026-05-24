@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, Clock, CheckCircle2, XCircle, User, Filter, Calendar, Package, LayoutGrid, Table2, Settings2, Loader2 } from 'lucide-react';
+import { FileText, Clock, CheckCircle2, XCircle, User, Filter, Calendar, Package, LayoutGrid, Table2, Settings2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -50,6 +50,7 @@ import { AbsencesApprovalTable, ABSENCE_COLUMN_VISIBILITY_STORAGE_KEY, DEFAULT_A
 import type { AbsenceColumnVisibility } from './components/AbsencesApprovalTable';
 import { ProcessTimesheetModal } from './components/ProcessTimesheetModal';
 import { PageLoader } from '@/components/ui/page-loader';
+import { SectionLoader } from '@/components/ui/section-loader';
 import { NuqsClientAdapter } from '@/components/providers/NuqsClientAdapter';
 import {
   type ApprovedAbsenceForTimesheet,
@@ -141,7 +142,6 @@ function ApprovalsContent() {
   
   const [timesheets, setTimesheets] = useState<TimesheetWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [hasLoadedTimesheets, setHasLoadedTimesheets] = useState(false);
   const [timesheetFilter, setTimesheetFilter] = useState<TimesheetStatusFilter>(defaultStatusFilters.timesheets);
   const [absenceStatusFilter, setAbsenceStatusFilter] = useState<AbsenceStatusFilter>(defaultStatusFilters.absences);
   const statusFilter: StatusFilter = activeTab === 'timesheets' ? timesheetFilter : absenceStatusFilter;
@@ -641,7 +641,6 @@ function ApprovalsContent() {
       toast.error('Failed to load approvals', { id: errorContextId });
     } finally {
       setLoading(false);
-      setHasLoadedTimesheets(true);
     }
   }, [
     dateFrom,
@@ -740,10 +739,7 @@ function ApprovalsContent() {
     }
   };
 
-  const activeTabLoading =
-    activeTab === 'timesheets' ? (!hasLoadedTimesheets && loading) : absencesLoading;
-
-  if (permissionLoading || absenceSecondaryLoading || employeesLoading || activeTabLoading) {
+  if (permissionLoading || absenceSecondaryLoading || employeesLoading) {
     return <PageLoader message="Loading approvals..." />;
   }
 
@@ -1079,11 +1075,7 @@ function ApprovalsContent() {
 
           <TabsContent value="timesheets" className="mt-6 space-y-4">
             {loading ? (
-              <Card className="border-border">
-                <CardContent className="flex items-center justify-center py-12">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                </CardContent>
-              </Card>
+              <SectionLoader message="Loading timesheet approvals..." />
             ) : filteredTimesheets.length === 0 ? (
               <Card className="border-border">
                 <CardContent className="flex flex-col items-center justify-center py-12">
@@ -1283,11 +1275,7 @@ function ApprovalsContent() {
 
           <TabsContent value="absences" className="mt-6 space-y-4">
             {absencesLoading ? (
-              <Card className="border-border">
-                <CardContent className="flex items-center justify-center py-12">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                </CardContent>
-              </Card>
+              <SectionLoader message="Loading absence approvals..." />
             ) : !canAuthoriseBookings || filteredAbsences.length === 0 ? (
               <Card className="border-border">
                 <CardContent className="flex flex-col items-center justify-center py-12">

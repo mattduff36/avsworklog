@@ -4106,6 +4106,10 @@ export type Database = {
           metadata: Json
           created_by: string | null
           resolved_by: string | null
+          ignored_until: string | null
+          ignored_forever: boolean
+          ignored_at: string | null
+          ignored_by: string | null
           first_detected_at: string
           last_detected_at: string
           resolved_at: string | null
@@ -4128,6 +4132,10 @@ export type Database = {
           metadata?: Json
           created_by?: string | null
           resolved_by?: string | null
+          ignored_until?: string | null
+          ignored_forever?: boolean
+          ignored_at?: string | null
+          ignored_by?: string | null
           first_detected_at?: string
           last_detected_at?: string
           resolved_at?: string | null
@@ -4150,6 +4158,10 @@ export type Database = {
           metadata?: Json
           created_by?: string | null
           resolved_by?: string | null
+          ignored_until?: string | null
+          ignored_forever?: boolean
+          ignored_at?: string | null
+          ignored_by?: string | null
           first_detected_at?: string
           last_detected_at?: string
           resolved_at?: string | null
@@ -4176,6 +4188,13 @@ export type Database = {
             columns: ['plant_id']
             isOneToOne: false
             referencedRelation: 'plant'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'reminder_actions_ignored_by_fkey'
+            columns: ['ignored_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
             referencedColumns: ['id']
           },
           {

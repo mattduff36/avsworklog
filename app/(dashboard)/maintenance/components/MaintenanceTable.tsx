@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { LoadMorePagination } from '@/components/ui/load-more-pagination';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   DropdownMenu,
@@ -42,6 +43,7 @@ import {
 } from '@/lib/utils/maintenanceCalculations';
 import { EditMaintenanceDialog } from './EditMaintenanceDialog';
 import { useDeletedVehicles, usePermanentlyDeleteArchivedVehicle, useRestoreArchivedVehicle } from '@/lib/hooks/useMaintenance';
+import { useLoadMorePagination } from '@/lib/hooks/useLoadMorePagination';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { createClient } from '@/lib/supabase/client';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
@@ -333,6 +335,17 @@ export function MaintenanceTable({
         return 0;
     }
   });
+  const paginationKey = [
+    assetLabel,
+    searchQuery.trim(),
+    sortField,
+    sortDirection,
+    sortedVehicles.length,
+  ].join(':');
+  const {
+    visibleItems: visibleVehicles,
+    showMore,
+  } = useLoadMorePagination(sortedVehicles, { resetKey: paginationKey });
   
   return (
     <>
@@ -482,7 +495,7 @@ export function MaintenanceTable({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortedVehicles.map((vehicle) => (
+                    {visibleVehicles.map((vehicle) => (
                       <TableRow 
                         key={vehicle.van_id ?? vehicle.id ?? vehicle.vehicle?.id}
                         onClick={() => {
@@ -546,7 +559,7 @@ export function MaintenanceTable({
           {/* Mobile Card View */}
           {vehicles.length > 0 && (
             <div className={cn('space-y-3', tabletModeEnabled ? 'block' : 'md:hidden')}>
-              {sortedVehicles.map((vehicle) => {
+              {visibleVehicles.map((vehicle) => {
                 const cardVehicleId = vehicle.hgv_id ?? vehicle.van_id ?? vehicle.id;
                 const isExpanded = expandedCardId === cardVehicleId;
                 
@@ -706,6 +719,12 @@ export function MaintenanceTable({
               })}
             </div>
           )}
+          <LoadMorePagination
+            visibleCount={visibleVehicles.length}
+            totalCount={sortedVehicles.length}
+            itemLabel={`${assetLabelPluralLower}`}
+            onShowMore={showMore}
+          />
             </TabsContent>
             
             {/* Retired Assets Tab */}

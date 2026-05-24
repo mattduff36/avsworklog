@@ -49,6 +49,7 @@ import {
 } from '@/lib/utils/van-inspection-overlap';
 import { isClientSessionPausedError } from '@/lib/app-auth/session-error';
 import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
+import { completeInspectionReminder } from '@/lib/client/complete-inspection-reminder';
 
 // Dynamic imports for heavy components - loaded only when needed
 const PhotoUpload = dynamic(() => import('@/components/forms/PhotoUpload'), { ssr: false });
@@ -1861,6 +1862,18 @@ function NewInspectionContent() {
           return;
         } finally {
           setCreatingWorkshopTask(false);
+        }
+      }
+
+      if (status === 'submitted') {
+        try {
+          await completeInspectionReminder({
+            assetType: 'van',
+            assetId: vehicleId,
+            assignedTo: selectedEmployeeId,
+          });
+        } catch (reminderError) {
+          console.error('Error completing reminder after van daily check submission:', reminderError);
         }
       }
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
 import { getUsersWithModuleAccess } from '@/lib/server/team-permissions';
+import { getReminderActionRequiredModule } from '@/lib/utils/reminder-action-permissions';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type { AssignRemindersRequest } from '@/types/reminders';
@@ -36,14 +37,11 @@ export async function POST(request: NextRequest) {
 
     const admin = createAdminClient();
 
-    const [{ data: action, error: actionError }, allowedUsers] = await Promise.all([
-      admin
-        .from('reminder_actions')
-        .select('id, status')
-        .eq('id', actionId)
-        .maybeSingle(),
-      getUsersWithModuleAccess('reminders', assigneeIds, admin),
-    ]);
+    const { data: action, error: actionError } = await admin
+      .from('reminder_actions')
+      .select('id, status, asset_type')
+      .eq('id', actionId)
+      .maybeSingle();
 
     if (actionError) {
       throw actionError;
@@ -57,6 +55,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Only open actions can be assigned' }, { status: 400 });
     }
 
+    const requiredModule = getReminderActionRequiredModule(action.asset_type);
+    const allowedUsers = await getUsersWithModuleAccess(requiredModule, assigneeIds, admin);
     const validAssigneeIds = assigneeIds.filter((id) => allowedUsers.has(id));
     if (validAssigneeIds.length === 0) {
       return NextResponse.json({ error: 'No selected users can receive reminders' }, { status: 400 });
@@ -82,6 +82,21 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       throw error;
+    }
+
+    const { error: clearIgnoreError } = await admin
+      .from('reminder_actions')
+      .update({
+        ignored_until: null,
+        ignored_forever: false,
+        ignored_at: null,
+        ignored_by: null,
+        updated_at: nowIso,
+      })
+      .eq('id', actionId);
+
+    if (clearIgnoreError) {
+      throw clearIgnoreError;
     }
 
     return NextResponse.json({

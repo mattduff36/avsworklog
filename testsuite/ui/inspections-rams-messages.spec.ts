@@ -14,9 +14,7 @@ test.describe('@inspections Daily Checks Module', () => {
     await page.goto('/van-inspections');
     await waitForAppReady(page);
 
-    const bodyText = await page.locator('body').innerText();
-    const hasInspectionContent = /daily check|inspection|van|plant|hgv/i.test(bodyText);
-    expect(hasInspectionContent, 'Daily checks module content should load').toBeTruthy();
+    await expect(page.locator('body')).toContainText(/daily check|inspection|van|plant|hgv/i, { timeout: 10_000 });
 
     const errors = capture.getErrors();
     expect(errors, 'No page errors on inspections').toHaveLength(0);

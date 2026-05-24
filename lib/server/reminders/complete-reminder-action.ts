@@ -1,0 +1,101 @@
+import { createAdminClient } from '@/lib/supabase/admin';
+import { FLEET_INSPECTION_OVERDUE_WORKFLOW_KEY } from '@/lib/config/reminder-workflows';
+import type { ReminderAssetType } from '@/types/reminders';
+
+type AdminClient = ReturnType<typeof createAdminClient>;
+
+export interface CompleteReminderActionInput {
+  admin: AdminClient;
+  assetType: ReminderAssetType;
+  assetId: string;
+  assignedTo: string;
+  actionedBy: string;
+  nowIso?: string;
+}
+
+export interface CompleteReminderActionResult {
+  actionedCount: number;
+  cancelledCount: number;
+  actionIds: string[];
+}
+
+export function getReminderAssetIdColumn(assetType: ReminderAssetType): 'van_id' | 'plant_id' | 'hgv_id' {
+  if (assetType === 'plant') return 'plant_id';
+  if (assetType === 'hgv') return 'hgv_id';
+  return 'van_id';
+}
+
+export async function completeReminderActionForAsset({
+  admin,
+  assetType,
+  assetId,
+  assignedTo,
+  actionedBy,
+  nowIso = new Date().toISOString(),
+}: CompleteReminderActionInput): Promise<CompleteReminderActionResult> {
+  const assetColumn = getReminderAssetIdColumn(assetType);
+  const { data: actions, error: actionsError } = await admin
+    .from('reminder_actions')
+    .select('id')
+    .eq('workflow_key', FLEET_INSPECTION_OVERDUE_WORKFLOW_KEY)
+    .eq('status', 'open')
+    .eq('asset_type', assetType)
+    .eq(assetColumn, assetId);
+
+  if (actionsError) throw actionsError;
+
+  const actionIds = (actions || []).map((action) => action.id);
+  if (actionIds.length === 0) {
+    return {
+      actionedCount: 0,
+      cancelledCount: 0,
+      actionIds: [],
+    };
+  }
+
+  const { data: actionedRows, error: actionedError } = await admin
+    .from('reminders')
+    .update({
+      status: 'actioned',
+      action_note: 'Completed by submitted daily check.',
+      actioned_at: nowIso,
+      actioned_by: actionedBy,
+      cancelled_at: null,
+      updated_at: nowIso,
+    })
+    .in('action_id', actionIds)
+    .eq('assigned_to', assignedTo)
+    .eq('status', 'pending')
+    .select('id, action_id');
+
+  if (actionedError) throw actionedError;
+
+  const completedActionIds = Array.from(new Set((actionedRows || []).map((row) => row.action_id)));
+  if (completedActionIds.length === 0) {
+    return {
+      actionedCount: 0,
+      cancelledCount: 0,
+      actionIds,
+    };
+  }
+
+  const { data: cancelledRows, error: cancelledError } = await admin
+    .from('reminders')
+    .update({
+      status: 'cancelled',
+      cancelled_at: nowIso,
+      updated_at: nowIso,
+    })
+    .in('action_id', completedActionIds)
+    .eq('status', 'pending')
+    .neq('assigned_to', assignedTo)
+    .select('id');
+
+  if (cancelledError) throw cancelledError;
+
+  return {
+    actionedCount: (actionedRows || []).length,
+    cancelledCount: (cancelledRows || []).length,
+    actionIds: completedActionIds,
+  };
+}

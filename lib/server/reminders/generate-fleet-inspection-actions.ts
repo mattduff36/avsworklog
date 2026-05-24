@@ -1,4 +1,11 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { FLEET_INSPECTION_OVERDUE_WORKFLOW_KEY } from '@/lib/config/reminder-workflows';
+import {
+  isFleetInspectionAssetTypeEnabled,
+  loadFleetInspectionWorkflowSettings,
+  type FleetInspectionWorkflowConfig,
+  type ResolvedFleetInspectionWorkflowSettings,
+} from '@/lib/server/reminders/fleet-inspection-workflow-settings';
 import type { Database, Json } from '@/types/database';
 import type {
   ReminderActionStatus,
@@ -20,11 +27,14 @@ interface BaseAssetRow {
 
 interface VanAssetRow extends BaseAssetRow {
   reg_number?: string | null;
+  current_mileage?: number | null;
 }
 
 interface PlantAssetRow extends BaseAssetRow {
   plant_id?: string | null;
   reg_number?: string | null;
+  serial_number?: string | null;
+  current_hours?: number | null;
 }
 
 interface OverdueAsset {
@@ -32,6 +42,12 @@ interface OverdueAsset {
   assetType: ReminderAssetType;
   assetLabel: string;
   assetRoute: string;
+  assetRegistration: string | null;
+  assetPlantId: string | null;
+  assetSerialNumber: string | null;
+  assetNickname: string | null;
+  assetCurrentMileage: number | null;
+  assetCurrentHours: number | null;
   lastSubmittedAt: string | null;
   daysOverdue: number;
   dedupeKey: string;
@@ -52,8 +68,7 @@ export interface FleetInspectionGenerationSummary {
   openCount: number;
 }
 
-const REMINDER_WORKFLOW_KEY = 'fleet_inspection_overdue';
-const OVERDUE_DAYS_THRESHOLD = 28;
+const REMINDER_WORKFLOW_KEY = FLEET_INSPECTION_OVERDUE_WORKFLOW_KEY;
 
 function getIsoDateOnly(value: Date): string {
   return value.toISOString().slice(0, 10);
@@ -118,7 +133,11 @@ function buildActionDescription(params: {
   return `${params.assetLabel} is overdue for a submitted daily check. The latest submitted inspection was ${params.daysOverdue} days ago on ${params.lastSubmittedAt}.`;
 }
 
-function buildOpenActionRecord(asset: OverdueAsset, nowIso: string): ReminderActionInsert {
+function buildOpenActionRecord(
+  asset: OverdueAsset,
+  nowIso: string,
+  workflowSettings: FleetInspectionWorkflowConfig,
+): ReminderActionInsert {
   return {
     workflow_key: REMINDER_WORKFLOW_KEY,
     source_type: 'system_generated',
@@ -131,9 +150,15 @@ function buildOpenActionRecord(asset: OverdueAsset, nowIso: string): ReminderAct
     metadata: {
       asset_label: asset.assetLabel,
       asset_route: asset.assetRoute,
+      asset_registration: asset.assetRegistration,
+      asset_plant_id: asset.assetPlantId,
+      asset_serial_number: asset.assetSerialNumber,
+      asset_nickname: asset.assetNickname,
+      asset_current_mileage: asset.assetCurrentMileage,
+      asset_current_hours: asset.assetCurrentHours,
       days_overdue: asset.daysOverdue,
       last_submitted_inspection_date: asset.lastSubmittedAt,
-      threshold_days: OVERDUE_DAYS_THRESHOLD,
+      threshold_days: workflowSettings.overdue_days_threshold,
     },
     first_detected_at: nowIso,
     last_detected_at: nowIso,
@@ -182,11 +207,29 @@ async function loadLatestInspectionDates(
   return latestByAsset;
 }
 
-async function loadOverdueAssets(admin: AdminClient): Promise<OverdueAsset[]> {
+async function loadOverdueAssets(
+  admin: AdminClient,
+  workflowSettings: ResolvedFleetInspectionWorkflowSettings,
+): Promise<OverdueAsset[]> {
+  if (!workflowSettings.is_enabled) {
+    return [];
+  }
+
+  const thresholdDays = workflowSettings.config.overdue_days_threshold;
+  const includeVan = isFleetInspectionAssetTypeEnabled(workflowSettings.config, 'van');
+  const includePlant = isFleetInspectionAssetTypeEnabled(workflowSettings.config, 'plant');
+  const includeHgv = isFleetInspectionAssetTypeEnabled(workflowSettings.config, 'hgv');
+
   const [vansResult, hgvsResult, plantResult] = await Promise.all([
-    admin.from('vans').select('id, reg_number, nickname').eq('status', 'active'),
-    admin.from('hgvs').select('id, reg_number, nickname').eq('status', 'active'),
-    admin.from('plant').select('id, plant_id, reg_number, nickname').eq('status', 'active'),
+    includeVan
+      ? admin.from('vans').select('id, reg_number, nickname').eq('status', 'active')
+      : Promise.resolve({ data: [], error: null }),
+    includeHgv
+      ? admin.from('hgvs').select('id, reg_number, nickname, current_mileage').eq('status', 'active')
+      : Promise.resolve({ data: [], error: null }),
+    includePlant
+      ? admin.from('plant').select('id, plant_id, reg_number, nickname, serial_number, current_hours').eq('status', 'active')
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
   if (vansResult.error) throw vansResult.error;
@@ -197,11 +240,33 @@ async function loadOverdueAssets(admin: AdminClient): Promise<OverdueAsset[]> {
   const hgvRows = (hgvsResult.data || []) as VanAssetRow[];
   const plantRows = (plantResult.data || []) as PlantAssetRow[];
 
-  const [vanLatest, hgvLatest, plantLatest] = await Promise.all([
-    loadLatestInspectionDates(admin, 'van_inspections', 'van_id', vanRows.map((row) => row.id)),
-    loadLatestInspectionDates(admin, 'hgv_inspections', 'hgv_id', hgvRows.map((row) => row.id)),
-    loadLatestInspectionDates(admin, 'plant_inspections', 'plant_id', plantRows.map((row) => row.id)),
+  const [vanLatest, hgvLatest, plantLatest, vanMileageRows] = await Promise.all([
+    includeVan
+      ? loadLatestInspectionDates(admin, 'van_inspections', 'van_id', vanRows.map((row) => row.id))
+      : Promise.resolve(new Map<string, string>()),
+    includeHgv
+      ? loadLatestInspectionDates(admin, 'hgv_inspections', 'hgv_id', hgvRows.map((row) => row.id))
+      : Promise.resolve(new Map<string, string>()),
+    includePlant
+      ? loadLatestInspectionDates(admin, 'plant_inspections', 'plant_id', plantRows.map((row) => row.id))
+      : Promise.resolve(new Map<string, string>()),
+    includeVan && vanRows.length > 0
+      ? admin
+        .from('vehicle_maintenance')
+        .select('van_id, current_mileage')
+        .in('van_id', vanRows.map((row) => row.id))
+        .order('updated_at', { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
   ]);
+
+  if (vanMileageRows.error) throw vanMileageRows.error;
+
+  const vanMileageByAssetId = new Map<string, number | null>();
+  for (const row of (vanMileageRows.data || []) as Array<{ van_id: string | null; current_mileage: number | null }>) {
+    if (row.van_id && !vanMileageByAssetId.has(row.van_id)) {
+      vanMileageByAssetId.set(row.van_id, row.current_mileage);
+    }
+  }
 
   const today = new Date();
   function mapAssetRow(
@@ -210,21 +275,33 @@ async function loadOverdueAssets(admin: AdminClient): Promise<OverdueAsset[]> {
     lastSubmittedAt: string | null,
   ): OverdueAsset | null {
     const lastSubmittedDate = lastSubmittedAt ? new Date(lastSubmittedAt) : null;
-    const daysOverdue = lastSubmittedDate ? getDaysBetween(today, lastSubmittedDate) : OVERDUE_DAYS_THRESHOLD;
+    const daysOverdue = lastSubmittedDate ? getDaysBetween(today, lastSubmittedDate) : thresholdDays;
 
-    if (lastSubmittedDate && daysOverdue < OVERDUE_DAYS_THRESHOLD) {
+    if (lastSubmittedDate && daysOverdue < thresholdDays) {
       return null;
     }
 
     const assetLabel = assetType === 'plant' ? buildPlantLabel(row as PlantAssetRow) : buildVanLabel(row as VanAssetRow);
     const assetRoute = buildAssetRoute(assetType, row.id);
     const normalizedLastSubmittedAt = lastSubmittedAt ? getIsoDateOnly(lastSubmittedDate!) : null;
+    const plantRow = row as PlantAssetRow;
+    const vehicleRow = row as VanAssetRow;
 
     return {
       assetId: row.id,
       assetType,
       assetLabel,
       assetRoute,
+      assetRegistration: assetType === 'plant' ? plantRow.reg_number?.trim() || null : vehicleRow.reg_number?.trim() || null,
+      assetPlantId: assetType === 'plant' ? plantRow.plant_id?.trim() || null : null,
+      assetSerialNumber: assetType === 'plant' ? plantRow.serial_number?.trim() || null : null,
+      assetNickname: row.nickname?.trim() || null,
+      assetCurrentMileage: assetType === 'van'
+        ? vanMileageByAssetId.get(row.id) ?? null
+        : assetType === 'hgv'
+          ? vehicleRow.current_mileage ?? null
+          : null,
+      assetCurrentHours: assetType === 'plant' ? plantRow.current_hours ?? null : null,
       lastSubmittedAt: normalizedLastSubmittedAt,
       daysOverdue,
       dedupeKey: `${REMINDER_WORKFLOW_KEY}:${assetType}:${row.id}`,
@@ -240,16 +317,17 @@ async function loadOverdueAssets(admin: AdminClient): Promise<OverdueAsset[]> {
   }
 
   return [
-    ...vanRows.map((row) => mapAssetRow('van', row, vanLatest.get(row.id) || null)),
-    ...hgvRows.map((row) => mapAssetRow('hgv', row, hgvLatest.get(row.id) || null)),
-    ...plantRows.map((row) => mapAssetRow('plant', row, plantLatest.get(row.id) || null)),
+    ...(includeVan ? vanRows.map((row) => mapAssetRow('van', row, vanLatest.get(row.id) || null)) : []),
+    ...(includeHgv ? hgvRows.map((row) => mapAssetRow('hgv', row, hgvLatest.get(row.id) || null)) : []),
+    ...(includePlant ? plantRows.map((row) => mapAssetRow('plant', row, plantLatest.get(row.id) || null)) : []),
   ].filter((asset): asset is OverdueAsset => Boolean(asset)).sort((left, right) => right.daysOverdue - left.daysOverdue || left.assetLabel.localeCompare(right.assetLabel));
 }
 
 export async function generateFleetInspectionReminderActions(): Promise<FleetInspectionGenerationSummary> {
   const admin = createAdminClient();
   const nowIso = new Date().toISOString();
-  const overdueAssets = await loadOverdueAssets(admin);
+  const workflowSettings = await loadFleetInspectionWorkflowSettings(admin);
+  const overdueAssets = await loadOverdueAssets(admin, workflowSettings);
 
   const { data: openActionRows, error: openActionError } = await admin
     .from('reminder_actions')
@@ -270,7 +348,7 @@ export async function generateFleetInspectionReminderActions(): Promise<FleetIns
 
   for (const asset of overdueAssets) {
     const existing = openActionsByDedupeKey.get(asset.dedupeKey);
-    const nextRecord = buildOpenActionRecord(asset, nowIso);
+    const nextRecord = buildOpenActionRecord(asset, nowIso, workflowSettings.config);
 
     if (!existing) {
       const { error } = await admin.from('reminder_actions').insert(nextRecord);
@@ -364,6 +442,10 @@ export function mapReminderActionWithAsset(
     metadata: (action.metadata || {}) as Record<string, unknown>,
     created_by: action.created_by,
     resolved_by: action.resolved_by,
+    ignored_until: action.ignored_until,
+    ignored_forever: action.ignored_forever,
+    ignored_at: action.ignored_at,
+    ignored_by: action.ignored_by,
     first_detected_at: action.first_detected_at,
     last_detected_at: action.last_detected_at,
     resolved_at: action.resolved_at,

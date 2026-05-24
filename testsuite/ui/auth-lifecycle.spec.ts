@@ -23,6 +23,25 @@ async function logIssue(testInfo: TestInfo, issue: AuthLifecycleIssueInput): Pro
   });
 }
 
+async function fetchSessionStatus(page: import('@playwright/test').Page): Promise<number> {
+  return page.evaluate(async () => {
+    const response = await fetch('/api/auth/session', {
+      credentials: 'include',
+    });
+    return response.status;
+  });
+}
+
+async function fetchSessionPayload(page: import('@playwright/test').Page): Promise<{ status: number; payload: { locked?: boolean } | null }> {
+  return page.evaluate(async () => {
+    const response = await fetch('/api/auth/session', {
+      credentials: 'include',
+    });
+    const payload = await response.json().catch(() => null) as { locked?: boolean } | null;
+    return { status: response.status, payload };
+  });
+}
+
 test.describe('@auth @lifecycle Authentication Lifecycle', () => {
   test.beforeEach(async ({ page }) => {
     await login(page, 'admin');
@@ -30,8 +49,8 @@ test.describe('@auth @lifecycle Authentication Lifecycle', () => {
   });
 
   test('session stays healthy after visibility/focus transitions', async ({ page }, testInfo) => {
-    const initial = await page.request.get('/api/auth/session');
-    expect(initial.ok(), 'Initial session request should be successful').toBeTruthy();
+    const initialStatus = await fetchSessionStatus(page);
+    expect(initialStatus, 'Initial session request should be successful').toBe(200);
 
     const secondPage = await page.context().newPage();
     await secondPage.goto('/dashboard');
@@ -45,11 +64,11 @@ test.describe('@auth @lifecycle Authentication Lifecycle', () => {
     });
 
     await page.waitForTimeout(500);
-    const after = await page.request.get('/api/auth/session');
-    if (!after.ok()) {
+    const afterStatus = await fetchSessionStatus(page);
+    if (afterStatus !== 200) {
       await logIssue(testInfo, {
         scenario: 'focus/visibility revalidation',
-        details: `Session check failed after focus transition with status ${after.status()}.`,
+        details: `Session check failed after focus transition with status ${afterStatus}.`,
         severity: 'high',
         route: '/dashboard',
       });
@@ -93,8 +112,8 @@ test.describe('@auth @lifecycle Authentication Lifecycle', () => {
       });
     }
 
-    const sessionCheck = await siblingTab.request.get('/api/auth/session');
-    expect([200, 401]).toContain(sessionCheck.status());
+    const sessionStatus = await fetchSessionStatus(siblingTab);
+    expect([200, 401]).toContain(sessionStatus);
   });
 
   test('authenticated users do not stay on the login route', async ({ page }, testInfo) => {
@@ -122,11 +141,11 @@ test.describe('@auth @lifecycle Authentication Lifecycle', () => {
     await context.setOffline(false);
     await page.waitForTimeout(1_250);
 
-    const sessionAfterReconnect = await page.request.get('/api/auth/session');
-    if (!sessionAfterReconnect.ok()) {
+    const sessionAfterReconnectStatus = await fetchSessionStatus(page);
+    if (sessionAfterReconnectStatus !== 200) {
       await logIssue(testInfo, {
         scenario: 'network reconnect revalidation',
-        details: `Session check failed after reconnect with status ${sessionAfterReconnect.status()}.`,
+        details: `Session check failed after reconnect with status ${sessionAfterReconnectStatus}.`,
         severity: 'medium',
         route: '/dashboard',
       });
@@ -171,19 +190,18 @@ test.describe('@auth @lifecycle Authentication Lifecycle', () => {
       return;
     }
 
-    const sessionResponse = await page.request.get('/api/auth/session');
-    if (!sessionResponse.ok()) {
+    const sessionResponse = await fetchSessionPayload(page);
+    if (sessionResponse.status !== 200) {
       await logIssue(testInfo, {
         scenario: 'locked session API shape',
-        details: `Expected /api/auth/session to stay readable after lock but got ${sessionResponse.status()}.`,
+        details: `Expected /api/auth/session to stay readable after lock but got ${sessionResponse.status}.`,
         severity: 'medium',
         route: '/lock',
       });
       return;
     }
 
-    const payload = (await sessionResponse.json()) as { locked?: boolean };
-    if (payload.locked !== true) {
+    if (sessionResponse.payload?.locked !== true) {
       await logIssue(testInfo, {
         scenario: 'lock state propagation',
         details: 'Lock route loaded but /api/auth/session did not report locked=true.',

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
+import { LoadMorePagination } from '@/components/ui/load-more-pagination';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import {
@@ -36,6 +37,7 @@ import { Undo2, XCircle } from 'lucide-react';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { cn } from '@/lib/utils/cn';
 import { useMaintenance } from '@/lib/hooks/useMaintenance';
+import { useLoadMorePagination } from '@/lib/hooks/useLoadMorePagination';
 import type { MaintenanceItem } from '@/types/maintenance';
 
 type PlantAsset = {
@@ -290,6 +292,16 @@ export function PlantTable({
         return 0;
     }
   });
+  const paginationKey = [
+    searchQuery.trim(),
+    sortField,
+    sortDirection,
+    sortedPlant.length,
+  ].join(':');
+  const {
+    visibleItems: visiblePlant,
+    showMore,
+  } = useLoadMorePagination(sortedPlant, { resetKey: paginationKey });
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -563,7 +575,7 @@ export function PlantTable({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortedPlant.map((asset) => (
+                    {visiblePlant.map((asset) => (
                       <TableRow 
                         key={asset.plant_id}
                         onClick={() => handleViewHistory(asset.plant?.id || '')}
@@ -651,7 +663,7 @@ export function PlantTable({
           {/* Mobile Card View */}
           {sortedPlant.length > 0 && (
             <div className={cn('space-y-3', tabletModeEnabled ? 'block' : 'md:hidden')}>
-              {sortedPlant.map((asset) => {
+              {visiblePlant.map((asset) => {
                 const isExpanded = expandedCardId === asset.plant_id;
                 
                 return (
@@ -796,6 +808,12 @@ export function PlantTable({
               })}
             </div>
           )}
+          <LoadMorePagination
+            visibleCount={visiblePlant.length}
+            totalCount={sortedPlant.length}
+            itemLabel="plant assets"
+            onShowMore={showMore}
+          />
             </TabsContent>
             
             {/* Retired Plant Tab */}

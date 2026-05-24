@@ -8,7 +8,6 @@ import { test, expect } from '@playwright/test';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { config } from 'dotenv';
 import { resolve } from 'path';
-import { getTestUser } from '../helpers/auth';
 import { attachConsoleErrorCapture } from '../helpers/console-error-fixture';
 import { waitForAppReady } from '../helpers/wait-for-app';
 
@@ -16,7 +15,6 @@ config({ path: resolve(process.cwd(), '.env.local') });
 
 const CLIENT_ERROR_MARKER = 'Test client-side error: Button click handler failed';
 const SERVER_ERROR_MARKER = 'Test caught error: Database connection failed';
-const adminUser = getTestUser('admin');
 
 interface ErrorLogRow {
   id: string;
@@ -69,7 +67,6 @@ async function fetchRecentTargetErrorLogs(sinceIso: string): Promise<ErrorLogRow
   const { data, error } = await supabase
     .from('error_logs')
     .select('id, error_message, user_email, timestamp, page_url, component_name')
-    .eq('user_email', adminUser.email)
     .gte('timestamp', sinceIso)
     .order('timestamp', { ascending: false })
     .limit(50);

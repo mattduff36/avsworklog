@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { SectionLoader } from '@/components/ui/section-loader';
 import { AppPageShell } from '@/components/layout/AppPageShell';
 import { MobileTextSizeDialog } from '@/components/layout/MobileTextSizeDialog';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
@@ -101,24 +102,13 @@ export default function DashboardPage() {
   } = usePermissionSnapshot();
   const {
     data: ramsSummary,
-    isLoading: ramsLoading,
     errorStatus: ramsErrorStatus,
     refetch: refetchRamsAssignmentSummary,
   } = useRamsAssignmentSummary(profile?.id);
   const pendingRAMSCount = ramsSummary?.pendingCount || 0;
   const hasRAMSAssignments = ramsSummary?.hasAssignments || false;
   
-  // Intro animation state (all devices)
-  const [showIntro, setShowIntro] = useState(true);
   const [mobileTextSizeDialogOpen, setMobileTextSizeDialogOpen] = useState(false);
-  
-  // Hide intro after 3 seconds
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowIntro(false);
-    }, 3000);
-    return () => clearTimeout(timer);
-  }, []);
 
   // useAuth flags already reflect the effective (view-as) role
   const isSuperAdmin = isActualSuperAdmin;
@@ -354,6 +344,46 @@ export default function DashboardPage() {
   const visibleAdminTiles = getFilteredNavByPermissions(adminNavItems, userPermissions, effectiveIsAdmin);
   const renderedManagerTiles = visibleManagerTiles.filter(link => link.href !== '/absence/manage');
   const renderedManagementTiles = [...renderedManagerTiles, ...visibleAdminTiles];
+  const renderedQuickActionTiles = formTypes
+    .filter(formType => {
+      // Map form IDs to module names for permission checking
+      const moduleMap: Record<string, ModuleName> = {
+        'timesheet': 'timesheets',
+        'inspection': 'inspections',
+        'plant-inspection': 'plant-inspections',
+        'hgv-inspection': 'hgv-inspections',
+        'rams': 'rams',
+        'absence': 'absence',
+        'maintenance': 'maintenance',
+        'fleet': 'maintenance',
+        'workshop': 'workshop-tasks',
+        'inventory': 'inventory',
+        'reminders': 'reminders',
+      };
+
+      const moduleName = moduleMap[formType.id];
+
+      // Check module permission (admin permissions are expanded to full set above).
+      if (moduleName && !userPermissions.has(moduleName)) {
+        return false;
+      }
+
+      // Hide RAMS for employees with no assignments
+      if (formType.id === 'rams' && !effectiveIsManager && !effectiveIsAdmin && !hasRAMSAssignments) {
+        return false;
+      }
+
+      if (formType.id === 'reminders' && remindersPendingCount === 0) {
+        return false;
+      }
+
+      return true;
+    })
+    .sort((a, b) => {
+      if (a.id === 'reminders') return -1;
+      if (b.id === 'reminders') return 1;
+      return 0;
+    });
   const managementTileBadgeCountByHref: Record<string, number> = {
     '/approvals': approvalsTileBadgeCount,
     '/suggestions/manage': newSuggestionsCount,
@@ -363,32 +393,13 @@ export default function DashboardPage() {
   };
   const hasManagementTileBadge = (href: string) => href in managementTileBadgeCountByHref;
   const getManagementTileBadgeCount = (href: string) => managementTileBadgeCountByHref[href] || 0;
+  const isDashboardLoading = permissionsLoading || !profile?.id;
 
   return (
     <AppPageShell className="space-y-8">
       
-      {!tabletModeEnabled && (
+      {!tabletModeEnabled && !isDashboardLoading && (
         <div className="bg-slate-900 rounded-lg p-4 md:p-5 border border-slate-700 relative overflow-hidden">
-          {/* Intro Animation Overlay (All Devices) */}
-          <div
-            className={`flex absolute inset-0 bg-slate-900 items-center justify-center z-10 transition-opacity duration-700 ${
-              showIntro ? 'opacity-100' : 'opacity-0 pointer-events-none'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <Image
-                src="/icon-192x192.png"
-                alt=""
-                width={36}
-                height={36}
-                className="h-8 w-8 md:h-9 md:w-9"
-              />
-              <span className="text-2xl md:text-3xl font-bold text-avs-yellow tracking-wide">
-                SquiresApp
-              </span>
-            </div>
-          </div>
-
           {/* Actual Content */}
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-4 min-w-0">
@@ -448,50 +459,15 @@ export default function DashboardPage() {
 
       {/* Quick Actions - Square Button Grid */}
       <div>
-        {(permissionsLoading || ramsLoading || !profile?.id) ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-avs-yellow" />
-          </div>
+        {isDashboardLoading ? (
+          <SectionLoader message="Loading dashboard..." />
         ) : (
           <TooltipProvider>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
               {/* Active Forms */}
-              {formTypes
-              .filter(formType => {
-                // Map form IDs to module names for permission checking
-                const moduleMap: Record<string, ModuleName> = {
-                  'timesheet': 'timesheets',
-                  'inspection': 'inspections',
-                  'plant-inspection': 'plant-inspections',
-                  'hgv-inspection': 'hgv-inspections',
-                  'rams': 'rams',
-                  'absence': 'absence',
-                  'maintenance': 'maintenance',
-                  'fleet': 'maintenance',
-                  'workshop': 'workshop-tasks',
-                  'inventory': 'inventory',
-                  'reminders': 'reminders',
-                };
-                
-                const moduleName = moduleMap[formType.id];
-                
-                // Check module permission (admin permissions are expanded to full set above).
-                if (moduleName && !userPermissions.has(moduleName)) {
-                  return false;
-                }
-                
-                // Hide RAMS for employees with no assignments
-                if (formType.id === 'rams' && !effectiveIsManager && !effectiveIsAdmin && !hasRAMSAssignments) {
-                  return false;
-                }
-
-                if (formType.id === 'reminders' && remindersPendingCount === 0) {
-                  return false;
-                }
-                return true;
-              })
-              .map((formType, index) => {
+              {renderedQuickActionTiles.map((formType, index) => {
               const Icon = formType.icon;
+              const isRemindersTile = formType.id === 'reminders';
               const tileBadgeCountById: Partial<Record<string, number>> = {
                 rams: pendingRAMSCount,
                 workshop: workshopPendingCount,
@@ -510,9 +486,13 @@ export default function DashboardPage() {
               const textColorClass = needsDarkText ? 'text-slate-900' : 'text-white';
               
               return (
-                <Link key={formType.id} href={formType.href}>
+                <Link
+                  key={formType.id}
+                  href={formType.href}
+                  className={isRemindersTile ? 'col-span-2' : undefined}
+                >
                   <div
-                    className={`relative overflow-hidden bg-${formType.color} hover:opacity-90 hover:scale-105 transition-all duration-200 rounded-lg p-6 text-center shadow-lg aspect-square flex flex-col items-center justify-center space-y-3 cursor-pointer animate-tile-pop ${textColorClass}`}
+                    className={`relative overflow-hidden bg-${formType.color} hover:opacity-90 hover:scale-105 transition-all duration-200 rounded-lg p-6 text-center shadow-lg ${isRemindersTile ? 'aspect-[2/1]' : 'aspect-square'} flex flex-col items-center justify-center space-y-3 cursor-pointer animate-tile-pop ${textColorClass}`}
                     style={{ animationDelay: `${index * 75}ms` }}
                   >
                     {showMaintenanceBadges ? (
@@ -698,9 +678,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <p>Loading pending approvals...</p>
-              </div>
+              <SectionLoader message="Loading pending approvals..." />
             ) : (
               <div className="space-y-2">
                 {pendingApprovals.map((approval) => {

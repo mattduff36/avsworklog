@@ -7,6 +7,7 @@ export interface DirectoryUserRole {
   name?: string | null;
   display_name?: string | null;
   is_manager_admin?: boolean | null;
+  is_super_admin?: boolean | null;
 }
 
 export interface DirectoryUserTeam {
@@ -18,6 +19,7 @@ export interface DirectoryUser {
   id: string;
   full_name: string | null;
   employee_id: string | null;
+  super_admin?: boolean | null;
   annual_holiday_allowance_days?: number | null;
   role?: DirectoryUserRole | null;
   team?: DirectoryUserTeam | null;

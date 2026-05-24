@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import { LoadMorePagination } from '@/components/ui/load-more-pagination';
 import {
   Tooltip,
   TooltipContent,
@@ -36,12 +37,12 @@ import {
   getInventoryDueDate,
 } from '../utils';
 import { formatInventoryCategoryLabel, type InventoryCheckStatus, type InventoryItem, type InventoryLocation } from '../types';
+import { useLoadMorePagination } from '@/lib/hooks/useLoadMorePagination';
 
 type InventoryFilter = 'all' | InventoryCheckStatus | 'yard' | 'noloc';
 type SortField = 'item_number' | 'name' | 'location' | 'last_checked_at';
 type SortDir = 'asc' | 'desc';
 const ALL_LOCATIONS_FILTER = 'all';
-const INVENTORY_TABLE_PAGE_SIZE = 50;
 
 interface InventoryTableProps {
   items: InventoryItem[];
@@ -134,10 +135,8 @@ export function InventoryTable({
   const [locationFilterId, setLocationFilterId] = useState(ALL_LOCATIONS_FILTER);
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
-  const [pagination, setPagination] = useState({ key: '', limit: INVENTORY_TABLE_PAGE_SIZE });
   const showLocationFilter = Boolean(locationFilterLocations?.length);
   const paginationKey = `${filter}:${locationFilterId}:${search.trim()}:${sortField}:${sortDir}:${items.length}`;
-  const visibleItemLimit = pagination.key === paginationKey ? pagination.limit : INVENTORY_TABLE_PAGE_SIZE;
 
   const filteredItems = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -168,10 +167,10 @@ export function InventoryTable({
     });
   }, [filter, items, locationFilterId, search, sortDir, sortField]);
 
-  const visibleItems = useMemo(
-    () => filteredItems.slice(0, visibleItemLimit),
-    [filteredItems, visibleItemLimit]
-  );
+  const {
+    visibleItems,
+    showMore,
+  } = useLoadMorePagination(filteredItems, { resetKey: paginationKey });
 
   const selectedItems = useMemo(
     () => visibleItems.filter((item) => selectedItemIds.has(item.id)),
@@ -223,7 +222,6 @@ export function InventoryTable({
   }
 
   const allVisibleSelected = visibleItems.length > 0 && visibleItems.every((item) => selectedItemIds.has(item.id));
-  const hasMoreItems = visibleItemLimit < filteredItems.length;
 
   return (
     <TooltipProvider delayDuration={150}>
@@ -470,25 +468,12 @@ export function InventoryTable({
         )}
       </div>
 
-      {hasMoreItems ? (
-        <div className="flex flex-col items-center gap-2 border-t border-slate-700/60 pt-4">
-          <p className="text-xs text-muted-foreground">
-            Showing {visibleItems.length} of {filteredItems.length} inventory items
-          </p>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setPagination({ key: paginationKey, limit: visibleItemLimit + INVENTORY_TABLE_PAGE_SIZE })}
-            className="border-slate-600 text-white hover:bg-slate-800"
-          >
-            Show More
-          </Button>
-        </div>
-      ) : filteredItems.length > INVENTORY_TABLE_PAGE_SIZE ? (
-        <p className="border-t border-slate-700/60 pt-4 text-center text-xs text-muted-foreground">
-          Showing all {filteredItems.length} inventory items
-        </p>
-      ) : null}
+      <LoadMorePagination
+        visibleCount={visibleItems.length}
+        totalCount={filteredItems.length}
+        itemLabel="inventory items"
+        onShowMore={showMore}
+      />
     </div>
     </TooltipProvider>
   );

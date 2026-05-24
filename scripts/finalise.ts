@@ -40,6 +40,7 @@ interface ProcessInfo {
 interface RunCommandOptions {
   allowFailure?: boolean;
   captureOutput?: boolean;
+  env?: NodeJS.ProcessEnv;
 }
 
 interface ManagedProcess {
@@ -126,7 +127,7 @@ function runCommand(command: string, args: string[], options: RunCommandOptions 
 
   const result = spawnSync(getExecutable(command), args, {
     cwd: REPO_ROOT,
-    env: process.env,
+    env: options.env ?? process.env,
     shell: shouldUseShell(command),
     encoding: 'utf8',
     stdio: options.captureOutput ? 'pipe' : 'inherit',
@@ -257,6 +258,25 @@ function getPushModeDescription(options: FinaliseOptions): string {
   }
 
   return 'standard';
+}
+
+function printProgress(message: string, percent: number): void {
+  console.log(`- ${message} [${percent}% complete]`);
+}
+
+function getLocalProductionBaseUrl(): string {
+  return `http://127.0.0.1:${DEV_SERVER_PORT}`;
+}
+
+function getLocalTestEnv(): NodeJS.ProcessEnv {
+  const baseUrl = getLocalProductionBaseUrl();
+
+  return {
+    ...process.env,
+    PORT: String(DEV_SERVER_PORT),
+    NEXT_PUBLIC_SITE_URL: baseUrl,
+    TESTSUITE_BASE_URL: baseUrl,
+  };
 }
 
 function runUnloggedCommand(command: string, args: string[]): CommandResult {
@@ -506,10 +526,15 @@ function getManagedProcessOutput(managedProcess: ManagedProcess): string {
   return managedProcess.output.join('').trim();
 }
 
-function startManagedProcess(command: string, args: string[], label: string): ManagedProcess {
+function startManagedProcess(
+  command: string,
+  args: string[],
+  label: string,
+  env: NodeJS.ProcessEnv = process.env
+): ManagedProcess {
   const child = spawn(command, args, {
     cwd: REPO_ROOT,
-    env: process.env,
+    env,
     shell: process.platform === 'win32',
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -706,7 +731,7 @@ async function main(): Promise<void> {
       console.log(
         `Tests: ${
           options.full
-            ? `would run npm run test:run, start a local production server on ${DEV_SERVER_PORT}, then run npm run testsuite`
+            ? `would start a local production server on ${DEV_SERVER_PORT}, run npm run test:run, then run npm run testsuite`
             : 'skipped'
         }`
       );
@@ -724,66 +749,88 @@ async function main(): Promise<void> {
     }
 
     console.log(`Starting finalise workflow (${getPushModeDescription(options)})`);
+    printProgress('Workflow started.', 0);
 
     if (devServerProcesses.length > 0) {
       console.log(`\n==> Stop dev server (${devServerProcesses.length} process${devServerProcesses.length === 1 ? '' : 'es'})`);
+      printProgress('Stopping repo dev server...', 5);
       await run.step('Stop repo dev server', () => stopRepoDevServer(), {
         processCount: devServerProcesses.length,
       });
+      printProgress('Repo dev server stopped.', 10);
     } else {
       console.log('\n==> Stop dev server');
-      console.log('No repo dev server detected.');
+      printProgress('No repo dev server detected.', 10);
     }
 
     if (pendingMigrationFiles.length > 0) {
       console.log(`\n==> Run pending local migrations (${pendingMigrationFiles.length})`);
+      printProgress(`Running ${pendingMigrationFiles.length} pending migration${pendingMigrationFiles.length === 1 ? '' : 's'}...`, 12);
       await run.step('Run pending local migrations', () => runPendingMigrations(pendingMigrationFiles), {
         migrationFiles: pendingMigrationFiles,
       });
+      printProgress('Pending migrations applied.', 20);
     } else {
       console.log('\n==> Run pending local migrations');
-      console.log('No pending local migration files detected.');
+      printProgress('No pending local migration files detected.', 20);
     }
 
     if (shouldRunDbValidate) {
       console.log('\n==> Validate database after schema-risk migration');
+      printProgress('Running database validation...', 22);
       runCommand('npm', ['run', 'db:validate']);
+      printProgress('Database validation passed.', 25);
     } else {
       console.log('\n==> Validate database after schema-risk migration');
-      console.log('No rename/drop migration detected.');
+      printProgress('No rename/drop migration detected.', 25);
     }
 
     console.log('\n==> Remove clean build output');
+    printProgress('Removing previous clean build output...', 28);
     const removedBuildOutput = await run.step('Remove clean build output', () => removeNextBuildOutput());
-    console.log(removedBuildOutput ? 'Removed .next build output.' : 'No .next build output to remove.');
+    printProgress(removedBuildOutput ? 'Removed .next build output.' : 'No .next build output to remove.', 30);
 
     console.log('\n==> Run clean production build');
+    printProgress('Running clean production build...', 32);
     runCommand('npm', ['run', 'build']);
+    printProgress('Build passed.', 50);
 
     if (options.full) {
       console.log('\n==> Run full automated test suite');
-      runCommand('npm', ['run', 'test:run']);
-      console.log(`Starting local production server on port ${DEV_SERVER_PORT} for testsuite...`);
+      const localProductionBaseUrl = getLocalProductionBaseUrl();
+      const localTestEnv = getLocalTestEnv();
+      printProgress(`Starting local production server on ${localProductionBaseUrl}...`, 52);
       const testServer = startManagedProcess(
         'npm',
         ['run', 'start', '--', '--port', String(DEV_SERVER_PORT)],
-        'Local production server'
+        'Local production server',
+        localTestEnv
       );
 
       try {
+        printProgress('Waiting for local production server readiness...', 55);
         await run.step('Wait for local production server', () =>
-          waitForServerReady(testServer, `http://127.0.0.1:${DEV_SERVER_PORT}`)
+          waitForServerReady(testServer, localProductionBaseUrl)
         );
-        runCommand('npm', ['run', 'testsuite']);
+        printProgress(`Local production server ready on port ${DEV_SERVER_PORT}.`, 58);
+        printProgress('Running Vitest unit, integration, and component tests...', 60);
+        runCommand('npm', ['run', 'test:run'], { env: localTestEnv });
+        printProgress('Vitest test run passed.', 72);
+        printProgress('Running API and Playwright testsuite...', 75);
+        runCommand('npm', ['run', 'testsuite'], { env: localTestEnv });
+        printProgress('Full automated test suite passed.', 84);
       } finally {
+        printProgress('Stopping local production server...', 85);
         await run.step('Stop local production server', () => stopManagedProcess(testServer));
+        printProgress('Local production server stopped.', 86);
       }
     } else {
       console.log('\n==> Run full automated test suite');
-      console.log('Skipped for non-full finalise.');
+      printProgress('Skipped for non-full finalise.', 84);
     }
 
     console.log('\n==> Summarise workspace changes');
+    printProgress('Summarising workspace changes...', 87);
     const changeSummary = summarizeFinaliseChanges(getChangedFiles());
     if (changeSummary.fileCount > 0) {
       console.log(`Changed files: ${changeSummary.fileCount}`);
@@ -794,12 +841,15 @@ async function main(): Promise<void> {
     }
 
     console.log('\n==> Commit workspace changes');
+    printProgress('Committing workspace changes if needed...', 90);
     const committed = commitAllChanges(changeSummary.commitMessage);
-    console.log(
-      committed ? `Created commit: ${changeSummary.commitMessage}` : 'No uncommitted changes, so no commit was created.'
+    printProgress(
+      committed ? `Created commit: ${changeSummary.commitMessage}` : 'No uncommitted changes, so no commit was created.',
+      92
     );
 
     console.log('\n==> Bump release version locally');
+    printProgress('Checking release version bump...', 93);
     const releaseBeforeSha = readReleaseVersionState().lastProcessedSha;
     const releaseAfterSha = getHeadSha();
     const releasePrimaryCommitMessage =
@@ -807,19 +857,22 @@ async function main(): Promise<void> {
       (committed ? changeSummary.commitMessage : null);
     runCommand('npm', ['run', 'version:bump', '--', releaseBeforeSha, releaseAfterSha]);
     const releaseVersion = commitReleaseVersionChanges(releasePrimaryCommitMessage);
-    console.log(
+    printProgress(
       releaseVersion
         ? `Created release version commit: ${formatReleaseVersionCommitMessage(releasePrimaryCommitMessage, releaseVersion).split(/\r?\n/u)[0]}`
-        : 'No release version bump required.'
+        : 'No release version bump required.',
+      95
     );
 
     let pushedBranch: string | null = null;
     if (options.push) {
       console.log('\n==> Push current branch');
+      printProgress(`Pushing branch ${branch || '(detached HEAD)'}...`, 97);
       pushedBranch = pushCurrentBranch();
+      printProgress(`Pushed ${pushedBranch}.`, 99);
     } else {
       console.log('\n==> Push current branch');
-      console.log('Skipped for non-push finalise.');
+      printProgress('Skipped for non-push finalise.', 99);
     }
 
     console.log('\nFinalise complete.');
@@ -830,6 +883,7 @@ async function main(): Promise<void> {
     console.log(`- Commit: ${committed ? 'created' : 'skipped'}`);
     console.log(`- Release version: ${releaseVersion ? `bumped to ${releaseVersion}` : 'unchanged'}`);
     console.log(`- Push: ${pushedBranch ? `pushed ${pushedBranch}` : 'skipped'}`);
+    printProgress('Finalise workflow complete.', 100);
     run.finish('passed');
   } catch (error) {
     run.finish('failed', error);

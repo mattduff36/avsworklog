@@ -45,6 +45,7 @@ import { getRecentVehicleIds, recordRecentVehicleId, splitVehiclesByRecent } fro
 import { getReadingDigitGrowthWarning } from '@/lib/utils/readingDigitGrowthWarning';
 import { getInspectionErrorMessage, isDuplicateInspectionError } from '@/lib/utils/inspection-error-handling';
 import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
+import { completeInspectionReminder } from '@/lib/client/complete-inspection-reminder';
 
 // Dynamic imports for heavy components
 const PhotoUpload = dynamic(() => import('@/components/forms/PhotoUpload'), { ssr: false });
@@ -1433,6 +1434,18 @@ function NewPlantInspectionContent() {
           return;
         } finally {
           setCreatingWorkshopTask(false);
+        }
+      }
+
+      if (!isHiredPlant) {
+        try {
+          await completeInspectionReminder({
+            assetType: 'plant',
+            assetId: selectedPlantId,
+            assignedTo: selectedEmployeeId,
+          });
+        } catch (reminderError) {
+          console.error('Error completing reminder after plant daily check submission:', reminderError);
         }
       }
 

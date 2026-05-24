@@ -1,81 +1,64 @@
 'use client';
 
-import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { BellRing, Loader2, RefreshCw, Send, TriangleAlert } from 'lucide-react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { BellRing, ClipboardList, Settings } from 'lucide-react';
 import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { PageLoader } from '@/components/ui/page-loader';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
-import { cn } from '@/lib/utils/cn';
+import {
+  getReminderOverviewTab,
+  isValidReminderOverviewTabId,
+  REMINDER_OVERVIEW_TABS,
+} from '@/lib/config/reminder-workflows';
+import { getReminderAssignmentFilterValue, isReminderActionActive } from '@/lib/utils/reminder-action-filters';
 import type { ReminderActionWithAsset } from '@/types/reminders';
+import { ActionsOverviewPanel } from './components/ActionsOverviewPanel';
+import { ActionsSettingsTab } from './components/ActionsSettingsTab';
+import { ActionsSummaryCards, type ActionsSummaryStats } from './components/ActionsSummaryCards';
 
-interface AssignableUser {
-  id: string;
-  full_name: string | null;
-  employee_id?: string | null;
-  has_module_access?: boolean;
-  team?: {
-    id: string;
-    name: string | null;
-  } | null;
-  role?: {
-    id?: string;
-    name?: string;
-    display_name?: string;
-  } | null;
+const EMPTY_SUMMARY: ActionsSummaryStats = {
+  openActions: 0,
+  pendingReminders: 0,
+  unassigned: 0,
+};
+
+const tabTriggerClassName = 'gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900';
+
+function buildSummaryStats(actions: ReminderActionWithAsset[]): ActionsSummaryStats {
+  return actions.filter(isReminderActionActive).reduce(
+    (stats, action) => {
+      stats.openActions += 1;
+      stats.pendingReminders += action.reminders_count.pending;
+      if (getReminderAssignmentFilterValue(action) === 'unassigned') {
+        stats.unassigned += 1;
+      }
+      return stats;
+    },
+    { ...EMPTY_SUMMARY },
+  );
 }
 
-function getDaysOverdueLabel(action: ReminderActionWithAsset): string {
-  const value = action.metadata?.days_overdue;
-  return typeof value === 'number' ? `${value}d overdue` : 'No check recorded';
-}
-
-function getLatestInspectionLabel(action: ReminderActionWithAsset): string {
-  const value = action.metadata?.last_submitted_inspection_date;
-  return typeof value === 'string' ? value : 'Never submitted';
-}
-
-function getStatusBadgeVariant(status: ReminderActionWithAsset['status']) {
-  if (status === 'resolved') return 'success';
-  if (status === 'cancelled') return 'secondary';
-  return 'warning';
-}
-
-export default function ActionsPage() {
+function ActionsContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const { isManager, isAdmin, loading: authLoading } = useAuth();
   const { hasPermission: canViewActions, loading: actionsPermissionLoading } = usePermissionCheck('actions', false);
-  const [actions, setActions] = useState<ReminderActionWithAsset[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
-  const [assigning, setAssigning] = useState(false);
-  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
-  const [selectedAction, setSelectedAction] = useState<ReminderActionWithAsset | null>(null);
-  const [users, setUsers] = useState<AssignableUser[]>([]);
-  const [usersLoading, setUsersLoading] = useState(false);
-  const [searchValue, setSearchValue] = useState('');
-  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+
+  const canManage = isManager || isAdmin;
+  const [refreshToken, setRefreshToken] = useState(0);
+  const [summaryRefreshToken, setSummaryRefreshToken] = useState(0);
+  const [summary, setSummary] = useState<ActionsSummaryStats>(EMPTY_SUMMARY);
+  const requestedTab = searchParams.get('tab') || 'vans';
+  const pageTab: 'overview' | 'settings' = requestedTab === 'settings' && canManage ? 'settings' : 'overview';
+  const overviewTab = isValidReminderOverviewTabId(requestedTab) ? requestedTab : REMINDER_OVERVIEW_TABS[0]?.id || 'vans';
+
+  const activeOverviewTab = useMemo(
+    () => getReminderOverviewTab(overviewTab) || REMINDER_OVERVIEW_TABS[0],
+    [overviewTab],
+  );
 
   useEffect(() => {
     if (!actionsPermissionLoading && !canViewActions) {
@@ -83,141 +66,74 @@ export default function ActionsPage() {
     }
   }, [actionsPermissionLoading, canViewActions, router]);
 
-  const loadActions = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await fetch('/api/actions?status=open&workflow=fleet_inspection_overdue', {
-        cache: 'no-store',
-      });
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.error || 'Failed to load actions');
-      }
-
-      setActions((payload.actions || []) as ReminderActionWithAsset[]);
-    } catch (error) {
-      console.error(error);
-      setActions([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    if (!actionsPermissionLoading && canViewActions) {
-      void loadActions();
-    }
-  }, [actionsPermissionLoading, canViewActions, loadActions]);
-
-  const loadUsers = useCallback(async () => {
-    setUsersLoading(true);
-    try {
-      const response = await fetch('/api/users/directory?module=reminders&includeRole=1', {
-        cache: 'no-store',
-      });
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.error || 'Failed to load users');
-      }
-
-      setUsers((payload.users || []) as AssignableUser[]);
-    } catch (error) {
-      console.error(error);
-      setUsers([]);
-    } finally {
-      setUsersLoading(false);
-    }
-  }, []);
-
-  const handleGenerate = useCallback(async () => {
-    setGenerating(true);
-    try {
-      const response = await fetch('/api/actions/generate-fleet-inspection-reminders', {
-        method: 'POST',
-      });
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.error || 'Failed to generate actions');
-      }
-
-      await loadActions();
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setGenerating(false);
-    }
-  }, [loadActions]);
-
-  const openAssignDialog = useCallback(async (action: ReminderActionWithAsset) => {
-    setSelectedAction(action);
-    setSelectedUserIds([]);
-    setSearchValue('');
-    setAssignDialogOpen(true);
-    if (!users.length) {
-      await loadUsers();
-    }
-  }, [loadUsers, users.length]);
-
-  const filteredUsers = useMemo(() => {
-    const normalizedQuery = searchValue.trim().toLowerCase();
-    return users.filter((user) => {
-      if (user.has_module_access === false) {
-        return false;
-      }
-
-      if (!normalizedQuery) {
-        return true;
-      }
-
-      return [
-        user.full_name || '',
-        user.employee_id || '',
-        user.team?.name || '',
-        user.role?.display_name || user.role?.name || '',
-      ].some((value) => value.toLowerCase().includes(normalizedQuery));
-    });
-  }, [searchValue, users]);
-
-  function handleToggleUser(userId: string) {
-    setSelectedUserIds((current) =>
-      current.includes(userId) ? current.filter((id) => id !== userId) : [...current, userId],
-    );
-  }
-
-  async function handleAssignSelectedUsers() {
-    if (!selectedAction || selectedUserIds.length === 0) {
+    if (authLoading || actionsPermissionLoading || !canViewActions) {
       return;
     }
 
-    setAssigning(true);
+    if (requestedTab === 'settings') {
+      if (!canManage) {
+        router.replace('/actions?tab=vans', { scroll: false });
+      }
+      return;
+    }
+
+    if (isValidReminderOverviewTabId(requestedTab)) {
+      return;
+    }
+
+    router.replace('/actions?tab=vans', { scroll: false });
+  }, [authLoading, actionsPermissionLoading, canManage, canViewActions, requestedTab, router]);
+
+  const loadSummary = useCallback(async () => {
+    if (authLoading || actionsPermissionLoading || !canViewActions) {
+      return;
+    }
+
     try {
-      const response = await fetch('/api/actions/assign', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action_id: selectedAction.id,
-          assignee_ids: selectedUserIds,
-        }),
+      const searchParams = new URLSearchParams({ status: 'open' });
+      const response = await fetch(`/api/actions?${searchParams.toString()}`, {
+        cache: 'no-store',
       });
       const payload = await response.json();
       if (!response.ok) {
-        throw new Error(payload.error || 'Failed to assign users');
+        throw new Error(payload.error || 'Failed to load actions summary');
       }
 
-      setAssignDialogOpen(false);
-      setSelectedAction(null);
-      setSelectedUserIds([]);
-      await loadActions();
+      setSummary(buildSummaryStats((payload.actions || []) as ReminderActionWithAsset[]));
     } catch (error) {
       console.error(error);
-    } finally {
-      setAssigning(false);
+      setSummary(EMPTY_SUMMARY);
     }
+  }, [authLoading, actionsPermissionLoading, canViewActions]);
+
+  useEffect(() => {
+    void loadSummary();
+  }, [loadSummary, refreshToken, summaryRefreshToken]);
+
+  function handlePageTabChange(value: string) {
+    if (value === 'settings') {
+      router.push('/actions?tab=settings', { scroll: false });
+      return;
+    }
+
+    router.push(`/actions?tab=${overviewTab}`, { scroll: false });
   }
 
-  if (actionsPermissionLoading) {
+  function handleOverviewTabChange(value: string) {
+    router.push(`/actions?tab=${value}`, { scroll: false });
+  }
+
+  function handleSettingsSaved() {
+    setRefreshToken((current) => current + 1);
+    setSummaryRefreshToken((current) => current + 1);
+  }
+
+  function handleActionsChanged() {
+    setSummaryRefreshToken((current) => current + 1);
+  }
+
+  if (actionsPermissionLoading || authLoading) {
     return <PageLoader message="Loading actions..." />;
   }
 
@@ -226,187 +142,72 @@ export default function ActionsPage() {
   }
 
   return (
-    <AppPageShell>
+    <AppPageShell width="wide">
       <AppPageHeader
         title="Actions"
         description="Generated actions that managers and admins can assign as employee reminders."
         icon={<BellRing className="h-5 w-5" />}
-        iconContainerClassName="bg-reminders-soft text-reminders"
-        actions={(
-          <Button
-            type="button"
-            onClick={() => void handleGenerate()}
-            disabled={generating}
-            className="gap-2"
-          >
-            {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            Refresh generated actions
-          </Button>
-        )}
       />
 
-      <Card className="border-border">
-        <CardHeader>
-          <CardTitle className="text-foreground">Fleet inspection reminders</CardTitle>
-          <CardDescription className="text-muted-foreground">
-            Open actions are generated automatically for active assets with no submitted check in the last 4 weeks.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-lg border border-border bg-muted/20 p-4">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Open actions</p>
-              <p className="mt-2 text-2xl font-semibold text-foreground">{actions.length}</p>
-            </div>
-            <div className="rounded-lg border border-border bg-muted/20 p-4">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Pending reminders</p>
-              <p className="mt-2 text-2xl font-semibold text-foreground">
-                {actions.reduce((total, action) => total + action.reminders_count.pending, 0)}
-              </p>
-            </div>
-            <div className="rounded-lg border border-border bg-muted/20 p-4">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Actioned reminders</p>
-              <p className="mt-2 text-2xl font-semibold text-foreground">
-                {actions.reduce((total, action) => total + action.reminders_count.actioned, 0)}
-              </p>
-            </div>
-          </div>
+      <ActionsSummaryCards summary={summary} />
 
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-reminders" />
-            </div>
-          ) : actions.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-border bg-muted/10 p-8 text-center">
-              <TriangleAlert className="mx-auto h-6 w-6 text-muted-foreground" />
-              <p className="mt-3 text-sm text-muted-foreground">
-                No overdue fleet inspection actions are currently open.
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto rounded-lg border border-border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Asset</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Latest submitted</TableHead>
-                    <TableHead>Overdue</TableHead>
-                    <TableHead>Reminder counts</TableHead>
-                    <TableHead className="text-right">Assign</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {actions.map((action) => (
-                    <TableRow key={action.id}>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <p className="font-medium text-foreground">{action.asset_label || action.title}</p>
-                          <p className="text-xs text-muted-foreground">{action.description}</p>
-                          {action.asset_route ? (
-                            <Link href={action.asset_route} className="text-xs text-reminders hover:underline">
-                              Open asset history
-                            </Link>
-                          ) : null}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getStatusBadgeVariant(action.status)}>{action.status}</Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {getLatestInspectionLabel(action)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="warning">{getDaysOverdueLabel(action)}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-2">
-                          <Badge variant="outline">Pending {action.reminders_count.pending}</Badge>
-                          <Badge variant="outline">Actioned {action.reminders_count.actioned}</Badge>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button type="button" variant="outline" onClick={() => void openAssignDialog(action)}>
-                          Assign users
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <Tabs value={pageTab} onValueChange={handlePageTabChange}>
+        {canManage ? (
+          <TabsList>
+            <TabsTrigger value="overview" className={tabTriggerClassName}>
+              <ClipboardList className="h-4 w-4" />
+              Daily Checks
+            </TabsTrigger>
+            <TabsTrigger value="settings" className={tabTriggerClassName}>
+              <Settings className="h-4 w-4" />
+              Settings
+            </TabsTrigger>
+          </TabsList>
+        ) : null}
 
-      <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Assign reminder</DialogTitle>
-            <DialogDescription>
-              {selectedAction?.asset_label || selectedAction?.title || 'Select users to receive this reminder.'}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <Input
-              value={searchValue}
-              onChange={(event) => setSearchValue(event.target.value)}
-              placeholder="Search by name, team or role"
-            />
-
-            <div className="max-h-96 space-y-2 overflow-y-auto rounded-lg border border-border p-3">
-              {usersLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-5 w-5 animate-spin text-reminders" />
-                </div>
-              ) : filteredUsers.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No eligible users found.</p>
-              ) : (
-                filteredUsers.map((user) => {
-                  const isSelected = selectedUserIds.includes(user.id);
+        {pageTab === 'overview' ? (
+          <div className="mt-3 flex justify-end">
+            <Tabs value={overviewTab} onValueChange={handleOverviewTabChange}>
+              <TabsList>
+                {REMINDER_OVERVIEW_TABS.map((tab) => {
+                  const Icon = tab.icon;
                   return (
-                    <button
-                      key={user.id}
-                      type="button"
-                      onClick={() => handleToggleUser(user.id)}
-                      className={cn(
-                        'flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-colors',
-                        isSelected ? 'border-reminders bg-reminders-soft' : 'border-border hover:bg-muted/20',
-                      )}
-                    >
-                      <Checkbox checked={isSelected} className="mt-0.5" />
-                      <div className="space-y-1">
-                        <p className="font-medium text-foreground">{user.full_name || 'Unknown user'}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {[user.employee_id, user.team?.name, user.role?.display_name || user.role?.name]
-                            .filter(Boolean)
-                            .join(' · ')}
-                        </p>
-                      </div>
-                    </button>
+                    <TabsTrigger key={tab.id} value={tab.id} className={tabTriggerClassName}>
+                      <Icon className="h-4 w-4" />
+                      {tab.label}
+                    </TabsTrigger>
                   );
-                })
-              )}
-            </div>
+                })}
+              </TabsList>
+            </Tabs>
           </div>
+        ) : null}
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setAssignDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={() => void handleAssignSelectedUsers()}
-              disabled={assigning || selectedUserIds.length === 0}
-              className="gap-2"
-            >
-              {assigning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              Assign reminder
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        <TabsContent value="overview" className="mt-0 space-y-6">
+          {activeOverviewTab ? (
+            <ActionsOverviewPanel
+              key={activeOverviewTab.id}
+              tab={activeOverviewTab}
+              refreshToken={refreshToken}
+              onActionsChanged={handleActionsChanged}
+            />
+          ) : null}
+        </TabsContent>
+
+        {canManage ? (
+          <TabsContent value="settings" className="mt-0 space-y-6">
+            <ActionsSettingsTab onSaved={handleSettingsSaved} />
+          </TabsContent>
+        ) : null}
+      </Tabs>
     </AppPageShell>
+  );
+}
+
+export default function ActionsPage() {
+  return (
+    <Suspense fallback={<PageLoader message="Loading actions..." />}>
+      <ActionsContent />
+    </Suspense>
   );
 }

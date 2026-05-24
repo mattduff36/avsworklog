@@ -94,8 +94,6 @@ async function collectPageSignals(page: Page): Promise<{ horizontalOverflow: boo
 async function waitForStableRender(page: Page): Promise<void> {
   await page.waitForLoadState('domcontentloaded');
   await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-  const loadingOverlay = page.getByText('Loading SquiresApp...');
-  await loadingOverlay.first().waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
   await page.waitForTimeout(400);
 }
 

@@ -488,7 +488,7 @@ export default function InventoryPage() {
         )}
       />
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="hidden grid-cols-5 gap-2 min-[430px]:grid lg:gap-4">
         <SummaryCard label="Active Items" value={summary.total} icon={<PackageSearch className="h-5 w-5" />} />
         <SummaryCard label="Overdue" value={summary.overdue} icon={<AlertTriangle className="h-5 w-5" />} tone="danger" />
         <SummaryCard label="Due Soon" value={summary.dueSoon} icon={<AlertTriangle className="h-5 w-5" />} tone="warning" />
@@ -662,13 +662,13 @@ function SummaryCard({ label, value, icon, tone = 'default' }: SummaryCardProps)
 
   return (
     <Card className="border-slate-700 bg-slate-900/70">
-      <CardContent className="flex items-center gap-3 p-4">
-        <div className={`rounded-lg p-2 ${toneClassName}`}>
+      <CardContent className="flex min-h-[88px] flex-col items-start justify-center gap-2 p-2 min-[900px]:min-h-0 min-[900px]:flex-row min-[900px]:items-center min-[900px]:gap-3 min-[900px]:p-4">
+        <div className={`rounded-lg p-1.5 min-[900px]:p-2 [&_svg]:h-4 [&_svg]:w-4 min-[900px]:[&_svg]:h-5 min-[900px]:[&_svg]:w-5 ${toneClassName}`}>
           {icon}
         </div>
         <div>
-          <div className="text-2xl font-bold text-white">{value}</div>
-          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
+          <div className="text-xl font-bold text-white min-[900px]:text-2xl">{value}</div>
+          <div className="text-[10px] font-medium uppercase leading-tight tracking-wide text-muted-foreground min-[900px]:text-xs">{label}</div>
         </div>
       </CardContent>
     </Card>

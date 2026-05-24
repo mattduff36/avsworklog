@@ -10,7 +10,27 @@ export async function GET(request: NextRequest) {
   const type = searchParams.get('type') || 'throw';
 
   try {
-    if (type === 'throw') {
+    if (type === 'client') {
+      try {
+        throw new Error('Test client-side error: Button click handler failed');
+      } catch (error) {
+        await logServerError({
+          error: error as Error,
+          request,
+          componentName: 'GET /api/test-error-logging client marker',
+          additionalData: {
+            testType: 'client_marker',
+            endpoint: '/api/test-error-logging',
+            description: 'Test marker used to verify client-triggered error visibility in the debug console',
+          },
+        });
+
+        return NextResponse.json({
+          success: true,
+          message: 'Client error marker logged',
+        });
+      }
+    } else if (type === 'throw') {
       // Test 1: Thrown error
       throw new Error('Test server-side error: Simulated API failure');
     } else if (type === 'catch') {

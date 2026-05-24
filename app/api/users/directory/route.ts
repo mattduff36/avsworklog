@@ -69,14 +69,14 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(Math.max(Number.parseInt(request.nextUrl.searchParams.get('limit') || '200', 10) || 200, 1), 500);
   const offset = Math.max(Number.parseInt(request.nextUrl.searchParams.get('offset') || '0', 10) || 0, 0);
 
-  const fields = ['id', 'full_name', 'employee_id', 'team:org_teams!profiles_team_id_fkey(id, name)'];
+  const fields = ['id', 'full_name', 'employee_id', 'super_admin', 'team:org_teams!profiles_team_id_fkey(id, name)'];
 
   if (includeAllowance) {
     fields.push('annual_holiday_allowance_days');
   }
 
   if (includeRole) {
-    fields.push('role:roles(id, name, display_name, is_manager_admin)');
+    fields.push('role:roles(id, name, display_name, is_manager_admin, is_super_admin)');
   }
 
   const admin = createAdminClient();

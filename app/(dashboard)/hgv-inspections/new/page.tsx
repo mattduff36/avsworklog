@@ -48,6 +48,7 @@ import { useInspectionPhotos } from '@/lib/hooks/useInspectionPhotos';
 import { getInspectionPhotoKey } from '@/lib/inspection-photos';
 import { getReadingDigitGrowthWarning } from '@/lib/utils/readingDigitGrowthWarning';
 import { getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
+import { completeInspectionReminder } from '@/lib/client/complete-inspection-reminder';
 
 const PhotoUpload = dynamic(() => import('@/components/forms/PhotoUpload'), { ssr: false });
 const SignaturePad = dynamic(() => import('@/components/forms/SignaturePad'), { ssr: false });
@@ -1233,6 +1234,16 @@ function NewHgvInspectionContent() {
       }
 
       if (status === 'submitted') {
+        try {
+          await completeInspectionReminder({
+            assetType: 'hgv',
+            assetId: hgvId,
+            assignedTo: selectedEmployeeId,
+          });
+        } catch (reminderError) {
+          console.error('Error completing reminder after HGV daily check submission:', reminderError);
+        }
+
         toast.success('HGV inspection submitted successfully');
         if (typeof window !== 'undefined') {
           window.sessionStorage.removeItem(getInspectionTimerStorageKey(inspectionId));

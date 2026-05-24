@@ -719,25 +719,28 @@ class ErrorLogger {
     this.isProcessing = true;
 
     try {
-      const batch = [...this.queue];
-      this.queue = [];
+      while (this.queue.length > 0) {
+        const batch = [...this.queue];
+        this.queue = [];
 
-      const response = await fetch('/api/errors/log', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'same-origin',
-        keepalive: true,
-        body: JSON.stringify({ logs: batch }),
-      });
+        const response = await fetch('/api/errors/log', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'same-origin',
+          keepalive: true,
+          body: JSON.stringify({ logs: batch }),
+        });
 
-      if (!response.ok) {
-        // Put items back in queue if insert failed
-        this.queue.unshift(...batch);
-        const payload = await response.json().catch(() => ({}));
-        console.warn('Failed to save error logs to database:', payload?.error || `HTTP ${response.status}`);
-      } else {
+        if (!response.ok) {
+          // Put items back in queue if insert failed
+          this.queue.unshift(...batch);
+          const payload = await response.json().catch(() => ({}));
+          console.warn('Failed to save error logs to database:', payload?.error || `HTTP ${response.status}`);
+          break;
+        }
+
         // After successfully logging error, check if we should send daily summary
         this.checkAndSendDailySummary();
       }
