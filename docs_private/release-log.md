@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0526.6.0
+
+**GIT COMMIT MESSAGE**
+`feat(actions): add reminder workflow management`
+
+**WHAT CHANGED**
+Add reminder workflow management.
+
+**COMMITS IN THIS RELEASE**
+- `feat(actions): add reminder workflow management`
+
 ## 0526.5.2
 
 **GIT COMMIT MESSAGE**
