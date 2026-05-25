@@ -23,7 +23,12 @@ import {
   upsertAccountSwitchDevice,
 } from '@/lib/server/account-switch-device';
 
-export type AppAuthSessionSource = 'password_login' | 'pin_unlock' | 'session_bootstrap';
+export type AppAuthSessionSource =
+  | 'password_login'
+  | 'pin_unlock'
+  | 'session_bootstrap'
+  | 'biometric_login'
+  | 'biometric_unlock';
 
 export interface AppAuthSessionRow {
   id: string;
@@ -303,7 +308,7 @@ export async function issueAppSession(
     profileId: options.profileId,
     actorProfileId: options.actorProfileId ?? options.profileId,
     eventType:
-      options.source === 'pin_unlock'
+      options.source === 'pin_unlock' || options.source === 'biometric_unlock'
         ? 'app_session_unlocked'
         : 'app_session_created',
     metadata: {

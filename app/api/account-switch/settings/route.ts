@@ -11,6 +11,7 @@ import {
   buildAccountSwitchErrorResponse,
   getAccountSwitcherDisabledResponse,
 } from '@/lib/server/account-switch-route-helpers';
+import { hasActiveWebAuthnCredentialForDevice } from '@/lib/server/webauthn/credentials';
 
 export async function GET(request: NextRequest) {
   const disabledResponse = getAccountSwitcherDisabledResponse();
@@ -33,6 +34,7 @@ export async function GET(request: NextRequest) {
     let pinConfigured = false;
     let pinLastChangedAt: string | null = null;
     let deviceRegistered = false;
+    let biometricConfigured = false;
 
     if (deviceId) {
       const deviceCredential = await getAccountSwitchDeviceCredential({
@@ -53,6 +55,10 @@ export async function GET(request: NextRequest) {
         pinLockedUntil = null;
         pinLastChangedAt = null;
       }
+      biometricConfigured = await hasActiveWebAuthnCredentialForDevice({
+        profileId: access.userId,
+        rawDeviceId: deviceId,
+      });
     }
 
     const isLocked = isPinLockActive(pinLockedUntil);
@@ -69,6 +75,7 @@ export async function GET(request: NextRequest) {
         pin_is_locked: isLocked,
         pin_last_changed_at: pinLastChangedAt,
         device_registered: deviceRegistered,
+        biometric_configured: biometricConfigured,
       },
     });
   } catch (error) {

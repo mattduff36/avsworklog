@@ -1,9 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import type { PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/browser';
 import { ACCOUNT_SWITCHER_PRD_EPIC_ID } from '@/lib/account-switch/epic';
 import { isAccountSwitcherEnabled } from '@/lib/account-switch/feature-flag';
-import { canUseBiometricUnlock } from '@/lib/account-switch/biometric';
+import {
+  canUseBiometricUnlock,
+  startBiometricRegistration,
+} from '@/lib/account-switch/biometric';
 import {
   getAccountSwitchDeviceLabel,
   getOrCreateAccountSwitchDeviceId,
@@ -22,6 +26,13 @@ interface AccountSwitchSettingsPayload {
   pin_locked_until: string | null;
   pin_is_locked: boolean;
   pin_last_changed_at: string | null;
+  biometric_configured?: boolean;
+}
+
+interface WebAuthnOptionsResponse {
+  challenge?: string;
+  error?: string;
+  [key: string]: unknown;
 }
 
 const PIN_LENGTH = 4;
@@ -36,13 +47,14 @@ export function AccountSwitcherSettingsCard() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [savingBiometric, setSavingBiometric] = useState(false);
+  const [biometricSupported, setBiometricSupported] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [resetPassword, setResetPassword] = useState('');
   const [newPin, setNewPin] = useState('');
   const isFeatureEnabled = isAccountSwitcherEnabled();
-  const biometricSupported = canUseBiometricUnlock();
 
   async function loadSettings() {
     if (!isFeatureEnabled) return;
@@ -80,6 +92,21 @@ export function AccountSwitcherSettingsCard() {
   useEffect(() => {
     void loadSettings();
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    void canUseBiometricUnlock()
+      .then((isSupported) => {
+        if (mounted) setBiometricSupported(isSupported);
+      })
+      .catch(() => {
+        if (mounted) setBiometricSupported(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   if (!isFeatureEnabled) return null;
@@ -170,6 +197,76 @@ export function AccountSwitcherSettingsCard() {
     }
   }
 
+  async function getRegistrationOptions(): Promise<WebAuthnOptionsResponse> {
+    const response = await fetch('/api/auth/webauthn/register/options', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ deviceId }),
+    });
+    const payload = (await response.json()) as WebAuthnOptionsResponse;
+    if (!response.ok || !payload.challenge) {
+      throw new Error(payload.error || 'Unable to start biometric setup');
+    }
+    return payload;
+  }
+
+  async function handleSaveBiometric() {
+    setSavingBiometric(true);
+    try {
+      const options = (await getRegistrationOptions()) as PublicKeyCredentialCreationOptionsJSON &
+        WebAuthnOptionsResponse;
+      const registrationResponse = await startBiometricRegistration(options);
+      const verifyResponse = await fetch('/api/auth/webauthn/register/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          response: registrationResponse,
+          challenge: options.challenge,
+          deviceId,
+        }),
+      });
+      const payload = (await verifyResponse.json().catch(() => ({}))) as { error?: string };
+      if (!verifyResponse.ok) {
+        throw new Error(payload.error || 'Unable to enable biometric login');
+      }
+
+      toast.success('Biometric login enabled for this device');
+      await loadSettings();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to enable biometric login');
+    } finally {
+      setSavingBiometric(false);
+    }
+  }
+
+  async function handleRemoveBiometric() {
+    setSavingBiometric(true);
+    try {
+      const response = await fetch('/api/auth/webauthn/revoke-device', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ deviceId }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error || 'Unable to remove biometric login');
+      }
+
+      toast.success('Biometric login removed for this device');
+      await loadSettings();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to remove biometric login');
+    } finally {
+      setSavingBiometric(false);
+    }
+  }
+
   return (
     <Card data-prd-epic-id={ACCOUNT_SWITCHER_PRD_EPIC_ID}>
       <CardHeader>
@@ -194,6 +291,12 @@ export function AccountSwitcherSettingsCard() {
                 </span>
               </p>
               <p>
+                Biometrics:{' '}
+                <span className="font-medium text-foreground">
+                  {settings?.biometric_configured ? 'Configured' : 'Not configured'}
+                </span>
+              </p>
+              <p>
                 Lock status:{' '}
                 <span className="font-medium text-foreground">
                   {settings?.pin_is_locked ? `Locked until ${settings?.pin_locked_until}` : 'Unlocked'}
@@ -203,9 +306,33 @@ export function AccountSwitcherSettingsCard() {
           )}
         </div>
 
-        <p className="text-xs text-muted-foreground">
-          Biometric quick unlock {biometricSupported ? 'is supported on this device and will be enabled in a future release.' : 'is not currently available on this device/browser.'}
-        </p>
+        <div className="space-y-3 rounded-md border border-border/60 p-4">
+          <h3 className="font-semibold">Biometric login</h3>
+          <p className="text-xs text-muted-foreground">
+            {biometricSupported
+              ? 'This device supports biometric login. You can use it for sign-in and quick unlock.'
+              : 'Biometric login is not currently available on this device/browser.'}
+          </p>
+          {biometricSupported ? (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                onClick={() => void handleSaveBiometric()}
+                disabled={savingBiometric || settings?.biometric_configured === true}
+              >
+                {savingBiometric ? 'Working...' : 'Enable biometrics'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void handleRemoveBiometric()}
+                disabled={savingBiometric || settings?.biometric_configured !== true}
+              >
+                Remove biometrics
+              </Button>
+            </div>
+          ) : null}
+        </div>
 
         <div className="space-y-3 rounded-md border border-border/60 p-4">
           <h3 className="font-semibold">Set up PIN</h3>

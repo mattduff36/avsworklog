@@ -807,7 +807,7 @@ export type Database = {
           id: string
           profile_id: string
           actor_profile_id: string
-          event_type: 'pin_setup' | 'pin_reset' | 'pin_verify_success' | 'pin_verify_failed' | 'pin_locked' | 'session_registered' | 'session_switch_success' | 'session_switch_failed' | 'shortcut_removed' | 'device_registered' | 'device_revoked' | 'password_fallback_success' | 'password_fallback_failed' | 'app_session_created' | 'app_session_locked' | 'app_session_unlocked' | 'app_session_revoked' | 'device_pin_cleared'
+          event_type: 'pin_setup' | 'pin_reset' | 'pin_verify_success' | 'pin_verify_failed' | 'pin_locked' | 'session_registered' | 'session_switch_success' | 'session_switch_failed' | 'shortcut_removed' | 'device_registered' | 'device_revoked' | 'password_fallback_success' | 'password_fallback_failed' | 'app_session_created' | 'app_session_locked' | 'app_session_unlocked' | 'app_session_revoked' | 'device_pin_cleared' | 'biometric_registration_success' | 'biometric_registration_failed' | 'biometric_login_success' | 'biometric_login_failed' | 'biometric_unlock_success' | 'biometric_unlock_failed' | 'biometric_prompt_dismissed' | 'biometric_credential_revoked'
           metadata: Json
           created_at: string
         }
@@ -815,7 +815,7 @@ export type Database = {
           id?: string
           profile_id: string
           actor_profile_id?: string | null
-          event_type: 'pin_setup' | 'pin_reset' | 'pin_verify_success' | 'pin_verify_failed' | 'pin_locked' | 'session_registered' | 'session_switch_success' | 'session_switch_failed' | 'shortcut_removed' | 'device_registered' | 'device_revoked' | 'password_fallback_success' | 'password_fallback_failed' | 'app_session_created' | 'app_session_locked' | 'app_session_unlocked' | 'app_session_revoked' | 'device_pin_cleared'
+          event_type: 'pin_setup' | 'pin_reset' | 'pin_verify_success' | 'pin_verify_failed' | 'pin_locked' | 'session_registered' | 'session_switch_success' | 'session_switch_failed' | 'shortcut_removed' | 'device_registered' | 'device_revoked' | 'password_fallback_success' | 'password_fallback_failed' | 'app_session_created' | 'app_session_locked' | 'app_session_unlocked' | 'app_session_revoked' | 'device_pin_cleared' | 'biometric_registration_success' | 'biometric_registration_failed' | 'biometric_login_success' | 'biometric_login_failed' | 'biometric_unlock_success' | 'biometric_unlock_failed' | 'biometric_prompt_dismissed' | 'biometric_credential_revoked'
           metadata?: Json
           created_at?: string
         }
@@ -823,7 +823,7 @@ export type Database = {
           id?: string
           profile_id?: string
           actor_profile_id?: string | null
-          event_type?: 'pin_setup' | 'pin_reset' | 'pin_verify_success' | 'pin_verify_failed' | 'pin_locked' | 'session_registered' | 'session_switch_success' | 'session_switch_failed' | 'shortcut_removed' | 'device_registered' | 'device_revoked' | 'password_fallback_success' | 'password_fallback_failed' | 'app_session_created' | 'app_session_locked' | 'app_session_unlocked' | 'app_session_revoked' | 'device_pin_cleared'
+          event_type?: 'pin_setup' | 'pin_reset' | 'pin_verify_success' | 'pin_verify_failed' | 'pin_locked' | 'session_registered' | 'session_switch_success' | 'session_switch_failed' | 'shortcut_removed' | 'device_registered' | 'device_revoked' | 'password_fallback_success' | 'password_fallback_failed' | 'app_session_created' | 'app_session_locked' | 'app_session_unlocked' | 'app_session_revoked' | 'device_pin_cleared' | 'biometric_registration_success' | 'biometric_registration_failed' | 'biometric_login_success' | 'biometric_login_failed' | 'biometric_unlock_success' | 'biometric_unlock_failed' | 'biometric_prompt_dismissed' | 'biometric_credential_revoked'
           metadata?: Json
           created_at?: string
         }
@@ -1155,7 +1155,7 @@ export type Database = {
           profile_id: string
           device_id: string
           session_secret_hash: string
-          session_source: 'password_login' | 'pin_unlock' | 'session_bootstrap'
+          session_source: 'password_login' | 'pin_unlock' | 'session_bootstrap' | 'biometric_login' | 'biometric_unlock'
           remember_me: boolean
           locked_at: string
           last_seen_at: string
@@ -1174,7 +1174,7 @@ export type Database = {
           profile_id: string
           device_id?: string | null
           session_secret_hash: string
-          session_source: 'password_login' | 'pin_unlock' | 'session_bootstrap'
+          session_source: 'password_login' | 'pin_unlock' | 'session_bootstrap' | 'biometric_login' | 'biometric_unlock'
           remember_me?: boolean
           locked_at?: string | null
           last_seen_at?: string
@@ -1193,7 +1193,7 @@ export type Database = {
           profile_id?: string
           device_id?: string | null
           session_secret_hash?: string
-          session_source?: 'password_login' | 'pin_unlock' | 'session_bootstrap'
+          session_source?: 'password_login' | 'pin_unlock' | 'session_bootstrap' | 'biometric_login' | 'biometric_unlock'
           remember_me?: boolean
           locked_at?: string | null
           last_seen_at?: string
@@ -1227,6 +1227,168 @@ export type Database = {
             columns: ['replaced_by_session_id']
             isOneToOne: false
             referencedRelation: 'app_auth_sessions'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      webauthn_challenges: {
+        Row: {
+          id: string
+          profile_id: string | null
+          device_id: string | null
+          challenge: string
+          challenge_type: 'registration' | 'authentication' | 'account_switch_authentication'
+          webauthn_user_id: string | null
+          expires_at: string
+          consumed_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          profile_id?: string | null
+          device_id?: string | null
+          challenge: string
+          challenge_type: 'registration' | 'authentication' | 'account_switch_authentication'
+          webauthn_user_id?: string | null
+          expires_at: string
+          consumed_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          profile_id?: string | null
+          device_id?: string | null
+          challenge?: string
+          challenge_type?: 'registration' | 'authentication' | 'account_switch_authentication'
+          webauthn_user_id?: string | null
+          expires_at?: string
+          consumed_at?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'webauthn_challenges_device_id_fkey'
+            columns: ['device_id']
+            isOneToOne: false
+            referencedRelation: 'account_switch_devices'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'webauthn_challenges_profile_id_fkey'
+            columns: ['profile_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      webauthn_credentials: {
+        Row: {
+          id: string
+          profile_id: string
+          device_id: string | null
+          credential_id: string
+          public_key: string
+          webauthn_user_id: string
+          counter: number
+          transports: string[] | null
+          device_type: 'singleDevice' | 'multiDevice'
+          backed_up: boolean
+          authenticator_attachment: 'platform'
+          name: string | null
+          last_used_at: string | null
+          revoked_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          profile_id: string
+          device_id?: string | null
+          credential_id: string
+          public_key: string
+          webauthn_user_id: string
+          counter?: number
+          transports?: string[] | null
+          device_type: 'singleDevice' | 'multiDevice'
+          backed_up?: boolean
+          authenticator_attachment?: 'platform'
+          name?: string | null
+          last_used_at?: string | null
+          revoked_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          profile_id?: string
+          device_id?: string | null
+          credential_id?: string
+          public_key?: string
+          webauthn_user_id?: string
+          counter?: number
+          transports?: string[] | null
+          device_type?: 'singleDevice' | 'multiDevice'
+          backed_up?: boolean
+          authenticator_attachment?: 'platform'
+          name?: string | null
+          last_used_at?: string | null
+          revoked_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'webauthn_credentials_device_id_fkey'
+            columns: ['device_id']
+            isOneToOne: false
+            referencedRelation: 'account_switch_devices'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'webauthn_credentials_profile_id_fkey'
+            columns: ['profile_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      webauthn_prompt_preferences: {
+        Row: {
+          profile_id: string
+          device_id: string
+          dismissed_at: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          profile_id: string
+          device_id: string
+          dismissed_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          profile_id?: string
+          device_id?: string
+          dismissed_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'webauthn_prompt_preferences_device_id_fkey'
+            columns: ['device_id']
+            isOneToOne: false
+            referencedRelation: 'account_switch_devices'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'webauthn_prompt_preferences_profile_id_fkey'
+            columns: ['profile_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
             referencedColumns: ['id']
           },
         ]
@@ -6113,11 +6275,11 @@ export type Database = {
       check__absences__status: 'pending' | 'approved' | 'processed' | 'rejected' | 'cancelled'
       check__absences_archive__half_day_session: 'AM' | 'PM'
       check__absences_archive__status: 'pending' | 'approved' | 'processed' | 'rejected' | 'cancelled'
-      check__account_switch_audit_events__event_type: 'pin_setup' | 'pin_reset' | 'pin_verify_success' | 'pin_verify_failed' | 'pin_locked' | 'session_registered' | 'session_switch_success' | 'session_switch_failed' | 'shortcut_removed' | 'device_registered' | 'device_revoked' | 'password_fallback_success' | 'password_fallback_failed' | 'app_session_created' | 'app_session_locked' | 'app_session_unlocked' | 'app_session_revoked' | 'device_pin_cleared'
+      check__account_switch_audit_events__event_type: 'pin_setup' | 'pin_reset' | 'pin_verify_success' | 'pin_verify_failed' | 'pin_locked' | 'session_registered' | 'session_switch_success' | 'session_switch_failed' | 'shortcut_removed' | 'device_registered' | 'device_revoked' | 'password_fallback_success' | 'password_fallback_failed' | 'app_session_created' | 'app_session_locked' | 'app_session_unlocked' | 'app_session_revoked' | 'device_pin_cleared' | 'biometric_registration_success' | 'biometric_registration_failed' | 'biometric_login_success' | 'biometric_login_failed' | 'biometric_unlock_success' | 'biometric_unlock_failed' | 'biometric_prompt_dismissed' | 'biometric_credential_revoked'
       check__actions__action_type: 'inspection_defect' | 'workshop_vehicle_task' | 'manager_action'
       check__actions__priority: 'low' | 'medium' | 'high' | 'urgent'
       check__actions__status: 'pending' | 'in_progress' | 'logged' | 'on_hold' | 'completed'
-      check__app_auth_sessions__session_source: 'password_login' | 'pin_unlock' | 'session_bootstrap'
+      check__app_auth_sessions__session_source: 'password_login' | 'pin_unlock' | 'session_bootstrap' | 'biometric_login' | 'biometric_unlock'
       check__customers__status: 'active' | 'inactive'
       check__dvla_sync_log__sync_status: 'success' | 'error'
       check__dvla_sync_log__trigger_type: 'manual' | 'bulk' | 'automatic' | 'auto_on_create'

@@ -3,11 +3,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Delete, Lock, Plus } from 'lucide-react';
+import type { PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/browser';
+import { Delete, Fingerprint, Lock, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { broadcastAuthStateChange, clearLegacyAccountSwitchClientState } from '@/lib/app-auth/client';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { isAccountSwitcherEnabled } from '@/lib/account-switch/feature-flag';
+import {
+  canUseBiometricUnlock,
+  startBiometricAuthentication,
+} from '@/lib/account-switch/biometric';
 import { invalidateCachedDataToken } from '@/lib/supabase/client';
 import {
   getAccountSwitchDeviceLabel,
@@ -28,6 +33,7 @@ interface AccountSwitchSettingsResponse {
   code?: string;
   settings?: {
     pin_configured?: boolean;
+    biometric_configured?: boolean;
   };
   error?: string;
   details?: {
@@ -41,6 +47,13 @@ interface DeviceProfileSummary {
   role_name: string | null;
   avatar_url?: string | null;
   email?: string | null;
+  biometric_configured?: boolean;
+}
+
+interface WebAuthnOptionsResponse {
+  challenge?: string;
+  error?: string;
+  [key: string]: unknown;
 }
 
 interface DeviceProfilesResponse {
@@ -81,6 +94,7 @@ export default function LockPage() {
   const [submitting, setSubmitting] = useState(false);
   const [pinLockedUntil, setPinLockedUntil] = useState<string | null>(null);
   const [activePinKey, setActivePinKey] = useState<string | null>(null);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
   const activePinKeyTimeoutRef = useRef<number | null>(null);
   const isFeatureEnabled = useMemo(() => isAccountSwitcherEnabled(), []);
 
@@ -98,6 +112,8 @@ export default function LockPage() {
     () => profiles.find((item) => item.profile_id === selectedProfileId) || null,
     [profiles, selectedProfileId]
   );
+  const selectedProfileHasBiometric =
+    biometricAvailable && selectedProfile?.biometric_configured === true;
 
   const keypadDisabled = loadingState || submitting;
 
@@ -112,6 +128,21 @@ export default function LockPage() {
     }
     setProfiles(payload.profiles || []);
   }, [deviceId]);
+
+  useEffect(() => {
+    let mounted = true;
+    void canUseBiometricUnlock()
+      .then((isAvailable) => {
+        if (mounted) setBiometricAvailable(isAvailable);
+      })
+      .catch(() => {
+        if (mounted) setBiometricAvailable(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (authLoading) return;
@@ -159,7 +190,10 @@ export default function LockPage() {
 
         await reloadProfiles();
 
-        if (settingsPayload.settings?.pin_configured) {
+        if (
+          settingsPayload.settings?.pin_configured ||
+          settingsPayload.settings?.biometric_configured
+        ) {
           setMode('locked');
           if (forcePinSetup && currentProfileId) {
             setSelectedProfileId(currentProfileId);
@@ -169,7 +203,7 @@ export default function LockPage() {
           setMode('set-pin-enter');
           setSelectedProfileId(currentProfileId);
           setPinModalOpen(true);
-          toast.info('Set a 4-digit PIN before using the lock screen on this device.');
+          toast.info('Set a 4-digit PIN or enable biometrics before using the lock screen on this device.');
         }
       } catch (error) {
         toast.error(error instanceof Error ? error.message : 'Failed to load lock screen');
@@ -334,6 +368,55 @@ export default function LockPage() {
     handleBackspace();
   }, [flashPinKey, handleBackspace]);
 
+  const handleBiometricUnlock = useCallback(async (): Promise<void> => {
+    if (!selectedProfileId) return;
+
+    setSubmitting(true);
+    try {
+      const optionsResponse = await fetch('/api/account-switch/biometric/options', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          targetProfileId: selectedProfileId,
+          deviceId,
+        }),
+      });
+      const options = (await optionsResponse.json()) as PublicKeyCredentialRequestOptionsJSON &
+        WebAuthnOptionsResponse;
+      if (!optionsResponse.ok || !options.challenge) {
+        throw new Error(options.error || 'Unable to start biometric unlock');
+      }
+
+      const authenticationResponse = await startBiometricAuthentication(options);
+      const verifyResponse = await fetch('/api/account-switch/biometric/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          targetProfileId: selectedProfileId,
+          deviceId,
+          challenge: options.challenge,
+          response: authenticationResponse,
+        }),
+      });
+      const payload = (await verifyResponse.json().catch(() => ({}))) as { error?: string };
+      if (!verifyResponse.ok) {
+        throw new Error(payload.error || 'Biometric unlock failed');
+      }
+
+      invalidateCachedDataToken();
+      broadcastAuthStateChange('biometric_unlock');
+      window.location.replace(selectedProfileId === currentProfileId ? returnTo : '/dashboard');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to unlock with biometrics');
+    } finally {
+      setSubmitting(false);
+    }
+  }, [currentProfileId, deviceId, returnTo, selectedProfileId]);
+
   const getPinButtonClassName = useCallback((baseClassName: string, keyId: string): string => {
     return activePinKey === keyId ? `${baseClassName} ${PIN_KEY_FLASH_CLASS}` : baseClassName;
   }, [activePinKey]);
@@ -438,7 +521,7 @@ export default function LockPage() {
                   submitting ? 'pointer-events-none opacity-70' : ''
                 }`}
               >
-                <div className="flex aspect-square items-center justify-center rounded-2xl border border-slate-700/70 bg-[#151935] shadow-lg transition-colors hover:border-slate-500">
+                <div className="relative flex aspect-square items-center justify-center rounded-2xl border border-slate-700/70 bg-[#151935] shadow-lg transition-colors hover:border-slate-500">
                   {deviceProfile.avatar_url ? (
                     <div className="relative h-full w-full overflow-hidden rounded-2xl">
                       <Image
@@ -454,6 +537,11 @@ export default function LockPage() {
                       {getInitials(deviceProfile.full_name)}
                     </div>
                   )}
+                  {biometricAvailable && deviceProfile.biometric_configured ? (
+                    <span className="absolute right-2 top-2 rounded-full bg-avs-yellow p-1 text-slate-950">
+                      <Fingerprint className="h-3.5 w-3.5" />
+                    </span>
+                  ) : null}
                 </div>
                 <p className="mt-2 text-sm font-semibold tracking-tight text-white truncate">
                   {deviceProfile.full_name || 'Account'}
@@ -503,11 +591,26 @@ export default function LockPage() {
             <DialogDescription>
               {mode === 'set-pin-enter' && 'Enter a 4-digit PIN for this device.'}
               {mode === 'set-pin-confirm' && 'Re-enter the PIN to confirm it.'}
-              {mode === 'locked' && 'Enter the 4-digit PIN for the selected profile.'}
+              {mode === 'locked' &&
+                (selectedProfileHasBiometric
+                  ? 'Use this device biometrics or enter the 4-digit PIN for the selected profile.'
+                  : 'Enter the 4-digit PIN for the selected profile.')}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
+            {mode === 'locked' && selectedProfileHasBiometric ? (
+              <Button
+                type="button"
+                className="h-12 w-full"
+                onClick={() => void handleBiometricUnlock()}
+                disabled={submitting}
+              >
+                <Fingerprint className="mr-2 h-4 w-4" />
+                {submitting ? 'Unlocking...' : 'Unlock with biometrics'}
+              </Button>
+            ) : null}
+
             <div className="flex items-center justify-center gap-2">
               {Array.from({ length: PIN_LENGTH }).map((_, index) => (
                 <div

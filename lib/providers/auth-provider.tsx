@@ -100,7 +100,12 @@ interface AuthContextValue {
   signIn: (
     email: string,
     password: string,
-    options?: { rememberMe?: boolean; deviceId?: string | null; deviceLabel?: string | null }
+    options?: {
+      rememberMe?: boolean;
+      deviceId?: string | null;
+      deviceLabel?: string | null;
+      deferRedirect?: boolean;
+    }
   ) => Promise<{
     data: {
       error?: string;
@@ -704,7 +709,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const signIn = useCallback(async (
     email: string,
     password: string,
-    options?: { rememberMe?: boolean; deviceId?: string | null; deviceLabel?: string | null }
+    options?: {
+      rememberMe?: boolean;
+      deviceId?: string | null;
+      deviceLabel?: string | null;
+      deferRedirect?: boolean;
+    }
   ) => {
     const response = await fetch('/api/auth/login', {
       method: 'POST',
@@ -734,7 +744,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     broadcastAuthStateChange('signed_in');
-    await loadAuthSession({ silent: true, reason: 'sign_in' });
+    if (!options?.deferRedirect) {
+      await loadAuthSession({ silent: true, reason: 'sign_in' });
+    }
     return {
       data: payload,
       error: null,

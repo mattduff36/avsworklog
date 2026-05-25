@@ -40,6 +40,8 @@ export interface AccountSwitchDeviceProfileSummary {
   pin_last_changed_at: string | null;
   pin_failed_attempts: number;
   pin_locked_until: string | null;
+  biometric_configured: boolean;
+  biometric_last_used_at: string | null;
 }
 
 interface AccountSwitchDeviceListRow {
@@ -362,10 +364,25 @@ export async function listAccountSwitchDeviceProfiles(
     (credentialRows || []).map((row) => [row.device_id, row])
   );
 
+  const { data: biometricRows, error: biometricError } = await supabaseAdmin
+    .from('webauthn_credentials')
+    .select('device_id, profile_id, last_used_at')
+    .in('device_id', deviceIds)
+    .is('revoked_at', null);
+
+  if (biometricError) {
+    throw new Error(biometricError.message);
+  }
+
+  const biometricByDeviceId = new Map(
+    (biometricRows || []).map((row) => [row.device_id, row])
+  );
+
   return normalizedDeviceRows
     .reduce<AccountSwitchDeviceProfileSummary[]>((acc, deviceRow) => {
       const credential = credentialByDeviceId.get(deviceRow.id);
-      if (!credential) {
+      const biometricCredential = biometricByDeviceId.get(deviceRow.id);
+      if (!credential && !biometricCredential) {
         return acc;
       }
 
@@ -381,9 +398,11 @@ export async function listAccountSwitchDeviceProfiles(
         role_name: roleValue?.name || null,
         last_authenticated_at: null,
         last_locked_at: null,
-        pin_last_changed_at: credential.pin_last_changed_at || null,
-        pin_failed_attempts: credential.pin_failed_attempts || 0,
-        pin_locked_until: credential.pin_locked_until || null,
+        pin_last_changed_at: credential?.pin_last_changed_at || null,
+        pin_failed_attempts: credential?.pin_failed_attempts || 0,
+        pin_locked_until: credential?.pin_locked_until || null,
+        biometric_configured: Boolean(biometricCredential),
+        biometric_last_used_at: biometricCredential?.last_used_at || null,
       });
       return acc;
     }, [])

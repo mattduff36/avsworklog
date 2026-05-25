@@ -1,18 +1,56 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import type {
+  PublicKeyCredentialCreationOptionsJSON,
+  PublicKeyCredentialRequestOptionsJSON,
+} from '@simplewebauthn/browser';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { isAccountSwitcherEnabled } from '@/lib/account-switch/feature-flag';
 import {
   getAccountSwitchDeviceLabel,
   getOrCreateAccountSwitchDeviceId,
 } from '@/lib/account-switch/device';
+import {
+  canUseBiometricUnlock,
+  startBiometricAuthentication,
+  startBiometricRegistration,
+} from '@/lib/account-switch/biometric';
 import { clearLegacyAccountSwitchClientState } from '@/lib/app-auth/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
-import { Lock } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Fingerprint, Lock } from 'lucide-react';
+import { toast } from 'sonner';
+
+interface WebAuthnOptionsResponse {
+  challenge?: string;
+  error?: string;
+  [key: string]: unknown;
+}
+
+interface WebAuthnStatusResponse {
+  credentials_configured?: boolean;
+  prompt_dismissed?: boolean;
+  error?: string;
+}
+
+interface AuthResponsePayload {
+  profile?: { must_change_password?: boolean | null };
+  error?: string;
+}
+
+function isSafeRedirectTarget(value: string | null): value is string {
+  return Boolean(value && value.startsWith('/') && !value.startsWith('/lock'));
+}
 
 export default function LoginPage() {
   const { signIn } = useAuth();
@@ -21,6 +59,10 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricPromptOpen, setBiometricPromptOpen] = useState(false);
+  const [biometricWorking, setBiometricWorking] = useState(false);
+  const [pendingRedirectUrl, setPendingRedirectUrl] = useState('/dashboard');
 
   useEffect(() => {
     const savedPreference = localStorage.getItem('rememberMe');
@@ -29,17 +71,78 @@ export default function LoginPage() {
     }
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+
+    void canUseBiometricUnlock()
+      .then((isAvailable) => {
+        if (mounted) setBiometricAvailable(isAvailable);
+      })
+      .catch(() => {
+        if (mounted) setBiometricAvailable(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  function getPostLoginRedirect(payload?: AuthResponsePayload | null): string {
+    if (payload?.profile?.must_change_password === true) return '/change-password';
+
+    const redirectTarget =
+      typeof window === 'undefined'
+        ? null
+        : new URL(window.location.href).searchParams.get('redirect');
+    if (isSafeRedirectTarget(redirectTarget)) return redirectTarget;
+
+    return '/dashboard';
+  }
+
+  async function shouldOfferBiometricSetup(deviceId: string): Promise<boolean> {
+    if (!biometricAvailable) return false;
+
+    const response = await fetch(
+      `/api/auth/webauthn/status?deviceId=${encodeURIComponent(deviceId)}`,
+      { cache: 'no-store' }
+    );
+    const payload = (await response.json().catch(() => ({}))) as WebAuthnStatusResponse;
+    if (!response.ok) return false;
+
+    return payload.credentials_configured !== true && payload.prompt_dismissed !== true;
+  }
+
+  async function getWebAuthnOptions(endpoint: string, body?: Record<string, unknown>) {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const payload = (await response.json()) as WebAuthnOptionsResponse;
+    if (!response.ok || !payload.challenge) {
+      throw new Error(payload.error || 'Unable to start biometric authentication');
+    }
+    return payload;
+  }
+
+  function redirectAfterAuth(target = pendingRedirectUrl): void {
+    window.location.replace(target);
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
-      const accountSwitcherEnabled = isAccountSwitcherEnabled();
-      const { error } = await signIn(email, password, {
+      const deviceId = getOrCreateAccountSwitchDeviceId();
+      const { data, error } = await signIn(email, password, {
         rememberMe,
-        deviceId: accountSwitcherEnabled ? getOrCreateAccountSwitchDeviceId() : null,
-        deviceLabel: accountSwitcherEnabled ? getAccountSwitchDeviceLabel() : null,
+        deviceId,
+        deviceLabel: getAccountSwitchDeviceLabel(),
+        deferRedirect: true,
       });
 
       if (error) {
@@ -50,12 +153,112 @@ export default function LoginPage() {
       clearLegacyAccountSwitchClientState();
 
       localStorage.setItem('rememberMe', rememberMe ? 'true' : 'false');
+      const redirectUrl = getPostLoginRedirect(data);
+      if (redirectUrl === '/change-password') {
+        redirectAfterAuth(redirectUrl);
+        return;
+      }
+
+      setPendingRedirectUrl(redirectUrl);
+      if (await shouldOfferBiometricSetup(deviceId)) {
+        setBiometricPromptOpen(true);
+        return;
+      }
+
+      redirectAfterAuth(redirectUrl);
     } catch {
       setError('An unexpected error occurred');
     } finally {
       setLoading(false);
     }
   };
+
+  async function handleEnableBiometricLogin(): Promise<void> {
+    const deviceId = getOrCreateAccountSwitchDeviceId();
+    setBiometricWorking(true);
+    try {
+      const options = (await getWebAuthnOptions('/api/auth/webauthn/register/options', {
+        deviceId,
+      })) as PublicKeyCredentialCreationOptionsJSON & WebAuthnOptionsResponse;
+      const registrationResponse = await startBiometricRegistration(options);
+      const verifyResponse = await fetch('/api/auth/webauthn/register/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          response: registrationResponse,
+          challenge: options.challenge,
+          deviceId,
+        }),
+      });
+      const payload = (await verifyResponse.json().catch(() => ({}))) as { error?: string };
+      if (!verifyResponse.ok) {
+        throw new Error(payload.error || 'Unable to enable biometric login');
+      }
+
+      toast.success('Biometric login enabled on this device');
+      redirectAfterAuth();
+    } catch (setupError) {
+      toast.error(setupError instanceof Error ? setupError.message : 'Unable to enable biometric login');
+    } finally {
+      setBiometricWorking(false);
+    }
+  }
+
+  async function handleDismissBiometricPrompt(): Promise<void> {
+    const deviceId = getOrCreateAccountSwitchDeviceId();
+    setBiometricWorking(true);
+    try {
+      await fetch('/api/auth/webauthn/prompt/dismiss', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ deviceId }),
+      });
+    } finally {
+      setBiometricWorking(false);
+      redirectAfterAuth();
+    }
+  }
+
+  async function handleBiometricLogin(): Promise<void> {
+    const deviceId = getOrCreateAccountSwitchDeviceId();
+    setError('');
+    setLoading(true);
+    try {
+      const options = (await getWebAuthnOptions(
+        '/api/auth/webauthn/login/options'
+      )) as PublicKeyCredentialRequestOptionsJSON & WebAuthnOptionsResponse;
+      const authenticationResponse = await startBiometricAuthentication(options);
+      const verifyResponse = await fetch('/api/auth/webauthn/login/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          response: authenticationResponse,
+          challenge: options.challenge,
+          rememberMe,
+          deviceId,
+          deviceLabel: getAccountSwitchDeviceLabel(),
+        }),
+      });
+      const payload = (await verifyResponse.json().catch(() => ({}))) as AuthResponsePayload;
+      if (!verifyResponse.ok) {
+        throw new Error(payload.error || 'Biometric login failed');
+      }
+
+      clearLegacyAccountSwitchClientState();
+      localStorage.setItem('rememberMe', rememberMe ? 'true' : 'false');
+      redirectAfterAuth(getPostLoginRedirect(payload));
+    } catch (loginError) {
+      setError(loginError instanceof Error ? loginError.message : 'Biometric login failed');
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="h-dvh sm:h-auto sm:min-h-screen flex items-start justify-center px-4 pb-4 pt-0 sm:pt-16 md:pt-24 relative overflow-y-auto overflow-x-hidden bg-slate-950">
@@ -145,6 +348,19 @@ export default function LoginPage() {
               >
                 {loading ? 'Signing in...' : 'Sign In'}
               </Button>
+
+              {biometricAvailable ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-12 w-full border-slate-600 bg-slate-900/40 text-white hover:bg-slate-800"
+                  disabled={loading}
+                  onClick={() => void handleBiometricLogin()}
+                >
+                  <Fingerprint className="mr-2 h-4 w-4" />
+                  Use biometrics
+                </Button>
+              ) : null}
             </form>
           </CardContent>
         </Card>
@@ -153,6 +369,44 @@ export default function LoginPage() {
           <p>Contact your administrator for account access or password resets.</p>
         </div>
       </div>
+
+      <Dialog
+        open={biometricPromptOpen}
+        onOpenChange={(open) => {
+          if (open) {
+            setBiometricPromptOpen(true);
+            return;
+          }
+          if (!biometricWorking) void handleDismissBiometricPrompt();
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enable Biometric Login?</DialogTitle>
+            <DialogDescription>
+              This device supports biometric login. You can use this device&apos;s biometrics to
+              sign in faster next time.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={biometricWorking}
+              onClick={() => void handleDismissBiometricPrompt()}
+            >
+              Not now
+            </Button>
+            <Button
+              type="button"
+              disabled={biometricWorking}
+              onClick={() => void handleEnableBiometricLogin()}
+            >
+              {biometricWorking ? 'Setting up...' : 'Enable biometric login'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

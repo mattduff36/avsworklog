@@ -18,7 +18,15 @@ export type AccountSwitchAuditEventType =
   | 'app_session_locked'
   | 'app_session_unlocked'
   | 'app_session_revoked'
-  | 'device_pin_cleared';
+  | 'device_pin_cleared'
+  | 'biometric_registration_success'
+  | 'biometric_registration_failed'
+  | 'biometric_login_success'
+  | 'biometric_login_failed'
+  | 'biometric_unlock_success'
+  | 'biometric_unlock_failed'
+  | 'biometric_prompt_dismissed'
+  | 'biometric_credential_revoked';
 
 export async function createAccountSwitchAuditEvent({
   profileId,
