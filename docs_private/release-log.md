@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0526.8.0
+
+**GIT COMMIT MESSAGE**
+`feat(inspections): update inspection workflows, database migrations, and 2 more areas`
+
+**WHAT CHANGED**
+Update inspection workflows, database migrations, and 2 more areas.
+
+**COMMITS IN THIS RELEASE**
+- `feat(inspections): update inspection workflows, database migrations, and 2 more areas`
+
 ## 0526.7.3
 
 **GIT COMMIT MESSAGE**
