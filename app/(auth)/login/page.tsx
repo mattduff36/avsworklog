@@ -64,7 +64,7 @@ export default function LoginPage() {
         <div className="absolute inset-0 bg-[linear-gradient(rgba(241,214,74,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(241,214,74,0.03)_1px,transparent_1px)] bg-[size:64px_64px]" />
       </div>
 
-      <div className="w-full max-w-lg relative z-10 translate-y-[clamp(1.5rem,8svh,3.75rem)] sm:translate-y-0">
+      <div className="w-full max-w-lg relative z-10 translate-y-[clamp(1.5rem,10svh,5rem)] sm:translate-y-0">
         {/* AVS Yellow Icon */}
         <div className="flex justify-center mb-6">
           <div className="bg-avs-yellow rounded-2xl p-5 shadow-lg shadow-avs-yellow/20">
