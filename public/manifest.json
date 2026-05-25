@@ -2,11 +2,12 @@
   "name": "Squires",
   "short_name": "Squires",
   "description": "Digital forms management for A&V Squires Plant Co. Ltd.",
-  "start_url": "/",
+  "id": "/dashboard",
+  "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",
   "background_color": "#0f172a",
-  "theme_color": "#F1D64A",
+  "theme_color": "#0f172a",
   "orientation": "portrait-primary",
   "icons": [
     {

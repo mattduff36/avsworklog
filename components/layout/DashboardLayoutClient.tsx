@@ -7,6 +7,7 @@ import { DashboardContent } from '@/components/layout/DashboardContent';
 import { MessageBlockingCheck } from '@/components/messages/MessageBlockingCheck';
 import { MobileNavBar } from '@/components/layout/MobileNavBar';
 import { PullToRefresh } from '@/components/layout/PullToRefresh';
+import { PwaShellBridge } from '@/components/layout/PwaShellBridge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { getAccentFromRoute } from '@/lib/theme/getAccentFromRoute';
@@ -256,6 +257,7 @@ function DashboardLayoutShell({
       
       {/* Blocking Message Check (Password Change → Toolbox Talks → Reminders) */}
       <MessageBlockingCheck />
+      <PwaShellBridge />
       
       <Navbar />
       <PullToRefresh />

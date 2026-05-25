@@ -264,6 +264,97 @@ function printProgress(message: string, percent: number): void {
   console.log(`- ${message} [${percent}% complete]`);
 }
 
+interface BuildProgressMilestone {
+  message: string;
+  percent: number;
+  patterns: RegExp[];
+}
+
+const BUILD_PROGRESS_MILESTONES: BuildProgressMilestone[] = [
+  {
+    message: 'Compiling application bundles...',
+    percent: 34,
+    patterns: [/Creating an optimized production build/u],
+  },
+  {
+    message: 'Application bundles compiled.',
+    percent: 38,
+    patterns: [/Compiled successfully/u],
+  },
+  {
+    message: 'Running lint and TypeScript validation...',
+    percent: 41,
+    patterns: [/Linting and checking validity of types/u],
+  },
+  {
+    message: 'Collecting route and page data...',
+    percent: 44,
+    patterns: [/Collecting page data/u],
+  },
+  {
+    message: 'Generating static route output...',
+    percent: 47,
+    patterns: [/Generating static pages/u],
+  },
+  {
+    message: 'Finalising route manifests and build traces...',
+    percent: 49,
+    patterns: [/Finalizing page optimization/u, /Collecting build traces/u],
+  },
+];
+
+function handleBuildProgressLine(line: string, printedMilestones: Set<number>): void {
+  BUILD_PROGRESS_MILESTONES.forEach((milestone, index) => {
+    if (printedMilestones.has(index)) return;
+    if (!milestone.patterns.some((pattern) => pattern.test(line))) return;
+
+    printedMilestones.add(index);
+    printProgress(milestone.message, milestone.percent);
+  });
+}
+
+function runCleanProductionBuildWithProgress(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    printProgress('Starting clean Next.js production build...', 32);
+    const printedMilestones = new Set<number>();
+    let bufferedOutput = '';
+
+    const child = spawn(getExecutable('npm'), ['run', 'build'], {
+      cwd: REPO_ROOT,
+      env: process.env,
+      shell: shouldUseShell('npm'),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    function processOutput(chunk: string | Buffer, writer: NodeJS.WriteStream): void {
+      const text = typeof chunk === 'string' ? chunk : chunk.toString('utf8');
+      writer.write(text);
+      bufferedOutput += text;
+
+      const lines = bufferedOutput.split(/\r?\n/u);
+      bufferedOutput = lines.pop() || '';
+      lines.forEach((line) => handleBuildProgressLine(line, printedMilestones));
+    }
+
+    child.stdout?.on('data', (chunk: string | Buffer) => processOutput(chunk, process.stdout));
+    child.stderr?.on('data', (chunk: string | Buffer) => processOutput(chunk, process.stderr));
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (bufferedOutput) {
+        handleBuildProgressLine(bufferedOutput, printedMilestones);
+      }
+
+      if (code === 0) {
+        printProgress('Build passed.', 50);
+        resolve();
+        return;
+      }
+
+      reject(new Error(`Command failed (npm run build)${typeof code === 'number' ? ` with exit code ${code}` : ''}`));
+    });
+  });
+}
+
 function getLocalProductionBaseUrl(): string {
   return `http://127.0.0.1:${DEV_SERVER_PORT}`;
 }
@@ -791,9 +882,7 @@ async function main(): Promise<void> {
     printProgress(removedBuildOutput ? 'Removed .next build output.' : 'No .next build output to remove.', 30);
 
     console.log('\n==> Run clean production build');
-    printProgress('Running clean production build...', 32);
-    runCommand('npm', ['run', 'build']);
-    printProgress('Build passed.', 50);
+    await runCleanProductionBuildWithProgress();
 
     if (options.full) {
       console.log('\n==> Run full automated test suite');

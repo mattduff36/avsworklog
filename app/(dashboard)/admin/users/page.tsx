@@ -39,6 +39,7 @@ import {
   Trash2,
   Shield,
   User,
+  Users,
   Mail,
   Calendar,
   Loader2,
@@ -263,10 +264,22 @@ function formatAdminActivityTimestamp(value?: string | null): string {
   return absolute || 'Unknown';
 }
 
-function isSupervisorRole(role?: { name?: string | null; display_name?: string | null } | null): boolean {
+function matchesNamedRole(
+  role: { name?: string | null; display_name?: string | null } | null | undefined,
+  expectedName: string
+): boolean {
+  const normalized = expectedName.trim().toLowerCase();
   const roleName = role?.name?.trim().toLowerCase();
   const roleDisplayName = role?.display_name?.trim().toLowerCase();
-  return roleName === 'supervisor' || roleDisplayName === 'supervisor';
+  return roleName === normalized || roleDisplayName === normalized;
+}
+
+function isSupervisorRole(role?: { name?: string | null; display_name?: string | null } | null): boolean {
+  return matchesNamedRole(role, 'supervisor');
+}
+
+function isContractorRole(role?: { name?: string | null; display_name?: string | null } | null): boolean {
+  return matchesNamedRole(role, 'contractor');
 }
 
 export default function UsersAdminPage() {
@@ -287,7 +300,7 @@ export default function UsersAdminPage() {
   const [filteredUsers, setFilteredUsers] = useState<ProfileWithEmail[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'manager' | 'employee'>('all');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'manager' | 'supervisor' | 'employee' | 'contractor'>('all');
   const [teamFilter, setTeamFilter] = useState<string>('all');
   const [managerFilter, setManagerFilter] = useState<string>('all');
   const [userStatusTab, setUserStatusTab] = useState<UserStatusTab>('active');
@@ -371,7 +384,11 @@ export default function UsersAdminPage() {
     total: usersForCurrentStatus.length,
     admins: usersForCurrentStatus.filter((u) => u.role?.role_class === 'admin' || u.role?.name === 'admin').length,
     managers: usersForCurrentStatus.filter((u) => u.role?.role_class === 'manager').length,
-    employees: usersForCurrentStatus.filter((u) => u.role?.role_class === 'employee').length,
+    supervisors: usersForCurrentStatus.filter((u) => isSupervisorRole(u.role)).length,
+    employees: usersForCurrentStatus.filter(
+      (u) => u.role?.role_class === 'employee' && !isSupervisorRole(u.role) && !isContractorRole(u.role)
+    ).length,
+    contractors: usersForCurrentStatus.filter((u) => isContractorRole(u.role)).length,
   };
 
   const managerNameById = useMemo(() => {
@@ -676,7 +693,11 @@ export default function UsersAdminPage() {
       filtered = filtered.filter((user) => {
         if (roleFilter === 'admin') return user.role?.role_class === 'admin' || user.role?.name === 'admin';
         if (roleFilter === 'manager') return user.role?.role_class === 'manager';
-        if (roleFilter === 'employee') return user.role?.role_class === 'employee';
+        if (roleFilter === 'supervisor') return isSupervisorRole(user.role);
+        if (roleFilter === 'contractor') return isContractorRole(user.role);
+        if (roleFilter === 'employee') {
+          return user.role?.role_class === 'employee' && !isSupervisorRole(user.role) && !isContractorRole(user.role);
+        }
         return true;
       });
     }
@@ -1280,7 +1301,7 @@ export default function UsersAdminPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
         <Card 
           className={`border-border cursor-pointer hover:shadow-lg transition-all ${
             roleFilter === 'all' ? 'border-2 border-yellow-500' : ''
@@ -1290,10 +1311,10 @@ export default function UsersAdminPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">{userStatusTab === 'deleted' ? 'Deleted Users' : 'Active Users'}</p>
+                <p className="text-sm text-muted-foreground">{userStatusTab === 'deleted' ? 'Deleted Users' : 'All Users'}</p>
                 <p className="text-2xl font-bold text-white">{stats.total}</p>
               </div>
-              <User className="h-8 w-8 text-blue-500" />
+              <Users className="h-8 w-8 text-blue-500" />
             </div>
           </CardContent>
         </Card>
@@ -1309,7 +1330,7 @@ export default function UsersAdminPage() {
                 <p className="text-sm text-muted-foreground">Admins</p>
                 <p className="text-2xl font-bold text-white">{stats.admins}</p>
               </div>
-              <Shield className="h-8 w-8 text-red-500" />
+              <User className="h-8 w-8 text-red-500" />
             </div>
           </CardContent>
         </Card>
@@ -1325,7 +1346,23 @@ export default function UsersAdminPage() {
                 <p className="text-sm text-muted-foreground">Managers</p>
                 <p className="text-2xl font-bold text-white">{stats.managers}</p>
               </div>
-              <Shield className="h-8 w-8 text-amber-500" />
+              <User className="h-8 w-8 text-amber-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card 
+          className={`border-border cursor-pointer hover:shadow-lg transition-all ${
+            roleFilter === 'supervisor' ? 'border-2 border-yellow-500' : ''
+          }`}
+          onClick={() => setRoleFilter('supervisor')}
+        >
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Supervisors</p>
+                <p className="text-2xl font-bold text-white">{stats.supervisors}</p>
+              </div>
+              <User className="h-8 w-8 text-sky-500" />
             </div>
           </CardContent>
         </Card>
@@ -1342,6 +1379,22 @@ export default function UsersAdminPage() {
                 <p className="text-2xl font-bold text-white">{stats.employees}</p>
               </div>
               <User className="h-8 w-8 text-green-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card 
+          className={`border-border cursor-pointer hover:shadow-lg transition-all ${
+            roleFilter === 'contractor' ? 'border-2 border-yellow-500' : ''
+          }`}
+          onClick={() => setRoleFilter('contractor')}
+        >
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Contractors</p>
+                <p className="text-2xl font-bold text-white">{stats.contractors}</p>
+              </div>
+              <User className="h-8 w-8 text-orange-500" />
             </div>
           </CardContent>
         </Card>

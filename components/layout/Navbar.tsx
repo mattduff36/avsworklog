@@ -776,8 +776,7 @@ export function Navbar() {
       {!tabletModeEnabled && <SidebarNav open={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />}
 
       <nav 
-        className="bg-slate-900/50 backdrop-blur-xl border-b border-border/50 sticky top-0 z-50"
-        style={{ '--top-nav-h': '68px' } as React.CSSProperties}
+        className="bg-slate-900/50 backdrop-blur-xl border-b border-border/50 top-0 z-50 app-top-navbar"
       >
         {/* AVS Yellow accent strip */}
         <div className="h-1 bg-gradient-to-r from-avs-yellow via-avs-yellow to-avs-yellow-hover"></div>

@@ -58,11 +58,13 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-start justify-center p-4 pt-12 sm:pt-16 md:pt-24 relative overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950">
-      {/* Subtle background pattern */}
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(241,214,74,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(241,214,74,0.03)_1px,transparent_1px)] bg-[size:64px_64px]" />
+    <div className="h-dvh sm:h-auto sm:min-h-screen flex items-start justify-center px-4 pb-4 pt-0 sm:pt-16 md:pt-24 relative overflow-hidden bg-slate-950">
+      {/* Fixed background starts at the viewport edge so iOS can render it under the native status bar. */}
+      <div className="fixed inset-0 z-0 pointer-events-none bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950">
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(241,214,74,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(241,214,74,0.03)_1px,transparent_1px)] bg-[size:64px_64px]" />
+      </div>
 
-      <div className="w-full max-w-md relative z-10">
+      <div className="w-full max-w-md relative z-10 translate-y-[60px] sm:translate-y-0">
         {/* AVS Yellow Icon */}
         <div className="flex justify-center mb-6">
           <div className="bg-avs-yellow rounded-2xl p-5 shadow-lg shadow-avs-yellow/20">
