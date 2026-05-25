@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0526.7.1
+
+**GIT COMMIT MESSAGE**
+`chore(finalise): update finalise commit summaries and sidebar navigation styling`
+
+**WHAT CHANGED**
+Update finalise commit summaries and sidebar navigation styling.
+
+**COMMITS IN THIS RELEASE**
+- `chore(finalise): update finalise commit summaries and sidebar navigation styling`
+
 ## 0526.7.0
 
 **GIT COMMIT MESSAGE**
