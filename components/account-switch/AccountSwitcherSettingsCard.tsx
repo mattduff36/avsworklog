@@ -6,8 +6,11 @@ import { ACCOUNT_SWITCHER_PRD_EPIC_ID } from '@/lib/account-switch/epic';
 import { isAccountSwitcherEnabled } from '@/lib/account-switch/feature-flag';
 import {
   canUseBiometricUnlock,
+  clearLocalBiometricLoginProfile,
+  markLocalBiometricLoginEnabled,
   startBiometricRegistration,
 } from '@/lib/account-switch/biometric';
+import { useAuth } from '@/lib/hooks/useAuth';
 import {
   getAccountSwitchDeviceLabel,
   getOrCreateAccountSwitchDeviceId,
@@ -42,6 +45,7 @@ function isValidFixedPin(value: string): boolean {
 }
 
 export function AccountSwitcherSettingsCard() {
+  const { profile } = useAuth();
   const [deviceId] = useState(() => getOrCreateAccountSwitchDeviceId());
   const [settings, setSettings] = useState<AccountSwitchSettingsPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -234,6 +238,7 @@ export function AccountSwitcherSettingsCard() {
         throw new Error(payload.error || 'Unable to enable biometric login');
       }
 
+      if (profile?.id) markLocalBiometricLoginEnabled(profile.id);
       toast.success('Biometric login enabled for this device');
       await loadSettings();
     } catch (error) {
@@ -258,6 +263,7 @@ export function AccountSwitcherSettingsCard() {
         throw new Error(payload.error || 'Unable to remove biometric login');
       }
 
+      if (profile?.id) clearLocalBiometricLoginProfile(profile.id);
       toast.success('Biometric login removed for this device');
       await loadSettings();
     } catch (error) {

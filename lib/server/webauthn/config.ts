@@ -7,34 +7,55 @@ export interface WebAuthnRequestConfig {
   expectedOrigins: string[];
 }
 
+function normalizeOrigin(origin: string): string {
+  return origin.replace(/\/+$/, '');
+}
+
 function getConfiguredOrigins(origin: string): string[] {
   const configured = process.env.WEBAUTHN_EXPECTED_ORIGINS || process.env.WEBAUTHN_ORIGIN;
   if (!configured) return [origin];
 
-  return configured
+  return Array.from(new Set([
+    origin,
+    ...configured
     .split(',')
     .map((value) => value.trim())
-    .filter(Boolean);
+      .filter(Boolean)
+      .map(normalizeOrigin),
+  ]));
 }
 
-function getOriginFromHeaders(host: string | null, protocol: string | null): string {
+function getOriginFromHeaders(
+  originHeader: string | null,
+  host: string | null,
+  protocol: string | null
+): string {
   const configuredOrigin = process.env.WEBAUTHN_ORIGIN;
-  if (configuredOrigin) return configuredOrigin.replace(/\/+$/, '');
+  if (originHeader) return normalizeOrigin(originHeader);
 
-  const vercelUrl = process.env.VERCEL_URL;
-  if (vercelUrl) return `https://${vercelUrl}`.replace(/\/+$/, '');
+  if (configuredOrigin && !host) return normalizeOrigin(configuredOrigin);
 
   const safeHost = host || 'localhost:4000';
   const safeProtocol = protocol || (safeHost.startsWith('localhost') ? 'http' : 'https');
-  return `${safeProtocol}://${safeHost}`.replace(/\/+$/, '');
+  return normalizeOrigin(`${safeProtocol}://${safeHost}`);
+}
+
+function isRpIdValidForHost(rpID: string, hostname: string): boolean {
+  return hostname === rpID || hostname.endsWith(`.${rpID}`);
 }
 
 export async function getWebAuthnRequestConfig(): Promise<WebAuthnRequestConfig> {
   const headerStore = await headers();
+  const originHeader = headerStore.get('origin');
   const host = headerStore.get('x-forwarded-host') || headerStore.get('host');
   const protocol = headerStore.get('x-forwarded-proto');
-  const origin = getOriginFromHeaders(host, protocol);
-  const rpID = process.env.WEBAUTHN_RP_ID || new URL(origin).hostname;
+  const origin = getOriginFromHeaders(originHeader, host, protocol);
+  const originHostname = new URL(origin).hostname;
+  const configuredRpID = process.env.WEBAUTHN_RP_ID;
+  const rpID =
+    configuredRpID && isRpIdValidForHost(configuredRpID, originHostname)
+      ? configuredRpID
+      : originHostname;
 
   return {
     rpName: process.env.WEBAUTHN_RP_NAME || 'SQUIRES',

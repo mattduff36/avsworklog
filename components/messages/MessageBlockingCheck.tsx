@@ -6,6 +6,8 @@ import { subscribeToAuthStateChange } from '@/lib/app-auth/client';
 import { loadClientAuthSession } from '@/lib/app-auth/client-session';
 import { fetchWithAuth } from '@/lib/utils/fetch-with-auth';
 import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
+import { useAuth } from '@/lib/hooks/useAuth';
+import { BiometricEnrollmentPrompt } from '@/components/auth/BiometricEnrollmentPrompt';
 import { BlockingMessageModal } from './BlockingMessageModal';
 import { ReminderModal } from './ReminderModal';
 
@@ -49,6 +51,7 @@ export function MessageBlockingCheck() {
   const router = useRouter();
   const pathname = usePathname();
   const isDashboardPath = pathname?.startsWith('/dashboard') ?? false;
+  const { profile, loading: authLoading, locked } = useAuth();
 
   const [authRefreshTick, setAuthRefreshTick] = useState(0);
   const [checking, setChecking] = useState(false);
@@ -56,6 +59,8 @@ export function MessageBlockingCheck() {
   const [currentToolboxTalkIndex, setCurrentToolboxTalkIndex] = useState(0);
   const [pendingReminders, setPendingReminders] = useState<PendingReminder[]>([]);
   const [showReminder, setShowReminder] = useState(false);
+  const [biometricPromptOpen, setBiometricPromptOpen] = useState(false);
+  const [biometricCheckComplete, setBiometricCheckComplete] = useState(false);
 
   const checkPendingMessages = useCallback(async (signal: AbortSignal) => {
     try {
@@ -89,7 +94,8 @@ export function MessageBlockingCheck() {
       setPendingToolboxTalks(talks);
       setCurrentToolboxTalkIndex(0);
       setPendingReminders(reminders);
-      setShowReminder(talks.length === 0 && reminders.length > 0);
+      setShowReminder(false);
+      setBiometricCheckComplete(false);
     } catch (error) {
       if (signal.aborted) {
         return;
@@ -111,6 +117,7 @@ export function MessageBlockingCheck() {
   useEffect(() => {
     if (!isDashboardPath) {
       setChecking(false);
+      setBiometricCheckComplete(false);
       return;
     }
 
@@ -133,6 +140,17 @@ export function MessageBlockingCheck() {
     return () => window.clearTimeout(timeoutId);
   }, [checking, isDashboardPath, pathname]);
 
+  useEffect(() => {
+    if (pendingToolboxTalks.length > 0) return;
+    if (!biometricCheckComplete || biometricPromptOpen) return;
+    if (pendingReminders.length > 0) setShowReminder(true);
+  }, [
+    biometricCheckComplete,
+    biometricPromptOpen,
+    pendingReminders.length,
+    pendingToolboxTalks.length,
+  ]);
+
   function handleToolboxTalkSigned() {
     // Move to next Toolbox Talk or finish
     if (currentToolboxTalkIndex + 1 < pendingToolboxTalks.length) {
@@ -141,10 +159,6 @@ export function MessageBlockingCheck() {
       // All Toolbox Talks signed, check if there are Reminders
       setPendingToolboxTalks([]);
       setCurrentToolboxTalkIndex(0);
-      
-      if (pendingReminders.length > 0) {
-        setShowReminder(true);
-      }
     }
   }
 
@@ -178,19 +192,30 @@ export function MessageBlockingCheck() {
     );
   }
 
-  // Show non-blocking Reminder modal (if any pending)
-  if (showReminder && pendingReminders.length > 0) {
-    return (
-      <ReminderModal
-        open={true}
-        onClose={() => setShowReminder(false)}
-        message={pendingReminders[0]}
-        onDismissed={handleReminderDismissed}
-      />
-    );
-  }
+  const canCheckBiometrics =
+    isDashboardPath &&
+    !authLoading &&
+    !locked &&
+    Boolean(profile?.id) &&
+    pendingToolboxTalks.length === 0;
 
-  // No blocking messages
-  return null;
+  return (
+    <>
+      <BiometricEnrollmentPrompt
+        profileId={profile?.id}
+        canCheck={canCheckBiometrics}
+        onOpenChange={setBiometricPromptOpen}
+        onCheckComplete={() => setBiometricCheckComplete(true)}
+      />
+      {showReminder && pendingReminders.length > 0 ? (
+        <ReminderModal
+          open={true}
+          onClose={() => setShowReminder(false)}
+          message={pendingReminders[0]}
+          onDismissed={handleReminderDismissed}
+        />
+      ) : null}
+    </>
+  );
 }
 
