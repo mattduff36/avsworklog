@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0526.7.2
+
+**GIT COMMIT MESSAGE**
+`fix(layout): improve sidebar navigation styling`
+
+**WHAT CHANGED**
+Improve sidebar navigation styling.
+
+**COMMITS IN THIS RELEASE**
+- `fix(layout): improve sidebar navigation styling`
+
 ## 0526.7.1
 
 **GIT COMMIT MESSAGE**
