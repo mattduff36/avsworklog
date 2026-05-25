@@ -58,13 +58,13 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="h-dvh sm:h-auto sm:min-h-screen flex items-start justify-center px-4 pb-4 pt-0 sm:pt-16 md:pt-24 relative overflow-hidden bg-slate-950">
+    <div className="h-dvh sm:h-auto sm:min-h-screen flex items-start justify-center px-4 pb-4 pt-0 sm:pt-16 md:pt-24 relative overflow-y-auto overflow-x-hidden bg-slate-950">
       {/* Fixed background starts at the viewport edge so iOS can render it under the native status bar. */}
       <div className="fixed inset-0 z-0 pointer-events-none bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950">
         <div className="absolute inset-0 bg-[linear-gradient(rgba(241,214,74,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(241,214,74,0.03)_1px,transparent_1px)] bg-[size:64px_64px]" />
       </div>
 
-      <div className="w-full max-w-md relative z-10 translate-y-[60px] sm:translate-y-0">
+      <div className="w-full max-w-lg relative z-10 translate-y-[clamp(1.5rem,8svh,3.75rem)] sm:translate-y-0">
         {/* AVS Yellow Icon */}
         <div className="flex justify-center mb-6">
           <div className="bg-avs-yellow rounded-2xl p-5 shadow-lg shadow-avs-yellow/20">
@@ -79,16 +79,18 @@ export default function LoginPage() {
 
         {/* Glass-morphism Card */}
         <Card className="bg-card/40 backdrop-blur-xl border-border/50 shadow-2xl">
-          <CardContent className="p-8">
-            <form onSubmit={handleSubmit} className="space-y-5">
+          <CardContent className="login-card-content p-6 sm:p-8">
+            <form onSubmit={handleSubmit} className="login-form space-y-5 sm:space-y-6">
               {error && (
                 <div className="p-3 text-sm text-red-300 bg-red-900/30 border border-red-700/50 rounded-lg backdrop-blur-sm">
                   {error}
                 </div>
               )}
               
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-muted-foreground font-medium">Email Address</Label>
+              <div className="login-field-group space-y-2.5">
+                <Label htmlFor="email" className="login-field-label text-base font-medium text-muted-foreground">
+                  Email Address
+                </Label>
                 <Input
                   id="email"
                   type="email"
@@ -98,12 +100,14 @@ export default function LoginPage() {
                   required
                   disabled={loading}
                   autoComplete="email"
-                  className="bg-input border-border text-white placeholder:text-muted-foreground focus:border-avs-yellow focus:ring-avs-yellow/20 h-12"
+                  className="login-form-input h-14 bg-input border-border px-4 text-base text-white placeholder:text-muted-foreground focus:border-avs-yellow focus:ring-avs-yellow/20"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-muted-foreground font-medium">Password</Label>
+              <div className="login-field-group space-y-2.5">
+                <Label htmlFor="password" className="login-field-label text-base font-medium text-muted-foreground">
+                  Password
+                </Label>
                 <Input
                   id="password"
                   type="password"
@@ -113,22 +117,22 @@ export default function LoginPage() {
                   required
                   disabled={loading}
                   autoComplete="current-password"
-                  className="bg-input border-border text-white placeholder:text-muted-foreground focus:border-avs-yellow focus:ring-avs-yellow/20 h-12"
+                  className="login-form-input h-14 bg-input border-border px-4 text-base text-white placeholder:text-muted-foreground focus:border-avs-yellow focus:ring-avs-yellow/20"
                 />
               </div>
 
-              <div className="flex items-center space-x-2">
+              <div className="login-remember-row flex items-center space-x-3">
                 <input
                   type="checkbox"
                   id="remember"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 rounded border-slate-600 bg-slate-700/50 text-avs-yellow focus:ring-avs-yellow focus:ring-offset-slate-800"
+                  className="login-checkbox h-5 w-5 rounded border-slate-600 bg-slate-700/50 text-avs-yellow focus:ring-avs-yellow focus:ring-offset-slate-800"
                   disabled={loading}
                 />
                 <Label 
                   htmlFor="remember" 
-                  className="text-sm font-normal cursor-pointer text-muted-foreground"
+                  className="login-remember-label cursor-pointer text-base font-normal leading-none text-muted-foreground"
                 >
                   Keep me signed in
                 </Label>
@@ -136,7 +140,7 @@ export default function LoginPage() {
 
               <Button
                 type="submit"
-                className="w-full h-12 bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900 font-semibold text-base shadow-lg shadow-avs-yellow/20 transition-all"
+                className="login-submit h-14 w-full bg-avs-yellow text-base font-semibold text-slate-900 shadow-lg shadow-avs-yellow/20 transition-all hover:bg-avs-yellow-hover"
                 disabled={loading}
               >
                 {loading ? 'Signing in...' : 'Sign In'}

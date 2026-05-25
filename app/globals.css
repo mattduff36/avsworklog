@@ -671,6 +671,51 @@ input[type="date"]::-webkit-datetime-edit-year-field {
   .border-2 { border-width: 1.6px !important; }
 }
 
+/* Login screen opts out of the app-wide mobile scale reduction for readability. */
+@media (max-width: 768px) {
+  .login-card-content {
+    padding: clamp(1.5rem, 5.5vw, 2rem) !important;
+  }
+
+  .login-form > * + * {
+    margin-top: clamp(1.25rem, 4vw, 1.5rem) !important;
+  }
+
+  .login-field-group > * + * {
+    margin-top: 0.625rem !important;
+  }
+
+  .login-field-label,
+  .login-remember-label {
+    font-size: clamp(0.95rem, 3.8vw, 1.0625rem) !important;
+    line-height: 1.35 !important;
+  }
+
+  .login-form-input {
+    height: clamp(3.25rem, 12vw, 3.75rem) !important;
+    padding-right: 1rem !important;
+    padding-left: 1rem !important;
+    font-size: clamp(1rem, 4vw, 1.125rem) !important;
+    line-height: 1.35 !important;
+  }
+
+  .login-checkbox {
+    width: clamp(1.25rem, 4.8vw, 1.5rem) !important;
+    height: clamp(1.25rem, 4.8vw, 1.5rem) !important;
+    flex: 0 0 auto;
+  }
+
+  .login-remember-row {
+    gap: 0.75rem !important;
+  }
+
+  .login-submit {
+    height: clamp(3.25rem, 12vw, 3.75rem) !important;
+    font-size: clamp(1rem, 4vw, 1.125rem) !important;
+    line-height: 1.35 !important;
+  }
+}
+
 /* Selectable Card Component */
 .selectable-card {
   transition: all 0.2s ease;
