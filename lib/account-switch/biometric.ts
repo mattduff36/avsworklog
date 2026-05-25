@@ -71,8 +71,12 @@ export function hasLocalBiometricLoginProfile(): boolean {
   return readEnabledProfileIds().length > 0;
 }
 
+export function getLocalBiometricLoginProfileIds(): string[] {
+  return readEnabledProfileIds();
+}
+
 export function markLocalBiometricLoginEnabled(profileId: string): void {
-  writeEnabledProfileIds([...readEnabledProfileIds(), profileId]);
+  writeEnabledProfileIds([profileId, ...readEnabledProfileIds().filter((value) => value !== profileId)]);
 }
 
 export function clearLocalBiometricLoginProfile(profileId: string): void {

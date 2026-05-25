@@ -1,19 +1,49 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { generateAuthenticationOptions } from '@simplewebauthn/server';
 import { getWebAuthnRequestConfig } from '@/lib/server/webauthn/config';
-import { saveWebAuthnChallenge } from '@/lib/server/webauthn/credentials';
+import {
+  getActiveWebAuthnCredentialsForProfile,
+  saveWebAuthnChallenge,
+} from '@/lib/server/webauthn/credentials';
 
 export const runtime = 'nodejs';
 
-export async function POST() {
+interface LoginOptionsBody {
+  profileId?: string;
+  deviceId?: string;
+}
+
+export async function POST(request: NextRequest) {
+  const body = (await request.json().catch(() => ({}))) as LoginOptionsBody;
+  const profileId = body.profileId?.trim() || null;
+  const deviceId = body.deviceId?.trim() || null;
   const config = await getWebAuthnRequestConfig();
+  const credentials = profileId && deviceId
+    ? await getActiveWebAuthnCredentialsForProfile({
+      profileId,
+      rawDeviceId: deviceId,
+    })
+    : [];
+
+  if (profileId && credentials.length === 0) {
+    return NextResponse.json(
+      { error: 'Biometric login is not enabled for this device' },
+      { status: 404 }
+    );
+  }
+
   const options = await generateAuthenticationOptions({
     rpID: config.rpID,
-    allowCredentials: [],
+    allowCredentials: credentials.map((credential) => ({
+      id: credential.credential_id,
+      transports: credential.transports || undefined,
+    })),
     userVerification: 'required',
   });
 
   await saveWebAuthnChallenge({
+    profileId,
+    rawDeviceId: deviceId,
     challenge: options.challenge,
     challengeType: 'authentication',
   });

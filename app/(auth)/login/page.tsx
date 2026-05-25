@@ -9,7 +9,8 @@ import {
 } from '@/lib/account-switch/device';
 import {
   canUseBiometricUnlock,
-  clearAllLocalBiometricLoginProfiles,
+  clearLocalBiometricLoginProfile,
+  getLocalBiometricLoginProfileIds,
   hasLocalBiometricLoginProfile,
   startBiometricAuthentication,
 } from '@/lib/account-switch/biometric';
@@ -127,7 +128,8 @@ export default function LoginPage() {
   };
 
   async function handleBiometricLogin(): Promise<void> {
-    if (!hasLocalBiometricLoginProfile()) {
+    const localProfileId = getLocalBiometricLoginProfileIds()[0] || null;
+    if (!localProfileId) {
       setError('Sign in with your password first to enable biometric login on this device.');
       setBiometricAvailable(false);
       return;
@@ -138,7 +140,11 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const options = (await getWebAuthnOptions(
-        '/api/auth/webauthn/login/options'
+        '/api/auth/webauthn/login/options',
+        {
+          profileId: localProfileId,
+          deviceId,
+        }
       )) as PublicKeyCredentialRequestOptionsJSON & WebAuthnOptionsResponse;
       const authenticationResponse = await startBiometricAuthentication(options);
       const verifyResponse = await fetch('/api/auth/webauthn/login/verify', {
@@ -152,6 +158,7 @@ export default function LoginPage() {
           rememberMe,
           deviceId,
           deviceLabel: getAccountSwitchDeviceLabel(),
+          profileId: localProfileId,
         }),
       });
       const payload = (await verifyResponse.json().catch(() => ({}))) as AuthResponsePayload;
@@ -164,9 +171,13 @@ export default function LoginPage() {
       redirectAfterAuth(getPostLoginRedirect(payload));
     } catch (loginError) {
       const message = loginError instanceof Error ? loginError.message : 'Biometric login failed';
-      if (message.includes('not recognised')) {
-        clearAllLocalBiometricLoginProfiles();
-        setBiometricAvailable(false);
+      if (
+        message.includes('not recognised') ||
+        message.includes('not enabled for this device')
+      ) {
+        clearLocalBiometricLoginProfile(localProfileId);
+        const hasAnotherLocalProfile = hasLocalBiometricLoginProfile();
+        setBiometricAvailable(hasAnotherLocalProfile);
         setError('Biometric login is not enabled on this device. Sign in with your password to enable it.');
       } else {
         setError(message);

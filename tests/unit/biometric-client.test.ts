@@ -73,4 +73,32 @@ describe('biometric browser helpers', () => {
     expect(startRegistrationMock).toHaveBeenCalledWith({ optionsJSON: registrationOptions });
     expect(startAuthenticationMock).toHaveBeenCalledWith({ optionsJSON: authenticationOptions });
   });
+
+  it('stores the most recently enabled local biometric profile first', async () => {
+    const store = new Map<string, string>();
+    vi.stubGlobal('window', {
+      localStorage: {
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, value: string) => store.set(key, value),
+        removeItem: (key: string) => store.delete(key),
+      },
+    });
+
+    const {
+      clearLocalBiometricLoginProfile,
+      getLocalBiometricLoginProfileIds,
+      hasLocalBiometricLoginProfile,
+      markLocalBiometricLoginEnabled,
+    } = await import('@/lib/account-switch/biometric');
+
+    markLocalBiometricLoginEnabled('profile-1');
+    markLocalBiometricLoginEnabled('profile-2');
+    markLocalBiometricLoginEnabled('profile-1');
+
+    expect(hasLocalBiometricLoginProfile()).toBe(true);
+    expect(getLocalBiometricLoginProfileIds()).toEqual(['profile-1', 'profile-2']);
+
+    clearLocalBiometricLoginProfile('profile-1');
+    expect(getLocalBiometricLoginProfileIds()).toEqual(['profile-2']);
+  });
 });

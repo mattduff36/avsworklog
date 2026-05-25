@@ -24,6 +24,7 @@ interface VerifyLoginBody {
   rememberMe?: boolean;
   deviceId?: string;
   deviceLabel?: string;
+  profileId?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -38,10 +39,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Biometric credential was not recognised' }, { status: 401 });
     }
 
+    if (body.profileId && credential.profile_id !== body.profileId) {
+      return NextResponse.json({ error: 'Biometric credential was not recognised' }, { status: 401 });
+    }
+
     const challenge = await consumeWebAuthnChallenge({
       challenge: body.challenge,
       challengeType: 'authentication',
+      profileId: body.profileId || null,
     });
+    if (challenge.device_id && credential.device_id !== challenge.device_id) {
+      return NextResponse.json({ error: 'Biometric credential was not recognised for this device' }, { status: 401 });
+    }
     const config = await getWebAuthnRequestConfig();
     const verification = await verifyAuthenticationResponse({
       response: body.response,
