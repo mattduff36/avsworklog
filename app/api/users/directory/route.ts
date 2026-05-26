@@ -16,6 +16,8 @@ const ACTION_ASSIGNMENT_MODULES: readonly ModuleName[] = [
   'reminders',
 ];
 
+const TOOLBOX_TALKS_ASSIGNMENT_CONTEXT = 'toolbox-talks-assignment';
+
 function isTruthy(value: string | null): boolean {
   return value === '1' || value === 'true';
 }
@@ -42,6 +44,7 @@ export async function GET(request: NextRequest) {
 
   const context = request.nextUrl.searchParams.get('context');
   const isActionsAssignmentDirectory = context === 'actions-assignment';
+  const isToolboxTalksAssignmentDirectory = context === TOOLBOX_TALKS_ASSIGNMENT_CONTEXT;
   if (isActionsAssignmentDirectory && !ACTION_ASSIGNMENT_MODULES.includes(moduleName as ModuleName)) {
     return NextResponse.json({ error: 'Actions assignment directory requires a reminder module' }, { status: 400 });
   }
@@ -49,6 +52,9 @@ export async function GET(request: NextRequest) {
   const effectiveRole = await getEffectiveRole();
   const canUseActionsAssignmentDirectory = isActionsAssignmentDirectory
     ? await canEffectiveRoleAccessModule('actions')
+    : false;
+  const canUseToolboxTalksAssignmentDirectory = isToolboxTalksAssignmentDirectory
+    ? await canEffectiveRoleAccessModule('toolbox-talks')
     : false;
   const isInspectionDirectoryRequest =
     moduleName === 'inspections' ||
@@ -64,7 +70,8 @@ export async function GET(request: NextRequest) {
         effectiveRole.is_manager_admin ||
         effectiveRole.role_name === 'supervisor' ||
         hasWorkshopInspectionAccess ||
-        canUseActionsAssignmentDirectory
+        canUseActionsAssignmentDirectory ||
+        canUseToolboxTalksAssignmentDirectory
       )
   );
   if (!canViewDirectory) {
@@ -72,7 +79,7 @@ export async function GET(request: NextRequest) {
   }
   const isAdminOrSuper = hasEffectiveRoleFullAccess(effectiveRole);
   let shouldScopeToTeam = false;
-  if (!canUseActionsAssignmentDirectory) {
+  if (!canUseActionsAssignmentDirectory && !canUseToolboxTalksAssignmentDirectory) {
     shouldScopeToTeam = hasWorkshopInspectionAccess ||
       ((effectiveRole.is_manager_admin || effectiveRole.role_name === 'supervisor') &&
         !isAdminOrSuper &&

@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { UserPlus, AlertTriangle, Upload, File, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { AssignRecipientsModal } from './AssignRecipientsModal';
+import { ToolboxTalkAssignDialog } from './ToolboxTalkAssignDialog';
 
 interface CreateToolboxTalkFormProps {
   onSuccess?: () => void;
@@ -214,13 +214,11 @@ export function CreateToolboxTalkForm({ onSuccess }: CreateToolboxTalkFormProps)
         </div>
       </form>
 
-      {/* Assign Recipients Modal */}
-      <AssignRecipientsModal
+      <ToolboxTalkAssignDialog
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onOpenChange={setModalOpen}
         onSend={handleSendToRecipients}
-        messageSubject={subject}
-        messageType="TOOLBOX_TALK"
+        subject={subject}
       />
     </>
   );

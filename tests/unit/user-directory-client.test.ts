@@ -73,6 +73,25 @@ describe('fetchUserDirectory', () => {
     );
   });
 
+  it('passes toolbox talks assignment context through to the directory endpoint', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        users: [{ id: 'user-5', full_name: 'Elliot Electrician', employee_id: 'E005' }],
+        pagination: { has_more: false },
+      }),
+    } as Response);
+
+    await fetchUserDirectory({
+      includeRole: true,
+      context: 'toolbox-talks-assignment',
+    });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toContain(
+      '/api/users/directory?includeRole=true&context=toolbox-talks-assignment&limit=500&offset=0',
+    );
+  });
+
   it('preserves failed response status codes for paginated requests', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: false,
