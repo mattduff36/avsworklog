@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0526.12.0
+
+**GIT COMMIT MESSAGE**
+`feat(timesheets): update timesheet workflow and API routes`
+
+**WHAT CHANGED**
+Update timesheet workflow and API routes.
+
+**COMMITS IN THIS RELEASE**
+- `feat(timesheets): update timesheet workflow and API routes`
+
 ## 0526.11.1
 
 **GIT COMMIT MESSAGE**
