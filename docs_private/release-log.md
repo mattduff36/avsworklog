@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0526.11.1
+
+**GIT COMMIT MESSAGE**
+`fix(actions): update archive tabs and ignore periods`
+
+**WHAT CHANGED**
+Update archive tabs and ignore periods.
+
+**COMMITS IN THIS RELEASE**
+- `fix(actions): update archive tabs and ignore periods`
+
 ## 0526.11.0
 
 **GIT COMMIT MESSAGE**
