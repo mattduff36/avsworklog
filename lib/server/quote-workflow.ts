@@ -356,6 +356,7 @@ async function sendEmail(params: {
   from?: string;
   to: string[];
   cc?: string[];
+  replyTo?: string | null;
   subject: string;
   html: string;
   attachments?: EmailAttachment[];
@@ -375,6 +376,7 @@ async function sendEmail(params: {
       from: params.from || fromEmail,
       to: params.to,
       cc: params.cc,
+      reply_to: params.replyTo || undefined,
       subject: params.subject,
       html: params.html,
       attachments: params.attachments,
@@ -393,8 +395,17 @@ function getDefaultFromEmail(): string {
   return getQuotesCustomersEmailConfig().fromEmail;
 }
 
-export async function renderQuotePdfAttachment(bundle: QuoteBundle): Promise<EmailAttachment> {
+function normalizeEmailAddress(value?: string | null): string | null {
+  const email = value?.trim();
+  return email && email.includes('@') ? email : null;
+}
+
+export async function renderQuotePdfAttachment(
+  bundle: QuoteBundle,
+  managerEmailOverride?: string | null
+): Promise<EmailAttachment> {
   const logoSrc = await loadSquiresLogoDataUrl();
+  const managerEmail = normalizeEmailAddress(managerEmailOverride) || bundle.quote.manager_email || '';
 
   const pdfDocument = QuotePDF({
     quoteReference: bundle.quote.quote_reference,
@@ -407,7 +418,7 @@ export async function renderQuotePdfAttachment(bundle: QuoteBundle): Promise<Ema
     subjectLine: bundle.quote.subject_line || '',
     scope: bundle.quote.scope || '',
     siteAddress: bundle.quote.site_address || '',
-    managerEmail: bundle.quote.manager_email || '',
+    managerEmail,
     lineItems: bundle.lineItems.map(item => ({
       description: item.description,
       quantity: Number(item.quantity),
@@ -461,8 +472,13 @@ async function renderClientVisibleQuoteAttachments(bundle: QuoteBundle): Promise
   return attachments;
 }
 
-export async function sendQuoteToCustomerEmail(bundle: QuoteBundle, cc: string[]) {
-  const quotePdfAttachment = await renderQuotePdfAttachment(bundle);
+export async function sendQuoteToCustomerEmail(
+  bundle: QuoteBundle,
+  cc: string[],
+  senderEmail?: string | null
+) {
+  const replyToEmail = normalizeEmailAddress(senderEmail) || normalizeEmailAddress(bundle.quote.manager_email);
+  const quotePdfAttachment = await renderQuotePdfAttachment(bundle, replyToEmail);
   const clientAttachments = await renderClientVisibleQuoteAttachments(bundle);
   const customerEmail = bundle.quote.attention_email?.trim() || bundle.quote.customer?.contact_email?.trim() || '';
   if (!customerEmail) {
@@ -494,6 +510,7 @@ export async function sendQuoteToCustomerEmail(bundle: QuoteBundle, cc: string[]
     cc: cc.filter(Boolean),
     subject,
     html,
+    replyTo: replyToEmail,
     attachments: [quotePdfAttachment, ...clientAttachments],
   });
 }

@@ -145,7 +145,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         current.quote.manager_email || '',
         'rob@avsquires.co.uk',
         'charlotte@avsquires.co.uk',
-      ]);
+      ], user.email);
 
       if (!emailResult.success) {
         return NextResponse.json({ error: emailResult.error || 'Failed to send quote email' }, { status: 500 });
@@ -225,7 +225,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         current.quote.manager_email || '',
         'rob@avsquires.co.uk',
         'charlotte@avsquires.co.uk',
-      ]);
+      ], user.email);
 
       if (!emailResult.success) {
         return NextResponse.json({ error: emailResult.error || 'Failed to send quote email' }, { status: 500 });

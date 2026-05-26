@@ -8,11 +8,15 @@ const BRAND_TEXT = '#111827';
 const BRAND_MUTED = '#475569';
 const BRAND_BORDER = '#cbd5e1';
 const BRAND_BORDER_DARK = '#94a3b8';
+const PAGE_PADDING = 36;
+const PAGE_BOTTOM_PADDING = 78;
+const A4_CONTENT_HEIGHT = 841.89 - PAGE_PADDING - PAGE_BOTTOM_PADDING;
+const MAX_TABLE_MIN_PRESENCE_AHEAD = A4_CONTENT_HEIGHT - 60;
 
 const styles = StyleSheet.create({
   page: {
-    padding: 36,
-    paddingBottom: 78,
+    padding: PAGE_PADDING,
+    paddingBottom: PAGE_BOTTOM_PADDING,
     fontSize: 9.5,
     fontFamily: 'Helvetica',
     color: BRAND_TEXT,
@@ -396,6 +400,26 @@ function formatQuantity(item: LineItem): string {
   return `${item.quantity}`;
 }
 
+function estimateQuoteTableRowHeight(item: LineItem): number {
+  const lineCount = Math.max(1, Math.ceil(item.description.trim().length / 42));
+  return 18 + lineCount * 11;
+}
+
+function getQuoteTableMinPresenceAhead(lineItems: LineItem[]): number {
+  const labelHeight = 18;
+  const headerHeight = 28;
+  const totalHeight = 30;
+  const rowHeight = lineItems.reduce(
+    (sum, item) => sum + estimateQuoteTableRowHeight(item),
+    0
+  );
+
+  return Math.min(
+    MAX_TABLE_MIN_PRESENCE_AHEAD,
+    labelHeight + headerHeight + totalHeight + rowHeight
+  );
+}
+
 export function QuotePDF({
   quoteReference,
   baseQuoteReference,
@@ -418,6 +442,8 @@ export function QuotePDF({
   customFooterText,
   logoSrc = null,
 }: QuotePDFProps) {
+  const managerContactEmail = managerEmail?.trim() || '';
+  const quoteTableMinPresenceAhead = getQuoteTableMinPresenceAhead(lineItems);
   const formattedDate = (() => {
     try {
       const d = new Date(quoteDate);
@@ -472,9 +498,12 @@ export function QuotePDF({
               <Text style={styles.contactValue}>01636 812227</Text>
             </View>
             <View style={styles.contactItem}>
-              <Text style={styles.contactLabel}>Email / Web</Text>
-              <Text style={styles.contactValue}>office@avsquires.co.uk</Text>
-              <Text style={styles.contactValue}>avsquires.co.uk</Text>
+              <Text style={styles.contactLabel}>Email</Text>
+              {managerContactEmail && (
+                <Link src={`mailto:${managerContactEmail}`} style={styles.contactValue}>
+                  {managerContactEmail}
+                </Link>
+              )}
             </View>
             <View style={styles.contactItem}>
               <Text style={styles.contactLabel}>Registered Office</Text>
@@ -519,11 +548,11 @@ export function QuotePDF({
               <Text style={styles.detailValue}>{siteAddress}</Text>
             </View>
           )}
-          {managerEmail && (
+          {managerContactEmail && (
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Manager email</Text>
-              <Link src={`mailto:${managerEmail}`} style={styles.detailLink}>
-                {managerEmail}
+              <Link src={`mailto:${managerContactEmail}`} style={styles.detailLink}>
+                {managerContactEmail}
               </Link>
             </View>
           )}
@@ -537,32 +566,33 @@ export function QuotePDF({
             </Text>
           </View>
         ) : (
-          <>
-          <Text style={styles.tableLabel}>Quoted items</Text>
-          <View style={styles.table}>
-            <View style={styles.tableHeader}>
-              <Text style={[styles.colItemHeader, styles.tableHeaderText]}>Item</Text>
-              <Text style={[styles.colQtyHeader, styles.tableHeaderText]}>Quantity</Text>
-              <Text style={[styles.colRateHeader, styles.tableHeaderText]}>Unit Rate</Text>
-              <Text style={[styles.colTotalHeader, styles.tableHeaderText]}>Total</Text>
-            </View>
-            {lineItems.map((item, idx) => (
-              <View
-                key={idx}
-                style={idx % 2 === 0 ? styles.tableRow : styles.tableRowAlt}
-              >
-                <Text style={styles.colItem}>{item.description}</Text>
-                <Text style={styles.colQty}>{formatQuantity(item)}</Text>
-                <Text style={styles.colRate}>{gbp(item.unit_rate)}</Text>
-                <Text style={styles.colTotal}>{gbp(item.line_total)}</Text>
+          <View minPresenceAhead={quoteTableMinPresenceAhead}>
+            <Text style={styles.tableLabel} minPresenceAhead={quoteTableMinPresenceAhead}>Quoted items</Text>
+            <View style={styles.table} minPresenceAhead={quoteTableMinPresenceAhead}>
+              <View style={styles.tableHeader} wrap={false}>
+                <Text style={[styles.colItemHeader, styles.tableHeaderText]}>Item</Text>
+                <Text style={[styles.colQtyHeader, styles.tableHeaderText]}>Quantity</Text>
+                <Text style={[styles.colRateHeader, styles.tableHeaderText]}>Unit Rate</Text>
+                <Text style={[styles.colTotalHeader, styles.tableHeaderText]}>Total</Text>
               </View>
-            ))}
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Total</Text>
-              <Text style={styles.totalValue}>{gbp(total)}</Text>
+              {lineItems.map((item, idx) => (
+                <View
+                  key={idx}
+                  style={idx % 2 === 0 ? styles.tableRow : styles.tableRowAlt}
+                  wrap={false}
+                >
+                  <Text style={styles.colItem}>{item.description}</Text>
+                  <Text style={styles.colQty}>{formatQuantity(item)}</Text>
+                  <Text style={styles.colRate}>{gbp(item.unit_rate)}</Text>
+                  <Text style={styles.colTotal}>{gbp(item.line_total)}</Text>
+                </View>
+              ))}
+              <View style={styles.totalRow} wrap={false}>
+                <Text style={styles.totalLabel}>Total</Text>
+                <Text style={styles.totalValue}>{gbp(total)}</Text>
+              </View>
             </View>
           </View>
-          </>
         )}
 
         <View style={styles.notesPanel}>

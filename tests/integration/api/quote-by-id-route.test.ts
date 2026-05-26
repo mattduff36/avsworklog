@@ -74,7 +74,7 @@ describe('PATCH /api/quotes/[id]', () => {
     mockCreateClient.mockResolvedValue({
       auth: {
         getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'user-1' } },
+          data: { user: { id: 'user-1', email: 'sender@avsquires.co.uk' } },
           error: null,
         }),
       },
@@ -185,7 +185,11 @@ describe('PATCH /api/quotes/[id]', () => {
     const response = await PATCH(request, { params: Promise.resolve({ id: 'quote-1' }) });
 
     expect(response.status).toBe(200);
-    expect(mockSendQuoteToCustomerEmail).toHaveBeenCalled();
+    expect(mockSendQuoteToCustomerEmail).toHaveBeenCalledWith(
+      expect.anything(),
+      ['manager@avsquires.co.uk', 'rob@avsquires.co.uk', 'charlotte@avsquires.co.uk'],
+      'sender@avsquires.co.uk'
+    );
     expect(mockQuoteUpdate).toHaveBeenCalledWith(expect.objectContaining({
       status: 'sent',
       approved_by: 'user-1',
