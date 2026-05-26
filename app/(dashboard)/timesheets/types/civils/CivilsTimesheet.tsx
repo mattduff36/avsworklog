@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, type CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
+import { useTimesheetJobCodeOptions } from '@/lib/client/timesheet-job-codes';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -113,6 +114,7 @@ export function CivilsTimesheet({
 }: CivilsTimesheetProps) {
   const router = useRouter();
   const { user, profile, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
+  const { options: jobCodeOptions, isLoading: jobCodeOptionsLoading } = useTimesheetJobCodeOptions();
   
   const supabase = useMemo(() => createClient(), []);
   
@@ -1107,7 +1109,7 @@ export function CivilsTimesheet({
     });
     
     if (!allJobNumbersValid) {
-      setError('Please enter at least one valid Job Number (format: 1234-AB) for all working days, and do not repeat the same code on a single day.');
+      setError('Please enter at least one valid Job Number (format: 1234-AB or 40001-GH) for all working days, and do not repeat the same code on a single day.');
       setShowErrorDialog(true);
       return;
     }
@@ -1600,7 +1602,7 @@ export function CivilsTimesheet({
                   ? 'N/A (Training)'
                   : entry.working_in_yard
                     ? 'N/A (Yard)'
-                    : '1234-AB';
+                    : 'Select job code';
 
                 return (
                 <TabsContent key={index} value={String(index)} className="space-y-4 px-4 pb-4 overflow-hidden">
@@ -1661,6 +1663,8 @@ export function CivilsTimesheet({
                         onRemove={(jobIndex) => handleRemoveJobNumberField(index, jobIndex)}
                         placeholder={jobNumberPlaceholder}
                         disabled={disableJobNumberInput}
+                        jobCodeOptions={jobCodeOptions}
+                        jobCodeOptionsLoading={jobCodeOptionsLoading}
                         inputClassName="h-16 text-3xl text-center bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground uppercase disabled:opacity-30 disabled:cursor-not-allowed"
                       />
                     </div>
@@ -1810,7 +1814,7 @@ export function CivilsTimesheet({
                     ? 'N/A (Training)'
                     : entry.working_in_yard
                       ? 'N/A (Yard)'
-                      : '1234-AB';
+                      : 'Select job code';
 
                   return (
                   <tr key={entry.day_of_week} className="border-b border-border/50">
@@ -1859,6 +1863,8 @@ export function CivilsTimesheet({
                         onRemove={(jobIndex) => handleRemoveJobNumberField(index, jobIndex)}
                         placeholder={jobNumberPlaceholder}
                         disabled={disableJobNumberInput}
+                        jobCodeOptions={jobCodeOptions}
+                        jobCodeOptionsLoading={jobCodeOptionsLoading}
                         inputClassName="w-28 bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground uppercase disabled:opacity-30 disabled:cursor-not-allowed"
                       />
                     </td>

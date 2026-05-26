@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
+import { useTimesheetJobCodeOptions } from '@/lib/client/timesheet-job-codes';
 import { fetchCurrentWorkShift, fetchEmployeeWorkShift } from '@/lib/client/work-shifts';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -197,7 +198,7 @@ function buildJobNumberValidationErrors(
 
     const jobNumbers = getNormalizedJobNumbers(entry.job_numbers);
     if (jobNumbers.length === 0 || hasDuplicateJobNumbers(entry.job_numbers) || !jobNumbers.every((jobNumber) => isValidJobNumber(jobNumber))) {
-      errors[index] = `${DAY_NAMES[index]}: Add at least one valid Job Number in format 1234-AB and do not repeat the same code on a single day.`;
+      errors[index] = `${DAY_NAMES[index]}: Add at least one valid Job Number in format 1234-AB or 40001-GH and do not repeat the same code on a single day.`;
     }
   });
 
@@ -267,6 +268,7 @@ export function PlantTimesheetV2({
 }: PlantTimesheetV2Props) {
   const router = useRouter();
   const { user, profile, loading: authLoading, isManager, isAdmin, isSuperAdmin } = useAuth();
+  const { options: jobCodeOptions, isLoading: jobCodeOptionsLoading } = useTimesheetJobCodeOptions();
   const supabase = useMemo(() => createClient(), []);
   const hasElevatedPermissions = isSuperAdmin || isManager || isAdmin;
 
@@ -1501,7 +1503,7 @@ export function PlantTimesheetV2({
                   ? 'N/A (Training)'
                   : entry.working_in_yard
                     ? 'N/A (Yard)'
-                    : '1234-AB';
+                    : 'Select job code';
 
                 return (
                   <TabsContent key={entry.day_of_week} value={String(index)} className="space-y-4 px-4 pb-4 overflow-hidden">
@@ -1604,6 +1606,8 @@ export function PlantTimesheetV2({
                             onRemove={(jobIndex) => handleRemoveJobNumberField(index, jobIndex)}
                             placeholder={jobNumberPlaceholder}
                             disabled={disableJobNumberInput}
+                            jobCodeOptions={jobCodeOptions}
+                            jobCodeOptionsLoading={jobCodeOptionsLoading}
                             inputClassName="h-16 text-3xl text-center bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground uppercase disabled:opacity-30 disabled:cursor-not-allowed"
                           />
                         </div>
@@ -1854,7 +1858,7 @@ export function PlantTimesheetV2({
                     ? 'N/A (Training)'
                     : entry.working_in_yard
                       ? 'N/A (Yard)'
-                      : '1234-AB';
+                      : 'Select job code';
 
                   return (
                     <Fragment key={entry.day_of_week}>
@@ -1915,6 +1919,8 @@ export function PlantTimesheetV2({
                             onRemove={(jobIndex) => handleRemoveJobNumberField(index, jobIndex)}
                             placeholder={jobNumberPlaceholder}
                             disabled={disableJobNumberInput}
+                            jobCodeOptions={jobCodeOptions}
+                            jobCodeOptionsLoading={jobCodeOptionsLoading}
                             inputClassName="w-32 bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground uppercase disabled:opacity-30 disabled:cursor-not-allowed"
                           />
                         </td>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { useTimesheetJobCodeOptions } from '@/lib/client/timesheet-job-codes';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -57,6 +58,7 @@ export default function ViewTimesheetPage() {
   const router = useRouter();
   const params = useParams();
   const { user, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
+  const { options: jobCodeOptions, isLoading: jobCodeOptionsLoading } = useTimesheetJobCodeOptions();
   const supabase = createClient();
   
   const [timesheet, setTimesheet] = useState<Timesheet | null>(null);
@@ -400,7 +402,7 @@ export default function ViewTimesheetPage() {
       });
 
       if (invalidJobEntry) {
-        const errorMessage = `${DAY_NAMES[invalidJobEntry.day_of_week - 1]}: add at least one valid Job Number in format 1234-AB and do not repeat the same code on a single day.`;
+        const errorMessage = `${DAY_NAMES[invalidJobEntry.day_of_week - 1]}: add at least one valid Job Number in format 1234-AB or 40001-GH and do not repeat the same code on a single day.`;
         setError(errorMessage);
         return {
           success: false,
@@ -1011,6 +1013,8 @@ export default function ViewTimesheetPage() {
                           onRemove={(jobIndex) => handleRemoveJobNumberField(index, jobIndex)}
                           disabled={entry.did_not_work || entry.working_in_yard}
                           placeholder={entry.working_in_yard ? 'YARD' : 'Job #'}
+                          jobCodeOptions={jobCodeOptions}
+                          jobCodeOptionsLoading={jobCodeOptionsLoading}
                           inputClassName="w-32 font-mono text-slate-900"
                         />
                       ) : (
@@ -1151,6 +1155,8 @@ export default function ViewTimesheetPage() {
                         onRemove={(jobIndex) => handleRemoveJobNumberField(index, jobIndex)}
                         disabled={entry.did_not_work || entry.working_in_yard}
                         placeholder={entry.working_in_yard ? 'YARD' : 'Job #'}
+                        jobCodeOptions={jobCodeOptions}
+                        jobCodeOptionsLoading={jobCodeOptionsLoading}
                         inputClassName="font-mono"
                       />
                     ) : (

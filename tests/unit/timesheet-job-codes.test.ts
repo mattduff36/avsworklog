@@ -4,6 +4,7 @@ import {
   formatEntryJobNumbers,
   getEntryJobNumbers,
   hasDuplicateJobNumbers,
+  isValidJobNumber,
   normalizeJobNumberInput,
 } from '@/lib/utils/timesheet-job-codes';
 
@@ -11,6 +12,15 @@ describe('timesheet job code helpers', () => {
   it('normalizes manual input into the expected job format', () => {
     expect(normalizeJobNumberInput('1234ab')).toBe('1234-AB');
     expect(normalizeJobNumberInput('12 34-ab-99')).toBe('1234-AB');
+    expect(normalizeJobNumberInput('40001gh')).toBe('40001-GH');
+    expect(normalizeJobNumberInput('40001-GH')).toBe('40001-GH');
+  });
+
+  it('validates legacy and quote-backed job code formats', () => {
+    expect(isValidJobNumber('1234-AB')).toBe(true);
+    expect(isValidJobNumber('40001-GH')).toBe(true);
+    expect(isValidJobNumber('40001')).toBe(false);
+    expect(isValidJobNumber('123456-GH')).toBe(false);
   });
 
   it('prefers ordered child job-code rows over the legacy scalar field', () => {
