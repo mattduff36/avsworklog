@@ -32,6 +32,7 @@ export interface FetchUserDirectoryOptions {
   includeDeleted?: boolean;
   ids?: string[];
   module?: ModuleName;
+  context?: 'actions-assignment';
   limit?: number;
   offset?: number;
 }
@@ -59,6 +60,10 @@ export async function fetchUserDirectory(
 
   if (options.module) {
     params.set('module', options.module);
+  }
+
+  if (options.context) {
+    params.set('context', options.context);
   }
 
   if (typeof options.limit === 'number') {

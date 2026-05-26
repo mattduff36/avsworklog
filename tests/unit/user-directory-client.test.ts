@@ -53,6 +53,26 @@ describe('fetchUserDirectory', () => {
     expect(fetchMock.mock.calls[0]?.[0]).toContain('/api/users/directory?limit=25&offset=50');
   });
 
+  it('passes actions assignment context through to the directory endpoint', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        users: [{ id: 'user-4', full_name: 'Dana Driver', employee_id: 'E004' }],
+        pagination: { has_more: false },
+      }),
+    } as Response);
+
+    await fetchUserDirectory({
+      includeRole: true,
+      module: 'inspections',
+      context: 'actions-assignment',
+    });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toContain(
+      '/api/users/directory?includeRole=true&module=inspections&context=actions-assignment&limit=500&offset=0',
+    );
+  });
+
   it('preserves failed response status codes for paginated requests', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: false,

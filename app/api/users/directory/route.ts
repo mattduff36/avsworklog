@@ -3,10 +3,18 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { hasWorkshopInspectionFullVisibilityOverride } from '@/lib/utils/inspection-visibility';
 import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { getUsersWithModuleAccess } from '@/lib/server/team-permissions';
 import { filterHiddenSystemTestAccountProfiles } from '@/lib/server/system-test-accounts';
 import { ALL_MODULES, type ModuleName } from '@/types/roles';
+
+const ACTION_ASSIGNMENT_MODULES: readonly ModuleName[] = [
+  'inspections',
+  'plant-inspections',
+  'hgv-inspections',
+  'reminders',
+];
 
 function isTruthy(value: string | null): boolean {
   return value === '1' || value === 'true';
@@ -32,7 +40,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Valid module query parameter is required' }, { status: 400 });
   }
 
+  const context = request.nextUrl.searchParams.get('context');
+  const isActionsAssignmentDirectory = context === 'actions-assignment';
+  if (isActionsAssignmentDirectory && !ACTION_ASSIGNMENT_MODULES.includes(moduleName as ModuleName)) {
+    return NextResponse.json({ error: 'Actions assignment directory requires a reminder module' }, { status: 400 });
+  }
+
   const effectiveRole = await getEffectiveRole();
+  const canUseActionsAssignmentDirectory = isActionsAssignmentDirectory
+    ? await canEffectiveRoleAccessModule('actions')
+    : false;
   const isInspectionDirectoryRequest =
     moduleName === 'inspections' ||
     moduleName === 'plant-inspections' ||
@@ -46,18 +63,21 @@ export async function GET(request: NextRequest) {
         hasEffectiveRoleFullAccess(effectiveRole) ||
         effectiveRole.is_manager_admin ||
         effectiveRole.role_name === 'supervisor' ||
-        hasWorkshopInspectionAccess
+        hasWorkshopInspectionAccess ||
+        canUseActionsAssignmentDirectory
       )
   );
   if (!canViewDirectory) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
   const isAdminOrSuper = hasEffectiveRoleFullAccess(effectiveRole);
-  const shouldScopeToTeam = hasWorkshopInspectionAccess
-    ? true
-    : (effectiveRole.is_manager_admin || effectiveRole.role_name === 'supervisor') &&
-      !isAdminOrSuper &&
-      !isInspectionDirectoryRequest;
+  let shouldScopeToTeam = false;
+  if (!canUseActionsAssignmentDirectory) {
+    shouldScopeToTeam = hasWorkshopInspectionAccess ||
+      ((effectiveRole.is_manager_admin || effectiveRole.role_name === 'supervisor') &&
+        !isAdminOrSuper &&
+        !isInspectionDirectoryRequest);
+  }
 
   const includeRole = isTruthy(request.nextUrl.searchParams.get('includeRole'));
   const includeAllowance = isTruthy(request.nextUrl.searchParams.get('includeAllowance'));

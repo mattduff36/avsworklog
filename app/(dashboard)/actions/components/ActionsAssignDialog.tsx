@@ -41,7 +41,7 @@ export function ActionsAssignDialog({
       const directoryUsers = await fetchUserDirectory({
         includeRole: true,
         module: requiredModule,
-        limit: 500,
+        context: 'actions-assignment',
       });
 
       setUsers(
