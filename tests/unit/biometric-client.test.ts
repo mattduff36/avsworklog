@@ -33,9 +33,9 @@ describe('biometric browser helpers', () => {
   });
 
   it('hides biometric UI when the WebAuthn browser API is unavailable', async () => {
-    const { canUseBiometricUnlock } = await import('@/lib/account-switch/biometric');
+    const { canUsePlatformAuthenticator } = await import('@/lib/webauthn/client');
 
-    await expect(canUseBiometricUnlock()).resolves.toBe(false);
+    await expect(canUsePlatformAuthenticator()).resolves.toBe(false);
     expect(browserSupportsWebAuthnMock).not.toHaveBeenCalled();
   });
 
@@ -43,9 +43,9 @@ describe('biometric browser helpers', () => {
     vi.stubGlobal('window', { PublicKeyCredential: function PublicKeyCredential() {} });
     platformAuthenticatorIsAvailableMock.mockResolvedValue(false);
 
-    const { canUseBiometricUnlock } = await import('@/lib/account-switch/biometric');
+    const { canUsePlatformAuthenticator } = await import('@/lib/webauthn/client');
 
-    await expect(canUseBiometricUnlock()).resolves.toBe(false);
+    await expect(canUsePlatformAuthenticator()).resolves.toBe(false);
     expect(browserSupportsWebAuthnMock).toHaveBeenCalled();
     expect(platformAuthenticatorIsAvailableMock).toHaveBeenCalled();
   });
@@ -58,7 +58,7 @@ describe('biometric browser helpers', () => {
     const {
       startBiometricAuthentication,
       startBiometricRegistration,
-    } = await import('@/lib/account-switch/biometric');
+    } = await import('@/lib/webauthn/client');
 
     const registrationOptions = { challenge: 'registration-challenge' };
     const authenticationOptions = { challenge: 'authentication-challenge' };
@@ -89,7 +89,7 @@ describe('biometric browser helpers', () => {
       getLocalBiometricLoginProfileIds,
       hasLocalBiometricLoginProfile,
       markLocalBiometricLoginEnabled,
-    } = await import('@/lib/account-switch/biometric');
+    } = await import('@/lib/webauthn/client');
 
     markLocalBiometricLoginEnabled('profile-1');
     markLocalBiometricLoginEnabled('profile-2');

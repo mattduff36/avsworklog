@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { GET, POST } from '@/app/api/quotes/route';
+import { createSupabaseQueryMock } from '@/tests/utils/supabase-query-mock';
 
 const {
   mockCreateClient,
@@ -45,14 +46,7 @@ vi.mock('@/lib/server/quote-workflow', () => ({
 
 function createQueryableResult<T>(rows: T[]) {
   const result = { data: rows, error: null };
-  const query = {
-    eq: vi.fn().mockReturnThis(),
-    in: vi.fn().mockReturnThis(),
-    order: vi.fn().mockResolvedValue(result),
-    then: (resolve: (value: typeof result) => unknown) => Promise.resolve(result).then(resolve),
-  };
-
-  return query;
+  return createSupabaseQueryMock(result, ['eq', 'in', 'order']);
 }
 
 function createPaginatedQuoteQuery(rows: Array<Record<string, unknown>>) {

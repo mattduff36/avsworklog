@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAccountSwitchAuditEvent } from '@/lib/server/account-switch-audit';
+import { createWebAuthnAuditEvent } from '@/lib/server/webauthn/audit';
 import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
 import { dismissBiometricPrompt } from '@/lib/server/webauthn/credentials';
 
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     rawDeviceId: body.deviceId,
   });
 
-  await createAccountSwitchAuditEvent({
+  await createWebAuthnAuditEvent({
     profileId: current.profile.id,
     actorProfileId: current.profile.id,
     eventType: 'biometric_prompt_dismissed',

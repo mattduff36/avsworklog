@@ -11,8 +11,8 @@ import { ProfileIdentityCard } from '@/components/profile/ProfileIdentityCard';
 import { ProfileModuleSummaries } from '@/components/profile/ProfileModuleSummaries';
 import { ProfileQuickLinks } from '@/components/profile/ProfileQuickLinks';
 import { ProfileSettingsCard } from '@/components/profile/ProfileSettingsCard';
+import { ProfileBiometricsCard } from '@/components/profile/ProfileBiometricsCard';
 import { ProfileHelpShortcuts } from '@/components/profile/ProfileHelpShortcuts';
-import { AccountSwitcherSettingsCard } from '@/components/account-switch/AccountSwitcherSettingsCard';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   NOTIFICATION_MODULES,
@@ -404,7 +404,7 @@ export default function ProfilePage() {
         onTogglePreference={handleTogglePreference}
       />
 
-      <AccountSwitcherSettingsCard />
+      <ProfileBiometricsCard />
 
       <ProfileHelpShortcuts />
     </AppPageShell>

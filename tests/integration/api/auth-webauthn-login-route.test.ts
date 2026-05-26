@@ -60,8 +60,8 @@ vi.mock('@/lib/server/app-auth/profile', () => ({
   getAppAuthProfile: getAppAuthProfileMock,
 }));
 
-vi.mock('@/lib/server/account-switch-audit', () => ({
-  createAccountSwitchAuditEvent: vi.fn(),
+vi.mock('@/lib/server/webauthn/audit', () => ({
+  createWebAuthnAuditEvent: vi.fn(),
 }));
 
 import { POST as verifyPost } from '@/app/api/auth/webauthn/login/verify/route';

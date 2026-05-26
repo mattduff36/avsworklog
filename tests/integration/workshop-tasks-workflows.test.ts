@@ -449,7 +449,7 @@ describe('Workshop Tasks Module Workflows', () => {
           testCategoryId = data.category.id;
           createdCategoryIds.add(data.category.id);
         }
-      } catch (error) {
+      } catch {
         console.log('API test skipped - server may not be reachable from test environment');
         return;
       }

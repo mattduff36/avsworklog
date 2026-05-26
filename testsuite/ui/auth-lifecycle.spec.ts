@@ -32,16 +32,6 @@ async function fetchSessionStatus(page: import('@playwright/test').Page): Promis
   });
 }
 
-async function fetchSessionPayload(page: import('@playwright/test').Page): Promise<{ status: number; payload: { locked?: boolean } | null }> {
-  return page.evaluate(async () => {
-    const response = await fetch('/api/auth/session', {
-      credentials: 'include',
-    });
-    const payload = await response.json().catch(() => null) as { locked?: boolean } | null;
-    return { status: response.status, payload };
-  });
-}
-
 test.describe('@auth @lifecycle Authentication Lifecycle', () => {
   test.beforeEach(async ({ page }) => {
     await login(page, 'admin');
@@ -152,61 +142,14 @@ test.describe('@auth @lifecycle Authentication Lifecycle', () => {
     }
   });
 
-  test('lock flow enters lock state when switcher is available', async ({ page }, testInfo) => {
+  test('retired lock switch entrypoint is absent', async ({ page }, testInfo) => {
     const lockButton = page.getByRole('button', { name: /lock\s*\/\s*switch/i }).first();
-    const hasLockButton = (await lockButton.count()) > 0;
-    if (!hasLockButton) {
+    if ((await lockButton.count()) > 0) {
       await logIssue(testInfo, {
-        scenario: 'lock entrypoint visibility',
-        details: 'Lock / Switch control was not available in this environment.',
-        severity: 'medium',
-        route: '/dashboard',
-      });
-      return;
-    }
-
-    await lockButton.click();
-
-    const movedToLock = await page
-      .waitForURL((url) => url.pathname.includes('/lock'), { timeout: 8_000 })
-      .then(() => true)
-      .catch(() => false);
-
-    if (!movedToLock) {
-      const hasPinSetupDialog = await page
-        .getByText(/set your 4-digit pin|create device pin/i)
-        .first()
-        .isVisible()
-        .catch(() => false);
-
-      if (!hasPinSetupDialog) {
-        await logIssue(testInfo, {
-          scenario: 'lock navigation transition',
-          details: 'Lock action did not navigate to /lock and no PIN setup dialog was visible.',
-          severity: 'high',
-          route: '/dashboard',
-        });
-      }
-      return;
-    }
-
-    const sessionResponse = await fetchSessionPayload(page);
-    if (sessionResponse.status !== 200) {
-      await logIssue(testInfo, {
-        scenario: 'locked session API shape',
-        details: `Expected /api/auth/session to stay readable after lock but got ${sessionResponse.status}.`,
-        severity: 'medium',
-        route: '/lock',
-      });
-      return;
-    }
-
-    if (sessionResponse.payload?.locked !== true) {
-      await logIssue(testInfo, {
-        scenario: 'lock state propagation',
-        details: 'Lock route loaded but /api/auth/session did not report locked=true.',
+        scenario: 'retired lock entrypoint visibility',
+        details: 'Lock / Switch control is still visible after the feature was removed.',
         severity: 'high',
-        route: '/lock',
+        route: '/dashboard',
       });
     }
   });

@@ -320,7 +320,7 @@ async function main() {
 
         console.log(`   → DVLA: ${dvlaSuccess ? 'Success' : 'Failed'}, MOT: ${motSuccess ? 'Success' : 'Failed'}`);
         console.log('   → Both APIs handled errors gracefully');
-      } catch (error) {
+      } catch {
         throw new Error('Unhandled error in parallel API calls');
       }
     });

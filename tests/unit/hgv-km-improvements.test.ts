@@ -71,7 +71,10 @@ describe('KM labels present in HGV-specific files', () => {
   });
 
   it('HGV fleet history page uses "Current KM" and "Service Due KM"', () => {
-    const src = readSource('app/(dashboard)/fleet/hgvs/[hgvId]/history/page.tsx');
+    const src = [
+      readSource('app/(dashboard)/fleet/hgvs/[hgvId]/history/page.tsx'),
+      readSource('lib/fleet/asset-history-field-labels.ts'),
+    ].join('\n');
     expect(src).toContain('Current KM');
     expect(src).toContain('Service Due KM');
     expect(src).toContain('Last Service KM');

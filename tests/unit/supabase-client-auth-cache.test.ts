@@ -67,7 +67,6 @@ describe('supabase browser client', () => {
     loadClientAuthSessionMock.mockResolvedValue({
       payload: {
         authenticated: true,
-        locked: false,
         user: {
           id: 'user-123',
           email: 'worker@example.com',
@@ -90,7 +89,7 @@ describe('supabase browser client', () => {
       invalidateCachedDataToken,
     } = await import('@/lib/supabase/client');
 
-    const client = createClient() as typeof baseClient & {
+    const client = createClient() as unknown as typeof baseClient & {
       options: {
         accessToken: () => Promise<string | null>;
       };
@@ -131,7 +130,6 @@ describe('supabase browser client', () => {
     loadClientAuthSessionMock.mockResolvedValue({
       payload: {
         authenticated: true,
-        locked: false,
         user: {
           id: 'user-123',
           email: 'worker@example.com',
@@ -140,7 +138,7 @@ describe('supabase browser client', () => {
     });
 
     const { createClient } = await import('@/lib/supabase/client');
-    const client = createClient() as {
+    const client = createClient() as unknown as {
       options: {
         global: {
           fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -150,7 +148,7 @@ describe('supabase browser client', () => {
 
     await client.options.global.fetch('https://example.supabase.co/rest/v1/profiles', {});
 
-    const [, init] = fetchSpy.mock.calls[0];
+    const [, init] = fetchSpy.mock.calls[0] as [RequestInfo | URL, RequestInit | undefined];
     const headers = new Headers(init?.headers);
     expect(headers.get('x-view-as-role-id')).toBe('role-123');
     expect(headers.get('x-view-as-team-id')).toBe('team-456');
@@ -167,7 +165,6 @@ describe('supabase browser client', () => {
     loadClientAuthSessionMock.mockResolvedValue({
       payload: {
         authenticated: true,
-        locked: false,
         user: {
           id: 'user-123',
           email: 'worker@example.com',
@@ -184,7 +181,7 @@ describe('supabase browser client', () => {
     vi.stubGlobal('fetch', fetchSpy);
 
     const { createClient, getLastDataTokenFailureStatus } = await import('@/lib/supabase/client');
-    const client = createClient() as typeof baseClient & {
+    const client = createClient() as unknown as typeof baseClient & {
       options: {
         accessToken: () => Promise<string | null>;
       };

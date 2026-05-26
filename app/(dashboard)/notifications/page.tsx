@@ -50,6 +50,8 @@ const MODULE_ICONS: Record<string, React.ComponentType<{ className?: string }>> 
   'FileText': FileText,
   'CheckSquare': CheckSquare,
   'ClipboardCheck': ClipboardCheck,
+  'PenLine': PenLine,
+  'Bell': Bell,
 };
 
 function isDismissibleNotification(notification: NotificationItem) {

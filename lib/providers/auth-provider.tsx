@@ -13,7 +13,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { type SupabaseClient, type User } from '@supabase/supabase-js';
 import {
   broadcastAuthStateChange,
-  clearLegacyAccountSwitchClientState,
+  clearRetiredAccountSwitchClientState,
   subscribeToAuthStateChange,
 } from '@/lib/app-auth/client';
 import {
@@ -96,7 +96,6 @@ interface AuthContextValue {
   user: User | null;
   profile: Profile | null;
   loading: boolean;
-  locked: boolean;
   signIn: (
     email: string,
     password: string,
@@ -114,7 +113,7 @@ interface AuthContextValue {
     } | null;
     error: { message: string } | null;
   }>;
-  signOut: (options?: { deviceId?: string | null }) => Promise<{ error: { message: string } | null }>;
+  signOut: () => Promise<{ error: { message: string } | null }>;
   signUp: (
     email: string,
     password: string,
@@ -206,23 +205,8 @@ function buildLoginRedirectUrl(): string {
   const url = new URL('/login', window.location.origin);
   const currentPath = getCurrentPath();
 
-  if (!isPublicPath(currentPath) && !currentPath.startsWith('/lock')) {
+  if (!isPublicPath(currentPath)) {
     url.searchParams.set('redirect', currentPath);
-  }
-
-  return url.toString();
-}
-
-function buildLockRedirectUrl(): string {
-  if (typeof window === 'undefined') {
-    return '/lock';
-  }
-
-  const url = new URL('/lock', window.location.origin);
-  const currentPath = getCurrentPath();
-
-  if (!currentPath.startsWith('/lock')) {
-    url.searchParams.set('returnTo', currentPath);
   }
 
   return url.toString();
@@ -249,8 +233,7 @@ function buildAuthenticatedRedirectUrl(payload: ClientAuthSessionResponse): stri
     const redirectTarget = currentUrl.searchParams.get('redirect');
     if (
       redirectTarget &&
-      redirectTarget.startsWith('/') &&
-      !redirectTarget.startsWith('/lock')
+      redirectTarget.startsWith('/')
     ) {
       return redirectTarget;
     }
@@ -274,14 +257,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const queryClient = useQueryClient();
   const previousUserIdRef = useRef<string | null>(null);
   const sessionSnapshotRef = useRef<AuthSessionSnapshot>(getUnauthenticatedSessionSnapshot());
-  const redirectInProgressRef = useRef<'login' | 'lock' | null>(null);
+  const redirectInProgressRef = useRef<'login' | null>(null);
   const recoveryPromiseRef = useRef<Promise<boolean> | null>(null);
   const lastBackgroundRefreshAtRef = useRef(0);
   const pendingResumeRefreshTimeoutRef = useRef<number | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [locked, setLocked] = useState(false);
   const [effectiveRole, setEffectiveRole] = useState<EffectiveRole | null>(null);
   const [supabase, setSupabase] = useState<BrowserSupabaseClient | null>(null);
   const [viewAsSelection, setViewAsSelection] = useState<ViewAsSelection>({ roleId: '', teamId: '' });
@@ -336,7 +318,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     sessionSnapshotRef.current = getUnauthenticatedSessionSnapshot();
     setUser(null);
     setProfile(null);
-    setLocked(false);
     setEffectiveRole(null);
   }, []);
 
@@ -371,25 +352,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     window.location.replace(buildLoginRedirectUrl());
   }, [clearLocalAuthState]);
 
-  const redirectToLock = useCallback(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    const currentPath = getCurrentPath();
-    if (currentPath.startsWith('/lock') || redirectInProgressRef.current === 'lock' || isPublicPath(currentPath)) {
-      return;
-    }
-
-    redirectInProgressRef.current = 'lock';
-    invalidateCachedDataToken();
-    window.location.replace(buildLockRedirectUrl());
-  }, []);
-
   const applySessionPayload = useCallback((payload: ClientAuthSessionResponse) => {
     setUser(buildSyntheticUser(payload));
     setProfile(payload.profile ? ({ ...payload.profile } as Profile) : null);
-    setLocked(payload.locked === true);
   }, []);
 
   const onAuthTransition = useCallback(async (
@@ -417,8 +382,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (
       transition.authChanged ||
       transition.userChanged ||
-      transition.profileChanged ||
-      transition.lockChanged
+      transition.profileChanged
     ) {
       await invalidateAuthScopedQueries();
     }
@@ -446,15 +410,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       return result;
     }
 
-    if (result.status === 'locked' && result.payload) {
-      redirectInProgressRef.current = null;
-      await onAuthTransition(buildSessionSnapshot(result.payload), reason);
-      applySessionPayload(result.payload);
-      setLoading(false);
-      redirectToLock();
-      return result;
-    }
-
     if (result.status === 'unauthenticated') {
       if (shouldDeferUnauthenticatedHandling(reason, { silent: options?.silent })) {
         setLoading(false);
@@ -470,7 +425,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     setLoading(false);
     return result;
-  }, [applySessionPayload, clearLocalAuthState, onAuthTransition, redirectToLock, redirectToLogin]);
+  }, [applySessionPayload, clearLocalAuthState, onAuthTransition, redirectToLogin]);
 
   const requestBackgroundAuthRefresh = useCallback(async (
     reason: Extract<AuthTransitionReason, 'focus' | 'visibility' | 'online' | 'interval'>
@@ -506,7 +461,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [requestBackgroundAuthRefresh]);
 
   useEffect(() => {
-    clearLegacyAccountSwitchClientState();
+    clearRetiredAccountSwitchClientState();
     void loadAuthSession({ reason: 'initial_load' });
 
     const unsubscribe = subscribeToAuthStateChange(() => {
@@ -671,13 +626,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => installGlobalAuthAwareFetch(), []);
 
   const forceAuthRedirect = useCallback(async (statusCode?: number | null) => {
-    if (statusCode === 423 || locked) {
-      redirectToLock();
-      return;
-    }
-
+    void statusCode;
     await redirectToLogin();
-  }, [locked, redirectToLock, redirectToLogin]);
+  }, [redirectToLogin]);
 
   const recoverFromAuthFailure = useCallback(async (options?: AuthRecoveryOptions) => {
     if (recoveryPromiseRef.current) {
@@ -753,15 +704,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
   }, [loadAuthSession]);
 
-  const signOut = useCallback(async (options?: { deviceId?: string | null }) => {
+  const signOut = useCallback(async () => {
     const response = await fetch('/api/auth/logout', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        deviceId: options?.deviceId || null,
-      }),
+      body: JSON.stringify({}),
     });
 
     const payload = (await response.json().catch(() => ({}))) as { error?: string };
@@ -815,7 +764,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     user,
     profile,
     loading,
-    locked,
     signIn,
     signOut,
     signUp,
@@ -837,7 +785,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isViewingAs,
     loadAuthSession,
     loading,
-    locked,
     profile,
     recoverFromAuthFailure,
     roleForFlags,

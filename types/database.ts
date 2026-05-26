@@ -802,12 +802,12 @@ export type Database = {
           },
         ]
       }
-      account_switch_audit_events: {
+      webauthn_audit_events: {
         Row: {
           id: string
           profile_id: string
           actor_profile_id: string
-          event_type: 'pin_setup' | 'pin_reset' | 'pin_verify_success' | 'pin_verify_failed' | 'pin_locked' | 'session_registered' | 'session_switch_success' | 'session_switch_failed' | 'shortcut_removed' | 'device_registered' | 'device_revoked' | 'password_fallback_success' | 'password_fallback_failed' | 'app_session_created' | 'app_session_locked' | 'app_session_unlocked' | 'app_session_revoked' | 'device_pin_cleared' | 'biometric_registration_success' | 'biometric_registration_failed' | 'biometric_login_success' | 'biometric_login_failed' | 'biometric_unlock_success' | 'biometric_unlock_failed' | 'biometric_prompt_dismissed' | 'biometric_credential_revoked'
+          event_type: 'biometric_registration_success' | 'biometric_registration_failed' | 'biometric_login_success' | 'biometric_login_failed' | 'biometric_prompt_dismissed' | 'biometric_credential_revoked'
           metadata: Json
           created_at: string
         }
@@ -815,7 +815,7 @@ export type Database = {
           id?: string
           profile_id: string
           actor_profile_id?: string | null
-          event_type: 'pin_setup' | 'pin_reset' | 'pin_verify_success' | 'pin_verify_failed' | 'pin_locked' | 'session_registered' | 'session_switch_success' | 'session_switch_failed' | 'shortcut_removed' | 'device_registered' | 'device_revoked' | 'password_fallback_success' | 'password_fallback_failed' | 'app_session_created' | 'app_session_locked' | 'app_session_unlocked' | 'app_session_revoked' | 'device_pin_cleared' | 'biometric_registration_success' | 'biometric_registration_failed' | 'biometric_login_success' | 'biometric_login_failed' | 'biometric_unlock_success' | 'biometric_unlock_failed' | 'biometric_prompt_dismissed' | 'biometric_credential_revoked'
+          event_type: 'biometric_registration_success' | 'biometric_registration_failed' | 'biometric_login_success' | 'biometric_login_failed' | 'biometric_prompt_dismissed' | 'biometric_credential_revoked'
           metadata?: Json
           created_at?: string
         }
@@ -823,20 +823,20 @@ export type Database = {
           id?: string
           profile_id?: string
           actor_profile_id?: string | null
-          event_type?: 'pin_setup' | 'pin_reset' | 'pin_verify_success' | 'pin_verify_failed' | 'pin_locked' | 'session_registered' | 'session_switch_success' | 'session_switch_failed' | 'shortcut_removed' | 'device_registered' | 'device_revoked' | 'password_fallback_success' | 'password_fallback_failed' | 'app_session_created' | 'app_session_locked' | 'app_session_unlocked' | 'app_session_revoked' | 'device_pin_cleared' | 'biometric_registration_success' | 'biometric_registration_failed' | 'biometric_login_success' | 'biometric_login_failed' | 'biometric_unlock_success' | 'biometric_unlock_failed' | 'biometric_prompt_dismissed' | 'biometric_credential_revoked'
+          event_type?: 'biometric_registration_success' | 'biometric_registration_failed' | 'biometric_login_success' | 'biometric_login_failed' | 'biometric_prompt_dismissed' | 'biometric_credential_revoked'
           metadata?: Json
           created_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: 'account_switch_audit_events_actor_profile_id_fkey'
+            foreignKeyName: 'webauthn_audit_events_actor_profile_id_fkey'
             columns: ['actor_profile_id']
             isOneToOne: false
             referencedRelation: 'profiles'
             referencedColumns: ['id']
           },
           {
-            foreignKeyName: 'account_switch_audit_events_profile_id_fkey'
+            foreignKeyName: 'webauthn_audit_events_profile_id_fkey'
             columns: ['profile_id']
             isOneToOne: false
             referencedRelation: 'profiles'
@@ -844,62 +844,7 @@ export type Database = {
           },
         ]
       }
-      account_switch_device_credentials: {
-        Row: {
-          profile_id: string
-          device_id: string
-          pin_hash: string
-          pin_failed_attempts: number
-          pin_locked_until: string
-          pin_last_changed_at: string
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          profile_id: string
-          device_id: string
-          pin_hash: string
-          pin_failed_attempts?: number
-          pin_locked_until?: string | null
-          pin_last_changed_at?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          profile_id?: string
-          device_id?: string
-          pin_hash?: string
-          pin_failed_attempts?: number
-          pin_locked_until?: string | null
-          pin_last_changed_at?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: 'account_switch_device_credentials_device_id_fkey'
-            columns: ['device_id']
-            isOneToOne: false
-            referencedRelation: 'account_switch_devices'
-            referencedColumns: ['id']
-          },
-          {
-            foreignKeyName: 'account_switch_device_credentials_device_id_profile_id_fkey'
-            columns: ['device_id', 'device_id', 'profile_id', 'profile_id']
-            isOneToOne: false
-            referencedRelation: 'account_switch_devices'
-            referencedColumns: ['profile_id', 'id', 'id', 'profile_id']
-          },
-          {
-            foreignKeyName: 'account_switch_device_credentials_profile_id_fkey'
-            columns: ['profile_id']
-            isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
-          },
-        ]
-      }
-      account_switch_devices: {
+      webauthn_devices: {
         Row: {
           id: string
           profile_id: string
@@ -911,7 +856,6 @@ export type Database = {
           created_at: string
           updated_at: string
           last_authenticated_at: string
-          last_locked_at: string
         }
         Insert: {
           id?: string
@@ -924,7 +868,6 @@ export type Database = {
           created_at?: string
           updated_at?: string
           last_authenticated_at?: string | null
-          last_locked_at?: string | null
         }
         Update: {
           id?: string
@@ -937,40 +880,10 @@ export type Database = {
           created_at?: string
           updated_at?: string
           last_authenticated_at?: string | null
-          last_locked_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: 'account_switch_devices_profile_id_fkey'
-            columns: ['profile_id']
-            isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
-          },
-        ]
-      }
-      account_switch_settings: {
-        Row: {
-          profile_id: string
-          quick_switch_enabled: boolean
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          profile_id: string
-          quick_switch_enabled?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          profile_id?: string
-          quick_switch_enabled?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: 'account_switch_settings_profile_id_fkey'
+            foreignKeyName: 'webauthn_devices_profile_id_fkey'
             columns: ['profile_id']
             isOneToOne: false
             referencedRelation: 'profiles'
@@ -1155,9 +1068,8 @@ export type Database = {
           profile_id: string
           device_id: string
           session_secret_hash: string
-          session_source: 'password_login' | 'pin_unlock' | 'session_bootstrap' | 'biometric_login' | 'biometric_unlock'
+          session_source: 'password_login' | 'session_bootstrap' | 'biometric_login'
           remember_me: boolean
-          locked_at: string
           last_seen_at: string
           idle_expires_at: string
           absolute_expires_at: string
@@ -1174,9 +1086,8 @@ export type Database = {
           profile_id: string
           device_id?: string | null
           session_secret_hash: string
-          session_source: 'password_login' | 'pin_unlock' | 'session_bootstrap' | 'biometric_login' | 'biometric_unlock'
+          session_source: 'password_login' | 'session_bootstrap' | 'biometric_login'
           remember_me?: boolean
-          locked_at?: string | null
           last_seen_at?: string
           idle_expires_at: string
           absolute_expires_at: string
@@ -1193,9 +1104,8 @@ export type Database = {
           profile_id?: string
           device_id?: string | null
           session_secret_hash?: string
-          session_source?: 'password_login' | 'pin_unlock' | 'session_bootstrap' | 'biometric_login' | 'biometric_unlock'
+          session_source?: 'password_login' | 'session_bootstrap' | 'biometric_login'
           remember_me?: boolean
-          locked_at?: string | null
           last_seen_at?: string
           idle_expires_at?: string
           absolute_expires_at?: string
@@ -1212,7 +1122,7 @@ export type Database = {
             foreignKeyName: 'app_auth_sessions_device_id_fkey'
             columns: ['device_id']
             isOneToOne: false
-            referencedRelation: 'account_switch_devices'
+            referencedRelation: 'webauthn_devices'
             referencedColumns: ['id']
           },
           {
@@ -1237,7 +1147,7 @@ export type Database = {
           profile_id: string | null
           device_id: string | null
           challenge: string
-          challenge_type: 'registration' | 'authentication' | 'account_switch_authentication'
+          challenge_type: 'registration' | 'authentication'
           webauthn_user_id: string | null
           expires_at: string
           consumed_at: string | null
@@ -1248,7 +1158,7 @@ export type Database = {
           profile_id?: string | null
           device_id?: string | null
           challenge: string
-          challenge_type: 'registration' | 'authentication' | 'account_switch_authentication'
+          challenge_type: 'registration' | 'authentication'
           webauthn_user_id?: string | null
           expires_at: string
           consumed_at?: string | null
@@ -1259,7 +1169,7 @@ export type Database = {
           profile_id?: string | null
           device_id?: string | null
           challenge?: string
-          challenge_type?: 'registration' | 'authentication' | 'account_switch_authentication'
+          challenge_type?: 'registration' | 'authentication'
           webauthn_user_id?: string | null
           expires_at?: string
           consumed_at?: string | null
@@ -1270,7 +1180,7 @@ export type Database = {
             foreignKeyName: 'webauthn_challenges_device_id_fkey'
             columns: ['device_id']
             isOneToOne: false
-            referencedRelation: 'account_switch_devices'
+            referencedRelation: 'webauthn_devices'
             referencedColumns: ['id']
           },
           {
@@ -1342,7 +1252,7 @@ export type Database = {
             foreignKeyName: 'webauthn_credentials_device_id_fkey'
             columns: ['device_id']
             isOneToOne: false
-            referencedRelation: 'account_switch_devices'
+            referencedRelation: 'webauthn_devices'
             referencedColumns: ['id']
           },
           {
@@ -1381,7 +1291,7 @@ export type Database = {
             foreignKeyName: 'webauthn_prompt_preferences_device_id_fkey'
             columns: ['device_id']
             isOneToOne: false
-            referencedRelation: 'account_switch_devices'
+            referencedRelation: 'webauthn_devices'
             referencedColumns: ['id']
           },
           {
@@ -2981,7 +2891,7 @@ export type Database = {
         Row: {
           id: string
           user_id: string
-          module_key: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections'
+          module_key: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'toolbox_talks' | 'reminders' | 'general_notifications'
           enabled: boolean
           notify_in_app: boolean
           notify_email: boolean
@@ -2991,7 +2901,7 @@ export type Database = {
         Insert: {
           id?: string
           user_id: string
-          module_key: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections'
+          module_key: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'toolbox_talks' | 'reminders' | 'general_notifications'
           enabled?: boolean | null
           notify_in_app?: boolean | null
           notify_email?: boolean | null
@@ -3001,7 +2911,7 @@ export type Database = {
         Update: {
           id?: string
           user_id?: string
-          module_key?: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections'
+          module_key?: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'toolbox_talks' | 'reminders' | 'general_notifications'
           enabled?: boolean | null
           notify_in_app?: boolean | null
           notify_email?: boolean | null
@@ -6275,11 +6185,11 @@ export type Database = {
       check__absences__status: 'pending' | 'approved' | 'processed' | 'rejected' | 'cancelled'
       check__absences_archive__half_day_session: 'AM' | 'PM'
       check__absences_archive__status: 'pending' | 'approved' | 'processed' | 'rejected' | 'cancelled'
-      check__account_switch_audit_events__event_type: 'pin_setup' | 'pin_reset' | 'pin_verify_success' | 'pin_verify_failed' | 'pin_locked' | 'session_registered' | 'session_switch_success' | 'session_switch_failed' | 'shortcut_removed' | 'device_registered' | 'device_revoked' | 'password_fallback_success' | 'password_fallback_failed' | 'app_session_created' | 'app_session_locked' | 'app_session_unlocked' | 'app_session_revoked' | 'device_pin_cleared' | 'biometric_registration_success' | 'biometric_registration_failed' | 'biometric_login_success' | 'biometric_login_failed' | 'biometric_unlock_success' | 'biometric_unlock_failed' | 'biometric_prompt_dismissed' | 'biometric_credential_revoked'
+      check__webauthn_audit_events__event_type: 'biometric_registration_success' | 'biometric_registration_failed' | 'biometric_login_success' | 'biometric_login_failed' | 'biometric_prompt_dismissed' | 'biometric_credential_revoked'
       check__actions__action_type: 'inspection_defect' | 'workshop_vehicle_task' | 'manager_action'
       check__actions__priority: 'low' | 'medium' | 'high' | 'urgent'
       check__actions__status: 'pending' | 'in_progress' | 'logged' | 'on_hold' | 'completed'
-      check__app_auth_sessions__session_source: 'password_login' | 'pin_unlock' | 'session_bootstrap' | 'biometric_login' | 'biometric_unlock'
+      check__app_auth_sessions__session_source: 'password_login' | 'session_bootstrap' | 'biometric_login'
       check__customers__status: 'active' | 'inactive'
       check__dvla_sync_log__sync_status: 'success' | 'error'
       check__dvla_sync_log__trigger_type: 'manual' | 'bulk' | 'automatic' | 'auto_on_create'
@@ -6293,7 +6203,7 @@ export type Database = {
       check__message_recipients__status: 'PENDING' | 'SHOWN' | 'SIGNED' | 'DISMISSED'
       check__messages__priority: 'HIGH' | 'LOW'
       check__messages__type: 'TOOLBOX_TALK' | 'REMINDER' | 'NOTIFICATION'
-      check__notification_preferences__module_key: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections'
+      check__notification_preferences__module_key: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'toolbox_talks' | 'reminders' | 'general_notifications'
       check__org_teams__timesheet_type: 'civils' | 'plant'
       check__plant__status: 'active' | 'inactive' | 'maintenance' | 'retired'
       check__plant_inspections__status: 'draft' | 'submitted'

@@ -4,12 +4,11 @@ import { applyValidationCookieIfNeeded } from '@/lib/server/app-auth/response';
 import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
 
 export async function GET() {
-  const current = await getCurrentAuthenticatedProfile({ allowLocked: true, includeEmail: true });
+  const current = await getCurrentAuthenticatedProfile({ includeEmail: true });
   if (!current) {
     return NextResponse.json(
       {
         authenticated: false,
-        locked: false,
         user: null,
         profile: null,
         data_token_available: Boolean(process.env.SUPABASE_JWT_SECRET),
@@ -20,7 +19,6 @@ export async function GET() {
 
   const response = NextResponse.json({
     authenticated: true,
-    locked: current.validation.status === 'locked',
     user: {
       id: current.profile.id,
       email: current.profile.email,

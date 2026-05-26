@@ -83,7 +83,7 @@ function DashboardLayoutShell({
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { profile, loading: authLoading, locked } = useAuth();
+  const { profile, loading: authLoading } = useAuth();
   const clientServiceOutage = useClientServiceOutage();
   const { tabletModeEnabled, tabletModeInfoOpen, dismissTabletModeInfo } = useTabletMode();
   const lastTrackedPathRef = useRef<string>('');
@@ -98,7 +98,7 @@ function DashboardLayoutShell({
   }, [pathname, searchParams]);
 
   const trackPageVisit = useCallback((path: string, minimumGapMs = 0) => {
-    if (!path || authLoading || locked || clientServiceOutage || !profile?.id) return;
+    if (!path || authLoading || clientServiceOutage || !profile?.id) return;
 
     const now = Date.now();
     const lastVisit = lastPageVisitRef.current;
@@ -118,7 +118,7 @@ function DashboardLayoutShell({
     }).catch(() => {
       // Avoid noisy console logs for non-critical tracking telemetry.
     });
-  }, [authLoading, clientServiceOutage, locked, profile?.id]);
+  }, [authLoading, clientServiceOutage, profile?.id]);
 
   const stopHeartbeat = useCallback(() => {
     if (!heartbeatIntervalRef.current) return;
@@ -159,11 +159,11 @@ function DashboardLayoutShell({
   }, []);
 
   const sendHeartbeat = useCallback(() => {
-    if (document.hidden || authLoading || locked || clientServiceOutage || !profile?.id) return;
+    if (document.hidden || authLoading || clientServiceOutage || !profile?.id) return;
     const currentPath = getCurrentTrackedPath();
     if (!currentPath) return;
     trackPageVisit(currentPath, PAGE_VISIT_RESUME_MIN_GAP_MS);
-  }, [authLoading, clientServiceOutage, getCurrentTrackedPath, locked, profile?.id, trackPageVisit]);
+  }, [authLoading, clientServiceOutage, getCurrentTrackedPath, profile?.id, trackPageVisit]);
 
   const startHeartbeat = useCallback(() => {
     stopHeartbeat();

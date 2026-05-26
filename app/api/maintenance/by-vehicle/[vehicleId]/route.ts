@@ -249,7 +249,7 @@ export async function POST(
     });
 
     const requestedUpdates: Partial<UpdateMaintenanceRequest> = {
-      ...(autoPlan?.maintenanceUpdates || {}),
+      ...autoPlan?.maintenanceUpdates,
     };
 
     const requestedCustomItemsByCategoryId = new Map<string, CustomMaintenanceItemUpdate>();
@@ -261,7 +261,7 @@ export async function POST(
     }
 
     const requestedPlantUpdates: { loler_due_date?: string | null } = {
-      ...(autoPlan?.plantUpdates || {}),
+      ...autoPlan?.plantUpdates,
     };
 
     const maintenanceFields: Array<keyof UpdateMaintenanceRequest> = [

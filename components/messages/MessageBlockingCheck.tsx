@@ -51,7 +51,7 @@ export function MessageBlockingCheck() {
   const router = useRouter();
   const pathname = usePathname();
   const isDashboardPath = pathname?.startsWith('/dashboard') ?? false;
-  const { profile, loading: authLoading, locked } = useAuth();
+  const { profile, loading: authLoading } = useAuth();
 
   const [authRefreshTick, setAuthRefreshTick] = useState(0);
   const [checking, setChecking] = useState(false);
@@ -195,7 +195,6 @@ export function MessageBlockingCheck() {
   const canCheckBiometrics =
     isDashboardPath &&
     !authLoading &&
-    !locked &&
     Boolean(profile?.id) &&
     pendingToolboxTalks.length === 0;
 

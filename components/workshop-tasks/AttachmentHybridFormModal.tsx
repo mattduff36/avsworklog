@@ -358,7 +358,7 @@ export function AttachmentHybridFormModal({
       [key]: {
         response_value: prev[key]?.response_value ?? null,
         response_json: {
-          ...(prev[key]?.response_json || {}),
+          ...prev[key]?.response_json,
           ...updates,
         },
         field_id: field.id || prev[key]?.field_id || null,

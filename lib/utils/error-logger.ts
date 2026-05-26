@@ -658,7 +658,7 @@ class ErrorLogger {
     try {
       const errorObj = typeof error === 'string' ? new Error(error) : error;
       const normalizedAdditionalData: Record<string, unknown> = {
-        ...(additionalData || {}),
+        ...additionalData,
       };
       const args = Array.isArray(normalizedAdditionalData.args)
         ? (normalizedAdditionalData.args as unknown[])

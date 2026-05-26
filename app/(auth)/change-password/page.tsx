@@ -12,7 +12,6 @@ import { loadClientAuthSession } from '@/lib/app-auth/client-session';
 
 interface AuthSessionResponse {
   authenticated: boolean;
-  locked: boolean;
   profile?: {
     full_name?: string | null;
     must_change_password?: boolean | null;
@@ -40,11 +39,6 @@ export default function ChangePasswordPage() {
     async function checkUser() {
       try {
         const sessionResult = await loadClientAuthSession();
-        if (sessionResult.status === 'locked') {
-          router.replace('/lock');
-          return;
-        }
-
         if (sessionResult.status !== 'authenticated' || !sessionResult.payload) {
           router.replace('/login');
           return;

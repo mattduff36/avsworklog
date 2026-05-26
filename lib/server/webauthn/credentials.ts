@@ -5,15 +5,14 @@ import type {
 import { createAdminClient } from '@/lib/supabase/admin';
 import { randomToken, fromBase64Url, toBase64Url } from '@/lib/server/app-auth/jwt';
 import {
-  getAccountSwitchDevice,
-  parseAccountSwitchDeviceId,
-  upsertAccountSwitchDevice,
-} from '@/lib/server/account-switch-device';
+  getWebAuthnDevice,
+  parseWebAuthnDeviceId,
+  upsertWebAuthnDevice,
+} from '@/lib/server/webauthn/devices';
 
 export type WebAuthnChallengeType =
   | 'registration'
-  | 'authentication'
-  | 'account_switch_authentication';
+  | 'authentication';
 
 export interface WebAuthnCredentialRow {
   id: string;
@@ -77,10 +76,10 @@ async function resolveDeviceId(
   profileId: string,
   rawDeviceId?: string | null
 ): Promise<string | null> {
-  const parsedDeviceId = parseAccountSwitchDeviceId(rawDeviceId);
+  const parsedDeviceId = parseWebAuthnDeviceId(rawDeviceId);
   if (!parsedDeviceId) return null;
 
-  const device = await upsertAccountSwitchDevice({
+  const device = await upsertWebAuthnDevice({
     profileId,
     rawDeviceId: parsedDeviceId,
     deviceLabel: null,
@@ -120,8 +119,8 @@ export async function getActiveWebAuthnCredentialsForProfile({
   rawDeviceId?: string | null;
 }): Promise<WebAuthnCredentialRow[]> {
   const supabaseAdmin = createAdminClient();
-  const parsedDeviceId = parseAccountSwitchDeviceId(rawDeviceId);
-  const device = parsedDeviceId ? await getAccountSwitchDevice(profileId, parsedDeviceId) : null;
+  const parsedDeviceId = parseWebAuthnDeviceId(rawDeviceId);
+  const device = parsedDeviceId ? await getWebAuthnDevice(profileId, parsedDeviceId) : null;
 
   let query = supabaseAdmin
     .from('webauthn_credentials')
@@ -273,10 +272,10 @@ export async function revokeWebAuthnCredentialsForDevice({
   profileId: string;
   rawDeviceId: string;
 }): Promise<number> {
-  const parsedDeviceId = parseAccountSwitchDeviceId(rawDeviceId);
+  const parsedDeviceId = parseWebAuthnDeviceId(rawDeviceId);
   if (!parsedDeviceId) return 0;
 
-  const device = await getAccountSwitchDevice(profileId, parsedDeviceId);
+  const device = await getWebAuthnDevice(profileId, parsedDeviceId);
   if (!device) return 0;
 
   const supabaseAdmin = createAdminClient();
@@ -299,10 +298,10 @@ export async function isBiometricPromptDismissed({
   profileId: string;
   rawDeviceId?: string | null;
 }): Promise<boolean> {
-  const parsedDeviceId = parseAccountSwitchDeviceId(rawDeviceId);
+  const parsedDeviceId = parseWebAuthnDeviceId(rawDeviceId);
   if (!parsedDeviceId) return false;
 
-  const device = await getAccountSwitchDevice(profileId, parsedDeviceId);
+  const device = await getWebAuthnDevice(profileId, parsedDeviceId);
   if (!device) return false;
 
   const supabaseAdmin = createAdminClient();

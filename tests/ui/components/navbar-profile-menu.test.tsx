@@ -62,10 +62,6 @@ vi.mock('@/lib/hooks/useNavMetrics', () => ({
   usePendingAbsenceCount: () => ({ count: 0 }),
 }));
 
-vi.mock('@/lib/account-switch/feature-flag', () => ({
-  isAccountSwitcherEnabled: () => true,
-}));
-
 vi.mock('@/components/layout/tablet-mode-context', () => ({
   useTabletMode: () => ({
     tabletModeEnabled: false,
@@ -151,7 +147,7 @@ describe('Navbar desktop burger menu', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Profile')).toBeTruthy();
-      expect(screen.getByRole('button', { name: 'Lock / Switch' })).toBeDisabled();
+      expect(screen.queryByRole('button', { name: 'Lock / Switch' })).toBeNull();
       expect(screen.getByText('Notifications')).toBeTruthy();
       expect(screen.getByTestId('desktop-menu-notification-link-badge')).toBeInTheDocument();
       expect(screen.getByText('Help')).toBeTruthy();
@@ -182,7 +178,7 @@ describe('Navbar desktop burger menu', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Active Now')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Lock / Switch' })).toBeDisabled();
+      expect(screen.queryByRole('button', { name: 'Lock / Switch' })).toBeNull();
       expect(screen.getByTestId('mobile-menu-notification-link-badge')).toBeInTheDocument();
     });
 

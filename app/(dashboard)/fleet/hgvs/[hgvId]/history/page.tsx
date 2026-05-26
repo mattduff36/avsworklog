@@ -34,6 +34,7 @@ import type { TrackerLocationData } from '@/types/fleet-tracker';
 import { fetchDailyChecks, type DailyCheckHistoryItem } from '@/components/fleet/DailyChecksHistoryTab';
 import { AssetHistoryTable } from '@/components/fleet/AssetHistoryTable';
 import { buildAssetHistoryRows } from '@/lib/fleet/asset-history-events';
+import { getAssetHistoryFieldLabel } from '@/lib/fleet/asset-history-field-labels';
 
 // Dynamic imports for dialog components
 const EditMaintenanceDialog = dynamic(() => import('@/app/(dashboard)/maintenance/components/EditMaintenanceDialog').then(m => ({ default: m.EditMaintenanceDialog })), { ssr: false });
@@ -692,28 +693,15 @@ export default function HgvHistoryPage({
     });
   };
 
-  const getFieldLabel = (fieldName: string): string => {
-    const labels: Record<string, string> = {
-      mot_expiry_date: 'MOT Expiry',
-      tax_due_date: 'Tax Due Date',
-      service_due_date: 'Service Due',
-      service_due_mileage: 'Service Due KM',
-      last_service_date: 'Last Service',
-      last_service_mileage: 'Last Service KM',
-      notes: 'Notes',
-    };
-    return labels[fieldName] || fieldName.replace(/_/g, ' ');
-  };
-
   const assetHistoryRows = useMemo(
     () => buildAssetHistoryRows({
       assetType: 'hgv',
       records: maintenanceHistory,
       workshopTasks,
       dailyTasks: dailyChecks,
-      getFieldLabel,
+      getFieldLabel: (fieldName) => getAssetHistoryFieldLabel('hgv', fieldName),
     }),
-    [maintenanceHistory, workshopTasks, dailyChecks, getFieldLabel]
+    [maintenanceHistory, workshopTasks, dailyChecks]
   );
 
   if (!vehicle && !loading) {

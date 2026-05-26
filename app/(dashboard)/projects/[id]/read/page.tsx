@@ -79,11 +79,6 @@ function ReadRAMSContent() {
       setError(null);
 
       const sessionResult = await loadClientAuthSession();
-      if (sessionResult.status === 'locked') {
-        router.replace('/lock');
-        return;
-      }
-
       if (sessionResult.status !== 'authenticated' || !sessionResult.payload?.user?.id) {
         router.replace('/login');
         return;

@@ -47,6 +47,10 @@ export function parseFleetInspectionWorkflowConfig(
   config: Record<string, unknown> | null | undefined,
 ): FleetInspectionWorkflowConfig {
   const defaults = getDefaultFleetInspectionWorkflowConfig();
+  const assetTypes =
+    config?.asset_types && typeof config.asset_types === 'object'
+      ? (config.asset_types as Record<string, unknown>)
+      : {};
   const parsed = fleetInspectionWorkflowConfigSchema.safeParse({
     overdue_days_threshold:
       typeof config?.overdue_days_threshold === 'number'
@@ -54,16 +58,16 @@ export function parseFleetInspectionWorkflowConfig(
         : defaults.overdue_days_threshold,
     asset_types: {
       van:
-        typeof (config?.asset_types as Record<string, unknown> | undefined)?.van === 'boolean'
-          ? (config?.asset_types as Record<string, boolean>).van
+        typeof assetTypes.van === 'boolean'
+          ? assetTypes.van
           : defaults.asset_types.van,
       plant:
-        typeof (config?.asset_types as Record<string, unknown> | undefined)?.plant === 'boolean'
-          ? (config?.asset_types as Record<string, boolean>).plant
+        typeof assetTypes.plant === 'boolean'
+          ? assetTypes.plant
           : defaults.asset_types.plant,
       hgv:
-        typeof (config?.asset_types as Record<string, unknown> | undefined)?.hgv === 'boolean'
-          ? (config?.asset_types as Record<string, boolean>).hgv
+        typeof assetTypes.hgv === 'boolean'
+          ? assetTypes.hgv
           : defaults.asset_types.hgv,
     },
   });

@@ -60,7 +60,6 @@ describe('supabase middleware cookie refresh', () => {
     verifyJwtHS256Mock.mockResolvedValue({
       sid: 'session-1',
       secret: 'secret-1',
-      locked: false,
       exp: Math.floor(Date.now() / 1000) + 3600,
       v: 1,
     });

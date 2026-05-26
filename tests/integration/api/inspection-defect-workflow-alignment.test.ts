@@ -21,6 +21,7 @@ import { POST as plantSyncPost } from '@/app/api/plant-inspections/sync-defect-t
 import { POST as hgvSyncPost } from '@/app/api/hgv-inspections/sync-defect-tasks/route';
 import { GET as plantLockedDefectsGet } from '@/app/api/plant-inspections/locked-defects/route';
 import { GET as hgvLockedDefectsGet } from '@/app/api/hgv-inspections/locked-defects/route';
+import { createSupabaseQueryMock } from '@/tests/utils/supabase-query-mock';
 
 function mockAuthenticatedUser() {
   vi.mocked(createServerClient).mockResolvedValue({
@@ -147,20 +148,18 @@ describe('Inspection defect workflow alignment', () => {
             select: () => {
               const filters: Record<string, unknown> = {};
               const completedTasksPayload = { data: [], error: null } as const;
-              const query = {
-                eq: (column: string, value: unknown) => {
+              const query = createSupabaseQueryMock(
+                () => (filters.inspection_id ? { data: [], error: null } : { data: activeTasks, error: null }),
+                []
+              );
+              query.eq = vi.fn((column: string, value: unknown) => {
                   filters[column] = value;
                   return query;
-                },
-                in: async () => ({ data: activeTasks, error: null }),
-                order: () => ({
+                });
+              query.in = vi.fn(async () => ({ data: activeTasks, error: null }));
+              query.order = vi.fn(() => ({
                   limit: async () => completedTasksPayload,
-                }),
-                then: (resolve: (value: { data: typeof activeTasks | []; error: null }) => unknown) => {
-                  const payload = filters.inspection_id ? { data: [], error: null } : { data: activeTasks, error: null };
-                  return Promise.resolve(payload).then(resolve);
-                },
-              };
+                }));
               return query;
             },
             update: (payload: Record<string, unknown>) => ({
@@ -289,20 +288,18 @@ describe('Inspection defect workflow alignment', () => {
             select: () => {
               const filters: Record<string, unknown> = {};
               const completedTasksPayload = { data: [], error: null } as const;
-              const query = {
-                eq: (column: string, value: unknown) => {
+              const query = createSupabaseQueryMock(
+                () => (filters.inspection_id ? { data: [], error: null } : { data: activeTasks, error: null }),
+                []
+              );
+              query.eq = vi.fn((column: string, value: unknown) => {
                   filters[column] = value;
                   return query;
-                },
-                in: async () => ({ data: activeTasks, error: null }),
-                order: () => ({
+                });
+              query.in = vi.fn(async () => ({ data: activeTasks, error: null }));
+              query.order = vi.fn(() => ({
                   limit: async () => completedTasksPayload,
-                }),
-                then: (resolve: (value: { data: typeof activeTasks | []; error: null }) => unknown) => {
-                  const payload = filters.inspection_id ? { data: [], error: null } : { data: activeTasks, error: null };
-                  return Promise.resolve(payload).then(resolve);
-                },
-              };
+                }));
               return query;
             },
             update: (payload: Record<string, unknown>) => ({
@@ -420,20 +417,15 @@ describe('Inspection defect workflow alignment', () => {
             select: () => {
               const filters: Record<string, unknown> = {};
               const completedTasksPayload = { data: [], error: null } as const;
-              const query = {
-                eq: (column: string, value: unknown) => {
+              const query = createSupabaseQueryMock({ data: [], error: null }, []);
+              query.eq = vi.fn((column: string, value: unknown) => {
                   filters[column] = value;
                   return query;
-                },
-                in: async () => ({ data: [], error: null }),
-                order: () => ({
+                });
+              query.in = vi.fn(async () => ({ data: [], error: null }));
+              query.order = vi.fn(() => ({
                   limit: async () => completedTasksPayload,
-                }),
-                then: (resolve: (value: { data: []; error: null }) => unknown) => {
-                  const payload = filters.inspection_id ? { data: [], error: null } : { data: [], error: null };
-                  return Promise.resolve(payload).then(resolve);
-                },
-              };
+                }));
               return query;
             },
             update: (payload: Record<string, unknown>) => ({

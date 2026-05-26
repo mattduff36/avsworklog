@@ -7,8 +7,8 @@ import type {
   GetAllNotificationPreferencesResponse,
   AdminUpdatePreferenceRequest,
   UpdateNotificationPreferenceResponse,
-  NotificationModuleKey,
 } from '@/types/notifications';
+import { NOTIFICATION_MODULE_KEYS } from '@/types/notifications';
 
 /**
  * GET /api/notification-preferences/admin
@@ -115,10 +115,9 @@ export async function PUT(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const validModules: NotificationModuleKey[] = ['errors', 'maintenance', 'rams', 'approvals', 'inspections'];
-    if (!validModules.includes(module_key)) {
+    if (!NOTIFICATION_MODULE_KEYS.includes(module_key)) {
       return NextResponse.json({ 
-        error: 'Invalid module_key. Must be: errors, maintenance, rams, approvals, or inspections' 
+        error: `Invalid module_key. Must be one of: ${NOTIFICATION_MODULE_KEYS.join(', ')}`
       }, { status: 400 });
     }
 

@@ -4,17 +4,17 @@ import { useEffect, useState } from 'react';
 import type { PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/browser';
 import { useAuth } from '@/lib/hooks/useAuth';
 import {
-  getAccountSwitchDeviceLabel,
-  getOrCreateAccountSwitchDeviceId,
-} from '@/lib/account-switch/device';
+  getOrCreateWebAuthnDeviceId,
+  getWebAuthnDeviceLabel,
+} from '@/lib/webauthn/device';
 import {
-  canUseBiometricUnlock,
+  canUsePlatformAuthenticator,
   clearLocalBiometricLoginProfile,
   getLocalBiometricLoginProfileIds,
   hasLocalBiometricLoginProfile,
   startBiometricAuthentication,
-} from '@/lib/account-switch/biometric';
-import { clearLegacyAccountSwitchClientState } from '@/lib/app-auth/client';
+} from '@/lib/webauthn/client';
+import { clearRetiredAccountSwitchClientState } from '@/lib/app-auth/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -33,7 +33,7 @@ interface AuthResponsePayload {
 }
 
 function isSafeRedirectTarget(value: string | null): value is string {
-  return Boolean(value && value.startsWith('/') && !value.startsWith('/lock'));
+  return Boolean(value && value.startsWith('/'));
 }
 
 export default function LoginPage() {
@@ -55,7 +55,7 @@ export default function LoginPage() {
   useEffect(() => {
     let mounted = true;
 
-    void canUseBiometricUnlock()
+    void canUsePlatformAuthenticator()
       .then((isAvailable) => {
         if (mounted) setBiometricAvailable(isAvailable && hasLocalBiometricLoginProfile());
       })
@@ -105,11 +105,11 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const deviceId = getOrCreateAccountSwitchDeviceId();
+      const deviceId = getOrCreateWebAuthnDeviceId();
       const { error } = await signIn(email, password, {
         rememberMe,
         deviceId,
-        deviceLabel: getAccountSwitchDeviceLabel(),
+        deviceLabel: getWebAuthnDeviceLabel(),
       });
 
       if (error) {
@@ -117,7 +117,7 @@ export default function LoginPage() {
         return;
       }
 
-      clearLegacyAccountSwitchClientState();
+      clearRetiredAccountSwitchClientState();
 
       localStorage.setItem('rememberMe', rememberMe ? 'true' : 'false');
     } catch {
@@ -135,7 +135,7 @@ export default function LoginPage() {
       return;
     }
 
-    const deviceId = getOrCreateAccountSwitchDeviceId();
+    const deviceId = getOrCreateWebAuthnDeviceId();
     setError('');
     setLoading(true);
     try {
@@ -157,7 +157,7 @@ export default function LoginPage() {
           challenge: options.challenge,
           rememberMe,
           deviceId,
-          deviceLabel: getAccountSwitchDeviceLabel(),
+          deviceLabel: getWebAuthnDeviceLabel(),
           profileId: localProfileId,
         }),
       });
@@ -166,7 +166,7 @@ export default function LoginPage() {
         throw new Error(payload.error || 'Biometric login failed');
       }
 
-      clearLegacyAccountSwitchClientState();
+      clearRetiredAccountSwitchClientState();
       localStorage.setItem('rememberMe', rememberMe ? 'true' : 'false');
       redirectAfterAuth(getPostLoginRedirect(payload));
     } catch (loginError) {

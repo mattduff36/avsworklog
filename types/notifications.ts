@@ -2,7 +2,26 @@
  * Notification Preferences Types
  */
 
-export type NotificationModuleKey = 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections';
+export type NotificationModuleKey =
+  | 'errors'
+  | 'maintenance'
+  | 'rams'
+  | 'approvals'
+  | 'inspections'
+  | 'toolbox_talks'
+  | 'reminders'
+  | 'general_notifications';
+
+export const NOTIFICATION_MODULE_KEYS: NotificationModuleKey[] = [
+  'errors',
+  'maintenance',
+  'rams',
+  'approvals',
+  'inspections',
+  'toolbox_talks',
+  'reminders',
+  'general_notifications',
+];
 
 export interface NotificationPreference {
   id: string;
@@ -57,6 +76,27 @@ export const NOTIFICATION_MODULES: NotificationModule[] = [
     label: 'Inspection Defects',
     description: 'Notifications when defects create workshop tasks',
     icon: 'ClipboardCheck',
+    availableFor: 'all',
+  },
+  {
+    key: 'toolbox_talks',
+    label: 'Toolbox Talks',
+    description: 'Assigned toolbox talks that need reading and signing',
+    icon: 'PenLine',
+    availableFor: 'all',
+  },
+  {
+    key: 'reminders',
+    label: 'Reminders',
+    description: 'Reminder messages from managers, maintenance workflows, and actions',
+    icon: 'Bell',
+    availableFor: 'all',
+  },
+  {
+    key: 'general_notifications',
+    label: 'General Notifications',
+    description: 'Operational notifications such as quotes, inventory, absence, and timesheet alerts',
+    icon: 'Bell',
     availableFor: 'all',
   },
 ];

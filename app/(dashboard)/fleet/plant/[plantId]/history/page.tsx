@@ -30,6 +30,7 @@ import type { TrackerLocationData } from '@/types/fleet-tracker';
 import { fetchDailyChecks, type DailyCheckHistoryItem } from '@/components/fleet/DailyChecksHistoryTab';
 import { AssetHistoryTable } from '@/components/fleet/AssetHistoryTable';
 import { buildAssetHistoryRows } from '@/lib/fleet/asset-history-events';
+import { getAssetHistoryFieldLabel } from '@/lib/fleet/asset-history-field-labels';
 
 // Dynamic imports for dialog components
 const EditPlantRecordDialog = dynamic(() => import('@/app/(dashboard)/maintenance/components/EditPlantRecordDialog').then(m => ({ default: m.EditPlantRecordDialog })), { ssr: false });
@@ -337,15 +338,19 @@ export default function PlantHistoryPage({
   // Use the plant history hook
   const { data: historyData, refetch: refetchHistory, isLoading: historyLoading } = usePlantMaintenanceHistory(unwrappedParams.plantId);
 
-  const workshopTasks = historyData?.workshopTasks || [];
-  const maintenanceHistory = (historyData?.history || []).filter((entry: MaintenanceHistoryEntry) => {
-    const oldValue = entry.old_value?.toLowerCase();
-    const newValue = entry.new_value?.toLowerCase();
-    if (entry.field_name === 'status' && (oldValue === 'draft' || newValue === 'draft')) {
-      return false;
-    }
-    return true;
-  });
+  const workshopTasks = useMemo(() => historyData?.workshopTasks ?? [], [historyData?.workshopTasks]);
+  const maintenanceHistory = useMemo(
+    () =>
+      (historyData?.history ?? []).filter((entry: MaintenanceHistoryEntry) => {
+        const oldValue = entry.old_value?.toLowerCase();
+        const newValue = entry.new_value?.toLowerCase();
+        if (entry.field_name === 'status' && (oldValue === 'draft' || newValue === 'draft')) {
+          return false;
+        }
+        return true;
+      }),
+    [historyData?.history]
+  );
 
   // Fetch comments for all workshop tasks
   const { comments: taskComments } = useWorkshopTaskComments({
@@ -425,36 +430,15 @@ export default function PlantHistoryPage({
     }
   }, [user, unwrappedParams.plantId, fetchPlantData, fetchMaintenanceRecord, fetchDailyCheckHistory]);
 
-  const getFieldLabel = (fieldName: string): string => {
-    const labels: Record<string, string> = {
-      nickname: 'Nickname',
-      reg_number: 'Registration Number',
-      serial_number: 'Serial Number',
-      current_hours: 'Current Hours',
-      last_service_hours: 'Last Service Hours',
-      next_service_hours: 'Next Service Hours',
-      tax_due_date: 'Tax Due Date',
-      mot_due_date: 'MOT Due Date',
-      current_mileage: 'Current Mileage',
-      loler_due_date: 'LOLER THOROUGH EXAMINATION Due Date',
-      loler_last_inspection_date: 'LOLER THOROUGH EXAMINATION Last Inspection',
-      loler_certificate_number: 'LOLER THOROUGH EXAMINATION Certificate',
-      loler_inspection_interval_months: 'LOLER THOROUGH EXAMINATION Interval',
-      tracker_id: 'GPS Tracker',
-      no_changes: 'Update (No Field Changes)',
-    };
-    return labels[fieldName] || fieldName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-  };
-
   const assetHistoryRows = useMemo(
     () => buildAssetHistoryRows({
       assetType: 'plant',
       records: maintenanceHistory,
       workshopTasks,
       dailyTasks: dailyChecks,
-      getFieldLabel,
+      getFieldLabel: (fieldName) => getAssetHistoryFieldLabel('plant', fieldName),
     }),
-    [maintenanceHistory, workshopTasks, dailyChecks, getFieldLabel]
+    [maintenanceHistory, workshopTasks, dailyChecks]
   );
 
   if (!plant && !loading) {

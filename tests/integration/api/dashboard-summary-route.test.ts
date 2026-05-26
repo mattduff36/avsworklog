@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { createSupabaseQueryMock } from '@/tests/utils/supabase-query-mock';
 
 vi.mock('@/lib/server/app-auth/session', () => ({
   getCurrentAuthenticatedProfile: vi.fn(),
@@ -23,14 +24,7 @@ vi.mock('@/lib/server/absence-secondary-permissions', async (importOriginal) => 
 
 function createCountQuery(count: number) {
   const resolved = { count, error: null };
-  const query = {
-    eq: vi.fn(),
-    in: vi.fn(),
-    then: (resolve: (value: typeof resolved) => unknown) => Promise.resolve(resolved).then(resolve),
-  };
-  query.eq.mockReturnValue(query);
-  query.in.mockReturnValue(query);
-  return query;
+  return createSupabaseQueryMock(resolved, ['eq', 'in']);
 }
 
 function createScopedRowsQuery<T extends Record<string, unknown>>(rows: T[]) {

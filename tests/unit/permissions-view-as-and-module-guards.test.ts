@@ -136,15 +136,16 @@ describe('module guard alignment checks', () => {
     });
   });
 
-  it('shows account lock/switch entry points in navbar menu variants', () => {
+  it('does not include retired account lock/switch entry points in navbar menu variants', () => {
     const source = readSource('components/layout/Navbar.tsx');
-    expect(source).toContain('Lock / Switch');
-    expect(source).toContain('accountLockLabel');
-    expect(source).toContain("buildLockPathWithReturnTo");
+    expect(source).not.toContain('Lock / Switch');
+    expect(source).not.toContain('accountLockLabel');
+    expect(source).not.toContain("buildLockPathWithReturnTo");
   });
 
-  it('shows account switcher settings in profile hub', () => {
+  it('keeps biometric settings but removes account switcher settings from profile hub', () => {
     const source = readSource('app/(dashboard)/profile/page.tsx');
-    expect(source).toContain('AccountSwitcherSettingsCard');
+    expect(source).toContain('ProfileBiometricsCard');
+    expect(source).not.toContain('AccountSwitcherSettingsCard');
   });
 });

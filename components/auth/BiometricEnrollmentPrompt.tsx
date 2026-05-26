@@ -5,14 +5,14 @@ import type { PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/bro
 import { Fingerprint } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  canUseBiometricUnlock,
+  canUsePlatformAuthenticator,
   markLocalBiometricLoginEnabled,
   startBiometricRegistration,
-} from '@/lib/account-switch/biometric';
+} from '@/lib/webauthn/client';
 import {
-  getAccountSwitchDeviceLabel,
-  getOrCreateAccountSwitchDeviceId,
-} from '@/lib/account-switch/device';
+  getOrCreateWebAuthnDeviceId,
+  getWebAuthnDeviceLabel,
+} from '@/lib/webauthn/device';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -72,10 +72,10 @@ export function BiometricEnrollmentPrompt({
     }
 
     let mounted = true;
-    const deviceId = getOrCreateAccountSwitchDeviceId();
+    const deviceId = getOrCreateWebAuthnDeviceId();
 
     void (async () => {
-      const isSupported = await canUseBiometricUnlock();
+      const isSupported = await canUsePlatformAuthenticator();
       if (!mounted || !isSupported) return;
 
       const response = await fetch(
@@ -125,7 +125,7 @@ export function BiometricEnrollmentPrompt({
   async function handleEnable(): Promise<void> {
     if (!profileId) return;
 
-    const deviceId = getOrCreateAccountSwitchDeviceId();
+    const deviceId = getOrCreateWebAuthnDeviceId();
     setWorking(true);
     try {
       const options = await getRegistrationOptions(deviceId);
@@ -139,7 +139,7 @@ export function BiometricEnrollmentPrompt({
           response: registrationResponse,
           challenge: options.challenge,
           deviceId,
-          deviceLabel: getAccountSwitchDeviceLabel(),
+          deviceLabel: getWebAuthnDeviceLabel(),
         }),
       });
       const payload = (await verifyResponse.json().catch(() => ({}))) as { error?: string };
@@ -158,7 +158,7 @@ export function BiometricEnrollmentPrompt({
   }
 
   async function handleDismiss(): Promise<void> {
-    const deviceId = getOrCreateAccountSwitchDeviceId();
+    const deviceId = getOrCreateWebAuthnDeviceId();
     setWorking(true);
     try {
       await fetch('/api/auth/webauthn/prompt/dismiss', {

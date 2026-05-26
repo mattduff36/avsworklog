@@ -464,7 +464,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   }
 
   async function callAction(action: string, payload?: Record<string, unknown>, scope: 'workflow' | 'versions' | 'general' = 'workflow') {
-    await updateQuote({ action, ...(payload || {}) }, scope);
+    await updateQuote({ action, ...payload }, scope);
   }
 
   async function handleTriggerRams() {

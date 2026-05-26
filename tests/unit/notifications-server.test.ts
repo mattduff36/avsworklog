@@ -5,23 +5,14 @@ import {
   normalizeNotificationError,
   parseNotificationLimit,
 } from '@/lib/server/notifications';
+import { createSupabaseQueryMock } from '@/tests/utils/supabase-query-mock';
 
 function createNotificationsSupabaseMock(
   data: unknown[] | null,
   error: { message?: string | null } | null = null
 ) {
   const response = { data, error };
-  const query = {
-    select: vi.fn(() => query),
-    eq: vi.fn(() => query),
-    gte: vi.fn(() => query),
-    is: vi.fn(() => query),
-    order: vi.fn(() => query),
-    limit: vi.fn(() => query),
-    then(onFulfilled?: (value: typeof response) => unknown, onRejected?: (reason: unknown) => unknown) {
-      return Promise.resolve(response).then(onFulfilled, onRejected);
-    },
-  };
+  const query = createSupabaseQueryMock(response, ['select', 'eq', 'gte', 'is', 'order', 'limit']);
 
   return {
     supabase: {
@@ -33,15 +24,7 @@ function createNotificationsSupabaseMock(
 
 function createNotificationCountSupabaseMock(count: number | null, error: { message?: string | null } | null = null) {
   const response = { count, error };
-  const query = {
-    select: vi.fn(() => query),
-    eq: vi.fn(() => query),
-    gte: vi.fn(() => query),
-    is: vi.fn(() => query),
-    then(onFulfilled?: (value: typeof response) => unknown, onRejected?: (reason: unknown) => unknown) {
-      return Promise.resolve(response).then(onFulfilled, onRejected);
-    },
-  };
+  const query = createSupabaseQueryMock(response, ['select', 'eq', 'gte', 'is']);
 
   return {
     supabase: {

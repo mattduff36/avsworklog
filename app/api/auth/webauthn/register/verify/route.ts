@@ -3,7 +3,7 @@ import {
   verifyRegistrationResponse,
   type RegistrationResponseJSON,
 } from '@simplewebauthn/server';
-import { createAccountSwitchAuditEvent } from '@/lib/server/account-switch-audit';
+import { createWebAuthnAuditEvent } from '@/lib/server/webauthn/audit';
 import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
 import { getWebAuthnRequestConfig } from '@/lib/server/webauthn/config';
 import {
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!verification.verified || !verification.registrationInfo) {
-      await createAccountSwitchAuditEvent({
+      await createWebAuthnAuditEvent({
         profileId: current.profile.id,
         actorProfileId: current.profile.id,
         eventType: 'biometric_registration_failed',
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
       name: 'Device biometrics',
     });
 
-    await createAccountSwitchAuditEvent({
+    await createWebAuthnAuditEvent({
       profileId: current.profile.id,
       actorProfileId: current.profile.id,
       eventType: 'biometric_registration_success',
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, verified: true });
   } catch (error) {
-    await createAccountSwitchAuditEvent({
+    await createWebAuthnAuditEvent({
       profileId: current.profile.id,
       actorProfileId: current.profile.id,
       eventType: 'biometric_registration_failed',

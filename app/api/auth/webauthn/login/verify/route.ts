@@ -3,7 +3,7 @@ import {
   verifyAuthenticationResponse,
   type AuthenticationResponseJSON,
 } from '@simplewebauthn/server';
-import { createAccountSwitchAuditEvent } from '@/lib/server/account-switch-audit';
+import { createWebAuthnAuditEvent } from '@/lib/server/webauthn/audit';
 import { clearAllAuthCookies } from '@/lib/server/app-auth/response';
 import { setAppSessionCookieInResponse } from '@/lib/server/app-auth/cookies';
 import { getAppAuthProfile } from '@/lib/server/app-auth/profile';
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!verification.verified) {
-      await createAccountSwitchAuditEvent({
+      await createWebAuthnAuditEvent({
         profileId: credential.profile_id,
         actorProfileId: credential.profile_id,
         eventType: 'biometric_login_failed',
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
       counter: verification.authenticationInfo.newCounter,
     });
 
-    const existing = await validateAppSession({ allowLocked: true });
+    const existing = await validateAppSession();
     const nextSession = await issueAppSession({
       profileId: credential.profile_id,
       source: 'biometric_login',
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
     }
 
     const profile = await getAppAuthProfile(credential.profile_id, null);
-    await createAccountSwitchAuditEvent({
+    await createWebAuthnAuditEvent({
       profileId: credential.profile_id,
       actorProfileId: credential.profile_id,
       eventType: 'biometric_login_success',

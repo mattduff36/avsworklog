@@ -23,7 +23,7 @@ async function fetchJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> 
     ...init,
     cache: 'no-store',
     headers: {
-      ...(init?.headers || {}),
+      ...init?.headers,
       'Cache-Control': 'no-cache',
     },
   })
@@ -61,7 +61,6 @@ async function getCurrentAuthSessionResponse(): Promise<ClientAuthSessionRespons
   const result = await loadClientAuthSession()
   return result.payload || {
     authenticated: false,
-    locked: false,
     user: null,
     data_token_available: false,
   }
@@ -182,7 +181,7 @@ export function createClient(): BrowserSupabaseClient {
     getSession: (async () => {
       const sessionResponse = await getCurrentAuthSessionResponse()
       const user = buildSyntheticUser(sessionResponse)
-      if (!user || sessionResponse.locked) {
+      if (!user) {
         return {
           data: {
             session: null,

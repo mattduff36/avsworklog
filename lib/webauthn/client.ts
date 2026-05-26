@@ -38,13 +38,13 @@ function writeEnabledProfileIds(profileIds: string[]): void {
   window.localStorage.setItem(BIOMETRIC_LOGIN_PROFILES_STORAGE_KEY, JSON.stringify(uniqueProfileIds));
 }
 
-export function browserMaySupportBiometricUnlock(): boolean {
+export function browserMaySupportWebAuthn(): boolean {
   if (typeof window === 'undefined') return false;
   return typeof window.PublicKeyCredential !== 'undefined';
 }
 
-export async function canUseBiometricUnlock(): Promise<boolean> {
-  if (!browserMaySupportBiometricUnlock()) return false;
+export async function canUsePlatformAuthenticator(): Promise<boolean> {
+  if (!browserMaySupportWebAuthn()) return false;
 
   const { browserSupportsWebAuthn, platformAuthenticatorIsAvailable } = await import(
     '@simplewebauthn/browser'

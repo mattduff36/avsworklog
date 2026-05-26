@@ -11,7 +11,6 @@ import type { Database } from '@/types/database'
 interface MiddlewareSessionPayload extends Record<string, unknown> {
   sid: string
   secret: string
-  locked: boolean
   exp: number
   v: number
 }
@@ -162,11 +161,15 @@ async function getSupabaseUser(
     },
   })
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-  return user ? { id: user.id } : null
+    return user ? { id: user.id } : null
+  } catch {
+    return null
+  }
 }
 
 export async function updateSession(request: NextRequest) {
@@ -177,12 +180,7 @@ export async function updateSession(request: NextRequest) {
   const publicPaths = ['/login', '/change-password', '/offline']
   const isPublicPath = publicPaths.some((path) => request.nextUrl.pathname.startsWith(path))
   const isApiRoute = request.nextUrl.pathname.startsWith('/api/')
-  const isLockRoute = request.nextUrl.pathname.startsWith('/lock')
   const isAuthRoute = request.nextUrl.pathname.startsWith('/api/auth/')
-  const isAccountSwitchRoute = request.nextUrl.pathname.startsWith('/api/account-switch/')
-  const isVersionRoute = request.nextUrl.pathname === '/api/version'
-  const allowLockedApi =
-    isAuthRoute || isAccountSwitchRoute || isVersionRoute
 
   if (isAuthorizedCronRequest(request)) {
     return response
@@ -220,7 +218,6 @@ export async function updateSession(request: NextRequest) {
   }
 
   const isAuthenticated = Boolean(session)
-  const isLocked = session?.locked === true
 
   if (request.nextUrl.pathname.startsWith('/rams')) {
     const url = request.nextUrl.clone()
@@ -231,7 +228,7 @@ export async function updateSession(request: NextRequest) {
   if (request.nextUrl.pathname === '/') {
     const url = request.nextUrl.clone()
     if (isAuthenticated) {
-      url.pathname = isLocked ? '/lock' : '/dashboard'
+      url.pathname = '/dashboard'
       return redirectWithMiddlewareCookies(response, url, 307)
     }
     if (hasLegacyCookie) {
@@ -242,24 +239,6 @@ export async function updateSession(request: NextRequest) {
     }
     url.pathname = '/login'
     return redirectWithMiddlewareCookies(response, url, 307)
-  }
-
-  if (isAuthenticated && isLocked && !isLockRoute && !isApiRoute && request.nextUrl.pathname !== '/login') {
-    const returnTo = `${request.nextUrl.pathname}${request.nextUrl.search}`
-    const url = request.nextUrl.clone()
-    url.pathname = '/lock'
-    url.search = ''
-    url.searchParams.set('returnTo', returnTo)
-
-    return redirectWithMiddlewareCookies(response, url, 307)
-  }
-
-  if (isAuthenticated && isLocked && isApiRoute && !allowLockedApi) {
-    return jsonWithMiddlewareCookies(
-      response,
-      { error: 'Session is locked', code: 'SESSION_LOCKED' },
-      { status: 423 }
-    )
   }
 
   if (!isPublicPath && !isAuthenticated && !isAuthRoute) {
@@ -278,10 +257,10 @@ export async function updateSession(request: NextRequest) {
     return redirectWithMiddlewareCookies(response, url)
   }
 
-  if (request.nextUrl.pathname === '/login' && isAuthenticated && !isLocked) {
+  if (request.nextUrl.pathname === '/login' && isAuthenticated) {
     const url = request.nextUrl.clone()
     const redirectTarget = request.nextUrl.searchParams.get('redirect')
-    if (redirectTarget?.startsWith('/') && !redirectTarget.startsWith('//') && !redirectTarget.startsWith('/lock')) {
+    if (redirectTarget?.startsWith('/') && !redirectTarget.startsWith('//')) {
       const targetUrl = new URL(redirectTarget, request.nextUrl.origin)
       url.pathname = targetUrl.pathname
       url.search = targetUrl.search

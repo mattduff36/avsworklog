@@ -144,7 +144,7 @@ async function backupDatabase() {
         const result = await client.query(`SELECT COUNT(*) FROM ${table}`);
         const count = result.rows[0].count;
         backupSQL += `-- ${table}: ${count} rows\n`;
-      } catch (_err: unknown) {
+      } catch {
         // Table doesn't exist, skip
       }
     }
@@ -155,7 +155,7 @@ async function backupDatabase() {
     const { mkdirSync } = await import('fs');
     try {
       mkdirSync(resolve(process.cwd(), 'backups'), { recursive: true });
-    } catch (_err: unknown) {
+    } catch {
       // Directory already exists
     }
 

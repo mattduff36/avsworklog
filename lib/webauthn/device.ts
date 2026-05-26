@@ -1,6 +1,8 @@
 'use client';
 
-const ACCOUNT_SWITCH_DEVICE_ID_STORAGE_KEY = 'account_switch_device_id_v1';
+// Keep the legacy storage key so existing biometric credentials remain tied to
+// the same browser device identifier after removing Lock / Switch.
+const WEBAUTHN_DEVICE_ID_STORAGE_KEY = 'account_switch_device_id_v1';
 const DEVICE_ID_MIN_LENGTH = 16;
 const DEVICE_ID_MAX_LENGTH = 200;
 
@@ -26,17 +28,17 @@ function normalizeStoredDeviceId(rawValue: string | null): string | null {
   return trimmed;
 }
 
-export function getOrCreateAccountSwitchDeviceId(): string {
+export function getOrCreateWebAuthnDeviceId(): string {
   if (!isBrowser()) {
     return '';
   }
 
   const existingValue = normalizeStoredDeviceId(
-    localStorage.getItem(ACCOUNT_SWITCH_DEVICE_ID_STORAGE_KEY)
+    localStorage.getItem(WEBAUTHN_DEVICE_ID_STORAGE_KEY)
   );
   if (existingValue) {
-    if (localStorage.getItem(ACCOUNT_SWITCH_DEVICE_ID_STORAGE_KEY) !== existingValue) {
-      localStorage.setItem(ACCOUNT_SWITCH_DEVICE_ID_STORAGE_KEY, existingValue);
+    if (localStorage.getItem(WEBAUTHN_DEVICE_ID_STORAGE_KEY) !== existingValue) {
+      localStorage.setItem(WEBAUTHN_DEVICE_ID_STORAGE_KEY, existingValue);
     }
     return existingValue;
   }
@@ -46,27 +48,27 @@ export function getOrCreateAccountSwitchDeviceId(): string {
       ? crypto.randomUUID()
       : buildFallbackDeviceId();
 
-  localStorage.setItem(ACCOUNT_SWITCH_DEVICE_ID_STORAGE_KEY, nextDeviceId);
+  localStorage.setItem(WEBAUTHN_DEVICE_ID_STORAGE_KEY, nextDeviceId);
   return nextDeviceId;
 }
 
-export function getAccountSwitchDeviceId(): string | null {
+export function getWebAuthnDeviceId(): string | null {
   if (!isBrowser()) {
     return null;
   }
 
   const existingValue = normalizeStoredDeviceId(
-    localStorage.getItem(ACCOUNT_SWITCH_DEVICE_ID_STORAGE_KEY)
+    localStorage.getItem(WEBAUTHN_DEVICE_ID_STORAGE_KEY)
   );
   if (!existingValue) {
-    localStorage.removeItem(ACCOUNT_SWITCH_DEVICE_ID_STORAGE_KEY);
+    localStorage.removeItem(WEBAUTHN_DEVICE_ID_STORAGE_KEY);
     return null;
   }
 
   return existingValue;
 }
 
-export function getAccountSwitchDeviceLabel(): string {
+export function getWebAuthnDeviceLabel(): string {
   if (typeof navigator === 'undefined') {
     return 'Unknown device';
   }

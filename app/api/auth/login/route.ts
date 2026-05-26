@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const existing = await validateAppSession({ allowLocked: true });
+    const existing = await validateAppSession();
     const nextSession = await issueAppSession({
       profileId: user.id,
       source: 'password_login',

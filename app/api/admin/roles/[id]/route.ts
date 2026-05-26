@@ -154,7 +154,7 @@ export async function PATCH(
 
       if (nextRoleClass === 'admin' && normalizedName !== 'admin') {
         return NextResponse.json({
-          error: 'Admin role must use internal name \"admin\"'
+          error: 'Admin role must use internal name "admin"'
         }, { status: 400 });
       }
     }
