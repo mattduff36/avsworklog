@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { BellRing, ClipboardList, Settings } from 'lucide-react';
+import { BellRing, CheckCircle2, ClipboardList, EyeOff, Settings } from 'lucide-react';
 import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -15,9 +15,11 @@ import {
 } from '@/lib/config/reminder-workflows';
 import { getReminderAssignmentFilterValue, isReminderActionActive } from '@/lib/utils/reminder-action-filters';
 import type { ReminderActionWithAsset } from '@/types/reminders';
+import { ActionedActionsPanel } from './components/ActionedActionsPanel';
 import { ActionsOverviewPanel } from './components/ActionsOverviewPanel';
 import { ActionsSettingsTab } from './components/ActionsSettingsTab';
 import { ActionsSummaryCards, type ActionsSummaryStats } from './components/ActionsSummaryCards';
+import { IgnoredActionsPanel } from './components/IgnoredActionsPanel';
 
 const EMPTY_SUMMARY: ActionsSummaryStats = {
   openActions: 0,
@@ -26,6 +28,30 @@ const EMPTY_SUMMARY: ActionsSummaryStats = {
 };
 
 const tabTriggerClassName = 'gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900';
+
+const ACTIONS_ARCHIVE_TABS = [
+  {
+    id: 'ignored-reminders',
+    label: 'Ignored',
+    icon: EyeOff,
+  },
+  {
+    id: 'actioned-reminders',
+    label: 'Actioned',
+    icon: CheckCircle2,
+  },
+] as const;
+
+type ActionsArchiveTabId = (typeof ACTIONS_ARCHIVE_TABS)[number]['id'];
+type ActionsOverviewTabId = string | ActionsArchiveTabId;
+
+function isActionsArchiveTabId(value: string): value is ActionsArchiveTabId {
+  return ACTIONS_ARCHIVE_TABS.some((tab) => tab.id === value);
+}
+
+function isValidActionsOverviewTabId(value: string): boolean {
+  return isValidReminderOverviewTabId(value) || isActionsArchiveTabId(value);
+}
 
 function buildSummaryStats(actions: ReminderActionWithAsset[]): ActionsSummaryStats {
   return actions.filter(isReminderActionActive).reduce(
@@ -53,10 +79,12 @@ function ActionsContent() {
   const [summary, setSummary] = useState<ActionsSummaryStats>(EMPTY_SUMMARY);
   const requestedTab = searchParams.get('tab') || 'vans';
   const pageTab: 'overview' | 'settings' = requestedTab === 'settings' && canManage ? 'settings' : 'overview';
-  const overviewTab = isValidReminderOverviewTabId(requestedTab) ? requestedTab : REMINDER_OVERVIEW_TABS[0]?.id || 'vans';
+  const overviewTab: ActionsOverviewTabId = isValidActionsOverviewTabId(requestedTab)
+    ? requestedTab
+    : REMINDER_OVERVIEW_TABS[0]?.id || 'vans';
 
   const activeOverviewTab = useMemo(
-    () => getReminderOverviewTab(overviewTab) || REMINDER_OVERVIEW_TABS[0],
+    () => getReminderOverviewTab(overviewTab),
     [overviewTab],
   );
 
@@ -78,7 +106,7 @@ function ActionsContent() {
       return;
     }
 
-    if (isValidReminderOverviewTabId(requestedTab)) {
+    if (isValidActionsOverviewTabId(requestedTab)) {
       return;
     }
 
@@ -133,6 +161,27 @@ function ActionsContent() {
     setSummaryRefreshToken((current) => current + 1);
   }
 
+  function renderOverviewContent() {
+    if (overviewTab === 'ignored-reminders') {
+      return <IgnoredActionsPanel onRestored={handleSettingsSaved} />;
+    }
+
+    if (overviewTab === 'actioned-reminders') {
+      return <ActionedActionsPanel />;
+    }
+
+    if (!activeOverviewTab) return null;
+
+    return (
+      <ActionsOverviewPanel
+        key={activeOverviewTab.id}
+        tab={activeOverviewTab}
+        refreshToken={refreshToken}
+        onActionsChanged={handleActionsChanged}
+      />
+    );
+  }
+
   if (actionsPermissionLoading || authLoading) {
     return <PageLoader message="Loading actions..." />;
   }
@@ -178,20 +227,26 @@ function ActionsContent() {
                     </TabsTrigger>
                   );
                 })}
+                {ACTIONS_ARCHIVE_TABS.map((tab, index) => {
+                  const Icon = tab.icon;
+                  return (
+                    <TabsTrigger
+                      key={tab.id}
+                      value={tab.id}
+                      className={`${tabTriggerClassName} ${index === 0 ? 'ml-3' : ''}`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {tab.label}
+                    </TabsTrigger>
+                  );
+                })}
               </TabsList>
             </Tabs>
           </div>
         ) : null}
 
         <TabsContent value="overview" className="mt-0 space-y-6">
-          {activeOverviewTab ? (
-            <ActionsOverviewPanel
-              key={activeOverviewTab.id}
-              tab={activeOverviewTab}
-              refreshToken={refreshToken}
-              onActionsChanged={handleActionsChanged}
-            />
-          ) : null}
+          {renderOverviewContent()}
         </TabsContent>
 
         {canManage ? (

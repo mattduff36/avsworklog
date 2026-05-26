@@ -302,17 +302,17 @@ function IgnoreActionPopover({
           type="button"
           variant="ghost"
           className="h-9 w-full justify-start px-2 font-normal text-slate-100 hover:bg-slate-800 hover:text-white"
-          onClick={() => handleIgnore('2_weeks')}
+          onClick={() => handleIgnore('6_weeks')}
         >
-          Ignore for 2 weeks
+          Ignore for 6 weeks
         </Button>
         <Button
           type="button"
           variant="ghost"
           className="h-9 w-full justify-start px-2 font-normal text-slate-100 hover:bg-slate-800 hover:text-white"
-          onClick={() => handleIgnore('6_weeks')}
+          onClick={() => handleIgnore('1_year')}
         >
-          Ignore for 6 weeks
+          Ignore for 1 year
         </Button>
         <Button
           type="button"

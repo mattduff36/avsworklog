@@ -13,14 +13,18 @@ interface RouteContext {
 }
 
 const ignoreReminderActionSchema = z.object({
-  duration: z.enum(['2_weeks', '6_weeks', 'forever']),
+  duration: z.enum(['6_weeks', '1_year', 'forever']),
 });
 
 function getIgnoredUntil(duration: ReminderActionIgnoreDuration, now: Date): string | null {
   if (duration === 'forever') return null;
 
   const ignoredUntil = new Date(now);
-  ignoredUntil.setDate(ignoredUntil.getDate() + (duration === '2_weeks' ? 14 : 42));
+  if (duration === '1_year') {
+    ignoredUntil.setFullYear(ignoredUntil.getFullYear() + 1);
+  } else {
+    ignoredUntil.setDate(ignoredUntil.getDate() + 42);
+  }
   return ignoredUntil.toISOString();
 }
 

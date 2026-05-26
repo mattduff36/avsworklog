@@ -15,10 +15,18 @@ test.describe('@actions @reminders Actions and Reminders', () => {
     });
   });
 
-  test('actions settings loads with settings and archive surfaces', async ({ page }) => {
+  test('actions settings loads with workflow settings', async ({ page }) => {
     await gotoWithTimeoutSkip(page, '/actions?tab=settings', 'Actions settings route timed out in this environment');
 
-    await expect(page.locator('body')).toContainText(/settings|ignored|actioned|daily checks|workflow/i, {
+    await expect(page.locator('body')).toContainText(/settings|fleet inspections|daily checks|workflow/i, {
+      timeout: 10_000,
+    });
+  });
+
+  test('actions archive tabs load from the overview route', async ({ page }) => {
+    await gotoWithTimeoutSkip(page, '/actions?tab=ignored-reminders', 'Ignored actions route timed out in this environment');
+
+    await expect(page.locator('body')).toContainText(/ignored reminders|restore ignored|daily checks/i, {
       timeout: 10_000,
     });
   });

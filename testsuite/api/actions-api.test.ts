@@ -9,7 +9,7 @@ import { expectAuthGuard, expectJsonError, type ApiRouteProbe } from './helpers'
 const actionsRoutes: ApiRouteProbe[] = [
   { method: 'GET', path: '/api/actions' },
   { method: 'POST', path: '/api/actions/assign', body: { action_id: 'fake-id', assignee_ids: [] } },
-  { method: 'POST', path: '/api/actions/fake-id/ignore', body: { duration: '2_weeks' } },
+  { method: 'POST', path: '/api/actions/fake-id/ignore', body: { duration: '6_weeks' } },
   { method: 'GET', path: '/api/actions/settings/fleet_inspection_overdue' },
   { method: 'PATCH', path: '/api/actions/settings/fleet_inspection_overdue', body: {} },
 ];

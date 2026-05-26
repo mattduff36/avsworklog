@@ -73,7 +73,7 @@ export interface AssignRemindersRequest {
   assignee_ids: string[];
 }
 
-export type ReminderActionIgnoreDuration = '2_weeks' | '6_weeks' | 'forever';
+export type ReminderActionIgnoreDuration = '6_weeks' | '1_year' | 'forever';
 
 export interface IgnoreReminderActionRequest {
   duration: ReminderActionIgnoreDuration;
