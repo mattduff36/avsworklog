@@ -13,6 +13,7 @@ import { X } from 'lucide-react';
 import * as maptilersdk from '@maptiler/sdk';
 import '@maptiler/sdk/dist/maptiler-sdk.css';
 import { formatTrackerTimestamp } from '@/lib/utils/tracker-dates';
+import { buildTrackerPopupHtml } from '@/lib/utils/tracker-popup';
 import type { TrackerLocationData } from '@/types/fleet-tracker';
 
 interface AssetLocationMapModalProps {
@@ -143,7 +144,7 @@ export function AssetLocationMapModal({
         if (String(v.vehicleId) === String(location!.vehicleId)) continue;
         if (isNaN(v.lat) || isNaN(v.lng)) continue;
 
-        const label = extractLabel(v.name, v.vrn);
+        const label = v.vrn || extractLabel(v.name, v.vrn);
         const lastSeen = formatTrackerTimestamp(v.updatedAt);
         otherCount++;
 
@@ -151,12 +152,13 @@ export function AssetLocationMapModal({
           .setLngLat([v.lng, v.lat])
           .setPopup(
             new maptilersdk.Popup({ offset: 25 }).setHTML(
-              `<div style="color: #1e293b; padding: 4px; font-size: 13px;">
-                <strong>${label}</strong><br/>
-                ${v.vrn ? `VRN: ${v.vrn}<br/>` : ''}
-                Speed: ${v.speed ?? 0} mph<br/>
-                Last seen: ${lastSeen}
-              </div>`
+              buildTrackerPopupHtml({
+                regLabel: label,
+                vrn: v.vrn,
+                nickname: v.nickname,
+                speed: v.speed,
+                lastSeen,
+              })
             )
           )
           .addTo(map);
@@ -166,16 +168,18 @@ export function AssetLocationMapModal({
 
       // Add main asset marker (red) – on top
       const assetLastSeen = formatTrackerTimestamp(location!.updatedAt);
+      const assetRegLabel = location!.vrn || assetLabel;
       const marker = new maptilersdk.Marker({ color: '#ef4444' })
         .setLngLat([location!.lng, location!.lat])
         .setPopup(
           new maptilersdk.Popup({ offset: 25 }).setHTML(
-            `<div style="color: #1e293b; padding: 4px; font-size: 13px;">
-              <strong>${assetLabel}</strong><br/>
-              ${location!.vrn ? `VRN: ${location!.vrn}<br/>` : ''}
-              Speed: ${location!.speed ?? 0} mph<br/>
-              Last seen: ${assetLastSeen}
-            </div>`
+            buildTrackerPopupHtml({
+              regLabel: assetRegLabel,
+              vrn: location!.vrn,
+              nickname: location!.nickname,
+              speed: location!.speed,
+              lastSeen: assetLastSeen,
+            })
           )
         )
         .addTo(map);

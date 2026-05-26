@@ -3,6 +3,7 @@ import {
   getVelocityfleetLocations,
   isVelocityfleetError,
 } from '@/lib/services/velocityfleet';
+import { enrichTrackerLocationsWithVanNicknames } from '@/lib/server/fleet-tracker-enrichment';
 
 export async function GET() {
   if (!process.env.VELOCITYFLEET_API_KEY) {
@@ -13,7 +14,7 @@ export async function GET() {
   }
 
   try {
-    const vehicles = await getVelocityfleetLocations();
+    const vehicles = await enrichTrackerLocationsWithVanNicknames(await getVelocityfleetLocations());
 
     return NextResponse.json({
       vehicles,

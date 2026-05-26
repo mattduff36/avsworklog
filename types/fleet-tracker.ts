@@ -7,4 +7,6 @@ export interface TrackerLocationData {
   name: string;
   vrn: string;
   vehicleId: string;
+  /** Present when the tracker VRN matches a van in the fleet database */
+  nickname?: string | null;
 }

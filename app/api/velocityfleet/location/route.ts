@@ -3,6 +3,7 @@ import {
   getVelocityfleetLocationByRegistration,
   isVelocityfleetError,
 } from '@/lib/services/velocityfleet';
+import { enrichTrackerLocationWithVanNickname } from '@/lib/server/fleet-tracker-enrichment';
 
 export async function GET(request: NextRequest) {
   if (!process.env.VELOCITYFLEET_API_KEY) {
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'not_found', message: 'Asset not found in Velocityfleet' });
     }
 
-    return NextResponse.json(location);
+    return NextResponse.json(await enrichTrackerLocationWithVanNickname(location));
   } catch (error) {
     if (isVelocityfleetError(error) && error.velocityfleet) {
       return NextResponse.json(

@@ -111,6 +111,7 @@ export function AssetLocationMap({
             name: data.name,
             vrn: data.vrn,
             vehicleId: data.vehicleId,
+            nickname: data.nickname ?? null,
           };
           setLocationData(loc);
           setHasMatch(true);
