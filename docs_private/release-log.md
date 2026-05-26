@@ -2,6 +2,18 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0526.10.0
+
+**GIT COMMIT MESSAGE**
+`feat(fleet): update fleet workflow and API routes`
+
+**WHAT CHANGED**
+Update fleet workflow and API routes. Sync approval summary counts.
+
+**COMMITS IN THIS RELEASE**
+- `feat(fleet): update fleet workflow and API routes`
+- `fix(dashboard): sync approval summary counts`
+
 ## 0526.9.1
 
 **GIT COMMIT MESSAGE**
