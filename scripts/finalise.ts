@@ -400,8 +400,11 @@ function collectMigrationFilesFromScript(filePath: string): string[] {
 }
 
 function isLikelyMigrationScript(relativePath: string): boolean {
+  if (relativePath.startsWith('scripts/migrations/')) {
+    return false;
+  }
+
   return (
-    /^scripts\/migrations\/.+\.ts$/u.test(relativePath) ||
     /^scripts\/.+migration.+\.ts$/u.test(relativePath) ||
     /^scripts\/.+migrations.+\.ts$/u.test(relativePath)
   );

@@ -2229,13 +2229,96 @@ export type Database = {
           },
         ]
       }
+      inventory_minor_plant_details: {
+        Row: {
+          id: string
+          inventory_item_id: string
+          source_plant_id: string | null
+          plant_identifier: string | null
+          make: string | null
+          model: string | null
+          reg_number: string | null
+          year: number | null
+          weight_class: string | null
+          serial_number?: string | null
+          copied_at: string | null
+          created_at: string
+          updated_at: string
+          created_by: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          inventory_item_id: string
+          source_plant_id?: string | null
+          plant_identifier?: string | null
+          make?: string | null
+          model?: string | null
+          reg_number?: string | null
+          year?: number | null
+          weight_class?: string | null
+          serial_number?: string | null
+          copied_at?: string | null
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          inventory_item_id?: string
+          source_plant_id?: string | null
+          plant_identifier?: string | null
+          make?: string | null
+          model?: string | null
+          reg_number?: string | null
+          year?: number | null
+          weight_class?: string | null
+          serial_number?: string | null
+          copied_at?: string | null
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'inventory_minor_plant_details_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_minor_plant_details_inventory_item_id_fkey'
+            columns: ['inventory_item_id']
+            isOneToOne: true
+            referencedRelation: 'inventory_items'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_minor_plant_details_source_plant_id_fkey'
+            columns: ['source_plant_id']
+            isOneToOne: true
+            referencedRelation: 'plant'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_minor_plant_details_updated_by_fkey'
+            columns: ['updated_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       inventory_items: {
         Row: {
           id: string
           item_number: string
           item_number_normalized: string
           name: string
-          category: 'hired_plant' | 'signs' | 'minor_plant' | 'tools' | 'equipment' | 'unknown'
+          category: 'hired_plant' | 'signs' | 'minor_plant' | 'van_stock' | 'tools' | 'equipment' | 'unknown'
           location_id: string | null
           last_checked_at: string | null
           status: 'active' | 'inactive'
@@ -2251,7 +2334,7 @@ export type Database = {
           item_number: string
           item_number_normalized: string
           name: string
-          category?: 'hired_plant' | 'signs' | 'minor_plant' | 'tools' | 'equipment' | 'unknown'
+          category?: 'hired_plant' | 'signs' | 'minor_plant' | 'van_stock' | 'tools' | 'equipment' | 'unknown'
           location_id?: string | null
           last_checked_at?: string | null
           status?: 'active' | 'inactive'
@@ -2267,7 +2350,7 @@ export type Database = {
           item_number?: string
           item_number_normalized?: string
           name?: string
-          category?: 'hired_plant' | 'signs' | 'minor_plant' | 'tools' | 'equipment' | 'unknown'
+          category?: 'hired_plant' | 'signs' | 'minor_plant' | 'van_stock' | 'tools' | 'equipment' | 'unknown'
           location_id?: string | null
           last_checked_at?: string | null
           status?: 'active' | 'inactive'

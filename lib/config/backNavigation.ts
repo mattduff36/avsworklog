@@ -75,6 +75,9 @@ export function getParentHref(
     const fromTab = searchParams?.get('fromTab');
     const validInventoryTabs = ['overview', 'locations', 'groups'];
     if (fromTab && validInventoryTabs.includes(fromTab)) {
+      if (fromTab === 'overview' && searchParams?.get('overview') === 'minor-plant') {
+        return '/inventory?overview=minor-plant';
+      }
       return fromTab === 'overview' ? '/inventory' : `/inventory?tab=${fromTab}`;
     }
     return '/inventory';

@@ -246,6 +246,17 @@ export default function InventoryItemDetailPage() {
               <DetailRow label="Source" value={item.source || 'Not recorded'} />
               <DetailRow label="Source Reference" value={item.source_reference || 'Not recorded'} />
               <DetailRow label="Group" value={group?.name || 'No group'} />
+              {item.minor_plant_detail ? (
+                <>
+                  <DetailRow label="Plant ID" value={item.minor_plant_detail.plant_identifier || 'Not recorded'} />
+                  {'serial_number' in item.minor_plant_detail ? (
+                    <DetailRow label="Serial Number" value={item.minor_plant_detail.serial_number || 'Not recorded'} />
+                  ) : null}
+                  <DetailRow label="Make" value={item.minor_plant_detail.make || 'Not recorded'} />
+                  <DetailRow label="Model" value={item.minor_plant_detail.model || 'Not recorded'} />
+                  <DetailRow label="Registration" value={item.minor_plant_detail.reg_number || 'Not recorded'} />
+                </>
+              ) : null}
               {item.location?.linked_asset_label ? (
                 <DetailRow label="Linked Location Asset" value={`${item.location.linked_asset_label}${item.location.linked_asset_nickname ? ` · ${item.location.linked_asset_nickname}` : ''}`} />
               ) : null}

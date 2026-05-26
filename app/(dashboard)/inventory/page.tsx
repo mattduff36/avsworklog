@@ -48,6 +48,7 @@ export default function InventoryPage() {
   const [categories, setCategories] = useState<InventoryItemCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [pageTab, setPageTab] = useState<'overview' | 'locations' | 'settings'>('overview');
+  const [overviewTab, setOverviewTab] = useState<'small_tools' | 'minor_plant'>('small_tools');
   const [settingsTab, setSettingsTab] = useState<'categories' | 'groups'>('categories');
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
@@ -55,6 +56,7 @@ export default function InventoryPage() {
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [editingLocation, setEditingLocation] = useState<InventoryLocation | null>(null);
   const [movingItems, setMovingItems] = useState<InventoryItem[]>([]);
+  const [restoringMinorPlantItems, setRestoringMinorPlantItems] = useState(false);
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
 
   const fetchInventoryData = useCallback(async () => {
@@ -124,6 +126,7 @@ export default function InventoryPage() {
   useEffect(() => {
     const requestedTab = searchParams.get('tab');
     const requestedSettings = searchParams.get('settings');
+    const requestedOverview = searchParams.get('overview');
 
     if (requestedTab === 'locations') {
       setPageTab('locations');
@@ -149,6 +152,7 @@ export default function InventoryPage() {
     }
 
     setPageTab('overview');
+    setOverviewTab(requestedOverview === 'minor-plant' ? 'minor_plant' : 'small_tools');
   }, [searchParams]);
 
   const summary = useMemo(() => {
@@ -177,6 +181,16 @@ export default function InventoryPage() {
   const categoryLabels = useMemo(
     () => Object.fromEntries(categories.map((category) => [category.slug, category.name])),
     [categories]
+  );
+
+  const smallToolsItems = useMemo(
+    () => items.filter((item) => item.category !== 'minor_plant'),
+    [items]
+  );
+
+  const minorPlantItems = useMemo(
+    () => items.filter((item) => item.category === 'minor_plant'),
+    [items]
   );
 
   async function parseJsonResponse(response: Response, fallbackMessage: string) {
@@ -294,6 +308,35 @@ export default function InventoryPage() {
     const result = await parseJsonResponse(response, 'Failed to move inventory items');
     toast.success(result.moved_count === 1 ? 'Item moved' : `${result.moved_count} items moved`);
     await fetchInventoryData();
+  }
+
+  async function handleRestoreMinorPlantToPlant(itemsToRestore: InventoryItem[]) {
+    if (itemsToRestore.length === 0) return;
+    if (!window.confirm(`Move ${itemsToRestore.length} Minor Plant item${itemsToRestore.length === 1 ? '' : 's'} back to the Plant asset table?`)) return;
+
+    setRestoringMinorPlantItems(true);
+    try {
+      const response = await fetch('/api/inventory/minor-plant/restore-to-plant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ item_ids: itemsToRestore.map((item) => item.id) }),
+      });
+      const result = await parseJsonResponse(response, 'Failed to move Minor Plant items back to Plant assets');
+      toast.success('Minor Plant items moved to Plant assets', {
+        description: `${result.restored_count || 0} moved${result.skipped_count ? `, ${result.skipped_count} skipped` : ''}.`,
+      });
+      if (result.skipped_count) {
+        toast.warning('Some Minor Plant items were skipped', {
+          description: 'Only items linked to a source Plant asset can be restored automatically.',
+        });
+      }
+      setSelectedItemIds(new Set());
+      await fetchInventoryData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to move Minor Plant items back to Plant assets');
+    } finally {
+      setRestoringMinorPlantItems(false);
+    }
   }
 
   async function handleSetUserLocation(locationId: string, changeReason?: string) {
@@ -510,7 +553,7 @@ export default function InventoryPage() {
             return;
           }
           setPageTab('overview');
-          router.push('/inventory', { scroll: false });
+          router.push(overviewTab === 'minor_plant' ? '/inventory?overview=minor-plant' : '/inventory', { scroll: false });
         }}
       >
         <TabsList>
@@ -553,17 +596,60 @@ export default function InventoryPage() {
         ) : null}
 
         <TabsContent value="overview" className="mt-0 space-y-6">
-          <InventoryTable
-            items={items}
-            selectedItemIds={selectedItemIds}
-            onSelectedItemIdsChange={setSelectedItemIds}
-            onEdit={(item) => { setEditingItem(item); setItemDialogOpen(true); }}
-            onDelete={handleRemoveItem}
-            onMove={setMovingItems}
-            onOpenDetails={(item) => router.push('/inventory/items/' + item.id + '?fromTab=overview')}
-            locationFilterLocations={locations}
-            categoryLabels={categoryLabels}
-          />
+          <Tabs
+            value={overviewTab}
+            onValueChange={(value) => {
+              const nextOverviewTab = value as 'small_tools' | 'minor_plant';
+              setOverviewTab(nextOverviewTab);
+              router.push(nextOverviewTab === 'minor_plant' ? '/inventory?overview=minor-plant' : '/inventory', { scroll: false });
+            }}
+          >
+            <div className="flex justify-end">
+              <TabsList>
+                <TabsTrigger value="small_tools" className="gap-2">
+                  <PackageSearch className="h-4 w-4" />
+                  Small Tools
+                </TabsTrigger>
+                <TabsTrigger value="minor_plant" className="gap-2">
+                  <Truck className="h-4 w-4" />
+                  Minor Plant
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+            <TabsContent value="small_tools" className="mt-4">
+              <InventoryTable
+                items={smallToolsItems}
+                selectedItemIds={selectedItemIds}
+                onSelectedItemIdsChange={setSelectedItemIds}
+                onEdit={(item) => { setEditingItem(item); setItemDialogOpen(true); }}
+                onDelete={handleRemoveItem}
+                onMove={setMovingItems}
+                onOpenDetails={(item) => router.push('/inventory/items/' + item.id + '?fromTab=overview')}
+                locationFilterLocations={locations}
+                categoryLabels={categoryLabels}
+                tableLabel="small tools"
+              />
+            </TabsContent>
+
+            <TabsContent value="minor_plant" className="mt-4">
+              <InventoryTable
+                items={minorPlantItems}
+                selectedItemIds={selectedItemIds}
+                onSelectedItemIdsChange={setSelectedItemIds}
+                onEdit={(item) => { setEditingItem(item); setItemDialogOpen(true); }}
+                onDelete={handleRemoveItem}
+                onMove={setMovingItems}
+                onBulkAction={handleRestoreMinorPlantToPlant}
+                bulkActionLabel={restoringMinorPlantItems ? 'Moving to Plant Assets...' : 'Move to Plant Assets'}
+                onOpenDetails={(item) => router.push('/inventory/items/' + item.id + '?fromTab=overview&overview=minor-plant')}
+                locationFilterLocations={locations}
+                categoryLabels={categoryLabels}
+                tableLabel="minor plant"
+                showMinorPlantDetails
+              />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
         <TabsContent value="locations" className="mt-0 space-y-6">

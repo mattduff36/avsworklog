@@ -6,6 +6,19 @@ interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
+interface InventoryItemRow {
+  minor_plant_detail?: unknown;
+  [key: string]: unknown;
+}
+
+function normalizeMinorPlantDetailRelation(item: InventoryItemRow): InventoryItemRow {
+  const relation = item.minor_plant_detail;
+  return {
+    ...item,
+    minor_plant_detail: Array.isArray(relation) ? relation[0] ?? null : relation ?? null,
+  };
+}
+
 export async function GET(_request: Request, { params }: RouteParams) {
   try {
     const access = await requireInventoryManagerAccess();
@@ -20,7 +33,8 @@ export async function GET(_request: Request, { params }: RouteParams) {
         .from('inventory_items')
         .select(`
           *,
-          location:inventory_locations(*)
+          location:inventory_locations(*),
+          minor_plant_detail:inventory_minor_plant_details(*)
         `)
         .eq('id', id)
         .single(),
@@ -64,7 +78,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     if (groupResult.error) throw groupResult.error;
 
     return NextResponse.json({
-      item: itemResult.data,
+      item: normalizeMinorPlantDetailRelation(itemResult.data as InventoryItemRow),
       movements: movementsResult.data || [],
       checks: checksResult.data || [],
       group: groupResult.data?.group || null,

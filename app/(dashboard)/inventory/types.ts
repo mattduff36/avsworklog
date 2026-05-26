@@ -59,11 +59,28 @@ export interface InventoryItem {
   source_reference: string | null;
   source_location_hint?: string | null;
   source_location_rows?: string | null;
+  minor_plant_detail?: InventoryMinorPlantDetail | null;
   group?: InventoryItemGroupSummary | null;
   created_at: string;
   updated_at: string;
   created_by: string | null;
   updated_by: string | null;
+}
+
+export interface InventoryMinorPlantDetail {
+  id: string;
+  inventory_item_id: string;
+  source_plant_id: string | null;
+  plant_identifier: string | null;
+  make: string | null;
+  model: string | null;
+  reg_number: string | null;
+  year: number | null;
+  weight_class: string | null;
+  serial_number?: string | null;
+  copied_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface InventoryItemFormData {
@@ -138,6 +155,7 @@ export const INVENTORY_CATEGORY_LABELS: Record<string, string> = {
   hired_plant: 'Hired Plant',
   signs: 'Signs',
   minor_plant: 'Minor Plant',
+  van_stock: 'Van Stock',
   tools: 'Tools',
   equipment: 'Equipment',
   unknown: 'Unknown',
@@ -153,7 +171,7 @@ export function formatInventoryCategoryLabel(
 export const EMPTY_INVENTORY_ITEM_FORM: InventoryItemFormData = {
   item_number: '',
   name: '',
-  category: 'minor_plant',
+  category: 'van_stock',
   location_id: '',
   last_checked_at: '',
   check_interval_months: '',

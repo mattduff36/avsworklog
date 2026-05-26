@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { LoadMorePagination } from '@/components/ui/load-more-pagination';
@@ -86,7 +87,7 @@ export function PlantTable({
 }: PlantTableProps) {
   const router = useRouter();
   const { tabletModeEnabled } = useTabletMode();
-  const { data: maintenanceData, isLoading: maintenanceLoading } = useMaintenance();
+  const { data: maintenanceData, isLoading: maintenanceLoading, refetch: refetchMaintenance } = useMaintenance();
   // ✅ Create supabase client using useMemo to avoid recreating on every render
   const supabase = useMemo(() => createClient(), []);
   const [sortField, setSortField] = useState<SortField>('plant_id');
@@ -100,6 +101,8 @@ export function PlantTable({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
   const [retiredSearchQuery, setRetiredSearchQuery] = useState('');
+  const [selectedPlantIds, setSelectedPlantIds] = useState<Set<string>>(new Set());
+  const [movingToMinorPlant, setMovingToMinorPlant] = useState(false);
   
   // Column visibility defaults - category hidden by default
   const defaultVisibility: ColumnVisibility = {
@@ -303,6 +306,12 @@ export function PlantTable({
     showMore,
   } = useLoadMorePagination(sortedPlant, { resetKey: paginationKey });
 
+  const visiblePlantIds = useMemo(
+    () => visiblePlant.map((asset) => asset.plant.id),
+    [visiblePlant]
+  );
+  const allVisiblePlantSelected = visiblePlantIds.length > 0 && visiblePlantIds.every((plantId) => selectedPlantIds.has(plantId));
+
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -314,6 +323,64 @@ export function PlantTable({
 
   const handleViewHistory = (plantId: string) => {
     router.push(`/fleet/plant/${plantId}/history?fromTab=plant`);
+  };
+
+  const togglePlantSelected = (plantId: string, checked: boolean) => {
+    setSelectedPlantIds((current) => {
+      const next = new Set(current);
+      if (checked) next.add(plantId);
+      else next.delete(plantId);
+      return next;
+    });
+  };
+
+  const toggleVisiblePlantSelected = (checked: boolean) => {
+    setSelectedPlantIds((current) => {
+      const next = new Set(current);
+      visiblePlantIds.forEach((plantId) => {
+        if (checked) next.add(plantId);
+        else next.delete(plantId);
+      });
+      return next;
+    });
+  };
+
+  const handleMoveSelectedToMinorPlant = async () => {
+    const plantIds = Array.from(selectedPlantIds);
+    if (plantIds.length === 0) return;
+    if (!confirm(`Move ${plantIds.length} selected Plant asset${plantIds.length === 1 ? '' : 's'} to Minor Plant inventory?`)) return;
+
+    setMovingToMinorPlant(true);
+    try {
+      const response = await fetch('/api/inventory/minor-plant/move-from-plant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plant_ids: plantIds }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || 'Failed to move Plant assets to Minor Plant');
+      }
+
+      toast.success('Plant assets moved to Minor Plant', {
+        description: `${payload.moved_count || 0} moved${payload.skipped_count ? `, ${payload.skipped_count} skipped` : ''}.`,
+      });
+      if (payload.skipped_count) {
+        toast.warning('Some Plant assets were skipped', {
+          description: 'They may already be moved, inactive, or have an inventory ID conflict.',
+        });
+      }
+      setSelectedPlantIds(new Set());
+      await Promise.all([fetchPlantData(), refetchMaintenance()]);
+      onVehicleAdded?.();
+    } catch (error: unknown) {
+      console.error('Error moving Plant assets to Minor Plant:', error);
+      toast.error('Failed to move Plant assets', {
+        description: error instanceof Error ? error.message : 'Please try again.',
+      });
+    } finally {
+      setMovingToMinorPlant(false);
+    }
   };
 
   const handleRestorePlant = (plant: PlantAsset) => {
@@ -440,6 +507,19 @@ export function PlantTable({
                 className={cn('bg-slate-900/50 border-slate-600 text-white', tabletModeEnabled ? 'pl-12 min-h-11 text-base' : 'pl-11')}
               />
             </div>
+            {selectedPlantIds.size > 0 ? (
+              <Button
+                variant="outline"
+                onClick={handleMoveSelectedToMinorPlant}
+                disabled={movingToMinorPlant}
+                className={cn('border-amber-500/50 text-amber-200 hover:bg-amber-900/20', tabletModeEnabled && 'min-h-11 text-base px-4')}
+              >
+                {movingToMinorPlant ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                Move to Minor Plant ({selectedPlantIds.size})
+              </Button>
+            ) : null}
             
             {/* Column Visibility Dropdown - Hidden on Mobile */}
             <DropdownMenu>
@@ -499,7 +579,17 @@ export function PlantTable({
                 <Table className="min-w-full">
                   <TableHeader>
                     <TableRow className="border-border">
-                        <TableHead 
+                      <TableHead
+                        className="sticky z-30 w-10 bg-slate-900 text-muted-foreground border-b-2 border-border"
+                        style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
+                      >
+                        <Checkbox
+                          checked={allVisiblePlantSelected}
+                          onCheckedChange={(checked) => toggleVisiblePlantSelected(checked === true)}
+                          aria-label="Select visible plant assets"
+                        />
+                      </TableHead>
+                      <TableHead 
                         className="sticky z-30 bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
                         style={{ top: 'calc(var(--top-nav-h, 68px) + 0px)' }}
                         onClick={() => handleSort('plant_id')}
@@ -581,6 +671,14 @@ export function PlantTable({
                         onClick={() => handleViewHistory(asset.plant?.id || '')}
                         className="border-slate-700 hover:bg-slate-800/50 cursor-pointer"
                       >
+                        <TableCell className="align-top">
+                          <Checkbox
+                            checked={selectedPlantIds.has(asset.plant.id)}
+                            onClick={(event) => event.stopPropagation()}
+                            onCheckedChange={(checked) => togglePlantSelected(asset.plant.id, checked === true)}
+                            aria-label={`Select ${asset.plant?.plant_id || 'Plant asset'}`}
+                          />
+                        </TableCell>
                         {/* Plant ID */}
                         <TableCell className="align-top font-medium text-white">
                           <div className="space-y-1">
@@ -697,6 +795,13 @@ export function PlantTable({
                       >
                         {/* Header */}
                         <div className="flex items-center justify-between mb-2">
+                          <Checkbox
+                            checked={selectedPlantIds.has(asset.plant.id)}
+                            onClick={(event) => event.stopPropagation()}
+                            onCheckedChange={(checked) => togglePlantSelected(asset.plant.id, checked === true)}
+                            aria-label={`Select ${asset.plant?.plant_id || 'Plant asset'}`}
+                            className="mr-3"
+                          />
                           <div className="flex-1">
                             <h3 className="font-semibold text-white text-lg">{asset.plant?.plant_id}</h3>
                             {asset.plant?.nickname && (

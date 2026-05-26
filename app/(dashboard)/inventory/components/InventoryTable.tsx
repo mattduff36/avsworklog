@@ -40,7 +40,7 @@ import { formatInventoryCategoryLabel, type InventoryCheckStatus, type Inventory
 import { useLoadMorePagination } from '@/lib/hooks/useLoadMorePagination';
 
 type InventoryFilter = 'all' | InventoryCheckStatus | 'yard' | 'noloc';
-type SortField = 'item_number' | 'name' | 'location' | 'last_checked_at';
+type SortField = 'item_number' | 'serial_number' | 'name' | 'location' | 'last_checked_at';
 type SortDir = 'asc' | 'desc';
 const ALL_LOCATIONS_FILTER = 'all';
 
@@ -51,9 +51,13 @@ interface InventoryTableProps {
   onEdit?: (item: InventoryItem) => void;
   onDelete?: (item: InventoryItem) => void;
   onMove: (items: InventoryItem[]) => void;
+  onBulkAction?: (items: InventoryItem[]) => void;
+  bulkActionLabel?: string;
   onOpenDetails?: (item: InventoryItem) => void;
   locationFilterLocations?: InventoryLocation[];
   categoryLabels?: Record<string, string>;
+  tableLabel?: string;
+  showMinorPlantDetails?: boolean;
 }
 
 const filters: Array<{ value: InventoryFilter; label: string }> = [
@@ -126,9 +130,13 @@ export function InventoryTable({
   onEdit,
   onDelete,
   onMove,
+  onBulkAction,
+  bulkActionLabel,
   onOpenDetails,
   locationFilterLocations,
   categoryLabels,
+  tableLabel = 'inventory',
+  showMinorPlantDetails = false,
 }: InventoryTableProps) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<InventoryFilter>('all');
@@ -136,6 +144,7 @@ export function InventoryTable({
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const showLocationFilter = Boolean(locationFilterLocations?.length);
+  const showSerialNumberColumn = showMinorPlantDetails && items.some((item) => Boolean(item.minor_plant_detail?.serial_number));
   const paginationKey = `${filter}:${locationFilterId}:${search.trim()}:${sortField}:${sortDir}:${items.length}`;
 
   const filteredItems = useMemo(() => {
@@ -143,6 +152,7 @@ export function InventoryTable({
     const filtered = items.filter((item) => {
       const locationName = item.location?.name || '';
       const linkedVanNickname = getVanLocationNickname(item) || '';
+      const serialNumber = item.minor_plant_detail?.serial_number || '';
       const checkStatus = getInventoryCheckStatus(item);
 
       if (locationFilterId !== ALL_LOCATIONS_FILTER && item.location_id !== locationFilterId) return false;
@@ -153,6 +163,7 @@ export function InventoryTable({
       if (!query) return true;
       return (
         item.item_number.toLowerCase().includes(query) ||
+        serialNumber.toLowerCase().includes(query) ||
         item.name.toLowerCase().includes(query) ||
         locationName.toLowerCase().includes(query) ||
         linkedVanNickname.toLowerCase().includes(query)
@@ -160,8 +171,16 @@ export function InventoryTable({
     });
 
     return filtered.sort((a, b) => {
-      const aValue = sortField === 'location' ? a.location?.name || '' : a[sortField] || '';
-      const bValue = sortField === 'location' ? b.location?.name || '' : b[sortField] || '';
+      const aValue = sortField === 'location'
+        ? a.location?.name || ''
+        : sortField === 'serial_number'
+          ? a.minor_plant_detail?.serial_number || ''
+          : a[sortField] || '';
+      const bValue = sortField === 'location'
+        ? b.location?.name || ''
+        : sortField === 'serial_number'
+          ? b.minor_plant_detail?.serial_number || ''
+          : b[sortField] || '';
       const compare = String(aValue).localeCompare(String(bValue), undefined, { sensitivity: 'base' });
       return sortDir === 'asc' ? compare : -compare;
     });
@@ -230,7 +249,7 @@ export function InventoryTable({
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search inventory..."
+            placeholder={`Search ${tableLabel}...`}
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             className="bg-slate-800 border-slate-600 pl-9 text-white placeholder:text-muted-foreground"
@@ -240,11 +259,11 @@ export function InventoryTable({
         {selectedItems.length > 0 ? (
           <Button
             variant="outline"
-            onClick={() => onMove(selectedItems)}
+            onClick={() => (onBulkAction || onMove)(selectedItems)}
             className="border-slate-600 text-white hover:bg-slate-800"
           >
             <Truck className="mr-2 h-4 w-4" />
-            Move Selected ({selectedItems.length})
+            {bulkActionLabel || 'Move Selected'} ({selectedItems.length})
           </Button>
         ) : null}
       </div>
@@ -304,24 +323,29 @@ export function InventoryTable({
               <th className="cursor-pointer px-4 py-3 text-left font-semibold text-muted-foreground hover:text-white" onClick={() => toggleSort('item_number')}>
                 ID {renderSortIcon('item_number')}
               </th>
+              {showSerialNumberColumn ? (
+                <th className="cursor-pointer px-4 py-3 text-left font-semibold text-muted-foreground hover:text-white" onClick={() => toggleSort('serial_number')}>
+                  Serial Number {renderSortIcon('serial_number')}
+                </th>
+              ) : null}
               <th className="cursor-pointer px-4 py-3 text-left font-semibold text-muted-foreground hover:text-white" onClick={() => toggleSort('name')}>
                 Name {renderSortIcon('name')}
               </th>
               <th className="cursor-pointer px-4 py-3 text-left font-semibold text-muted-foreground hover:text-white" onClick={() => toggleSort('location')}>
                 Location {renderSortIcon('location')}
               </th>
-              <th className="cursor-pointer px-4 py-3 text-left font-semibold text-muted-foreground hover:text-white" onClick={() => toggleSort('last_checked_at')}>
+              <th className="w-28 cursor-pointer px-4 py-3 text-left font-semibold text-muted-foreground hover:text-white" onClick={() => toggleSort('last_checked_at')}>
                 Last Checked {renderSortIcon('last_checked_at')}
               </th>
-              <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Check Status</th>
-              <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Actions</th>
+              <th className="w-36 px-4 py-3 text-left font-semibold text-muted-foreground">Check Status</th>
+              <th className="w-36 px-4 py-3 text-right font-semibold text-muted-foreground">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-700/50">
             {filteredItems.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-muted-foreground">
-                  {search ? 'No inventory items match your search.' : 'No inventory items found.'}
+                <td colSpan={showSerialNumberColumn ? 8 : 7} className="py-12 text-center text-muted-foreground">
+                  {search ? `No ${tableLabel} items match your search.` : `No ${tableLabel} items found.`}
                 </td>
               </tr>
             ) : (
@@ -342,6 +366,9 @@ export function InventoryTable({
                       />
                     </td>
                     <td className="px-4 py-3 font-medium text-white">{item.item_number}</td>
+                    {showSerialNumberColumn ? (
+                      <td className="px-4 py-3 text-slate-300">{item.minor_plant_detail?.serial_number || 'Not recorded'}</td>
+                    ) : null}
                     <td className="px-4 py-3">
                       <div className="font-medium text-white">{item.name}</div>
                       <div className="text-xs text-muted-foreground">{formatInventoryCategoryLabel(item.category, categoryLabels)}</div>
@@ -352,16 +379,18 @@ export function InventoryTable({
                       ) : null}
                     </td>
                     <td className="px-4 py-3 text-slate-300">{renderLocationDetails(item)}</td>
-                    <td className="px-4 py-3 text-slate-300">
+                    <td className="w-28 px-4 py-3 text-slate-300">
                       <div>{formatInventoryDate(item.last_checked_at)}</div>
-                      <div className="text-xs text-muted-foreground">Due {getInventoryDueDate(item.last_checked_at, getInventoryCheckIntervalMonths(item))}</div>
+                      {item.last_checked_at ? (
+                        <div className="whitespace-nowrap text-[11px] leading-4 text-muted-foreground">Due {getInventoryDueDate(item.last_checked_at, getInventoryCheckIntervalMonths(item))}</div>
+                      ) : null}
                     </td>
-                    <td className="px-4 py-3">
-                      <Badge variant="outline" className={getStatusBadgeClass(checkStatus)}>
+                    <td className="w-36 px-4 py-3">
+                      <Badge variant="outline" className={`whitespace-nowrap ${getStatusBadgeClass(checkStatus)}`}>
                         {getCheckStatusLabel(checkStatus)}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="w-36 px-4 py-3">
                       <div className="flex justify-end gap-2">
                         <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); onMove([item]); }} className="border-slate-600">
                           Move
@@ -396,7 +425,7 @@ export function InventoryTable({
       <div className="space-y-3 md:hidden">
         {filteredItems.length === 0 ? (
           <div className="py-12 text-center text-muted-foreground">
-            {search ? 'No inventory items match your search.' : 'No inventory items found.'}
+            {search ? `No ${tableLabel} items match your search.` : `No ${tableLabel} items found.`}
           </div>
         ) : (
           visibleItems.map((item) => {
@@ -421,6 +450,9 @@ export function InventoryTable({
                         {item.name}
                       </div>
                       <div className="text-xs text-muted-foreground">{item.item_number}</div>
+                      {showSerialNumberColumn ? (
+                        <div className="text-xs text-muted-foreground">Serial: {item.minor_plant_detail?.serial_number || 'Not recorded'}</div>
+                      ) : null}
                       {item.group ? (
                         <Badge variant="outline" className="mt-1 border-purple-500/30 bg-purple-500/10 text-purple-200">
                           Group: {item.group.name}
@@ -438,7 +470,9 @@ export function InventoryTable({
                     {renderLocationDetails(item)}
                   </div>
                   <span>Last: {formatInventoryDate(item.last_checked_at)}</span>
-                  <span>Due: {getInventoryDueDate(item.last_checked_at, getInventoryCheckIntervalMonths(item))}</span>
+                  {item.last_checked_at ? (
+                    <span>Due: {getInventoryDueDate(item.last_checked_at, getInventoryCheckIntervalMonths(item))}</span>
+                  ) : null}
                 </div>
                 <div className="mt-4 flex gap-2">
                   <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); onMove([item]); }} className="flex-1 border-slate-600">

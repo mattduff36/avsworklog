@@ -32,6 +32,7 @@ interface InventoryItemRow {
   id: string;
   item_number_normalized: string;
   location?: InventoryLocationRow | null;
+  minor_plant_detail?: unknown;
   [key: string]: unknown;
 }
 
@@ -142,21 +143,35 @@ function addLinkedVanDisplay(item: InventoryItemRow, vanById: Map<string, Linked
   };
 }
 
+function normalizeMinorPlantDetailRelation(item: InventoryItemRow): InventoryItemRow {
+  const relation = item.minor_plant_detail;
+  return {
+    ...item,
+    minor_plant_detail: Array.isArray(relation) ? relation[0] ?? null : relation ?? null,
+  };
+}
+
 async function loadItemGroups(
   admin: ReturnType<typeof createAdminClient>,
   itemIds: string[]
 ): Promise<Map<string, InventoryItemGroupSummary>> {
   if (itemIds.length === 0) return new Map();
 
-  const { data, error } = await admin
-    .from('inventory_item_group_members')
-    .select(`
-      item_id,
-      group:inventory_item_groups(id, name, description)
-    `)
-    .in('item_id', itemIds);
+  const rows: InventoryItemGroupMemberRow[] = [];
+  const chunkSize = 100;
+  for (let index = 0; index < itemIds.length; index += chunkSize) {
+    const chunk = itemIds.slice(index, index + chunkSize);
+    const { data, error } = await admin
+      .from('inventory_item_group_members')
+      .select(`
+        item_id,
+        group:inventory_item_groups(id, name, description)
+      `)
+      .in('item_id', chunk);
 
-  if (error) throw error;
+    if (error) throw error;
+    rows.push(...((data || []) as unknown as InventoryItemGroupMemberRow[]));
+  }
 
   function pickGroup(group: InventoryItemGroupMemberRow['group']): InventoryItemGroupSummary | null {
     if (!group) return null;
@@ -164,7 +179,7 @@ async function loadItemGroups(
   }
 
   return new Map(
-    ((data || []) as unknown as InventoryItemGroupMemberRow[])
+    rows
       .map((member) => [member.item_id, pickGroup(member.group)] as const)
       .filter((entry): entry is readonly [string, InventoryItemGroupSummary] => Boolean(entry[1]))
   );
@@ -186,7 +201,8 @@ export async function GET(request: NextRequest) {
       .from('inventory_items')
       .select(`
         *,
-        location:inventory_locations(*)
+        location:inventory_locations(*),
+        minor_plant_detail:inventory_minor_plant_details(*)
       `)
       .eq('status', 'active')
       .order('name', { ascending: true })
@@ -206,7 +222,7 @@ export async function GET(request: NextRequest) {
 
     const inventory = items.map((item) => {
       const itemWithLinkedVan = {
-        ...addLinkedVanDisplay(item, vanById),
+        ...normalizeMinorPlantDetailRelation(addLinkedVanDisplay(item, vanById)),
         group: groupByItemId.get(item.id) || null,
       };
       if (itemWithLinkedVan.location) return itemWithLinkedVan;
@@ -269,7 +285,8 @@ export async function POST(request: NextRequest) {
       })
       .select(`
         *,
-        location:inventory_locations(*)
+        location:inventory_locations(*),
+        minor_plant_detail:inventory_minor_plant_details(*)
       `)
       .single();
 
@@ -280,7 +297,7 @@ export async function POST(request: NextRequest) {
       throw error;
     }
 
-    return NextResponse.json({ item: data }, { status: 201 });
+    return NextResponse.json({ item: normalizeMinorPlantDetailRelation(data as InventoryItemRow) }, { status: 201 });
   } catch (error) {
     console.error('Error creating inventory item:', error);
     return NextResponse.json({ error: 'Failed to create inventory item' }, { status: 500 });

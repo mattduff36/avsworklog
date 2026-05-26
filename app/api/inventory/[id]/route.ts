@@ -17,9 +17,22 @@ interface InventoryItemUpdateBody {
   status?: InventoryStatus;
 }
 
+interface InventoryItemRow {
+  minor_plant_detail?: unknown;
+  [key: string]: unknown;
+}
+
 function cleanOptionalDate(value: string | null | undefined): string | null {
   if (!value) return null;
   return value;
+}
+
+function normalizeMinorPlantDetailRelation(item: InventoryItemRow): InventoryItemRow {
+  const relation = item.minor_plant_detail;
+  return {
+    ...item,
+    minor_plant_detail: Array.isArray(relation) ? relation[0] ?? null : relation ?? null,
+  };
 }
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
@@ -64,7 +77,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       .eq('id', id)
       .select(`
         *,
-        location:inventory_locations(*)
+        location:inventory_locations(*),
+        minor_plant_detail:inventory_minor_plant_details(*)
       `)
       .single();
 
@@ -78,7 +92,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       throw error;
     }
 
-    return NextResponse.json({ item: data });
+    return NextResponse.json({ item: normalizeMinorPlantDetailRelation(data as InventoryItemRow) });
   } catch (error) {
     console.error('Error updating inventory item:', error);
     return NextResponse.json({ error: 'Failed to update inventory item' }, { status: 500 });
