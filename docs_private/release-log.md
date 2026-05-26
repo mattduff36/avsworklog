@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0526.9.1
+
+**GIT COMMIT MESSAGE**
+`fix(actions): allow cross-team reminder assignment`
+
+**WHAT CHANGED**
+Allow cross-team reminder assignment.
+
+**COMMITS IN THIS RELEASE**
+- `fix(actions): allow cross-team reminder assignment`
+
 ## 0526.9.0
 
 **GIT COMMIT MESSAGE**
