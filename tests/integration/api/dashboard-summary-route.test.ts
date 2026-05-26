@@ -234,7 +234,7 @@ describe('GET /api/dashboard/summary', () => {
     expect(response.status).toBe(200);
     expect(payload.metrics).toEqual({
       approvals: {
-        timesheets: 2,
+        timesheets: 1,
         absences: 1,
       },
       badges: {
@@ -251,7 +251,7 @@ describe('GET /api/dashboard/summary', () => {
     });
   });
 
-  it('uses Accounts-specific approval badge totals while preserving scoped approval visibility', async () => {
+  it('uses Accounts-specific approval statuses for both summary and badge totals', async () => {
     const { createClient } = await import('@/lib/supabase/server');
     const { createAdminClient } = await import('@/lib/supabase/admin');
     const { getEffectiveRole } = await import('@/lib/utils/view-as');
@@ -364,7 +364,7 @@ describe('GET /api/dashboard/summary', () => {
     expect(payload.metrics).toEqual({
       approvals: {
         timesheets: 2,
-        absences: 1,
+        absences: 2,
       },
       badges: {
         approvals: 4,
