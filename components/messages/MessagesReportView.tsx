@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Loader2, Search, Filter, CheckCircle2, Clock, AlertTriangle, Trash2, FileDown, FileText } from 'lucide-react';
+import { ArrowLeft, Loader2, Search, Filter, CheckCircle2, Clock, AlertTriangle, Trash2, FileDown, FileText } from 'lucide-react';
 import { formatDateTime } from '@/lib/utils/date';
 import { toast } from 'sonner';
 import type { MessageReportData } from '@/types/messages';
@@ -198,7 +198,7 @@ export function MessagesReportView() {
 
       {/* Messages List */}
       {filteredMessages.length === 0 ? (
-        <Card className="p-8 text-center text-muted-foreground">
+        <Card className="border-border p-8 text-center text-muted-foreground">
           No messages found
         </Card>
       ) : showDetail && selectedMessage ? (
@@ -211,15 +211,16 @@ export function MessagesReportView() {
               setShowDetail(false);
               setSelectedMessage(null);
             }}
-            className="mb-2"
+            className="mb-2 gap-2"
           >
-            ← Back to List
+            <ArrowLeft className="h-4 w-4" />
+            Back to List
           </Button>
 
-          <Card className="p-6">
+          <Card className="border-border p-6">
             <div className="space-y-4">
               {/* Message Header */}
-              <div className="flex items-start justify-between">
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>
                   <div className="flex items-center gap-2 mb-2">
                     <h3 className="text-xl font-bold text-foreground">
@@ -253,7 +254,7 @@ export function MessagesReportView() {
                       <Button
                         size="sm"
                         onClick={() => handleExportPDF(selectedMessage.message.id, selectedMessage.message.subject)}
-                        className="bg-red-600 hover:bg-red-700 text-white gap-2"
+                        className="gap-2 bg-avs-yellow text-slate-900 hover:bg-avs-yellow-hover"
                       >
                         <FileDown className="h-4 w-4" />
                         Download Report
@@ -276,7 +277,7 @@ export function MessagesReportView() {
 
               {/* Stats */}
               {selectedMessage.message.type === 'TOOLBOX_TALK' ? (
-                <div className="grid grid-cols-4 gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                <div className="grid grid-cols-2 gap-4 rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50 md:grid-cols-4">
                   <div>
                     <p className="text-xs text-muted-foreground">Total Assigned</p>
                     <p className="text-2xl font-bold text-foreground">{selectedMessage.total_assigned}</p>
@@ -295,7 +296,7 @@ export function MessagesReportView() {
                   </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-3 gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                <div className="grid grid-cols-1 gap-4 rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50 sm:grid-cols-3">
                   <div>
                     <p className="text-xs text-muted-foreground">Total Assigned</p>
                     <p className="text-2xl font-bold text-foreground">{selectedMessage.total_assigned}</p>
@@ -373,13 +374,13 @@ export function MessagesReportView() {
           {filteredMessages.map((msg) => (
             <Card
               key={msg.message.id}
-              className="p-4 hover:shadow-md transition-shadow cursor-pointer"
+              className="cursor-pointer border-border p-4 transition-shadow hover:shadow-md"
               onClick={() => {
                 setSelectedMessage(msg);
                 setShowDetail(true);
               }}
             >
-              <div className="flex items-start justify-between">
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <h4 className="font-semibold text-foreground">{msg.message.subject}</h4>
@@ -450,7 +451,7 @@ export function MessagesReportView() {
                           e.stopPropagation();
                           handleExportPDF(msg.message.id, msg.message.subject);
                         }}
-                        className="bg-red-600 hover:bg-red-700 text-white gap-2"
+                        className="gap-2 bg-avs-yellow text-slate-900 hover:bg-avs-yellow-hover"
                       >
                         <FileDown className="h-4 w-4" />
                         Download Report

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, use } from 'react';
+import { useState, useEffect, useCallback, use, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -11,10 +11,8 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Wrench, 
-  ClipboardCheck,
   FileText, 
   MessageSquare,
-  Calendar,
   AlertTriangle,
   Loader2,
   Edit,
@@ -22,7 +20,6 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { BackButton } from '@/components/ui/back-button';
-import { formatDateTime } from '@/lib/utils/date';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { formatMaintenanceDate } from '@/lib/utils/maintenanceCalculations';
 import { usePlantMaintenanceHistory } from '@/lib/hooks/useMaintenance';
@@ -30,12 +27,13 @@ import { useWorkshopTaskComments } from '@/lib/hooks/useWorkshopTaskComments';
 import { useTaskInspectionPhotos } from '@/lib/hooks/useTaskInspectionPhotos';
 import { AttachmentHistoryViewer } from '@/components/workshop-tasks/AttachmentHistoryViewer';
 import type { TrackerLocationData } from '@/types/fleet-tracker';
-import { DailyChecksHistoryTab } from '@/components/fleet/DailyChecksHistoryTab';
+import { fetchDailyChecks, type DailyCheckHistoryItem } from '@/components/fleet/DailyChecksHistoryTab';
+import { AssetHistoryTable } from '@/components/fleet/AssetHistoryTable';
+import { buildAssetHistoryRows } from '@/lib/fleet/asset-history-events';
 
 // Dynamic imports for dialog components
 const EditPlantRecordDialog = dynamic(() => import('@/app/(dashboard)/maintenance/components/EditPlantRecordDialog').then(m => ({ default: m.EditPlantRecordDialog })), { ssr: false });
 const DeletePlantDialog = dynamic(() => import('@/app/(dashboard)/maintenance/components/DeletePlantDialog').then(m => ({ default: m.DeletePlantDialog })), { ssr: false });
-const WorkshopTaskHistoryCard = dynamic(() => import('@/components/workshop-tasks/WorkshopTaskHistoryCard').then(m => ({ default: m.WorkshopTaskHistoryCard })), { ssr: false });
 
 // Dynamic imports for map components
 const AssetLocationMap = dynamic(() => import('@/components/fleet/AssetLocationMap').then(m => ({ default: m.AssetLocationMap })), { ssr: false });
@@ -107,15 +105,18 @@ type WorkshopTask = {
     comment?: string;
   }> | null;
   created_at: string;
-  created_by: string;
+  created_by: string | null;
   workshop_task_categories: {
     id: string;
     name: string;
     slug: string | null;
     ui_color: string | null;
   } | null;
-  profiles_created: {
-    full_name: string;
+  profiles_created?: {
+    full_name: string | null;
+  } | null;
+  profiles?: {
+    full_name: string | null;
   } | null;
 };
 
@@ -324,18 +325,17 @@ export default function PlantHistoryPage({
   const [plant, setPlant] = useState<Plant | null>(null);
   const [maintenanceRecord, setMaintenanceRecord] = useState<MaintenanceRecord | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dailyChecks, setDailyChecks] = useState<DailyCheckHistoryItem[]>([]);
+  const [dailyChecksLoading, setDailyChecksLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('maintenance');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
-  const [showWorkshopTasks, setShowWorkshopTasks] = useState(true);
-  const [showRecordUpdates, setShowRecordUpdates] = useState(true);
   const [hasMapMatch, setHasMapMatch] = useState(false);
   const [mapModalOpen, setMapModalOpen] = useState(false);
   const [mapLocationData, setMapLocationData] = useState<TrackerLocationData | null>(null);
 
   // Use the plant history hook
-  const { data: historyData, refetch: refetchHistory } = usePlantMaintenanceHistory(unwrappedParams.plantId);
+  const { data: historyData, refetch: refetchHistory, isLoading: historyLoading } = usePlantMaintenanceHistory(unwrappedParams.plantId);
 
   const workshopTasks = historyData?.workshopTasks || [];
   const maintenanceHistory = (historyData?.history || []).filter((entry: MaintenanceHistoryEntry) => {
@@ -398,12 +398,32 @@ export default function PlantHistoryPage({
     }
   }, [supabase, unwrappedParams.plantId]);
 
+  const fetchDailyCheckHistory = useCallback(async () => {
+    if (!unwrappedParams.plantId) {
+      setDailyChecks([]);
+      setDailyChecksLoading(false);
+      return;
+    }
+
+    try {
+      setDailyChecksLoading(true);
+      const rows = await fetchDailyChecks('plant', unwrappedParams.plantId);
+      setDailyChecks(rows);
+    } catch (error) {
+      console.error('Error fetching plant daily checks:', error);
+      setDailyChecks([]);
+    } finally {
+      setDailyChecksLoading(false);
+    }
+  }, [unwrappedParams.plantId]);
+
   useEffect(() => {
     if (user && unwrappedParams.plantId) {
       fetchPlantData();
       fetchMaintenanceRecord();
+      fetchDailyCheckHistory();
     }
-  }, [user, unwrappedParams.plantId, fetchPlantData, fetchMaintenanceRecord]);
+  }, [user, unwrappedParams.plantId, fetchPlantData, fetchMaintenanceRecord, fetchDailyCheckHistory]);
 
   const getFieldLabel = (fieldName: string): string => {
     const labels: Record<string, string> = {
@@ -425,6 +445,17 @@ export default function PlantHistoryPage({
     };
     return labels[fieldName] || fieldName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   };
+
+  const assetHistoryRows = useMemo(
+    () => buildAssetHistoryRows({
+      assetType: 'plant',
+      records: maintenanceHistory,
+      workshopTasks,
+      dailyTasks: dailyChecks,
+      getFieldLabel,
+    }),
+    [maintenanceHistory, workshopTasks, dailyChecks, getFieldLabel]
+  );
 
   if (!plant && !loading) {
     return (
@@ -476,8 +507,8 @@ export default function PlantHistoryPage({
       {plant && (
         <Card className="bg-gradient-to-r from-amber-900/20 to-amber-800/10 border-amber-700/30">
           <CardContent className="pt-6">
-            <div className={`grid gap-6 ${hasMapMatch ? 'grid-cols-1 md:grid-cols-[3fr_2fr]' : 'grid-cols-1'}`}>
-              <div className={hasMapMatch ? 'space-y-2.5 text-sm' : 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-sm'}>
+            <div className={`grid gap-6 ${hasMapMatch ? 'grid-cols-1 md:grid-cols-[fit-content(calc(50%_-_0.75rem))_minmax(calc(50%_-_0.75rem),_1fr)]' : 'grid-cols-1'}`}>
+              <div className={hasMapMatch ? 'min-w-0 space-y-2.5 text-sm' : 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-sm'}>
                 {plant.reg_number && (
                   <div className="flex items-baseline gap-2">
                     <span className="text-muted-foreground text-xs uppercase tracking-wide min-w-[100px]">Registration</span>
@@ -528,7 +559,7 @@ export default function PlantHistoryPage({
                 assetLabel={plant.plant_id || 'Unknown'}
                 locationProvider="fleetsmart"
                 loadingVariant="compact"
-                className="h-full min-h-[265px]"
+                className="min-w-0 h-full min-h-[265px]"
                 onMatchResult={setHasMapMatch}
                 onLocationData={setMapLocationData}
                 onClick={() => setMapModalOpen(true)}
@@ -549,14 +580,10 @@ export default function PlantHistoryPage({
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
+        <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid">
           <TabsTrigger value="maintenance" className="gap-2">
             <Wrench className="h-4 w-4" />
             History
-          </TabsTrigger>
-          <TabsTrigger value="inspections" className="gap-2">
-            <ClipboardCheck className="h-4 w-4" />
-            Daily Checks
           </TabsTrigger>
           <TabsTrigger value="documents" className="gap-2">
             <FileText className="h-4 w-4" />
@@ -629,130 +656,14 @@ export default function PlantHistoryPage({
             </Card>
           )}
 
-          <Card className="bg-slate-800/50 border-border">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Maintenance & Workshop History</CardTitle>
-                  <CardDescription>
-                    Complete timeline of maintenance updates and workshop tasks
-                  </CardDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowWorkshopTasks(!showWorkshopTasks)}
-                    className={`h-8 w-8 p-0 transition-all ${
-                      showWorkshopTasks
-                        ? 'bg-workshop/20 hover:bg-workshop/30 border-workshop text-workshop'
-                        : 'bg-muted/50 hover:bg-muted border-border text-muted-foreground'
-                    }`}
-                    title="Toggle Workshop Tasks"
-                  >
-                    <Wrench className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowRecordUpdates(!showRecordUpdates)}
-                    className={`h-8 w-8 p-0 transition-all ${
-                      showRecordUpdates
-                        ? 'bg-blue-500/20 hover:bg-blue-500/30 border-blue-500 text-blue-400'
-                        : 'bg-muted/50 hover:bg-muted border-border text-muted-foreground'
-                    }`}
-                    title="Toggle Record Updates"
-                  >
-                    <Calendar className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="space-y-4">
-                  {[1, 2, 3].map(i => (
-                    <Skeleton key={i} className="h-32 w-full" />
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* Workshop Tasks */}
-                  {showWorkshopTasks && workshopTasks.map((task: WorkshopTask) => (
-                    <WorkshopTaskHistoryCard
-                      key={task.id}
-                      task={task}
-                      comments={taskComments[task.id] || []}
-                      inspectionPhotos={taskInspectionPhotos[task.id] || []}
-                      defaultExpanded={expandedTasks.has(task.id)}
-                      onToggle={(taskId, isExpanded) => {
-                        setExpandedTasks(prev => {
-                          const newSet = new Set(prev);
-                          if (isExpanded) {
-                            newSet.add(taskId);
-                          } else {
-                            newSet.delete(taskId);
-                          }
-                          return newSet;
-                        });
-                      }}
-                    />
-                  ))}
-
-                  {/* Maintenance History Entries */}
-                  {showRecordUpdates && maintenanceHistory.map((entry: MaintenanceHistoryEntry) => (
-                    <Card key={entry.id} className="bg-slate-800/50 border-slate-700 border-l-4 border-l-blue-500">
-                      <CardContent className="pt-6">
-                        <div className="flex items-start gap-3">
-                          <Calendar className="h-5 w-5 text-blue-400 mt-0.5" />
-                          <div className="flex-1 space-y-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-sm font-medium">{entry.updated_by_name || 'System'}</span>
-                              <span className="text-xs text-muted-foreground">updated</span>
-                              <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30">
-                                {getFieldLabel(entry.field_name)}
-                              </Badge>
-                            </div>
-                            {/* Only show before/after if we have actual values (not "no_changes") */}
-                            {entry.field_name !== 'no_changes' && (entry.old_value || entry.new_value) && (
-                              <div className="text-sm text-muted-foreground">
-                                <span className="line-through">{entry.old_value || 'Not set'}</span>
-                                {' → '}
-                                <span className="text-slate-200 font-medium">{entry.new_value || 'Not set'}</span>
-                              </div>
-                            )}
-                            {entry.comment && (
-                              <div className="bg-slate-900/50 rounded p-2 border border-slate-700 mt-2">
-                                <p className="text-xs text-muted-foreground mb-1">Comment:</p>
-                                <p className="text-sm text-slate-200">&quot;{entry.comment}&quot;</p>
-                              </div>
-                            )}
-                            <p className="text-xs text-muted-foreground">
-                              {formatDateTime(entry.created_at)}
-                            </p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-
-                  {(!showWorkshopTasks || workshopTasks.length === 0) && (!showRecordUpdates || maintenanceHistory.length === 0) && (
-                    <div className="text-center py-12">
-                      <Wrench className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-600">
-                        {!showWorkshopTasks && !showRecordUpdates 
-                          ? 'Enable filters to view history' 
-                          : 'No maintenance history yet'}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <AssetHistoryTable
+            assetType="plant"
+            rows={assetHistoryRows}
+            loading={loading || historyLoading || dailyChecksLoading}
+            taskComments={taskComments}
+            taskInspectionPhotos={taskInspectionPhotos}
+          />
         </TabsContent>
-
-        <DailyChecksHistoryTab assetType="plant" assetId={unwrappedParams.plantId} />
 
         {/* Documents Tab */}
         <TabsContent value="documents" className="space-y-4">

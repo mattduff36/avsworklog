@@ -116,9 +116,9 @@ export function ToolboxTalkAssignDialog({
       submitLabel="Send toolbox talk"
       submittingLabel="Sending..."
       selectableVariant="default"
-      submitButtonClassName="bg-red-600 text-white hover:bg-red-700"
-      teamActiveClassName="border-red-600 bg-red-600/15 text-foreground"
-      spinnerClassName="text-red-600"
+      submitButtonClassName="bg-avs-yellow text-slate-900 hover:bg-avs-yellow-hover"
+      teamActiveClassName="border-avs-yellow bg-avs-yellow/15 text-foreground"
+      spinnerClassName="text-avs-yellow"
       requireSelection
       onSubmit={handleSubmit}
     />

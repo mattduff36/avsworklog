@@ -131,8 +131,9 @@ export const MODULE_PAGES: ModulePage[] = [
     module: 'toolbox-talks',
     displayName: MODULE_DISPLAY_NAMES['toolbox-talks'],
     subPages: [
-      { value: 'toolbox-talks-list', label: 'Toolbox Talks List' },
-      { value: 'toolbox-talks-new', label: 'New Toolbox Talk' },
+      { value: 'toolbox-talks-new', label: 'Create Toolbox Talk' },
+      { value: 'toolbox-talks-reminder', label: 'Create Reminder' },
+      { value: 'toolbox-talks-list', label: 'Message Reports' },
     ],
   },
   {
@@ -271,8 +272,9 @@ export function getPageUrl(value: string): string {
     'error-reports-manage': '/admin/errors/manage',
     
     // Toolbox Talks
-    'toolbox-talks-list': '/toolbox-talks',
-    'toolbox-talks-new': '/toolbox-talks/new',
+    'toolbox-talks-list': '/toolbox-talks?tab=reports',
+    'toolbox-talks-new': '/toolbox-talks?tab=create-toolbox-talk',
+    'toolbox-talks-reminder': '/toolbox-talks?tab=create-reminder',
     
     // Admin - Users
     'admin-users-list': '/admin/users',

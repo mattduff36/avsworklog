@@ -171,7 +171,7 @@ export function CreateToolboxTalkForm({ onSuccess }: CreateToolboxTalkFormProps)
                 type="button"
                 variant="outline"
                 onClick={() => document.getElementById('pdf-upload')?.click()}
-                className="w-full h-20 border-2 border-dashed border-border hover:border-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all"
+                className="h-20 w-full border-2 border-dashed border-border transition-all hover:border-avs-yellow hover:bg-avs-yellow/10"
               >
                 <div className="flex flex-col items-center gap-2">
                   <Upload className="h-6 w-6" />
@@ -182,7 +182,7 @@ export function CreateToolboxTalkForm({ onSuccess }: CreateToolboxTalkFormProps)
             </div>
           ) : (
             <div className="flex items-center gap-3 p-3 border rounded-md bg-slate-50 dark:bg-slate-800 border-border">
-              <File className="h-8 w-8 text-red-600 shrink-0" />
+              <File className="h-8 w-8 text-avs-yellow shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{pdfFile.name}</p>
                 <p className="text-xs text-muted-foreground">
@@ -206,7 +206,7 @@ export function CreateToolboxTalkForm({ onSuccess }: CreateToolboxTalkFormProps)
         <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
           <Button
             type="submit"
-            className="bg-red-600 hover:bg-red-700 text-white"
+            className="bg-avs-yellow text-slate-900 shadow-md transition-all duration-200 hover:bg-avs-yellow-hover hover:shadow-lg active:scale-95"
           >
             <UserPlus className="h-4 w-4 mr-2" />
             Choose Recipients

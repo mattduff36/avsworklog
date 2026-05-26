@@ -286,7 +286,7 @@ export function AssignRecipientsModal({
                       className={`justify-start text-sm transition-all ${
                         allRoleSelected 
                           ? 'bg-avs-yellow text-slate-900 font-semibold border-2 border-avs-yellow shadow-lg' 
-                          : 'hover:bg-slate-800'
+                          : 'hover:bg-muted/40'
                       }`}
                     >
                       {allRoleSelected && '✓ '}{role.display_name} ({roleCount})
@@ -323,12 +323,8 @@ export function AssignRecipientsModal({
                 onToggleAllTeams={handleToggleAllTeams}
                 disabled={loading || fetching || teamOptions.length === 0}
                 triggerLabel="Select Teams"
-                triggerClassName={
-                  messageType === 'TOOLBOX_TALK'
-                    ? 'border-red-600 text-red-500 hover:bg-red-600 hover:text-white text-xs'
-                    : 'border-blue-600 text-blue-500 hover:bg-blue-600 hover:text-white text-xs'
-                }
-                activeItemClassName={messageType === 'TOOLBOX_TALK' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white'}
+                triggerClassName="border-avs-yellow text-avs-yellow hover:bg-avs-yellow hover:text-slate-900 text-xs"
+                activeItemClassName="bg-avs-yellow text-slate-900"
               />
               <span className="text-sm text-muted-foreground">
                 {selectedIds.size} selected
@@ -389,10 +385,7 @@ export function AssignRecipientsModal({
             <Button 
               type="submit" 
               disabled={loading || selectedIds.size === 0}
-              className={messageType === 'TOOLBOX_TALK' 
-                ? 'bg-red-600 hover:bg-red-700 text-white' 
-                : 'bg-blue-600 hover:bg-blue-700 text-white'
-              }
+              className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow-hover"
             >
               {loading ? (
                 <>

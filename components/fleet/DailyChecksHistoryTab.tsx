@@ -9,22 +9,17 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { TabsContent } from '@/components/ui/tabs';
 import { createClient } from '@/lib/supabase/client';
 import { formatDate, formatDateTime } from '@/lib/utils/date';
+import type {
+  AssetHistoryAssetType,
+  AssetHistoryDailyTaskSource,
+} from '@/lib/fleet/asset-history-events';
 
-type AssetType = 'van' | 'plant' | 'hgv';
+type AssetType = AssetHistoryAssetType;
+export type DailyCheckHistoryItem = AssetHistoryDailyTaskSource;
 
 interface DailyChecksHistoryTabProps {
   assetId: string;
   assetType: AssetType;
-}
-
-interface DailyCheckHistoryItem {
-  id: string;
-  inspection_date: string;
-  inspection_end_date: string | null;
-  submitted_at: string | null;
-  status: 'draft' | 'submitted' | string;
-  current_mileage: number | null;
-  profile: { full_name: string | null } | null;
 }
 
 const assetConfig = {
@@ -57,6 +52,43 @@ const assetConfig = {
   distanceUnit: string;
 }>;
 
+async function addDefectCounts(rows: DailyCheckHistoryItem[]) {
+  if (rows.length === 0) return rows;
+
+  const supabase = createClient();
+  const inspectionIds = rows.map((row) => row.id);
+  const { data, error } = await supabase
+    .from('inspection_items')
+    .select('inspection_id, status')
+    .in('inspection_id', inspectionIds)
+    .in('status', ['attention', 'defect']);
+
+  if (error) throw error;
+
+  const defectCounts = new Map<string, number>();
+  (data || []).forEach((item: { inspection_id: string | null }) => {
+    if (!item.inspection_id) return;
+    defectCounts.set(item.inspection_id, (defectCounts.get(item.inspection_id) || 0) + 1);
+  });
+
+  return rows.map((row) => ({
+    ...row,
+    defect_count: defectCounts.get(row.id) || 0,
+  }));
+}
+
+function getDailyCheckStatusLabel(inspection: DailyCheckHistoryItem) {
+  const defectCount = inspection.defect_count || 0;
+  if (defectCount === 0) return 'All Passed';
+  return `${defectCount} ${defectCount === 1 ? 'Defect' : 'Defects'}`;
+}
+
+function getDailyCheckStatusClassName(inspection: DailyCheckHistoryItem) {
+  return (inspection.defect_count || 0) > 0
+    ? 'bg-red-500/10 text-red-300 border-red-500/30'
+    : 'bg-green-500/10 text-green-300 border-green-500/30';
+}
+
 function formatInspectionRange(startDate: string, endDate: string | null) {
   if (endDate && endDate !== startDate) return `${formatDate(startDate)} - ${formatDate(endDate)}`;
   return formatDate(startDate);
@@ -71,7 +103,7 @@ function formatDistance(value: number | null, assetType: AssetType) {
   return `${formattedValue} ${assetConfig[assetType].distanceUnit}`;
 }
 
-async function fetchDailyChecks(assetType: AssetType, assetId: string) {
+export async function fetchDailyChecks(assetType: AssetType, assetId: string) {
   const supabase = createClient();
 
   switch (assetType) {
@@ -93,7 +125,7 @@ async function fetchDailyChecks(assetType: AssetType, assetId: string) {
         .limit(50);
 
       if (error) throw error;
-      return (data || []) as unknown as DailyCheckHistoryItem[];
+      return addDefectCounts((data || []) as unknown as DailyCheckHistoryItem[]);
     }
     case 'plant': {
       const { data, error } = await supabase
@@ -113,7 +145,7 @@ async function fetchDailyChecks(assetType: AssetType, assetId: string) {
         .limit(50);
 
       if (error) throw error;
-      return (data || []) as unknown as DailyCheckHistoryItem[];
+      return addDefectCounts((data || []) as unknown as DailyCheckHistoryItem[]);
     }
     case 'hgv': {
       const { data, error } = await supabase
@@ -133,7 +165,7 @@ async function fetchDailyChecks(assetType: AssetType, assetId: string) {
         .limit(50);
 
       if (error) throw error;
-      return (data || []) as unknown as DailyCheckHistoryItem[];
+      return addDefectCounts((data || []) as unknown as DailyCheckHistoryItem[]);
     }
   }
 }
@@ -219,8 +251,8 @@ export function DailyChecksHistoryTab({ assetId, assetType }: DailyChecksHistory
                         </div>
                       )}
                     </div>
-                    <Badge variant="outline" className="w-fit bg-blue-500/10 text-blue-300 border-blue-500/30">
-                      {inspection.status}
+                    <Badge variant="outline" className={`w-fit ${getDailyCheckStatusClassName(inspection)}`}>
+                      {getDailyCheckStatusLabel(inspection)}
                     </Badge>
                   </div>
                 </button>

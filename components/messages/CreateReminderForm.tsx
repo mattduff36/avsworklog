@@ -121,7 +121,7 @@ export function CreateReminderForm({ onSuccess }: CreateReminderFormProps) {
         <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
           <Button
             type="submit"
-            className="bg-blue-600 hover:bg-blue-700 text-white"
+            className="bg-avs-yellow text-slate-900 shadow-md transition-all duration-200 hover:bg-avs-yellow-hover hover:shadow-lg active:scale-95"
           >
             <UserPlus className="h-4 w-4 mr-2" />
             Choose Recipients

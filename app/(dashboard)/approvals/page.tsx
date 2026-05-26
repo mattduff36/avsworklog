@@ -71,6 +71,7 @@ import {
 } from '@/lib/utils/approvals-filters';
 
 const APPROVALS_PAGE_SIZE = 50;
+const approvalsTabTriggerClassName = 'gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900';
 
 function isAnnualLeaveReason(name: string): boolean {
   return name.trim().toLowerCase() === 'annual leave';
@@ -1026,54 +1027,48 @@ function ApprovalsContent() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList className="grid w-full max-w-3xl grid-cols-2 h-auto p-0 bg-slate-100 dark:bg-slate-800 rounded-lg">
-            <TabsTrigger 
-              value="timesheets" 
-              className="flex flex-col items-center gap-1 py-3 rounded-md transition-all duration-200 active:scale-95 border-0"
-              style={activeTab === 'timesheets' ? {
-                backgroundColor: 'hsl(210 90% 50%)', // Timesheet Blue
-                color: 'white',
-                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
-              } : {}}
-            >
-              <div className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                <span className="text-sm font-medium">Timesheets</span>
-                {filteredTimesheets.length > 0 && (
-                  <Badge 
-                    variant="secondary" 
-                    className={activeTab === 'timesheets' ? "bg-white/20 text-white border-white/30" : ""}
+          <div className="flex justify-start">
+            <TabsList className="h-auto flex-wrap justify-start gap-0 p-1.5">
+              <TabsTrigger
+                value="timesheets"
+                className={approvalsTabTriggerClassName}
+              >
+                <FileText className="h-4 w-4" />
+                Timesheets
+                {filteredTimesheets.length > 0 ? (
+                  <Badge
+                    variant="secondary"
+                    className={activeTab === 'timesheets'
+                      ? 'border-avs-yellow/20 bg-slate-900/10 text-slate-900'
+                      : 'border-border bg-background/70 text-muted-foreground'
+                    }
                   >
                     {filteredTimesheets.length}
                   </Badge>
-                )}
-              </div>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="absences" 
-              className="flex flex-col items-center gap-1 py-3 rounded-md transition-all duration-200 active:scale-95 border-0"
-              style={activeTab === 'absences' ? {
-                backgroundColor: 'hsl(260 60% 50%)', // Purple for absences
-                color: 'white',
-                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
-              } : {}}
-            >
-              <div className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                <span className="text-sm font-medium">Absences</span>
-                {filteredAbsences.length > 0 && (
-                  <Badge 
+                ) : null}
+              </TabsTrigger>
+              <TabsTrigger
+                value="absences"
+                className={approvalsTabTriggerClassName}
+              >
+                <Calendar className="h-4 w-4" />
+                Absences
+                {filteredAbsences.length > 0 ? (
+                  <Badge
                     variant="secondary"
-                    className={activeTab === 'absences' ? "bg-white/20 text-white border-white/30" : ""}
+                    className={activeTab === 'absences'
+                      ? 'border-avs-yellow/20 bg-slate-900/10 text-slate-900'
+                      : 'border-border bg-background/70 text-muted-foreground'
+                    }
                   >
                     {filteredAbsences.length}
                   </Badge>
-                )}
-              </div>
-            </TabsTrigger>
-          </TabsList>
+                ) : null}
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
-          <TabsContent value="timesheets" className="mt-6 space-y-4">
+          <TabsContent value="timesheets" className="mt-4 space-y-4">
             {loading ? (
               <SectionLoader message="Loading timesheet approvals..." />
             ) : filteredTimesheets.length === 0 ? (
@@ -1273,7 +1268,7 @@ function ApprovalsContent() {
 
           {/* Inspections tab removed - inspections no longer require approvals */}
 
-          <TabsContent value="absences" className="mt-6 space-y-4">
+          <TabsContent value="absences" className="mt-4 space-y-4">
             {absencesLoading ? (
               <SectionLoader message="Loading absence approvals..." />
             ) : !canAuthoriseBookings || filteredAbsences.length === 0 ? (
