@@ -40,13 +40,6 @@ export interface ErrorAdditionalData extends Record<string, unknown> {
   toastCorrelationKey?: string | null;
 }
 
-export interface DebugInfo {
-  environment: string;
-  buildTime: string;
-  nodeVersion: string;
-  nextVersion: string;
-}
-
 export interface AuditLogEntry {
   id: string;
   table_name: string;

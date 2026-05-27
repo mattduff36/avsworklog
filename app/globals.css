@@ -69,6 +69,10 @@
     --maintenance-light: 0 100% 96%;
     --maintenance-dark: 0 84% 45%;
 
+    --debug-primary: 0 84% 60%;
+    --debug-light: 0 100% 96%;
+    --debug-dark: 0 84% 45%;
+
     --fleet-primary: 190 70% 42%;
     --fleet-light: 190 70% 96%;
     --fleet-dark: 190 70% 30%;
@@ -172,6 +176,12 @@
     --primary: var(--maintenance-primary);
     --primary-foreground: 210 40% 98%;
     --ring: var(--maintenance-primary);
+  }
+
+  [data-accent="debug"] {
+    --primary: var(--debug-primary);
+    --primary-foreground: 210 40% 98%;
+    --ring: var(--debug-primary);
   }
 
   [data-accent="fleet"] {

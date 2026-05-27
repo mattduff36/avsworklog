@@ -156,5 +156,7 @@ describe('Accent From Route', () => {
     expect(getAccentFromRoute('/timesheets')).toBe('timesheets');
     expect(getAccentFromRoute('/dashboard')).toBe('brand');
     expect(getAccentFromRoute('/fleet')).toBe('fleet');
+    expect(getAccentFromRoute('/debug')).toBe('debug');
+    expect(getAccentFromRoute('/debug?tab=notification-settings')).toBe('debug');
   });
 });

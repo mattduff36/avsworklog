@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { filterHiddenSystemTestAccountProfiles } from '@/lib/server/system-test-accounts';
+import { canAccessDebugConsole } from '@/lib/utils/debug-access';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type {
@@ -12,19 +14,24 @@ import { NOTIFICATION_MODULE_KEYS } from '@/types/notifications';
 
 /**
  * GET /api/notification-preferences/admin
- * Fetch all users' notification preferences (superadmin only)
+ * Fetch all users' notification preferences (debug access only)
  */
 export async function GET(request: NextRequest) {
   try {
-    // Check effective role (respects View As mode)
-    const effectiveRole = await getEffectiveRole();
-
-    if (!effectiveRole.user_id) {
+    const current = await getCurrentAuthenticatedProfile({ includeEmail: true });
+    if (!current) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!effectiveRole.is_super_admin) {
-      return NextResponse.json({ error: 'Forbidden: SuperAdmin access required' }, { status: 403 });
+    // Check effective role and shared debug access (respects View As mode)
+    const effectiveRole = await getEffectiveRole();
+
+    if (!canAccessDebugConsole({
+      email: current.profile.email,
+      isActualSuperAdmin: effectiveRole.is_actual_super_admin,
+      isViewingAs: effectiveRole.is_viewing_as,
+    })) {
+      return NextResponse.json({ error: 'Forbidden: Debug access required' }, { status: 403 });
     }
 
     // Use admin client to bypass RLS for fetching all users and preferences
@@ -90,19 +97,24 @@ export async function GET(request: NextRequest) {
 
 /**
  * PUT /api/notification-preferences/admin
- * Update any user's notification preference (superadmin override)
+ * Update any user's notification preference (debug access override)
  */
 export async function PUT(request: NextRequest) {
   try {
-    // Check effective role (respects View As mode)
-    const effectiveRole = await getEffectiveRole();
-
-    if (!effectiveRole.user_id) {
+    const current = await getCurrentAuthenticatedProfile({ includeEmail: true });
+    if (!current) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!effectiveRole.is_super_admin) {
-      return NextResponse.json({ error: 'Forbidden: SuperAdmin access required' }, { status: 403 });
+    // Check effective role and shared debug access (respects View As mode)
+    const effectiveRole = await getEffectiveRole();
+
+    if (!canAccessDebugConsole({
+      email: current.profile.email,
+      isActualSuperAdmin: effectiveRole.is_actual_super_admin,
+      isViewingAs: effectiveRole.is_viewing_as,
+    })) {
+      return NextResponse.json({ error: 'Forbidden: Debug access required' }, { status: 403 });
     }
 
     // Parse request body

@@ -464,7 +464,9 @@ export async function GET() {
         );
 
         return {
-          id: asset.id,
+          // No vehicle_maintenance row exists yet. Keep the maintenance id null
+          // so edit dialogs create a record instead of PUT-ing to the asset id.
+          id: null,
           van_id: assetType === 'van' ? asset.id : null,
           hgv_id: assetType === 'hgv' ? asset.id : null,
           plant_id: assetType === 'plant' ? asset.id : null,

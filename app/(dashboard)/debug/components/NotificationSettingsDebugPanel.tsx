@@ -1,3 +1,5 @@
+'use client';
+
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
@@ -5,36 +7,44 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CheckSquare, Loader2, Search, Send, Users } from 'lucide-react';
+import { AlertTriangle, CheckSquare, Loader2, Search, Send, Users } from 'lucide-react';
+import {
+  NOTIFICATION_MODULES,
+  type NotificationModuleKey,
+} from '@/types/notifications';
+
+interface NotificationSettingsPreference {
+  id?: string;
+  user_id?: string;
+  module_key: NotificationModuleKey;
+  enabled: boolean;
+  notify_in_app: boolean;
+  notify_email: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface NotificationSettingsUser {
+  user_id: string;
+  full_name: string;
+  role_name: string;
+  preferences: NotificationSettingsPreference[];
+}
+
+type ModuleFilter = 'all' | NotificationModuleKey;
+
+export const DEBUG_NOTIFICATION_SETTINGS_MODULES = NOTIFICATION_MODULES;
 
 export function NotificationSettingsDebugPanel() {
-  const [users, setUsers] = useState<Array<{
-    user_id: string;
-    full_name: string;
-    role_name: string;
-    preferences: Array<{
-      id?: string;
-      module_key: string;
-      enabled: boolean;
-      notify_in_app: boolean;
-      notify_email: boolean;
-    }>;
-  }>>([]);
+  const [users, setUsers] = useState<NotificationSettingsUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
-  const [moduleFilter, setModuleFilter] = useState<string>('all');
+  const [moduleFilter, setModuleFilter] = useState<ModuleFilter>('all');
   const [saving, setSaving] = useState<string | null>(null);
   const [batchMode, setBatchMode] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
-
-  const MODULES = [
-    { key: 'errors', label: 'Error Reports' },
-    { key: 'maintenance', label: 'Maintenance' },
-    { key: 'rams', label: 'RAMS Signatures' },
-    { key: 'approvals', label: 'Approvals' },
-    { key: 'inspections', label: 'Inspections' },
-  ];
 
   useEffect(() => {
     fetchAllPreferences();
@@ -42,9 +52,14 @@ export function NotificationSettingsDebugPanel() {
 
   const fetchAllPreferences = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const response = await fetch('/api/notification-preferences/admin');
       const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch preferences');
+      }
 
       if (data.success) {
         setUsers(data.users || []);
@@ -53,7 +68,12 @@ export function NotificationSettingsDebugPanel() {
       }
     } catch (error) {
       console.error('Error fetching notification preferences:', error);
-      toast.error('Failed to load notification preferences');
+      const message = error instanceof Error ? error.message : 'Failed to load notification preferences';
+      setUsers([]);
+      setLoadError(message);
+      toast.error('Failed to load notification preferences', {
+        description: message,
+      });
     } finally {
       setLoading(false);
     }
@@ -61,7 +81,7 @@ export function NotificationSettingsDebugPanel() {
 
   const updatePreference = async (
     userId: string,
-    moduleKey: string,
+    moduleKey: NotificationModuleKey,
     field: 'notify_in_app' | 'notify_email',
     value: boolean
   ) => {
@@ -125,18 +145,21 @@ export function NotificationSettingsDebugPanel() {
   });
 
   const uniqueRoles = Array.from(new Set(users.map(u => u.role_name))).sort();
+  const visibleModules = DEBUG_NOTIFICATION_SETTINGS_MODULES.filter(
+    (module) => moduleFilter === 'all' || module.key === moduleFilter
+  );
 
   const batchUpdatePreference = async (
     field: 'notify_in_app' | 'notify_email',
     value: boolean,
-    targetModule?: string
+    targetModule?: NotificationModuleKey
   ) => {
     if (selectedUsers.size === 0) {
       toast.error('Please select users first');
       return;
     }
 
-    const modulesToUpdate = targetModule ? [targetModule] : MODULES.map(m => m.key);
+    const modulesToUpdate = targetModule ? [targetModule] : DEBUG_NOTIFICATION_SETTINGS_MODULES.map(m => m.key);
 
     setSaving('batch');
     try {
@@ -207,6 +230,10 @@ export function NotificationSettingsDebugPanel() {
     setSelectedUsers(new Set());
   };
 
+  const handleModuleFilterChange = (value: string) => {
+    setModuleFilter(value as ModuleFilter);
+  };
+
   const getRoleBadgeVariant = (roleName: string) => {
     const lowerRole = roleName.toLowerCase();
     if (lowerRole.includes('super') || lowerRole === 'admin') return 'destructive';
@@ -253,13 +280,13 @@ export function NotificationSettingsDebugPanel() {
             </SelectContent>
           </Select>
 
-          <Select value={moduleFilter} onValueChange={setModuleFilter}>
+          <Select value={moduleFilter} onValueChange={handleModuleFilterChange}>
             <SelectTrigger className="w-full md:w-[200px] bg-white dark:bg-slate-900">
               <SelectValue placeholder="All Modules" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Modules</SelectItem>
-              {MODULES.map(m => (
+              {DEBUG_NOTIFICATION_SETTINGS_MODULES.map(m => (
                 <SelectItem key={m.key} value={m.key}>{m.label}</SelectItem>
               ))}
             </SelectContent>
@@ -307,6 +334,21 @@ export function NotificationSettingsDebugPanel() {
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
+        ) : loadError ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-900 dark:border-red-900 dark:bg-red-950/30 dark:text-red-100">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex gap-3">
+                <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+                <div>
+                  <p className="font-medium">Notification settings failed to load</p>
+                  <p className="mt-1 text-sm opacity-90">{loadError}</p>
+                </div>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={fetchAllPreferences}>
+                Retry
+              </Button>
+            </div>
+          </div>
         ) : filteredUsers.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -325,7 +367,7 @@ export function NotificationSettingsDebugPanel() {
                     )}
                     <th className="p-3 text-left text-sm font-medium text-foreground">User</th>
                     <th className="p-3 text-left text-sm font-medium text-foreground">Role</th>
-                    {MODULES.filter(m => moduleFilter === 'all' || m.key === moduleFilter).map(module => (
+                    {visibleModules.map(module => (
                       <th key={module.key} className="p-3 text-center text-sm font-medium text-foreground">
                         <div className="flex flex-col gap-1">
                           <span>{module.label}</span>
@@ -340,7 +382,7 @@ export function NotificationSettingsDebugPanel() {
                 </thead>
                 <tbody>
                   {filteredUsers.map(user => {
-                    const getPref = (moduleKey: string) => {
+                    const getPref = (moduleKey: NotificationModuleKey) => {
                       return user.preferences.find(p => p.module_key === moduleKey) || {
                         notify_in_app: true,
                         notify_email: true,
@@ -360,7 +402,7 @@ export function NotificationSettingsDebugPanel() {
                             {getRoleDisplayName(user.role_name)}
                           </Badge>
                         </td>
-                        {MODULES.filter(m => moduleFilter === 'all' || m.key === moduleFilter).map(module => {
+                        {visibleModules.map(module => {
                           const pref = getPref(module.key);
                           const saveKey = `${user.user_id}-${module.key}`;
                           const isSaving = saving?.startsWith(saveKey) || false;
@@ -384,7 +426,7 @@ export function NotificationSettingsDebugPanel() {
 
             <div className="md:hidden space-y-4">
               {filteredUsers.map(user => {
-                const getPref = (moduleKey: string) => {
+                const getPref = (moduleKey: NotificationModuleKey) => {
                   return user.preferences.find(p => p.module_key === moduleKey) || {
                     notify_in_app: true,
                     notify_email: true,
@@ -410,7 +452,7 @@ export function NotificationSettingsDebugPanel() {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
-                        {MODULES.filter(m => moduleFilter === 'all' || m.key === moduleFilter).map(module => {
+                        {visibleModules.map(module => {
                           const pref = getPref(module.key);
                           const saveKey = `${user.user_id}-${module.key}`;
                           const isSaving = saving?.startsWith(saveKey) || false;

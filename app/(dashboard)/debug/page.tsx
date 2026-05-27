@@ -9,19 +9,17 @@ import { AppPageShell } from '@/components/layout/AppPageShell';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Bug, Car, Clock, Database, History, RefreshCw, Send, ShieldAlert, Users } from 'lucide-react';
+import { Bug, Car, History, RefreshCw, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { canAccessDebugConsole } from '@/lib/utils/debug-access';
-import { DebugInfo } from './types';
 
 const AuditLogDebugPanel = dynamic(() => import('./components/AuditLogDebugPanel').then((mod) => ({ default: mod.AuditLogDebugPanel })));
 const DVLASyncDebugPanel = dynamic(() => import('./components/DVLASyncDebugPanel').then((mod) => ({ default: mod.DVLASyncDebugPanel })));
 const ErrorLogsDebugPanel = dynamic(() => import('./components/ErrorLogsDebugPanel').then((mod) => ({ default: mod.ErrorLogsDebugPanel })));
 const NotificationSettingsDebugPanel = dynamic(() => import('./components/NotificationSettingsDebugPanel').then((mod) => ({ default: mod.NotificationSettingsDebugPanel })));
 const TestFleetDebugPanel = dynamic(() => import('./components/TestFleetDebugPanel').then((mod) => ({ default: mod.TestFleetDebugPanel })));
-const UIModalStylesDebugPanel = dynamic(() => import('./components/UIModalStylesDebugPanel').then((mod) => ({ default: mod.UIModalStylesDebugPanel })));
 
-type DebugTab = 'error-log' | 'audit-log' | 'dvla-sync' | 'test-fleet' | 'notification-settings' | 'modal-styles';
+type DebugTab = 'error-log' | 'audit-log' | 'dvla-sync' | 'test-fleet' | 'notification-settings';
 
 const DEBUG_TAB_ALIASES: Record<string, DebugTab> = {
   errors: 'error-log',
@@ -33,8 +31,9 @@ const DEBUG_TAB_ALIASES: Record<string, DebugTab> = {
   'test-fleet': 'test-fleet',
   notifications: 'notification-settings',
   'notification-settings': 'notification-settings',
-  'modal-styles': 'modal-styles',
 };
+
+const tabTriggerClassName = 'gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground';
 
 export default function DebugPage() {
   const { profile, loading: authLoading, isActualSuperAdmin, isViewingAs } = useAuth();
@@ -64,13 +63,6 @@ export default function DebugPage() {
       return;
     }
   }, [authLoading, canAccessDebugTools, profile, router]);
-
-  const debugInfo: DebugInfo = {
-    environment: process.env.NODE_ENV || 'development',
-    buildTime: new Date().toISOString(),
-    nodeVersion: typeof process !== 'undefined' ? process.version : 'N/A',
-    nextVersion: '15.5.6',
-  };
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab');
@@ -109,92 +101,37 @@ export default function DebugPage() {
 
   return (
     <AppPageShell width="wide">
-      <div className="bg-gradient-to-r from-red-500 to-orange-500 rounded-lg p-6 text-white">
+      <div className="rounded-lg bg-gradient-to-r from-red-600 to-orange-500 p-6 text-white shadow-sm">
         <div className="flex items-center gap-3">
-          <Bug className="h-6 md:h-8 w-6 md:w-8" />
+          <Bug className="h-6 w-6 md:h-8 md:w-8" />
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold mb-1 md:mb-2">SuperAdmin Debug Console</h1>
-            <p className="text-sm md:text-base text-red-100">Developer tools and system information</p>
+            <h1 className="mb-1 text-2xl font-bold md:mb-2 md:text-3xl">SuperAdmin Debug Console</h1>
+            <p className="text-sm text-red-50 md:text-base">Developer tools and operational diagnostics</p>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-2 md:gap-4">
-        <Card>
-          <CardHeader className="pb-2 md:pb-3 px-3 md:px-6 pt-3 md:pt-6">
-            <CardDescription className="text-xs md:text-sm text-muted-foreground flex items-center gap-1 md:gap-2">
-              <Database className="h-3 md:h-4 w-3 md:w-4 text-blue-500" />
-              <span className="hidden md:inline">Environment</span>
-              <span className="md:hidden">Env</span>
-            </CardDescription>
-            <CardTitle className="text-base md:text-2xl font-bold text-foreground truncate">{debugInfo.environment}</CardTitle>
-          </CardHeader>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2 md:pb-3 px-3 md:px-6 pt-3 md:pt-6">
-            <CardDescription className="text-xs md:text-sm text-muted-foreground flex items-center gap-1 md:gap-2">
-              <Users className="h-3 md:h-4 w-3 md:w-4 text-green-500" />
-              <span className="hidden md:inline">Logged In</span>
-              <span className="md:hidden">User</span>
-            </CardDescription>
-            <CardTitle className="text-xs md:text-lg font-bold text-foreground truncate">{profile.full_name}</CardTitle>
-          </CardHeader>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2 md:pb-3 px-3 md:px-6 pt-3 md:pt-6">
-            <CardDescription className="text-xs md:text-sm text-muted-foreground flex items-center gap-1 md:gap-2">
-              <ShieldAlert className="h-3 md:h-4 w-3 md:w-4 text-red-500" />
-              <span className="hidden md:inline">Access</span>
-              <span className="md:hidden">Role</span>
-            </CardDescription>
-            <CardTitle className="text-xs md:text-base font-bold text-red-600 dark:text-red-400">Debug Access</CardTitle>
-          </CardHeader>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2 md:pb-3 px-3 md:px-6 pt-3 md:pt-6">
-            <CardDescription className="text-xs md:text-sm text-muted-foreground flex items-center gap-1 md:gap-2">
-              <Clock className="h-3 md:h-4 w-3 md:w-4 text-purple-500" />
-              <span className="hidden md:inline">Next.js</span>
-              <span className="md:hidden">Ver</span>
-            </CardDescription>
-            <CardTitle className="text-base md:text-2xl font-bold text-foreground">{debugInfo.nextVersion}</CardTitle>
-          </CardHeader>
-        </Card>
-      </div>
-
       <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as DebugTab)} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 gap-1 md:gap-0 h-auto md:h-10 p-1">
-          <TabsTrigger value="error-log" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
+        <TabsList className="h-auto flex-wrap justify-start gap-0 p-1.5">
+          <TabsTrigger value="error-log" className={tabTriggerClassName}>
             <Bug className="h-4 w-4 flex-shrink-0" />
-            <span className="hidden md:inline">Error Log</span>
-            <span className="md:hidden data-[state=active]:inline hidden">Errors</span>
+            Error Log
           </TabsTrigger>
-          <TabsTrigger value="audit-log" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
+          <TabsTrigger value="audit-log" className={tabTriggerClassName}>
             <History className="h-4 w-4 flex-shrink-0" />
-            <span className="hidden md:inline">Audit Log</span>
-            <span className="md:hidden data-[state=active]:inline hidden">Audit</span>
+            Audit Log
           </TabsTrigger>
-          <TabsTrigger value="dvla-sync" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
+          <TabsTrigger value="dvla-sync" className={tabTriggerClassName}>
             <RefreshCw className="h-4 w-4 flex-shrink-0" />
-            <span className="hidden md:inline">DVLA Sync</span>
-            <span className="md:hidden data-[state=active]:inline hidden">DVLA</span>
+            DVLA Sync
           </TabsTrigger>
-          <TabsTrigger value="test-fleet" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
+          <TabsTrigger value="test-fleet" className={tabTriggerClassName}>
             <Car className="h-4 w-4 flex-shrink-0" />
-            <span className="hidden md:inline">Test Fleet</span>
-            <span className="md:hidden data-[state=active]:inline hidden">Fleet</span>
+            Test Fleet
           </TabsTrigger>
-          <TabsTrigger value="notification-settings" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
+          <TabsTrigger value="notification-settings" className={tabTriggerClassName}>
             <Send className="h-4 w-4 flex-shrink-0" />
-            <span className="hidden md:inline">Notification Settings</span>
-            <span className="md:hidden data-[state=active]:inline hidden">Notifs</span>
-          </TabsTrigger>
-          <TabsTrigger value="modal-styles" className="flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm py-2 data-[state=active]:gap-2">
-            <span className="hidden md:inline">Modal Styles</span>
-            <span className="md:hidden data-[state=active]:inline hidden">Modals</span>
+            Notification Settings
           </TabsTrigger>
         </TabsList>
 
@@ -218,9 +155,6 @@ export default function DebugPage() {
           <NotificationSettingsDebugPanel />
         </TabsContent>
 
-        <TabsContent value="modal-styles">
-          <UIModalStylesDebugPanel />
-        </TabsContent>
       </Tabs>
     </AppPageShell>
   );

@@ -1,0 +1,12 @@
+---
+description: Tab styling conventions for app module pages
+globs: "{app,components}/**/*.tsx"
+alwaysApply: false
+---
+
+# Tab Styling
+
+- When asked to make tabs match the rest of the site, do not add spacing between sibling tabs.
+- Use no inter-tab gap on standard desktop/module tab lists: prefer `gap-0`, `p-0`, or the default `TabsList` spacing unless an existing local pattern says otherwise.
+- `gap-2` on `TabsTrigger` is fine for icon-to-label spacing. Avoid `gap-2` on `TabsList` unless implementing a touch/tablet wrapping layout.
+- For tablet-specific wrapping tabs, only use `flex-wrap gap-2 p-1.5` when the surrounding component already branches on tablet mode.

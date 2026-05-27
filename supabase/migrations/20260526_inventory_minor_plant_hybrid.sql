@@ -20,7 +20,8 @@ BEGIN
   SET category = van_stock_slug,
       updated_at = NOW()
   WHERE category = 'minor_plant'
-    AND status = 'active';
+    AND status = 'active'
+    AND source IS DISTINCT FROM 'fleet_plant';
 END $$;
 
 CREATE TABLE IF NOT EXISTS public.inventory_minor_plant_details (

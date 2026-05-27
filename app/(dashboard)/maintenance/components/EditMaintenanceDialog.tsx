@@ -80,6 +80,10 @@ interface CustomItemFormValue extends CustomMaintenanceItemUpdate {
   category_type: 'date' | 'mileage' | 'hours';
 }
 
+interface EditableMaintenanceRecord extends Omit<VehicleMaintenanceWithStatus, 'id'> {
+  id: string | null;
+}
+
 // ============================================================================
 // Component
 // ============================================================================
@@ -87,7 +91,7 @@ interface CustomItemFormValue extends CustomMaintenanceItemUpdate {
 interface EditMaintenanceDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  vehicle: VehicleMaintenanceWithStatus | null;
+  vehicle: EditableMaintenanceRecord | null;
   onSuccess?: () => void;
   onRetire?: () => void;
 }
@@ -315,7 +319,7 @@ export function EditMaintenanceDialog({
       comment: data.comment.trim(), // Mandatory comment for audit trail (not a DB column)
     };
 
-    if (isNewRecord) {
+    if (!vehicle.id) {
       const vanId = vehicle.van_id;
       const hgvId = vehicle.hgv_id;
 

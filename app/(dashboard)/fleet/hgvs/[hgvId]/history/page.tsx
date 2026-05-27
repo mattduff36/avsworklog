@@ -1273,7 +1273,9 @@ export default function HgvHistoryPage({
           onOpenChange={setEditDialogOpen}
           vehicle={{
             ...(maintenanceRecord || {
-              id: resolvedParams.hgvId,
+              // No vehicle_maintenance row exists yet. Keep id null so
+              // EditMaintenanceDialog creates one instead of PUT-ing to the HGV id.
+              id: null,
               van_id: null,
               hgv_id: resolvedParams.hgvId,
               plant_id: null,

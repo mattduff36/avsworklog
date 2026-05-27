@@ -14,6 +14,7 @@ export type AccentType =
   | 'fleet'
   | 'workshop'
   | 'reminders'
+  | 'debug'
   | 'brand'; // yellow for Dashboard, Manager/Admin, Help, Reports
 
 /**
@@ -41,6 +42,7 @@ export function getAccentFromRoute(
   if (path.startsWith('/maintenance')) return 'maintenance';
   if (path.startsWith('/workshop-tasks')) return 'workshop';
   if (path.startsWith('/reminders')) return 'reminders';
+  if (path.startsWith('/debug')) return 'debug';
   if (path.startsWith('/reports')) return 'brand';
 
   // Fleet pages → use fleet accent (rust/brick, distinct from maintenance red)
