@@ -91,6 +91,7 @@ export default function DashboardPage() {
   const [maintenanceDueSoonCount, setMaintenanceDueSoonCount] = useState(0);
   const [maintenanceOverdueCount, setMaintenanceOverdueCount] = useState(0);
   const [remindersPendingCount, setRemindersPendingCount] = useState(0);
+  const [actionsUnassignedCount, setActionsUnassignedCount] = useState(0);
   const [badgesLoading, setBadgesLoading] = useState(true);
   const [metricsErrorStatus, setMetricsErrorStatus] = useState<number | null>(null);
   const {
@@ -160,6 +161,7 @@ export default function DashboardPage() {
         maintenanceDueSoonCount: 0,
         maintenanceOverdueCount: 0,
         remindersPendingCount: 0,
+        actionsUnassignedCount: 0,
       };
     }
     const response = await fetch('/api/dashboard/summary', { cache: 'no-store' });
@@ -174,6 +176,7 @@ export default function DashboardPage() {
           maintenance_due_soon?: number;
           maintenance_overdue?: number;
           reminders_pending?: number;
+          actions_unassigned?: number;
           suggestions_new?: number;
           error_reports_new?: number;
           quotes_pending_internal_approval?: number;
@@ -195,6 +198,7 @@ export default function DashboardPage() {
     const maintenanceDueSoonCount = payload.metrics?.badges?.maintenance_due_soon || 0;
     const maintenanceOverdueCount = payload.metrics?.badges?.maintenance_overdue || 0;
     const remindersPendingCount = payload.metrics?.badges?.reminders_pending || 0;
+    const actionsUnassignedCount = payload.metrics?.badges?.actions_unassigned || 0;
 
     return {
       pendingApprovals: canViewApprovals ? buildPendingApprovalsSummary(timesheetsCount, absencesCount) : [],
@@ -207,6 +211,7 @@ export default function DashboardPage() {
       maintenanceDueSoonCount,
       maintenanceOverdueCount,
       remindersPendingCount,
+      actionsUnassignedCount,
     };
   }, [canViewApprovals]);
 
@@ -221,6 +226,7 @@ export default function DashboardPage() {
     setMaintenanceDueSoonCount(metrics.maintenanceDueSoonCount);
     setMaintenanceOverdueCount(metrics.maintenanceOverdueCount);
     setRemindersPendingCount(metrics.remindersPendingCount);
+    setActionsUnassignedCount(metrics.actionsUnassignedCount);
   }, []);
 
   const loadDashboardMetrics = useCallback(async (): Promise<number | null> => {
@@ -252,6 +258,7 @@ export default function DashboardPage() {
         setMaintenanceDueSoonCount(0);
         setMaintenanceOverdueCount(0);
         setRemindersPendingCount(0);
+        setActionsUnassignedCount(0);
       }
 
       return errorStatus;
@@ -386,6 +393,7 @@ export default function DashboardPage() {
     });
   const managementTileBadgeCountByHref: Record<string, number> = {
     '/approvals': approvalsTileBadgeCount,
+    '/actions': actionsUnassignedCount,
     '/suggestions/manage': newSuggestionsCount,
     '/admin/errors/manage': newErrorReportsCount,
     '/quotes': pendingQuotesCount,

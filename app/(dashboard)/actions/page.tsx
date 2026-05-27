@@ -13,19 +13,17 @@ import {
   isValidReminderOverviewTabId,
   REMINDER_OVERVIEW_TABS,
 } from '@/lib/config/reminder-workflows';
-import { getReminderAssignmentFilterValue, isReminderActionActive } from '@/lib/utils/reminder-action-filters';
+import {
+  buildActionsSummaryStats,
+  EMPTY_ACTIONS_SUMMARY,
+  type ActionsSummaryStats,
+} from '@/lib/utils/actions-summary';
 import type { ReminderActionWithAsset } from '@/types/reminders';
 import { ActionedActionsPanel } from './components/ActionedActionsPanel';
 import { ActionsOverviewPanel } from './components/ActionsOverviewPanel';
 import { ActionsSettingsTab } from './components/ActionsSettingsTab';
-import { ActionsSummaryCards, type ActionsSummaryStats } from './components/ActionsSummaryCards';
+import { ActionsSummaryCards } from './components/ActionsSummaryCards';
 import { IgnoredActionsPanel } from './components/IgnoredActionsPanel';
-
-const EMPTY_SUMMARY: ActionsSummaryStats = {
-  openActions: 0,
-  pendingReminders: 0,
-  unassigned: 0,
-};
 
 const tabTriggerClassName = 'gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900';
 
@@ -53,20 +51,6 @@ function isValidActionsOverviewTabId(value: string): boolean {
   return isValidReminderOverviewTabId(value) || isActionsArchiveTabId(value);
 }
 
-function buildSummaryStats(actions: ReminderActionWithAsset[]): ActionsSummaryStats {
-  return actions.filter(isReminderActionActive).reduce(
-    (stats, action) => {
-      stats.openActions += 1;
-      stats.pendingReminders += action.reminders_count.pending;
-      if (getReminderAssignmentFilterValue(action) === 'unassigned') {
-        stats.unassigned += 1;
-      }
-      return stats;
-    },
-    { ...EMPTY_SUMMARY },
-  );
-}
-
 function ActionsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -76,7 +60,7 @@ function ActionsContent() {
   const canManage = isManager || isAdmin;
   const [refreshToken, setRefreshToken] = useState(0);
   const [summaryRefreshToken, setSummaryRefreshToken] = useState(0);
-  const [summary, setSummary] = useState<ActionsSummaryStats>(EMPTY_SUMMARY);
+  const [summary, setSummary] = useState<ActionsSummaryStats>(EMPTY_ACTIONS_SUMMARY);
   const requestedTab = searchParams.get('tab') || 'vans';
   const pageTab: 'overview' | 'settings' = requestedTab === 'settings' && canManage ? 'settings' : 'overview';
   const overviewTab: ActionsOverviewTabId = isValidActionsOverviewTabId(requestedTab)
@@ -128,10 +112,10 @@ function ActionsContent() {
         throw new Error(payload.error || 'Failed to load actions summary');
       }
 
-      setSummary(buildSummaryStats((payload.actions || []) as ReminderActionWithAsset[]));
+      setSummary(buildActionsSummaryStats((payload.actions || []) as ReminderActionWithAsset[]));
     } catch (error) {
       console.error(error);
-      setSummary(EMPTY_SUMMARY);
+      setSummary(EMPTY_ACTIONS_SUMMARY);
     }
   }, [authLoading, actionsPermissionLoading, canViewActions]);
 

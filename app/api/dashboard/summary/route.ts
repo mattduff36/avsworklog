@@ -57,6 +57,13 @@ interface CountMetricResult {
   error: unknown;
 }
 
+type ReminderActionSummaryRow = Pick<
+  Database['public']['Tables']['reminder_actions']['Row'],
+  'id' | 'ignored_forever' | 'ignored_until'
+> & {
+  reminders?: Array<Pick<Database['public']['Tables']['reminders']['Row'], 'status'>> | null;
+};
+
 async function resolveCountMetric(
   label: string,
   promise: PromiseLike<CountMetricResult>
@@ -82,6 +89,42 @@ async function resolveMetricValue<T>(label: string, promise: PromiseLike<T>, fal
     console.error(`Failed to load ${label} dashboard metric:`, error);
     return fallback;
   }
+}
+
+function isReminderActionIgnoredNow(action: ReminderActionSummaryRow, nowIso: string): boolean {
+  return action.ignored_forever || Boolean(action.ignored_until && action.ignored_until > nowIso);
+}
+
+function isUnassignedReminderAction(action: ReminderActionSummaryRow, nowIso: string): boolean {
+  if (isReminderActionIgnoredNow(action, nowIso)) {
+    return false;
+  }
+
+  const reminders = action.reminders || [];
+  return reminders.every((reminder) => reminder.status !== 'pending' && reminder.status !== 'actioned');
+}
+
+async function getUnassignedReminderActionsCount(admin: SupabaseClient<Database>): Promise<number> {
+  const nowIso = new Date().toISOString();
+  const { data, error } = await admin
+    .from('reminder_actions')
+    .select(`
+      id,
+      ignored_forever,
+      ignored_until,
+      reminders (
+        status
+      )
+    `)
+    .eq('status', 'open');
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data || []) as ReminderActionSummaryRow[]).filter((action) =>
+    isUnassignedReminderAction(action, nowIso)
+  ).length;
 }
 
 function createFullAccessPermissionMap(): PermissionMap {
@@ -361,6 +404,7 @@ export async function GET() {
       : await getPermissionMapForUser(userId, effectiveRole.role_id, admin, effectiveRole.team_id);
 
   const canViewApprovals = permissions.approvals;
+  const canViewActions = permissions.actions;
   const canViewWorkshopTasks = permissions['workshop-tasks'];
   const canViewMaintenance = permissions.maintenance;
   const canViewReminders = permissions.reminders;
@@ -382,6 +426,7 @@ export async function GET() {
     errorLogsResult,
     maintenanceCounts,
     remindersPendingResult,
+    actionsUnassignedCount,
   ] = await Promise.all([
     canViewApprovals
       ? resolveMetricValue(
@@ -462,6 +507,13 @@ export async function GET() {
             .eq('status', 'pending')
         )
       : Promise.resolve({ count: 0, error: null }),
+    canViewActions
+      ? resolveMetricValue(
+          'unassigned action reminders',
+          getUnassignedReminderActionsCount(admin),
+          0
+        )
+      : Promise.resolve(0),
   ]);
 
   return NextResponse.json({
@@ -477,6 +529,7 @@ export async function GET() {
         maintenance_due_soon: maintenanceCounts.dueSoonTotal,
         maintenance_overdue: maintenanceCounts.overdueTotal,
         reminders_pending: remindersPendingResult.count || 0,
+        actions_unassigned: actionsUnassignedCount,
         suggestions_new: suggestionBadgeMetrics.newCount + suggestionBadgeMetrics.awaitingAdminReplyCount,
         error_reports_new: errorsNewResult.count || 0,
         quotes_pending_internal_approval: quotesResult.count || 0,

@@ -3,12 +3,7 @@
 import type { ReactNode } from 'react';
 import { BellRing, TriangleAlert, UserX } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-
-export interface ActionsSummaryStats {
-  openActions: number;
-  pendingReminders: number;
-  unassigned: number;
-}
+import type { ActionsSummaryStats } from '@/lib/utils/actions-summary';
 
 interface SummaryCardProps {
   label: string;

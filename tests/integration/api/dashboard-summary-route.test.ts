@@ -36,6 +36,10 @@ function createScopedRowsQuery<T extends Record<string, unknown>>(rows: T[]) {
   };
 }
 
+function createReminderActionsSummaryQuery(rows: Array<Record<string, unknown>>) {
+  return createSupabaseQueryMock({ data: rows, error: null }, ['eq']);
+}
+
 describe('GET /api/dashboard/summary', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -156,6 +160,35 @@ describe('GET /api/dashboard/summary', () => {
           };
         }
         if (table === 'actions') return { select: () => createCountQuery(3) };
+        if (table === 'reminder_actions') {
+          return {
+            select: () =>
+              createReminderActionsSummaryQuery([
+                {
+                  id: 'unassigned-action',
+                  ignored_forever: false,
+                  ignored_until: null,
+                  reminders: [],
+                },
+                {
+                  id: 'assigned-action',
+                  ignored_forever: false,
+                  ignored_until: null,
+                  reminders: [
+                    { status: 'pending' },
+                    { status: 'pending' },
+                    { status: 'pending' },
+                  ],
+                },
+                {
+                  id: 'ignored-action',
+                  ignored_forever: true,
+                  ignored_until: null,
+                  reminders: [],
+                },
+              ]),
+          };
+        }
         if (table === 'suggestions') {
           return {
             select: () => Promise.resolve({
@@ -237,6 +270,7 @@ describe('GET /api/dashboard/summary', () => {
         maintenance_due_soon: 0,
         maintenance_overdue: 0,
         reminders_pending: 0,
+        actions_unassigned: 1,
         suggestions_new: 6,
         error_reports_new: 1,
         quotes_pending_internal_approval: 6,
@@ -366,6 +400,7 @@ describe('GET /api/dashboard/summary', () => {
         maintenance_due_soon: 0,
         maintenance_overdue: 0,
         reminders_pending: 0,
+        actions_unassigned: 0,
         suggestions_new: 0,
         error_reports_new: 0,
         quotes_pending_internal_approval: 0,
@@ -757,6 +792,7 @@ describe('GET /api/dashboard/summary', () => {
         maintenance_due_soon: 0,
         maintenance_overdue: 0,
         reminders_pending: 0,
+        actions_unassigned: 0,
         suggestions_new: 0,
         error_reports_new: 0,
         quotes_pending_internal_approval: 0,
