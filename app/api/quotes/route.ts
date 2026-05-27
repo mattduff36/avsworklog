@@ -12,6 +12,7 @@ import {
   getInvoiceSummary,
   getQuoteManagerOption,
 } from '@/lib/server/quote-workflow';
+import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
 
 type QuoteFieldErrors = Record<string, string>;
 
@@ -53,6 +54,9 @@ export async function GET(request: NextRequest) {
     if (authError || !user) {
       return NextResponse.json({ error: 'You must be signed in to use quotes.' }, { status: 401 });
     }
+
+    const sensitiveAccessResponse = await requireSensitiveModuleAccess('quotes');
+    if (sensitiveAccessResponse) return sensitiveAccessResponse;
 
     const { searchParams } = new URL(request.url);
     const customerId = searchParams.get('customer_id');
@@ -237,6 +241,9 @@ export async function POST(request: NextRequest) {
     if (authError || !user) {
       return NextResponse.json({ error: 'You must be signed in to use quotes.' }, { status: 401 });
     }
+
+    const sensitiveAccessResponse = await requireSensitiveModuleAccess('quotes');
+    if (sensitiveAccessResponse) return sensitiveAccessResponse;
 
     const body = await request.json();
     const {

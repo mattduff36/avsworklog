@@ -4,7 +4,11 @@ import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { isAdminRole } from '@/lib/utils/role-access';
 import { ALL_MODULES } from '@/types/roles';
-import { getPermissionMapForUser, isMissingTeamPermissionSchemaError } from '@/lib/server/team-permissions';
+import {
+  getPermissionLevelsForUser,
+  getPermissionMapForUser,
+  isMissingTeamPermissionSchemaError,
+} from '@/lib/server/team-permissions';
 
 interface EffectiveRoleSnapshot {
   role_name: string | null;
@@ -62,22 +66,38 @@ export async function GET() {
       return NextResponse.json({
         success: true,
         permissions: fullAccessPermissions,
+        permission_levels: ALL_MODULES.reduce<Record<string, number>>((acc, moduleName) => {
+          acc[moduleName] = 5;
+          return acc;
+        }, {}),
         enabled_modules: ALL_MODULES,
         effective_team_id: effectiveRole.team_id,
         effective_team_name: effectiveRole.team_name,
       });
     }
 
-    const permissions = await withRetry(() => getPermissionMapForUser(
-      current.profile.id,
-      effectiveRole.role_id,
-      createAdminClient(),
-      effectiveRole.team_id
-    ));
+    const admin = createAdminClient();
+    const [permissions, permissionLevels] = await withRetry(() =>
+      Promise.all([
+        getPermissionMapForUser(
+          current.profile.id,
+          effectiveRole.role_id,
+          admin,
+          effectiveRole.team_id
+        ),
+        getPermissionLevelsForUser(
+          current.profile.id,
+          effectiveRole.role_id,
+          admin,
+          effectiveRole.team_id
+        ),
+      ])
+    );
 
     return NextResponse.json({
       success: true,
       permissions,
+      permission_levels: permissionLevels,
       enabled_modules: ALL_MODULES.filter((moduleName) => permissions[moduleName]),
       effective_team_id: effectiveRole.team_id,
       effective_team_name: effectiveRole.team_name,

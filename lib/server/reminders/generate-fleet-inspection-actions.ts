@@ -60,12 +60,21 @@ interface ReminderActionRowWithReminders extends ReminderActionRow {
   reminders?: Array<Pick<ReminderRow, 'id' | 'status'>> | null;
 }
 
+type OpenReminderActionRow = Pick<ReminderActionRow, 'id' | 'dedupe_key' | 'metadata'> & {
+  reminders?: Array<Pick<ReminderRow, 'id' | 'status'>> | null;
+};
+
 export interface FleetInspectionGenerationSummary {
   inserted: number;
   updated: number;
   resolved: number;
   cancelledReminders: number;
   openCount: number;
+}
+
+export interface FleetInspectionGenerationOptions {
+  admin?: AdminClient;
+  nowIso?: string;
 }
 
 const REMINDER_WORKFLOW_KEY = FLEET_INSPECTION_OVERDUE_WORKFLOW_KEY;
@@ -210,6 +219,7 @@ async function loadLatestInspectionDates(
 async function loadOverdueAssets(
   admin: AdminClient,
   workflowSettings: ResolvedFleetInspectionWorkflowSettings,
+  today = new Date(),
 ): Promise<OverdueAsset[]> {
   if (!workflowSettings.is_enabled) {
     return [];
@@ -268,7 +278,6 @@ async function loadOverdueAssets(
     }
   }
 
-  const today = new Date();
   function mapAssetRow(
     assetType: ReminderAssetType,
     row: VanAssetRow | PlantAssetRow,
@@ -323,15 +332,36 @@ async function loadOverdueAssets(
   ].filter((asset): asset is OverdueAsset => Boolean(asset)).sort((left, right) => right.daysOverdue - left.daysOverdue || left.assetLabel.localeCompare(right.assetLabel));
 }
 
-export async function generateFleetInspectionReminderActions(): Promise<FleetInspectionGenerationSummary> {
-  const admin = createAdminClient();
-  const nowIso = new Date().toISOString();
+async function markFleetInspectionWorkflowGenerated(admin: AdminClient, nowIso: string) {
+  const { error } = await admin
+    .from('reminder_workflow_settings')
+    .update({ last_generated_at: nowIso })
+    .eq('workflow_key', REMINDER_WORKFLOW_KEY);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function generateFleetInspectionReminderActions(
+  options: FleetInspectionGenerationOptions = {},
+): Promise<FleetInspectionGenerationSummary> {
+  const admin = options.admin || createAdminClient();
+  const nowIso = options.nowIso || new Date().toISOString();
   const workflowSettings = await loadFleetInspectionWorkflowSettings(admin);
-  const overdueAssets = await loadOverdueAssets(admin, workflowSettings);
+  const overdueAssets = await loadOverdueAssets(admin, workflowSettings, new Date(nowIso));
 
   const { data: openActionRows, error: openActionError } = await admin
     .from('reminder_actions')
-    .select('id, dedupe_key, metadata')
+    .select(`
+      id,
+      dedupe_key,
+      metadata,
+      reminders (
+        id,
+        status
+      )
+    `)
     .eq('workflow_key', REMINDER_WORKFLOW_KEY)
     .eq('status', 'open');
 
@@ -340,7 +370,7 @@ export async function generateFleetInspectionReminderActions(): Promise<FleetIns
   }
 
   const openActionsByDedupeKey = new Map(
-    ((openActionRows || []) as Array<Pick<ReminderActionRow, 'id' | 'dedupe_key' | 'metadata'>>).map((row) => [row.dedupe_key, row]),
+    ((openActionRows || []) as OpenReminderActionRow[]).map((row) => [row.dedupe_key, row]),
   );
 
   let inserted = 0;
@@ -357,6 +387,22 @@ export async function generateFleetInspectionReminderActions(): Promise<FleetIns
       continue;
     }
 
+    const previousLastSubmittedAt = getJsonStringValue(existing.metadata, 'last_submitted_inspection_date');
+    const inspectionSnapshotChanged = previousLastSubmittedAt !== asset.lastSubmittedAt;
+    const existingReminders = existing.reminders || [];
+    const hasPendingReminder = existingReminders.some((reminder) => reminder.status === 'pending');
+    const hasActionedReminder = existingReminders.some((reminder) => reminder.status === 'actioned');
+    const completedButStillOverdue = hasActionedReminder && !hasPendingReminder;
+
+    if (inspectionSnapshotChanged || completedButStillOverdue) {
+      const { error: remindersDeleteError } = await admin
+        .from('reminders')
+        .delete()
+        .eq('action_id', existing.id);
+
+      if (remindersDeleteError) throw remindersDeleteError;
+    }
+
     const { error } = await admin
       .from('reminder_actions')
       .update({
@@ -367,6 +413,14 @@ export async function generateFleetInspectionReminderActions(): Promise<FleetIns
         last_detected_at: nowIso,
         resolved_at: null,
         resolved_by: null,
+        ...(inspectionSnapshotChanged || completedButStillOverdue
+          ? {
+              ignored_until: null,
+              ignored_forever: false,
+              ignored_at: null,
+              ignored_by: null,
+            }
+          : {}),
         ...(asset.assetType === 'van' ? { van_id: asset.assetId, plant_id: null, hgv_id: null } : {}),
         ...(asset.assetType === 'plant' ? { van_id: null, plant_id: asset.assetId, hgv_id: null } : {}),
         ...(asset.assetType === 'hgv' ? { van_id: null, plant_id: null, hgv_id: asset.assetId } : {}),
@@ -411,6 +465,8 @@ export async function generateFleetInspectionReminderActions(): Promise<FleetIns
     if (cancelError) throw cancelError;
     cancelledReminders = (cancelledRows || []).length;
   }
+
+  await markFleetInspectionWorkflowGenerated(admin, nowIso);
 
   return {
     inserted,

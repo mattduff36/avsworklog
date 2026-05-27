@@ -11,6 +11,7 @@ import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SensitiveModuleGate, useSensitiveModuleAccess } from '@/components/security/SensitiveModuleGate';
 import {
   Select,
   SelectContent,
@@ -90,6 +91,7 @@ async function uploadClientQuoteAttachments(quoteId: string, files?: File[]) {
 export default function QuotesPage() {
   const { hasPermission: canViewQuotes, loading: permissionLoading } = usePermissionCheck('quotes', false);
   const { hasPermission: canViewCustomers, loading: customerPermissionLoading } = usePermissionCheck('customers', false);
+  const sensitiveAccess = useSensitiveModuleAccess('quotes');
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -169,14 +171,15 @@ export default function QuotesPage() {
   }, [canViewCustomers, customerId]);
 
   useEffect(() => {
-    if (permissionLoading || customerPermissionLoading) return;
+    if (permissionLoading || customerPermissionLoading || sensitiveAccess.loading) return;
     if (!canViewQuotes) {
       toast.error('You do not have access to quotes.', { id: 'quotes-access-denied' });
       router.push('/dashboard');
       return;
     }
+    if (!sensitiveAccess.canAccess) return;
     fetchData();
-  }, [permissionLoading, customerPermissionLoading, canViewQuotes, router, fetchData]);
+  }, [permissionLoading, customerPermissionLoading, sensitiveAccess.loading, sensitiveAccess.canAccess, canViewQuotes, router, fetchData]);
 
   useEffect(() => {
     setDetailQuoteId(quoteIdFromQuery);
@@ -292,8 +295,20 @@ export default function QuotesPage() {
     }
   }
 
-  if (permissionLoading || customerPermissionLoading || loading) {
+  if (permissionLoading || customerPermissionLoading || sensitiveAccess.loading || (sensitiveAccess.canAccess && loading)) {
     return <PageLoader message="Loading quotes..." />;
+  }
+
+  if (!canViewQuotes) {
+    return <PageLoader message="Redirecting..." />;
+  }
+
+  if (!sensitiveAccess.canAccess) {
+    return (
+      <AppPageShell>
+        <SensitiveModuleGate moduleLabel="Quotes" access={sensitiveAccess} />
+      </AppPageShell>
+    );
   }
 
   return (

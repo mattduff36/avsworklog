@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -13,6 +14,9 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const sensitiveAccessResponse = await requireSensitiveModuleAccess('customers');
+    if (sensitiveAccessResponse) return sensitiveAccessResponse;
 
     const { data, error } = await supabase
       .from('customers')
@@ -43,6 +47,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const sensitiveAccessResponse = await requireSensitiveModuleAccess('customers');
+    if (sensitiveAccessResponse) return sensitiveAccessResponse;
+
     const body = await request.json();
 
     const { data, error } = await supabase
@@ -69,6 +76,9 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const sensitiveAccessResponse = await requireSensitiveModuleAccess('customers');
+    if (sensitiveAccessResponse) return sensitiveAccessResponse;
 
     const { error } = await supabase
       .from('customers')

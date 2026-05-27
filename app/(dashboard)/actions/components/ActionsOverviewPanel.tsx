@@ -40,6 +40,7 @@ export function ActionsOverviewPanel({
       const searchParams = buildReminderActionsQueryParams({
         workflowKey: tab.workflowKey,
         assetType: tab.assetType,
+        ensureFresh: true,
       });
 
       const response = await fetch(`/api/actions?${searchParams.toString()}`, {

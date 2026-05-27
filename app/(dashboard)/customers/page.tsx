@@ -10,12 +10,14 @@ import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SensitiveModuleGate, useSensitiveModuleAccess } from '@/components/security/SensitiveModuleGate';
 import { CustomersTable } from './components/CustomersTable';
 import { CustomerFormDialog } from './components/CustomerFormDialog';
 import type { Customer, CustomerFormData } from './types';
 
 export default function CustomersPage() {
   const { hasPermission: canViewCustomers, loading: permissionLoading } = usePermissionCheck('customers', false);
+  const sensitiveAccess = useSensitiveModuleAccess('customers');
   const router = useRouter();
 
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -41,14 +43,15 @@ export default function CustomersPage() {
   }, []);
 
   useEffect(() => {
-    if (permissionLoading) return;
+    if (permissionLoading || sensitiveAccess.loading) return;
     if (!canViewCustomers) {
       toast.error('Access denied', { id: 'customers-access-denied' });
       router.push('/dashboard');
       return;
     }
+    if (!sensitiveAccess.canAccess) return;
     fetchCustomers();
-  }, [permissionLoading, canViewCustomers, router, fetchCustomers]);
+  }, [permissionLoading, sensitiveAccess.loading, sensitiveAccess.canAccess, canViewCustomers, router, fetchCustomers]);
 
   async function handleCreate(data: CustomerFormData) {
     const res = await fetch('/api/customers', {
@@ -84,8 +87,20 @@ export default function CustomersPage() {
     router.push(`/customers/${customer.id}/history`);
   }
 
-  if (permissionLoading || loading) {
+  if (permissionLoading || sensitiveAccess.loading || (sensitiveAccess.canAccess && loading)) {
     return <PageLoader message="Loading customers..." />;
+  }
+
+  if (!canViewCustomers) {
+    return <PageLoader message="Redirecting..." />;
+  }
+
+  if (!sensitiveAccess.canAccess) {
+    return (
+      <AppPageShell>
+        <SensitiveModuleGate moduleLabel="Customers" access={sensitiveAccess} />
+      </AppPageShell>
+    );
   }
 
   return (

@@ -27,6 +27,86 @@ function getSupabaseAdmin() {
   );
 }
 
+function getReminderAssetColumns(fleetType: 'vans' | 'hgvs' | 'plant') {
+  if (fleetType === 'hgvs') {
+    return { assetType: 'hgv', idColumn: 'hgv_id' } as const;
+  }
+
+  if (fleetType === 'plant') {
+    return { assetType: 'plant', idColumn: 'plant_id' } as const;
+  }
+
+  return { assetType: 'van', idColumn: 'van_id' } as const;
+}
+
+async function getReminderActionCleanupTargets(
+  adminSupabase: ReturnType<typeof getSupabaseAdmin>,
+  fleetType: 'vans' | 'hgvs' | 'plant',
+  itemIds: string[],
+) {
+  if (itemIds.length === 0) {
+    return {
+      actionIds: [] as string[],
+      reminderCount: 0,
+    };
+  }
+
+  const { assetType, idColumn } = getReminderAssetColumns(fleetType);
+  const { data: reminderActions, error: actionsError } = await adminSupabase
+    .from('reminder_actions')
+    .select('id')
+    .eq('asset_type', assetType)
+    .in(idColumn, itemIds);
+
+  if (actionsError) {
+    throw actionsError;
+  }
+
+  const actionIds = (reminderActions || []).map((action) => action.id);
+  if (actionIds.length === 0) {
+    return {
+      actionIds,
+      reminderCount: 0,
+    };
+  }
+
+  const { count: reminderCount, error: remindersError } = await adminSupabase
+    .from('reminders')
+    .select('id', { count: 'exact', head: true })
+    .in('action_id', actionIds);
+
+  if (remindersError) {
+    throw remindersError;
+  }
+
+  return {
+    actionIds,
+    reminderCount: reminderCount || 0,
+  };
+}
+
+async function deleteReminderActionsForFleetItems(
+  adminSupabase: ReturnType<typeof getSupabaseAdmin>,
+  fleetType: 'vans' | 'hgvs' | 'plant',
+  itemIds: string[],
+) {
+  const targets = await getReminderActionCleanupTargets(adminSupabase, fleetType, itemIds);
+  if (targets.actionIds.length === 0) {
+    return targets;
+  }
+
+  const { error } = await adminSupabase
+    .from('reminder_actions')
+    .delete()
+    .in('id', targets.actionIds);
+
+  if (error) {
+    throw error;
+  }
+
+  return targets;
+}
+
 /**
  * GET /api/debug/test-vehicles
  * List fleet items (vans, HGVs, and/or plant) matching a prefix (for test data management)
@@ -243,6 +323,21 @@ export async function POST(request: NextRequest) {
 
     // Build counts object
     const counts: Record<string, number> = {};
+
+    if (actions?.inspections) {
+      const reminderTargets = await getReminderActionCleanupTargets(adminSupabase, fleetType, itemIds);
+      counts.reminder_actions = reminderTargets.actionIds.length;
+      counts.reminders = reminderTargets.reminderCount;
+
+      if (mode === 'execute' && reminderTargets.actionIds.length > 0) {
+        const { error: deleteReminderActionsError } = await adminSupabase
+          .from('reminder_actions')
+          .delete()
+          .in('id', reminderTargets.actionIds);
+
+        if (deleteReminderActionsError) throw deleteReminderActionsError;
+      }
+    }
 
     // Count/delete inspections (van_inspections, hgv_inspections, or plant_inspections)
     if (actions?.inspections) {
@@ -663,6 +758,10 @@ export async function DELETE(request: NextRequest) {
 
       // Delete in proper order to avoid FK violations
       const deleteCounts: Record<string, number> = {};
+
+      const reminderTargets = await deleteReminderActionsForFleetItems(adminSupabase, fleetType, vehicleIds);
+      deleteCounts.reminder_actions = reminderTargets.actionIds.length;
+      deleteCounts.reminders = reminderTargets.reminderCount;
 
       // First, get all task IDs for these items
       const { data: tasksToDelete } = await adminSupabase

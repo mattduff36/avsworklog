@@ -82,10 +82,15 @@ export function filterReminderActions(
 export function buildReminderActionsQueryParams(params: {
   workflowKey: string;
   assetType?: string;
+  ensureFresh?: boolean;
 }): URLSearchParams {
   const searchParams = new URLSearchParams();
   searchParams.set('workflow', params.workflowKey);
   searchParams.set('status', 'open');
+
+  if (params.ensureFresh) {
+    searchParams.set('ensure_fresh', 'true');
+  }
 
   if (params.assetType) {
     searchParams.set('asset_type', params.assetType);

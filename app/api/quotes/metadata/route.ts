@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { filterHiddenSystemTestAccountProfiles } from '@/lib/server/system-test-accounts';
 import { listQuoteManagerOptions } from '@/lib/server/quote-workflow';
+import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
 
 export async function GET() {
   try {
@@ -15,6 +16,9 @@ export async function GET() {
     if (authError || !user) {
       return NextResponse.json({ error: 'You must be signed in to use quotes.' }, { status: 401 });
     }
+
+    const sensitiveAccessResponse = await requireSensitiveModuleAccess('quotes');
+    if (sensitiveAccessResponse) return sensitiveAccessResponse;
 
     const admin = createAdminClient();
     const [managerOptions, approversResult] = await Promise.all([

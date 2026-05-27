@@ -95,6 +95,7 @@ export interface ReminderWorkflowSettings {
   is_enabled: boolean;
   config: FleetInspectionWorkflowConfig | Record<string, unknown>;
   updated_by: string | null;
+  last_generated_at: string | null;
   created_at: string;
   updated_at: string;
 }

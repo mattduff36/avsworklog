@@ -4,6 +4,7 @@ import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
 import { getPermissionMapForUser } from '@/lib/server/team-permissions';
 import { createClient } from '@/lib/supabase/server';
 import { getEffectiveRole } from '@/lib/utils/view-as';
+import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
 
 interface EffectiveRoleSnapshot {
   role_name: string | null;
@@ -53,6 +54,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    const sensitiveAccessResponse = await requireSensitiveModuleAccess('customers');
+    if (sensitiveAccessResponse) return sensitiveAccessResponse;
+
     const { searchParams } = new URL(request.url);
     const limit = Math.min(Math.max(Number.parseInt(searchParams.get('limit') || '200', 10) || 200, 1), 500);
     const offset = Math.max(Number.parseInt(searchParams.get('offset') || '0', 10) || 0, 0);
@@ -86,6 +90,9 @@ export async function POST(request: NextRequest) {
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const sensitiveAccessResponse = await requireSensitiveModuleAccess('customers');
+    if (sensitiveAccessResponse) return sensitiveAccessResponse;
 
     const body = await request.json();
 

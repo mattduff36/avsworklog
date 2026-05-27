@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getPermissionLevelsForUser } from '@/lib/server/team-permissions';
 import { filterHiddenSystemTestAccounts } from '@/lib/utils/system-test-accounts';
 import {
   ABSENCE_SECONDARY_PERMISSION_HEADERS,
@@ -12,6 +13,7 @@ import {
   type AbsenceSecondaryPermissionMap,
   type AbsenceSecondaryRoleTier,
 } from '@/types/absence-permissions';
+import type { PermissionAccessLevel } from '@/types/roles';
 
 interface RoleShape {
   name?: string | null;
@@ -26,6 +28,7 @@ interface ProfileWithRoleRow {
   full_name: string | null;
   employee_id: string | null;
   team_id: string | null;
+  role_id: string | null;
   team?: { id?: string | null; name?: string | null } | null;
   role?: RoleShape | null;
 }
@@ -96,6 +99,13 @@ export function resolveAbsenceSecondaryRoleTier(role: RoleShape | null | undefin
   return 'employee';
 }
 
+function resolveAbsenceSecondaryRoleTierFromLevel(level: PermissionAccessLevel): AbsenceSecondaryRoleTier {
+  if (level >= 5) return 'admin';
+  if (level >= 4) return 'manager';
+  if (level >= 3) return 'supervisor';
+  return 'employee';
+}
+
 function normalizeExceptionOverrides(
   row: AbsenceSecondaryPermissionExceptionRecord | null | undefined
 ): Record<AbsenceSecondaryPermissionKey, boolean | null> {
@@ -157,7 +167,7 @@ async function fetchProfileWithRole(profileId: string) {
   const { data, error } = await admin
     .from('profiles')
     .select(
-      'id, full_name, employee_id, team_id, team:org_teams!profiles_team_id_fkey(id, name), role:roles(name, display_name, role_class, is_manager_admin, is_super_admin)'
+      'id, full_name, employee_id, team_id, role_id, team:org_teams!profiles_team_id_fkey(id, name), role:roles(name, display_name, role_class, is_manager_admin, is_super_admin)'
     )
     .eq('id', profileId)
     .single();
@@ -201,7 +211,16 @@ export async function getActorAbsenceSecondaryPermissions(
       ? (contextOverride.team_name ?? null)
       : (profile.team?.name ?? null);
 
-  const roleTier = resolveAbsenceSecondaryRoleTier(resolvedRole);
+  const permissionLevels = await getPermissionLevelsForUser(
+    profile.id,
+    profile.role ? undefined : profile.role_id,
+    createAdminClient(),
+    resolvedTeamId
+  );
+  const roleTier =
+    permissionLevels.absence > 0
+      ? resolveAbsenceSecondaryRoleTierFromLevel(permissionLevels.absence)
+      : resolveAbsenceSecondaryRoleTier(resolvedRole);
   const defaults = getAbsenceSecondaryDefaultMap(roleTier);
   const overrides = normalizeExceptionOverrides(exceptionRow.data || undefined);
   const effective = applyAbsenceSecondaryOverrides(defaults, overrides);
@@ -252,14 +271,14 @@ export async function getAbsenceSecondaryExceptionMatrix(): Promise<AbsenceSecon
   const { data: profilesData, error: profilesError } = await admin
     .from('profiles')
     .select(
-      'id, full_name, employee_id, team_id, team:org_teams!profiles_team_id_fkey(id, name), role:roles(name, display_name, role_class, is_manager_admin, is_super_admin)'
+      'id, full_name, employee_id, team_id, role_id, team:org_teams!profiles_team_id_fkey(id, name), role:roles(name, display_name, role_class, is_manager_admin, is_super_admin)'
     )
     .in('id', profileIds);
 
   if (profilesError) throw profilesError;
 
   const profileById = new Map<string, ProfileWithRoleRow>();
-  filterHiddenSystemTestAccounts((profilesData || []) as ProfileWithRoleRow[]).forEach((profile) => {
+  filterHiddenSystemTestAccounts((profilesData || []) as unknown as ProfileWithRoleRow[]).forEach((profile) => {
     profileById.set(profile.id, profile);
   });
 

@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { FLEET_INSPECTION_OVERDUE_WORKFLOW_KEY } from '@/lib/config/reminder-workflows';
+import {
+  ACTIONS_PAGE_FLEET_INSPECTION_REFRESH_INTERVAL_MS,
+  ensureFleetInspectionReminderActionsFresh,
+} from '@/lib/server/reminders/ensure-fleet-inspection-actions-fresh';
 import { mapReminderActionWithAsset } from '@/lib/server/reminders/generate-fleet-inspection-actions';
 import type { ReminderActionWithAsset } from '@/types/reminders';
 
@@ -149,8 +154,15 @@ export async function GET(request: NextRequest) {
     const workflowKey = request.nextUrl.searchParams.get('workflow');
     const assetType = request.nextUrl.searchParams.get('asset_type');
     const ignoredFilter = request.nextUrl.searchParams.get('ignored');
+    const ensureFresh = request.nextUrl.searchParams.get('ensure_fresh') === 'true';
     const nowIso = new Date().toISOString();
     const admin = createAdminClient();
+
+    if (ensureFresh && workflowKey === FLEET_INSPECTION_OVERDUE_WORKFLOW_KEY && statusFilter === 'open') {
+      await ensureFleetInspectionReminderActionsFresh({
+        staleAfterMs: ACTIONS_PAGE_FLEET_INSPECTION_REFRESH_INTERVAL_MS,
+      });
+    }
 
     let query = admin
       .from('reminder_actions')

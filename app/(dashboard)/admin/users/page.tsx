@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { toast } from 'sonner';
 import {
   UserPlus,
   Search,
@@ -103,7 +104,7 @@ interface UserActivitySummary {
 }
 type ProfileWithEmail = ProfileWithRole & UserActivitySummary;
 
-type TabType = 'users' | 'roles' | 'teams' | 'permissions';
+type TabType = 'users' | 'roles' | 'teams' | 'permissions' | 'team-permissions';
 type UserStatusTab = 'active' | 'deleted';
 type BinaryChoice = 'yes' | 'no' | '';
 
@@ -317,14 +318,19 @@ export default function UsersAdminPage() {
 
   useEffect(() => {
     const requestedTab = (searchParams.get('tab') || 'users') as TabType;
-    const validTabs: TabType[] = ['users', 'roles', 'teams', 'permissions'];
+    const validTabs: TabType[] = [
+      'users',
+      ...(canManageRoleDefinitions ? (['roles', 'teams'] as const) : []),
+      ...(canEditRolePermissions ? (['permissions'] as const) : []),
+      ...(isActualSuperAdmin ? (['team-permissions'] as const) : []),
+    ];
     if (validTabs.includes(requestedTab)) {
       setActiveTab(requestedTab);
       return;
     }
     setActiveTab('users');
     router.replace('/admin/users?tab=users', { scroll: false });
-  }, [searchParams, router]);
+  }, [canEditRolePermissions, canManageRoleDefinitions, isActualSuperAdmin, searchParams, router]);
 
   function handleTabChange(nextTab: TabType) {
     setActiveTab(nextTab);
@@ -337,6 +343,7 @@ export default function UsersAdminPage() {
   const [deleteOptionsDialogOpen, setDeleteOptionsDialogOpen] = useState(false);
   const [deletionMode, setDeletionMode] = useState<'keep-data' | 'delete-all'>('keep-data');
   const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false);
+  const [resetSensitivePinDialogOpen, setResetSensitivePinDialogOpen] = useState(false);
   const [passwordDisplayDialogOpen, setPasswordDisplayDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<ProfileWithEmail | null>(null);
   
@@ -1146,6 +1153,12 @@ export default function UsersAdminPage() {
     setResetPasswordDialogOpen(true);
   }
 
+  function openResetSensitivePinDialog(userProfile: ProfileWithEmail) {
+    setSelectedUser(userProfile);
+    setFormError('');
+    setResetSensitivePinDialogOpen(true);
+  }
+
   // Handle reset password
   async function handleResetPassword() {
     if (!selectedUser) return;
@@ -1175,6 +1188,33 @@ export default function UsersAdminPage() {
     } catch (error) {
       console.error('Error resetting password:', error);
       setFormError('Failed to reset password');
+    } finally {
+      setFormLoading(false);
+    }
+  }
+
+  async function handleResetSensitivePin() {
+    if (!selectedUser) return;
+
+    try {
+      setFormLoading(true);
+      setFormError('');
+
+      const response = await fetch(`/api/admin/users/${selectedUser.id}/reset-sensitive-pin`, {
+        method: 'POST',
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to reset sensitive PIN');
+      }
+
+      toast.success('Sensitive PIN reset. The user must set a new PIN from their profile.');
+      setResetSensitivePinDialogOpen(false);
+      setSelectedUser(null);
+    } catch (error) {
+      console.error('Error resetting sensitive PIN:', error);
+      setFormError(error instanceof Error ? error.message : 'Failed to reset sensitive PIN');
     } finally {
       setFormLoading(false);
     }
@@ -1241,7 +1281,13 @@ export default function UsersAdminPage() {
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as TabType)} className="space-y-6">
         <TabsList className={`grid w-full ${
-          canEditRolePermissions ? 'max-w-2xl grid-cols-4' : canManageRoleDefinitions ? 'max-w-xl grid-cols-3' : 'max-w-sm grid-cols-1'
+          isActualSuperAdmin
+            ? 'max-w-3xl grid-cols-5'
+            : canEditRolePermissions
+              ? 'max-w-2xl grid-cols-4'
+              : canManageRoleDefinitions
+                ? 'max-w-xl grid-cols-3'
+                : 'max-w-sm grid-cols-1'
         } bg-slate-100 dark:bg-slate-800 p-0`}>
           <TabsTrigger 
             value="users" 
@@ -1275,6 +1321,15 @@ export default function UsersAdminPage() {
             >
               <Shield className="h-4 w-4" />
               Permissions
+            </TabsTrigger>
+          )}
+          {isActualSuperAdmin && (
+            <TabsTrigger
+              value="team-permissions"
+              className="gap-2 data-[state=active]:bg-red-600 data-[state=active]:text-white text-red-200 hover:text-red-100"
+            >
+              <AlertTriangle className="h-4 w-4" />
+              Team Fallback
             </TabsTrigger>
           )}
         </TabsList>
@@ -1592,6 +1647,15 @@ export default function UsersAdminPage() {
                               title="Reset Password"
                             >
                               <KeyRound className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openResetSensitivePinDialog(user)}
+                              className="text-yellow-300 hover:text-yellow-200 hover:bg-slate-800"
+                              title="Reset Sensitive PIN"
+                            >
+                              <Shield className="h-3 w-3" />
                             </Button>
                             <Button
                               variant="ghost"
@@ -2347,6 +2411,67 @@ export default function UsersAdminPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Reset Sensitive PIN Confirmation Dialog */}
+      <Dialog open={resetSensitivePinDialogOpen} onOpenChange={setResetSensitivePinDialogOpen}>
+        <DialogContent className="border-border text-white">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-yellow-300" />
+              Reset Sensitive PIN
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              This clears the user&apos;s sensitive module PIN. They must set a new PIN from their profile before opening protected modules.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedUser && (
+            <div className="bg-slate-800 rounded p-4 space-y-2">
+              <p className="text-sm">
+                <span className="text-muted-foreground">Name:</span>{' '}
+                <span className="text-white font-medium">{selectedUser.full_name}</span>
+              </p>
+              <p className="text-sm">
+                <span className="text-muted-foreground">Email:</span>{' '}
+                <span className="text-slate-200">{selectedUser.email}</span>
+              </p>
+            </div>
+          )}
+          {formError && (
+            <div className="bg-red-500/10 border border-red-500/50 rounded p-3 text-sm text-red-400">
+              {formError}
+            </div>
+          )}
+          <div className="bg-yellow-500/10 border border-yellow-500/50 rounded p-3 text-sm text-yellow-200">
+            <strong>Note:</strong> The current PIN is not displayed or emailed. Admins will be notified of the reset.
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => { setResetSensitivePinDialogOpen(false); setSelectedUser(null); }}
+              className="border-slate-600 text-white hover:bg-slate-800"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleResetSensitivePin}
+              disabled={formLoading}
+              className="bg-yellow-500 hover:bg-yellow-600 text-slate-950"
+            >
+              {formLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Resetting...
+                </>
+              ) : (
+                <>
+                  <Shield className="h-4 w-4 mr-2" />
+                  Reset Sensitive PIN
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Password Display Dialog */}
       <Dialog open={passwordDisplayDialogOpen} onOpenChange={setPasswordDisplayDialogOpen}>
         <DialogContent className="border-border text-white max-w-lg">
@@ -2448,6 +2573,11 @@ export default function UsersAdminPage() {
         {canEditRolePermissions && (
           <TabsContent value="permissions">
             <RoleManagement />
+          </TabsContent>
+        )}
+        {isActualSuperAdmin && (
+          <TabsContent value="team-permissions">
+            <RoleManagement mode="team-fallback" />
           </TabsContent>
         )}
       </Tabs>

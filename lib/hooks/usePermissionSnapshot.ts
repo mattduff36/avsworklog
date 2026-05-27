@@ -13,6 +13,7 @@ import {
 
 interface PermissionSnapshotResponse {
   permissions?: Record<ModuleName, boolean>;
+  permission_levels?: Record<ModuleName, number>;
   enabled_modules?: ModuleName[];
   effective_team_id?: string | null;
   effective_team_name?: string | null;
@@ -83,6 +84,7 @@ export function usePermissionSnapshot() {
 
   return {
     permissions,
+    permissionLevels: query.data?.permission_levels || null,
     enabledModules,
     enabledModuleSet,
     effectiveTeamId: query.data?.effective_team_id || effectiveRole?.team_id || null,

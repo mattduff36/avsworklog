@@ -28,6 +28,7 @@ export interface ReminderWorkflowSettingsRow {
   is_enabled: boolean;
   config: Record<string, unknown>;
   updated_by: string | null;
+  last_generated_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -107,6 +108,7 @@ export interface ResolvedFleetInspectionWorkflowSettings {
   is_enabled: boolean;
   config: FleetInspectionWorkflowConfig;
   updated_by: string | null;
+  last_generated_at: string | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -116,7 +118,7 @@ export async function loadFleetInspectionWorkflowSettings(
 ): Promise<ResolvedFleetInspectionWorkflowSettings> {
   const { data, error } = await admin
     .from('reminder_workflow_settings')
-    .select('workflow_key, is_enabled, config, updated_by, created_at, updated_at')
+    .select('workflow_key, is_enabled, config, updated_by, last_generated_at, created_at, updated_at')
     .eq('workflow_key', 'fleet_inspection_overdue')
     .maybeSingle();
 
@@ -130,6 +132,7 @@ export async function loadFleetInspectionWorkflowSettings(
       is_enabled: true,
       config: getDefaultFleetInspectionWorkflowConfig(),
       updated_by: null,
+      last_generated_at: null,
       created_at: null,
       updated_at: null,
     };
@@ -140,6 +143,7 @@ export async function loadFleetInspectionWorkflowSettings(
     is_enabled: data.is_enabled,
     config: parseFleetInspectionWorkflowConfig(data.config as Record<string, unknown>),
     updated_by: data.updated_by,
+    last_generated_at: data.last_generated_at,
     created_at: data.created_at,
     updated_at: data.updated_at,
   };
@@ -167,7 +171,7 @@ export async function updateFleetInspectionWorkflowSettings(
   const { data, error } = await admin
     .from('reminder_workflow_settings')
     .upsert(payload, { onConflict: 'workflow_key' })
-    .select('workflow_key, is_enabled, config, updated_by, created_at, updated_at')
+    .select('workflow_key, is_enabled, config, updated_by, last_generated_at, created_at, updated_at')
     .single();
 
   if (error) {
@@ -179,6 +183,7 @@ export async function updateFleetInspectionWorkflowSettings(
     is_enabled: data.is_enabled,
     config: parseFleetInspectionWorkflowConfig(data.config as Record<string, unknown>),
     updated_by: data.updated_by,
+    last_generated_at: data.last_generated_at,
     created_at: data.created_at,
     updated_at: data.updated_at,
   };

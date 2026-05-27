@@ -13,6 +13,7 @@ import {
   sendQuoteRamsRequestEmail,
   sendQuoteToCustomerEmail,
 } from '@/lib/server/quote-workflow';
+import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
 
 type QuoteFieldErrors = Record<string, string>;
 
@@ -57,6 +58,9 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'You must be signed in to use quotes.' }, { status: 401 });
     }
 
+    const sensitiveAccessResponse = await requireSensitiveModuleAccess('quotes');
+    if (sensitiveAccessResponse) return sensitiveAccessResponse;
+
     const bundle = await fetchQuoteBundle(admin, id);
 
     return NextResponse.json({
@@ -86,6 +90,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (authError || !user) {
       return NextResponse.json({ error: 'You must be signed in to use quotes.' }, { status: 401 });
     }
+
+    const sensitiveAccessResponse = await requireSensitiveModuleAccess('quotes');
+    if (sensitiveAccessResponse) return sensitiveAccessResponse;
 
     const body = await request.json();
     const { action, line_items, manager_profile_id, approver_profile_id, ...quoteUpdates } = body as {
@@ -782,6 +789,9 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     if (authError || !user) {
       return NextResponse.json({ error: 'You must be signed in to use quotes.' }, { status: 401 });
     }
+
+    const sensitiveAccessResponse = await requireSensitiveModuleAccess('quotes');
+    if (sensitiveAccessResponse) return sensitiveAccessResponse;
 
     const bundle = await fetchQuoteBundle(admin, id);
     if (!bundle.quote.is_latest_version) {

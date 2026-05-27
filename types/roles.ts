@@ -62,8 +62,24 @@ export interface PermissionModuleMatrixColumn extends PermissionModuleDefinition
   minimum_role_id: string;
   minimum_role_name: string;
   minimum_hierarchy_rank: number;
+  requires_sensitive_pin: boolean;
   sort_order: number;
 }
+
+export type PermissionAccessLevel = 0 | 1 | 2 | 3 | 4 | 5;
+
+export type PermissionLevelRoleName = 'No access' | 'Contractor' | 'Employee' | 'Supervisor' | 'Manager' | 'Admin';
+
+export const PERMISSION_LEVEL_LABELS: Record<PermissionAccessLevel, PermissionLevelRoleName> = {
+  0: 'No access',
+  1: 'Contractor',
+  2: 'Employee',
+  3: 'Supervisor',
+  4: 'Manager',
+  5: 'Admin',
+};
+
+export const EDITABLE_PERMISSION_ACCESS_LEVELS: PermissionAccessLevel[] = [0, 1, 2, 3, 4, 5];
 
 export interface TeamPermissionMatrixRow {
   id: string;
@@ -78,6 +94,48 @@ export interface TeamPermissionMatrixResponse {
   roles: PermissionTierRole[];
   modules: PermissionModuleMatrixColumn[];
   teams: TeamPermissionMatrixRow[];
+}
+
+export interface UserPermissionMatrixRow {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  employee_id: string | null;
+  team_id: string | null;
+  team_name: string | null;
+  role_id: string | null;
+  role_name: string | null;
+  role_display_name: string | null;
+  role_class: RoleClass | null;
+  is_super_admin: boolean;
+  is_manager_admin: boolean;
+  is_locked_admin: boolean;
+  permissions: Record<ModuleName, PermissionAccessLevel>;
+  inherited_permissions: Record<ModuleName, PermissionAccessLevel>;
+}
+
+export interface PermissionsAuditModuleInfo {
+  displayName: string;
+  moduleName: ModuleName;
+  matrixGate: string;
+  minimumRole: string;
+  byRole: Partial<Record<PermissionLevelRoleName, string>>;
+}
+
+export interface PermissionsAuditInfo {
+  title: string;
+  auditDate: string;
+  matrixRule: string;
+  modules: PermissionsAuditModuleInfo[];
+  prdRelevantMismatches: string[];
+}
+
+export interface UserPermissionMatrixResponse {
+  success: boolean;
+  roles: PermissionTierRole[];
+  modules: PermissionModuleMatrixColumn[];
+  users: UserPermissionMatrixRow[];
+  audit: PermissionsAuditInfo;
 }
 
 export const STANDARD_MODULES: ModuleName[] = [
@@ -302,8 +360,17 @@ export interface UpdateTeamPermissionsRequest {
   }[];
 }
 
+export interface UpdateUserPermissionLevelsRequest {
+  updates: {
+    user_id: string;
+    module_name: ModuleName;
+    access_level: PermissionAccessLevel;
+  }[];
+}
+
 export interface ShiftPermissionModuleRequest {
-  direction: 'left' | 'right';
+  direction?: 'left' | 'right';
+  requires_sensitive_pin?: boolean;
 }
 
 export function createEmptyModulePermissionRecord(): Record<ModuleName, boolean> {

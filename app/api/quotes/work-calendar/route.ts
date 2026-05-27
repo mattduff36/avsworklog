@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { addDays, format, subDays } from 'date-fns';
 import { createClient } from '@/lib/supabase/server';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
 
 function normalizeDate(value: string | null, fallback: Date) {
   if (!value) return format(fallback, 'yyyy-MM-dd');
@@ -23,12 +24,18 @@ async function requireQuotesAccess() {
   const canAccessQuotes = await canEffectiveRoleAccessModule('quotes');
   if (!canAccessQuotes) return { supabase, user: null, error: 'Quotes access required.' };
 
+  const sensitiveAccessResponse = await requireSensitiveModuleAccess('quotes');
+  if (sensitiveAccessResponse) {
+    return { supabase, user: null, error: 'Sensitive access PIN required.', response: sensitiveAccessResponse };
+  }
+
   return { supabase, user, error: null };
 }
 
 export async function GET(request: NextRequest) {
   try {
-    const { supabase, error } = await requireQuotesAccess();
+    const { supabase, error, response } = await requireQuotesAccess();
+    if (response) return response;
     if (error) return NextResponse.json({ error }, { status: error.includes('signed in') ? 401 : 403 });
 
     const { searchParams } = new URL(request.url);
@@ -84,7 +91,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { supabase, user, error } = await requireQuotesAccess();
+    const { supabase, user, error, response } = await requireQuotesAccess();
+    if (response) return response;
     if (error || !user) return NextResponse.json({ error }, { status: error?.includes('signed in') ? 401 : 403 });
 
     const body = await request.json();
@@ -117,7 +125,8 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const { supabase, user, error } = await requireQuotesAccess();
+    const { supabase, user, error, response } = await requireQuotesAccess();
+    if (response) return response;
     if (error || !user) return NextResponse.json({ error }, { status: error?.includes('signed in') ? 401 : 403 });
 
     const body = await request.json();
@@ -150,7 +159,8 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const { supabase, error } = await requireQuotesAccess();
+    const { supabase, error, response } = await requireQuotesAccess();
+    if (response) return response;
     if (error) return NextResponse.json({ error }, { status: error.includes('signed in') ? 401 : 403 });
 
     const { searchParams } = new URL(request.url);

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { appendQuoteTimelineEvent, fetchQuoteBundle } from '@/lib/server/quote-workflow';
+import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
 
 type InvoiceFieldErrors = Record<string, string>;
 
@@ -21,6 +22,9 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     if (authError || !user) {
       return NextResponse.json({ error: 'You must be signed in to use quotes.' }, { status: 401 });
     }
+
+    const sensitiveAccessResponse = await requireSensitiveModuleAccess('quotes');
+    if (sensitiveAccessResponse) return sensitiveAccessResponse;
 
     const bundle = await fetchQuoteBundle(createAdminClient(), id);
     return NextResponse.json({ invoices: bundle.invoices, invoice_summary: bundle.invoiceSummary });
@@ -43,6 +47,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (authError || !user) {
       return NextResponse.json({ error: 'You must be signed in to use quotes.' }, { status: 401 });
     }
+
+    const sensitiveAccessResponse = await requireSensitiveModuleAccess('quotes');
+    if (sensitiveAccessResponse) return sensitiveAccessResponse;
 
     const body = await request.json() as {
       invoice_number?: string;

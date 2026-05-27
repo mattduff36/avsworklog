@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import {
+  FLEET_INSPECTION_OVERDUE_WORKFLOW_KEY,
   getReminderOverviewTab,
   isValidReminderOverviewTabId,
   REMINDER_OVERVIEW_TABS,
@@ -103,7 +104,11 @@ function ActionsContent() {
     }
 
     try {
-      const searchParams = new URLSearchParams({ status: 'open' });
+      const searchParams = new URLSearchParams({
+        status: 'open',
+        workflow: FLEET_INSPECTION_OVERDUE_WORKFLOW_KEY,
+        ensure_fresh: 'true',
+      });
       const response = await fetch(`/api/actions?${searchParams.toString()}`, {
         cache: 'no-store',
       });

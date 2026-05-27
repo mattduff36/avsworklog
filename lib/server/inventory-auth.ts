@@ -1,4 +1,4 @@
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { canEffectiveRoleAccessModule, getEffectiveModuleAccessLevel } from '@/lib/utils/rbac';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 
 export interface InventoryAccessResult {
@@ -9,20 +9,6 @@ export interface InventoryAccessResult {
   isManagerOrAdmin?: boolean;
   roleName?: string | null;
   roleClass?: 'admin' | 'manager' | 'employee' | null;
-}
-
-function isEffectiveInventoryManagerOrAdmin(role: {
-  role_name: string | null;
-  role_class: 'admin' | 'manager' | 'employee' | null;
-  is_manager_admin: boolean;
-  is_super_admin: boolean;
-}): boolean {
-  return (
-    role.is_super_admin ||
-    role.is_manager_admin ||
-    role.role_class === 'admin' ||
-    role.role_name?.trim().toLowerCase() === 'admin'
-  );
 }
 
 export async function requireInventoryAccess(): Promise<InventoryAccessResult> {
@@ -37,11 +23,13 @@ export async function requireInventoryAccess(): Promise<InventoryAccessResult> {
     return { allowed: false, status: 403, error: 'Forbidden' };
   }
 
+  const accessLevel = await getEffectiveModuleAccessLevel('inventory');
+
   return {
     allowed: true,
     status: 200,
     userId: effectiveRole.user_id,
-    isManagerOrAdmin: isEffectiveInventoryManagerOrAdmin(effectiveRole),
+    isManagerOrAdmin: accessLevel >= 4,
     roleName: effectiveRole.role_name,
     roleClass: effectiveRole.role_class,
   };

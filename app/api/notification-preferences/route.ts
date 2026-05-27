@@ -7,7 +7,29 @@ import type {
   UpdateNotificationPreferenceResponse,
   NotificationPreference,
 } from '@/types/notifications';
-import { NOTIFICATION_MODULE_KEYS, type NotificationModuleKey } from '@/types/notifications';
+import {
+  NOTIFICATION_MODULES,
+  NOTIFICATION_MODULE_KEYS,
+  type NotificationModuleKey,
+} from '@/types/notifications';
+import { getProfileWithRole } from '@/lib/utils/permissions';
+
+function canUseNotificationModule(
+  moduleKey: NotificationModuleKey,
+  profile: Awaited<ReturnType<typeof getProfileWithRole>>
+): boolean {
+  const notificationModule = NOTIFICATION_MODULES.find((entry) => entry.key === moduleKey);
+  if (!notificationModule) return false;
+  if (notificationModule.availableFor === 'all') return true;
+
+  const role = profile?.role;
+  const isAdmin = profile?.is_super_admin === true || role?.is_super_admin === true || role?.role_class === 'admin';
+  const isManager = role?.is_manager_admin === true || role?.role_class === 'manager';
+
+  if (notificationModule.availableFor === 'admin') return isAdmin;
+  if (notificationModule.availableFor === 'manager') return isManager || isAdmin;
+  return false;
+}
 
 /**
  * GET /api/notification-preferences
@@ -79,6 +101,11 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ 
         error: `Invalid module_key. Must be one of: ${NOTIFICATION_MODULE_KEYS.join(', ')}`
       }, { status: 400 });
+    }
+
+    const profile = await getProfileWithRole(user.id);
+    if (!canUseNotificationModule(module_key, profile)) {
+      return NextResponse.json({ error: 'Forbidden for this notification module' }, { status: 403 });
     }
 
     // Build upsert data

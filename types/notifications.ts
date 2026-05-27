@@ -10,7 +10,8 @@ export type NotificationModuleKey =
   | 'inspections'
   | 'toolbox_talks'
   | 'reminders'
-  | 'general_notifications';
+  | 'general_notifications'
+  | 'sensitive_pin_security';
 
 export const NOTIFICATION_MODULE_KEYS: NotificationModuleKey[] = [
   'errors',
@@ -21,6 +22,7 @@ export const NOTIFICATION_MODULE_KEYS: NotificationModuleKey[] = [
   'toolbox_talks',
   'reminders',
   'general_notifications',
+  'sensitive_pin_security',
 ];
 
 export interface NotificationPreference {
@@ -98,6 +100,13 @@ export const NOTIFICATION_MODULES: NotificationModule[] = [
     description: 'Operational notifications such as quotes, inventory, absence, and timesheet alerts',
     icon: 'Bell',
     availableFor: 'all',
+  },
+  {
+    key: 'sensitive_pin_security',
+    label: 'Sensitive PIN Security',
+    description: 'Admin alerts when users set or change sensitive module PINs',
+    icon: 'Shield',
+    availableFor: 'admin',
   },
 ];
 

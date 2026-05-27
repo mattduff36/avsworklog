@@ -24,6 +24,10 @@ import {
 } from '@/lib/utils/maintenanceCategoryRules';
 import { getDashboardApprovalsMetrics } from '@/lib/server/dashboard-approvals';
 import { canAccessDebugConsole } from '@/lib/utils/debug-access';
+import {
+  DASHBOARD_FLEET_INSPECTION_REFRESH_INTERVAL_MS,
+  ensureFleetInspectionReminderActionsFresh,
+} from '@/lib/server/reminders/ensure-fleet-inspection-actions-fresh';
 
 type PermissionMap = Record<(typeof ALL_MODULES)[number], boolean>;
 
@@ -416,6 +420,16 @@ export async function GET() {
     isActualSuperAdmin: effectiveRole.is_actual_super_admin,
     isViewingAs: effectiveRole.is_viewing_as,
   });
+
+  if (canViewActions) {
+    await resolveMetricValue(
+      'fleet inspection action refresh',
+      ensureFleetInspectionReminderActionsFresh({
+        staleAfterMs: DASHBOARD_FLEET_INSPECTION_REFRESH_INTERVAL_MS,
+      }),
+      null,
+    );
+  }
 
   const [
     approvalsMetrics,

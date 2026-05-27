@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
+import { SensitiveModuleGate, useSensitiveModuleAccess } from '@/components/security/SensitiveModuleGate';
 import { CustomerFormDialog } from '../../components/CustomerFormDialog';
 import type { Customer, CustomerFormData } from '../../types';
 import { ACCEPTED_QUOTE_STATUSES, getQuoteStatusConfig, type QuoteListSummary, type QuoteStatus } from '@/app/(dashboard)/quotes/types';
@@ -49,6 +50,7 @@ interface PageProps {
 export default function CustomerHistoryPage({ params }: PageProps) {
   const { id } = use(params);
   const { hasPermission: canViewCustomers, loading: permissionLoading } = usePermissionCheck('customers', false);
+  const sensitiveAccess = useSensitiveModuleAccess('customers');
   const router = useRouter();
 
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -83,13 +85,14 @@ export default function CustomerHistoryPage({ params }: PageProps) {
   }, [id]);
 
   useEffect(() => {
-    if (permissionLoading) return;
+    if (permissionLoading || sensitiveAccess.loading) return;
     if (!canViewCustomers) {
       router.push('/dashboard');
       return;
     }
+    if (!sensitiveAccess.canAccess) return;
     Promise.all([fetchCustomer(), fetchQuotes()]).finally(() => setLoading(false));
-  }, [permissionLoading, canViewCustomers, router, fetchCustomer, fetchQuotes]);
+  }, [permissionLoading, sensitiveAccess.loading, sensitiveAccess.canAccess, canViewCustomers, router, fetchCustomer, fetchQuotes]);
 
   async function handleUpdate(data: CustomerFormData) {
     const res = await fetch(`/api/customers/${id}`, {
@@ -102,8 +105,12 @@ export default function CustomerHistoryPage({ params }: PageProps) {
     await fetchCustomer();
   }
 
-  if (permissionLoading || loading) {
+  if (permissionLoading || sensitiveAccess.loading || (sensitiveAccess.canAccess && loading)) {
     return <PageLoader message="Loading customer history..." />;
+  }
+
+  if (!sensitiveAccess.canAccess) {
+    return <SensitiveModuleGate moduleLabel="Customers" access={sensitiveAccess} />;
   }
 
   if (!customer) return null;

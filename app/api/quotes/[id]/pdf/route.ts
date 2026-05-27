@@ -4,6 +4,7 @@ import { renderToStream } from '@react-pdf/renderer';
 import { QuotePDF } from '@/lib/pdf/quote-pdf';
 import { loadSquiresLogoDataUrl } from '@/lib/pdf/squires-logo';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -18,6 +19,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     if (authError || !user) {
       return NextResponse.json({ error: 'You must be signed in to use quotes.' }, { status: 401 });
     }
+
+    const sensitiveAccessResponse = await requireSensitiveModuleAccess('quotes');
+    if (sensitiveAccessResponse) return sensitiveAccessResponse;
 
     // Fetch quote
     const { data: quote, error: quoteError } = await supabase

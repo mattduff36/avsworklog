@@ -12,6 +12,7 @@ import { ProfileModuleSummaries } from '@/components/profile/ProfileModuleSummar
 import { ProfileQuickLinks } from '@/components/profile/ProfileQuickLinks';
 import { ProfileSettingsCard } from '@/components/profile/ProfileSettingsCard';
 import { ProfileBiometricsCard } from '@/components/profile/ProfileBiometricsCard';
+import { ProfileSensitivePinCard } from '@/components/profile/ProfileSensitivePinCard';
 import { ProfileHelpShortcuts } from '@/components/profile/ProfileHelpShortcuts';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -403,6 +404,8 @@ export default function ProfilePage() {
         savingPreferenceModules={savingPreferenceModules}
         onTogglePreference={handleTogglePreference}
       />
+
+      <ProfileSensitivePinCard />
 
       <ProfileBiometricsCard />
 

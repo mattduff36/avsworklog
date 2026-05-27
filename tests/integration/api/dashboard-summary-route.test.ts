@@ -13,6 +13,15 @@ vi.mock('@/lib/supabase/server');
 vi.mock('@/lib/supabase/admin');
 vi.mock('@/lib/utils/view-as');
 vi.mock('@/lib/server/team-permissions');
+vi.mock('@/lib/server/reminders/ensure-fleet-inspection-actions-fresh', () => ({
+  DASHBOARD_FLEET_INSPECTION_REFRESH_INTERVAL_MS: 15 * 60 * 1000,
+  ensureFleetInspectionReminderActionsFresh: vi.fn().mockResolvedValue({
+    refreshed: false,
+    reason: 'fresh',
+    lastGeneratedAt: '2026-05-27T08:00:00.000Z',
+    summary: null,
+  }),
+}));
 vi.mock('@/lib/server/absence-secondary-permissions', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/server/absence-secondary-permissions')>();
 

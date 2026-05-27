@@ -2974,7 +2974,7 @@ export type Database = {
         Row: {
           id: string
           user_id: string
-          module_key: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'toolbox_talks' | 'reminders' | 'general_notifications'
+          module_key: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'toolbox_talks' | 'reminders' | 'general_notifications' | 'sensitive_pin_security'
           enabled: boolean
           notify_in_app: boolean
           notify_email: boolean
@@ -2984,7 +2984,7 @@ export type Database = {
         Insert: {
           id?: string
           user_id: string
-          module_key: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'toolbox_talks' | 'reminders' | 'general_notifications'
+          module_key: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'toolbox_talks' | 'reminders' | 'general_notifications' | 'sensitive_pin_security'
           enabled?: boolean | null
           notify_in_app?: boolean | null
           notify_email?: boolean | null
@@ -2994,7 +2994,7 @@ export type Database = {
         Update: {
           id?: string
           user_id?: string
-          module_key?: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'toolbox_talks' | 'reminders' | 'general_notifications'
+          module_key?: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'toolbox_talks' | 'reminders' | 'general_notifications' | 'sensitive_pin_security'
           enabled?: boolean | null
           notify_in_app?: boolean | null
           notify_email?: boolean | null
@@ -3155,6 +3155,7 @@ export type Database = {
         Row: {
           module_name: string
           minimum_role_id: string
+          requires_sensitive_pin: boolean
           sort_order: number
           created_at: string
           updated_at: string
@@ -3162,6 +3163,7 @@ export type Database = {
         Insert: {
           module_name: string
           minimum_role_id: string
+          requires_sensitive_pin?: boolean
           sort_order: number
           created_at?: string
           updated_at?: string
@@ -3169,6 +3171,7 @@ export type Database = {
         Update: {
           module_name?: string
           minimum_role_id?: string
+          requires_sensitive_pin?: boolean
           sort_order?: number
           created_at?: string
           updated_at?: string
@@ -3179,6 +3182,55 @@ export type Database = {
             columns: ['minimum_role_id']
             isOneToOne: false
             referencedRelation: 'roles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      user_module_permissions: {
+        Row: {
+          user_id: string
+          module_name: string
+          access_level: number
+          updated_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          module_name: string
+          access_level: number
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          module_name?: string
+          access_level?: number
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'user_module_permissions_module_name_fkey'
+            columns: ['module_name']
+            isOneToOne: false
+            referencedRelation: 'permission_modules'
+            referencedColumns: ['module_name']
+          },
+          {
+            foreignKeyName: 'user_module_permissions_updated_by_fkey'
+            columns: ['updated_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'user_module_permissions_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
             referencedColumns: ['id']
           },
         ]
@@ -6286,7 +6338,7 @@ export type Database = {
       check__message_recipients__status: 'PENDING' | 'SHOWN' | 'SIGNED' | 'DISMISSED'
       check__messages__priority: 'HIGH' | 'LOW'
       check__messages__type: 'TOOLBOX_TALK' | 'REMINDER' | 'NOTIFICATION'
-      check__notification_preferences__module_key: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'toolbox_talks' | 'reminders' | 'general_notifications'
+      check__notification_preferences__module_key: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'toolbox_talks' | 'reminders' | 'general_notifications' | 'sensitive_pin_security'
       check__org_teams__timesheet_type: 'civils' | 'plant'
       check__plant__status: 'active' | 'inactive' | 'maintenance' | 'retired'
       check__plant_inspections__status: 'draft' | 'submitted'
