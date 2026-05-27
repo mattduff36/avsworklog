@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -86,6 +86,36 @@ function buildAddress(customer?: Customer): string {
     .join('\n');
 }
 
+function normalizeCustomerCompanyName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+function getDuplicateCustomerCompanyNames(customers: Customer[]): Set<string> {
+  const counts = new Map<string, number>();
+
+  customers.forEach(customer => {
+    const key = normalizeCustomerCompanyName(customer.company_name);
+    counts.set(key, (counts.get(key) || 0) + 1);
+  });
+
+  return new Set(
+    [...counts.entries()]
+      .filter(([, count]) => count > 1)
+      .map(([name]) => name)
+  );
+}
+
+function getCustomerSelectLabel(customer: Customer, duplicateCompanyNames: Set<string>): string {
+  const companyName = customer.company_name.trim() || customer.company_name;
+  const contactName = customer.contact_name?.trim();
+
+  if (contactName && duplicateCompanyNames.has(normalizeCustomerCompanyName(customer.company_name))) {
+    return `${companyName} [${contactName}]`;
+  }
+
+  return companyName;
+}
+
 export function QuoteFormDialog({
   open,
   onClose,
@@ -103,6 +133,10 @@ export function QuoteFormDialog({
 
   const defaultManager = managerOptions.find(option => option.profile_id === profile?.id) || managerOptions[0];
   const dialogKey = quote ? `edit:${quote.id}` : `new:${initialCustomerId || ''}`;
+  const duplicateCustomerCompanyNames = useMemo(
+    () => getDuplicateCustomerCompanyNames(customers),
+    [customers]
+  );
 
   const [form, setForm] = useState<QuoteFormData>({
     customer_id: '',
@@ -520,7 +554,9 @@ export function QuoteFormDialog({
                   </SelectTrigger>
                   <SelectContent>
                     {customers.map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.company_name}</SelectItem>
+                      <SelectItem key={c.id} value={c.id}>
+                        {getCustomerSelectLabel(c, duplicateCustomerCompanyNames)}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

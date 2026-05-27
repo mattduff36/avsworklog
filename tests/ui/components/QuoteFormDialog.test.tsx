@@ -110,6 +110,51 @@ describe('QuoteFormDialog', () => {
     expect(screen.queryByText('Manager Email')).not.toBeInTheDocument();
   });
 
+  it('adds contact names to duplicate customer names in the customer selector', () => {
+    mockUseAuth.mockReturnValue({
+      profile: {
+        id: 'manager-1',
+        full_name: 'Manager Example',
+      },
+    });
+
+    render(
+      <QuoteFormDialog
+        {...baseProps}
+        customers={[
+          {
+            ...baseProps.customers[0],
+            id: 'customer-1',
+            company_name: 'Exolum',
+            contact_name: 'Matthew Fitzgerald',
+          },
+          {
+            ...baseProps.customers[0],
+            id: 'customer-2',
+            company_name: 'Exolum',
+            contact_name: 'Julian Posner',
+            contact_email: 'julian@example.com',
+          },
+          {
+            ...baseProps.customers[0],
+            id: 'customer-3',
+            company_name: 'Johnsons Aggregates And Recycling Ltd',
+            contact_name: 'Kevin Marshall',
+            contact_email: 'kevin@example.com',
+          },
+        ]}
+      />
+    );
+
+    (Element.prototype as unknown as { hasPointerCapture?: (pointerId: number) => boolean }).hasPointerCapture ??= () => false;
+
+    fireEvent.pointerDown(screen.getAllByRole('combobox')[0]);
+
+    expect(screen.getByText('Exolum [Matthew Fitzgerald]')).toBeInTheDocument();
+    expect(screen.getByText('Exolum [Julian Posner]')).toBeInTheDocument();
+    expect(screen.getByText('Johnsons Aggregates And Recycling Ltd')).toBeInTheDocument();
+  });
+
   it('shows open, replace, and remove controls for saved client attachments', () => {
     mockUseAuth.mockReturnValue({
       profile: {
