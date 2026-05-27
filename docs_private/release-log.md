@@ -2,6 +2,18 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0526.16.1
+
+**GIT COMMIT MESSAGE**
+`fix(errors): filter notification fetch network noise`
+
+**WHAT CHANGED**
+Update sidebar navigation styling, maintenance workflow, and 5 more areas. Filter notification fetch network noise.
+
+**COMMITS IN THIS RELEASE**
+- `fix(layout): update sidebar navigation styling, maintenance workflow, and 5 more areas`
+- `fix(errors): filter notification fetch network noise`
+
 ## 0526.16.0
 
 **GIT COMMIT MESSAGE**
