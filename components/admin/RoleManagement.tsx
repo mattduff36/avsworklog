@@ -68,13 +68,6 @@ interface RoleManagementProps {
   mode?: 'users' | 'team-fallback';
 }
 
-interface FloatingHeaderState {
-  visible: boolean;
-  left: number;
-  width: number;
-  scrollLeft: number;
-}
-
 function getModuleColor(mod: ModuleName): string {
   return `hsl(var(${MODULE_CSS_VAR[mod]}))`;
 }
@@ -121,16 +114,14 @@ export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
   const [pendingUserChanges, setPendingUserChanges] = useState<Record<string, PendingUserLevelChange>>({});
   const [confirmUserSaveOpen, setConfirmUserSaveOpen] = useState(false);
   const [savingUserLevels, setSavingUserLevels] = useState(false);
-  const [floatingHeader, setFloatingHeader] = useState<FloatingHeaderState>({
-    visible: false,
-    left: 0,
-    width: 0,
-    scrollLeft: 0,
-  });
   const [savingCells, setSavingCells] = useState<Set<string>>(new Set());
   const [movingModules, setMovingModules] = useState<Set<string>>(new Set());
   const userMatrixViewportRef = useRef<HTMLDivElement | null>(null);
   const userMatrixHeaderRef = useRef<HTMLTableSectionElement | null>(null);
+  const floatingHeaderRef = useRef<HTMLDivElement | null>(null);
+  const floatingHeaderModulesViewportRef = useRef<HTMLDivElement | null>(null);
+  const floatingHeaderTrackRef = useRef<HTMLDivElement | null>(null);
+  const floatingHeaderFrameRef = useRef<number | null>(null);
   const abortControllers = useRef<Map<string, AbortController>>(new Map());
   const pendingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const pendingCells = useRef<Map<string, Set<string>>>(new Map());
@@ -242,16 +233,14 @@ export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
     [pendingUserChanges]
   );
 
-  const updateFloatingHeader = useCallback(() => {
-    if (mode !== 'users') {
-      setFloatingHeader((previous) => (previous.visible ? { ...previous, visible: false } : previous));
-      return;
-    }
-
+  const updateFloatingHeaderNow = useCallback(() => {
     const viewport = userMatrixViewportRef.current;
     const header = userMatrixHeaderRef.current;
-    if (!viewport || !header) {
-      setFloatingHeader((previous) => (previous.visible ? { ...previous, visible: false } : previous));
+    const overlay = floatingHeaderRef.current;
+    const moduleViewport = floatingHeaderModulesViewportRef.current;
+    const track = floatingHeaderTrackRef.current;
+    if (mode !== 'users' || !viewport || !header || !overlay || !moduleViewport || !track) {
+      if (overlay) overlay.style.display = 'none';
       return;
     }
 
@@ -261,43 +250,54 @@ export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
       headerRect.bottom <= NAVBAR_OFFSET_PX &&
       viewportRect.bottom > NAVBAR_OFFSET_PX + MODULE_HEADER_HEIGHT_PX &&
       viewportRect.top < window.innerHeight;
-    const next = {
-      visible,
-      left: Math.max(viewportRect.left, 0),
-      width: Math.min(viewportRect.width, window.innerWidth - Math.max(viewportRect.left, 0)),
-      scrollLeft: viewport.scrollLeft,
-    };
 
-    setFloatingHeader((previous) => {
-      if (
-        previous.visible === next.visible &&
-        Math.round(previous.left) === Math.round(next.left) &&
-        Math.round(previous.width) === Math.round(next.width) &&
-        Math.round(previous.scrollLeft) === Math.round(next.scrollLeft)
-      ) {
-        return previous;
-      }
+    if (!visible) {
+      overlay.style.display = 'none';
+      return;
+    }
 
-      return next;
-    });
+    const left = Math.max(viewportRect.left, 0);
+    const width = Math.min(viewportRect.width, window.innerWidth - left);
+    overlay.style.display = 'block';
+    overlay.style.left = `${left}px`;
+    overlay.style.width = `${width}px`;
+    moduleViewport.style.width = `${Math.max(width - USER_COLUMN_WIDTH_PX, 0)}px`;
+    track.style.transform = `translate3d(-${viewport.scrollLeft}px, 0, 0)`;
   }, [mode]);
+
+  const scheduleFloatingHeaderUpdate = useCallback(() => {
+    if (floatingHeaderFrameRef.current !== null) return;
+
+    floatingHeaderFrameRef.current = window.requestAnimationFrame(() => {
+      floatingHeaderFrameRef.current = null;
+      updateFloatingHeaderNow();
+    });
+  }, [updateFloatingHeaderNow]);
 
   useEffect(() => {
     if (mode !== 'users') return;
 
     const viewport = userMatrixViewportRef.current;
-    updateFloatingHeader();
+    const overlay = floatingHeaderRef.current;
+    scheduleFloatingHeaderUpdate();
 
-    window.addEventListener('scroll', updateFloatingHeader, { passive: true });
-    window.addEventListener('resize', updateFloatingHeader);
-    viewport?.addEventListener('scroll', updateFloatingHeader, { passive: true });
+    window.addEventListener('scroll', scheduleFloatingHeaderUpdate, { passive: true });
+    window.addEventListener('resize', scheduleFloatingHeaderUpdate);
+    viewport?.addEventListener('scroll', scheduleFloatingHeaderUpdate, { passive: true });
 
     return () => {
-      window.removeEventListener('scroll', updateFloatingHeader);
-      window.removeEventListener('resize', updateFloatingHeader);
-      viewport?.removeEventListener('scroll', updateFloatingHeader);
+      window.removeEventListener('scroll', scheduleFloatingHeaderUpdate);
+      window.removeEventListener('resize', scheduleFloatingHeaderUpdate);
+      viewport?.removeEventListener('scroll', scheduleFloatingHeaderUpdate);
+      if (floatingHeaderFrameRef.current !== null) {
+        window.cancelAnimationFrame(floatingHeaderFrameRef.current);
+        floatingHeaderFrameRef.current = null;
+      }
+      if (overlay) {
+        overlay.style.display = 'none';
+      }
     };
-  }, [mode, orderedUserModules.length, filteredUsers.length, updateFloatingHeader]);
+  }, [mode, orderedUserModules.length, filteredUsers.length, scheduleFloatingHeaderUpdate]);
 
   const flushTeamPermissions = useCallback(
     async (teamId: string) => {
@@ -921,42 +921,38 @@ export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
 
   return (
     <div className="space-y-6">
-      {floatingHeader.visible && (
+      <div
+        ref={floatingHeaderRef}
+        className="pointer-events-none fixed top-[68px] z-[55] hidden overflow-hidden rounded-t-lg border border-slate-700 bg-slate-900/95 shadow-xl backdrop-blur"
+        style={{ height: MODULE_HEADER_HEIGHT_PX }}
+      >
         <div
-          className="pointer-events-none fixed top-[68px] z-[55] overflow-hidden rounded-t-lg border border-slate-700 bg-slate-900/95 shadow-xl backdrop-blur"
+          className="absolute left-0 top-0 z-10 flex items-end bg-slate-800 px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground"
+          style={{ width: USER_COLUMN_WIDTH_PX, height: MODULE_HEADER_HEIGHT_PX }}
+        >
+          User
+        </div>
+        <div
+          ref={floatingHeaderModulesViewportRef}
+          className="overflow-hidden"
           style={{
-            left: floatingHeader.left,
-            width: floatingHeader.width,
+            marginLeft: USER_COLUMN_WIDTH_PX,
+            height: MODULE_HEADER_HEIGHT_PX,
           }}
         >
           <div
-            className="absolute left-0 top-0 z-10 flex items-end bg-slate-800 px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground"
-            style={{ width: USER_COLUMN_WIDTH_PX, height: MODULE_HEADER_HEIGHT_PX }}
-          >
-            User
-          </div>
-          <div
-            className="overflow-hidden"
+            ref={floatingHeaderTrackRef}
+            className="flex will-change-transform"
             style={{
-              marginLeft: USER_COLUMN_WIDTH_PX,
-              width: Math.max(floatingHeader.width - USER_COLUMN_WIDTH_PX, 0),
-              height: MODULE_HEADER_HEIGHT_PX,
+              width: orderedUserModules.length * MODULE_COLUMN_WIDTH_PX,
             }}
           >
-            <div
-              className="flex"
-              style={{
-                transform: `translateX(-${floatingHeader.scrollLeft}px)`,
-                width: orderedUserModules.length * MODULE_COLUMN_WIDTH_PX,
-              }}
-            >
-              {orderedUserModules.map((module, index) =>
-                renderFloatingModuleHeader(module, index > 0 && index % 3 === 0)
-              )}
-            </div>
+            {orderedUserModules.map((module, index) =>
+              renderFloatingModuleHeader(module, index > 0 && index % 3 === 0)
+            )}
           </div>
         </div>
-      )}
+      </div>
 
       <Card className="border-border">
         <CardHeader>
