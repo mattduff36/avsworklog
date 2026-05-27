@@ -57,6 +57,14 @@ describe('error logger filtering', () => {
     ).toBe(true);
   });
 
+  it('ignores handled notification fetch network failures', () => {
+    expect(
+      shouldIgnoreConsoleErrorForLogging(
+        'Error fetching notifications: TypeError: Load failed'
+      )
+    ).toBe(true);
+  });
+
   it('keeps application type errors without a transient network marker', () => {
     expect(
       shouldIgnoreConsoleErrorForLogging(

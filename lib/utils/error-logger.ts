@@ -95,6 +95,7 @@ export function shouldIgnoreConsoleErrorForLogging(errorMessage: string): boolea
     'error signing message:',
     'failed to load pdf document:',
     'error fetching rams documents:',
+    'error fetching notifications:',
   ].some((context) => normalized.includes(context));
 }
 
