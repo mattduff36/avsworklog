@@ -104,7 +104,7 @@ interface UserActivitySummary {
 }
 type ProfileWithEmail = ProfileWithRole & UserActivitySummary;
 
-type TabType = 'users' | 'roles' | 'teams' | 'permissions' | 'team-permissions';
+type TabType = 'users' | 'roles' | 'teams' | 'permissions';
 type UserStatusTab = 'active' | 'deleted';
 type BinaryChoice = 'yes' | 'no' | '';
 
@@ -317,12 +317,15 @@ export default function UsersAdminPage() {
   }>>([]);
 
   useEffect(() => {
+    if (authLoading || permissionLoading || !currentUser || !profile) {
+      return;
+    }
+
     const requestedTab = (searchParams.get('tab') || 'users') as TabType;
     const validTabs: TabType[] = [
       'users',
       ...(canManageRoleDefinitions ? (['roles', 'teams'] as const) : []),
       ...(canEditRolePermissions ? (['permissions'] as const) : []),
-      ...(isActualSuperAdmin ? (['team-permissions'] as const) : []),
     ];
     if (validTabs.includes(requestedTab)) {
       setActiveTab(requestedTab);
@@ -330,7 +333,16 @@ export default function UsersAdminPage() {
     }
     setActiveTab('users');
     router.replace('/admin/users?tab=users', { scroll: false });
-  }, [canEditRolePermissions, canManageRoleDefinitions, isActualSuperAdmin, searchParams, router]);
+  }, [
+    authLoading,
+    permissionLoading,
+    currentUser,
+    profile,
+    canEditRolePermissions,
+    canManageRoleDefinitions,
+    searchParams,
+    router,
+  ]);
 
   function handleTabChange(nextTab: TabType) {
     setActiveTab(nextTab);
@@ -1256,7 +1268,7 @@ export default function UsersAdminPage() {
   }
 
   return (
-    <AppPageShell width="wide">
+    <AppPageShell width="wide" className="2xl:max-w-[92rem]">
       {/* Header */}
       <div className="bg-slate-900 rounded-lg p-6 border border-border">
         <div className="flex items-center justify-between">
@@ -1281,9 +1293,7 @@ export default function UsersAdminPage() {
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as TabType)} className="space-y-6">
         <TabsList className={`grid w-full ${
-          isActualSuperAdmin
-            ? 'max-w-3xl grid-cols-5'
-            : canEditRolePermissions
+          canEditRolePermissions
               ? 'max-w-2xl grid-cols-4'
               : canManageRoleDefinitions
                 ? 'max-w-xl grid-cols-3'
@@ -1321,15 +1331,6 @@ export default function UsersAdminPage() {
             >
               <Shield className="h-4 w-4" />
               Permissions
-            </TabsTrigger>
-          )}
-          {isActualSuperAdmin && (
-            <TabsTrigger
-              value="team-permissions"
-              className="gap-2 data-[state=active]:bg-red-600 data-[state=active]:text-white text-red-200 hover:text-red-100"
-            >
-              <AlertTriangle className="h-4 w-4" />
-              Team Fallback
             </TabsTrigger>
           )}
         </TabsList>
@@ -2573,11 +2574,6 @@ export default function UsersAdminPage() {
         {canEditRolePermissions && (
           <TabsContent value="permissions">
             <RoleManagement />
-          </TabsContent>
-        )}
-        {isActualSuperAdmin && (
-          <TabsContent value="team-permissions">
-            <RoleManagement mode="team-fallback" />
           </TabsContent>
         )}
       </Tabs>

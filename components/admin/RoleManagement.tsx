@@ -1,6 +1,7 @@
 'use client';
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,31 +20,45 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Check, ChevronLeft, ChevronRight, Loader2, LockKeyhole, Minus } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Check, Loader2, LockKeyhole, Minus } from 'lucide-react';
 import { toast } from 'sonner';
 import { adminNavItems, employeeNavItems, managerNavItems } from '@/lib/config/navigation';
 import { getRoleSortPriority } from '@/lib/config/roles-core';
+import {
+  computeQuickEditFloatingPosition,
+  type FloatingPositionResult,
+} from '@/lib/ui/quick-edit-floating-position';
 import type {
   ModuleName,
   PermissionAccessLevel,
   PermissionsAuditInfo,
   PermissionModuleMatrixColumn,
-  PermissionTierRole,
-  TeamPermissionMatrixRow,
   UpdateUserPermissionLevelsRequest,
+  UserPermissionAssignableRole,
+  UserPermissionTeamDefaultRow,
   UserPermissionMatrixRow,
 } from '@/types/roles';
 import { MODULE_CSS_VAR, PERMISSION_LEVEL_LABELS } from '@/types/roles';
 import { cn } from '@/lib/utils';
 
-/** Vertical rule between job-role tier columns; matches matrix wrapper border (header + full height). */
-const TIER_DIVIDER_CLASS = 'border-l border-slate-700';
 const MODULE_GROUP_DIVIDER_CLASS = 'border-l border-slate-600/20';
 const PERMISSION_LEVELS: PermissionAccessLevel[] = [0, 1, 2, 3, 4, 5];
 const NAVBAR_OFFSET_PX = 68;
-const USER_COLUMN_WIDTH_PX = 280;
-const MODULE_COLUMN_WIDTH_PX = 42;
-const MODULE_HEADER_HEIGHT_PX = 118;
+const USER_COLUMN_WIDTH_PX = 180;
+const FLOATING_MODULE_HEADER_HEIGHT_PX = 96;
+const FLOATING_HEADER_HIDDEN_TRANSFORM = 'translate3d(0, -12px, 0)';
+const FLOATING_HEADER_VISIBLE_TRANSFORM = 'translate3d(0, 0, 0)';
+const MATRIX_TOOLTIP_CLASS = 'w-56 max-w-[calc(100vw-2rem)] text-xs leading-snug';
+const MATRIX_DETAIL_TOOLTIP_CLASS = 'w-64 max-w-[calc(100vw-2rem)] text-xs leading-snug';
+const UNSAVED_PERMISSIONS_TOAST_ID = 'permissions-unsaved-changes';
+const HIDDEN_MATRIX_MODULES = new Set<ModuleName>(['reminders']);
 const DASHBOARD_MODULE_ORDER = [
   ...employeeNavItems,
   ...managerNavItems,
@@ -64,9 +79,14 @@ type PendingUserLevelChange = {
   requiresSensitivePin: boolean;
 };
 
-interface RoleManagementProps {
-  mode?: 'users' | 'team-fallback';
-}
+type PendingTeamDefaultChange = {
+  teamId: string;
+  teamName: string;
+  moduleName: ModuleName;
+  moduleDisplayName: string;
+  fromEnabled: boolean;
+  toEnabled: boolean;
+};
 
 function getModuleColor(mod: ModuleName): string {
   return `hsl(var(${MODULE_CSS_VAR[mod]}))`;
@@ -80,13 +100,6 @@ function isYellowModule(mod: ModuleName): boolean {
   return MODULE_CSS_VAR[mod] === '--avs-yellow';
 }
 
-function getLevelOverlayClass(level: PermissionAccessLevel): string {
-  if (level === 1) return 'bg-white/20';
-  if (level === 2) return 'bg-white/10';
-  if (level === 4) return 'bg-black/10';
-  return '';
-}
-
 function getUserPermissionRolePriority(user: UserPermissionMatrixRow): number {
   if (user.is_locked_admin || user.role_class === 'admin' || user.role_name === 'admin') {
     return getRoleSortPriority('admin');
@@ -94,63 +107,144 @@ function getUserPermissionRolePriority(user: UserPermissionMatrixRow): number {
   return getRoleSortPriority(user.role_name || user.role_class || '');
 }
 
+function getLevelTextSizeClass(level: PermissionAccessLevel): string {
+  if (level === 1) return 'text-xs';
+  if (level === 2) return 'text-sm';
+  if (level === 3) return 'text-base';
+  if (level === 4) return 'text-lg';
+  if (level === 5) return 'text-xl';
+  return 'text-sm';
+}
+
+function getPermissionKeyRoleBadge(level: PermissionAccessLevel): {
+  label: string;
+  variant: 'destructive' | 'outline' | 'warning' | 'secondary';
+  className?: string;
+} | null {
+  if (level === 1) return { label: 'Contractor', variant: 'secondary' };
+  if (level === 2) return { label: 'Employee', variant: 'secondary' };
+  if (level === 3) {
+    return {
+      label: 'Supervisor',
+      variant: 'outline',
+      className: 'border-sky-400/50 bg-sky-500/20 text-sky-200 hover:bg-sky-500/30',
+    };
+  }
+  if (level === 4) return { label: 'Manager', variant: 'warning' };
+  if (level === 5) return { label: 'Admin', variant: 'destructive' };
+  return null;
+}
+
 function getUserPermissionTeamSortName(user: UserPermissionMatrixRow): string {
   return user.team_name || user.team_id || 'ZZZ Unassigned';
 }
 
-function formatEmployeeIdBadge(employeeId: string): string {
-  return employeeId.length > 6 ? `${employeeId.slice(0, 6)}...` : employeeId;
+function getRoleDefaultLevelForUser(
+  user: UserPermissionMatrixRow,
+  module: PermissionModuleMatrixColumn,
+  teamEnabled: boolean
+): PermissionAccessLevel {
+  if (user.is_locked_admin) return 5;
+  if (module.requires_full_access_role) return 0;
+  if (!teamEnabled || typeof user.role_hierarchy_rank !== 'number') return 0;
+  if (user.role_hierarchy_rank < module.enforced_minimum_access_level) return 0;
+  return user.role_hierarchy_rank === 5 ? 5
+    : user.role_hierarchy_rank === 4 ? 4
+      : user.role_hierarchy_rank === 3 ? 3
+        : user.role_hierarchy_rank === 2 ? 2
+          : user.role_hierarchy_rank === 1 ? 1
+            : 0;
 }
 
-export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
-  const [roles, setRoles] = useState<PermissionTierRole[]>([]);
+function getAllowedUserPermissionLevels(
+  user: UserPermissionMatrixRow,
+  module: PermissionModuleMatrixColumn
+): PermissionAccessLevel[] {
+  if (user.is_locked_admin) return [5];
+  if (module.requires_full_access_role) return [0];
+  return PERMISSION_LEVELS.filter((level) => level === 0 || level >= module.enforced_minimum_access_level);
+}
+
+function isUserPermissionLevelAllowed(
+  user: UserPermissionMatrixRow,
+  module: PermissionModuleMatrixColumn,
+  level: PermissionAccessLevel
+): boolean {
+  return getAllowedUserPermissionLevels(user, module).includes(level);
+}
+
+function matchesUserPermissionRole(user: UserPermissionMatrixRow, expectedName: string): boolean {
+  const normalized = expectedName.trim().toLowerCase();
+  return [user.role_name, user.role_display_name]
+    .filter(Boolean)
+    .some((value) => String(value).trim().toLowerCase() === normalized);
+}
+
+function getUserPermissionRoleBadge(user: UserPermissionMatrixRow): {
+  label: string;
+  variant: 'destructive' | 'outline' | 'warning' | 'secondary';
+  className?: string;
+} {
+  if (user.is_super_admin || user.email === 'admin@mpdee.co.uk') {
+    return { label: 'SuperAdmin', variant: 'destructive' };
+  }
+
+  if (matchesUserPermissionRole(user, 'supervisor')) {
+    return {
+      label: user.role_display_name || 'Supervisor',
+      variant: 'outline',
+      className: 'border-sky-400/50 bg-sky-500/20 text-sky-200 hover:bg-sky-500/30',
+    };
+  }
+
+  if (user.is_locked_admin || user.role_class === 'admin' || user.role_name === 'admin') {
+    return { label: user.role_display_name || 'Administrator', variant: 'destructive' };
+  }
+
+  if (user.role_class === 'manager') {
+    return { label: user.role_display_name || 'Manager', variant: 'warning' };
+  }
+
+  return { label: user.role_display_name || 'No Role', variant: 'secondary' };
+}
+
+function hideFloatingHeaderOverlay(overlay: HTMLDivElement): void {
+  overlay.style.opacity = '0';
+  overlay.style.transform = FLOATING_HEADER_HIDDEN_TRANSFORM;
+  overlay.setAttribute('aria-hidden', 'true');
+}
+
+function showFloatingHeaderOverlay(overlay: HTMLDivElement): void {
+  overlay.style.opacity = '1';
+  overlay.style.transform = FLOATING_HEADER_VISIBLE_TRANSFORM;
+  overlay.setAttribute('aria-hidden', 'false');
+}
+
+export function RoleManagement() {
   const [modules, setModules] = useState<PermissionModuleMatrixColumn[]>([]);
-  const [teams, setTeams] = useState<TeamPermissionMatrixRow[]>([]);
+  const [userTeams, setUserTeams] = useState<UserPermissionTeamDefaultRow[]>([]);
+  const [assignableRoles, setAssignableRoles] = useState<UserPermissionAssignableRole[]>([]);
   const [users, setUsers] = useState<UserPermissionMatrixRow[]>([]);
   const [audit, setAudit] = useState<PermissionsAuditInfo | null>(null);
-  const [loading, setLoading] = useState(true);
   const [userMatrixLoading, setUserMatrixLoading] = useState(true);
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [pendingUserChanges, setPendingUserChanges] = useState<Record<string, PendingUserLevelChange>>({});
+  const [pendingTeamDefaultChanges, setPendingTeamDefaultChanges] = useState<Record<string, PendingTeamDefaultChange>>({});
   const [confirmUserSaveOpen, setConfirmUserSaveOpen] = useState(false);
   const [savingUserLevels, setSavingUserLevels] = useState(false);
-  const [savingCells, setSavingCells] = useState<Set<string>>(new Set());
-  const [movingModules, setMovingModules] = useState<Set<string>>(new Set());
+  const [quickRoleTarget, setQuickRoleTarget] = useState<{ userId: string; triggerElement: HTMLElement } | null>(null);
+  const [quickRoleValue, setQuickRoleValue] = useState('');
+  const [quickRoleSaving, setQuickRoleSaving] = useState(false);
+  const [quickRolePosition, setQuickRolePosition] = useState<FloatingPositionResult | null>(null);
+  const [quickRolePanelReady, setQuickRolePanelReady] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   const userMatrixViewportRef = useRef<HTMLDivElement | null>(null);
   const userMatrixHeaderRef = useRef<HTMLTableSectionElement | null>(null);
   const floatingHeaderRef = useRef<HTMLDivElement | null>(null);
   const floatingHeaderModulesViewportRef = useRef<HTMLDivElement | null>(null);
   const floatingHeaderTrackRef = useRef<HTMLDivElement | null>(null);
   const floatingHeaderFrameRef = useRef<number | null>(null);
-  const abortControllers = useRef<Map<string, AbortController>>(new Map());
-  const pendingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
-  const pendingCells = useRef<Map<string, Set<string>>>(new Map());
-  const inflightCellKeys = useRef<Map<string, Set<string>>>(new Map());
-  const teamsRef = useRef(teams);
-  const modulesRef = useRef(modules);
-  teamsRef.current = teams;
-  modulesRef.current = modules;
-
-  const fetchMatrix = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await fetch('/api/admin/permissions/matrix', { cache: 'no-store' });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch team permission matrix');
-      }
-
-      setRoles(data.roles ?? []);
-      setModules(data.modules ?? []);
-      setTeams(data.teams ?? []);
-    } catch (error) {
-      console.error('Error fetching team permission matrix:', error);
-      toast.error('Failed to load team permission matrix');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const quickRolePanelRef = useRef<HTMLDivElement | null>(null);
 
   const fetchUserMatrix = useCallback(async () => {
     try {
@@ -162,9 +256,13 @@ export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
         throw new Error(data.error || 'Failed to fetch user permission matrix');
       }
 
+      setModules(data.modules ?? []);
       setUsers(data.users ?? []);
+      setUserTeams(data.teams ?? []);
+      setAssignableRoles(data.assignable_roles ?? []);
       setAudit(data.audit ?? null);
       setPendingUserChanges({});
+      setPendingTeamDefaultChanges({});
     } catch (error) {
       console.error('Error fetching user permission matrix:', error);
       toast.error('Failed to load user permission matrix');
@@ -174,33 +272,129 @@ export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
   }, []);
 
   useEffect(() => {
-    fetchMatrix();
-    if (mode === 'users') {
-      fetchUserMatrix();
-    }
-  }, [fetchMatrix, fetchUserMatrix, mode]);
+    setIsMounted(true);
+  }, []);
 
-  const groupedModules = useMemo(
-    () =>
-      roles
-        .map((role) => ({
-          role,
-          modules: modules.filter((module) => module.minimum_role_id === role.id),
-        }))
-        .filter((group) => group.modules.length > 0),
-    [roles, modules]
+  useEffect(() => {
+    fetchUserMatrix();
+  }, [fetchUserMatrix]);
+
+  const quickRoleUser = useMemo(
+    () => (quickRoleTarget ? users.find((user) => user.id === quickRoleTarget.userId) || null : null),
+    [quickRoleTarget, users]
   );
 
+  const closeQuickRoleEdit = useCallback(() => {
+    setQuickRoleTarget(null);
+    setQuickRoleValue('');
+    setQuickRolePosition(null);
+    setQuickRolePanelReady(false);
+  }, []);
+
+  const updateQuickRolePosition = useCallback(() => {
+    if (!quickRoleTarget || !quickRolePanelRef.current) return;
+    if (!document.body.contains(quickRoleTarget.triggerElement)) {
+      closeQuickRoleEdit();
+      return;
+    }
+
+    const triggerRect = quickRoleTarget.triggerElement.getBoundingClientRect();
+    const panelRect = quickRolePanelRef.current.getBoundingClientRect();
+    setQuickRolePosition(
+      computeQuickEditFloatingPosition({
+        triggerRect: {
+          top: triggerRect.top,
+          left: triggerRect.left,
+          right: triggerRect.right,
+          bottom: triggerRect.bottom,
+          width: triggerRect.width,
+          height: triggerRect.height,
+        },
+        panelSize: {
+          width: panelRect.width,
+          height: panelRect.height,
+        },
+        viewport: {
+          width: window.innerWidth,
+          height: window.innerHeight,
+          scrollX: window.scrollX,
+          scrollY: window.scrollY,
+        },
+      })
+    );
+    setQuickRolePanelReady(true);
+  }, [closeQuickRoleEdit, quickRoleTarget]);
+
+  useLayoutEffect(() => {
+    if (!quickRoleTarget || !quickRoleUser) return;
+    setQuickRolePanelReady(false);
+    updateQuickRolePosition();
+  }, [quickRoleTarget, quickRoleUser, updateQuickRolePosition]);
+
+  useEffect(() => {
+    if (!quickRoleTarget) return;
+
+    const handleViewportChange = () => updateQuickRolePosition();
+    window.addEventListener('resize', handleViewportChange);
+    window.addEventListener('scroll', handleViewportChange, true);
+
+    return () => {
+      window.removeEventListener('resize', handleViewportChange);
+      window.removeEventListener('scroll', handleViewportChange, true);
+    };
+  }, [quickRoleTarget, updateQuickRolePosition]);
+
+  useEffect(() => {
+    if (!quickRoleTarget || !quickRolePanelRef.current || typeof ResizeObserver === 'undefined') return;
+
+    const observer = new ResizeObserver(() => {
+      updateQuickRolePosition();
+    });
+    observer.observe(quickRolePanelRef.current);
+
+    return () => observer.disconnect();
+  }, [quickRoleTarget, updateQuickRolePosition]);
+
+  useEffect(() => {
+    if (!quickRoleTarget) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const targetNode = event.target as Node | null;
+      if (!targetNode) return;
+      if (targetNode instanceof Element && targetNode.closest('.quick-edit-select-content')) return;
+      if (quickRolePanelRef.current?.contains(targetNode)) return;
+      if (quickRoleTarget.triggerElement.contains(targetNode)) return;
+      closeQuickRoleEdit();
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeQuickRoleEdit();
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [closeQuickRoleEdit, quickRoleTarget]);
+
   const orderedUserModules = useMemo(() => {
-    const byModuleName = new Map(modules.map((module) => [module.module_name, module]));
+    const visibleModules = modules.filter((module) => !HIDDEN_MATRIX_MODULES.has(module.module_name));
+    const byModuleName = new Map(visibleModules.map((module) => [module.module_name, module]));
     const ordered = DASHBOARD_MODULE_ORDER
       .map((moduleName) => byModuleName.get(moduleName))
       .filter((module): module is PermissionModuleMatrixColumn => Boolean(module));
     const orderedNames = new Set(ordered.map((module) => module.module_name));
-    const remaining = modules.filter((module) => !orderedNames.has(module.module_name));
+    const remaining = visibleModules.filter((module) => !orderedNames.has(module.module_name));
 
     return [...ordered, ...remaining];
   }, [modules]);
+  const userTeamById = useMemo(
+    () => new Map(userTeams.map((team) => [team.id, team])),
+    [userTeams]
+  );
 
   const filteredUsers = useMemo(() => {
     const query = userSearchQuery.trim().toLowerCase();
@@ -232,6 +426,12 @@ export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
     () => Object.values(pendingUserChanges),
     [pendingUserChanges]
   );
+  const pendingTeamDefaultChangeList = useMemo(
+    () => Object.values(pendingTeamDefaultChanges),
+    [pendingTeamDefaultChanges]
+  );
+  const hasPendingPermissionChanges =
+    pendingUserChangeList.length > 0 || pendingTeamDefaultChangeList.length > 0;
 
   const updateFloatingHeaderNow = useCallback(() => {
     const viewport = userMatrixViewportRef.current;
@@ -239,8 +439,8 @@ export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
     const overlay = floatingHeaderRef.current;
     const moduleViewport = floatingHeaderModulesViewportRef.current;
     const track = floatingHeaderTrackRef.current;
-    if (mode !== 'users' || !viewport || !header || !overlay || !moduleViewport || !track) {
-      if (overlay) overlay.style.display = 'none';
+    if (!viewport || !header || !overlay || !moduleViewport || !track) {
+      if (overlay) hideFloatingHeaderOverlay(overlay);
       return;
     }
 
@@ -248,22 +448,22 @@ export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
     const headerRect = header.getBoundingClientRect();
     const visible =
       headerRect.bottom <= NAVBAR_OFFSET_PX &&
-      viewportRect.bottom > NAVBAR_OFFSET_PX + MODULE_HEADER_HEIGHT_PX &&
+      viewportRect.bottom > NAVBAR_OFFSET_PX + FLOATING_MODULE_HEADER_HEIGHT_PX &&
       viewportRect.top < window.innerHeight;
 
     if (!visible) {
-      overlay.style.display = 'none';
+      hideFloatingHeaderOverlay(overlay);
       return;
     }
 
     const left = Math.max(viewportRect.left, 0);
     const width = Math.min(viewportRect.width, window.innerWidth - left);
-    overlay.style.display = 'block';
     overlay.style.left = `${left}px`;
     overlay.style.width = `${width}px`;
+    showFloatingHeaderOverlay(overlay);
     moduleViewport.style.width = `${Math.max(width - USER_COLUMN_WIDTH_PX, 0)}px`;
-    track.style.transform = `translate3d(-${viewport.scrollLeft}px, 0, 0)`;
-  }, [mode]);
+    track.style.transform = 'translate3d(0, 0, 0)';
+  }, []);
 
   const scheduleFloatingHeaderUpdate = useCallback(() => {
     if (floatingHeaderFrameRef.current !== null) return;
@@ -275,8 +475,6 @@ export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
   }, [updateFloatingHeaderNow]);
 
   useEffect(() => {
-    if (mode !== 'users') return;
-
     const viewport = userMatrixViewportRef.current;
     const overlay = floatingHeaderRef.current;
     scheduleFloatingHeaderUpdate();
@@ -294,185 +492,56 @@ export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
         floatingHeaderFrameRef.current = null;
       }
       if (overlay) {
-        overlay.style.display = 'none';
+        hideFloatingHeaderOverlay(overlay);
       }
     };
-  }, [mode, orderedUserModules.length, filteredUsers.length, scheduleFloatingHeaderUpdate]);
+  }, [orderedUserModules.length, filteredUsers.length, scheduleFloatingHeaderUpdate]);
 
-  const flushTeamPermissions = useCallback(
-    async (teamId: string) => {
-      const cellsForTeam = pendingCells.current.get(teamId);
-      if (!cellsForTeam || cellsForTeam.size === 0) return;
+  const openQuickRoleEdit = useCallback((user: UserPermissionMatrixRow, triggerElement: HTMLElement) => {
+    setQuickRolePosition(null);
+    setQuickRolePanelReady(false);
+    setQuickRoleTarget({ userId: user.id, triggerElement });
+    setQuickRoleValue(user.role_id || '');
+  }, []);
 
-      const prevController = abortControllers.current.get(teamId);
-      if (prevController) prevController.abort();
+  const handleQuickRoleSave = useCallback(async () => {
+    if (!quickRoleUser) return;
 
-      const controller = new AbortController();
-      abortControllers.current.set(teamId, controller);
+    try {
+      setQuickRoleSaving(true);
+      const response = await fetch(`/api/admin/users/${quickRoleUser.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: quickRoleUser.email,
+          full_name: quickRoleUser.full_name,
+          phone_number: quickRoleUser.phone_number,
+          employee_id: quickRoleUser.employee_id,
+          role_id: quickRoleValue || null,
+          line_manager_id: quickRoleUser.line_manager_id || null,
+          team_id: quickRoleUser.team_id || null,
+        }),
+      });
+      const result = await response.json();
 
-      const currentTeam = teamsRef.current.find((team) => team.id === teamId);
-      if (!currentTeam) return;
-
-      const cellKeys = new Set(cellsForTeam);
-      const prevInflight = inflightCellKeys.current.get(teamId);
-      if (prevInflight) {
-        prevInflight.forEach((cellKey) => cellKeys.add(cellKey));
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update user role');
       }
-      inflightCellKeys.current.set(teamId, cellKeys);
-      pendingCells.current.delete(teamId);
 
-      try {
-        const permissionsArray = modulesRef.current.map((module) => ({
-          module_name: module.module_name,
-          enabled: currentTeam.permissions[module.module_name],
-        }));
-
-        const response = await fetch(`/api/admin/permissions/matrix/${teamId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ permissions: permissionsArray }),
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.error || 'Failed to update team permissions');
-        }
-      } catch (error) {
-        if ((error as Error).name === 'AbortError') return;
-
-        toast.error(`Failed to update permissions for ${currentTeam.name}`);
-        fetchMatrix();
-      } finally {
-        if (abortControllers.current.get(teamId) === controller) {
-          setSavingCells((prev) => {
-            const next = new Set(prev);
-            cellKeys.forEach((cellKey) => next.delete(cellKey));
-            return next;
-          });
-          abortControllers.current.delete(teamId);
-          inflightCellKeys.current.delete(teamId);
-        }
-      }
-    },
-    [fetchMatrix]
-  );
-
-  const handleTogglePermission = useCallback(
-    (team: TeamPermissionMatrixRow, moduleName: ModuleName, newValue: boolean) => {
-      const cellKey = `${team.id}:${moduleName}`;
-
-      setTeams((prev) =>
-        prev.map((row) =>
-          row.id === team.id
-            ? {
-                ...row,
-                permissions: {
-                  ...row.permissions,
-                  [moduleName]: newValue,
-                },
-              }
-            : row
-        )
-      );
-
-      setSavingCells((prev) => new Set(prev).add(cellKey));
-
-      if (!pendingCells.current.has(team.id)) {
-        pendingCells.current.set(team.id, new Set());
-      }
-      pendingCells.current.get(team.id)!.add(cellKey);
-
-      const existingTimer = pendingTimers.current.get(team.id);
-      if (existingTimer) clearTimeout(existingTimer);
-
-      pendingTimers.current.set(
-        team.id,
-        setTimeout(() => {
-          pendingTimers.current.delete(team.id);
-          flushTeamPermissions(team.id);
-        }, 300)
-      );
-    },
-    [flushTeamPermissions]
-  );
-
-  const handleShiftModule = useCallback(
-    async (module: PermissionModuleMatrixColumn, direction: 'left' | 'right') => {
-      setMovingModules((prev) => new Set(prev).add(module.module_name));
-
-      try {
-        const response = await fetch(`/api/admin/permissions/modules/${module.module_name}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ direction }),
-        });
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to move module');
-        }
-
-        toast.success(
-          `${module.display_name} moved ${direction === 'left' ? 'left' : 'right'} into ${data.module.minimum_role_name}`
-        );
-        await fetchMatrix();
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Failed to move module');
-      } finally {
-        setMovingModules((prev) => {
-          const next = new Set(prev);
-          next.delete(module.module_name);
-          return next;
-        });
-      }
-    },
-    [fetchMatrix]
-  );
-
-  const handleToggleSensitivePin = useCallback(
-    async (module: PermissionModuleMatrixColumn) => {
-      const nextValue = !module.requires_sensitive_pin;
-      setMovingModules((prev) => new Set(prev).add(module.module_name));
-
-      try {
-        const response = await fetch(`/api/admin/permissions/modules/${module.module_name}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ requires_sensitive_pin: nextValue }),
-        });
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to update sensitive PIN requirement');
-        }
-
-        setModules((previous) =>
-          previous.map((entry) =>
-            entry.module_name === module.module_name
-              ? { ...entry, requires_sensitive_pin: nextValue }
-              : entry
-          )
-        );
-        toast.success(
-          `${module.display_name} sensitive PIN ${nextValue ? 'enabled' : 'disabled'}`
-        );
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Failed to update sensitive PIN requirement');
-      } finally {
-        setMovingModules((prev) => {
-          const next = new Set(prev);
-          next.delete(module.module_name);
-          return next;
-        });
-      }
-    },
-    []
-  );
+      closeQuickRoleEdit();
+      await fetchUserMatrix();
+      toast.success('Job role updated');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update user role');
+    } finally {
+      setQuickRoleSaving(false);
+    }
+  }, [closeQuickRoleEdit, fetchUserMatrix, quickRoleUser, quickRoleValue]);
 
   const handleUserLevelChange = useCallback(
     (user: UserPermissionMatrixRow, module: PermissionModuleMatrixColumn, nextLevel: PermissionAccessLevel) => {
       if (user.is_locked_admin) return;
+      if (!isUserPermissionLevelAllowed(user, module, nextLevel)) return;
 
       const currentLevel = user.permissions[module.module_name] ?? 0;
       if (currentLevel === nextLevel) return;
@@ -520,15 +589,84 @@ export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
   const handleCycleUserLevel = useCallback(
     (user: UserPermissionMatrixRow, module: PermissionModuleMatrixColumn) => {
       const currentLevel = user.permissions[module.module_name] ?? 0;
-      const currentIndex = PERMISSION_LEVELS.indexOf(currentLevel);
-      const nextLevel = PERMISSION_LEVELS[(currentIndex + 1) % PERMISSION_LEVELS.length] ?? 0;
+      const allowedLevels = getAllowedUserPermissionLevels(user, module);
+      const currentIndex = allowedLevels.indexOf(currentLevel);
+      const nextLevel = allowedLevels[(currentIndex + 1) % allowedLevels.length] ?? allowedLevels[0] ?? 0;
       handleUserLevelChange(user, module, nextLevel);
     },
     [handleUserLevelChange]
   );
 
+  const handleTeamDefaultChange = useCallback(
+    (team: UserPermissionTeamDefaultRow, module: PermissionModuleMatrixColumn, nextEnabled: boolean) => {
+      const currentEnabled = team.permissions[module.module_name] ?? false;
+      if (currentEnabled === nextEnabled) return;
+
+      const changeKey = `${team.id}:${module.module_name}`;
+      setUserTeams((previous) =>
+        previous.map((entry) =>
+          entry.id === team.id
+            ? {
+                ...entry,
+                permissions: {
+                  ...entry.permissions,
+                  [module.module_name]: nextEnabled,
+                },
+              }
+            : entry
+        )
+      );
+
+      setUsers((previous) =>
+        previous.map((entry) => {
+          if (entry.team_id !== team.id || entry.is_locked_admin) return entry;
+
+          const entryCurrentLevel = entry.permissions[module.module_name] ?? 0;
+          const currentDefaultLevel = getRoleDefaultLevelForUser(entry, module, currentEnabled);
+          const nextDefaultLevel = getRoleDefaultLevelForUser(entry, module, nextEnabled);
+          return {
+            ...entry,
+            inherited_permissions: {
+              ...entry.inherited_permissions,
+              [module.module_name]: nextDefaultLevel,
+            },
+            permissions:
+              entryCurrentLevel === currentDefaultLevel
+                ? {
+                    ...entry.permissions,
+                    [module.module_name]: nextDefaultLevel,
+                  }
+                : entry.permissions,
+          };
+        })
+      );
+
+      setPendingTeamDefaultChanges((previous) => {
+        const existing = previous[changeKey];
+        const fromEnabled = existing?.fromEnabled ?? currentEnabled;
+        const next = { ...previous };
+
+        if (fromEnabled === nextEnabled) {
+          delete next[changeKey];
+          return next;
+        }
+
+        next[changeKey] = {
+          teamId: team.id,
+          teamName: team.name,
+          moduleName: module.module_name,
+          moduleDisplayName: module.display_name,
+          fromEnabled,
+          toEnabled: nextEnabled,
+        };
+        return next;
+      });
+    },
+    []
+  );
+
   const handleSaveUserLevels = useCallback(async () => {
-    if (pendingUserChangeList.length === 0) return;
+    if (!hasPendingPermissionChanges) return;
 
     try {
       setSavingUserLevels(true);
@@ -537,6 +675,11 @@ export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
           user_id: change.userId,
           module_name: change.moduleName,
           access_level: change.toLevel,
+        })),
+        team_default_updates: pendingTeamDefaultChangeList.map((change) => ({
+          team_id: change.teamId,
+          module_name: change.moduleName,
+          enabled: change.toEnabled,
         })),
       };
 
@@ -551,7 +694,7 @@ export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
         throw new Error(data.error || 'Failed to update user permission levels');
       }
 
-      toast.success('User permission levels updated');
+      toast.success('Permission levels updated');
       setConfirmUserSaveOpen(false);
       await fetchUserMatrix();
     } catch (error) {
@@ -559,7 +702,31 @@ export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
     } finally {
       setSavingUserLevels(false);
     }
-  }, [fetchUserMatrix, pendingUserChangeList]);
+  }, [fetchUserMatrix, hasPendingPermissionChanges, pendingTeamDefaultChangeList, pendingUserChangeList]);
+
+  useEffect(() => {
+    if (!hasPendingPermissionChanges) {
+      toast.dismiss(UNSAVED_PERMISSIONS_TOAST_ID);
+      return;
+    }
+
+    const changeCount = pendingUserChangeList.length + pendingTeamDefaultChangeList.length;
+    toast.warning('Unsaved permission changes', {
+      id: UNSAVED_PERMISSIONS_TOAST_ID,
+      description: `${changeCount} change${changeCount === 1 ? '' : 's'} will not take effect until saved.`,
+      duration: Infinity,
+      action: {
+        label: 'Save',
+        onClick: () => setConfirmUserSaveOpen(true),
+      },
+    });
+  }, [hasPendingPermissionChanges, pendingTeamDefaultChangeList.length, pendingUserChangeList.length]);
+
+  useEffect(() => {
+    return () => {
+      toast.dismiss(UNSAVED_PERMISSIONS_TOAST_ID);
+    };
+  }, []);
 
   function getModuleWarnings(module: PermissionModuleMatrixColumn): string[] {
     if (!audit) return [];
@@ -573,120 +740,6 @@ export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
     });
   }
 
-  function renderModuleHeader(module: PermissionModuleMatrixColumn, isFirstInTierGroup: boolean) {
-    const currentIndex = roles.findIndex((role) => role.id === module.minimum_role_id);
-    const canMoveLeft = currentIndex > 0;
-    const canMoveRight = currentIndex >= 0 && currentIndex < roles.length - 1;
-    const isMoving = movingModules.has(module.module_name);
-
-    return (
-      <th
-        key={module.module_name}
-        className={cn('p-0 align-bottom group relative', isFirstInTierGroup && TIER_DIVIDER_CLASS)}
-        style={{ width: 34, minWidth: 34, maxWidth: 34, height: 110 }}
-      >
-        <div className="flex items-end justify-center h-full pb-2 relative">
-          {canMoveLeft && (
-            <button
-              type="button"
-              disabled={isMoving}
-              onClick={() => handleShiftModule(module, 'left')}
-              className="absolute left-0.5 top-1 opacity-0 group-hover:opacity-100 transition-opacity rounded bg-slate-900/90 border border-slate-700 p-0.5 text-slate-200 hover:text-white disabled:opacity-40"
-              title={`Move ${module.display_name} into the next lower tier`}
-            >
-              <ChevronLeft className="h-3 w-3" />
-            </button>
-          )}
-          {canMoveRight && (
-            <button
-              type="button"
-              disabled={isMoving}
-              onClick={() => handleShiftModule(module, 'right')}
-              className="absolute right-0.5 top-1 opacity-0 group-hover:opacity-100 transition-opacity rounded bg-slate-900/90 border border-slate-700 p-0.5 text-slate-200 hover:text-white disabled:opacity-40"
-              title={`Move ${module.display_name} into the next higher tier`}
-            >
-              <ChevronRight className="h-3 w-3" />
-            </button>
-          )}
-          <button
-            type="button"
-            disabled={isMoving}
-            onClick={() => handleToggleSensitivePin(module)}
-            className={cn(
-              'absolute left-1/2 top-1 -translate-x-1/2 rounded border p-0.5 transition-colors disabled:opacity-40',
-              module.requires_sensitive_pin
-                ? 'border-amber-400/80 bg-amber-500/20 text-amber-200'
-                : 'border-slate-700 bg-slate-900/90 text-slate-500 opacity-0 group-hover:opacity-100'
-            )}
-            title={`${module.requires_sensitive_pin ? 'Disable' : 'Enable'} sensitive PIN for ${module.display_name}`}
-          >
-            <LockKeyhole className="h-3 w-3" />
-          </button>
-          <TooltipProvider delayDuration={200}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span
-                  className="cursor-default text-[11px] font-medium tracking-wide whitespace-nowrap"
-                  style={{
-                    writingMode: 'vertical-rl',
-                    transform: 'rotate(180deg)',
-                    color: getModuleColor(module.module_name),
-                  }}
-                >
-                  {isMoving ? '...' : module.short_name}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="text-xs">
-                {module.display_name}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
-      </th>
-    );
-  }
-
-  function renderPermissionCell(
-    team: TeamPermissionMatrixRow,
-    moduleName: ModuleName,
-    isFirstInTierGroup: boolean
-  ) {
-    const cellKey = `${team.id}:${moduleName}`;
-    const isSaving = savingCells.has(cellKey);
-    const isEnabled = team.permissions[moduleName];
-    const color = getModuleColor(moduleName);
-
-    return (
-      <td
-        key={moduleName}
-        className={cn('px-0 py-0.5 text-center', isFirstInTierGroup && TIER_DIVIDER_CLASS)}
-      >
-        <button
-          type="button"
-          disabled={isSaving}
-          onClick={() => handleTogglePermission(team, moduleName, !isEnabled)}
-          className="h-6 w-6 rounded flex items-center justify-center mx-auto transition-all duration-150 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          style={
-            isSaving
-              ? { backgroundColor: 'hsl(215 20% 18%)', border: '1.5px solid hsl(215 20% 30%)' }
-              : isEnabled
-                ? { backgroundColor: color, boxShadow: `0 0 6px ${getModuleColorAlpha(moduleName, 0.25)}` }
-                : { backgroundColor: 'transparent', border: '1.5px solid hsl(215 20% 30%)' }
-          }
-          aria-label={`${moduleName} for ${team.name}: ${isSaving ? 'saving' : isEnabled ? 'enabled' : 'disabled'}`}
-        >
-          {isSaving ? (
-            <Loader2 className="h-3.5 w-3.5 text-slate-400 animate-spin" />
-          ) : isEnabled ? (
-            <Check className="h-3.5 w-3.5 text-white" />
-          ) : (
-            <Minus className="h-3 w-3 text-slate-600" />
-          )}
-        </button>
-      </td>
-    );
-  }
-
   function renderUserModuleHeader(module: PermissionModuleMatrixColumn, showModuleGroupDivider: boolean) {
     return (
       <th
@@ -695,7 +748,7 @@ export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
           'p-0 align-bottom group relative bg-slate-900/95',
           showModuleGroupDivider && MODULE_GROUP_DIVIDER_CLASS
         )}
-        style={{ width: 42, minWidth: 42, maxWidth: 42, height: 118 }}
+        style={{ height: 118 }}
       >
         <div className="flex items-end justify-center h-full pb-2 relative">
           {module.requires_sensitive_pin && (
@@ -720,10 +773,17 @@ export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
                   {module.short_name}
                 </span>
               </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-sm text-xs">
+              <TooltipContent side="top" className={MATRIX_DETAIL_TOOLTIP_CLASS}>
                 <div className="space-y-1">
                   <div className="font-medium">{module.display_name}</div>
                   <div>{module.description}</div>
+                  {module.requires_full_access_role ? (
+                    <div className="text-amber-200">Hard-coded rule: Admin/Super Admin role required.</div>
+                  ) : module.enforced_minimum_access_level > module.minimum_hierarchy_rank ? (
+                    <div className="text-amber-200">
+                      Hard-coded rule: Level {module.enforced_minimum_access_level}+ required.
+                    </div>
+                  ) : null}
                   {module.requires_sensitive_pin && (
                     <div className="text-amber-200">Sensitive PIN required after access is granted.</div>
                   )}
@@ -741,16 +801,11 @@ export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
       <div
         key={module.module_name}
         className={cn(
-          'relative flex shrink-0 items-end justify-center bg-slate-900/95 pb-2',
+          'relative flex min-w-0 flex-1 basis-0 items-end justify-center bg-slate-900/50 pb-2',
           showModuleGroupDivider && MODULE_GROUP_DIVIDER_CLASS
         )}
-        style={{ width: MODULE_COLUMN_WIDTH_PX, height: MODULE_HEADER_HEIGHT_PX }}
+        style={{ height: FLOATING_MODULE_HEADER_HEIGHT_PX }}
       >
-        {module.requires_sensitive_pin && (
-          <span className="absolute left-1/2 top-1 -translate-x-1/2 rounded border border-amber-400/80 bg-amber-500/20 p-0.5 text-amber-200">
-            <LockKeyhole className="h-3 w-3" />
-          </span>
-        )}
         <span
           className="text-[11px] font-medium tracking-wide whitespace-nowrap"
           style={{
@@ -771,11 +826,15 @@ export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
     showModuleGroupDivider: boolean
   ) {
     const level = user.permissions[module.module_name] ?? 0;
-    const pendingKey = `${user.id}:${module.module_name}`;
-    const isPending = Boolean(pendingUserChanges[pendingKey]);
     const color = level > 0 ? getModuleColor(module.module_name) : undefined;
-    const overlayClass = !user.is_locked_admin && !isPending ? getLevelOverlayClass(level) : '';
-    const useDarkText = !user.is_locked_admin && !isPending && level > 0 && isYellowModule(module.module_name);
+    const useDarkText = !user.is_locked_admin && level > 0 && isYellowModule(module.module_name);
+    const isManualOverride =
+      !user.is_locked_admin &&
+      (user.inherited_permissions[module.module_name] ?? 0) !== level;
+    const isHardRuleLocked = !user.is_locked_admin && module.requires_full_access_role;
+    const hasHigherUsableMinimum =
+      !module.requires_full_access_role &&
+      module.enforced_minimum_access_level > module.minimum_hierarchy_rank;
 
     return (
       <td
@@ -787,40 +846,53 @@ export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
             <TooltipTrigger asChild>
               <button
                 type="button"
-                disabled={user.is_locked_admin}
+                disabled={user.is_locked_admin || isHardRuleLocked}
                 onClick={() => handleCycleUserLevel(user, module)}
                 className={cn(
                   'relative h-7 w-9 overflow-hidden rounded mx-auto flex items-center justify-center text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
                   user.is_locked_admin
                     ? 'cursor-not-allowed border border-amber-500/50 bg-amber-500/15 text-amber-100'
-                    : isPending
-                      ? 'border border-avs-yellow bg-avs-yellow/20 text-avs-yellow shadow-[0_0_0_1px_rgba(250,204,21,0.25)]'
-                      : level > 0
-                        ? useDarkText ? 'text-slate-900' : 'text-white'
-                        : 'border border-slate-700 bg-transparent text-slate-500 hover:border-slate-500 hover:text-slate-300'
+                    : isHardRuleLocked
+                      ? 'cursor-not-allowed border border-slate-700 bg-transparent text-slate-600'
+                    : level > 0
+                      ? cn('border', isManualOverride ? 'border-white' : 'border-transparent', useDarkText ? 'text-slate-900' : 'text-white')
+                      : cn(
+                          'border bg-transparent text-slate-500 hover:text-slate-300',
+                          isManualOverride ? 'border-white' : 'border-slate-700 hover:border-slate-500'
+                        )
                 )}
                 style={
-                  !user.is_locked_admin && level > 0 && !isPending
+                  !user.is_locked_admin && level > 0
                     ? { backgroundColor: color, boxShadow: `0 0 6px ${getModuleColorAlpha(module.module_name, 0.2)}` }
                     : undefined
                 }
                 aria-label={`${module.display_name} for ${user.full_name || user.email || user.id}: Level ${level}`}
               >
-                {overlayClass && <span aria-hidden="true" className={cn('absolute inset-0', overlayClass)} />}
-                <span className="relative z-10">{level === 0 ? '-' : level}</span>
+                <span className={cn('relative z-10 leading-none', getLevelTextSizeClass(level))}>
+                  {level === 0 ? '-' : level}
+                </span>
               </button>
             </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-xs text-xs">
+            <TooltipContent side="top" className={MATRIX_TOOLTIP_CLASS}>
               {user.is_locked_admin ? (
                 <div>
                   Admin-role users always have Level 5. Change this user&apos;s job role to non-admin before editing module permissions.
+                </div>
+              ) : isHardRuleLocked ? (
+                <div>
+                  {module.display_name} is currently limited to Admin/Super Admin roles by hard-coded module rules.
                 </div>
               ) : (
                 <div className="space-y-1">
                   <div>
                     {module.display_name}: <span className="font-semibold">{PERMISSION_LEVEL_LABELS[level]}</span>
                   </div>
-                  <div>Click to cycle through permission levels.</div>
+                  <div>
+                    Click to cycle through allowed permission levels
+                    {hasHigherUsableMinimum
+                      ? ` (${module.enforced_minimum_access_level}+ due to module rules).`
+                      : '.'}
+                  </div>
                   {module.requires_sensitive_pin && (
                     <div className="text-amber-200">This module still requires sensitive PIN unlock.</div>
                   )}
@@ -833,89 +905,71 @@ export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
     );
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-      </div>
-    );
-  }
+  function renderTeamDefaultPermissionCell(
+    team: UserPermissionTeamDefaultRow | null,
+    module: PermissionModuleMatrixColumn,
+    showModuleGroupDivider: boolean
+  ) {
+    if (!team) {
+      return (
+        <td
+          key={module.module_name}
+          className={cn('bg-slate-950/60 px-0 py-3', showModuleGroupDivider && MODULE_GROUP_DIVIDER_CLASS)}
+        />
+      );
+    }
 
-  if (mode === 'team-fallback') {
+    const isEnabled = team.permissions[module.module_name] ?? false;
+    const color = getModuleColor(module.module_name);
+
     return (
-      <Card className="border-red-500/60 bg-red-950/30 shadow-[0_0_0_1px_rgba(239,68,68,0.15)]">
-        <CardHeader>
-          <div>
-            <CardTitle className="text-red-100">Superadmin Legacy Team Permission Matrix</CardTitle>
-            <CardDescription className="text-red-200/80">
-              Fallback defaults only. Live permissions are now controlled from the user permission levels tab.
-            </CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {teams.length === 0 || modules.length === 0 ? (
-            <div className="text-center py-8 text-red-200/80">
-              Team permission matrix is not configured yet.
-            </div>
-          ) : (
-            <div className="border border-red-500/40 rounded-lg overflow-auto bg-slate-950/70">
-              <table className="w-full text-sm table-fixed min-w-max">
-                <colgroup>
-                  <col style={{ width: 150 }} />
-                  {modules.map((module) => (
-                    <col key={module.module_name} style={{ width: 34 }} />
-                  ))}
-                </colgroup>
-                <thead>
-                  <tr className="bg-red-950/50">
-                    <th
-                      rowSpan={2}
-                      className="sticky left-0 z-10 bg-red-950 px-3 py-2 text-left text-xs font-medium text-red-100 uppercase tracking-wider align-bottom border-b border-red-500/40"
-                    >
-                      Team Name
-                    </th>
-                    {groupedModules.map((group) => (
-                      <th
-                        key={group.role.id}
-                        colSpan={group.modules.length}
-                        className={cn(
-                          'px-1 py-1 text-center text-[10px] font-semibold text-red-200/80 uppercase tracking-widest',
-                          'border-l border-red-500/40'
-                        )}
-                      >
-                        {group.role.display_name}
-                      </th>
-                    ))}
-                  </tr>
-                  <tr className="border-b border-red-500/40">
-                    {groupedModules.flatMap((group) =>
-                      group.modules.map((module, idx) => renderModuleHeader(module, idx === 0))
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {teams.map((team) => (
-                    <tr
-                      key={team.id}
-                      className="border-b border-red-500/20 hover:bg-red-950/30 transition-colors"
-                    >
-                      <td className="sticky left-0 z-10 bg-red-950/95 px-3 py-1 font-medium text-red-50 whitespace-nowrap">
-                        <div className="text-sm truncate">{team.name}</div>
-                        <div className="text-[11px] text-red-200/70 font-mono mt-0.5">{team.id}</div>
-                      </td>
-                      {groupedModules.flatMap((group) =>
-                        group.modules.map((module, idx) =>
-                          renderPermissionCell(team, module.module_name, idx === 0)
-                        )
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <td
+        key={module.module_name}
+        className={cn('bg-slate-950/60 px-0 py-3 text-center', showModuleGroupDivider && MODULE_GROUP_DIVIDER_CLASS)}
+      >
+        <TooltipProvider delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => handleTeamDefaultChange(team, module, !isEnabled)}
+                className="relative mx-auto flex h-7 w-9 items-center justify-center overflow-hidden rounded border border-black/60 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                style={
+                  isEnabled
+                    ? { backgroundColor: color, boxShadow: `0 0 6px ${getModuleColorAlpha(module.module_name, 0.2)}` }
+                    : { backgroundColor: 'transparent' }
+                }
+                aria-label={`${module.display_name} default for ${team.name}: ${isEnabled ? 'enabled' : 'disabled'}`}
+              >
+                <span aria-hidden="true" className="absolute inset-0 bg-black/60" />
+                {isEnabled ? (
+                  <Check className="relative z-10 h-3.5 w-3.5 text-white" />
+                ) : (
+                  <Minus className="relative z-10 h-3 w-3 text-slate-400" />
+                )}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className={MATRIX_DETAIL_TOOLTIP_CLASS}>
+              <div className="space-y-1">
+                <div>
+                  {team.name} default for {module.display_name}:{' '}
+                  <span className="font-semibold">{isEnabled ? 'Enabled' : 'Disabled'}</span>
+                </div>
+                <div>
+                  Click to toggle the team default. Users currently matching their job-role default will move with it; custom user levels stay unchanged.
+                </div>
+                {module.requires_full_access_role ? (
+                  <div className="text-amber-200">Only Admin/Super Admin users can use this module.</div>
+                ) : module.enforced_minimum_access_level > module.minimum_hierarchy_rank ? (
+                  <div className="text-amber-200">
+                    Users below Level {module.enforced_minimum_access_level} will remain at no access.
+                  </div>
+                ) : null}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </td>
     );
   }
 
@@ -923,12 +977,16 @@ export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
     <div className="space-y-6">
       <div
         ref={floatingHeaderRef}
-        className="pointer-events-none fixed top-[68px] z-[55] hidden overflow-hidden rounded-t-lg border border-slate-700 bg-slate-900/95 shadow-xl backdrop-blur"
-        style={{ height: MODULE_HEADER_HEIGHT_PX }}
+        aria-hidden="true"
+        className="pointer-events-none fixed top-[68px] z-[55] overflow-hidden rounded-t-lg border border-border/50 bg-slate-900/50 opacity-0 shadow-2xl backdrop-blur-xl transition-[opacity,transform] duration-200 ease-out will-change-[opacity,transform] motion-reduce:transition-none"
+        style={{
+          height: FLOATING_MODULE_HEADER_HEIGHT_PX,
+          transform: FLOATING_HEADER_HIDDEN_TRANSFORM,
+        }}
       >
         <div
-          className="absolute left-0 top-0 z-10 flex items-end bg-slate-800 px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground"
-          style={{ width: USER_COLUMN_WIDTH_PX, height: MODULE_HEADER_HEIGHT_PX }}
+          className="absolute left-0 top-0 z-10 flex items-end bg-slate-900/70 px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground"
+          style={{ width: USER_COLUMN_WIDTH_PX, height: FLOATING_MODULE_HEADER_HEIGHT_PX }}
         >
           User
         </div>
@@ -937,15 +995,12 @@ export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
           className="overflow-hidden"
           style={{
             marginLeft: USER_COLUMN_WIDTH_PX,
-            height: MODULE_HEADER_HEIGHT_PX,
+            height: FLOATING_MODULE_HEADER_HEIGHT_PX,
           }}
         >
           <div
             ref={floatingHeaderTrackRef}
-            className="flex will-change-transform"
-            style={{
-              width: orderedUserModules.length * MODULE_COLUMN_WIDTH_PX,
-            }}
+            className="flex h-full w-full will-change-transform"
           >
             {orderedUserModules.map((module, index) =>
               renderFloatingModuleHeader(module, index > 0 && index % 3 === 0)
@@ -972,36 +1027,44 @@ export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
               />
               <Button
                 type="button"
-                disabled={pendingUserChangeList.length === 0}
+                disabled={!hasPendingPermissionChanges}
                 onClick={() => setConfirmUserSaveOpen(true)}
                 className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow-hover disabled:opacity-50"
               >
                 Save Changes
-                {pendingUserChangeList.length > 0 ? ` (${pendingUserChangeList.length})` : ''}
+                {hasPendingPermissionChanges
+                  ? ` (${pendingUserChangeList.length + pendingTeamDefaultChangeList.length})`
+                  : ''}
               </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-2 rounded-lg border border-slate-700 bg-slate-950/40 p-3 text-xs text-slate-300 md:grid-cols-3">
-            {PERMISSION_LEVELS.map((level) => (
-              <div key={level} className="flex items-center gap-2">
-                <Badge
-                  variant={level === 0 ? 'outline' : level >= 4 ? 'warning' : 'secondary'}
-                  className={cn(level === 0 && 'border-slate-600 text-slate-300')}
-                >
-                  {level === 0 ? '-' : level}
-                </Badge>
-                <span>{PERMISSION_LEVEL_LABELS[level]}</span>
-              </div>
-            ))}
-          </div>
+            {PERMISSION_LEVELS.map((level) => {
+              const roleBadge = getPermissionKeyRoleBadge(level);
 
-          {audit?.matrixRule && (
-            <div className="rounded-lg border border-slate-700 bg-slate-900/60 p-3 text-sm text-muted-foreground">
-              {audit.matrixRule}
-            </div>
-          )}
+              return (
+                <div key={level} className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      'flex h-7 w-9 items-center justify-center rounded border border-white bg-transparent font-bold leading-none text-white',
+                      getLevelTextSizeClass(level)
+                    )}
+                  >
+                    {level === 0 ? '-' : level}
+                  </span>
+                  {roleBadge ? (
+                    <Badge variant={roleBadge.variant} className={cn('text-[10px]', roleBadge.className)}>
+                      {roleBadge.label}
+                    </Badge>
+                  ) : (
+                    <span>{PERMISSION_LEVEL_LABELS[level]}</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
 
           {userMatrixLoading ? (
             <div className="flex items-center justify-center py-8">
@@ -1012,12 +1075,12 @@ export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
               {userSearchQuery ? 'No users found matching your search.' : 'User permission matrix is not configured yet.'}
             </div>
           ) : (
-            <div ref={userMatrixViewportRef} className="border border-slate-700 rounded-lg overflow-x-auto">
-              <table className="w-full text-sm table-fixed min-w-max">
+            <div ref={userMatrixViewportRef} className="border border-slate-700 rounded-lg overflow-x-hidden">
+              <table className="w-full text-sm table-fixed">
                 <colgroup>
-                  <col style={{ width: 280 }} />
+                  <col style={{ width: USER_COLUMN_WIDTH_PX }} />
                   {orderedUserModules.map((module) => (
-                    <col key={module.module_name} style={{ width: 42 }} />
+                    <col key={module.module_name} />
                   ))}
                 </colgroup>
                 <thead ref={userMatrixHeaderRef} className="bg-slate-900/95">
@@ -1040,33 +1103,38 @@ export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
                       index > 0 ? (filteredUsers[index - 1]?.team_id || 'unassigned') : null;
                     const startsNewTeam = index === 0 || currentTeamKey !== previousTeamKey;
                     const teamLabel = user.team_name || 'Unassigned';
+                    const teamDefault = currentTeamKey === 'unassigned' ? null : userTeamById.get(currentTeamKey) ?? null;
+                    const roleBadge = getUserPermissionRoleBadge(user);
 
                     return (
                       <Fragment key={user.id}>
                         {startsNewTeam && (
                           <tr className="border-b border-slate-700 bg-slate-950/60 hover:bg-slate-950/60">
                             <td
-                              colSpan={orderedUserModules.length + 1}
-                              className="sticky left-0 z-20 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-400"
+                              className="sticky left-0 z-20 bg-slate-950/95 px-2 py-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400"
                             >
                               {teamLabel}
                             </td>
+                            {orderedUserModules.map((module, moduleIndex) =>
+                              renderTeamDefaultPermissionCell(teamDefault, module, moduleIndex > 0 && moduleIndex % 3 === 0)
+                            )}
                           </tr>
                         )}
                         <tr className="border-b border-slate-700/50 hover:bg-slate-800/40 transition-colors">
-                          <td className="sticky left-0 z-10 bg-slate-900/95 px-3 py-2 font-medium text-white">
-                            <div className="flex items-start justify-between gap-3">
+                          <td className="sticky left-0 z-10 bg-slate-900/95 px-2 py-2 font-medium text-white">
+                            <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
-                                <div className="truncate text-sm">{user.full_name || user.employee_id || 'Unnamed User'}</div>
+                                <div className="truncate text-xs">{user.full_name || user.employee_id || 'Unnamed User'}</div>
                                 <div className="mt-1 flex flex-wrap gap-1">
-                                  <Badge variant={user.is_locked_admin ? 'destructive' : 'secondary'} className="text-[10px]">
-                                    {user.role_display_name || 'No Role'}
-                                  </Badge>
-                                  {user.employee_id && (
-                                    <Badge variant="outline" className="border-slate-600 text-[10px] text-slate-300">
-                                      {formatEmployeeIdBadge(user.employee_id)}
+                                  <button
+                                    type="button"
+                                    onClick={(event) => openQuickRoleEdit(user, event.currentTarget)}
+                                    className="cursor-pointer"
+                                  >
+                                    <Badge variant={roleBadge.variant} className={cn('text-[9px]', roleBadge.className)}>
+                                      {roleBadge.label}
                                     </Badge>
-                                  )}
+                                  </button>
                                 </div>
                               </div>
                               {user.is_locked_admin && (
@@ -1075,7 +1143,7 @@ export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
                                     <TooltipTrigger asChild>
                                       <LockKeyhole className="mt-1 h-4 w-4 shrink-0 text-amber-300" />
                                     </TooltipTrigger>
-                                    <TooltipContent side="right" className="w-[40rem] max-w-[calc(100vw-2rem)] text-xs">
+                                    <TooltipContent side="right" className={MATRIX_TOOLTIP_CLASS}>
                                       Admin-role users are locked at Level 5. Change their job role to non-admin to edit module levels.
                                     </TooltipContent>
                                   </Tooltip>
@@ -1097,17 +1165,110 @@ export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
         </CardContent>
       </Card>
 
+      {isMounted && quickRoleTarget && quickRoleUser && createPortal(
+        <div
+          ref={quickRolePanelRef}
+          role="dialog"
+          aria-modal="false"
+          data-testid="permissions-role-quick-edit"
+          className="z-[100] w-72 max-w-[calc(100vw-1rem)] overflow-y-auto overflow-x-hidden rounded-md border border-border bg-slate-900 p-4 text-white shadow-md outline-none"
+          style={{
+            position: 'fixed',
+            top: quickRolePosition?.top ?? 8,
+            left: quickRolePosition?.left ?? 8,
+            maxHeight: quickRolePosition?.maxHeight ?? 320,
+            visibility: quickRolePanelReady ? 'visible' : 'hidden',
+          }}
+        >
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-medium">Change Job Role</p>
+              <p className="text-xs text-muted-foreground">{quickRoleUser.full_name || quickRoleUser.email}</p>
+            </div>
+
+            <Select value={quickRoleValue} onValueChange={setQuickRoleValue}>
+              <SelectTrigger className="bg-input border-border text-white data-[placeholder]:[&>span]:!text-muted-foreground">
+                <SelectValue placeholder="Select role" />
+              </SelectTrigger>
+              <SelectContent className="quick-edit-select-content">
+                {assignableRoles.map((role) => (
+                  <SelectItem key={role.id} value={role.id}>
+                    {role.display_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={closeQuickRoleEdit}
+                disabled={quickRoleSaving}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => void handleQuickRoleSave()}
+                disabled={quickRoleSaving || !quickRoleValue}
+                className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900"
+              >
+                {quickRoleSaving ? 'Saving...' : 'Save'}
+              </Button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       <Dialog open={confirmUserSaveOpen} onOpenChange={setConfirmUserSaveOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Confirm User Permission Level Changes</DialogTitle>
+            <DialogTitle>Confirm Permission Level Changes</DialogTitle>
             <DialogDescription>
-              Review the changed module levels before saving. Sensitive PIN protection remains a separate unlock step.
+              Review the changed module levels before saving. Team defaults only move users who still match the old default.
+              Sensitive PIN protection remains a separate unlock step.
             </DialogDescription>
           </DialogHeader>
 
           <div className="max-h-[60vh] space-y-4 overflow-y-auto pr-1">
+            {pendingTeamDefaultChangeList.length > 0 && (
+              <div className="rounded-lg border border-slate-700 bg-slate-950/50">
+                <div className="border-b border-slate-700/60 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  Team Default Changes
+                </div>
+                {pendingTeamDefaultChangeList.map((change) => (
+                  <div key={`${change.teamId}:${change.moduleName}`} className="border-b border-slate-700/60 p-3 last:border-b-0">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <div className="font-medium text-white">{change.teamName}</div>
+                        <div className="text-xs text-muted-foreground">{change.moduleDisplayName}</div>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Badge variant="outline" className="border-slate-600 text-slate-300">
+                          {change.fromEnabled ? 'Enabled' : 'Disabled'}
+                        </Badge>
+                        <span className="text-muted-foreground">to</span>
+                        <Badge variant={change.toEnabled ? 'secondary' : 'outline'}>
+                          {change.toEnabled ? 'Enabled' : 'Disabled'}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      Matching team members will update using their job-role default. Custom user levels will not change.
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="rounded-lg border border-slate-700 bg-slate-950/50">
+              {pendingUserChangeList.length > 0 && (
+                <div className="border-b border-slate-700/60 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  User-Level Changes
+                </div>
+              )}
               {pendingUserChangeList.slice(0, 20).map((change) => {
                 const changedModule = modules.find((entry) => entry.module_name === change.moduleName);
                 const warnings = changedModule ? getModuleWarnings(changedModule) : [];
@@ -1151,6 +1312,11 @@ export function RoleManagement({ mode = 'users' }: RoleManagementProps) {
               {pendingUserChangeList.length > 20 && (
                 <div className="p-3 text-xs text-muted-foreground">
                   Plus {pendingUserChangeList.length - 20} more changes.
+                </div>
+              )}
+              {pendingUserChangeList.length === 0 && (
+                <div className="p-3 text-xs text-muted-foreground">
+                  No direct user-level changes.
                 </div>
               )}
             </div>

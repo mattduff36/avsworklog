@@ -16,10 +16,12 @@ import {
 } from '@/types/roles';
 import {
   getUserPermissionMatrix,
+  InvalidPermissionLevelError,
   isMissingTeamPermissionSchemaError,
+  updateTeamModulePermissionDefaults,
   updateUserModulePermissionLevels,
 } from '@/lib/server/team-permissions';
-import permissionsAudit from '@/docs_private/permissions-secondary-audit.json';
+import permissionsAudit from '@/lib/config/permissions-secondary-audit.json';
 
 type RawAuditModule = {
   displayName?: string;
@@ -82,10 +84,16 @@ export async function GET(request: NextRequest) {
       success: true,
       roles: matrix.roles,
       modules: matrix.modules,
+      teams: matrix.teams,
+      assignable_roles: matrix.assignableRoles,
       users: matrix.users,
       audit: toAuditInfo(),
     });
   } catch (error) {
+    if (error instanceof InvalidPermissionLevelError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
     if (isMissingTeamPermissionSchemaError(error)) {
       return NextResponse.json(
         { error: 'User permission level matrix is not configured yet.' },
@@ -116,11 +124,13 @@ export async function PUT(request: NextRequest) {
 
     const effectiveRole = await getEffectiveRole();
     const body = (await request.json()) as UpdateUserPermissionLevelsRequest;
-    if (!Array.isArray(body.updates)) {
-      return NextResponse.json({ error: 'Invalid request: updates array required' }, { status: 400 });
+    const updates = body.updates ?? [];
+    const teamDefaultUpdates = body.team_default_updates ?? [];
+    if (!Array.isArray(updates) || !Array.isArray(teamDefaultUpdates)) {
+      return NextResponse.json({ error: 'Invalid request: updates arrays required' }, { status: 400 });
     }
 
-    const normalizedUpdates = body.updates.filter(
+    const normalizedUpdates = updates.filter(
       (update): update is { user_id: string; module_name: ModuleName; access_level: PermissionAccessLevel } =>
         typeof update.user_id === 'string' &&
         update.user_id.length > 0 &&
@@ -128,17 +138,34 @@ export async function PUT(request: NextRequest) {
         EDITABLE_PERMISSION_ACCESS_LEVELS.includes(update.access_level)
     );
 
-    if (normalizedUpdates.length !== body.updates.length) {
+    const normalizedTeamDefaultUpdates = teamDefaultUpdates.filter(
+      (update): update is { team_id: string; module_name: ModuleName; enabled: boolean } =>
+        typeof update.team_id === 'string' &&
+        update.team_id.length > 0 &&
+        ALL_MODULES.includes(update.module_name) &&
+        typeof update.enabled === 'boolean'
+    );
+
+    if (
+      normalizedUpdates.length !== updates.length ||
+      normalizedTeamDefaultUpdates.length !== teamDefaultUpdates.length
+    ) {
       return NextResponse.json({ error: 'Invalid user permission level payload' }, { status: 400 });
     }
 
-    await updateUserModulePermissionLevels(createAdminClient(), normalizedUpdates, effectiveRole.user_id);
+    const admin = createAdminClient();
+    await updateTeamModulePermissionDefaults(admin, normalizedTeamDefaultUpdates, effectiveRole.user_id);
+    await updateUserModulePermissionLevels(admin, normalizedUpdates, effectiveRole.user_id);
 
     return NextResponse.json({
       success: true,
       message: 'User permission levels updated successfully',
     });
   } catch (error) {
+    if (error instanceof InvalidPermissionLevelError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
     if (isMissingTeamPermissionSchemaError(error)) {
       return NextResponse.json(
         { error: 'User permission level matrix is not configured yet.' },

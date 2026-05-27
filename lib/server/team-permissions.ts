@@ -4,6 +4,12 @@ import { getHiddenSystemTestAccountIds } from '@/lib/server/system-test-accounts
 import { isHiddenSystemTestAccountProfile } from '@/lib/utils/system-test-accounts';
 import { hasRoleFullAccess } from '@/lib/utils/role-access';
 import {
+  getModuleEnforcedMinimumAccessLevel,
+  getUsablePermissionAccessLevel,
+  isPermissionLevelAllowedForModule,
+  moduleRequiresFullAccessRole,
+} from '@/lib/config/permission-access-rules';
+import {
   ALL_MODULES,
   createEmptyModulePermissionRecord,
   MODULE_CSS_VAR,
@@ -14,7 +20,9 @@ import {
   type PermissionAccessLevel,
   type PermissionModuleMatrixColumn,
   type PermissionTierRole,
+  type UserPermissionAssignableRole,
   type TeamPermissionMatrixRow,
+  type UserPermissionTeamDefaultRow,
   type UserPermissionMatrixRow,
 } from '@/types/roles';
 
@@ -59,8 +67,10 @@ type UserModulePermissionRow = {
 type ProfilePermissionRow = {
   id: string;
   full_name: string | null;
+  phone_number?: string | null;
   employee_id: string | null;
   team_id: string | null;
+  line_manager_id?: string | null;
   role_id: string | null;
   is_placeholder?: boolean | null;
   role?: RoleRow | RoleRow[] | null;
@@ -71,6 +81,13 @@ type AuthUserSummary = {
   id: string;
   email?: string | null;
 };
+
+export class InvalidPermissionLevelError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidPermissionLevelError';
+  }
+}
 
 export function buildTeamPermissionRecord(
   modules: Array<Pick<PermissionModuleMatrixColumn, 'module_name'>>,
@@ -157,7 +174,8 @@ export function resolveModulesForRoleRank(params: {
   params.modules.forEach((module) => {
     if (
       (params.enabledByModule.get(module.module_name) ?? false) &&
-      params.role.hierarchy_rank! >= module.minimum_hierarchy_rank
+      params.role.hierarchy_rank! >= module.enforced_minimum_access_level &&
+      !module.requires_full_access_role
     ) {
       enabledModules.add(module.module_name);
     }
@@ -174,7 +192,8 @@ export function resolveModuleLevelForRoleRank(params: {
   const roleLevel = getAccessLevelForRole(params.role);
   if (roleLevel === 5) return 5;
   if (!params.enabled || typeof params.role.hierarchy_rank !== 'number') return 0;
-  if (params.role.hierarchy_rank < params.module.minimum_hierarchy_rank) return 0;
+  if (params.module.requires_full_access_role) return 0;
+  if (params.role.hierarchy_rank < params.module.enforced_minimum_access_level) return 0;
   return roleLevel;
 }
 
@@ -295,6 +314,8 @@ async function getPermissionModulesForRoles(
         throw new Error(`Permission module ${row.module_name} points to an unknown tier role.`);
       }
 
+      const enforcedMinimum = getModuleEnforcedMinimumAccessLevel(row.module_name, role.hierarchy_rank);
+
       return {
         module_name: row.module_name,
         display_name: MODULE_DISPLAY_NAMES[row.module_name],
@@ -304,6 +325,8 @@ async function getPermissionModulesForRoles(
         minimum_role_id: row.minimum_role_id,
         minimum_role_name: role.display_name,
         minimum_hierarchy_rank: role.hierarchy_rank,
+        enforced_minimum_access_level: enforcedMinimum,
+        requires_full_access_role: moduleRequiresFullAccessRole(row.module_name),
         requires_sensitive_pin: row.requires_sensitive_pin === true,
         sort_order: row.sort_order,
       };
@@ -438,20 +461,6 @@ function isDeletedProfile(profile: Pick<ProfilePermissionRow, 'full_name'>): boo
   return Boolean(profile.full_name?.includes('(Deleted User)'));
 }
 
-function buildTeamEnabledMap(permissionRows: TeamPermissionRow[]): Map<string, Map<ModuleName, boolean>> {
-  const enabledByTeam = new Map<string, Map<ModuleName, boolean>>();
-
-  permissionRows.forEach((row) => {
-    if (!enabledByTeam.has(row.team_id)) {
-      enabledByTeam.set(row.team_id, new Map<ModuleName, boolean>());
-    }
-
-    enabledByTeam.get(row.team_id)!.set(row.module_name, !!row.enabled);
-  });
-
-  return enabledByTeam;
-}
-
 function buildUserOverrideMap(permissionRows: UserModulePermissionRow[]): Map<string, Map<ModuleName, PermissionAccessLevel>> {
   const levelsByUser = new Map<string, Map<ModuleName, PermissionAccessLevel>>();
 
@@ -474,6 +483,13 @@ function getInheritedLevelsForProfile(params: {
 }): Record<ModuleName, PermissionAccessLevel> {
   const levels = createEmptyModuleLevelRecord();
   if (!params.role) return levels;
+
+  if (isFullAccessRole(params.role)) {
+    return ALL_MODULES.reduce((acc, moduleName) => {
+      acc[moduleName] = 5;
+      return acc;
+    }, {} as Record<ModuleName, PermissionAccessLevel>);
+  }
 
   params.modules.forEach((module) => {
     const enabled = params.profile.team_id
@@ -507,7 +523,9 @@ function getEffectiveLevelsForProfile(params: {
   params.modules.forEach((module) => {
     const override = params.overrideLevels?.get(module.module_name);
     if (override !== undefined) {
-      levels[module.module_name] = override;
+      levels[module.module_name] = getUsablePermissionAccessLevel(module, override, {
+        hasFullAccessRole: false,
+      });
     }
   });
 
@@ -519,14 +537,26 @@ export async function getUserPermissionMatrix(
 ): Promise<{
   roles: PermissionTierRole[];
   modules: PermissionModuleMatrixColumn[];
+  teams: UserPermissionTeamDefaultRow[];
+  assignableRoles: UserPermissionAssignableRole[];
   users: UserPermissionMatrixRow[];
 }> {
-  const [roles, profilesResult, permissionsResult, teamPermissionsResult] = await Promise.all([
+  const [roles, assignableRolesResult, teamsResult, profilesResult, permissionsResult, teamPermissionsResult] = await Promise.all([
     getPermissionTierRoles(supabaseAdmin),
+    supabaseAdmin
+      .from('roles')
+      .select('id, name, display_name, role_class, is_super_admin, is_manager_admin')
+      .order('is_super_admin', { ascending: false })
+      .order('is_manager_admin', { ascending: false })
+      .order('display_name', { ascending: true }),
+    supabaseAdmin
+      .from('org_teams')
+      .select('id, name, code, active')
+      .order('name', { ascending: true }),
     supabaseAdmin
       .from('profiles')
       .select(
-        'id, full_name, employee_id, team_id, role_id, is_placeholder, team:org_teams!profiles_team_id_fkey(id, name), role:roles(id, name, display_name, role_class, hierarchy_rank, is_super_admin, is_manager_admin)'
+        'id, full_name, phone_number, employee_id, team_id, line_manager_id, role_id, is_placeholder, team:org_teams!profiles_team_id_fkey(id, name), role:roles(id, name, display_name, role_class, hierarchy_rank, is_super_admin, is_manager_admin)'
       )
       .order('full_name', { ascending: true }),
     supabaseAdmin
@@ -538,6 +568,8 @@ export async function getUserPermissionMatrix(
   ]);
   const modules = await getPermissionModulesForRoles(roles, supabaseAdmin);
 
+  if (assignableRolesResult.error) throw assignableRolesResult.error;
+  if (teamsResult.error) throw teamsResult.error;
   if (profilesResult.error) throw profilesResult.error;
   if (permissionsResult.error) throw permissionsResult.error;
   if (teamPermissionsResult.error) throw teamPermissionsResult.error;
@@ -552,7 +584,31 @@ export async function getUserPermissionMatrix(
     supabaseAdmin
   );
   const levelsByUser = buildUserOverrideMap((permissionsResult.data || []) as UserModulePermissionRow[]);
-  const enabledByTeam = buildTeamEnabledMap((teamPermissionsResult.data || []) as TeamPermissionRow[]);
+  const permissionRows = (teamPermissionsResult.data || []) as TeamPermissionRow[];
+  const enabledByTeam = new Map<string, Map<ModuleName, boolean>>();
+  permissionRows.forEach((row) => {
+    if (!enabledByTeam.has(row.team_id)) {
+      enabledByTeam.set(row.team_id, new Map<ModuleName, boolean>());
+    }
+    enabledByTeam.get(row.team_id)!.set(row.module_name, row.enabled);
+  });
+  const activeTeams = ((teamsResult.data || []) as TeamRow[]).filter((team) => team.active);
+  const assignableRoles = ((assignableRolesResult.data || []) as Array<{
+    id: string;
+    name: string;
+    display_name: string;
+    role_class: RoleRow['role_class'];
+  }>).map((role) => ({
+    id: role.id,
+    name: role.name,
+    display_name: role.display_name,
+    role_class: role.role_class,
+  }));
+  const teams = activeTeams.map((team) => ({
+    id: team.id,
+    name: team.name,
+    permissions: buildTeamPermissionRecord(modules, enabledByTeam.get(team.id)),
+  }));
 
   const users = visibleProfiles.map((profile) => {
     const role = getProfileRole(profile);
@@ -574,13 +630,16 @@ export async function getUserPermissionMatrix(
       id: profile.id,
       full_name: profile.full_name,
       email: emailMap.get(profile.id) || null,
+      phone_number: profile.phone_number || null,
       employee_id: profile.employee_id,
       team_id: profile.team_id,
+      line_manager_id: profile.line_manager_id || null,
       team_name: getProfileTeamName(profile),
       role_id: profile.role_id,
       role_name: role?.name || null,
       role_display_name: role?.display_name || null,
       role_class: role?.role_class || null,
+      role_hierarchy_rank: role?.hierarchy_rank || null,
       is_super_admin: role?.is_super_admin === true,
       is_manager_admin: role?.is_manager_admin === true,
       is_locked_admin: role ? isFullAccessRole(role) : false,
@@ -589,7 +648,7 @@ export async function getUserPermissionMatrix(
     } satisfies UserPermissionMatrixRow;
   });
 
-  return { roles, modules, users };
+  return { roles, modules, teams, assignableRoles, users };
 }
 
 export async function updateTeamModulePermissions(
@@ -614,6 +673,143 @@ export async function updateTeamModulePermissions(
 
   if (error) {
     throw error;
+  }
+}
+
+export async function updateTeamModulePermissionDefaults(
+  supabaseAdmin: SupabaseAdminClient,
+  updates: Array<{ team_id: string; module_name: ModuleName; enabled: boolean }>,
+  actorUserId?: string | null
+): Promise<void> {
+  if (!updates.length) {
+    return;
+  }
+
+  const modules = await getPermissionModules(supabaseAdmin);
+  const modulesByName = new Map(modules.map((module) => [module.module_name, module]));
+  const teamIds = Array.from(new Set(updates.map((update) => update.team_id)));
+  const moduleNames = Array.from(new Set(updates.map((update) => update.module_name)));
+
+  const { data: existingDefaults, error: defaultsError } = await supabaseAdmin
+    .from('team_module_permissions')
+    .select('team_id, module_name, enabled')
+    .in('team_id', teamIds)
+    .in('module_name', moduleNames);
+
+  if (defaultsError) {
+    throw defaultsError;
+  }
+
+  const existingByKey = new Map<string, TeamPermissionRow>();
+  ((existingDefaults || []) as TeamPermissionRow[]).forEach((row) => {
+    existingByKey.set(`${row.team_id}:${row.module_name}`, row);
+  });
+
+  const defaultRows = updates.map((update) => ({
+    team_id: update.team_id,
+    module_name: update.module_name,
+    enabled: update.enabled,
+    updated_at: new Date().toISOString(),
+  }));
+
+  const { error: upsertDefaultsError } = await supabaseAdmin
+    .from('team_module_permissions')
+    .upsert(defaultRows, { onConflict: 'team_id,module_name' });
+
+  if (upsertDefaultsError) {
+    throw upsertDefaultsError;
+  }
+
+  const { data: profiles, error: profilesError } = await supabaseAdmin
+    .from('profiles')
+    .select('id, team_id, role:roles(id, name, display_name, role_class, hierarchy_rank, is_super_admin, is_manager_admin)')
+    .in('team_id', teamIds);
+
+  if (profilesError) {
+    throw profilesError;
+  }
+
+  const candidateProfiles = ((profiles || []) as unknown as ProfilePermissionRow[]).filter((profile) => {
+    const role = getProfileRole(profile);
+    return role ? !isFullAccessRole(role) : true;
+  });
+  const candidateUserIds = candidateProfiles.map((profile) => profile.id);
+
+  const { data: userPermissions, error: userPermissionsError } = candidateUserIds.length
+    ? await supabaseAdmin
+        .from('user_module_permissions')
+        .select('user_id, module_name, access_level')
+        .in('user_id', candidateUserIds)
+        .in('module_name', moduleNames)
+    : { data: [], error: null };
+
+  if (userPermissionsError) {
+    throw userPermissionsError;
+  }
+
+  const userPermissionByKey = new Map<string, UserModulePermissionRow>();
+  ((userPermissions || []) as UserModulePermissionRow[]).forEach((row) => {
+    userPermissionByKey.set(`${row.user_id}:${row.module_name}`, row);
+  });
+
+  const cascadeRows: Array<{
+    user_id: string;
+    module_name: ModuleName;
+    access_level: PermissionAccessLevel;
+    updated_by: string | null;
+    updated_at: string;
+  }> = [];
+
+  updates.forEach((update) => {
+    const existingDefault = existingByKey.get(`${update.team_id}:${update.module_name}`);
+    const oldEnabled = existingDefault?.enabled ?? false;
+    const nextEnabled = update.enabled;
+    const permissionModule = modulesByName.get(update.module_name);
+    if (!permissionModule) return;
+
+    candidateProfiles
+      .filter((profile) => profile.team_id === update.team_id)
+      .forEach((profile) => {
+        const role = getProfileRole(profile);
+        if (!role) return;
+
+        const oldDefault = resolveModuleLevelForRoleRank({
+          role,
+          module: permissionModule,
+          enabled: oldEnabled,
+        });
+        const nextLevel = resolveModuleLevelForRoleRank({
+          role,
+          module: permissionModule,
+          enabled: nextEnabled,
+        });
+        const existingUserLevel = userPermissionByKey.get(`${profile.id}:${update.module_name}`);
+        const currentLevel = existingUserLevel
+          ? normalizePermissionAccessLevel(existingUserLevel.access_level)
+          : oldDefault;
+
+        if (currentLevel !== oldDefault) return;
+
+        cascadeRows.push({
+          user_id: profile.id,
+          module_name: update.module_name,
+          access_level: nextLevel,
+          updated_by: actorUserId || null,
+          updated_at: new Date().toISOString(),
+        });
+      });
+  });
+
+  if (!cascadeRows.length) {
+    return;
+  }
+
+  const { error: cascadeError } = await supabaseAdmin
+    .from('user_module_permissions')
+    .upsert(cascadeRows, { onConflict: 'user_id,module_name' });
+
+  if (cascadeError) {
+    throw cascadeError;
   }
 }
 
@@ -656,6 +852,28 @@ export async function updateUserModulePermissionLevels(
   if (updates.some((update) => lockedAdminIds.has(update.user_id))) {
     throw new Error('Admin users always have Level 5 access. Change their job role before editing module levels.');
   }
+
+  const modules = await getPermissionModules(supabaseAdmin);
+  const modulesByName = new Map(modules.map((module) => [module.module_name, module]));
+  updates.forEach((update) => {
+    const permissionModule = modulesByName.get(update.module_name);
+    if (!permissionModule) {
+      throw new InvalidPermissionLevelError(`Module ${update.module_name} is not configured for the permission matrix.`);
+    }
+
+    const profile = profilesById.get(update.user_id);
+    const role = profile ? getProfileRole(profile) : null;
+    if (!isPermissionLevelAllowedForModule(permissionModule, update.access_level, {
+      hasFullAccessRole: role ? isFullAccessRole(role) : false,
+    })) {
+      const reason = permissionModule.requires_full_access_role
+        ? 'it requires an Admin/Super Admin job role'
+        : `use Level ${permissionModule.enforced_minimum_access_level} or higher`;
+      throw new InvalidPermissionLevelError(
+        `${permissionModule.display_name} cannot be set to Level ${update.access_level}; ${reason}.`
+      );
+    }
+  });
 
   const rows = updates.map((update) => ({
     user_id: update.user_id,
@@ -712,6 +930,7 @@ export async function shiftPermissionModuleTier(
     minimum_role_id: nextRole.id,
     minimum_role_name: nextRole.display_name,
     minimum_hierarchy_rank: nextRole.hierarchy_rank,
+    enforced_minimum_access_level: getModuleEnforcedMinimumAccessLevel(moduleName, nextRole.hierarchy_rank),
   };
 }
 
@@ -795,7 +1014,7 @@ export async function getPermissionLevelsForUser(
     getPermissionModules(supabaseAdmin),
     supabaseAdmin
       .from('team_module_permissions')
-      .select('module_name, enabled')
+      .select('team_id, module_name, enabled')
       .eq('team_id', teamId || ''),
     supabaseAdmin
       .from('user_module_permissions')
@@ -810,20 +1029,19 @@ export async function getPermissionLevelsForUser(
     throw userPermissionsResult.error;
   }
 
-  const enabledByModule = new Map<ModuleName, boolean>();
-  ((teamPermissionsResult.data || []) as Array<{ module_name: ModuleName; enabled: boolean }>).forEach(
-    (row) => {
-      enabledByModule.set(row.module_name, !!row.enabled);
+  const enabledByTeam = new Map<string, Map<ModuleName, boolean>>();
+  ((teamPermissionsResult.data || []) as TeamPermissionRow[]).forEach((row) => {
+    if (!enabledByTeam.has(row.team_id)) {
+      enabledByTeam.set(row.team_id, new Map<ModuleName, boolean>());
     }
-  );
+    enabledByTeam.get(row.team_id)!.set(row.module_name, row.enabled);
+  });
 
   const inheritedLevels = getInheritedLevelsForProfile({
     profile: { team_id: teamId, role_id: resolvedRoleId, role },
     modules,
     role,
-    enabledByTeam: teamId
-      ? new Map([[teamId, enabledByModule]])
-      : new Map<string, Map<ModuleName, boolean>>(),
+    enabledByTeam,
   });
   const overrides = new Map<ModuleName, PermissionAccessLevel>();
   ((userPermissionsResult.data || []) as Array<{ module_name: ModuleName; access_level: number }>).forEach(
@@ -987,7 +1205,10 @@ export async function getUsersWithModuleAccess(
 
     const overrideLevel = accessLevelByUser.get(profile.id);
     if (overrideLevel !== undefined) {
-      if (overrideLevel > 0) {
+      const usableOverrideLevel = getUsablePermissionAccessLevel(targetModule, overrideLevel, {
+        hasFullAccessRole: false,
+      });
+      if (usableOverrideLevel > 0) {
         allowedUsers.add(profile.id);
       }
       return;
@@ -999,7 +1220,7 @@ export async function getUsersWithModuleAccess(
 
     if (
       (enabledByTeam.get(profile.team_id)?.get(moduleName) ?? false) &&
-      role.hierarchy_rank >= targetModule.minimum_hierarchy_rank
+      resolveModuleLevelForRoleRank({ role, module: targetModule, enabled: true }) > 0
     ) {
       allowedUsers.add(profile.id);
     }

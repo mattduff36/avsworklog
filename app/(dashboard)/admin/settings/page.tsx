@@ -8,7 +8,6 @@ import { PageLoader } from '@/components/ui/page-loader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import {
   APP_WIDESCREEN_CHANGED_EVENT,
@@ -19,17 +18,15 @@ import { TimesheetTypeExceptionsCard } from './components/TimesheetTypeException
 
 export default function AdminSettingsPage() {
   const router = useRouter();
-  const { isAdmin, isSuperAdmin, isActualSuperAdmin } = useAuth();
   const { hasPermission: canAccessSettings, loading: permissionLoading } = usePermissionCheck('admin-settings', false);
-  const isAdminActor = isAdmin || isSuperAdmin || isActualSuperAdmin;
   const [settingsTab, setSettingsTab] = useState<'general' | 'timesheets'>('general');
   const [appWidescreenEnabled, setAppWidescreenEnabled] = useState(false);
 
   useEffect(() => {
-    if (!permissionLoading && (!canAccessSettings || !isAdminActor)) {
+    if (!permissionLoading && !canAccessSettings) {
       router.push('/dashboard');
     }
-  }, [canAccessSettings, isAdminActor, permissionLoading, router]);
+  }, [canAccessSettings, permissionLoading, router]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -57,7 +54,7 @@ export default function AdminSettingsPage() {
     return <PageLoader message="Loading admin settings..." />;
   }
 
-  if (!canAccessSettings || !isAdminActor) {
+  if (!canAccessSettings) {
     return null;
   }
 

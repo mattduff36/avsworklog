@@ -62,6 +62,8 @@ export interface PermissionModuleMatrixColumn extends PermissionModuleDefinition
   minimum_role_id: string;
   minimum_role_name: string;
   minimum_hierarchy_rank: number;
+  enforced_minimum_access_level: PermissionAccessLevel;
+  requires_full_access_role: boolean;
   requires_sensitive_pin: boolean;
   sort_order: number;
 }
@@ -100,18 +102,34 @@ export interface UserPermissionMatrixRow {
   id: string;
   full_name: string | null;
   email: string | null;
+  phone_number: string | null;
   employee_id: string | null;
   team_id: string | null;
+  line_manager_id: string | null;
   team_name: string | null;
   role_id: string | null;
   role_name: string | null;
   role_display_name: string | null;
   role_class: RoleClass | null;
+  role_hierarchy_rank: number | null;
   is_super_admin: boolean;
   is_manager_admin: boolean;
   is_locked_admin: boolean;
   permissions: Record<ModuleName, PermissionAccessLevel>;
   inherited_permissions: Record<ModuleName, PermissionAccessLevel>;
+}
+
+export interface UserPermissionTeamDefaultRow {
+  id: string;
+  name: string;
+  permissions: Record<ModuleName, boolean>;
+}
+
+export interface UserPermissionAssignableRole {
+  id: string;
+  name: string;
+  display_name: string;
+  role_class: RoleClass;
 }
 
 export interface PermissionsAuditModuleInfo {
@@ -134,6 +152,8 @@ export interface UserPermissionMatrixResponse {
   success: boolean;
   roles: PermissionTierRole[];
   modules: PermissionModuleMatrixColumn[];
+  teams: UserPermissionTeamDefaultRow[];
+  assignable_roles: UserPermissionAssignableRole[];
   users: UserPermissionMatrixRow[];
   audit: PermissionsAuditInfo;
 }
@@ -361,10 +381,15 @@ export interface UpdateTeamPermissionsRequest {
 }
 
 export interface UpdateUserPermissionLevelsRequest {
-  updates: {
+  updates?: {
     user_id: string;
     module_name: ModuleName;
     access_level: PermissionAccessLevel;
+  }[];
+  team_default_updates?: {
+    team_id: string;
+    module_name: ModuleName;
+    enabled: boolean;
   }[];
 }
 

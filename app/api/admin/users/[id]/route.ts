@@ -5,6 +5,7 @@ import { getEffectiveRole } from '@/lib/utils/view-as';
 import { canEffectiveRoleAccessModule, canEffectiveRoleAssignRole } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { isMissingTeamManagerSchemaError, reconcileProfileHierarchy } from '@/lib/server/team-managers';
+import { hasRoleFullAccess } from '@/lib/utils/role-access';
 
 function isMissingHierarchySchemaError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
@@ -96,6 +97,13 @@ interface ProfileChanges {
   line_manager?: ProfileChangeEntry;
   team?: ProfileChangeEntry;
 }
+
+type RoleAccessRow = {
+  name: string | null;
+  display_name: string | null;
+  role_class: 'admin' | 'manager' | 'employee' | null;
+  is_super_admin: boolean | null;
+};
 
 export async function PUT(
   request: NextRequest,
@@ -204,23 +212,29 @@ export async function PUT(
         new: String(team_id || ''),
       };
     }
+    let shouldClearUserPermissionOverrides = false;
     if (role_id !== existingUser.role_id) {
       // Fetch role names for email (display_name instead of UUID)
       const { data: oldRole } = await supabaseAdmin
         .from('roles')
-        .select('display_name')
+        .select('name, display_name, role_class, is_super_admin')
         .eq('id', existingUser.role_id)
-        .single();
+        .maybeSingle();
       
       const { data: newRole } = await supabaseAdmin
         .from('roles')
-        .select('display_name')
+        .select('name, display_name, role_class, is_super_admin')
         .eq('id', role_id)
-        .single();
+        .maybeSingle();
+
+      const oldRoleAccess = oldRole as RoleAccessRow | null;
+      const newRoleAccess = newRole as RoleAccessRow | null;
+      shouldClearUserPermissionOverrides =
+        hasRoleFullAccess(oldRoleAccess) && !hasRoleFullAccess(newRoleAccess);
       
       changes.role = {
-        old: oldRole?.display_name || 'Unknown',
-        new: newRole?.display_name || 'Unknown'
+        old: oldRoleAccess?.display_name || 'Unknown',
+        new: newRoleAccess?.display_name || 'Unknown'
       };
     }
 
@@ -257,6 +271,21 @@ export async function PUT(
 
     let hierarchyFieldsPersisted = true;
     let hierarchyWarning: string | null = null;
+
+    if (shouldClearUserPermissionOverrides) {
+      const { error: clearPermissionsError } = await supabaseAdmin
+        .from('user_module_permissions')
+        .delete()
+        .eq('user_id', userId);
+
+      if (clearPermissionsError) {
+        console.error('Permission override cleanup error:', clearPermissionsError);
+        return NextResponse.json(
+          { error: 'Failed to reset user permissions to team defaults' },
+          { status: 500 }
+        );
+      }
+    }
 
     let { error: profileError } = await supabaseAdmin
       .from('profiles')

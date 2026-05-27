@@ -31,7 +31,7 @@ const TooltipContent = React.forwardRef<
       sideOffset={sideOffset}
       collisionPadding={collisionPadding}
       style={{
-        maxWidth: 'min(40rem, calc(100vw - 2rem))',
+        maxWidth: 'min(24rem, calc(100vw - 2rem))',
         ...style,
       }}
       className={cn(
