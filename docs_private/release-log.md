@@ -2,6 +2,21 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0526.18.0
+
+**GIT COMMIT MESSAGE**
+`feat(api): update API routes and automation scripts`
+
+**WHAT CHANGED**
+Update API routes and automation scripts.
+
+**COMMITS IN THIS RELEASE**
+- `feat(api): update API routes and automation scripts`
+
+# Production release log
+
+Private changelog for production builds. Newest entries first.
+
 ## 0526.17.2
 
 **GIT COMMIT MESSAGE**
