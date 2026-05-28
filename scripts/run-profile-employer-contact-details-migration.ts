@@ -23,7 +23,7 @@ async function runMigration() {
     port: Number.parseInt(url.port, 10) || 5432,
     database: url.pathname.slice(1),
     user: url.username,
-    password: url.password,
+    password: decodeURIComponent(url.password),
     ssl: {
       rejectUnauthorized: false,
     },
