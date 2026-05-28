@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0526.21.1
+
+**GIT COMMIT MESSAGE**
+`chore(automation): update automation scripts`
+
+**WHAT CHANGED**
+Update automation scripts.
+
+**COMMITS IN THIS RELEASE**
+- `chore(automation): update automation scripts`
+
 ## 0526.21.0
 
 **GIT COMMIT MESSAGE**
