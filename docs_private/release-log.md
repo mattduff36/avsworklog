@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0526.20.2
+
+**GIT COMMIT MESSAGE**
+`chore(finalise): update finalise commit summaries, inspection workflows, and 2 more areas`
+
+**WHAT CHANGED**
+Update finalise commit summaries, inspection workflows, and 2 more areas.
+
+**COMMITS IN THIS RELEASE**
+- `chore(finalise): update finalise commit summaries, inspection workflows, and 2 more areas`
+
 ## 0526.20.1
 
 **GIT COMMIT MESSAGE**
