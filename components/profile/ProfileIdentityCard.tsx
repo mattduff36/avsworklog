@@ -40,7 +40,7 @@ export function ProfileIdentityCard({
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] lg:items-start">
           <div className="space-y-5">
             <div className="rounded-lg border border-border bg-slate-900/40 p-4">
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex min-w-0 flex-1 items-center gap-4">
                   <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-full border border-border bg-slate-900/30">
                     {profile.avatar_url ? (
@@ -68,7 +68,7 @@ export function ProfileIdentityCard({
                   </div>
                 </div>
 
-                <div className="flex w-44 shrink-0 flex-col gap-2">
+                <div className="flex w-full shrink-0 flex-col gap-2 sm:w-44">
                   <label>
                     <input
                       type="file"
