@@ -1,6 +1,12 @@
 import React from 'react';
 import { Document, Image, Link, Page, StyleSheet, Text, View } from '@react-pdf/renderer';
+import type { Style } from '@react-pdf/types';
 import { format } from 'date-fns';
+import {
+  getQuoteInlinePlainText,
+  parseQuoteRichText,
+  type QuoteRichTextInline,
+} from '@/lib/quotes/quote-rich-text';
 
 const BRAND_YELLOW = '#f2cc0c';
 const BRAND_YELLOW_LIGHT = '#fff6cc';
@@ -124,6 +130,18 @@ const styles = StyleSheet.create({
     padding: 12,
     backgroundColor: '#ffffff',
   },
+  recipientRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  recipientColumn: {
+    width: '50%',
+    paddingRight: 12,
+  },
+  recipientColumnRight: {
+    width: '50%',
+    paddingLeft: 12,
+  },
   sectionEyebrow: {
     fontSize: 7.5,
     color: BRAND_MUTED,
@@ -141,6 +159,11 @@ const styles = StyleSheet.create({
     color: '#1d4ed8',
     textDecoration: 'underline',
   },
+  preparedSiteAddress: {
+    fontSize: 9,
+    color: BRAND_TEXT,
+    lineHeight: 1.4,
+  },
   salutation: {
     marginBottom: 12,
     fontSize: 10,
@@ -152,16 +175,16 @@ const styles = StyleSheet.create({
     lineHeight: 1.45,
     color: BRAND_TEXT,
   },
-  subjectCard: {
-    marginBottom: 16,
-    padding: 14,
+  summaryCard: {
+    marginBottom: 12,
+    padding: 12,
     backgroundColor: '#f8fafc',
     border: `1pt solid ${BRAND_BORDER}`,
     borderLeft: `4pt solid ${BRAND_YELLOW}`,
     borderRadius: 4,
   },
   subjectTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: 'bold',
     color: BRAND_TEXT,
     marginBottom: 4,
@@ -169,7 +192,35 @@ const styles = StyleSheet.create({
   subjectDescription: {
     fontSize: 10,
     color: BRAND_MUTED,
-    marginBottom: 10,
+    lineHeight: 1.45,
+  },
+  subjectDescriptionHeading: {
+    fontSize: 10,
+    color: BRAND_TEXT,
+    fontWeight: 'bold',
+    lineHeight: 1.35,
+  },
+  scopeSection: {
+    marginTop: 2,
+  },
+  scopeTitle: {
+    fontSize: 7.5,
+    color: BRAND_MUTED,
+    marginBottom: 5,
+    letterSpacing: 0.8,
+  },
+  scopeText: {
+    fontSize: 10,
+    color: BRAND_TEXT,
+    lineHeight: 1.45,
+  },
+  scopeBottomSpacer: {
+    height: 16,
+  },
+  scopeHeading: {
+    fontSize: 10,
+    color: BRAND_TEXT,
+    fontWeight: 'bold',
     lineHeight: 1.45,
   },
   detailRow: {
@@ -188,6 +239,15 @@ const styles = StyleSheet.create({
     color: BRAND_TEXT,
     lineHeight: 1.4,
   },
+  detailContent: {
+    flex: 1,
+  },
+  detailValueHeading: {
+    fontSize: 9.5,
+    color: BRAND_TEXT,
+    fontWeight: 'bold',
+    lineHeight: 1.35,
+  },
   detailLink: {
     flex: 1,
     fontSize: 9.5,
@@ -195,9 +255,9 @@ const styles = StyleSheet.create({
     textDecoration: 'underline',
   },
   tableLabel: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: BRAND_TEXT,
+    fontSize: 7.5,
+    color: BRAND_MUTED,
+    letterSpacing: 0.8,
     marginBottom: 6,
   },
   table: {
@@ -250,6 +310,16 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: BRAND_TEXT,
     fontWeight: 'bold',
+  },
+  colItemCell: {
+    width: '40%',
+    padding: 8,
+  },
+  colItemText: {
+    fontSize: 9,
+    color: BRAND_TEXT,
+    fontWeight: 'bold',
+    lineHeight: 1.35,
   },
   colQty: {
     width: '15%',
@@ -309,6 +379,24 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: BRAND_MUTED,
     lineHeight: 1.5,
+  },
+  inlineStrong: {
+    fontWeight: 'bold',
+  },
+  inlineEmphasis: {
+    fontStyle: 'italic',
+  },
+  inlineLink: {
+    color: '#1d4ed8',
+    textDecoration: 'underline',
+  },
+  richHeading: {
+    fontWeight: 'bold',
+    color: BRAND_TEXT,
+  },
+  richListLine: {
+    marginLeft: 8,
+    lineHeight: 1.45,
   },
   signoff: {
     marginTop: 24,
@@ -395,8 +483,113 @@ interface QuotePDFProps {
   logoSrc?: string | null;
 }
 
+type PdfTextStyle = Style | Style[];
+
+interface PdfRichTextProps {
+  value: string;
+  textStyle: PdfTextStyle;
+  headingStyle?: PdfTextStyle;
+  blockGap?: number;
+  omitLeadingHeading?: string;
+}
+
+function composePdfTextStyle(
+  ...items: Array<PdfTextStyle | Style | undefined>
+): Style[] {
+  return items.flatMap(item => {
+    if (!item) return [];
+    return Array.isArray(item) ? item : [item];
+  });
+}
+
+function blockSpacing(index: number, gap: number): Style | undefined {
+  return index > 0 ? { marginTop: gap } : undefined;
+}
+
+function renderPdfInline(nodes: QuoteRichTextInline[], keyPrefix: string): React.ReactNode[] {
+  return nodes.map((node, index) => {
+    const key = `${keyPrefix}-${index}`;
+
+    switch (node.type) {
+      case 'text':
+        return node.text;
+      case 'strong':
+        return (
+          <Text key={key} style={styles.inlineStrong}>
+            {renderPdfInline(node.children, key)}
+          </Text>
+        );
+      case 'emphasis':
+        return (
+          <Text key={key} style={styles.inlineEmphasis}>
+            {renderPdfInline(node.children, key)}
+          </Text>
+        );
+      case 'link':
+        return (
+          <Link key={key} src={node.href} style={styles.inlineLink}>
+            {renderPdfInline(node.children, key)}
+          </Link>
+        );
+    }
+  });
+}
+
+function PdfRichText({ value, textStyle, headingStyle, blockGap = 4, omitLeadingHeading }: PdfRichTextProps) {
+  const blocks = parseQuoteRichText(value).filter((block, index) => {
+    if (!omitLeadingHeading || index !== 0 || block.type !== 'heading') {
+      return true;
+    }
+
+    return getQuoteInlinePlainText(block.children).trim().toLowerCase() !== omitLeadingHeading.toLowerCase();
+  });
+  if (blocks.length === 0) {
+    return null;
+  }
+
+  return (
+    <>
+      {blocks.map((block, index) => {
+        const key = `rich-block-${index}`;
+        const spacing = blockSpacing(index, blockGap);
+
+        if (block.type === 'heading') {
+          return (
+            <Text key={key} style={composePdfTextStyle(textStyle, styles.richHeading, headingStyle, spacing)}>
+              {renderPdfInline(block.children, key)}
+            </Text>
+          );
+        }
+
+        if (block.type === 'list') {
+          return (
+            <View key={key} style={spacing || {}}>
+              {block.items.map((item, itemIndex) => (
+                <Text
+                  key={`${key}-item-${itemIndex}`}
+                  style={composePdfTextStyle(textStyle, styles.richListLine)}
+                >
+                  {block.ordered ? `${itemIndex + 1}. ` : '\u2022 '}
+                  {renderPdfInline(item, `${key}-item-${itemIndex}`)}
+                </Text>
+              ))}
+            </View>
+          );
+        }
+
+        return (
+          <Text key={key} style={composePdfTextStyle(textStyle, spacing)}>
+            {renderPdfInline(block.children, key)}
+          </Text>
+        );
+      })}
+    </>
+  );
+}
+
 function formatQuantity(item: LineItem): string {
-  if (item.unit) return `${item.quantity} ${item.unit}`;
+  const unit = item.unit?.trim();
+  if (unit && unit !== String(item.quantity)) return `${item.quantity} ${unit}`;
   return `${item.quantity}`;
 }
 
@@ -443,7 +636,10 @@ export function QuotePDF({
   logoSrc = null,
 }: QuotePDFProps) {
   const managerContactEmail = managerEmail?.trim() || '';
-  const quoteTableMinPresenceAhead = getQuoteTableMinPresenceAhead(lineItems);
+  const keepQuoteTableTogether = lineItems.length <= 4;
+  const quoteTableMinPresenceAhead = keepQuoteTableTogether
+    ? getQuoteTableMinPresenceAhead(lineItems)
+    : 64;
   const formattedDate = (() => {
     try {
       const d = new Date(quoteDate);
@@ -514,18 +710,28 @@ export function QuotePDF({
           </View>
         </View>
 
-        <View style={styles.recipientCard}>
-          <Text style={styles.sectionEyebrow}>PREPARED FOR</Text>
-          {attentionName ? (
-            <Text style={styles.recipientName}>For the attention of {attentionName}</Text>
-          ) : (
-            <Text style={styles.recipientName}>For the attention of your team</Text>
-          )}
-          {attentionEmail && (
-            <Link src={`mailto:${attentionEmail}`} style={styles.emailLink}>
-              {attentionEmail}
-            </Link>
-          )}
+        <View style={styles.recipientCard} wrap={false}>
+          <View style={styles.recipientRow}>
+            <View style={styles.recipientColumn}>
+              <Text style={styles.sectionEyebrow}>PREPARED FOR</Text>
+              {attentionName ? (
+                <Text style={styles.recipientName}>For the attention of {attentionName}</Text>
+              ) : (
+                <Text style={styles.recipientName}>For the attention of your team</Text>
+              )}
+              {attentionEmail && (
+                <Link src={`mailto:${attentionEmail}`} style={styles.emailLink}>
+                  {attentionEmail}
+                </Link>
+              )}
+            </View>
+            {siteAddress && (
+              <View style={styles.recipientColumnRight}>
+                <Text style={styles.sectionEyebrow}>SITE ADDRESS</Text>
+                <Text style={styles.preparedSiteAddress}>{siteAddress}</Text>
+              </View>
+            )}
+          </View>
         </View>
 
         <Text style={styles.salutation}>{salutation || 'Dear Sir/Madam,'}</Text>
@@ -533,30 +739,30 @@ export function QuotePDF({
           Further to your request, we are pleased to provide our quotation as follows:
         </Text>
 
-        <View style={styles.subjectCard}>
+        <View style={styles.summaryCard}>
           {subjectLine && <Text style={styles.subjectTitle}>{subjectLine}</Text>}
-          {projectDescription && <Text style={styles.subjectDescription}>{projectDescription}</Text>}
-          {scope && (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Scope</Text>
-              <Text style={styles.detailValue}>{scope}</Text>
-            </View>
-          )}
-          {siteAddress && (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Site address</Text>
-              <Text style={styles.detailValue}>{siteAddress}</Text>
-            </View>
-          )}
-          {managerContactEmail && (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Manager email</Text>
-              <Link src={`mailto:${managerContactEmail}`} style={styles.detailLink}>
-                {managerContactEmail}
-              </Link>
-            </View>
+          {projectDescription && (
+            <PdfRichText
+              value={projectDescription}
+              textStyle={styles.subjectDescription}
+              headingStyle={styles.subjectDescriptionHeading}
+            />
           )}
         </View>
+
+        {scope && (
+          <>
+            <Text style={[styles.scopeSection, styles.scopeTitle]}>SCOPE</Text>
+            <PdfRichText
+              value={scope}
+              textStyle={styles.scopeText}
+              headingStyle={styles.scopeHeading}
+              blockGap={4}
+              omitLeadingHeading="scope of works"
+            />
+            <View style={styles.scopeBottomSpacer} />
+          </>
+        )}
 
         {pricingMode === 'attachments_only' ? (
           <View style={styles.notesPanel}>
@@ -566,9 +772,12 @@ export function QuotePDF({
             </Text>
           </View>
         ) : (
-          <View minPresenceAhead={quoteTableMinPresenceAhead}>
-            <Text style={styles.tableLabel} minPresenceAhead={quoteTableMinPresenceAhead}>Quoted items</Text>
-            <View style={styles.table} minPresenceAhead={quoteTableMinPresenceAhead}>
+          <View
+            minPresenceAhead={quoteTableMinPresenceAhead}
+            wrap={!keepQuoteTableTogether}
+          >
+            <Text style={styles.tableLabel} minPresenceAhead={quoteTableMinPresenceAhead}>QUOTED ITEMS</Text>
+            <View style={styles.table}>
               <View style={styles.tableHeader} wrap={false}>
                 <Text style={[styles.colItemHeader, styles.tableHeaderText]}>Item</Text>
                 <Text style={[styles.colQtyHeader, styles.tableHeaderText]}>Quantity</Text>
@@ -581,7 +790,14 @@ export function QuotePDF({
                   style={idx % 2 === 0 ? styles.tableRow : styles.tableRowAlt}
                   wrap={false}
                 >
-                  <Text style={styles.colItem}>{item.description}</Text>
+                  <View style={styles.colItemCell}>
+                    <PdfRichText
+                      value={item.description}
+                      textStyle={styles.colItemText}
+                      headingStyle={styles.colItemText}
+                      blockGap={2}
+                    />
+                  </View>
                   <Text style={styles.colQty}>{formatQuantity(item)}</Text>
                   <Text style={styles.colRate}>{gbp(item.unit_rate)}</Text>
                   <Text style={styles.colTotal}>{gbp(item.line_total)}</Text>
@@ -596,9 +812,11 @@ export function QuotePDF({
         )}
 
         <View style={styles.notesPanel}>
-          <Text style={styles.notesPrimary}>
-            {customFooterText || `Quotation valid for ${validityDays} days.`}
-          </Text>
+          <PdfRichText
+            value={customFooterText || `Quotation valid for ${validityDays} days.`}
+            textStyle={styles.notesPrimary}
+            headingStyle={styles.notesPrimary}
+          />
           <Text style={styles.notesSecondary}>
             We trust you will find this of interest and assure you of our close attention to your requirements.
           </Text>

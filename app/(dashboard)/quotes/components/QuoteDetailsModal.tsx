@@ -55,6 +55,7 @@ import {
   replaceQuoteAttachment,
   uploadQuoteAttachment,
 } from '../quote-attachment-client';
+import { FormattedQuoteText } from './FormattedQuoteText';
 import type { Quote, QuoteAttachment, QuoteCompletionStatus, QuoteRevisionType } from '../types';
 import { getQuoteStatusConfig } from '../types';
 
@@ -138,6 +139,7 @@ function getTimelineEventMeta(eventType: string) {
         iconClassName: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
       };
     case 'invoice_added':
+    case 'invoice_requested':
       return {
         icon: Receipt,
         iconClassName: 'text-fuchsia-300 bg-fuchsia-500/10 border-fuchsia-500/20',
@@ -170,6 +172,19 @@ function getTimelineEventMeta(eventType: string) {
   }
 }
 
+function getBillingStatusConfig(status: NonNullable<Quote['invoice_summary']>['status'] | undefined) {
+  switch (status) {
+    case 'ready_to_invoice':
+      return { label: 'Ready to invoice', color: 'border-violet-500/30 text-violet-300 bg-violet-500/10' };
+    case 'partially_invoiced':
+      return { label: 'Part billed', color: 'border-fuchsia-500/30 text-fuchsia-300 bg-fuchsia-500/10' };
+    case 'invoiced':
+      return { label: 'Fully billed', color: 'border-emerald-500/30 text-emerald-300 bg-emerald-500/10' };
+    default:
+      return { label: 'Not billed', color: 'border-slate-500/30 text-slate-300 bg-slate-500/10' };
+  }
+}
+
 async function buildResponseError(response: Response, fallback: string) {
   const payload = await response.json().catch(() => null) as { error?: string; field_errors?: DetailFieldErrors } | null;
   const error = new Error(payload?.error || fallback) as Error & { fieldErrors?: DetailFieldErrors };
@@ -194,6 +209,12 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().slice(0, 10));
   const [invoiceScope, setInvoiceScope] = useState<'full' | 'partial'>('partial');
   const [invoiceComments, setInvoiceComments] = useState('');
+  const [invoiceRequestAmount, setInvoiceRequestAmount] = useState('');
+  const [invoiceRequestDate, setInvoiceRequestDate] = useState(new Date().toISOString().slice(0, 10));
+  const [invoiceRequestScope, setInvoiceRequestScope] = useState<'full' | 'partial'>('full');
+  const [invoiceRequestComments, setInvoiceRequestComments] = useState('');
+  const [selectedInvoiceRequestId, setSelectedInvoiceRequestId] = useState('');
+  const [invoiceMatchesRequest, setInvoiceMatchesRequest] = useState(false);
   const [revisionType, setRevisionType] = useState<QuoteRevisionType>('revision');
   const [revisionNotes, setRevisionNotes] = useState('');
   const [ramsComments, setRamsComments] = useState('');
@@ -202,6 +223,8 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   const [loadError, setLoadError] = useState<string | null>(null);
   const [workflowError, setWorkflowError] = useState<string | null>(null);
   const [workflowFieldErrors, setWorkflowFieldErrors] = useState<DetailFieldErrors>({});
+  const [invoiceRequestError, setInvoiceRequestError] = useState<string | null>(null);
+  const [invoiceRequestFieldErrors, setInvoiceRequestFieldErrors] = useState<DetailFieldErrors>({});
   const [invoiceError, setInvoiceError] = useState<string | null>(null);
   const [invoiceFieldErrors, setInvoiceFieldErrors] = useState<DetailFieldErrors>({});
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
@@ -221,7 +244,17 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   const canManageAttachments = isLatestVersion;
   const canCreateVersions = isLatestVersion;
   const hasMultipleVersions = (quote?.versions?.length ?? 0) > 1;
+  const availableToRequest = Number(quote?.invoice_summary?.availableToRequest ?? quote?.invoice_summary?.remainingBalance ?? quote?.total ?? 0);
   const suggestedInvoiceAmount = Number(quote?.invoice_summary?.remainingBalance ?? quote?.total ?? 0);
+  const pendingInvoiceRequests = useMemo(
+    () => (quote?.invoice_requests || []).filter(request => request.status === 'pending'),
+    [quote?.invoice_requests]
+  );
+  const selectedInvoiceRequest = pendingInvoiceRequests.find(request => request.id === selectedInvoiceRequestId) || null;
+  const pendingFullInvoiceRequest = pendingInvoiceRequests.find(request => request.requested_invoice_scope === 'full') || null;
+  const billingStatusConfig = getBillingStatusConfig(quote?.invoice_summary?.status);
+  const managerRequestCtaLabel = pendingInvoiceRequests.length > 0 ? 'Request Another Invoice' : 'Mark Ready To Invoice';
+  const managerRequestControlsDisabled = !canManageInvoices || availableToRequest <= 0 || Boolean(pendingFullInvoiceRequest);
 
   const groupedTimeline = useMemo(() => {
     const timeline = quote?.timeline ?? [];
@@ -310,19 +343,68 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
     });
   }
 
+  function clearInvoiceRequestError(field?: string) {
+    setInvoiceRequestError(null);
+    if (!field) {
+      setInvoiceRequestFieldErrors({});
+      return;
+    }
+
+    setInvoiceRequestFieldErrors(prev => {
+      if (!(field in prev)) {
+        return prev;
+      }
+
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  }
+
+  function validateInvoiceRequestFields() {
+    const errors: DetailFieldErrors = {};
+    const amount = Number(invoiceRequestAmount);
+
+    if (!invoiceRequestAmount || !Number.isFinite(amount) || amount <= 0) {
+      errors.requested_amount = 'Enter an invoice request amount greater than 0.';
+    }
+
+    if (!invoiceRequestDate) {
+      errors.requested_invoice_date = 'Enter the requested invoice date.';
+    }
+
+    if (Number.isFinite(amount) && amount - availableToRequest > 0.005) {
+      errors.requested_amount = `This quote has £${availableToRequest.toLocaleString('en-GB', { minimumFractionDigits: 2 })} available to request.`;
+    }
+
+    if (Number.isFinite(amount) && invoiceRequestScope === 'full' && Math.abs(amount - availableToRequest) > 0.005) {
+      errors.requested_amount = `Full invoice request must be £${availableToRequest.toLocaleString('en-GB', { minimumFractionDigits: 2 })}.`;
+    }
+
+    if (Number.isFinite(amount) && invoiceRequestScope === 'partial' && amount >= availableToRequest - 0.005) {
+      errors.requested_invoice_scope = 'Select full invoice for the remaining balance.';
+    }
+
+    return errors;
+  }
+
   function validateInvoiceFields() {
     const errors: DetailFieldErrors = {};
     if (!invoiceNumber.trim()) {
       errors.invoice_number = 'Enter an invoice number.';
     }
 
-    const amount = Number(invoiceAmount);
-    if (!invoiceAmount || !Number.isFinite(amount) || amount <= 0) {
-      errors.amount = 'Enter an invoice amount greater than 0.';
-    }
+    const amount = selectedInvoiceRequest ? Number(selectedInvoiceRequest.requested_amount) : Number(invoiceAmount);
+    if (!selectedInvoiceRequest) {
+      if (!invoiceAmount || !Number.isFinite(amount) || amount <= 0) {
+        errors.amount = 'Enter an invoice amount greater than 0.';
+      }
 
-    if (!invoiceDate) {
-      errors.invoice_date = 'Enter an invoice date.';
+      if (!invoiceDate) {
+        errors.invoice_date = 'Enter an invoice date.';
+      }
+    } else if (!invoiceMatchesRequest) {
+      errors.confirm_matches_request = 'Confirm the invoice details match the manager request.';
     }
 
     if (Number.isFinite(amount) && amount - suggestedInvoiceAmount > 0.005) {
@@ -345,8 +427,16 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
     setInvoiceDate(new Date().toISOString().slice(0, 10));
     setInvoiceScope(nextQuote.invoice_summary?.remainingBalance === 0 ? 'partial' : 'full');
     setInvoiceComments('');
+    setInvoiceRequestAmount(nextQuote.invoice_summary?.availableToRequest ? String(nextQuote.invoice_summary.availableToRequest) : '');
+    setInvoiceRequestDate(new Date().toISOString().slice(0, 10));
+    setInvoiceRequestScope(nextQuote.invoice_summary?.availableToRequest === nextQuote.invoice_summary?.remainingBalance ? 'full' : 'partial');
+    setInvoiceRequestComments('');
+    setSelectedInvoiceRequestId((nextQuote.invoice_requests || []).find(request => request.status === 'pending')?.id || '');
+    setInvoiceMatchesRequest(false);
     setWorkflowError(null);
     setWorkflowFieldErrors({});
+    setInvoiceRequestError(null);
+    setInvoiceRequestFieldErrors({});
     setInvoiceError(null);
     setInvoiceFieldErrors({});
     setAttachmentError(null);
@@ -408,8 +498,12 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
       setLoadError(null);
       setWorkflowError(null);
       setWorkflowFieldErrors({});
+      setInvoiceRequestError(null);
+      setInvoiceRequestFieldErrors({});
       setInvoiceError(null);
       setInvoiceFieldErrors({});
+      setSelectedInvoiceRequestId('');
+      setInvoiceMatchesRequest(false);
       setAttachmentError(null);
       setDeleteError(null);
       setRemovingAttachmentId(null);
@@ -546,6 +640,83 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
     }
   }
 
+  async function createInvoiceRequest() {
+    if (!activeQuoteId) return;
+
+    const nextRequestErrors = validateInvoiceRequestFields();
+    if (Object.keys(nextRequestErrors).length > 0) {
+      setInvoiceRequestFieldErrors(nextRequestErrors);
+      setInvoiceRequestError('Please correct the highlighted fields and try again.');
+      toast.error('Please correct the highlighted fields and try again.');
+      return;
+    }
+
+    setActionLoading(true);
+    clearInvoiceRequestError();
+    try {
+      const res = await fetch(`/api/quotes/${activeQuoteId}/invoice-requests`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requested_amount: Number(invoiceRequestAmount),
+          requested_invoice_date: invoiceRequestDate,
+          requested_invoice_scope: invoiceRequestScope,
+          manager_comments: invoiceRequestComments,
+        }),
+      });
+
+      if (!res.ok) {
+        throw await buildResponseError(res, 'Unable to mark this quote ready to invoice right now.');
+      }
+
+      toast.success('Accounts notified');
+      setInvoiceRequestComments('');
+      await fetchQuote();
+      onRefresh();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to mark this quote ready to invoice right now.';
+      const fieldErrors = error instanceof Error && 'fieldErrors' in error
+        ? ((error as Error & { fieldErrors?: DetailFieldErrors }).fieldErrors || {})
+        : {};
+      setInvoiceRequestFieldErrors(fieldErrors);
+      setInvoiceRequestError(message);
+      toast.error(message);
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function retractInvoiceRequest(invoiceRequestId: string) {
+    if (!activeQuoteId || !invoiceRequestId) return;
+
+    setActionLoading(true);
+    clearInvoiceRequestError();
+    try {
+      const res = await fetch(`/api/quotes/${activeQuoteId}/invoice-requests`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'cancel',
+          invoice_request_id: invoiceRequestId,
+        }),
+      });
+
+      if (!res.ok) {
+        throw await buildResponseError(res, 'Unable to retract this invoice request right now.');
+      }
+
+      toast.success('Invoice request retracted');
+      await fetchQuote();
+      onRefresh();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to retract this invoice request right now.';
+      setInvoiceRequestError(message);
+      toast.error(message);
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   async function addInvoice() {
     if (!activeQuoteId) return;
 
@@ -564,10 +735,12 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          invoice_request_id: selectedInvoiceRequest?.id || undefined,
           invoice_number: invoiceNumber,
-          invoice_date: invoiceDate,
-          amount: Number(invoiceAmount),
-          invoice_scope: invoiceScope,
+          invoice_date: selectedInvoiceRequest?.requested_invoice_date || invoiceDate,
+          amount: selectedInvoiceRequest ? Number(selectedInvoiceRequest.requested_amount) : Number(invoiceAmount),
+          invoice_scope: selectedInvoiceRequest?.requested_invoice_scope || invoiceScope,
+          confirm_matches_request: Boolean(selectedInvoiceRequest) ? invoiceMatchesRequest : undefined,
           comments: invoiceComments,
         }),
       });
@@ -580,6 +753,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
       setInvoiceNumber('');
       setInvoiceAmount('');
       setInvoiceComments('');
+      setInvoiceMatchesRequest(false);
       await fetchQuote();
       onRefresh();
     } catch (error) {
@@ -635,7 +809,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   return (
     <>
     <Dialog open={open} onOpenChange={isOpen => { if (!isOpen) onClose(); }}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-slate-900 border-slate-700 text-white">
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-3xl xl:max-w-[60rem] max-h-[90vh] overflow-y-auto bg-slate-900 border-slate-700 text-white">
         <DialogHeader className="sr-only">
           <DialogTitle>Quote Details</DialogTitle>
         </DialogHeader>
@@ -720,24 +894,34 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                 </div>
               </div>
 
-              {quote.site_address && (
-                <div className="text-sm">
-                  <span className="text-muted-foreground">Site Address</span>
-                  <p className="text-slate-300 whitespace-pre-wrap">{quote.site_address}</p>
-                </div>
-              )}
+              {(quote.site_address || quote.project_description) && (
+                <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+                  <div>
+                    <span className="text-muted-foreground">Site Address</span>
+                    {quote.site_address ? (
+                      <p className="text-slate-300 whitespace-pre-wrap">{quote.site_address}</p>
+                    ) : (
+                      <p className="text-slate-500">—</p>
+                    )}
+                  </div>
 
-              {quote.project_description && (
-                <div className="text-sm">
-                  <span className="text-muted-foreground">Summary</span>
-                  <p className="text-slate-300 whitespace-pre-wrap">{quote.project_description}</p>
+                  <div>
+                    <span className="text-muted-foreground">Summary</span>
+                    {quote.project_description ? (
+                      <FormattedQuoteText value={quote.project_description} className="mt-1" />
+                    ) : (
+                      <p className="text-slate-500">—</p>
+                    )}
+                  </div>
                 </div>
               )}
 
               {quote.scope && (
                 <div className="text-sm">
                   <span className="text-muted-foreground">Scope</span>
-                  <p className="text-slate-300 whitespace-pre-wrap">{quote.scope}</p>
+                  <div className="mt-1 max-h-44 overflow-y-auto overscroll-contain rounded-md border border-slate-700/70 bg-slate-950/20 p-3 pr-4">
+                    <FormattedQuoteText value={quote.scope} omitLeadingHeading="scope of works" />
+                  </div>
                 </div>
               )}
 
@@ -1015,101 +1199,344 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                 </TabsContent>
 
                 <TabsContent value="invoices" className="space-y-4">
+                  {invoiceRequestError ? (
+                    <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-100">
+                      {invoiceRequestError}
+                    </div>
+                  ) : null}
                   {invoiceError ? (
                     <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-100">
                       {invoiceError}
                     </div>
                   ) : null}
 
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                    <div className="space-y-2 sm:col-span-2">
-                      <Label>Invoice Number *</Label>
-                      <Input
-                        value={invoiceNumber}
-                        disabled={!canManageInvoices}
-                        onChange={e => {
-                          clearInvoiceError('invoice_number');
-                          setInvoiceNumber(e.target.value);
-                        }}
-                        className={getFieldClassName(invoiceFieldErrors, 'invoice_number')}
-                      />
-                      {renderFieldError(invoiceFieldErrors, 'invoice_number')}
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+                    <div className="rounded-lg border border-slate-700 bg-slate-800/30 p-4 text-sm">
+                      <p className="text-muted-foreground">Quote Total</p>
+                      <p className="mt-1 text-lg font-semibold text-white">£{Number(quote.total).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Amount *</Label>
-                      <Input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={invoiceAmount}
-                        disabled={!canManageInvoices}
-                        onChange={e => {
-                          clearInvoiceError('amount');
-                          const nextValue = e.target.value;
-                          setInvoiceAmount(nextValue);
-
-                          const numericValue = Number(nextValue);
-                          if (nextValue && Number.isFinite(numericValue) && numericValue < suggestedInvoiceAmount) {
-                            setInvoiceScope('partial');
-                          }
-                        }}
-                        className={getFieldClassName(invoiceFieldErrors, 'amount')}
-                      />
-                      {renderFieldError(invoiceFieldErrors, 'amount')}
+                    <div className="rounded-lg border border-slate-700 bg-slate-800/30 p-4 text-sm">
+                      <p className="text-muted-foreground">Actual Invoiced</p>
+                      <p className="mt-1 text-lg font-semibold text-white">£{Number(quote.invoice_summary?.invoicedTotal || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Date *</Label>
-                      <Input
-                        type="date"
-                        value={invoiceDate}
-                        disabled={!canManageInvoices}
-                        onChange={e => {
-                          clearInvoiceError('invoice_date');
-                          setInvoiceDate(e.target.value);
-                        }}
-                        className={getFieldClassName(invoiceFieldErrors, 'invoice_date')}
-                      />
-                      {renderFieldError(invoiceFieldErrors, 'invoice_date')}
+                    <div className="rounded-lg border border-slate-700 bg-slate-800/30 p-4 text-sm">
+                      <p className="text-muted-foreground">Pending Requested</p>
+                      <p className="mt-1 text-lg font-semibold text-white">£{Number(quote.invoice_summary?.pendingRequestedTotal || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
+                    </div>
+                    <div className="rounded-lg border border-slate-700 bg-slate-800/30 p-4 text-sm">
+                      <p className="text-muted-foreground">Available To Request</p>
+                      <p className="mt-1 text-lg font-semibold text-white">£{availableToRequest.toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Invoice Scope</Label>
-                      <Select value={invoiceScope} onValueChange={(value: 'full' | 'partial') => setInvoiceScope(value)} disabled={!canManageInvoices}>
-                        <SelectTrigger className={getSelectClassName(invoiceFieldErrors, 'invoice_scope')}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="full">Invoice in full</SelectItem>
-                          <SelectItem value="partial">Partial invoice</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {renderFieldError(invoiceFieldErrors, 'invoice_scope')}
+                  <div className="rounded-lg border border-slate-700 bg-slate-800/30 p-4 space-y-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <h4 className="font-semibold text-white">Manager request</h4>
+                        <p className="text-xs text-muted-foreground">Mark this quote as ready for Accounts to create invoice details.</p>
+                      </div>
+                      <Badge variant="outline" className={billingStatusConfig.color}>
+                        {billingStatusConfig.label}
+                      </Badge>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Comments</Label>
-                      <Textarea
-                        value={invoiceComments}
-                      disabled={!canManageInvoices}
-                        onChange={e => {
-                          clearInvoiceError('comments');
-                          setInvoiceComments(e.target.value);
-                        }}
-                        rows={2}
-                        className={getFieldClassName(invoiceFieldErrors, 'comments')}
-                      />
-                      {renderFieldError(invoiceFieldErrors, 'comments')}
-                    </div>
+
+                    {pendingFullInvoiceRequest ? (
+                      <div className="rounded-md border border-violet-500/30 bg-violet-500/10 p-3 text-sm text-violet-100">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="font-medium">Full amount has already been requested.</p>
+                            <p className="text-xs text-violet-100/80">
+                              Marked ready: {format(new Date(pendingFullInvoiceRequest.requested_at), 'dd MMM yyyy')}
+                            </p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => retractInvoiceRequest(pendingFullInvoiceRequest.id)}
+                            disabled={actionLoading || !canManageInvoices}
+                            className="border-violet-400/40 text-violet-100 hover:bg-violet-500/20"
+                          >
+                            Retract request
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+                          <div className="space-y-2">
+                            <Label>Amount *</Label>
+                            <Input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              value={invoiceRequestAmount}
+                              disabled={managerRequestControlsDisabled}
+                              onChange={e => {
+                                clearInvoiceRequestError('requested_amount');
+                                const nextValue = e.target.value;
+                                setInvoiceRequestAmount(nextValue);
+
+                                const numericValue = Number(nextValue);
+                                if (nextValue && Number.isFinite(numericValue) && numericValue < availableToRequest) {
+                                  setInvoiceRequestScope('partial');
+                                }
+                              }}
+                              className={getFieldClassName(invoiceRequestFieldErrors, 'requested_amount')}
+                            />
+                            {renderFieldError(invoiceRequestFieldErrors, 'requested_amount')}
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Date *</Label>
+                            <Input
+                              type="date"
+                              value={invoiceRequestDate}
+                              disabled={managerRequestControlsDisabled}
+                              onChange={e => {
+                                clearInvoiceRequestError('requested_invoice_date');
+                                setInvoiceRequestDate(e.target.value);
+                              }}
+                              className={getFieldClassName(invoiceRequestFieldErrors, 'requested_invoice_date')}
+                            />
+                            {renderFieldError(invoiceRequestFieldErrors, 'requested_invoice_date')}
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Invoice Scope</Label>
+                            <Select
+                              value={invoiceRequestScope}
+                              onValueChange={(value: 'full' | 'partial') => {
+                                clearInvoiceRequestError('requested_invoice_scope');
+                                setInvoiceRequestScope(value);
+                              }}
+                              disabled={managerRequestControlsDisabled}
+                            >
+                              <SelectTrigger className={getSelectClassName(invoiceRequestFieldErrors, 'requested_invoice_scope')}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="full">Invoice in full</SelectItem>
+                                <SelectItem value="partial">Partial invoice</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            {renderFieldError(invoiceRequestFieldErrors, 'requested_invoice_scope')}
+                          </div>
+                          <div className="flex items-end">
+                            <Button
+                              onClick={createInvoiceRequest}
+                              disabled={actionLoading || managerRequestControlsDisabled}
+                              className="w-full bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90"
+                            >
+                              <Send className="mr-2 h-4 w-4" /> {managerRequestCtaLabel}
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Internal Comments</Label>
+                          <Textarea
+                            value={invoiceRequestComments}
+                            disabled={managerRequestControlsDisabled}
+                            onChange={e => {
+                              clearInvoiceRequestError('manager_comments');
+                              setInvoiceRequestComments(e.target.value);
+                            }}
+                            rows={2}
+                            className={getFieldClassName(invoiceRequestFieldErrors, 'manager_comments')}
+                          />
+                          {renderFieldError(invoiceRequestFieldErrors, 'manager_comments')}
+                        </div>
+                      </>
+                    )}
+
+                    {pendingInvoiceRequests.length > 0 && !pendingFullInvoiceRequest ? (
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Pending invoice requests</p>
+                        {pendingInvoiceRequests.map(request => (
+                          <div key={request.id} className="flex flex-col gap-2 rounded-md border border-slate-700 bg-slate-900/40 p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                              <p className="font-medium text-slate-100">
+                                £{Number(request.requested_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })} • {request.requested_invoice_scope === 'full' ? 'Full invoice' : 'Partial invoice'}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Marked ready: {format(new Date(request.requested_at), 'dd MMM yyyy')} • Requested date: {format(new Date(request.requested_invoice_date), 'dd MMM yyyy')}
+                              </p>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => retractInvoiceRequest(request.id)}
+                              disabled={actionLoading || !canManageInvoices}
+                            >
+                              Retract request
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    {availableToRequest <= 0 && !pendingFullInvoiceRequest ? (
+                      <p className="text-xs text-muted-foreground">No remaining balance is available to request.</p>
+                    ) : null}
                   </div>
 
-                  <Button
-                    onClick={addInvoice}
-                    disabled={actionLoading || !canManageInvoices}
-                    className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90"
-                  >
-                    <Receipt className="mr-2 h-4 w-4" /> Add Invoice
-                  </Button>
+                  <div className="rounded-lg border border-slate-700 bg-slate-800/30 p-4 space-y-4">
+                    <div>
+                      <h4 className="font-semibold text-white">Accounts invoice details</h4>
+                      <p className="text-xs text-muted-foreground">Create the invoice, then record the invoice number here.</p>
+                    </div>
+
+                    {pendingInvoiceRequests.length ? (
+                      <div className="space-y-2">
+                        <Label>Pending Request</Label>
+                        <Select
+                          value={selectedInvoiceRequestId}
+                          onValueChange={(value) => {
+                            clearInvoiceError();
+                            setSelectedInvoiceRequestId(value);
+                            setInvoiceMatchesRequest(false);
+                          }}
+                          disabled={!canManageInvoices}
+                        >
+                          <SelectTrigger className="bg-slate-800 border-slate-600">
+                            <SelectValue placeholder="Select pending request" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {pendingInvoiceRequests.map(request => (
+                              <SelectItem key={request.id} value={request.id}>
+                                {format(new Date(request.requested_invoice_date), 'dd MMM yyyy')} • £{Number(request.requested_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })} • {request.requested_invoice_scope}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No pending invoice requests. Accounts can still record ad-hoc invoice details if needed.</p>
+                    )}
+
+                    {selectedInvoiceRequest ? (
+                      <div className="rounded-md border border-violet-500/30 bg-violet-500/10 p-3 text-sm text-violet-100">
+                        <p className="font-medium">Manager requested {selectedInvoiceRequest.requested_invoice_scope} invoice for £{Number(selectedInvoiceRequest.requested_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
+                        <p className="text-xs text-violet-100/80">Requested date: {format(new Date(selectedInvoiceRequest.requested_invoice_date), 'dd MMM yyyy')}</p>
+                        {selectedInvoiceRequest.manager_comments ? (
+                          <p className="mt-2 whitespace-pre-wrap text-sm">{selectedInvoiceRequest.manager_comments}</p>
+                        ) : null}
+                      </div>
+                    ) : null}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                      <div className="space-y-2 sm:col-span-2">
+                        <Label>Invoice Number *</Label>
+                        <Input
+                          value={invoiceNumber}
+                          disabled={!canManageInvoices}
+                          onChange={e => {
+                            clearInvoiceError('invoice_number');
+                            setInvoiceNumber(e.target.value);
+                          }}
+                          className={getFieldClassName(invoiceFieldErrors, 'invoice_number')}
+                        />
+                        {renderFieldError(invoiceFieldErrors, 'invoice_number')}
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Amount *</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={selectedInvoiceRequest ? String(selectedInvoiceRequest.requested_amount) : invoiceAmount}
+                          disabled={!canManageInvoices || Boolean(selectedInvoiceRequest)}
+                          onChange={e => {
+                            clearInvoiceError('amount');
+                            const nextValue = e.target.value;
+                            setInvoiceAmount(nextValue);
+
+                            const numericValue = Number(nextValue);
+                            if (nextValue && Number.isFinite(numericValue) && numericValue < suggestedInvoiceAmount) {
+                              setInvoiceScope('partial');
+                            }
+                          }}
+                          className={getFieldClassName(invoiceFieldErrors, 'amount')}
+                        />
+                        {renderFieldError(invoiceFieldErrors, 'amount')}
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Date *</Label>
+                        <Input
+                          type="date"
+                          value={selectedInvoiceRequest?.requested_invoice_date || invoiceDate}
+                          disabled={!canManageInvoices || Boolean(selectedInvoiceRequest)}
+                          onChange={e => {
+                            clearInvoiceError('invoice_date');
+                            setInvoiceDate(e.target.value);
+                          }}
+                          className={getFieldClassName(invoiceFieldErrors, 'invoice_date')}
+                        />
+                        {renderFieldError(invoiceFieldErrors, 'invoice_date')}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Invoice Scope</Label>
+                        <Select
+                          value={selectedInvoiceRequest?.requested_invoice_scope || invoiceScope}
+                          onValueChange={(value: 'full' | 'partial') => setInvoiceScope(value)}
+                          disabled={!canManageInvoices || Boolean(selectedInvoiceRequest)}
+                        >
+                          <SelectTrigger className={getSelectClassName(invoiceFieldErrors, 'invoice_scope')}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="full">Invoice in full</SelectItem>
+                            <SelectItem value="partial">Partial invoice</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {renderFieldError(invoiceFieldErrors, 'invoice_scope')}
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Accounts Comments</Label>
+                        <Textarea
+                          value={invoiceComments}
+                          disabled={!canManageInvoices}
+                          onChange={e => {
+                            clearInvoiceError('comments');
+                            setInvoiceComments(e.target.value);
+                          }}
+                          rows={2}
+                          className={getFieldClassName(invoiceFieldErrors, 'comments')}
+                        />
+                        {renderFieldError(invoiceFieldErrors, 'comments')}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-h-10 flex-1">
+                        {selectedInvoiceRequest ? (
+                          <label className="flex items-start gap-2 text-sm text-slate-300">
+                            <input
+                              type="checkbox"
+                              checked={invoiceMatchesRequest}
+                              disabled={!canManageInvoices}
+                              onChange={event => {
+                                clearInvoiceError('confirm_matches_request');
+                                setInvoiceMatchesRequest(event.target.checked);
+                              }}
+                              className="mt-1"
+                            />
+                            <span>I confirm the invoice details and total match the manager request.</span>
+                          </label>
+                        ) : null}
+                        {renderFieldError(invoiceFieldErrors, 'confirm_matches_request')}
+                      </div>
+
+                      <Button
+                        onClick={addInvoice}
+                        disabled={actionLoading || !canManageInvoices}
+                        className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90 sm:self-start"
+                      >
+                        <Receipt className="mr-2 h-4 w-4" /> Add Invoice Details
+                      </Button>
+                    </div>
+                  </div>
 
                   {!canManageInvoices ? (
                     <p className="text-xs text-muted-foreground">
@@ -1118,20 +1545,29 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                   ) : null}
 
                   <div className="space-y-2">
-                    {quote.invoices?.length ? quote.invoices.map(invoice => (
-                      <div key={invoice.id} className="rounded-lg border border-slate-700 bg-slate-800/30 p-4">
-                        <div className="flex items-center justify-between gap-4">
-                          <div>
-                            <p className="font-medium text-white">{invoice.invoice_number}</p>
-                            <p className="text-xs text-muted-foreground">{format(new Date(invoice.invoice_date), 'dd MMM yyyy')} • {invoice.invoice_scope.replace('_', ' ')}</p>
+                    {quote.invoices?.length ? quote.invoices.map(invoice => {
+                      const linkedRequest = quote.invoice_requests?.find(request => request.id === invoice.invoice_request_id) || null;
+                      return (
+                        <div key={invoice.id} className="rounded-lg border border-slate-700 bg-slate-800/30 p-4">
+                          <div className="flex items-center justify-between gap-4">
+                            <div>
+                              <p className="font-medium text-white">{invoice.invoice_number}</p>
+                              <p className="text-xs text-muted-foreground">
+                                Invoice date: {format(new Date(invoice.invoice_date), 'dd MMM yyyy')} • {invoice.invoice_scope === 'full' ? 'Full invoice' : 'Partial invoice'}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {linkedRequest ? `Marked ready: ${format(new Date(linkedRequest.requested_at), 'dd MMM yyyy')} • ` : ''}
+                                Added by Accounts: {format(new Date(invoice.created_at), 'dd MMM yyyy')}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-semibold text-white">£{Number(invoice.amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <p className="font-semibold text-white">£{Number(invoice.amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
-                          </div>
+                          {invoice.comments && <p className="mt-2 text-sm text-slate-300 whitespace-pre-wrap">{invoice.comments}</p>}
                         </div>
-                        {invoice.comments && <p className="mt-2 text-sm text-slate-300 whitespace-pre-wrap">{invoice.comments}</p>}
-                      </div>
-                    )) : (
+                      );
+                    }) : (
                       <p className="text-sm text-muted-foreground">No invoices recorded yet.</p>
                     )}
                   </div>

@@ -36,6 +36,7 @@ type SortDir = 'asc' | 'desc';
 const BILLING_FILTER_OPTIONS = [
   { value: 'all', label: 'All billing' },
   { value: 'not_invoiced', label: 'Not billed' },
+  { value: 'ready_to_invoice', label: 'Ready to invoice' },
   { value: 'partially_invoiced', label: 'Part billed' },
   { value: 'invoiced', label: 'Fully billed' },
 ] as const;
@@ -58,6 +59,19 @@ function quoteMatchesStatus(quote: Quote, status: QuoteStatus) {
   return quote.status === status;
 }
 
+function getBillingStatusConfig(status: NonNullable<Quote['invoice_summary']>['status'] | undefined) {
+  switch (status) {
+    case 'ready_to_invoice':
+      return { label: 'Ready to invoice', color: 'border-violet-500/30 text-violet-300 bg-violet-500/10' };
+    case 'partially_invoiced':
+      return { label: 'Part billed', color: 'border-fuchsia-500/30 text-fuchsia-300 bg-fuchsia-500/10' };
+    case 'invoiced':
+      return { label: 'Fully billed', color: 'border-emerald-500/30 text-emerald-300 bg-emerald-500/10' };
+    default:
+      return { label: 'Not billed', color: 'border-slate-500/30 text-slate-300 bg-slate-500/10' };
+  }
+}
+
 export function QuotesTable({
   quotes,
   statusCounts: providedStatusCounts,
@@ -67,7 +81,7 @@ export function QuotesTable({
 }: QuotesTableProps) {
   const [search, setSearch] = useState('');
   const [poFilter, setPoFilter] = useState<'all' | 'with_po' | 'without_po'>('all');
-  const [invoiceFilter, setInvoiceFilter] = useState<'all' | 'not_invoiced' | 'partially_invoiced' | 'invoiced'>('all');
+  const [invoiceFilter, setInvoiceFilter] = useState<'all' | 'not_invoiced' | 'ready_to_invoice' | 'partially_invoiced' | 'invoiced'>('all');
   const [sortField, setSortField] = useState<SortField>('quote_date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [expandedThreads, setExpandedThreads] = useState<Record<string, boolean>>({});
@@ -215,7 +229,7 @@ export function QuotesTable({
 
           <Select
             value={invoiceFilter}
-            onValueChange={(value: 'all' | 'not_invoiced' | 'partially_invoiced' | 'invoiced') => setInvoiceFilter(value)}
+            onValueChange={(value: 'all' | 'not_invoiced' | 'ready_to_invoice' | 'partially_invoiced' | 'invoiced') => setInvoiceFilter(value)}
           >
             <SelectTrigger className="w-full bg-slate-800 border-slate-600 text-white sm:w-[150px]">
               <SelectValue placeholder="Billing" />
@@ -306,6 +320,7 @@ export function QuotesTable({
             ) : (
               filtered.map(quote => {
                 const cfg = getQuoteStatusConfig(quote.status);
+                const billingCfg = getBillingStatusConfig(quote.invoice_summary?.status);
                 const previousVersions = quote.previous_versions || [];
                 const isExpanded = Boolean(expandedThreads[quote.quote_thread_id]);
                 return (
@@ -351,6 +366,7 @@ export function QuotesTable({
                           {quote.commercial_status === 'closed' && (
                             <Badge variant="outline" className="border-slate-300/30 text-slate-200 bg-slate-400/10">Archived</Badge>
                           )}
+                          <Badge variant="outline" className={billingCfg.color}>{billingCfg.label}</Badge>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-xs text-slate-300">{formatCurrency(quote.invoice_summary?.invoicedTotal)}</td>
@@ -360,6 +376,7 @@ export function QuotesTable({
                     </tr>
                     {isExpanded ? previousVersions.map(version => {
                       const versionCfg = getQuoteStatusConfig(version.status);
+                      const versionBillingCfg = getBillingStatusConfig(version.invoice_summary?.status);
                       return (
                         <tr
                           key={version.id}
@@ -388,6 +405,7 @@ export function QuotesTable({
                               {version.commercial_status === 'closed' && (
                                 <Badge variant="outline" className="border-slate-300/30 text-slate-300 bg-slate-400/10">Archived</Badge>
                               )}
+                              <Badge variant="outline" className={versionBillingCfg.color}>{versionBillingCfg.label}</Badge>
                             </div>
                           </td>
                           <td className="px-4 py-3 text-xs">{formatCurrency(version.invoice_summary?.invoicedTotal)}</td>
@@ -414,6 +432,7 @@ export function QuotesTable({
         ) : (
           filtered.map(quote => {
             const cfg = getQuoteStatusConfig(quote.status);
+            const billingCfg = getBillingStatusConfig(quote.invoice_summary?.status);
             const previousVersions = quote.previous_versions || [];
             const isExpanded = Boolean(expandedThreads[quote.quote_thread_id]);
             return (
@@ -445,6 +464,7 @@ export function QuotesTable({
                     {quote.commercial_status === 'closed' && (
                       <Badge variant="outline" className="border-slate-300/30 text-slate-200 bg-slate-400/10">Archived</Badge>
                     )}
+                    <Badge variant="outline" className={billingCfg.color}>{billingCfg.label}</Badge>
                   </div>
                 </div>
                 <div className="text-xs text-slate-400">{quote.version_label || 'Original'}</div>

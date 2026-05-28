@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { appendQuoteTimelineEvent, fetchQuoteBundle } from '@/lib/server/quote-workflow';
+import { appendQuoteTimelineEvent, createQuoteNotification, fetchQuoteBundle } from '@/lib/server/quote-workflow';
 import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
 
 type InvoiceFieldErrors = Record<string, string>;
@@ -27,7 +27,11 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     if (sensitiveAccessResponse) return sensitiveAccessResponse;
 
     const bundle = await fetchQuoteBundle(createAdminClient(), id);
-    return NextResponse.json({ invoices: bundle.invoices, invoice_summary: bundle.invoiceSummary });
+    return NextResponse.json({
+      invoices: bundle.invoices,
+      invoice_requests: bundle.invoiceRequests,
+      invoice_summary: bundle.invoiceSummary,
+    });
   } catch (error) {
     console.error('Error fetching quote invoices:', error);
     return NextResponse.json({ error: 'Unable to load invoices right now.' }, { status: 500 });
@@ -52,10 +56,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (sensitiveAccessResponse) return sensitiveAccessResponse;
 
     const body = await request.json() as {
+      invoice_request_id?: string;
       invoice_number?: string;
       invoice_date?: string;
       amount?: number;
       invoice_scope?: 'full' | 'partial';
+      confirm_matches_request?: boolean;
       comments?: string;
       allocations?: Array<{
         quote_line_item_id?: string | null;
@@ -72,6 +78,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       ? body.invoice_date.trim()
       : new Date().toISOString().slice(0, 10);
     const normalizedAmount = typeof body.amount === 'number' ? body.amount : Number(body.amount);
+    const normalizedInvoiceScope = body.invoice_scope === 'full' ? 'full' : 'partial';
 
     if (!normalizedInvoiceNumber) {
       fieldErrors.invoice_number = 'Enter an invoice number.';
@@ -100,6 +107,70 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Only the latest quote version can be invoiced.' }, { status: 400 });
     }
 
+    const quoteInvoiceRequests = bundleBeforeInsert.invoiceRequests || [];
+    const linkedRequest = body.invoice_request_id
+      ? quoteInvoiceRequests.find(request => request.id === body.invoice_request_id)
+      : null;
+
+    if (body.invoice_request_id && !linkedRequest) {
+      return NextResponse.json({ error: 'Invoice request not found for this quote.' }, { status: 400 });
+    }
+
+    if (linkedRequest) {
+      if (linkedRequest.status !== 'pending') {
+        return NextResponse.json({ error: 'This invoice request has already been processed.' }, { status: 400 });
+      }
+
+      if (body.confirm_matches_request !== true) {
+        return NextResponse.json(
+          {
+            error: 'Confirm the invoice details match the manager request before adding them.',
+            field_errors: {
+              confirm_matches_request: 'Confirm the invoice details match the manager request.',
+            },
+          },
+          { status: 400 }
+        );
+      }
+
+      const requestedAmount = Number(linkedRequest.requested_amount || 0);
+      if (Math.abs(normalizedAmount - requestedAmount) > 0.005) {
+        return NextResponse.json(
+          {
+            error: 'Invoice amount must match the manager request.',
+            field_errors: {
+              amount: `Requested amount is £${requestedAmount.toLocaleString('en-GB', { minimumFractionDigits: 2 })}.`,
+            },
+          },
+          { status: 400 }
+        );
+      }
+
+      if (normalizedInvoiceDate !== linkedRequest.requested_invoice_date) {
+        return NextResponse.json(
+          {
+            error: 'Invoice date must match the manager request.',
+            field_errors: {
+              invoice_date: `Requested date is ${linkedRequest.requested_invoice_date}.`,
+            },
+          },
+          { status: 400 }
+        );
+      }
+
+      if (normalizedInvoiceScope !== linkedRequest.requested_invoice_scope) {
+        return NextResponse.json(
+          {
+            error: 'Invoice scope must match the manager request.',
+            field_errors: {
+              invoice_scope: `Requested scope is ${linkedRequest.requested_invoice_scope}.`,
+            },
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     const remainingBalance = Number(bundleBeforeInsert.invoiceSummary.remainingBalance || 0);
 
     if (normalizedAmount - remainingBalance > 0.005) {
@@ -118,10 +189,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .from('quote_invoices')
       .insert({
         quote_id: id,
+        invoice_request_id: linkedRequest?.id || null,
         invoice_number: normalizedInvoiceNumber,
         invoice_date: normalizedInvoiceDate,
         amount: normalizedAmount,
-        invoice_scope: body.invoice_scope || 'partial',
+        invoice_scope: normalizedInvoiceScope,
         comments: normalizedComments,
         created_by: user.id,
       })
@@ -146,17 +218,39 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       if (allocationError) throw allocationError;
     }
 
+    if (linkedRequest) {
+      const fulfilledAt = new Date().toISOString();
+      const { error: requestUpdateError } = await supabase
+        .from('quote_invoice_requests')
+        .update({
+          status: 'fulfilled',
+          fulfilled_invoice_id: invoice.id,
+          fulfilled_by: user.id,
+          fulfilled_at: fulfilledAt,
+        })
+        .eq('id', linkedRequest.id)
+        .eq('status', 'pending');
+
+      if (requestUpdateError) {
+        await admin
+          .from('quote_invoices')
+          .delete()
+          .eq('id', invoice.id);
+
+        throw requestUpdateError;
+      }
+    }
+
     const bundleAfterInsert = await fetchQuoteBundle(admin, id);
-    const nextStatus = bundleAfterInsert.invoiceSummary.remainingBalance > 0 ? 'partially_invoiced' : 'invoiced';
+    const isFullyInvoiced = bundleAfterInsert.invoiceSummary.remainingBalance <= 0;
 
     const { error: quoteUpdateError } = await supabase
       .from('quotes')
       .update({
-        status: nextStatus,
         invoice_number: invoice.invoice_number,
         invoice_notes: invoice.comments,
         last_invoice_at: invoice.invoice_date,
-        invoiced_at: nextStatus === 'invoiced' ? new Date().toISOString() : null,
+        invoiced_at: isFullyInvoiced ? new Date().toISOString() : bundleBeforeInsert.quote.invoiced_at,
         updated_by: user.id,
       })
       .eq('id', id);
@@ -168,6 +262,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         .from('quote_invoices')
         .delete()
         .eq('id', invoice.id);
+
+      if (linkedRequest) {
+        await admin
+          .from('quote_invoice_requests')
+          .update({
+            status: 'pending',
+            fulfilled_invoice_id: null,
+            fulfilled_by: null,
+            fulfilled_at: null,
+          })
+          .eq('id', linkedRequest.id);
+      }
 
       throw quoteUpdateError;
     }
@@ -181,13 +287,36 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       title: 'Invoice added',
       description: `${invoice.invoice_number} • £${Number(invoice.amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`,
       fromStatus: bundleBeforeInsert.quote.status,
-      toStatus: nextStatus,
+      toStatus: bundleBeforeInsert.quote.status,
       actorUserId: user.id,
       createdAt: invoice.created_at,
     });
 
+    const managerRecipientId = refreshedBundle.quote.requester_id || linkedRequest?.requested_by || null;
+    if (managerRecipientId && managerRecipientId !== user.id) {
+      try {
+        await createQuoteNotification({
+          senderId: user.id,
+          recipientIds: [managerRecipientId],
+          subject: `Invoice details added: ${refreshedBundle.quote.quote_reference}`,
+          body: [
+            `Invoice details have been added to quote ${refreshedBundle.quote.quote_reference}.`,
+            '',
+            `Invoice number: ${invoice.invoice_number}`,
+            `Amount: £${Number(invoice.amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`,
+            `Date: ${invoice.invoice_date}`,
+            `Scope: ${invoice.invoice_scope === 'full' ? 'Full invoice' : 'Partial invoice'}`,
+          ].join('\n'),
+          sendEmail: true,
+        });
+      } catch (notificationError) {
+        console.error('Failed to notify quote manager about invoice details:', notificationError);
+      }
+    }
+
     return NextResponse.json({
       invoices: refreshedBundle.invoices,
+      invoice_requests: refreshedBundle.invoiceRequests,
       invoice_summary: refreshedBundle.invoiceSummary,
     }, { status: 201 });
   } catch (error) {

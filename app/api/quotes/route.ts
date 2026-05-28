@@ -155,13 +155,25 @@ export async function GET(request: NextRequest) {
     const allVisibleQuotes = [...quotes, ...previousVersions];
     const summaryQuoteIds = allVisibleQuotes.map(quote => quote.id);
     if (summaryQuoteIds.length > 0) {
-      const { data: invoices, error: invoiceError } = await supabase
-        .from('quote_invoices')
-        .select('quote_id, amount, invoice_date')
-        .in('quote_id', summaryQuoteIds);
+      const [
+        { data: invoices, error: invoiceError },
+        { data: invoiceRequests, error: invoiceRequestError },
+      ] = await Promise.all([
+        supabase
+          .from('quote_invoices')
+          .select('quote_id, amount, invoice_date')
+          .in('quote_id', summaryQuoteIds),
+        supabase
+          .from('quote_invoice_requests')
+          .select('quote_id, requested_amount, status')
+          .in('quote_id', summaryQuoteIds),
+      ]);
 
       if (invoiceError) {
         throw invoiceError;
+      }
+      if (invoiceRequestError) {
+        throw invoiceRequestError;
       }
 
       const invoicesByQuoteId = new Map<string, Array<{ quote_id: string; amount: number; invoice_date: string | null }>>();
@@ -172,12 +184,21 @@ export async function GET(request: NextRequest) {
         invoicesByQuoteId.get(invoice.quote_id)!.push(invoice);
       });
 
+      const invoiceRequestsByQuoteId = new Map<string, Array<{ quote_id: string; requested_amount: number; status: string | null }>>();
+      (invoiceRequests || []).forEach((request) => {
+        if (!invoiceRequestsByQuoteId.has(request.quote_id)) {
+          invoiceRequestsByQuoteId.set(request.quote_id, []);
+        }
+        invoiceRequestsByQuoteId.get(request.quote_id)!.push(request);
+      });
+
       for (const quote of allVisibleQuotes) {
         summaries.set(
           quote.id,
           getInvoiceSummary({
             total: Number(quote.total || 0),
             invoices: invoicesByQuoteId.get(quote.id) || [],
+            invoiceRequests: invoiceRequestsByQuoteId.get(quote.id) || [],
           })
         );
       }

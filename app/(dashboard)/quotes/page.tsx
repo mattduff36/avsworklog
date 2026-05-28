@@ -5,7 +5,7 @@ import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { AppPageShell } from '@/components/layout/AppPageShell';
-import { CalendarClock, Plus, Receipt, Settings, Trash2 } from 'lucide-react';
+import { Bell, CalendarClock, Plus, Receipt, Settings, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
 import { PageLoader } from '@/components/ui/page-loader';
@@ -56,6 +56,19 @@ interface ApproverOption {
 }
 
 type QuotePageTab = 'overview' | 'settings';
+
+interface QuoteNotificationRecipientOption {
+  id: string;
+  full_name: string | null;
+  employee_id: string | null;
+  team_id: string | null;
+}
+
+interface QuoteNotificationSettingsPayload {
+  can_manage: boolean;
+  eligible_recipients: QuoteNotificationRecipientOption[];
+  selected_recipient_ids: string[];
+}
 
 function isQuotePageTab(value: string): value is QuotePageTab {
   return value === 'overview' || value === 'settings';
@@ -118,6 +131,11 @@ export default function QuotesPage() {
   const [deleteQuoteId, setDeleteQuoteId] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [quoteNotificationSettings, setQuoteNotificationSettings] = useState<QuoteNotificationSettingsPayload | null>(null);
+  const [selectedQuoteNotificationRecipientIds, setSelectedQuoteNotificationRecipientIds] = useState<string[]>([]);
+  const [quoteNotificationSettingsLoading, setQuoteNotificationSettingsLoading] = useState(false);
+  const [quoteNotificationSettingsSaving, setQuoteNotificationSettingsSaving] = useState(false);
+  const [quoteNotificationSettingsError, setQuoteNotificationSettingsError] = useState<string | null>(null);
 
   // Modals
   const [detailQuoteId, setDetailQuoteId] = useState<string | null>(null);
@@ -164,6 +182,26 @@ export default function QuotesPage() {
     }
   }, [canViewCustomers, customerId]);
 
+  const fetchQuoteNotificationSettings = useCallback(async () => {
+    setQuoteNotificationSettingsLoading(true);
+    setQuoteNotificationSettingsError(null);
+    try {
+      const res = await fetch('/api/quotes/notification-settings', { cache: 'no-store' });
+      if (!res.ok) {
+        throw await buildResponseError(res, 'Unable to load quote notification settings.');
+      }
+      const payload = await res.json() as QuoteNotificationSettingsPayload;
+      setQuoteNotificationSettings(payload);
+      setSelectedQuoteNotificationRecipientIds(payload.selected_recipient_ids || []);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to load quote notification settings.';
+      setQuoteNotificationSettingsError(message);
+      toast.error(message);
+    } finally {
+      setQuoteNotificationSettingsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (permissionLoading || customerPermissionLoading || sensitiveAccess.loading) return;
     if (!canViewQuotes) {
@@ -174,6 +212,13 @@ export default function QuotesPage() {
     if (!sensitiveAccess.canAccess) return;
     fetchData();
   }, [permissionLoading, customerPermissionLoading, sensitiveAccess.loading, sensitiveAccess.canAccess, canViewQuotes, router, fetchData]);
+
+  useEffect(() => {
+    if (permissionLoading || sensitiveAccess.loading || !sensitiveAccess.canAccess || !canViewQuotes) return;
+    if (pageTab === 'settings') {
+      fetchQuoteNotificationSettings();
+    }
+  }, [permissionLoading, sensitiveAccess.loading, sensitiveAccess.canAccess, canViewQuotes, pageTab, fetchQuoteNotificationSettings]);
 
   useEffect(() => {
     setDetailQuoteId(quoteIdFromQuery);
@@ -262,6 +307,42 @@ export default function QuotesPage() {
     const nextParams = new URLSearchParams(searchParams.toString());
     nextParams.set('tab', nextTab);
     router.replace(`${pathname}?${nextParams.toString()}`, { scroll: false });
+  }
+
+  function toggleQuoteNotificationRecipient(profileId: string, checked: boolean) {
+    setSelectedQuoteNotificationRecipientIds(current => {
+      if (checked) {
+        return current.includes(profileId) ? current : [...current, profileId];
+      }
+      return current.filter(id => id !== profileId);
+    });
+  }
+
+  async function saveQuoteNotificationSettings() {
+    setQuoteNotificationSettingsSaving(true);
+    setQuoteNotificationSettingsError(null);
+    try {
+      const res = await fetch('/api/quotes/notification-settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipient_ids: selectedQuoteNotificationRecipientIds }),
+      });
+
+      if (!res.ok) {
+        throw await buildResponseError(res, 'Unable to save quote notification settings.');
+      }
+
+      const payload = await res.json() as QuoteNotificationSettingsPayload;
+      setQuoteNotificationSettings(payload);
+      setSelectedQuoteNotificationRecipientIds(payload.selected_recipient_ids || []);
+      toast.success('Quote notification details saved');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to save quote notification settings.';
+      setQuoteNotificationSettingsError(message);
+      toast.error(message);
+    } finally {
+      setQuoteNotificationSettingsSaving(false);
+    }
   }
 
   async function handleDeleteSelectedQuote() {
@@ -380,6 +461,83 @@ export default function QuotesPage() {
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-6 mt-0">
+          <div className="rounded-lg border border-slate-700 bg-slate-900/70 p-6">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-avs-yellow/10">
+                <Bell className="h-5 w-5 text-avs-yellow" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-white">Quote notification details</h2>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Choose which Accounts team members are notified when a manager requests invoice details. The quote manager is notified automatically when Accounts add invoice details.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-4">
+              {quoteNotificationSettingsLoading ? (
+                <p className="text-sm text-muted-foreground">Loading quote notification details...</p>
+              ) : quoteNotificationSettings ? (
+                <>
+                  {!quoteNotificationSettings.can_manage ? (
+                    <div className="rounded-md border border-slate-700 bg-slate-800/60 px-3 py-2 text-sm text-muted-foreground">
+                      Only admins can manage quote notification details.
+                    </div>
+                  ) : null}
+
+                  {quoteNotificationSettings.eligible_recipients.length > 0 ? (
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {quoteNotificationSettings.eligible_recipients.map(recipient => (
+                        <label
+                          key={recipient.id}
+                          className="flex items-start gap-3 rounded-md border border-slate-700 bg-slate-800/40 p-3 text-sm"
+                        >
+                          <input
+                            type="checkbox"
+                            className="mt-1"
+                            checked={selectedQuoteNotificationRecipientIds.includes(recipient.id)}
+                            disabled={!quoteNotificationSettings.can_manage || quoteNotificationSettingsSaving}
+                            onChange={event => toggleQuoteNotificationRecipient(recipient.id, event.target.checked)}
+                          />
+                          <span>
+                            <span className="block font-medium text-slate-100">{recipient.full_name || 'Unnamed user'}</span>
+                            {recipient.employee_id ? (
+                              <span className="block text-xs text-muted-foreground">Employee ID: {recipient.employee_id}</span>
+                            ) : null}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No Accounts team users with Quotes access are available.</p>
+                  )}
+
+                  {quoteNotificationSettingsError ? (
+                    <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-100">
+                      {quoteNotificationSettingsError}
+                    </div>
+                  ) : null}
+
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={saveQuoteNotificationSettings}
+                      disabled={
+                        !quoteNotificationSettings.can_manage
+                        || quoteNotificationSettingsSaving
+                        || quoteNotificationSettings.eligible_recipients.length === 0
+                      }
+                      className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90"
+                    >
+                      {quoteNotificationSettingsSaving ? 'Saving...' : 'Save notification details'}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">Quote notification details have not been loaded yet.</p>
+              )}
+            </div>
+          </div>
+
           <div className="rounded-lg border border-slate-700 bg-slate-900/70 p-6">
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/10">

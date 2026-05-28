@@ -23,6 +23,7 @@ import {
 import { ExternalLink, Loader2, Plus, RefreshCw, Trash2, GripVertical, Upload, X } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { cn } from '@/lib/utils/cn';
+import { getQuoteRichPasteText } from '@/lib/quotes/quote-rich-text';
 import { toast } from 'sonner';
 import {
   deleteQuoteAttachment,
@@ -357,6 +358,43 @@ export function QuoteFormDialog({
     setForm(prev => ({ ...prev, [key]: value }));
   }
 
+  function insertPastedText(currentValue: string, pastedText: string, target: HTMLTextAreaElement): string {
+    const selectionStart = target.selectionStart ?? currentValue.length;
+    const selectionEnd = target.selectionEnd ?? selectionStart;
+
+    return [
+      currentValue.slice(0, selectionStart),
+      pastedText,
+      currentValue.slice(selectionEnd),
+    ].join('');
+  }
+
+  function handleFormattedFieldPaste(
+    key: 'project_description' | 'scope' | 'custom_footer_text' | 'version_notes',
+    event: React.ClipboardEvent<HTMLTextAreaElement>
+  ) {
+    const pastedText = getQuoteRichPasteText(event.clipboardData);
+    if (!pastedText) return;
+
+    event.preventDefault();
+    updateField(key, insertPastedText(form[key], pastedText, event.currentTarget));
+  }
+
+  function handleLineItemDescriptionPaste(
+    idx: number,
+    event: React.ClipboardEvent<HTMLTextAreaElement>
+  ) {
+    const pastedText = getQuoteRichPasteText(event.clipboardData);
+    if (!pastedText) return;
+
+    event.preventDefault();
+    updateLineItem(
+      idx,
+      'description',
+      insertPastedText(form.line_items[idx]?.description || '', pastedText, event.currentTarget)
+    );
+  }
+
   function handleCustomerChange(customerId: string) {
     clearFieldError('customer_id');
     setSubmitError(null);
@@ -656,10 +694,12 @@ export function QuoteFormDialog({
                 <Textarea
                   value={form.project_description}
                   onChange={e => updateField('project_description', e.target.value)}
+                  onPaste={e => handleFormattedFieldPaste('project_description', e)}
                   placeholder="Brief customer-facing summary"
-                  rows={2}
+                  rows={4}
                   className={getFieldClassName('project_description')}
                 />
+                <p className="text-xs text-muted-foreground">Supports pasted ChatGPT-style headings, bold text, bullets and numbered lists.</p>
                 {renderFieldError('project_description')}
               </div>
               <div className="space-y-2">
@@ -667,10 +707,12 @@ export function QuoteFormDialog({
                 <Textarea
                   value={form.scope}
                   onChange={e => updateField('scope', e.target.value)}
+                  onPaste={e => handleFormattedFieldPaste('scope', e)}
                   placeholder="Describe the included scope of works"
-                  rows={3}
+                  rows={5}
                   className={getFieldClassName('scope')}
                 />
+                <p className="text-xs text-muted-foreground">Use simple formatting such as headings, bullets, numbered lists, bold and italic text.</p>
                 {renderFieldError('scope')}
               </div>
             </div>
@@ -721,6 +763,7 @@ export function QuoteFormDialog({
                 <Textarea
                   value={form.version_notes}
                   onChange={e => updateField('version_notes', e.target.value)}
+                  onPaste={e => handleFormattedFieldPaste('version_notes', e)}
                   rows={3}
                   placeholder="Use this for revision context, handover notes, or customer-specific context."
                   className={getFieldClassName('version_notes')}
@@ -775,11 +818,13 @@ export function QuoteFormDialog({
                     <div className="space-y-1">
                       <div className="flex items-center gap-1">
                         <GripVertical className="h-4 w-4 text-slate-600 hidden sm:block flex-shrink-0" />
-                        <Input
+                        <Textarea
                           value={item.description}
                           onChange={e => updateLineItem(idx, 'description', e.target.value)}
+                          onPaste={e => handleLineItemDescriptionPaste(idx, e)}
                           placeholder="Item description"
-                          className={cn('h-8 text-sm', getFieldClassName(`line_items.${idx}.description`))}
+                          rows={2}
+                          className={cn('min-h-10 text-sm', getFieldClassName(`line_items.${idx}.description`))}
                         />
                       </div>
                       {renderFieldError(`line_items.${idx}.description`)}

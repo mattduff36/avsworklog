@@ -12,14 +12,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { ReviewDetailDialog } from '@/components/management/ReviewDetailDialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   Lightbulb, 
   Loader2, 
@@ -327,49 +321,31 @@ export default function SuggestionsManagePage() {
       </Card>
 
       {/* Detail Dialog */}
-      <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="max-w-2xl bg-white dark:bg-slate-900 border-border">
-          <DialogHeader>
-            <DialogTitle className="text-foreground">
-              Suggestion Details
-            </DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              Review and update this suggestion
-            </DialogDescription>
-          </DialogHeader>
-          
-          {selectedSuggestion && (
-            <div className="space-y-4">
-              {/* Suggestion Info */}
-              <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-white/10 dark:bg-slate-800/95">
-                <div className="flex items-start justify-between">
-                  <h3 className="font-semibold text-foreground">
-                    {selectedSuggestion.title}
-                  </h3>
-                  <Badge className={`${SUGGESTION_STATUS_COLORS[selectedSuggestion.status]} text-white`}>
-                    {SUGGESTION_STATUS_LABELS[selectedSuggestion.status]}
-                  </Badge>
-                </div>
-                <div className="rounded-md border border-slate-200 bg-white px-3 py-2 shadow-sm dark:border-white/15 dark:bg-slate-900/60">
-                  <p className="whitespace-pre-wrap text-[15px] leading-6 text-slate-700 dark:text-slate-100">
-                    {selectedSuggestion.body}
-                  </p>
-                </div>
-                <div className="flex items-center gap-4 border-t border-slate-200 pt-2 text-xs text-muted-foreground dark:border-white/10">
-                  <span>From: {selectedSuggestion.user?.full_name || 'Unknown'}</span>
-                  <span>{new Date(selectedSuggestion.created_at).toLocaleString()}</span>
-                  {selectedSuggestion.page_hint && (
-                    <span>Related to: {selectedSuggestion.page_hint}</span>
-                  )}
-                </div>
+      <ReviewDetailDialog
+        open={detailDialogOpen}
+        onOpenChange={setDetailDialogOpen}
+        title="Suggestion Details"
+        description="Review the suggestion, related page, admin notes, and update history."
+        icon={<Lightbulb className="h-5 w-5 text-avs-yellow" />}
+        statusBadge={selectedSuggestion ? (
+          <Badge className={`${SUGGESTION_STATUS_COLORS[selectedSuggestion.status]} text-white`}>
+            {SUGGESTION_STATUS_LABELS[selectedSuggestion.status]}
+          </Badge>
+        ) : null}
+        sidebar={selectedSuggestion ? (
+          <>
+            <section className="rounded-xl border border-slate-800 bg-slate-900/80 p-4 shadow-sm">
+              <div className="mb-4">
+                <h3 className="text-sm font-semibold text-slate-100">Admin update</h3>
+                <p className="text-xs text-slate-400">
+                  Track the decision, private notes, and the visible update trail.
+                </p>
               </div>
-
-              {/* Update Form */}
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label className="text-slate-700 dark:text-muted-foreground">Status</Label>
+                  <Label htmlFor="suggestion-status" className="text-slate-300">Status</Label>
                   <Select value={newStatus} onValueChange={(v) => setNewStatus(v as SuggestionStatus)}>
-                    <SelectTrigger className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900">
+                    <SelectTrigger id="suggestion-status" className="border-slate-700 bg-slate-950 text-slate-100">
                       <SelectValue placeholder="Select status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -383,47 +359,51 @@ export default function SuggestionsManagePage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-slate-700 dark:text-muted-foreground">
+                  <Label htmlFor="suggestion-admin-note" className="text-slate-300">
                     Internal Notes (not visible to submitter)
                   </Label>
                   <Textarea
+                    id="suggestion-admin-note"
                     value={adminNote}
                     onChange={(e) => setAdminNote(e.target.value)}
                     placeholder="Add internal notes..."
-                    rows={2}
-                    className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900"
+                    rows={5}
+                    className="border-slate-700 bg-slate-950 text-slate-100 placeholder:text-slate-500"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-slate-700 dark:text-muted-foreground">
+                  <Label htmlFor="suggestion-update-note" className="text-slate-300">
                     Update Note (for history)
                   </Label>
                   <Input
+                    id="suggestion-update-note"
                     value={updateNote}
                     onChange={(e) => setUpdateNote(e.target.value)}
                     placeholder="Brief note about this update..."
-                    className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900"
+                    className="border-slate-700 bg-slate-950 text-slate-100 placeholder:text-slate-500"
                   />
                 </div>
               </div>
+            </section>
 
-              {/* Update History */}
+            <section className="rounded-xl border border-slate-800 bg-slate-900/80 p-4 shadow-sm">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold text-slate-100">History</h3>
+                {loadingDetail ? <Loader2 className="h-4 w-4 animate-spin text-avs-yellow" /> : null}
+              </div>
               {loadingDetail ? (
-                <div className="flex justify-center py-4">
-                  <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
-                </div>
-              ) : suggestionUpdates.length > 0 && (
-                <div className="space-y-2">
-                  <Label className="text-slate-700 dark:text-muted-foreground">History</Label>
-                  <div className="max-h-32 overflow-y-auto space-y-2">
+                <p className="text-sm text-slate-400">Loading update history...</p>
+              ) : suggestionUpdates.length > 0 ? (
+                <ScrollArea className="max-h-[32vh] pr-2">
+                  <div className="space-y-2">
                     {suggestionUpdates.map((update) => (
-                      <div 
+                      <div
                         key={update.id}
-                        className="text-xs p-2 rounded bg-slate-100 dark:bg-slate-700"
+                        className="rounded-lg border border-slate-800 bg-slate-950/80 p-3 text-xs"
                       >
-                        <div className="flex items-center justify-between">
-                          <span className="text-muted-foreground">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-medium text-slate-200">
                             {update.old_status && update.new_status ? (
                               <>
                                 {SUGGESTION_STATUS_LABELS[update.old_status]} → {SUGGESTION_STATUS_LABELS[update.new_status]}
@@ -432,51 +412,92 @@ export default function SuggestionsManagePage() {
                               'Note added'
                             )}
                           </span>
-                          <span className="text-muted-foreground">
+                          <span className="text-slate-500">
                             {new Date(update.created_at).toLocaleDateString()}
                           </span>
                         </div>
                         {update.note && (
-                          <p className="text-slate-600 dark:text-muted-foreground mt-1">
+                          <p className="mt-2 whitespace-pre-wrap leading-5 text-slate-300">
                             {update.note}
                           </p>
                         )}
-                        <p className="text-muted-foreground mt-1">
+                        <p className="mt-2 text-slate-500">
                           by {update.user?.full_name || 'Unknown'}
                         </p>
                       </div>
                     ))}
                   </div>
-                </div>
+                </ScrollArea>
+              ) : (
+                <p className="text-sm text-slate-400">No history has been added yet.</p>
               )}
-            </div>
-          )}
-
-          <DialogFooter>
+            </section>
+          </>
+        ) : null}
+        footer={(
+          <>
             <Button
               variant="outline"
               onClick={() => setDetailDialogOpen(false)}
-              className="border-border"
+              className="border-slate-700 bg-transparent text-slate-100 hover:bg-slate-800 hover:text-slate-50"
             >
               Cancel
             </Button>
             <Button
               onClick={handleUpdateSuggestion}
               disabled={updating}
-              className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900"
+              className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow-hover"
             >
               {updating ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Saving...
                 </>
               ) : (
                 'Save Changes'
               )}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </>
+        )}
+      >
+        {selectedSuggestion && (
+          <section className="rounded-xl border border-slate-800 bg-slate-900/80 p-4 shadow-sm">
+            <div className="mb-4 min-w-0">
+              <h3 className="text-lg font-semibold leading-6 text-slate-50">
+                {selectedSuggestion.title}
+              </h3>
+              <p className="mt-1 text-xs text-slate-400">
+                Submitted by {selectedSuggestion.user?.full_name || 'Unknown'} on {formatDateTime(selectedSuggestion.created_at)}
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-slate-800 bg-slate-950/80 p-4">
+              <p className="whitespace-pre-wrap text-sm leading-6 text-slate-200">
+                {selectedSuggestion.body}
+              </p>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 text-xs text-slate-400 sm:grid-cols-2">
+              <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-3">
+                <span className="block text-slate-500">Submitter</span>
+                <span className="mt-1 block text-slate-200">{selectedSuggestion.user?.full_name || 'Unknown'}</span>
+              </div>
+              <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-3">
+                <span className="block text-slate-500">Submitted</span>
+                <span className="mt-1 block text-slate-200">{formatDateTime(selectedSuggestion.created_at)}</span>
+              </div>
+              {selectedSuggestion.page_hint && (
+                <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-3 sm:col-span-2">
+                  <span className="block text-slate-500">Related page</span>
+                  <span className="mt-1 block break-words text-slate-200">
+                    {selectedSuggestion.page_hint}
+                  </span>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+      </ReviewDetailDialog>
     </AppPageShell>
   );
 }

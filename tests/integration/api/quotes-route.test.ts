@@ -66,7 +66,9 @@ describe('GET /api/quotes', () => {
     vi.clearAllMocks();
     mockGetInvoiceSummary.mockImplementation(({ total, invoices }) => ({
       invoicedTotal: (invoices || []).reduce((sum: number, invoice: { amount: number }) => sum + invoice.amount, 0),
+      pendingRequestedTotal: 0,
       remainingBalance: total,
+      availableToRequest: total,
       lastInvoiceAt: null,
       status: 'not_invoiced',
     }));
@@ -108,6 +110,10 @@ describe('GET /api/quotes', () => {
       data: [],
       error: null,
     });
+    const invoiceRequestIn = vi.fn().mockResolvedValue({
+      data: [],
+      error: null,
+    });
     let quoteSelectCount = 0;
     const selectQuotes = vi.fn((columns: string) => {
       if (columns.includes('customer:customers')) {
@@ -128,6 +134,9 @@ describe('GET /api/quotes', () => {
     const selectInvoices = vi.fn(() => ({
       in: invoiceIn,
     }));
+    const selectInvoiceRequests = vi.fn(() => ({
+      in: invoiceRequestIn,
+    }));
 
     mockCreateClient.mockResolvedValue({
       auth: {
@@ -145,6 +154,10 @@ describe('GET /api/quotes', () => {
           return { select: selectInvoices };
         }
 
+        if (table === 'quote_invoice_requests') {
+          return { select: selectInvoiceRequests };
+        }
+
         throw new Error(`Unexpected table: ${table}`);
       }),
     } as unknown as SupabaseClient);
@@ -159,6 +172,7 @@ describe('GET /api/quotes', () => {
     expect(previousVersionsQuery.eq).toHaveBeenCalledWith('is_latest_version', false);
     expect(summaryQuery.eq).toHaveBeenCalledWith('is_latest_version', true);
     expect(invoiceIn).toHaveBeenCalledWith('quote_id', ['quote-1', 'quote-2']);
+    expect(invoiceRequestIn).toHaveBeenCalledWith('quote_id', ['quote-1', 'quote-2']);
     expect(payload.summary).toEqual({
       total_quotes: 4,
       status_counts: expect.objectContaining({
@@ -206,10 +220,13 @@ describe('POST /api/quotes', () => {
       attachments: [],
       ramsDocuments: [],
       invoices: [],
+      invoiceRequests: [],
       versions: [],
       invoiceSummary: {
         invoicedTotal: 0,
+        pendingRequestedTotal: 0,
         remainingBalance: 0,
+        availableToRequest: 0,
         lastInvoiceAt: null,
         status: 'not_invoiced',
       },

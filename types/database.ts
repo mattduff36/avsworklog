@@ -2974,7 +2974,7 @@ export type Database = {
         Row: {
           id: string
           user_id: string
-          module_key: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'toolbox_talks' | 'reminders' | 'general_notifications' | 'sensitive_pin_security'
+          module_key: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'toolbox_talks' | 'reminders' | 'quotes' | 'general_notifications' | 'sensitive_pin_security'
           enabled: boolean
           notify_in_app: boolean
           notify_email: boolean
@@ -2984,7 +2984,7 @@ export type Database = {
         Insert: {
           id?: string
           user_id: string
-          module_key: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'toolbox_talks' | 'reminders' | 'general_notifications' | 'sensitive_pin_security'
+          module_key: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'toolbox_talks' | 'reminders' | 'quotes' | 'general_notifications' | 'sensitive_pin_security'
           enabled?: boolean | null
           notify_in_app?: boolean | null
           notify_email?: boolean | null
@@ -2994,7 +2994,7 @@ export type Database = {
         Update: {
           id?: string
           user_id?: string
-          module_key?: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'toolbox_talks' | 'reminders' | 'general_notifications' | 'sensitive_pin_security'
+          module_key?: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'toolbox_talks' | 'reminders' | 'quotes' | 'general_notifications' | 'sensitive_pin_security'
           enabled?: boolean | null
           notify_in_app?: boolean | null
           notify_email?: boolean | null
@@ -3794,6 +3794,7 @@ export type Database = {
         Row: {
           id: string
           quote_id: string
+          invoice_request_id: string | null
           invoice_number: string
           invoice_date: string
           amount: number
@@ -3806,6 +3807,7 @@ export type Database = {
         Insert: {
           id?: string
           quote_id: string
+          invoice_request_id?: string | null
           invoice_number: string
           invoice_date?: string
           amount: number
@@ -3818,6 +3820,7 @@ export type Database = {
         Update: {
           id?: string
           quote_id?: string
+          invoice_request_id?: string | null
           invoice_number?: string
           invoice_date?: string
           amount?: number
@@ -3828,6 +3831,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: 'quote_invoices_invoice_request_id_fkey'
+            columns: ['invoice_request_id']
+            isOneToOne: false
+            referencedRelation: 'quote_invoice_requests'
+            referencedColumns: ['id']
+          },
           {
             foreignKeyName: 'quote_invoices_created_by_fkey'
             columns: ['created_by']
@@ -3840,6 +3850,135 @@ export type Database = {
             columns: ['quote_id']
             isOneToOne: false
             referencedRelation: 'quotes'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      quote_invoice_requests: {
+        Row: {
+          id: string
+          quote_id: string
+          requested_amount: number
+          requested_invoice_date: string
+          requested_invoice_scope: 'full' | 'partial'
+          manager_comments: string | null
+          status: 'pending' | 'fulfilled' | 'cancelled'
+          requested_by: string | null
+          requested_at: string
+          notified_at: string | null
+          fulfilled_invoice_id: string | null
+          fulfilled_by: string | null
+          fulfilled_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          quote_id: string
+          requested_amount: number
+          requested_invoice_date?: string
+          requested_invoice_scope?: 'full' | 'partial'
+          manager_comments?: string | null
+          status?: 'pending' | 'fulfilled' | 'cancelled'
+          requested_by?: string | null
+          requested_at?: string
+          notified_at?: string | null
+          fulfilled_invoice_id?: string | null
+          fulfilled_by?: string | null
+          fulfilled_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          quote_id?: string
+          requested_amount?: number
+          requested_invoice_date?: string
+          requested_invoice_scope?: 'full' | 'partial'
+          manager_comments?: string | null
+          status?: 'pending' | 'fulfilled' | 'cancelled'
+          requested_by?: string | null
+          requested_at?: string
+          notified_at?: string | null
+          fulfilled_invoice_id?: string | null
+          fulfilled_by?: string | null
+          fulfilled_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'quote_invoice_requests_fulfilled_by_fkey'
+            columns: ['fulfilled_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'quote_invoice_requests_fulfilled_invoice_id_fkey'
+            columns: ['fulfilled_invoice_id']
+            isOneToOne: false
+            referencedRelation: 'quote_invoices'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'quote_invoice_requests_quote_id_fkey'
+            columns: ['quote_id']
+            isOneToOne: false
+            referencedRelation: 'quotes'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'quote_invoice_requests_requested_by_fkey'
+            columns: ['requested_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      quote_invoice_notification_recipients: {
+        Row: {
+          profile_id: string
+          created_by: string | null
+          updated_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          profile_id: string
+          created_by?: string | null
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          profile_id?: string
+          created_by?: string | null
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'quote_invoice_notification_recipients_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'quote_invoice_notification_recipients_profile_id_fkey'
+            columns: ['profile_id']
+            isOneToOne: true
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'quote_invoice_notification_recipients_updated_by_fkey'
+            columns: ['updated_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
             referencedColumns: ['id']
           },
         ]
@@ -6661,6 +6800,8 @@ export type Database = {
       check__plant__status: 'active' | 'inactive' | 'maintenance' | 'retired'
       check__plant_inspections__status: 'draft' | 'submitted'
       check__profile_reporting_lines__relation_type: 'primary' | 'secondary' | 'line_manager'
+      check__quote_invoice_requests__requested_invoice_scope: 'full' | 'partial'
+      check__quote_invoice_requests__status: 'pending' | 'fulfilled' | 'cancelled'
       check__quote_invoices__invoice_scope: 'full' | 'partial'
       check__quotes__commercial_status: 'open' | 'closed'
       check__quotes__completion_status: 'not_completed' | 'approved_in_full' | 'approved_in_part'

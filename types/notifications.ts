@@ -10,6 +10,7 @@ export type NotificationModuleKey =
   | 'inspections'
   | 'toolbox_talks'
   | 'reminders'
+  | 'quotes'
   | 'general_notifications'
   | 'sensitive_pin_security';
 
@@ -21,6 +22,7 @@ export const NOTIFICATION_MODULE_KEYS: NotificationModuleKey[] = [
   'inspections',
   'toolbox_talks',
   'reminders',
+  'quotes',
   'general_notifications',
   'sensitive_pin_security',
 ];
@@ -92,6 +94,13 @@ export const NOTIFICATION_MODULES: NotificationModule[] = [
     label: 'Reminders',
     description: 'Reminder messages from managers, maintenance workflows, and actions',
     icon: 'Bell',
+    availableFor: 'all',
+  },
+  {
+    key: 'quotes',
+    label: 'Quotes',
+    description: 'Quote workflow and invoice request notifications',
+    icon: 'Receipt',
     availableFor: 'all',
   },
   {

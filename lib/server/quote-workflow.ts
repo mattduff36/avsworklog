@@ -4,8 +4,10 @@ import { QuotePDF } from '@/lib/pdf/quote-pdf';
 import { loadSquiresLogoDataUrl } from '@/lib/pdf/squires-logo';
 import { getQuotesCustomersEmailConfig } from '@/lib/server/quotes-customers-email-config';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getUsersWithModuleAccess } from '@/lib/server/team-permissions';
 import { getHiddenSystemTestAccountIds } from '@/lib/server/system-test-accounts';
 import type { Database } from '@/types/database';
+import type { NotificationModuleKey } from '@/types/notifications';
 import {
   buildVersionLabel,
   buildVersionReference,
@@ -15,15 +17,24 @@ import {
 } from '@/lib/utils/quote-workflow';
 
 const { Client } = pg;
+const QUOTE_NOTIFICATION_MODULE_KEY: NotificationModuleKey = 'quotes';
 
 export type QuoteRow = Database['public']['Tables']['quotes']['Row'];
 export type QuoteLineItemRow = Database['public']['Tables']['quote_line_items']['Row'];
 export type QuoteAttachmentRow = Database['public']['Tables']['quote_attachments']['Row'];
 export type QuoteInvoiceRow = Database['public']['Tables']['quote_invoices']['Row'];
+export type QuoteInvoiceRequestRow = Database['public']['Tables']['quote_invoice_requests']['Row'];
 export type QuoteInvoiceAllocationRow = Database['public']['Tables']['quote_invoice_allocations']['Row'];
 export type QuoteManagerSeriesRow = Database['public']['Tables']['quote_manager_series']['Row'];
 export type QuoteTimelineEventRow = Database['public']['Tables']['quote_timeline_events']['Row'];
 export type RamsDocumentRow = Database['public']['Tables']['rams_documents']['Row'];
+
+export interface QuoteNotificationRecipientOption {
+  id: string;
+  full_name: string | null;
+  employee_id: string | null;
+  team_id: string | null;
+}
 
 interface QuoteManagerOption {
   profile_id: string;
@@ -66,6 +77,7 @@ export interface QuoteBundle {
   attachments: QuoteAttachmentRow[];
   ramsDocuments: RamsDocumentRow[];
   invoices: Array<QuoteInvoiceRow & { allocations: QuoteInvoiceAllocationRow[] }>;
+  invoiceRequests: QuoteInvoiceRequestRow[];
   versions: QuoteRow[];
   timeline: Array<QuoteTimelineEventRow & { actor?: { id: string; full_name: string | null } | null }>;
   invoiceSummary: InvoiceSummary;
@@ -285,12 +297,13 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
 
   const typedQuote = quote as QuoteBundle['quote'];
 
-  const [lineItemsResult, attachmentsResult, ramsDocumentsResult, versionsResult, invoicesResult, timelineResult] = await Promise.all([
+  const [lineItemsResult, attachmentsResult, ramsDocumentsResult, versionsResult, invoicesResult, invoiceRequestsResult, timelineResult] = await Promise.all([
     supabase.from('quote_line_items').select('*').eq('quote_id', quoteId).order('sort_order', { ascending: true }),
     supabase.from('quote_attachments').select('*').eq('quote_id', quoteId).order('created_at', { ascending: false }),
     supabase.from('rams_documents').select('*').eq('quote_id', quoteId).order('created_at', { ascending: false }),
     supabase.from('quotes').select('*').eq('quote_thread_id', typedQuote.quote_thread_id).order('created_at', { ascending: false }),
     supabase.from('quote_invoices').select('*').eq('quote_id', quoteId).order('invoice_date', { ascending: false }),
+    supabase.from('quote_invoice_requests').select('*').eq('quote_id', quoteId).order('requested_at', { ascending: false }),
     supabase
       .from('quote_timeline_events')
       .select(`
@@ -306,9 +319,11 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
   if (ramsDocumentsResult.error) throw ramsDocumentsResult.error;
   if (versionsResult.error) throw versionsResult.error;
   if (invoicesResult.error) throw invoicesResult.error;
+  if (invoiceRequestsResult.error) throw invoiceRequestsResult.error;
   if (timelineResult.error) throw timelineResult.error;
 
   const invoices = (invoicesResult.data || []) as QuoteInvoiceRow[];
+  const invoiceRequests = (invoiceRequestsResult.data || []) as QuoteInvoiceRequestRow[];
   const invoiceIds = invoices.map(invoice => invoice.id);
   const allocationsByInvoice = new Map<string, QuoteInvoiceAllocationRow[]>();
 
@@ -330,6 +345,7 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
   const invoiceSummary = getInvoiceSummary({
     total: Number(typedQuote.total || 0),
     invoices,
+    invoiceRequests,
   });
 
   return {
@@ -343,6 +359,7 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
       ...invoice,
       allocations: allocationsByInvoice.get(invoice.id) || [],
     })),
+    invoiceRequests,
     invoiceSummary,
   };
 }
@@ -398,6 +415,19 @@ function getDefaultFromEmail(): string {
 function normalizeEmailAddress(value?: string | null): string | null {
   const email = value?.trim();
   return email && email.includes('@') ? email : null;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function plainTextToHtml(value: string): string {
+  return escapeHtml(value).replace(/\n/g, '<br>');
 }
 
 export async function renderQuotePdfAttachment(
@@ -611,39 +641,158 @@ export async function createQuoteNotification(params: {
   recipientIds: string[];
   subject: string;
   body: string;
+  createdVia?: string;
+  moduleKey?: NotificationModuleKey;
+  sendEmail?: boolean;
 }) {
-  if (params.recipientIds.length === 0) {
+  const recipientIds = Array.from(new Set(params.recipientIds.filter(Boolean)));
+  if (recipientIds.length === 0) {
     return;
   }
 
   const admin = createAdminClient();
-  const { data: message, error: messageError } = await admin
-    .from('messages')
-    .insert({
-      type: 'NOTIFICATION',
-      priority: 'HIGH',
-      subject: params.subject,
-      body: params.body,
-      sender_id: params.senderId,
-    })
-    .select()
-    .single();
+  const moduleKey = params.moduleKey || QUOTE_NOTIFICATION_MODULE_KEY;
+  const { data: preferences, error: preferenceError } = await admin
+    .from('notification_preferences')
+    .select('user_id, enabled, notify_in_app, notify_email')
+    .eq('module_key', moduleKey)
+    .in('user_id', recipientIds);
 
-  if (messageError || !message) {
-    throw messageError || new Error('Failed to create notification');
+  if (preferenceError) {
+    throw preferenceError;
   }
 
-  const { error: recipientsError } = await admin
-    .from('message_recipients')
-    .insert(params.recipientIds.map(recipientId => ({
-      message_id: message.id,
-      user_id: recipientId,
-      status: 'PENDING',
-    })));
+  const preferenceByUserId = new Map((preferences || []).map(preference => [preference.user_id, preference]));
+  const shouldNotifyInApp = (recipientId: string) => {
+    const preference = preferenceByUserId.get(recipientId);
+    return preference?.enabled !== false && preference?.notify_in_app !== false;
+  };
+  const shouldNotifyByEmail = (recipientId: string) => {
+    const preference = preferenceByUserId.get(recipientId);
+    return preference?.enabled !== false && preference?.notify_email !== false;
+  };
 
-  if (recipientsError) {
-    throw recipientsError;
+  const inAppRecipientIds = recipientIds.filter(shouldNotifyInApp);
+  if (inAppRecipientIds.length > 0) {
+    const { data: message, error: messageError } = await admin
+      .from('messages')
+      .insert({
+        type: 'NOTIFICATION',
+        priority: 'HIGH',
+        subject: params.subject,
+        body: params.body,
+        sender_id: params.senderId,
+        created_via: params.createdVia || 'quote_invoice_workflow',
+      })
+      .select()
+      .single();
+
+    if (messageError || !message) {
+      throw messageError || new Error('Failed to create notification');
+    }
+
+    const { error: recipientsError } = await admin
+      .from('message_recipients')
+      .insert(inAppRecipientIds.map(recipientId => ({
+        message_id: message.id,
+        user_id: recipientId,
+        status: 'PENDING',
+      })));
+
+    if (recipientsError) {
+      throw recipientsError;
+    }
   }
+
+  if (!params.sendEmail) {
+    return;
+  }
+
+  const emailRecipientIds = recipientIds.filter(shouldNotifyByEmail);
+  if (emailRecipientIds.length === 0) {
+    return;
+  }
+
+  const emails = await Promise.all(emailRecipientIds.map(async recipientId => {
+    const { data } = await admin.auth.admin.getUserById(recipientId);
+    return normalizeEmailAddress(data.user?.email);
+  }));
+
+  const emailTo = Array.from(new Set(emails.filter((email): email is string => Boolean(email))));
+  if (emailTo.length === 0) {
+    return;
+  }
+
+  const emailResult = await sendEmail({
+    to: emailTo,
+    subject: params.subject,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937; max-width: 640px; margin: 0 auto; padding: 24px;">
+          <h2>${escapeHtml(params.subject)}</h2>
+          <p>${plainTextToHtml(params.body)}</p>
+        </body>
+      </html>
+    `,
+  });
+
+  if (!emailResult.success) {
+    console.error('Failed to send quote notification email:', emailResult.error || 'Unknown email error');
+  }
+}
+
+export async function listQuoteAccountsNotificationRecipientOptions(
+  supabase: ReturnType<typeof createAdminClient>
+): Promise<QuoteNotificationRecipientOption[]> {
+  const quoteUserIds = Array.from(await getUsersWithModuleAccess('quotes', undefined, supabase));
+  if (quoteUserIds.length === 0) {
+    return [];
+  }
+
+  const hiddenIds = await getHiddenSystemTestAccountIds(supabase);
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, full_name, employee_id, team_id')
+    .in('id', quoteUserIds)
+    .eq('team_id', 'accounts')
+    .order('full_name', { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data || []) as QuoteNotificationRecipientOption[])
+    .filter(profile => !hiddenIds.has(profile.id));
+}
+
+export async function getSelectedQuoteInvoiceNotificationRecipientIds(
+  supabase: ReturnType<typeof createAdminClient>
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('quote_invoice_notification_recipients')
+    .select('profile_id');
+
+  if (error) {
+    throw error;
+  }
+
+  return (data || []).map(row => row.profile_id);
+}
+
+export async function getQuoteAccountsRecipientIds(
+  supabase: ReturnType<typeof createAdminClient>,
+  excludeUserId?: string | null
+): Promise<string[]> {
+  const [eligibleRecipients, selectedRecipientIds] = await Promise.all([
+    listQuoteAccountsNotificationRecipientOptions(supabase),
+    getSelectedQuoteInvoiceNotificationRecipientIds(supabase),
+  ]);
+  const eligibleIds = new Set(eligibleRecipients.map(profile => profile.id));
+
+  return selectedRecipientIds
+    .filter(profileId => eligibleIds.has(profileId))
+    .filter(profileId => profileId !== excludeUserId);
 }
 
 export {

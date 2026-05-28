@@ -43,6 +43,7 @@ export interface QuoteInvoiceAllocation {
 export interface QuoteInvoice {
   id: string;
   quote_id: string;
+  invoice_request_id: string | null;
   invoice_number: string;
   invoice_date: string;
   amount: number;
@@ -52,6 +53,24 @@ export interface QuoteInvoice {
   created_at: string;
   updated_at: string;
   allocations?: QuoteInvoiceAllocation[];
+}
+
+export interface QuoteInvoiceRequest {
+  id: string;
+  quote_id: string;
+  requested_amount: number;
+  requested_invoice_date: string;
+  requested_invoice_scope: 'full' | 'partial';
+  manager_comments: string | null;
+  status: 'pending' | 'fulfilled' | 'cancelled';
+  requested_by: string | null;
+  requested_at: string;
+  notified_at: string | null;
+  fulfilled_invoice_id: string | null;
+  fulfilled_by: string | null;
+  fulfilled_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface QuoteManagerOption {
@@ -175,14 +194,17 @@ export interface Quote {
   attachments?: QuoteAttachment[];
   rams_documents?: QuoteRamsDocument[];
   invoices?: QuoteInvoice[];
+  invoice_requests?: QuoteInvoiceRequest[];
   versions?: Quote[];
   previous_versions?: Quote[];
   timeline?: QuoteTimelineEvent[];
   invoice_summary?: {
     invoicedTotal: number;
+    pendingRequestedTotal: number;
     remainingBalance: number;
+    availableToRequest: number;
     lastInvoiceAt: string | null;
-    status: 'not_invoiced' | 'partially_invoiced' | 'invoiced';
+    status: 'not_invoiced' | 'ready_to_invoice' | 'partially_invoiced' | 'invoiced';
   };
 }
 
