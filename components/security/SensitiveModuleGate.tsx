@@ -136,7 +136,19 @@ export function SensitiveModuleGate({
       });
       const payload = await response.json();
       if (!response.ok) {
-        throw new Error(payload.error || 'Unable to send verification email');
+        throw new Error(payload.error || 'Unable to set sensitive PIN');
+      }
+
+      if (payload.requiresVerification === false) {
+        toast.success('Sensitive PIN set');
+        const unlocked = await access.unlock(setupPin);
+        if (unlocked) {
+          setSetupPin('');
+          setConfirmSetupPin('');
+        } else {
+          await access.refresh();
+        }
+        return;
       }
 
       setSetupPending(true);
@@ -144,7 +156,7 @@ export function SensitiveModuleGate({
       setVerificationCode('');
       toast.success('Verification code sent');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Unable to send verification email');
+      toast.error(error instanceof Error ? error.message : 'Unable to set sensitive PIN');
     } finally {
       setWorking(false);
     }
@@ -195,7 +207,7 @@ export function SensitiveModuleGate({
             </CardTitle>
             <CardDescription className="mx-auto max-w-md">
               {setupRequired
-                ? `Create a 4 or 6 digit PIN to unlock protected modules for 20 minutes on this session. A verification code will be emailed before it is activated.`
+                ? `Create a 4 or 6 digit PIN to unlock protected modules for 20 minutes on this session.`
                 : `Enter your sensitive access PIN to unlock all protected modules for 20 minutes on this session.`}
             </CardDescription>
           </CardHeader>
@@ -240,7 +252,7 @@ export function SensitiveModuleGate({
                       className="w-full bg-avs-yellow text-slate-900 hover:bg-[#d1b82f] disabled:opacity-60"
                     >
                       {working ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
-                      Email Verification Code
+                      Set PIN and Unlock Protected Modules
                     </Button>
                   </>
                 ) : (

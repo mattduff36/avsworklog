@@ -252,6 +252,78 @@ export async function requestSensitivePinVerification(params: {
   return { email: current.profile.email };
 }
 
+export async function setupSensitivePinWithoutEmailVerification(params: {
+  pin: string;
+}): Promise<{ eventType: 'set' }> {
+  const current = await getCurrentAuthenticatedProfile({ includeEmail: true });
+  if (!current) throw new Error('Unauthorized');
+
+  const existing = await getSensitivePinRow(current.profile.id);
+  if (existing?.pin_hash && !existing.must_reset) {
+    throw new Error('Use the change PIN flow for an existing sensitive PIN');
+  }
+
+  const validation = validateSensitivePin(params.pin);
+  if (!validation.valid || !validation.length) {
+    throw new Error(validation.error || 'Invalid PIN');
+  }
+
+  const matchesMainPassword = await verifyUserPassword(
+    current.profile.email,
+    current.profile.id,
+    params.pin
+  );
+  if (matchesMainPassword) {
+    throw new Error('Sensitive PIN cannot be the same as your main password');
+  }
+
+  const pending = await hashPin(params.pin);
+  const admin = createAdminClient();
+  const nowIso = new Date().toISOString();
+
+  const { error: upsertError } = await admin
+    .from('profile_sensitive_pins')
+    .upsert({
+      profile_id: current.profile.id,
+      pin_hash: pending.hash,
+      pin_salt: pending.salt,
+      pin_length: validation.length,
+      failed_attempts: 0,
+      locked_until: null,
+      must_reset: false,
+      last_changed_at: nowIso,
+      updated_at: nowIso,
+    }, { onConflict: 'profile_id' });
+
+  if (upsertError) throw new Error(upsertError.message);
+
+  await Promise.all([
+    admin
+      .from('sensitive_pin_verification_tokens')
+      .update({ consumed_at: nowIso })
+      .eq('profile_id', current.profile.id)
+      .is('consumed_at', null),
+    admin
+      .from('sensitive_pin_unlocks')
+      .delete()
+      .eq('profile_id', current.profile.id),
+    admin.from('sensitive_pin_audit_events').insert({
+      profile_id: current.profile.id,
+      actor_profile_id: current.profile.id,
+      event_type: 'setup_confirmed',
+    }),
+  ]);
+
+  await notifyAdminsOfSensitivePinEvent({
+    actorProfileId: current.profile.id,
+    targetProfileId: current.profile.id,
+    targetName: current.profile.full_name || current.profile.email || 'A user',
+    eventType: 'set',
+  });
+
+  return { eventType: 'set' };
+}
+
 export async function confirmSensitivePinVerification(params: {
   code: string;
   purpose: SensitivePinPurpose;

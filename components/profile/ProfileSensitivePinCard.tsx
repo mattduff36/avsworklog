@@ -75,6 +75,14 @@ export function ProfileSensitivePinCard() {
         throw new Error(payload.error || 'Unable to send verification email');
       }
 
+      if (payload.requiresVerification === false) {
+        setPin('');
+        setConfirmPin('');
+        toast.success('Sensitive PIN set');
+        await loadStatus();
+        return;
+      }
+
       setPendingMode(nextMode);
       setSentToEmail(payload.email || '');
       setVerificationCode('');
@@ -183,7 +191,7 @@ export function ProfileSensitivePinCard() {
 
             <p className="text-xs text-muted-foreground">
               Choose 4 or 6 digits. This PIN cannot be the same as your normal account password.
-              A verification code will be emailed before the PIN is activated.
+              First-time setup is activated immediately; changes and resets use email verification.
             </p>
 
             <div className="flex flex-wrap gap-2">
