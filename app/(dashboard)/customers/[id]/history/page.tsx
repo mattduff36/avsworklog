@@ -22,7 +22,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
-import { SensitiveModuleGate, useSensitiveModuleAccess } from '@/components/security/SensitiveModuleGate';
+import { SensitiveModuleGate, SensitiveModuleSessionManager, useSensitiveModuleAccess } from '@/components/security/SensitiveModuleGate';
 import { CustomerFormDialog } from '../../components/CustomerFormDialog';
 import type { Customer, CustomerFormData } from '../../types';
 import { ACCEPTED_QUOTE_STATUSES, getQuoteStatusConfig, type QuoteListSummary, type QuoteStatus } from '@/app/(dashboard)/quotes/types';
@@ -128,6 +128,7 @@ export default function CustomerHistoryPage({ params }: PageProps) {
 
   return (
     <div className="space-y-6 max-w-5xl">
+      <SensitiveModuleSessionManager moduleLabel="Customers" access={sensitiveAccess} />
       {/* Back nav */}
       <Link href="/customers" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-white transition-colors">
         <ArrowLeft className="h-4 w-4" /> Back to Customers

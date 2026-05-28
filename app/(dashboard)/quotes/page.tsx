@@ -11,7 +11,7 @@ import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { SensitiveModuleGate, useSensitiveModuleAccess } from '@/components/security/SensitiveModuleGate';
+import { SensitiveModuleGate, SensitiveModuleSessionManager, useSensitiveModuleAccess } from '@/components/security/SensitiveModuleGate';
 import {
   Select,
   SelectContent,
@@ -307,6 +307,7 @@ export default function QuotesPage() {
 
   return (
     <AppPageShell>
+      <SensitiveModuleSessionManager moduleLabel="Quotes" access={sensitiveAccess} />
       <div className="bg-white dark:bg-slate-900 rounded-lg border border-border p-6">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">

@@ -102,6 +102,14 @@ type LoggedAction = {
   };
 };
 
+type LockedDefectItem = {
+  item_number: number;
+  item_description: string;
+  status: string;
+  actionId: string;
+  comment: string | null;
+};
+
 type PreviousDefect = PreviousDefectSummary;
 type RecentCompletedDefect = { completedAt: string };
 
@@ -1024,10 +1032,13 @@ function NewInspectionContent() {
       ]);
 
       if (previousDefectsResponse.ok) {
-        const { previousDefects: previousDefectItems } = await previousDefectsResponse.json();
+        const previousDefectsPayload = await previousDefectsResponse.json().catch(() => null) as
+          | { previousDefects?: Array<PreviousDefectSummary & { signature: string }> }
+          | null;
+        const previousDefectItems = previousDefectsPayload?.previousDefects ?? [];
         const defectsMap = new Map<string, PreviousDefect>();
 
-        (previousDefectItems as Array<PreviousDefectSummary & { signature: string }>).forEach((item) => {
+        previousDefectItems.forEach((item) => {
           defectsMap.set(item.signature, {
             item_number: item.item_number,
             item_description: item.item_description,
@@ -1041,10 +1052,13 @@ function NewInspectionContent() {
       }
 
       if (recentCompletedResponse.ok) {
-        const { recentlyCompletedItems } = await recentCompletedResponse.json();
+        const recentCompletedPayload = await recentCompletedResponse.json().catch(() => null) as
+          | { recentlyCompletedItems?: Array<{ signature: string; completedAt: string }> }
+          | null;
+        const recentlyCompletedItems = recentCompletedPayload?.recentlyCompletedItems ?? [];
         const recentCompletedMap = new Map<string, RecentCompletedDefect>();
 
-        (recentlyCompletedItems as Array<{ signature: string; completedAt: string }>).forEach((item) => {
+        recentlyCompletedItems.forEach((item) => {
           recentCompletedMap.set(item.signature, { completedAt: item.completedAt });
         });
 
@@ -1066,10 +1080,13 @@ function NewInspectionContent() {
       let loggedError: Error | null = null;
       
       if (response.ok) {
-        const { lockedItems } = await response.json();
+        const lockedDefectsPayload = await response.json().catch(() => null) as
+          | { lockedItems?: LockedDefectItem[] }
+          | null;
+        const lockedItems = lockedDefectsPayload?.lockedItems ?? [];
         
         // Transform to match existing data structure
-        loggedActionsData = lockedItems.map((item: { id: string; [key: string]: unknown }) => ({
+        loggedActionsData = lockedItems.map((item) => ({
           inspection_items: {
             item_number: item.item_number,
             item_description: item.item_description

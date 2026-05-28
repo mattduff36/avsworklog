@@ -603,3 +603,41 @@ export async function unlockSensitiveModuleWithPin(params: {
 
   return getSensitiveModulePinState(params.moduleName);
 }
+
+export async function renewSensitiveModuleAccess(moduleName: ModuleName): Promise<SensitiveModulePinState> {
+  const current = await getCurrentAuthenticatedProfile();
+  if (!current) throw new Error('Unauthorized');
+
+  const sessionId = current.validation.session?.id;
+  if (!sessionId) {
+    throw new Error('Sensitive PIN unlock requires an active app session');
+  }
+
+  const admin = createAdminClient();
+  const nowIso = new Date().toISOString();
+  const { data: unlock, error: unlockError } = await admin
+    .from('sensitive_pin_unlocks')
+    .select('module_name')
+    .eq('profile_id', current.profile.id)
+    .eq('session_id', sessionId)
+    .eq('module_name', moduleName)
+    .gt('expires_at', nowIso)
+    .maybeSingle();
+
+  if (unlockError) throw new Error(unlockError.message);
+  if (!unlock) {
+    throw new Error('Sensitive access PIN required for protected modules.');
+  }
+
+  const expiresAt = getUnlockExpiry();
+  const { error: updateError } = await admin
+    .from('sensitive_pin_unlocks')
+    .update({ expires_at: expiresAt })
+    .eq('profile_id', current.profile.id)
+    .eq('session_id', sessionId)
+    .gt('expires_at', nowIso);
+
+  if (updateError) throw new Error(updateError.message);
+
+  return getSensitiveModulePinState(moduleName);
+}

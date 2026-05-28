@@ -32,7 +32,7 @@ export async function fetchAllPaginatedItems<TItem>(
       `${endpoint}${separator}limit=${options.limit}&offset=${offset}`,
       { cache: options.cache || 'no-store' }
     );
-    const payload = (await response.json()) as PaginationPayload;
+    const payload = (await response.json().catch(() => ({}))) as PaginationPayload;
 
     if (!response.ok) {
       throw createStatusError(

@@ -40,6 +40,7 @@ vi.mock('@/components/ui/page-loader', () => ({
 
 vi.mock('@/components/security/SensitiveModuleGate', () => ({
   SensitiveModuleGate: () => <div>Sensitive module gate</div>,
+  SensitiveModuleSessionManager: () => null,
   useSensitiveModuleAccess: () => ({
     canAccess: true,
     loading: false,

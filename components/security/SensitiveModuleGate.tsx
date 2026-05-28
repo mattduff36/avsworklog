@@ -1,13 +1,27 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { KeyRound, LockKeyhole, Loader2, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import type { ModuleName } from '@/types/roles';
+
+const SENSITIVE_ACCESS_HEARTBEAT_MS = 5 * 60 * 1000;
+const SENSITIVE_ACCESS_IDLE_WARNING_MS = 10 * 60 * 1000;
+const ACTIVITY_EVENT_NAMES = ['pointerdown', 'keydown', 'input', 'wheel'] as const;
 
 interface SensitivePinStatus {
   configured: boolean;
@@ -29,6 +43,7 @@ export interface SensitiveModuleAccessState {
   canAccess: boolean;
   refresh: () => Promise<void>;
   unlock: (pin: string) => Promise<boolean>;
+  renew: () => Promise<boolean>;
 }
 
 export function useSensitiveModuleAccess(moduleName: ModuleName): SensitiveModuleAccessState {
@@ -79,13 +94,183 @@ export function useSensitiveModuleAccess(moduleName: ModuleName): SensitiveModul
     }
   }, [moduleName, refresh]);
 
+  const renew = useCallback(async () => {
+    try {
+      const response = await fetch('/api/sensitive-access/renew', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ module: moduleName }),
+      });
+      const payload = await response.json().catch(() => null) as { state?: SensitiveModuleState } | null;
+      if (!response.ok) {
+        if (response.status === 428) {
+          setState((current) => current ? { ...current, unlocked: false, expires_at: null } : current);
+        }
+        return false;
+      }
+      if (payload?.state) {
+        setState(payload.state);
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }, [moduleName]);
+
   return {
     loading,
     state,
     canAccess: Boolean(state && (!state.required || state.unlocked)),
     refresh,
     unlock,
+    renew,
   };
+}
+
+export function SensitiveModuleSessionManager({
+  moduleLabel,
+  access,
+  initialLastActivityAt,
+  initialWarningOpen = false,
+}: {
+  moduleLabel: string;
+  access: SensitiveModuleAccessState;
+  initialLastActivityAt?: number;
+  initialWarningOpen?: boolean;
+}) {
+  const router = useRouter();
+  const { canAccess, renew, state } = access;
+  const lastActivityAtRef = useRef(initialLastActivityAt ?? Date.now());
+  const warningOpenRef = useRef(initialWarningOpen);
+  const heartbeatRunningRef = useRef(false);
+  const [warningOpen, setWarningOpen] = useState(initialWarningOpen);
+  const [confirming, setConfirming] = useState(false);
+  const moduleName = state?.module_name;
+  const canManageSession = canAccess && state?.required === true && Boolean(state.expires_at);
+
+  const runHeartbeat = useCallback(async () => {
+    if (!canManageSession) return;
+    if (heartbeatRunningRef.current) return;
+
+    heartbeatRunningRef.current = true;
+    try {
+      if (warningOpenRef.current) {
+        router.push('/dashboard');
+        return;
+      }
+
+      const idleFor = Date.now() - lastActivityAtRef.current;
+      if (idleFor <= SENSITIVE_ACCESS_HEARTBEAT_MS) {
+        const renewed = await renew();
+        if (!renewed) {
+          router.push('/dashboard');
+        }
+        return;
+      }
+
+      if (idleFor >= SENSITIVE_ACCESS_IDLE_WARNING_MS) {
+        warningOpenRef.current = true;
+        setWarningOpen(true);
+      }
+    } finally {
+      heartbeatRunningRef.current = false;
+    }
+  }, [canManageSession, renew, router]);
+
+  const confirmStillActive = useCallback(async () => {
+    setConfirming(true);
+    lastActivityAtRef.current = Date.now();
+    warningOpenRef.current = false;
+    setWarningOpen(false);
+
+    try {
+      const renewed = await renew();
+      if (!renewed) {
+        router.push('/dashboard');
+      }
+    } finally {
+      setConfirming(false);
+    }
+  }, [renew, router]);
+
+  useEffect(() => {
+    if (!canManageSession) return;
+
+    lastActivityAtRef.current = initialLastActivityAt ?? Date.now();
+    warningOpenRef.current = initialWarningOpen;
+    setWarningOpen(initialWarningOpen);
+
+    const recordActivity = (event?: Event) => {
+      if (event && event.isTrusted === false) return;
+      if (!warningOpenRef.current) {
+        lastActivityAtRef.current = Date.now();
+      }
+    };
+    const recordVisibleActivity = (event?: Event) => {
+      if (document.visibilityState === 'visible') {
+        recordActivity(event);
+      }
+    };
+    const listenerOptions = { capture: true, passive: true };
+
+    ACTIVITY_EVENT_NAMES.forEach((eventName) => {
+      document.addEventListener(eventName, recordActivity, listenerOptions);
+    });
+    document.addEventListener('visibilitychange', recordVisibleActivity, listenerOptions);
+
+    let heartbeat: number | null = null;
+    let cancelled = false;
+    const scheduleHeartbeat = () => {
+      heartbeat = window.setTimeout(() => {
+        if (!cancelled) {
+          scheduleHeartbeat();
+        }
+        void runHeartbeat();
+      }, SENSITIVE_ACCESS_HEARTBEAT_MS);
+    };
+
+    scheduleHeartbeat();
+
+    return () => {
+      cancelled = true;
+      if (heartbeat !== null) {
+        window.clearTimeout(heartbeat);
+      }
+      ACTIVITY_EVENT_NAMES.forEach((eventName) => {
+        document.removeEventListener(eventName, recordActivity, listenerOptions);
+      });
+      document.removeEventListener('visibilitychange', recordVisibleActivity, listenerOptions);
+    };
+  }, [canManageSession, initialLastActivityAt, initialWarningOpen, moduleName, runHeartbeat]);
+
+  if (!canManageSession) return null;
+
+  return (
+    <AlertDialog open={warningOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Are you still using {moduleLabel}?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Sensitive access is about to expire because there has been no recent activity on this page.
+            Confirm you are still here to keep working without losing your current changes.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogAction
+            onClick={(event) => {
+              event.preventDefault();
+              void confirmStillActive();
+            }}
+            disabled={confirming}
+            className="bg-avs-yellow text-slate-900 hover:bg-[#d1b82f] disabled:opacity-60"
+          >
+            {confirming ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Yes, I&apos;m still here
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
 }
 
 export function SensitiveModuleGate({

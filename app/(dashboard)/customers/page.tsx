@@ -7,10 +7,11 @@ import { AppPageShell } from '@/components/layout/AppPageShell';
 import { Building2, Plus, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
+import { getErrorStatus } from '@/lib/utils/http-error';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { SensitiveModuleGate, useSensitiveModuleAccess } from '@/components/security/SensitiveModuleGate';
+import { SensitiveModuleGate, SensitiveModuleSessionManager, useSensitiveModuleAccess } from '@/components/security/SensitiveModuleGate';
 import { CustomersTable } from './components/CustomersTable';
 import { CustomerFormDialog } from './components/CustomerFormDialog';
 import type { Customer, CustomerFormData } from './types';
@@ -18,6 +19,7 @@ import type { Customer, CustomerFormData } from './types';
 export default function CustomersPage() {
   const { hasPermission: canViewCustomers, loading: permissionLoading } = usePermissionCheck('customers', false);
   const sensitiveAccess = useSensitiveModuleAccess('customers');
+  const refreshSensitiveAccess = sensitiveAccess.refresh;
   const router = useRouter();
 
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -34,13 +36,20 @@ export default function CustomersPage() {
       });
       setCustomers(items);
     } catch (error) {
+      if (getErrorStatus(error) === 428) {
+        setCustomers([]);
+        await refreshSensitiveAccess();
+        toast.info('Customers locked. Enter your sensitive PIN to continue.', { id: 'customers-sensitive-access-required' });
+        return;
+      }
+
       const errorContextId = 'customers-fetch-list-error';
       console.error('Error fetching customers:', error, { errorContextId });
       toast.error('Failed to load customers', { id: errorContextId });
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refreshSensitiveAccess]);
 
   useEffect(() => {
     if (permissionLoading || sensitiveAccess.loading) return;
@@ -105,6 +114,7 @@ export default function CustomersPage() {
 
   return (
     <AppPageShell>
+      <SensitiveModuleSessionManager moduleLabel="Customers" access={sensitiveAccess} />
       <div className="bg-white dark:bg-slate-900 rounded-lg border border-border p-6">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">

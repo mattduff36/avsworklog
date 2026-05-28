@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { PageLoader } from '@/components/ui/page-loader';
 import { Badge } from '@/components/ui/badge';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
-import { SensitiveModuleGate, useSensitiveModuleAccess } from '@/components/security/SensitiveModuleGate';
+import { SensitiveModuleGate, SensitiveModuleSessionManager, useSensitiveModuleAccess } from '@/components/security/SensitiveModuleGate';
 
 interface QuoteCalendarRow {
   id: string;
@@ -197,6 +197,7 @@ export default function QuoteWorkCalendarPage() {
 
   return (
     <AppPageShell>
+      <SensitiveModuleSessionManager moduleLabel="Quotes" access={sensitiveAccess} />
       <AppPageHeader
         title="Quote Work Calendar"
         description="Planned quote starts, estimated durations, and manual work entries."

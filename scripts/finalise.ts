@@ -6,6 +6,7 @@ import pg from 'pg';
 import { parseCommitsFromMessages, selectPrimaryCommitMessage } from '../lib/config/release-version-logic';
 import { AutomationRun } from './automation/logger';
 import { checkFinaliseBlockingActivity, formatBlockingActivity } from './finalise-activity-guard';
+import { getSkippableFinaliseTasks, type RecentFinaliseTaskRun } from './finalise-recent-tasks';
 import { formatReleaseVersionCommitMessage, summarizeFinaliseChanges } from './finalise-summary';
 
 config({ path: path.resolve(process.cwd(), '.env.local') });
@@ -13,6 +14,7 @@ config({ path: path.resolve(process.cwd(), '.env.local') });
 const { Client } = pg;
 const REPO_ROOT = process.cwd();
 const NEXT_BUILD_DIR = path.join(REPO_ROOT, '.next');
+const NEXT_BUILD_ARTIFACT_PATH = path.join(NEXT_BUILD_DIR, 'BUILD_ID');
 const RELEASE_VERSION_JSON_PATH = path.join(REPO_ROOT, 'lib/config/release-version.json');
 const RELEASE_VERSION_FILES = ['lib/config/release-version.json', 'docs_private/release-log.md'] as const;
 const DEV_SERVER_PORT = 4000;
@@ -262,6 +264,19 @@ function getPushModeDescription(options: FinaliseOptions): string {
 
 function printProgress(message: string, percent: number): void {
   console.log(`- ${message} [${percent}% complete]`);
+}
+
+function formatRecentTask(run: RecentFinaliseTaskRun): string {
+  return `${run.command} (${run.source}, completed ${run.completedAt})`;
+}
+
+function getRecentTaskMetadata(run: RecentFinaliseTaskRun): Record<string, unknown> {
+  return {
+    reason: 'recent-successful-run',
+    command: run.command,
+    completedAt: run.completedAt,
+    source: run.source,
+  };
 }
 
 interface BuildProgressMilestone {
@@ -817,6 +832,17 @@ async function main(): Promise<void> {
     const devServerProcesses = getRepoDevServerProcesses();
     const branch = getCurrentBranch();
     const initialChangeSummary = summarizeFinaliseChanges(changedFiles);
+    const skippableTasks = getSkippableFinaliseTasks({
+      repoRoot: REPO_ROOT,
+      changedFiles,
+      pendingMigrationFiles,
+      buildArtifactPath: NEXT_BUILD_ARTIFACT_PATH,
+    });
+    const recentMigrationRun = pendingMigrationFiles.length > 0 ? skippableTasks.migrations : undefined;
+    const recentDbValidateRun = shouldRunDbValidate ? skippableTasks['db-validate'] : undefined;
+    const recentBuildRun = skippableTasks.build;
+    const recentTestRun = options.full ? skippableTasks['test-run'] : undefined;
+    const recentTestsuiteRun = options.full ? skippableTasks.testsuite : undefined;
 
     if (options.dryRun) {
       console.log(`Mode: ${getPushModeDescription(options)}`);
@@ -824,17 +850,37 @@ async function main(): Promise<void> {
       console.log(`Dev server: ${devServerProcesses.length > 0 ? `would stop ${devServerProcesses.length} process(es)` : 'none running'}`);
       console.log(
         `Migrations: ${
-          pendingMigrationFiles.length > 0
+          recentMigrationRun
+            ? `would skip; recent run found: ${formatRecentTask(recentMigrationRun)}`
+            : pendingMigrationFiles.length > 0
             ? `would run ${pendingMigrationFiles.join(', ')}`
             : 'none pending'
         }`
       );
-      console.log(`DB validate: ${shouldRunDbValidate ? 'would run' : 'not needed'}`);
-      console.log('Build: would remove .next and run npm run build');
+      console.log(
+        `DB validate: ${
+          recentDbValidateRun
+            ? `would skip; recent run found: ${formatRecentTask(recentDbValidateRun)}`
+            : shouldRunDbValidate
+            ? 'would run'
+            : 'not needed'
+        }`
+      );
+      console.log(
+        `Build: ${
+          recentBuildRun
+            ? `would reuse recent passed build: ${formatRecentTask(recentBuildRun)}`
+            : 'would remove .next and run npm run build'
+        }`
+      );
       console.log(
         `Tests: ${
           options.full
-            ? `would start a local production server on ${DEV_SERVER_PORT}, run npm run test:run, then run npm run testsuite`
+            ? [
+                `would start a local production server on ${DEV_SERVER_PORT} if needed`,
+                recentTestRun ? `skip npm run test:run (${formatRecentTask(recentTestRun)})` : 'run npm run test:run',
+                recentTestsuiteRun ? `skip npm run testsuite (${formatRecentTask(recentTestsuiteRun)})` : 'run npm run testsuite',
+              ].join(', ')
             : 'skipped'
         }`
       );
@@ -868,11 +914,19 @@ async function main(): Promise<void> {
 
     if (pendingMigrationFiles.length > 0) {
       console.log(`\n==> Run pending local migrations (${pendingMigrationFiles.length})`);
-      printProgress(`Running ${pendingMigrationFiles.length} pending migration${pendingMigrationFiles.length === 1 ? '' : 's'}...`, 12);
-      await run.step('Run pending local migrations', () => runPendingMigrations(pendingMigrationFiles), {
-        migrationFiles: pendingMigrationFiles,
-      });
-      printProgress('Pending migrations applied.', 20);
+      if (recentMigrationRun) {
+        await run.step('Skip pending local migrations', () => undefined, {
+          ...getRecentTaskMetadata(recentMigrationRun),
+          migrationFiles: pendingMigrationFiles,
+        });
+        printProgress(`Reused recent migration run: ${formatRecentTask(recentMigrationRun)}.`, 20);
+      } else {
+        printProgress(`Running ${pendingMigrationFiles.length} pending migration${pendingMigrationFiles.length === 1 ? '' : 's'}...`, 12);
+        await run.step('Run pending local migrations', () => runPendingMigrations(pendingMigrationFiles), {
+          migrationFiles: pendingMigrationFiles,
+        });
+        printProgress('Pending migrations applied.', 20);
+      }
     } else {
       console.log('\n==> Run pending local migrations');
       printProgress('No pending local migration files detected.', 20);
@@ -880,50 +934,81 @@ async function main(): Promise<void> {
 
     if (shouldRunDbValidate) {
       console.log('\n==> Validate database after schema-risk migration');
-      printProgress('Running database validation...', 22);
-      runCommand('npm', ['run', 'db:validate']);
-      printProgress('Database validation passed.', 25);
+      if (recentDbValidateRun) {
+        await run.step('Skip database validation after schema-risk migration', () => undefined, getRecentTaskMetadata(recentDbValidateRun));
+        printProgress(`Reused recent database validation: ${formatRecentTask(recentDbValidateRun)}.`, 25);
+      } else {
+        printProgress('Running database validation...', 22);
+        runCommand('npm', ['run', 'db:validate']);
+        printProgress('Database validation passed.', 25);
+      }
     } else {
       console.log('\n==> Validate database after schema-risk migration');
       printProgress('No rename/drop migration detected.', 25);
     }
 
-    console.log('\n==> Remove clean build output');
-    printProgress('Removing previous clean build output...', 28);
-    const removedBuildOutput = await run.step('Remove clean build output', () => removeNextBuildOutput());
-    printProgress(removedBuildOutput ? 'Removed .next build output.' : 'No .next build output to remove.', 30);
-
     console.log('\n==> Run clean production build');
-    await runCleanProductionBuildWithProgress();
+    if (recentBuildRun) {
+      await run.step('Reuse recent production build', () => undefined, getRecentTaskMetadata(recentBuildRun));
+      printProgress(`Reused recent production build: ${formatRecentTask(recentBuildRun)}.`, 50);
+    } else {
+      console.log('\n==> Remove clean build output');
+      printProgress('Removing previous clean build output...', 28);
+      const removedBuildOutput = await run.step('Remove clean build output', () => removeNextBuildOutput());
+      printProgress(removedBuildOutput ? 'Removed .next build output.' : 'No .next build output to remove.', 30);
+
+      await run.step('Run clean production build', () => runCleanProductionBuildWithProgress());
+    }
 
     if (options.full) {
       console.log('\n==> Run full automated test suite');
       const localProductionBaseUrl = getLocalProductionBaseUrl();
       const localTestEnv = getLocalTestEnv();
-      printProgress(`Starting local production server on ${localProductionBaseUrl}...`, 52);
-      const testServer = startManagedProcess(
-        'npm',
-        ['run', 'start', '--', '--port', String(DEV_SERVER_PORT)],
-        'Local production server',
-        localTestEnv
-      );
+      const shouldRunTestRun = !recentTestRun;
+      const shouldRunTestsuite = !recentTestsuiteRun;
 
-      try {
-        printProgress('Waiting for local production server readiness...', 55);
-        await run.step('Wait for local production server', () =>
-          waitForServerReady(testServer, localProductionBaseUrl)
+      if (!shouldRunTestRun && !shouldRunTestsuite) {
+        await run.step('Reuse recent full automated test suite', () => undefined, {
+          testRun: recentTestRun ? getRecentTaskMetadata(recentTestRun) : null,
+          testsuite: recentTestsuiteRun ? getRecentTaskMetadata(recentTestsuiteRun) : null,
+        });
+        printProgress('Reused recent full automated test suite.', 84);
+      } else {
+        printProgress(`Starting local production server on ${localProductionBaseUrl}...`, 52);
+        const testServer = startManagedProcess(
+          'npm',
+          ['run', 'start', '--', '--port', String(DEV_SERVER_PORT)],
+          'Local production server',
+          localTestEnv
         );
-        printProgress(`Local production server ready on port ${DEV_SERVER_PORT}.`, 58);
-        printProgress('Running Vitest unit, integration, and component tests...', 60);
-        runCommand('npm', ['run', 'test:run'], { env: localTestEnv });
-        printProgress('Vitest test run passed.', 72);
-        printProgress('Running API and Playwright testsuite...', 75);
-        runCommand('npm', ['run', 'testsuite'], { env: localTestEnv });
-        printProgress('Full automated test suite passed.', 84);
-      } finally {
-        printProgress('Stopping local production server...', 85);
-        await run.step('Stop local production server', () => stopManagedProcess(testServer));
-        printProgress('Local production server stopped.', 86);
+
+        try {
+          printProgress('Waiting for local production server readiness...', 55);
+          await run.step('Wait for local production server', () =>
+            waitForServerReady(testServer, localProductionBaseUrl)
+          );
+          printProgress(`Local production server ready on port ${DEV_SERVER_PORT}.`, 58);
+          if (recentTestRun) {
+            await run.step('Reuse recent Vitest test run', () => undefined, getRecentTaskMetadata(recentTestRun));
+            printProgress(`Reused recent Vitest test run: ${formatRecentTask(recentTestRun)}.`, 72);
+          } else {
+            printProgress('Running Vitest unit, integration, and component tests...', 60);
+            runCommand('npm', ['run', 'test:run'], { env: localTestEnv });
+            printProgress('Vitest test run passed.', 72);
+          }
+          if (recentTestsuiteRun) {
+            await run.step('Reuse recent API and Playwright testsuite', () => undefined, getRecentTaskMetadata(recentTestsuiteRun));
+            printProgress(`Reused recent API and Playwright testsuite: ${formatRecentTask(recentTestsuiteRun)}.`, 84);
+          } else {
+            printProgress('Running API and Playwright testsuite...', 75);
+            runCommand('npm', ['run', 'testsuite'], { env: localTestEnv });
+            printProgress('Full automated test suite passed.', 84);
+          }
+        } finally {
+          printProgress('Stopping local production server...', 85);
+          await run.step('Stop local production server', () => stopManagedProcess(testServer));
+          printProgress('Local production server stopped.', 86);
+        }
       }
     } else {
       console.log('\n==> Run full automated test suite');
@@ -978,9 +1063,17 @@ async function main(): Promise<void> {
 
     console.log('\nFinalise complete.');
     console.log(`- Branch: ${branch || '(detached HEAD)'}`);
-    console.log(`- Migrations run: ${pendingMigrationFiles.length}`);
-    console.log(`- Build: passed`);
-    console.log(`- Tests: ${options.full ? 'passed' : 'skipped'}`);
+    console.log(`- Migrations run: ${recentMigrationRun ? 'reused recent run' : pendingMigrationFiles.length}`);
+    console.log(`- Build: ${recentBuildRun ? 'reused recent passed build' : 'passed'}`);
+    console.log(
+      `- Tests: ${
+        options.full
+          ? recentTestRun && recentTestsuiteRun
+            ? 'reused recent passed runs'
+            : 'passed'
+          : 'skipped'
+      }`
+    );
     console.log(`- Commit: ${committed ? 'created' : 'skipped'}`);
     console.log(`- Release version: ${releaseVersion ? `bumped to ${releaseVersion}` : 'unchanged'}`);
     console.log(`- Push: ${pushedBranch ? `pushed ${pushedBranch}` : 'skipped'}`);
