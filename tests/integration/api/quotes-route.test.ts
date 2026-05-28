@@ -34,6 +34,10 @@ vi.mock('@/lib/supabase/admin', () => ({
   createAdminClient: mockCreateAdminClient,
 }));
 
+vi.mock('@/lib/server/sensitive-module-access', () => ({
+  requireSensitiveModuleAccess: vi.fn().mockResolvedValue(null),
+}));
+
 vi.mock('@/lib/server/quote-workflow', () => ({
   calculateQuoteTotals: mockCalculateQuoteTotals,
   appendQuoteTimelineEvent: mockAppendQuoteTimelineEvent,

@@ -422,8 +422,9 @@ export async function getSensitiveModulePinState(moduleName: ModuleName): Promis
     .select('expires_at')
     .eq('profile_id', current.profile.id)
     .eq('session_id', sessionId)
-    .eq('module_name', moduleName)
     .gt('expires_at', new Date().toISOString())
+    .order('expires_at', { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   if (unlockError) throw new Error(unlockError.message);
@@ -488,6 +489,24 @@ export async function unlockSensitiveModuleWithPin(params: {
   }
 
   const expiresAt = getUnlockExpiry();
+  const { data: protectedModules, error: protectedModulesError } = await admin
+    .from('permission_modules')
+    .select('module_name')
+    .eq('requires_sensitive_pin', true);
+
+  if (protectedModulesError) {
+    throw new Error(protectedModulesError.message);
+  }
+
+  const unlockRows = ((protectedModules || []) as Array<{ module_name: ModuleName }>)
+    .map((module) => ({
+      profile_id: current.profile.id,
+      session_id: current.validation.session!.id,
+      module_name: module.module_name,
+      unlocked_at: new Date().toISOString(),
+      expires_at: expiresAt,
+    }));
+
   await Promise.all([
     admin
       .from('profile_sensitive_pins')
@@ -497,15 +516,11 @@ export async function unlockSensitiveModuleWithPin(params: {
         updated_at: new Date().toISOString(),
       })
       .eq('profile_id', current.profile.id),
-    admin
-      .from('sensitive_pin_unlocks')
-      .upsert({
-        profile_id: current.profile.id,
-        session_id: current.validation.session.id,
-        module_name: params.moduleName,
-        unlocked_at: new Date().toISOString(),
-        expires_at: expiresAt,
-      }, { onConflict: 'session_id,module_name' }),
+    unlockRows.length > 0
+      ? admin
+        .from('sensitive_pin_unlocks')
+        .upsert(unlockRows, { onConflict: 'session_id,module_name' })
+      : Promise.resolve(),
     admin.from('sensitive_pin_audit_events').insert({
       profile_id: current.profile.id,
       actor_profile_id: current.profile.id,

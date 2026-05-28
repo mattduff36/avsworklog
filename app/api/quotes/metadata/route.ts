@@ -21,22 +21,42 @@ export async function GET() {
     if (sensitiveAccessResponse) return sensitiveAccessResponse;
 
     const admin = createAdminClient();
-    const [managerOptions, approversResult] = await Promise.all([
+    const [managerOptions, approversResult, customersResult] = await Promise.all([
       listQuoteManagerOptions(),
       admin
         .from('profiles')
         .select('id, full_name, employee_id, is_placeholder')
         .order('full_name'),
+      admin
+        .from('customers')
+        .select(`
+          id,
+          company_name,
+          short_name,
+          contact_name,
+          contact_email,
+          address_line_1,
+          address_line_2,
+          city,
+          county,
+          postcode,
+          default_validity_days
+        `)
+        .order('company_name', { ascending: true }),
     ]);
 
     if (approversResult.error) {
       throw approversResult.error;
+    }
+    if (customersResult.error) {
+      throw customersResult.error;
     }
 
     const approvers = await filterHiddenSystemTestAccountProfiles(admin, approversResult.data || []);
 
     return NextResponse.json({
       managerOptions,
+      customers: customersResult.data || [],
       approvers: approvers.map(approver => ({
         ...approver,
         email: null,

@@ -139,25 +139,19 @@ export default function QuotesPage() {
   const fetchData = useCallback(async () => {
     try {
       const url = customerId ? `/api/quotes?customer_id=${customerId}` : '/api/quotes';
-      const [quotesResult, customersResult, metadataRes] = await Promise.all([
+      const [quotesResult, metadataRes] = await Promise.all([
         fetchAllPaginatedItems<Quote>(url, 'quotes', {
           limit: 250,
           errorMessage: 'Failed to load quotes',
         }),
-        canViewCustomers
-          ? fetchAllPaginatedItems<CustomerOption>('/api/customers', 'customers', {
-            limit: 500,
-            errorMessage: 'Failed to load customers',
-          })
-          : Promise.resolve({ items: [], firstPagePayload: null }),
         fetch('/api/quotes/metadata'),
       ]);
 
       setQuotes(quotesResult.items);
       setQuoteSummary((quotesResult.firstPagePayload?.summary as QuoteListSummary | undefined) || null);
-      setCustomers(customersResult.items);
       if (metadataRes.ok) {
         const data = await metadataRes.json();
+        setCustomers(canViewCustomers ? data.customers || [] : []);
         setManagerOptions(data.managerOptions || []);
         setApprovers(data.approvers || []);
       }

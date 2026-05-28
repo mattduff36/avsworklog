@@ -38,6 +38,21 @@ vi.mock('@/components/ui/page-loader', () => ({
   PageLoader: ({ message }: { message: string }) => <div>{message}</div>,
 }));
 
+vi.mock('@/components/security/SensitiveModuleGate', () => ({
+  SensitiveModuleGate: () => <div>Sensitive module gate</div>,
+  useSensitiveModuleAccess: () => ({
+    canAccess: true,
+    loading: false,
+    status: {
+      requiresSensitivePin: false,
+      hasPin: true,
+      unlocked: true,
+      expiresAt: null,
+    },
+    refreshStatus: vi.fn(),
+  }),
+}));
+
 vi.mock('@/app/(dashboard)/quotes/components/QuotesTable', () => ({
   QuotesTable: () => <div>Quotes table</div>,
 }));

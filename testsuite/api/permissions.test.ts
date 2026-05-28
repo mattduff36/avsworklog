@@ -10,6 +10,10 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync, existsSync } from 'fs';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { getUsablePermissionAccessLevel, isPermissionLevelAllowedForModule } from '@/lib/config/permission-access-rules';
+import { getUserPermissionMatrix } from '@/lib/server/team-permissions';
+import type { ModuleName, PermissionAccessLevel } from '@/types/roles';
 
 config({ path: resolve(process.cwd(), '.env.local') });
 
@@ -35,6 +39,12 @@ interface UnreachableRouteResult {
 
 type RouteResult = ReachableRouteResult | UnreachableRouteResult;
 
+interface UserModulePermissionRow {
+  user_id: string;
+  module_name: ModuleName;
+  access_level: number;
+}
+
 function requireTestUsers(testUsers: TestUsers | null): TestUsers {
   if (!testUsers) {
     throw new Error('Test users not provisioned. Run npm run testsuite:setup before authenticated permission tests.');
@@ -46,6 +56,46 @@ function loadTestUsers(): TestUsers | null {
   const stateFile = resolve(process.cwd(), 'testsuite', '.state', 'test-users.json');
   if (!existsSync(stateFile)) return null;
   return JSON.parse(readFileSync(stateFile, 'utf-8'));
+}
+
+function normalizePermissionAccessLevel(value: number | null | undefined): PermissionAccessLevel {
+  if (value === 5) return 5;
+  if (value === 4) return 4;
+  if (value === 3) return 3;
+  if (value === 2) return 2;
+  if (value === 1) return 1;
+  return 0;
+}
+
+async function fetchAllUserModulePermissionRows(): Promise<UserModulePermissionRow[]> {
+  const supabase = createAdminClient();
+  const pageSize = 1000;
+  const rows: UserModulePermissionRow[] = [];
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from('user_module_permissions')
+      .select('user_id, module_name, access_level')
+      .order('user_id', { ascending: true })
+      .order('module_name', { ascending: true })
+      .range(from, from + pageSize - 1);
+
+    if (error) {
+      throw new Error(`Failed to load user module permission rows: ${error.message}`);
+    }
+
+    const pageRows = (data || []) as UserModulePermissionRow[];
+    rows.push(...pageRows);
+
+    if (pageRows.length < pageSize) {
+      break;
+    }
+
+    from += pageSize;
+  }
+
+  return rows;
 }
 
 async function fetchRoute(path: string, init?: RequestInit): Promise<RouteResult> {
@@ -135,6 +185,88 @@ describe('@permissions API Endpoint Access Control', () => {
     it('login page is accessible', async () => {
       const res = expectReachable(await fetchRoute('/login'), '/login');
       expect(res.status).toBe(200);
+    });
+  });
+
+  describe('User permission matrix regressions', () => {
+    it('loads persisted user overrides beyond the default Supabase page size', async () => {
+      const supabase = createAdminClient();
+      const [matrix, storedPermissionRows] = await Promise.all([
+        getUserPermissionMatrix(supabase),
+        fetchAllUserModulePermissionRows(),
+      ]);
+      const usersById = new Map(matrix.users.map((user) => [user.id, user]));
+      const modulesByName = new Map(matrix.modules.map((permissionModule) => [
+        permissionModule.module_name,
+        permissionModule,
+      ]));
+      const checkedOverrides: string[] = [];
+      const mismatches: string[] = [];
+
+      expect(
+        storedPermissionRows.length,
+        'This regression test must cover Supabase responses larger than the default 1000-row range.'
+      ).toBeGreaterThan(1000);
+
+      storedPermissionRows.forEach((row) => {
+        const user = usersById.get(row.user_id);
+        const permissionModule = modulesByName.get(row.module_name);
+        if (!user || !permissionModule || user.is_locked_admin) return;
+
+        const expectedLevel = getUsablePermissionAccessLevel(
+          permissionModule,
+          normalizePermissionAccessLevel(row.access_level),
+          { hasFullAccessRole: false }
+        );
+        const actualLevel = user.permissions[row.module_name] ?? 0;
+        checkedOverrides.push(`${row.user_id}:${row.module_name}`);
+
+        if (actualLevel !== expectedLevel) {
+          mismatches.push(`${user.full_name || row.user_id} ${row.module_name}: expected ${expectedLevel}, got ${actualLevel}`);
+        }
+      });
+
+      expect(checkedOverrides.length).toBeGreaterThan(0);
+      expect(mismatches).toEqual([]);
+    });
+
+    it('keeps hard module minimums future-proofed in the matrix metadata', async () => {
+      const matrix = await getUserPermissionMatrix(createAdminClient());
+      const toolboxTalks = matrix.modules.find((permissionModule) => permissionModule.module_name === 'toolbox-talks');
+      const adminSettings = matrix.modules.find((permissionModule) => permissionModule.module_name === 'admin-settings');
+
+      expect(toolboxTalks?.enforced_minimum_access_level).toBe(4);
+      expect(adminSettings?.enforced_minimum_access_level).toBe(4);
+      expect(toolboxTalks && isPermissionLevelAllowedForModule(toolboxTalks, 3, { hasFullAccessRole: false })).toBe(false);
+      expect(toolboxTalks && isPermissionLevelAllowedForModule(toolboxTalks, 4, { hasFullAccessRole: false })).toBe(true);
+      expect(adminSettings && isPermissionLevelAllowedForModule(adminSettings, 4, { hasFullAccessRole: false })).toBe(true);
+    });
+
+    it('exposes sensitive PIN metadata for matrix header toggles', async () => {
+      const supabase = createAdminClient();
+      const [matrix, modulesResult] = await Promise.all([
+        getUserPermissionMatrix(supabase),
+        supabase
+          .from('permission_modules')
+          .select('module_name, requires_sensitive_pin'),
+      ]);
+
+      if (modulesResult.error) {
+        throw new Error(`Failed to load permission modules: ${modulesResult.error.message}`);
+      }
+
+      const dbSensitivePinByModule = new Map(
+        (modulesResult.data || []).map((permissionModule) => [
+          permissionModule.module_name,
+          permissionModule.requires_sensitive_pin === true,
+        ])
+      );
+
+      expect(matrix.modules.length).toBeGreaterThan(0);
+      matrix.modules.forEach((permissionModule) => {
+        expect(typeof permissionModule.requires_sensitive_pin).toBe('boolean');
+        expect(permissionModule.requires_sensitive_pin).toBe(dbSensitivePinByModule.get(permissionModule.module_name));
+      });
     });
   });
 });

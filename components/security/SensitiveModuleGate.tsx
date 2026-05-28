@@ -1,8 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import Link from 'next/link';
-import { LockKeyhole, Loader2 } from 'lucide-react';
+import { KeyRound, LockKeyhole, Loader2, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -97,6 +96,11 @@ export function SensitiveModuleGate({
   access: SensitiveModuleAccessState;
 }) {
   const [pin, setPin] = useState('');
+  const [setupPin, setSetupPin] = useState('');
+  const [confirmSetupPin, setConfirmSetupPin] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [setupEmail, setSetupEmail] = useState('');
+  const [setupPending, setSetupPending] = useState(false);
   const [working, setWorking] = useState(false);
   const pinStatus = access.state?.pin_status;
   const setupRequired = !pinStatus?.configured || pinStatus.must_reset;
@@ -113,57 +117,185 @@ export function SensitiveModuleGate({
     }
   }
 
+  async function requestPinSetup() {
+    if (setupPin !== confirmSetupPin) {
+      toast.error('PINs do not match');
+      return;
+    }
+    if (!/^\d{4}$|^\d{6}$/.test(setupPin)) {
+      toast.error('PIN must be either 4 or 6 digits');
+      return;
+    }
+
+    setWorking(true);
+    try {
+      const response = await fetch('/api/me/sensitive-pin/setup/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: setupPin }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || 'Unable to send verification email');
+      }
+
+      setSetupPending(true);
+      setSetupEmail(payload.email || '');
+      setVerificationCode('');
+      toast.success('Verification code sent');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to send verification email');
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function confirmPinSetup() {
+    setWorking(true);
+    try {
+      const response = await fetch('/api/me/sensitive-pin/setup/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: verificationCode }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || 'Unable to confirm verification code');
+      }
+
+      toast.success('Sensitive PIN set');
+      const unlocked = await access.unlock(setupPin);
+      if (unlocked) {
+        setSetupPin('');
+        setConfirmSetupPin('');
+        setVerificationCode('');
+        setSetupEmail('');
+        setSetupPending(false);
+      } else {
+        await access.refresh();
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to confirm verification code');
+    } finally {
+      setWorking(false);
+    }
+  }
+
   return (
-    <Card className="border-border">
-      <CardHeader>
-        <div className="flex items-start gap-3">
-          <div className="rounded-lg bg-avs-yellow/15 p-2 text-avs-yellow">
-            <LockKeyhole className="h-5 w-5" />
-          </div>
-          <div>
-            <CardTitle>{moduleLabel} Requires Sensitive PIN</CardTitle>
-            <CardDescription>
-              Enter your sensitive access PIN to unlock this module for 20 minutes on this session.
+    <div className="flex min-h-[calc(100vh-11rem)] items-center justify-center px-4 py-8">
+      <Card className="relative flex w-full max-w-[640px] overflow-hidden border-border bg-slate-950/75 shadow-2xl shadow-black/30 md:aspect-[3/2]">
+        <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-avs-yellow/70 to-transparent" />
+        <div className="flex w-full flex-col justify-center">
+          <CardHeader className="pb-4 text-center">
+            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-2xl border border-avs-yellow/30 bg-avs-yellow/15 text-avs-yellow shadow-lg shadow-avs-yellow/10">
+              {setupRequired ? <ShieldCheck className="h-6 w-6" /> : <LockKeyhole className="h-6 w-6" />}
+            </div>
+            <CardTitle className="text-2xl">
+              {setupRequired ? 'Set Sensitive PIN' : `${moduleLabel} Requires Sensitive PIN`}
+            </CardTitle>
+            <CardDescription className="mx-auto max-w-md">
+              {setupRequired
+                ? `Create a 4 or 6 digit PIN to unlock protected modules for 20 minutes on this session. A verification code will be emailed before it is activated.`
+                : `Enter your sensitive access PIN to unlock all protected modules for 20 minutes on this session.`}
             </CardDescription>
-          </div>
+          </CardHeader>
+          <CardContent className="space-y-4 px-6 pb-6">
+            {setupRequired ? (
+              <div className="space-y-4">
+                {!setupPending ? (
+                  <>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="sensitive-module-setup-pin">New PIN</Label>
+                        <Input
+                          id="sensitive-module-setup-pin"
+                          type="password"
+                          inputMode="numeric"
+                          autoComplete="off"
+                          value={setupPin}
+                          onChange={(event) => setSetupPin(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                          placeholder="4 or 6 digits"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="sensitive-module-confirm-pin">Confirm PIN</Label>
+                        <Input
+                          id="sensitive-module-confirm-pin"
+                          type="password"
+                          inputMode="numeric"
+                          autoComplete="off"
+                          value={confirmSetupPin}
+                          onChange={(event) => setConfirmSetupPin(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                          placeholder="Repeat PIN"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-center text-xs text-muted-foreground">
+                      This PIN cannot be the same as your normal account password. Admins are notified when it is set or changed.
+                    </p>
+                    <Button
+                      type="button"
+                      onClick={() => void requestPinSetup()}
+                      disabled={working || !setupPin || !confirmSetupPin}
+                      className="w-full bg-avs-yellow text-slate-900 hover:bg-[#d1b82f] disabled:opacity-60"
+                    >
+                      {working ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
+                      Email Verification Code
+                    </Button>
+                  </>
+                ) : (
+                  <div className="space-y-3 rounded-xl border border-avs-yellow/35 bg-avs-yellow/10 p-4">
+                    <p className="text-center text-sm text-foreground">
+                      Enter the 6-digit verification code sent to {setupEmail || 'your email address'}.
+                    </p>
+                    <Input
+                      value={verificationCode}
+                      onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      placeholder="123456"
+                      className="mx-auto max-w-48 text-center text-lg tracking-[0.35em]"
+                    />
+                    <Button
+                      type="button"
+                      onClick={() => void confirmPinSetup()}
+                      disabled={working || verificationCode.length !== 6}
+                      className="w-full bg-avs-yellow text-slate-900 hover:bg-[#d1b82f] disabled:opacity-60"
+                    >
+                      {working ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      Set PIN and Unlock Protected Modules
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="mx-auto grid max-w-md gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="sensitive-module-pin">Sensitive PIN</Label>
+                  <Input
+                    id="sensitive-module-pin"
+                    type="password"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    value={pin}
+                    onChange={(event) => setPin(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="4 or 6 digits"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  onClick={() => void handleUnlock()}
+                  disabled={working || (pin.length !== 4 && pin.length !== 6)}
+                  className="mx-auto w-fit bg-avs-yellow text-slate-900 hover:bg-[#d1b82f] disabled:opacity-60"
+                >
+                  {working ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LockKeyhole className="mr-2 h-4 w-4" />}
+                  Unlock {moduleLabel}
+                </Button>
+              </div>
+            )}
+          </CardContent>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {setupRequired ? (
-          <div className="space-y-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-100">
-            <p>You need to set or reset your sensitive access PIN before opening this module.</p>
-            <Button asChild className="bg-avs-yellow text-slate-900 hover:bg-[#d1b82f]">
-              <Link href="/profile">Manage PIN in Profile</Link>
-            </Button>
-          </div>
-        ) : (
-          <div className="grid gap-3 md:grid-cols-[220px_auto]">
-            <div className="space-y-1.5">
-              <Label htmlFor="sensitive-module-pin">Sensitive PIN</Label>
-              <Input
-                id="sensitive-module-pin"
-                type="password"
-                inputMode="numeric"
-                autoComplete="off"
-                value={pin}
-                onChange={(event) => setPin(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                placeholder="4 or 6 digits"
-              />
-            </div>
-            <div className="flex items-end">
-              <Button
-                type="button"
-                onClick={() => void handleUnlock()}
-                disabled={working || (pin.length !== 4 && pin.length !== 6)}
-                className="bg-avs-yellow text-slate-900 hover:bg-[#d1b82f] disabled:opacity-60"
-              >
-                {working ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LockKeyhole className="mr-2 h-4 w-4" />}
-                Unlock {moduleLabel}
-              </Button>
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      </Card>
+    </div>
   );
 }

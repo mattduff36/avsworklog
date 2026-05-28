@@ -36,6 +36,10 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
 }));
 
+vi.mock('@/lib/server/sensitive-module-access', () => ({
+  requireSensitiveModuleAccess: vi.fn().mockResolvedValue(null),
+}));
+
 function createCustomerListQuery(rows: Array<Record<string, unknown>>) {
   const range = vi.fn().mockResolvedValue({ data: rows, error: null });
   const order = vi.fn().mockReturnValue({ range });

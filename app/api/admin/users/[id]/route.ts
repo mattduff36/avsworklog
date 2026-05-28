@@ -182,14 +182,15 @@ export async function PUT(
       );
     }
 
-    // Get existing email from auth
-    const { data: existingAuthUser } = await supabaseAdmin.auth.admin.getUserById(userId);
-    const existingEmail = existingAuthUser?.user?.email || '';
-
     // Track changes for email notification
     const changes: ProfileChanges = {};
-    if (email && email !== existingEmail) {
-      changes.email = { old: existingEmail, new: email };
+    const notificationEmail = email || null;
+    if (email) {
+      const { data: existingAuthUser } = await supabaseAdmin.auth.admin.getUserById(userId);
+      const existingEmail = existingAuthUser?.user?.email || '';
+      if (email !== existingEmail) {
+        changes.email = { old: existingEmail, new: email };
+      }
     }
     if (full_name !== existingUser.full_name) {
       changes.full_name = { old: existingUser.full_name, new: full_name };
@@ -324,10 +325,9 @@ export async function PUT(
     }
 
     // Send notification email if there were changes
-    if (Object.keys(changes).length > 0) {
-      const targetEmail = email || existingEmail; // Use new email if changed, otherwise existing
+    if (Object.keys(changes).length > 0 && notificationEmail) {
       const emailResult = await sendProfileUpdateEmail({
-        to: targetEmail,
+        to: notificationEmail,
         userName: full_name,
         changes,
       });

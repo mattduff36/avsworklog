@@ -77,11 +77,6 @@ type ProfilePermissionRow = {
   team?: { id?: string | null; name?: string | null } | Array<{ id?: string | null; name?: string | null }> | null;
 };
 
-type AuthUserSummary = {
-  id: string;
-  email?: string | null;
-};
-
 export class InvalidPermissionLevelError extends Error {
   constructor(message: string) {
     super(message);
@@ -386,57 +381,6 @@ export async function getTeamPermissionMatrix(
   return { roles, modules, teams };
 }
 
-async function getAuthUserEmailMap(
-  userIds: string[],
-  supabaseAdmin: SupabaseAdminClient
-): Promise<Map<string, string | null>> {
-  if (userIds.length === 0) {
-    return new Map();
-  }
-
-  const emailMap = new Map<string, string | null>();
-  const adminWithAuth = supabaseAdmin as SupabaseAdminClient & {
-    auth?: {
-      admin?: {
-        listUsers?: (params?: { page?: number; perPage?: number }) => Promise<{
-          data?: { users?: AuthUserSummary[] };
-          error?: { message?: string } | null;
-        }>;
-      };
-    };
-  };
-
-  const authAdmin = adminWithAuth.auth?.admin;
-  if (!authAdmin?.listUsers) {
-    return emailMap;
-  }
-
-  let page = 1;
-  const perPage = 1000;
-  const targetIds = new Set(userIds);
-
-  while (emailMap.size < targetIds.size) {
-    const { data, error } = await authAdmin.listUsers({ page, perPage });
-    if (error) {
-      throw new Error(error.message || 'Failed to load user emails');
-    }
-
-    const users = data?.users || [];
-    users.forEach((user) => {
-      if (targetIds.has(user.id)) {
-        emailMap.set(user.id, user.email || null);
-      }
-    });
-
-    if (users.length < perPage) {
-      break;
-    }
-    page += 1;
-  }
-
-  return emailMap;
-}
-
 function getProfileRole(
   profile: Pick<ProfilePermissionRow, 'role'> & { role_id?: string | null },
   rolesById?: Map<string, RoleRow>
@@ -473,6 +417,57 @@ function buildUserOverrideMap(permissionRows: UserModulePermissionRow[]): Map<st
   });
 
   return levelsByUser;
+}
+
+async function fetchUserModulePermissionRows(
+  supabaseAdmin: SupabaseAdminClient,
+  params: {
+    userIds?: string[];
+    moduleNames?: ModuleName[];
+  } = {}
+): Promise<UserModulePermissionRow[]> {
+  if (params.userIds && params.userIds.length === 0) {
+    return [];
+  }
+  if (params.moduleNames && params.moduleNames.length === 0) {
+    return [];
+  }
+
+  const pageSize = 1000;
+  const rows: UserModulePermissionRow[] = [];
+  let from = 0;
+
+  while (true) {
+    let query = supabaseAdmin
+      .from('user_module_permissions')
+      .select('user_id, module_name, access_level')
+      .order('user_id', { ascending: true })
+      .order('module_name', { ascending: true })
+      .range(from, from + pageSize - 1);
+
+    if (params.userIds) {
+      query = query.in('user_id', params.userIds);
+    }
+    if (params.moduleNames) {
+      query = query.in('module_name', params.moduleNames);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      throw error;
+    }
+
+    const pageRows = (data || []) as UserModulePermissionRow[];
+    rows.push(...pageRows);
+
+    if (pageRows.length < pageSize) {
+      break;
+    }
+
+    from += pageSize;
+  }
+
+  return rows;
 }
 
 function getInheritedLevelsForProfile(params: {
@@ -541,7 +536,7 @@ export async function getUserPermissionMatrix(
   assignableRoles: UserPermissionAssignableRole[];
   users: UserPermissionMatrixRow[];
 }> {
-  const [roles, assignableRolesResult, teamsResult, profilesResult, permissionsResult, teamPermissionsResult] = await Promise.all([
+  const [roles, assignableRolesResult, teamsResult, profilesResult, teamPermissionsResult] = await Promise.all([
     getPermissionTierRoles(supabaseAdmin),
     supabaseAdmin
       .from('roles')
@@ -560,9 +555,6 @@ export async function getUserPermissionMatrix(
       )
       .order('full_name', { ascending: true }),
     supabaseAdmin
-      .from('user_module_permissions')
-      .select('user_id, module_name, access_level'),
-    supabaseAdmin
       .from('team_module_permissions')
       .select('team_id, module_name, enabled'),
   ]);
@@ -571,7 +563,6 @@ export async function getUserPermissionMatrix(
   if (assignableRolesResult.error) throw assignableRolesResult.error;
   if (teamsResult.error) throw teamsResult.error;
   if (profilesResult.error) throw profilesResult.error;
-  if (permissionsResult.error) throw permissionsResult.error;
   if (teamPermissionsResult.error) throw teamPermissionsResult.error;
 
   const typedProfiles = (profilesResult.data || []) as unknown as ProfilePermissionRow[];
@@ -579,11 +570,10 @@ export async function getUserPermissionMatrix(
   const visibleProfiles = typedProfiles.filter(
     (profile) => !hiddenIds.has(profile.id) && !isHiddenSystemTestAccountProfile(profile) && !isDeletedProfile(profile)
   );
-  const emailMap = await getAuthUserEmailMap(
-    visibleProfiles.map((profile) => profile.id),
-    supabaseAdmin
-  );
-  const levelsByUser = buildUserOverrideMap((permissionsResult.data || []) as UserModulePermissionRow[]);
+  const userPermissionRows = await fetchUserModulePermissionRows(supabaseAdmin, {
+    userIds: visibleProfiles.map((profile) => profile.id),
+  });
+  const levelsByUser = buildUserOverrideMap(userPermissionRows);
   const permissionRows = (teamPermissionsResult.data || []) as TeamPermissionRow[];
   const enabledByTeam = new Map<string, Map<ModuleName, boolean>>();
   permissionRows.forEach((row) => {
@@ -629,7 +619,7 @@ export async function getUserPermissionMatrix(
     return {
       id: profile.id,
       full_name: profile.full_name,
-      email: emailMap.get(profile.id) || null,
+      email: null,
       phone_number: profile.phone_number || null,
       employee_id: profile.employee_id,
       team_id: profile.team_id,
@@ -735,20 +725,13 @@ export async function updateTeamModulePermissionDefaults(
   });
   const candidateUserIds = candidateProfiles.map((profile) => profile.id);
 
-  const { data: userPermissions, error: userPermissionsError } = candidateUserIds.length
-    ? await supabaseAdmin
-        .from('user_module_permissions')
-        .select('user_id, module_name, access_level')
-        .in('user_id', candidateUserIds)
-        .in('module_name', moduleNames)
-    : { data: [], error: null };
-
-  if (userPermissionsError) {
-    throw userPermissionsError;
-  }
+  const userPermissionRows = await fetchUserModulePermissionRows(supabaseAdmin, {
+    userIds: candidateUserIds,
+    moduleNames,
+  });
 
   const userPermissionByKey = new Map<string, UserModulePermissionRow>();
-  ((userPermissions || []) as UserModulePermissionRow[]).forEach((row) => {
+  userPermissionRows.forEach((row) => {
     userPermissionByKey.set(`${row.user_id}:${row.module_name}`, row);
   });
 

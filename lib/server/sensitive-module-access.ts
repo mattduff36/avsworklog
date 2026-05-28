@@ -22,7 +22,7 @@ export async function requireSensitiveModuleAccess(moduleName: ModuleName): Prom
     {
       error: code === 'SENSITIVE_PIN_SETUP_REQUIRED'
         ? 'Set up your sensitive access PIN from your profile before opening this module.'
-        : 'Sensitive access PIN required.',
+        : 'Sensitive access PIN required for protected modules.',
       code,
       sensitive_access: state,
     },
