@@ -134,7 +134,7 @@ The Workshop Tasks module provides a dedicated interface for workshop staff to l
 - **FR-3.1** Fields:
   - Vehicle (required): Select from active vehicles by reg number
   - Category (required): Select from active categories
-  - Workshop Comments (required): Textarea, minimum 10 chars
+  - Workshop Comments (required): Textarea, minimum 5 chars
 - **FR-3.2** On submit:
   - INSERT into `actions` with `action_type='workshop_vehicle_task'`
   - Default status: `pending`

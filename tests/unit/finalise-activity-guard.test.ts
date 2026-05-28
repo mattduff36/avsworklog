@@ -15,6 +15,7 @@ describe('finalise activity guard', () => {
 
     expect(activity?.isRunning).toBe(true);
     expect(activity?.isAgentReview).toBe(true);
+    expect(activity?.pid).toBe(123);
   });
 
   it('detects a running finalise command from command metadata', () => {
@@ -31,6 +32,7 @@ describe('finalise activity guard', () => {
 
     expect(activity?.isRunning).toBe(true);
     expect(activity?.isFinalise).toBe(true);
+    expect(activity?.startedAt).toBe('2026-05-19T22:08:57.699Z');
   });
 
   it('does not treat completed finalise output as running', () => {

@@ -50,6 +50,7 @@ import {
 import { isClientSessionPausedError } from '@/lib/app-auth/session-error';
 import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 import { completeInspectionReminder } from '@/lib/client/complete-inspection-reminder';
+import { WORKSHOP_TASK_COMMENT_MIN_LENGTH } from '@/lib/workshop-tasks/validation';
 
 // Dynamic imports for heavy components - loaded only when needed
 const PhotoUpload = dynamic(() => import('@/components/forms/PhotoUpload'), { ssr: false });
@@ -1379,11 +1380,11 @@ function NewInspectionContent() {
     }
 
     // Validate inform workshop has sufficient comment
-    if (informWorkshop && inspectorComments.trim().length < 10) {
-      setError('Workshop notification requires at least 10 characters in the comment field');
+    if (informWorkshop && inspectorComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH) {
+      setError(`Workshop notification requires at least ${WORKSHOP_TASK_COMMENT_MIN_LENGTH} characters in the comment field`);
       toast.error('Comment too short', {
         id: 'van-inspections-new-validation-workshop-comment-too-short',
-        description: 'Add at least 10 characters to your end-of-inspection notes to create a workshop task.',
+        description: `Add at least ${WORKSHOP_TASK_COMMENT_MIN_LENGTH} characters to your end-of-inspection notes to create a workshop task.`,
       });
       setShowConfirmSubmitDialog(false);
       scrollToTarget(document.getElementById('inspector-comments'));
@@ -1821,7 +1822,7 @@ function NewInspectionContent() {
       }
 
       // Handle "Inform Workshop" task creation if enabled
-      if (informWorkshop && inspectorComments.trim().length >= 10) {
+      if (informWorkshop && inspectorComments.trim().length >= WORKSHOP_TASK_COMMENT_MIN_LENGTH) {
         try {
           setCreatingWorkshopTask(true);
           
@@ -2580,15 +2581,15 @@ function NewInspectionContent() {
                     </div>
                     
                     {/* Validation warning */}
-                    {informWorkshop && inspectorComments.trim().length < 10 && (
+                    {informWorkshop && inspectorComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH && (
                       <p className="text-xs text-amber-400 mt-2 flex items-center gap-1">
                         <AlertTriangle className="h-3 w-3" />
-                        Comment must be at least 10 characters to create a workshop task
+                        Comment must be at least {WORKSHOP_TASK_COMMENT_MIN_LENGTH} characters to create a workshop task
                       </p>
                     )}
                     
                     {/* Ready indicator */}
-                    {informWorkshop && inspectorComments.trim().length >= 10 && (
+                    {informWorkshop && inspectorComments.trim().length >= WORKSHOP_TASK_COMMENT_MIN_LENGTH && (
                       <p className="text-xs text-green-400 mt-2 flex items-center gap-1">
                         <CheckCircle2 className="h-3 w-3" />
                         Workshop task will be created on submit
@@ -2605,7 +2606,7 @@ function NewInspectionContent() {
             <Button
               variant="outline"
               onClick={() => saveInspection('draft')}
-              disabled={loading || !vehicleId || (informWorkshop && inspectorComments.trim().length < 10)}
+              disabled={loading || !vehicleId || (informWorkshop && inspectorComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH)}
               className="border-slate-600 text-white hover:bg-slate-800"
             >
               <Save className="h-4 w-4 mr-2" />
@@ -2613,7 +2614,7 @@ function NewInspectionContent() {
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={loading || !vehicleId || (informWorkshop && inspectorComments.trim().length < 10)}
+              disabled={loading || !vehicleId || (informWorkshop && inspectorComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH)}
               className="bg-inspection hover:bg-inspection/90 text-slate-900 font-semibold"
             >
               <Send className="h-4 w-4 mr-2" />
@@ -2630,7 +2631,7 @@ function NewInspectionContent() {
           <Button
             variant="outline"
             onClick={() => saveInspection('draft')}
-            disabled={loading || !vehicleId || (informWorkshop && inspectorComments.trim().length < 10)}
+            disabled={loading || !vehicleId || (informWorkshop && inspectorComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH)}
             className="flex-1 h-14 border-slate-600 text-white hover:bg-slate-800"
           >
             <Save className="h-5 w-5 mr-2" />
@@ -2638,7 +2639,7 @@ function NewInspectionContent() {
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={loading || !vehicleId || (informWorkshop && inspectorComments.trim().length < 10)}
+            disabled={loading || !vehicleId || (informWorkshop && inspectorComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH)}
             className="flex-1 h-14 bg-inspection hover:bg-inspection/90 text-slate-900 font-semibold text-base"
           >
             <Send className="h-5 w-5 mr-2" />
@@ -2967,7 +2968,7 @@ function NewInspectionContent() {
                   setSavingDraftFromConfirm(false);
                 }
               }}
-              disabled={savingDraftFromConfirm || loading || (informWorkshop && inspectorComments.trim().length < 10)}
+              disabled={savingDraftFromConfirm || loading || (informWorkshop && inspectorComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH)}
               className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
             >
               <Save className="h-4 w-4 mr-2" />
@@ -2975,7 +2976,7 @@ function NewInspectionContent() {
             </Button>
             <Button
               onClick={validateAndSubmit}
-              disabled={savingDraftFromConfirm || (informWorkshop && inspectorComments.trim().length < 10)}
+              disabled={savingDraftFromConfirm || (informWorkshop && inspectorComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH)}
               className="bg-inspection hover:bg-inspection/90 text-slate-900 font-semibold"
             >
               <Send className="h-4 w-4 mr-2" />

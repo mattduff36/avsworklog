@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { recordRecentVehicleId } from '@/lib/utils/recentVehicles';
 import { showErrorWithDetails, fetchErrorDetails } from '@/lib/utils/error-details';
 import { inferAssetMeterUnit } from '@/lib/workshop-tasks/asset-meter';
+import { WORKSHOP_TASK_COMMENT_MIN_LENGTH } from '@/lib/workshop-tasks/validation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ErrorDetailsResponse } from '@/types/error-details';
 import type { Action, Category, Subcategory, Vehicle } from '../types';
@@ -185,8 +186,8 @@ export function useWorkshopTaskCrudActions({
       return;
     }
 
-    if (workshopComments.length < 10) {
-      toast.error('Comments must be at least 10 characters');
+    if (workshopComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH) {
+      toast.error(`Comments must be at least ${WORKSHOP_TASK_COMMENT_MIN_LENGTH} characters`);
       return;
     }
 
@@ -394,8 +395,8 @@ export function useWorkshopTaskCrudActions({
       return;
     }
 
-    if (editComments.length < 10) {
-      toast.error('Comments must be at least 10 characters');
+    if (editComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH) {
+      toast.error(`Comments must be at least ${WORKSHOP_TASK_COMMENT_MIN_LENGTH} characters`);
       return;
     }
 
@@ -720,7 +721,7 @@ export function useWorkshopTaskCrudActions({
   };
 
   const isSaveEditDisabled = (() => {
-    if (submitting || !editVehicleId || !editCategoryId || editComments.length < 10 || !editMileage.trim()) return true;
+    if (submitting || !editVehicleId || !editCategoryId || editComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH || !editMileage.trim()) return true;
     const editSubsArr = editingTask?.plant_id ? plantSubcategories : editingTask?.hgv_id ? hgvSubcategories : subcategories;
     const editHasSubs = editSubsArr.filter(s => s.category_id === editCategoryId).length > 0;
     const catChanged = editCategoryId !== initialEditCategoryId;

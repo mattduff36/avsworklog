@@ -7,6 +7,7 @@
 import { toast } from 'sonner';
 import { isClientSessionPausedMessage } from '@/lib/app-auth/session-error';
 import { getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
+import { getUsageAnalyticsContext, trackUsageEvent } from '@/lib/analytics/client';
 
 export interface ErrorHandlingMetadata {
   wasHandled: boolean;
@@ -680,6 +681,20 @@ class ErrorLogger {
           normalizedAdditionalData.userAction = recentAction;
         }
       }
+
+      const usageAnalyticsContext = getUsageAnalyticsContext();
+      normalizedAdditionalData.usageAnalytics = usageAnalyticsContext;
+      trackUsageEvent({
+        eventName: 'error_observed',
+        path: typeof window !== 'undefined' ? window.location.href : null,
+        metadata: {
+          componentName,
+          errorType: errorObj.name || 'Error',
+          errorMessage: this.truncate(errorObj.message || String(error), 180),
+          classification: normalizedAdditionalData.errorClassification,
+          clientSessionId: usageAnalyticsContext.clientSessionId,
+        },
+      });
       
       const errorLog: Omit<ErrorLog, 'id'> = {
         timestamp: new Date().toISOString(),

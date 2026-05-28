@@ -49,6 +49,7 @@ import { getInspectionPhotoKey } from '@/lib/inspection-photos';
 import { getReadingDigitGrowthWarning } from '@/lib/utils/readingDigitGrowthWarning';
 import { getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
 import { completeInspectionReminder } from '@/lib/client/complete-inspection-reminder';
+import { WORKSHOP_TASK_COMMENT_MIN_LENGTH } from '@/lib/workshop-tasks/validation';
 
 const PhotoUpload = dynamic(() => import('@/components/forms/PhotoUpload'), { ssr: false });
 const SignaturePad = dynamic(() => import('@/components/forms/SignaturePad'), { ssr: false });
@@ -998,8 +999,8 @@ function NewHgvInspectionContent() {
       return 'Please add comments for all failed items';
     }
 
-    if (informWorkshop && inspectorComments.trim().length < 10) {
-      return 'Workshop notification requires at least 10 characters in notes';
+    if (informWorkshop && inspectorComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH) {
+      return `Workshop notification requires at least ${WORKSHOP_TASK_COMMENT_MIN_LENGTH} characters in notes`;
     }
 
     if (!canSubmitNow) {
@@ -1057,7 +1058,7 @@ function NewHgvInspectionContent() {
       return;
     }
 
-    if (informWorkshop && inspectorComments.trim().length < 10) {
+    if (informWorkshop && inspectorComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH) {
       scroll(document.getElementById('inspectorComments'));
     }
   };
@@ -1220,7 +1221,7 @@ function NewHgvInspectionContent() {
         });
       }
 
-      if (status === 'submitted' && informWorkshop && inspectorComments.trim().length >= 10) {
+      if (status === 'submitted' && informWorkshop && inspectorComments.trim().length >= WORKSHOP_TASK_COMMENT_MIN_LENGTH) {
         await fetch('/api/hgv-inspections/inform-workshop', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

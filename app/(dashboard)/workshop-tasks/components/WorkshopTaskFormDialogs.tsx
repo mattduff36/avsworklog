@@ -9,6 +9,7 @@ import { splitVehiclesByRecent } from '@/lib/utils/recentVehicles';
 import { triggerShakeAnimation } from '@/lib/utils/animations';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { useWorkshopDraftPersistence } from '@/lib/hooks/useWorkshopDraftPersistence';
+import { WORKSHOP_TASK_COMMENT_MIN_LENGTH } from '@/lib/workshop-tasks/validation';
 import {
   TabletAwareButton,
   TabletAwareSelectContent,
@@ -406,12 +407,12 @@ export function WorkshopTaskFormDialogs({
                 id="comments"
                 value={workshopComments}
                 onChange={(e) => onWorkshopCommentsChange(e.target.value)}
-                placeholder="Describe the work needed (minimum 10 characters)"
+                placeholder={`Describe the work needed (minimum ${WORKSHOP_TASK_COMMENT_MIN_LENGTH} characters)`}
                 className="bg-white dark:bg-slate-800 border-border text-foreground min-h-[100px]"
                 maxLength={300}
               />
               <p className="text-xs text-muted-foreground">
-                {workshopComments.length}/300 characters (minimum 10)
+                {workshopComments.length}/300 characters (minimum {WORKSHOP_TASK_COMMENT_MIN_LENGTH})
               </p>
             </div>
 
@@ -482,7 +483,7 @@ export function WorkshopTaskFormDialogs({
             </TabletAwareButton>
             <TabletAwareButton
               onClick={onCreateTask}
-              disabled={submitting || !selectedVehicleId || !selectedCategoryId || (categoryHasSubcategories && !selectedSubcategoryId) || workshopComments.length < 10 || !newMeterReading.trim()}
+              disabled={submitting || !selectedVehicleId || !selectedCategoryId || (categoryHasSubcategories && !selectedSubcategoryId) || workshopComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH || !newMeterReading.trim()}
               className="bg-workshop hover:bg-workshop-dark text-white"
             >
               {submitting ? 'Creating...' : 'Create Task'}
@@ -647,12 +648,12 @@ export function WorkshopTaskFormDialogs({
                 id="edit-comments"
                 value={editComments}
                 onChange={(e) => onEditCommentsChange(e.target.value)}
-                placeholder="Describe the work needed (minimum 10 characters)"
+                placeholder={`Describe the work needed (minimum ${WORKSHOP_TASK_COMMENT_MIN_LENGTH} characters)`}
                 className="bg-white dark:bg-slate-800 border-border text-foreground min-h-[100px]"
                 maxLength={300}
               />
               <p className="text-xs text-muted-foreground">
-                {editComments.length}/300 characters (minimum 10)
+                {editComments.length}/300 characters (minimum {WORKSHOP_TASK_COMMENT_MIN_LENGTH})
               </p>
             </div>
           </div>

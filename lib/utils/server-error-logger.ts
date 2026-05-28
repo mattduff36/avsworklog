@@ -5,6 +5,7 @@
 
 import { insertErrorLogs } from '@/lib/server/error-logs';
 import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
+import { trackServerUsageEvent } from '@/lib/server/user-analytics';
 import type { Json } from '@/types/database';
 
 export interface ServerErrorLog {
@@ -150,6 +151,17 @@ export async function logServerError({
         ...errorLog,
         timestamp: new Date().toISOString(),
       }]);
+    await trackServerUsageEvent({
+      eventName: 'error_observed',
+      userId: finalUserId,
+      request,
+      metadata: {
+        componentName,
+        errorType: errorObj.name || 'Error',
+        originalMessage: errorObj.message,
+        requestContext,
+      },
+    });
   } catch (err) {
     // Silent fail - don't want error logging to break the app
     console.warn('[Server Error Logger] Failed to log error:', err);

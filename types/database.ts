@@ -5214,6 +5214,324 @@ export type Database = {
           },
         ]
       }
+      user_usage_daily_rollups: {
+        Row: {
+          id: string
+          rollup_date: string
+          module: string | null
+          event_name: string
+          event_category: string
+          role_id: string | null
+          team_id: string | null
+          device_type: string | null
+          total_events: number
+          unique_users: number
+          session_count: number
+          page_view_count: number
+          avg_duration_ms: number | null
+          first_event_at: string | null
+          last_event_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          rollup_date: string
+          module?: string | null
+          event_name: string
+          event_category: string
+          role_id?: string | null
+          team_id?: string | null
+          device_type?: string | null
+          total_events?: number
+          unique_users?: number
+          session_count?: number
+          page_view_count?: number
+          avg_duration_ms?: number | null
+          first_event_at?: string | null
+          last_event_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          rollup_date?: string
+          module?: string | null
+          event_name?: string
+          event_category?: string
+          role_id?: string | null
+          team_id?: string | null
+          device_type?: string | null
+          total_events?: number
+          unique_users?: number
+          session_count?: number
+          page_view_count?: number
+          avg_duration_ms?: number | null
+          first_event_at?: string | null
+          last_event_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'user_usage_daily_rollups_role_id_fkey'
+            columns: ['role_id']
+            isOneToOne: false
+            referencedRelation: 'roles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'user_usage_daily_rollups_team_id_fkey'
+            columns: ['team_id']
+            isOneToOne: false
+            referencedRelation: 'org_teams'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      user_usage_events: {
+        Row: {
+          id: string
+          session_id: string | null
+          user_id: string | null
+          app_session_id: string | null
+          client_session_id: string | null
+          client_event_id: string | null
+          occurred_at: string
+          received_at: string
+          event_name: 'session_started' | 'session_heartbeat' | 'session_ended' | 'page_view' | 'route_changed' | 'visibility_resume' | 'auth_login_success' | 'auth_login_failed' | 'auth_logout' | 'error_observed'
+          event_category: 'session' | 'navigation' | 'auth' | 'error' | 'performance'
+          module: string | null
+          path: string | null
+          normalized_path: string | null
+          referrer_path: string | null
+          event_source: 'client' | 'server'
+          duration_ms: number | null
+          related_record_type: string | null
+          related_record_id: string | null
+          error_log_id: string | null
+          metadata: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          session_id?: string | null
+          user_id?: string | null
+          app_session_id?: string | null
+          client_session_id?: string | null
+          client_event_id?: string | null
+          occurred_at?: string
+          received_at?: string
+          event_name: 'session_started' | 'session_heartbeat' | 'session_ended' | 'page_view' | 'route_changed' | 'visibility_resume' | 'auth_login_success' | 'auth_login_failed' | 'auth_logout' | 'error_observed'
+          event_category: 'session' | 'navigation' | 'auth' | 'error' | 'performance'
+          module?: string | null
+          path?: string | null
+          normalized_path?: string | null
+          referrer_path?: string | null
+          event_source?: 'client' | 'server'
+          duration_ms?: number | null
+          related_record_type?: string | null
+          related_record_id?: string | null
+          error_log_id?: string | null
+          metadata?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          session_id?: string | null
+          user_id?: string | null
+          app_session_id?: string | null
+          client_session_id?: string | null
+          client_event_id?: string | null
+          occurred_at?: string
+          received_at?: string
+          event_name?: 'session_started' | 'session_heartbeat' | 'session_ended' | 'page_view' | 'route_changed' | 'visibility_resume' | 'auth_login_success' | 'auth_login_failed' | 'auth_logout' | 'error_observed'
+          event_category?: 'session' | 'navigation' | 'auth' | 'error' | 'performance'
+          module?: string | null
+          path?: string | null
+          normalized_path?: string | null
+          referrer_path?: string | null
+          event_source?: 'client' | 'server'
+          duration_ms?: number | null
+          related_record_type?: string | null
+          related_record_id?: string | null
+          error_log_id?: string | null
+          metadata?: Json
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'user_usage_events_app_session_id_fkey'
+            columns: ['app_session_id']
+            isOneToOne: false
+            referencedRelation: 'app_auth_sessions'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'user_usage_events_error_log_id_fkey'
+            columns: ['error_log_id']
+            isOneToOne: false
+            referencedRelation: 'error_logs'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'user_usage_events_session_id_fkey'
+            columns: ['session_id']
+            isOneToOne: false
+            referencedRelation: 'user_usage_sessions'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'user_usage_events_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      user_usage_retention_runs: {
+        Row: {
+          id: string
+          started_at: string
+          completed_at: string | null
+          status: 'running' | 'completed' | 'failed'
+          raw_retention_days: number
+          cutoff_at: string
+          rollups_refreshed: number
+          events_deleted: number
+          sessions_deleted: number
+          error_message: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          started_at?: string
+          completed_at?: string | null
+          status?: 'running' | 'completed' | 'failed'
+          raw_retention_days?: number
+          cutoff_at: string
+          rollups_refreshed?: number
+          events_deleted?: number
+          sessions_deleted?: number
+          error_message?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          started_at?: string
+          completed_at?: string | null
+          status?: 'running' | 'completed' | 'failed'
+          raw_retention_days?: number
+          cutoff_at?: string
+          rollups_refreshed?: number
+          events_deleted?: number
+          sessions_deleted?: number
+          error_message?: string | null
+          created_at?: string
+        }
+        Relationships: [
+        ]
+      }
+      user_usage_sessions: {
+        Row: {
+          id: string
+          user_id: string | null
+          app_session_id: string | null
+          client_session_id: string
+          first_seen_at: string
+          last_seen_at: string
+          ended_at: string | null
+          entry_path: string | null
+          exit_path: string | null
+          referrer_path: string | null
+          user_agent: string | null
+          browser_name: string | null
+          browser_version: string | null
+          os_name: string | null
+          device_type: 'desktop' | 'mobile' | 'tablet' | 'unknown' | null
+          viewport_width: number | null
+          viewport_height: number | null
+          locale: string | null
+          timezone: string | null
+          event_count: number
+          page_view_count: number
+          heartbeat_count: number
+          duration_seconds: number | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          app_session_id?: string | null
+          client_session_id: string
+          first_seen_at?: string
+          last_seen_at?: string
+          ended_at?: string | null
+          entry_path?: string | null
+          exit_path?: string | null
+          referrer_path?: string | null
+          user_agent?: string | null
+          browser_name?: string | null
+          browser_version?: string | null
+          os_name?: string | null
+          device_type?: 'desktop' | 'mobile' | 'tablet' | 'unknown' | null
+          viewport_width?: number | null
+          viewport_height?: number | null
+          locale?: string | null
+          timezone?: string | null
+          event_count?: number
+          page_view_count?: number
+          heartbeat_count?: number
+          duration_seconds?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          app_session_id?: string | null
+          client_session_id?: string
+          first_seen_at?: string
+          last_seen_at?: string
+          ended_at?: string | null
+          entry_path?: string | null
+          exit_path?: string | null
+          referrer_path?: string | null
+          user_agent?: string | null
+          browser_name?: string | null
+          browser_version?: string | null
+          os_name?: string | null
+          device_type?: 'desktop' | 'mobile' | 'tablet' | 'unknown' | null
+          viewport_width?: number | null
+          viewport_height?: number | null
+          locale?: string | null
+          timezone?: string | null
+          event_count?: number
+          page_view_count?: number
+          heartbeat_count?: number
+          duration_seconds?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'user_usage_sessions_app_session_id_fkey'
+            columns: ['app_session_id']
+            isOneToOne: false
+            referencedRelation: 'app_auth_sessions'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'user_usage_sessions_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       user_page_visits: {
         Row: {
           id: string
@@ -6360,6 +6678,11 @@ export type Database = {
       check__timesheets__status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'processed' | 'adjusted'
       check__timesheets__template_version: 1 | 2
       check__timesheets__timesheet_type: 'civils' | 'plant'
+      check__user_usage_events__event_category: 'session' | 'navigation' | 'auth' | 'error' | 'performance'
+      check__user_usage_events__event_name: 'session_started' | 'session_heartbeat' | 'session_ended' | 'page_view' | 'route_changed' | 'visibility_resume' | 'auth_login_success' | 'auth_login_failed' | 'auth_logout' | 'error_observed'
+      check__user_usage_events__event_source: 'client' | 'server'
+      check__user_usage_retention_runs__status: 'running' | 'completed' | 'failed'
+      check__user_usage_sessions__device_type: 'desktop' | 'mobile' | 'tablet' | 'unknown'
       check__van_archive__archive_reason: 'Sold' | 'Scrapped' | 'Other'
       check__van_inspections__status: 'draft' | 'submitted'
       check__vans__asset_type: 'vehicle' | 'plant' | 'tool'

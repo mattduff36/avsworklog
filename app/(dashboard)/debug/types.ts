@@ -67,6 +67,58 @@ export interface ErrorLogEntry {
   additional_data: ErrorAdditionalData | null;
 }
 
+export interface UsageAnalyticsSummary {
+  totalEvents: number;
+  uniqueUsers: number;
+  sessionCount: number;
+  pageViews: number;
+  errorEvents: number;
+  activeSessions: number;
+  avgDurationMs: number | null;
+}
+
+export interface UsageAnalyticsPayload {
+  success: true;
+  generatedAt: string;
+  range: {
+    start: string;
+    end: string;
+  };
+  summary: UsageAnalyticsSummary;
+  topModules: Array<{ module: string; events: number; users: number }>;
+  topPages: Array<{ path: string; views: number; users: number }>;
+  topEvents: Array<{ eventName: string; events: number; users: number }>;
+  activeSessions: Array<{
+    id: string;
+    userId: string | null;
+    userName: string;
+    teamName: string | null;
+    roleName: string | null;
+    lastSeenAt: string;
+    entryPath: string | null;
+    exitPath: string | null;
+    deviceType: string | null;
+    browserName: string | null;
+    eventCount: number;
+    pageViewCount: number;
+  }>;
+  recentEvents: Array<{
+    id: string;
+    occurredAt: string;
+    eventName: string;
+    eventCategory: string;
+    module: string | null;
+    path: string | null;
+    userId: string | null;
+    userName: string;
+    teamName: string | null;
+    roleName: string | null;
+    deviceType: string | null;
+    sessionId: string | null;
+    metadata: Record<string, unknown>;
+  }>;
+}
+
 export interface TestVehicle {
   id: string;
   reg_number: string;

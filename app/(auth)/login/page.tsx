@@ -294,6 +294,9 @@ export default function LoginPage() {
 
         <div className="mt-6 text-center text-sm text-muted-foreground">
           <p>Contact your administrator for account access or password resets.</p>
+          <p className="mt-2 text-xs">
+            This company portal uses essential cookies and usage logs to keep accounts secure, diagnose issues, and improve the service.
+          </p>
         </div>
       </div>
 

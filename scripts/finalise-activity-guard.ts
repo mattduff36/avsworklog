@@ -4,7 +4,9 @@ import path from 'path';
 
 export interface TerminalActivity {
   filePath: string;
+  pid: number | null;
   command: string;
+  startedAt: string | null;
   isRunning: boolean;
   isAgentReview: boolean;
   isFinalise: boolean;
@@ -44,6 +46,13 @@ function getCommandFromHeader(header: string): string {
   return getHeaderValue(header, 'active_command') || getHeaderValue(header, 'command') || getHeaderValue(header, 'last_command');
 }
 
+function getPidFromHeader(header: string): number | null {
+  const raw = getHeaderValue(header, 'pid');
+  if (!raw) return null;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function hasExitFooter(content: string): boolean {
   return /(?:^|\r?\n)---\r?\nexit_code:/u.test(content);
 }
@@ -65,14 +74,16 @@ export function parseTerminalActivity(filePath: string, content: string): Termin
 
   return {
     filePath,
+    pid: getPidFromHeader(header),
     command,
+    startedAt: getHeaderValue(header, 'started_at') || null,
     isRunning,
     isAgentReview: /\bagent\s+review\b|\breviewing your changes\b/iu.test(content),
     isFinalise: /\b(finalise|finalize)(?::(?:full|push))*\b/iu.test(normalizedCommand),
   };
 }
 
-export function checkFinaliseBlockingActivity(repoRoot: string): FinaliseActivityCheck {
+export function checkFinaliseBlockingActivity(repoRoot: string, ignoredPids: number[] = []): FinaliseActivityCheck {
   const terminalDirectory = getDefaultTerminalDirectory(repoRoot);
   if (!existsSync(terminalDirectory)) {
     return { terminalDirectory, activities: [], blockingActivities: [] };
@@ -86,8 +97,11 @@ export function checkFinaliseBlockingActivity(repoRoot: string): FinaliseActivit
     })
     .filter((activity): activity is TerminalActivity => activity !== null);
 
+  const ignoredPidSet = new Set(ignoredPids.filter((pid) => Number.isFinite(pid)));
   const blockingActivities = activities.filter((activity) =>
-    activity.isRunning && (activity.isAgentReview || activity.isFinalise)
+    activity.isRunning &&
+    !ignoredPidSet.has(activity.pid ?? -1) &&
+    (activity.isAgentReview || activity.isFinalise)
   );
 
   return { terminalDirectory, activities, blockingActivities };

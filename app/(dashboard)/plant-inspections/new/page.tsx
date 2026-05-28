@@ -46,6 +46,7 @@ import { getReadingDigitGrowthWarning } from '@/lib/utils/readingDigitGrowthWarn
 import { getInspectionErrorMessage, isDuplicateInspectionError } from '@/lib/utils/inspection-error-handling';
 import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 import { completeInspectionReminder } from '@/lib/client/complete-inspection-reminder';
+import { WORKSHOP_TASK_COMMENT_MIN_LENGTH } from '@/lib/workshop-tasks/validation';
 
 // Dynamic imports for heavy components
 const PhotoUpload = dynamic(() => import('@/components/forms/PhotoUpload'), { ssr: false });
@@ -1105,8 +1106,8 @@ function NewPlantInspectionContent() {
     }
 
     // Validate inform workshop (not applicable for hired plant)
-    if (!isHiredPlant && informWorkshop && inspectorComments.trim().length < 10) {
-      setError('Workshop notification requires at least 10 characters in the comment field');
+    if (!isHiredPlant && informWorkshop && inspectorComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH) {
+      setError(`Workshop notification requires at least ${WORKSHOP_TASK_COMMENT_MIN_LENGTH} characters in the comment field`);
       toast.error('Comment too short', { id: 'plant-inspections-new-validation-workshop-comment-too-short' });
       setShowConfirmSubmitDialog(false);
       scrollToTarget(document.getElementById('inspector-comments'));
@@ -1402,7 +1403,7 @@ function NewPlantInspectionContent() {
       }
 
       // Handle inform workshop (skip for hired plant)
-      if (!isHiredPlant && informWorkshop && inspectorComments.trim().length >= 10) {
+      if (!isHiredPlant && informWorkshop && inspectorComments.trim().length >= WORKSHOP_TASK_COMMENT_MIN_LENGTH) {
         try {
           setCreatingWorkshopTask(true);
           

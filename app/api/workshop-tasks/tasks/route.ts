@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { inferAssetMeterUnit } from '@/lib/workshop-tasks/asset-meter';
+import { WORKSHOP_TASK_COMMENT_MIN_LENGTH } from '@/lib/workshop-tasks/validation';
 import type { Database } from '@/types/database';
 
 type AssetType = 'van' | 'plant' | 'hgv';
@@ -156,8 +157,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'A workshop category is required' }, { status: 400 });
     }
 
-    if (comments.length < 10) {
-      return NextResponse.json({ error: 'Comments must be at least 10 characters' }, { status: 400 });
+    if (comments.length < WORKSHOP_TASK_COMMENT_MIN_LENGTH) {
+      return NextResponse.json({ error: `Comments must be at least ${WORKSHOP_TASK_COMMENT_MIN_LENGTH} characters` }, { status: 400 });
     }
 
     if (readingValue === null) {

@@ -9,7 +9,7 @@ import { AppPageShell } from '@/components/layout/AppPageShell';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Bug, Car, History, RefreshCw, Send } from 'lucide-react';
+import { BarChart3, Bug, Car, History, RefreshCw, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { canAccessDebugConsole } from '@/lib/utils/debug-access';
 
@@ -18,14 +18,18 @@ const DVLASyncDebugPanel = dynamic(() => import('./components/DVLASyncDebugPanel
 const ErrorLogsDebugPanel = dynamic(() => import('./components/ErrorLogsDebugPanel').then((mod) => ({ default: mod.ErrorLogsDebugPanel })));
 const NotificationSettingsDebugPanel = dynamic(() => import('./components/NotificationSettingsDebugPanel').then((mod) => ({ default: mod.NotificationSettingsDebugPanel })));
 const TestFleetDebugPanel = dynamic(() => import('./components/TestFleetDebugPanel').then((mod) => ({ default: mod.TestFleetDebugPanel })));
+const UserAnalyticsDebugPanel = dynamic(() => import('./components/UserAnalyticsDebugPanel').then((mod) => ({ default: mod.UserAnalyticsDebugPanel })));
 
-type DebugTab = 'error-log' | 'audit-log' | 'dvla-sync' | 'test-fleet' | 'notification-settings';
+type DebugTab = 'error-log' | 'audit-log' | 'usage-analytics' | 'dvla-sync' | 'test-fleet' | 'notification-settings';
 
 const DEBUG_TAB_ALIASES: Record<string, DebugTab> = {
   errors: 'error-log',
   'error-log': 'error-log',
   audit: 'audit-log',
   'audit-log': 'audit-log',
+  analytics: 'usage-analytics',
+  usage: 'usage-analytics',
+  'usage-analytics': 'usage-analytics',
   dvla: 'dvla-sync',
   'dvla-sync': 'dvla-sync',
   'test-fleet': 'test-fleet',
@@ -121,6 +125,10 @@ export default function DebugPage() {
             <History className="h-4 w-4 flex-shrink-0" />
             Audit Log
           </TabsTrigger>
+          <TabsTrigger value="usage-analytics" className={tabTriggerClassName}>
+            <BarChart3 className="h-4 w-4 flex-shrink-0" />
+            Usage Analytics
+          </TabsTrigger>
           <TabsTrigger value="dvla-sync" className={tabTriggerClassName}>
             <RefreshCw className="h-4 w-4 flex-shrink-0" />
             DVLA Sync
@@ -141,6 +149,10 @@ export default function DebugPage() {
 
         <TabsContent value="audit-log">
           <AuditLogDebugPanel supabase={supabase} />
+        </TabsContent>
+
+        <TabsContent value="usage-analytics">
+          <UserAnalyticsDebugPanel />
         </TabsContent>
 
         <TabsContent value="dvla-sync">

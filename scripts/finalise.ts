@@ -768,12 +768,21 @@ Variants:
 }
 
 function assertNoBlockingCursorActivity(): void {
-  const activityCheck = checkFinaliseBlockingActivity(REPO_ROOT);
-  if (activityCheck.blockingActivities.length === 0) return;
+  const activityCheck = checkFinaliseBlockingActivity(REPO_ROOT, [process.pid, process.ppid]);
+  const nowMs = Date.now();
+  const blockingActivities = activityCheck.blockingActivities.filter((activity) => {
+    if (!activity.isFinalise || activity.isAgentReview || !activity.startedAt) return true;
+    const startedAtMs = Date.parse(activity.startedAt);
+    if (Number.isNaN(startedAtMs)) return true;
+    // Cursor writes the current terminal metadata before this script can run.
+    // Ignore only a finalise terminal that has just started, which is this invocation.
+    return Math.abs(nowMs - startedAtMs) > 60_000;
+  });
+  if (blockingActivities.length === 0) return;
 
   throw new Error([
     'Blocking Cursor activity detected before finalise:',
-    ...activityCheck.blockingActivities.map((activity) => `- ${formatBlockingActivity(activity)}`),
+    ...blockingActivities.map((activity) => `- ${formatBlockingActivity(activity)}`),
     `Terminal directory checked: ${activityCheck.terminalDirectory}`,
     'Wait for the active Agent Review/finalise run to finish, then rerun finalise.',
   ].join('\n'));

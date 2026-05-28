@@ -5,6 +5,7 @@ import {
   FALLBACK_SUBCATEGORY 
 } from '@/lib/utils/inspectionWorkshopRouting';
 import { getInspectionRouteActorAccess } from '@/lib/server/inspection-route-access';
+import { WORKSHOP_TASK_COMMENT_MIN_LENGTH } from '@/lib/workshop-tasks/validation';
 
 /**
  * POST /api/van-inspections/inform-workshop
@@ -45,10 +46,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate comment length (strict minimum of 10 characters)
-    if (!comment || typeof comment !== 'string' || comment.trim().length < 10) {
+    // Validate comment length before creating a workshop task.
+    if (!comment || typeof comment !== 'string' || comment.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH) {
       return NextResponse.json(
-        { error: 'Comment must be at least 10 characters' },
+        { error: `Comment must be at least ${WORKSHOP_TASK_COMMENT_MIN_LENGTH} characters` },
         { status: 400 }
       );
     }

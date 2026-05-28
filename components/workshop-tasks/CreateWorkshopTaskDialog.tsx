@@ -17,6 +17,7 @@ import { getRecentVehicleIds, recordRecentVehicleId, splitVehiclesByRecent } fro
 import { useAttachmentTemplates } from '@/lib/hooks/useAttachmentTemplates';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { triggerShakeAnimation } from '@/lib/utils/animations';
+import { WORKSHOP_TASK_COMMENT_MIN_LENGTH } from '@/lib/workshop-tasks/validation';
 
 type Vehicle = {
   id: string;
@@ -364,8 +365,8 @@ export function CreateWorkshopTaskDialog({
       return;
     }
 
-    if (workshopComments.length < 10) {
-      toast.error('Comments must be at least 10 characters');
+    if (workshopComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH) {
+      toast.error(`Comments must be at least ${WORKSHOP_TASK_COMMENT_MIN_LENGTH} characters`);
       return;
     }
 
@@ -692,12 +693,12 @@ export function CreateWorkshopTaskDialog({
               id="comments"
               value={workshopComments}
               onChange={(e) => setWorkshopComments(e.target.value)}
-              placeholder="Describe the work needed (minimum 10 characters)"
+              placeholder={`Describe the work needed (minimum ${WORKSHOP_TASK_COMMENT_MIN_LENGTH} characters)`}
               className={`min-h-[100px] ${tabletModeEnabled ? 'text-base' : ''}`}
               maxLength={300}
             />
             <p className="text-xs text-muted-foreground">
-              {workshopComments.length}/300 characters (minimum 10)
+              {workshopComments.length}/300 characters (minimum {WORKSHOP_TASK_COMMENT_MIN_LENGTH})
             </p>
           </div>
 
@@ -758,7 +759,7 @@ export function CreateWorkshopTaskDialog({
           </Button>
           <Button
             onClick={handleAddTask}
-            disabled={submitting || !selectedVehicleId || !selectedCategoryId || (categoryHasSubcategories && !selectedSubcategoryId) || workshopComments.length < 10 || !newMeterReading.trim()}
+            disabled={submitting || !selectedVehicleId || !selectedCategoryId || (categoryHasSubcategories && !selectedSubcategoryId) || workshopComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH || !newMeterReading.trim()}
               className={`bg-workshop hover:bg-workshop-dark text-white ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
           >
             {submitting ? 'Creating...' : 'Create Task'}

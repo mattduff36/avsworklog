@@ -9,6 +9,7 @@ import { setAppSessionCookieInResponse } from '@/lib/server/app-auth/cookies';
 import { getAppAuthProfile } from '@/lib/server/app-auth/profile';
 import { issueAppSession, revokeAppSession, validateAppSession } from '@/lib/server/app-auth/session';
 import { getWebAuthnRequestConfig } from '@/lib/server/webauthn/config';
+import { trackServerUsageEvent } from '@/lib/server/user-analytics';
 import {
   consumeWebAuthnChallenge,
   getCredentialPublicKey,
@@ -31,15 +32,43 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as VerifyLoginBody;
     if (!body.response || !body.challenge) {
+      await trackServerUsageEvent({
+        eventName: 'auth_login_failed',
+        request,
+        metadata: {
+          method: 'biometric',
+          reason: 'missing_biometric_response',
+          status: 400,
+        },
+      });
       return NextResponse.json({ error: 'Biometric response is required' }, { status: 400 });
     }
 
     const credential = await getWebAuthnCredentialByCredentialId(body.response.id);
     if (!credential) {
+      await trackServerUsageEvent({
+        eventName: 'auth_login_failed',
+        request,
+        metadata: {
+          method: 'biometric',
+          reason: 'credential_not_recognised',
+          status: 401,
+        },
+      });
       return NextResponse.json({ error: 'Biometric credential was not recognised' }, { status: 401 });
     }
 
     if (body.profileId && credential.profile_id !== body.profileId) {
+      await trackServerUsageEvent({
+        eventName: 'auth_login_failed',
+        userId: credential.profile_id,
+        request,
+        metadata: {
+          method: 'biometric',
+          reason: 'profile_mismatch',
+          status: 401,
+        },
+      });
       return NextResponse.json({ error: 'Biometric credential was not recognised' }, { status: 401 });
     }
 
@@ -49,6 +78,16 @@ export async function POST(request: NextRequest) {
       profileId: body.profileId || null,
     });
     if (challenge.device_id && credential.device_id !== challenge.device_id) {
+      await trackServerUsageEvent({
+        eventName: 'auth_login_failed',
+        userId: credential.profile_id,
+        request,
+        metadata: {
+          method: 'biometric',
+          reason: 'device_mismatch',
+          status: 401,
+        },
+      });
       return NextResponse.json({ error: 'Biometric credential was not recognised for this device' }, { status: 401 });
     }
     const config = await getWebAuthnRequestConfig();
@@ -71,6 +110,16 @@ export async function POST(request: NextRequest) {
         profileId: credential.profile_id,
         actorProfileId: credential.profile_id,
         eventType: 'biometric_login_failed',
+      });
+      await trackServerUsageEvent({
+        eventName: 'auth_login_failed',
+        userId: credential.profile_id,
+        request,
+        metadata: {
+          method: 'biometric',
+          reason: 'verification_failed',
+          status: 401,
+        },
       });
       return NextResponse.json({ error: 'Biometric login failed' }, { status: 401 });
     }
@@ -95,6 +144,18 @@ export async function POST(request: NextRequest) {
     }
 
     const profile = await getAppAuthProfile(credential.profile_id, null);
+    await trackServerUsageEvent({
+      eventName: 'auth_login_success',
+      userId: credential.profile_id,
+      appSessionId: nextSession.row.id,
+      request,
+      metadata: {
+        method: 'biometric',
+        rememberMe: body.rememberMe === true,
+        hadExistingSession: Boolean(existing.session),
+        deviceLabelProvided: Boolean(body.deviceLabel),
+      },
+    });
     await createWebAuthnAuditEvent({
       profileId: credential.profile_id,
       actorProfileId: credential.profile_id,

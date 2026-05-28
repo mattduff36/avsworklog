@@ -109,7 +109,7 @@ Added new columns:
 - **Add Task Modal:**
   - Vehicle selection (active vehicles)
   - Category selection (active categories)
-  - Workshop comments (min 10 chars, max 500)
+  - Workshop comments (min 5 chars, max 500)
   - Validation and error handling
 - **Mark In Progress Modal:**
   - Short progress note (max 40 chars)

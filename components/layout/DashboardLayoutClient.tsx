@@ -15,6 +15,7 @@ import { TabletModeProvider, useTabletMode } from '@/components/layout/tablet-mo
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useClientServiceOutage } from '@/lib/hooks/useClientServiceOutage';
 import { fetchWithAuth } from '@/lib/utils/fetch-with-auth';
+import { trackUsageEvent } from '@/lib/analytics/client';
 import {
   MOBILE_TEXT_SIZE_CHANGED_EVENT,
   applyMobileTextSizePreference,
@@ -90,6 +91,7 @@ function DashboardLayoutShell({
   const lastPageVisitRef = useRef<{ path: string; trackedAt: number }>({ path: '', trackedAt: 0 });
   const heartbeatIntervalRef = useRef<number | null>(null);
   const heartbeatOwnerTabIdRef = useRef<string>(createPageVisitTabId());
+  const sessionStartedRef = useRef(false);
   
   const getCurrentTrackedPath = useCallback(() => {
     if (!pathname) return '';
@@ -163,6 +165,13 @@ function DashboardLayoutShell({
     const currentPath = getCurrentTrackedPath();
     if (!currentPath) return;
     trackPageVisit(currentPath, PAGE_VISIT_RESUME_MIN_GAP_MS);
+    trackUsageEvent({
+      eventName: 'session_heartbeat',
+      path: currentPath,
+      metadata: {
+        source: 'dashboard_layout',
+      },
+    });
   }, [authLoading, clientServiceOutage, getCurrentTrackedPath, profile?.id, trackPageVisit]);
 
   const startHeartbeat = useCallback(() => {
@@ -183,13 +192,48 @@ function DashboardLayoutShell({
   const accent = getAccentFromRoute(pathname, searchParams);
 
   useEffect(() => {
+    if (authLoading || clientServiceOutage || !profile?.id || sessionStartedRef.current) return;
+    const currentPath = getCurrentTrackedPath();
+    if (!currentPath) return;
+
+    sessionStartedRef.current = true;
+    trackUsageEvent({
+      eventName: 'session_started',
+      path: currentPath,
+      referrerPath: typeof document !== 'undefined' ? document.referrer || null : null,
+      metadata: {
+        source: 'dashboard_layout',
+      },
+    });
+  }, [authLoading, clientServiceOutage, getCurrentTrackedPath, profile?.id]);
+
+  useEffect(() => {
     const nextPath = getCurrentTrackedPath();
     if (!nextPath) return;
     if (lastTrackedPathRef.current === nextPath) return;
+    const previousPath = lastTrackedPathRef.current;
     lastTrackedPathRef.current = nextPath;
 
     const timer = window.setTimeout(() => {
       trackPageVisit(nextPath);
+      if (previousPath) {
+        trackUsageEvent({
+          eventName: 'route_changed',
+          path: nextPath,
+          referrerPath: previousPath,
+          metadata: {
+            source: 'dashboard_layout',
+          },
+        });
+      }
+      trackUsageEvent({
+        eventName: 'page_view',
+        path: nextPath,
+        referrerPath: previousPath || (typeof document !== 'undefined' ? document.referrer || null : null),
+        metadata: {
+          source: 'dashboard_layout',
+        },
+      });
     }, PAGE_VISIT_DEBOUNCE_MS);
 
     return () => {
@@ -205,6 +249,13 @@ function DashboardLayoutShell({
         return;
       }
 
+      trackUsageEvent({
+        eventName: 'visibility_resume',
+        path: getCurrentTrackedPath(),
+        metadata: {
+          source: 'dashboard_layout',
+        },
+      });
       sendHeartbeat();
       startHeartbeat();
     };
@@ -229,7 +280,7 @@ function DashboardLayoutShell({
       stopHeartbeat();
       releaseHeartbeatOwnership();
     };
-  }, [releaseHeartbeatOwnership, sendHeartbeat, startHeartbeat, stopHeartbeat]);
+  }, [getCurrentTrackedPath, releaseHeartbeatOwnership, sendHeartbeat, startHeartbeat, stopHeartbeat]);
 
   useEffect(() => {
     const syncMobileTextSizePreference = () => {
