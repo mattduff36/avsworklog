@@ -5,33 +5,17 @@ import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { AppPageShell } from '@/components/layout/AppPageShell';
-import { Bell, CalendarClock, Plus, Receipt, Settings, Trash2 } from 'lucide-react';
+import { CalendarClock, Plus, Receipt, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SensitiveModuleGate, SensitiveModuleSessionManager, useSensitiveModuleAccess } from '@/components/security/SensitiveModuleGate';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { QuotesTable } from './components/QuotesTable';
 import { QuoteDetailsModal } from './components/QuoteDetailsModal';
 import { QuoteFormDialog } from './components/QuoteFormDialog';
+import { QuoteSettingsTab, type QuoteSettingsSubTab } from './components/settings/QuoteSettingsTab';
 import { uploadQuoteAttachment } from './quote-attachment-client';
 import type { Quote, QuoteFormData, QuoteListSummary, QuoteManagerOption, QuoteStatus } from './types';
 
@@ -57,21 +41,12 @@ interface ApproverOption {
 
 type QuotePageTab = 'overview' | 'settings';
 
-interface QuoteNotificationRecipientOption {
-  id: string;
-  full_name: string | null;
-  employee_id: string | null;
-  team_id: string | null;
-}
-
-interface QuoteNotificationSettingsPayload {
-  can_manage: boolean;
-  eligible_recipients: QuoteNotificationRecipientOption[];
-  selected_recipient_ids: string[];
-}
-
 function isQuotePageTab(value: string): value is QuotePageTab {
   return value === 'overview' || value === 'settings';
+}
+
+function isQuoteSettingsSubTab(value: string): value is QuoteSettingsSubTab {
+  return ['notifications', 'managers', 'sending', 'schedule', 'admin-tools'].includes(value);
 }
 
 function buildFormRequestError(payload: { error?: string; field_errors?: Record<string, string> }, fallback: string) {
@@ -128,14 +103,6 @@ export default function QuotesPage() {
   const [approvers, setApprovers] = useState<ApproverOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<QuoteStatus | 'all'>('all');
-  const [deleteQuoteId, setDeleteQuoteId] = useState('');
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [quoteNotificationSettings, setQuoteNotificationSettings] = useState<QuoteNotificationSettingsPayload | null>(null);
-  const [selectedQuoteNotificationRecipientIds, setSelectedQuoteNotificationRecipientIds] = useState<string[]>([]);
-  const [quoteNotificationSettingsLoading, setQuoteNotificationSettingsLoading] = useState(false);
-  const [quoteNotificationSettingsSaving, setQuoteNotificationSettingsSaving] = useState(false);
-  const [quoteNotificationSettingsError, setQuoteNotificationSettingsError] = useState<string | null>(null);
 
   // Modals
   const [detailQuoteId, setDetailQuoteId] = useState<string | null>(null);
@@ -146,13 +113,18 @@ export default function QuotesPage() {
   const quoteIdFromQuery = searchParams.get('quote_id');
   const tabParam = searchParams.get('tab') || 'overview';
   const pageTab: QuotePageTab = isQuotePageTab(tabParam) ? tabParam : 'overview';
-  const deletableQuotes = useMemo(
-    () => [...quotes]
-      .filter(quote => quote.is_latest_version && quote.status === 'draft')
-      .sort((a, b) => a.quote_reference.localeCompare(b.quote_reference)),
-    [quotes]
+  const settingsParam = searchParams.get('settings') || 'notifications';
+  const settingsTab: QuoteSettingsSubTab = isQuoteSettingsSubTab(settingsParam) ? settingsParam : 'notifications';
+  const managerParam = searchParams.get('manager') || 'all';
+  const activeManagerOptions = useMemo(
+    () => managerOptions.filter(option => option.is_active),
+    [managerOptions]
   );
-  const selectedDeleteQuote = deletableQuotes.find(quote => quote.id === deleteQuoteId) || null;
+  const activeManagerIds = useMemo(
+    () => new Set(activeManagerOptions.map(option => option.profile_id)),
+    [activeManagerOptions]
+  );
+  const managerFilter = managerParam === 'all' || activeManagerIds.has(managerParam) ? managerParam : 'all';
 
   const fetchData = useCallback(async () => {
     try {
@@ -182,26 +154,6 @@ export default function QuotesPage() {
     }
   }, [canViewCustomers, customerId]);
 
-  const fetchQuoteNotificationSettings = useCallback(async () => {
-    setQuoteNotificationSettingsLoading(true);
-    setQuoteNotificationSettingsError(null);
-    try {
-      const res = await fetch('/api/quotes/notification-settings', { cache: 'no-store' });
-      if (!res.ok) {
-        throw await buildResponseError(res, 'Unable to load quote notification settings.');
-      }
-      const payload = await res.json() as QuoteNotificationSettingsPayload;
-      setQuoteNotificationSettings(payload);
-      setSelectedQuoteNotificationRecipientIds(payload.selected_recipient_ids || []);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to load quote notification settings.';
-      setQuoteNotificationSettingsError(message);
-      toast.error(message);
-    } finally {
-      setQuoteNotificationSettingsLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
     if (permissionLoading || customerPermissionLoading || sensitiveAccess.loading) return;
     if (!canViewQuotes) {
@@ -214,21 +166,8 @@ export default function QuotesPage() {
   }, [permissionLoading, customerPermissionLoading, sensitiveAccess.loading, sensitiveAccess.canAccess, canViewQuotes, router, fetchData]);
 
   useEffect(() => {
-    if (permissionLoading || sensitiveAccess.loading || !sensitiveAccess.canAccess || !canViewQuotes) return;
-    if (pageTab === 'settings') {
-      fetchQuoteNotificationSettings();
-    }
-  }, [permissionLoading, sensitiveAccess.loading, sensitiveAccess.canAccess, canViewQuotes, pageTab, fetchQuoteNotificationSettings]);
-
-  useEffect(() => {
     setDetailQuoteId(quoteIdFromQuery);
   }, [quoteIdFromQuery]);
-
-  useEffect(() => {
-    if (deleteQuoteId && !deletableQuotes.some(quote => quote.id === deleteQuoteId)) {
-      setDeleteQuoteId('');
-    }
-  }, [deletableQuotes, deleteQuoteId]);
 
   async function handleCreate(data: QuoteFormData) {
     const res = await fetch('/api/quotes', {
@@ -306,67 +245,48 @@ export default function QuotesPage() {
   function handlePageTabChange(nextTab: QuotePageTab) {
     const nextParams = new URLSearchParams(searchParams.toString());
     nextParams.set('tab', nextTab);
+    if (nextTab === 'settings') {
+      nextParams.set('settings', settingsTab);
+    } else {
+      nextParams.delete('settings');
+    }
     router.replace(`${pathname}?${nextParams.toString()}`, { scroll: false });
   }
 
-  function toggleQuoteNotificationRecipient(profileId: string, checked: boolean) {
-    setSelectedQuoteNotificationRecipientIds(current => {
-      if (checked) {
-        return current.includes(profileId) ? current : [...current, profileId];
-      }
-      return current.filter(id => id !== profileId);
-    });
-  }
-
-  async function saveQuoteNotificationSettings() {
-    setQuoteNotificationSettingsSaving(true);
-    setQuoteNotificationSettingsError(null);
-    try {
-      const res = await fetch('/api/quotes/notification-settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipient_ids: selectedQuoteNotificationRecipientIds }),
-      });
-
-      if (!res.ok) {
-        throw await buildResponseError(res, 'Unable to save quote notification settings.');
-      }
-
-      const payload = await res.json() as QuoteNotificationSettingsPayload;
-      setQuoteNotificationSettings(payload);
-      setSelectedQuoteNotificationRecipientIds(payload.selected_recipient_ids || []);
-      toast.success('Quote notification details saved');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to save quote notification settings.';
-      setQuoteNotificationSettingsError(message);
-      toast.error(message);
-    } finally {
-      setQuoteNotificationSettingsSaving(false);
+  function handleManagerFilterChange(nextManagerId: string) {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set('tab', 'overview');
+    nextParams.delete('settings');
+    if (nextManagerId === 'all') {
+      nextParams.delete('manager');
+    } else {
+      nextParams.set('manager', nextManagerId);
     }
+    router.replace(`${pathname}?${nextParams.toString()}`, { scroll: false });
   }
 
-  async function handleDeleteSelectedQuote() {
-    if (!selectedDeleteQuote || deleteLoading) return;
+  function handleSettingsTabChange(nextTab: QuoteSettingsSubTab) {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set('tab', 'settings');
+    nextParams.set('settings', nextTab);
+    router.replace(`${pathname}?${nextParams.toString()}`, { scroll: false });
+  }
 
-    setDeleteLoading(true);
+  async function handleDeleteQuote(quote: Quote) {
     try {
-      const res = await fetch(`/api/quotes/${selectedDeleteQuote.id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/quotes/${quote.id}`, { method: 'DELETE' });
       if (!res.ok) {
         throw await buildResponseError(res, 'Unable to delete this quote right now.');
       }
 
-      toast.success(`Quote ${selectedDeleteQuote.quote_reference} deleted`);
-      if (detailQuoteId === selectedDeleteQuote.id) {
+      toast.success(`Quote ${quote.quote_reference} deleted`);
+      if (detailQuoteId === quote.id) {
         handleCloseQuoteDetails();
       }
-      setDeleteDialogOpen(false);
-      setDeleteQuoteId('');
       await fetchData();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to delete this quote right now.';
       toast.error(message);
-    } finally {
-      setDeleteLoading(false);
     }
   }
 
@@ -390,22 +310,22 @@ export default function QuotesPage() {
     <AppPageShell>
       <SensitiveModuleSessionManager moduleLabel="Quotes" access={sensitiveAccess} />
       <div className="bg-white dark:bg-slate-900 rounded-lg border border-border p-6">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-avs-yellow/10">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-avs-yellow/10">
               <Receipt className="h-5 w-5 text-avs-yellow" />
             </div>
-            <div>
+            <div className="min-w-0">
               <h1 className="text-3xl font-bold text-foreground">Quotes</h1>
               <p className="text-muted-foreground">
                 {customerId ? 'Track and manage quotes for this customer.' : 'Create, review, and manage customer quotations.'}
               </p>
             </div>
           </div>
-          <div className="flex flex-col items-end gap-2">
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <Link href="/quotes/work-calendar">
-                <Button variant="outline" className="border-border text-muted-foreground">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+              <Link href="/quotes/work-calendar" className="w-full sm:w-auto">
+                <Button variant="outline" className="w-full border-border text-muted-foreground sm:w-auto">
                   <CalendarClock className="h-4 w-4 mr-2" />
                   Work Calendar
                 </Button>
@@ -418,7 +338,7 @@ export default function QuotesPage() {
                 }}
                 disabled={!canViewCustomers}
                 aria-describedby={!canViewCustomers ? 'quotes-customer-access-note' : undefined}
-                className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90 font-semibold disabled:bg-slate-300 disabled:text-slate-600 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
+                className="w-full bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90 font-semibold disabled:bg-slate-300 disabled:text-slate-600 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 sm:w-auto"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 New Quote
@@ -450,6 +370,23 @@ export default function QuotesPage() {
           </TabsTrigger>
         </TabsList>
 
+        {pageTab === 'overview' ? (
+          <div className="mt-3 flex justify-end">
+            <Tabs value={managerFilter} onValueChange={handleManagerFilterChange}>
+              <TabsList className="h-auto flex-wrap">
+                <TabsTrigger value="all" className="gap-2">
+                  All Quotes
+                </TabsTrigger>
+                {activeManagerOptions.map(option => (
+                  <TabsTrigger key={option.profile_id} value={option.profile_id} className="gap-2">
+                    {option.profile?.full_name || option.signoff_name || option.initials}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          </div>
+        ) : null}
+
         <TabsContent value="overview" className="space-y-6 mt-0">
           <QuotesTable
             quotes={quotes}
@@ -457,169 +394,20 @@ export default function QuotesPage() {
             onRowClick={handleRowClick}
             statusFilter={statusFilter}
             onStatusFilterChange={setStatusFilter}
+            managerFilter={managerFilter}
           />
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-6 mt-0">
-          <div className="rounded-lg border border-slate-700 bg-slate-900/70 p-6">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-avs-yellow/10">
-                <Bell className="h-5 w-5 text-avs-yellow" />
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold text-white">Quote notification details</h2>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Choose which Accounts team members are notified when a manager requests invoice details. The quote manager is notified automatically when Accounts add invoice details.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 space-y-4">
-              {quoteNotificationSettingsLoading ? (
-                <p className="text-sm text-muted-foreground">Loading quote notification details...</p>
-              ) : quoteNotificationSettings ? (
-                <>
-                  {!quoteNotificationSettings.can_manage ? (
-                    <div className="rounded-md border border-slate-700 bg-slate-800/60 px-3 py-2 text-sm text-muted-foreground">
-                      Only admins can manage quote notification details.
-                    </div>
-                  ) : null}
-
-                  {quoteNotificationSettings.eligible_recipients.length > 0 ? (
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                      {quoteNotificationSettings.eligible_recipients.map(recipient => (
-                        <label
-                          key={recipient.id}
-                          className="flex items-start gap-3 rounded-md border border-slate-700 bg-slate-800/40 p-3 text-sm"
-                        >
-                          <input
-                            type="checkbox"
-                            className="mt-1"
-                            checked={selectedQuoteNotificationRecipientIds.includes(recipient.id)}
-                            disabled={!quoteNotificationSettings.can_manage || quoteNotificationSettingsSaving}
-                            onChange={event => toggleQuoteNotificationRecipient(recipient.id, event.target.checked)}
-                          />
-                          <span>
-                            <span className="block font-medium text-slate-100">{recipient.full_name || 'Unnamed user'}</span>
-                            {recipient.employee_id ? (
-                              <span className="block text-xs text-muted-foreground">Employee ID: {recipient.employee_id}</span>
-                            ) : null}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No Accounts team users with Quotes access are available.</p>
-                  )}
-
-                  {quoteNotificationSettingsError ? (
-                    <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-100">
-                      {quoteNotificationSettingsError}
-                    </div>
-                  ) : null}
-
-                  <div className="flex justify-end">
-                    <Button
-                      onClick={saveQuoteNotificationSettings}
-                      disabled={
-                        !quoteNotificationSettings.can_manage
-                        || quoteNotificationSettingsSaving
-                        || quoteNotificationSettings.eligible_recipients.length === 0
-                      }
-                      className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90"
-                    >
-                      {quoteNotificationSettingsSaving ? 'Saving...' : 'Save notification details'}
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground">Quote notification details have not been loaded yet.</p>
-              )}
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-slate-700 bg-slate-900/70 p-6">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/10">
-                <Trash2 className="h-5 w-5 text-red-300" />
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold text-white">Delete Draft Quote</h2>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Select a latest draft quote to permanently delete it. Confirmed, invoiced, archived, or older quote versions are protected.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-              <div className="space-y-2">
-                <label htmlFor="delete-quote-select" className="text-sm font-medium text-slate-200">
-                  Quote reference
-                </label>
-                <Select
-                  value={deleteQuoteId}
-                  onValueChange={setDeleteQuoteId}
-                  disabled={deletableQuotes.length === 0 || deleteLoading}
-                >
-                  <SelectTrigger id="delete-quote-select" className="bg-slate-800 border-slate-600 text-white">
-                    <SelectValue placeholder={deletableQuotes.length > 0 ? 'Select a draft quote' : 'No draft quotes available'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {deletableQuotes.map((quote) => (
-                      <SelectItem key={quote.id} value={quote.id}>
-                        {quote.quote_reference}{quote.customer?.company_name ? ` - ${quote.customer.company_name}` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <Button
-                variant="destructive"
-                onClick={() => setDeleteDialogOpen(true)}
-                disabled={!selectedDeleteQuote || deleteLoading}
-              >
-                <Trash2 className="h-4 w-4" />
-                Delete Quote
-              </Button>
-            </div>
-          </div>
+          <QuoteSettingsTab
+            activeTab={settingsTab}
+            onTabChange={handleSettingsTabChange}
+            quotes={quotes}
+            onDeleteQuote={handleDeleteQuote}
+            onRefresh={fetchData}
+          />
         </TabsContent>
       </Tabs>
-
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent className="border-border text-white">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete draft quote?</AlertDialogTitle>
-            <AlertDialogDescription className="text-muted-foreground">
-              {selectedDeleteQuote ? (
-                <>
-                  This will permanently delete quote{' '}
-                  <span className="font-semibold text-white">{selectedDeleteQuote.quote_reference}</span>.
-                  {selectedDeleteQuote.previous_versions?.length
-                    ? ' The previous quote version will become the latest version again. This action cannot be undone.'
-                    : ' This action cannot be undone.'}
-                </>
-              ) : (
-                'Select a draft quote before deleting.'
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteLoading}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(event) => {
-                event.preventDefault();
-                void handleDeleteSelectedQuote();
-              }}
-              disabled={!selectedDeleteQuote || deleteLoading}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {deleteLoading ? 'Deleting...' : 'Delete Quote'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <QuoteDetailsModal
         open={!!detailQuoteId}

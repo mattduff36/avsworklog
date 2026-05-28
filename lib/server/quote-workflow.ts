@@ -36,6 +36,24 @@ export interface QuoteNotificationRecipientOption {
   team_id: string | null;
 }
 
+export type QuoteInvoiceNotificationType =
+  | 'invoice_request'
+  | 'invoice_added'
+  | 'quote_sent_copy'
+  | 'start_alert_copy';
+
+export const QUOTE_INVOICE_NOTIFICATION_TYPES: QuoteInvoiceNotificationType[] = [
+  'invoice_request',
+  'invoice_added',
+  'quote_sent_copy',
+  'start_alert_copy',
+];
+
+export interface QuoteModuleSettings {
+  default_start_alert_days: number | null;
+  default_estimated_duration_days: number | null;
+}
+
 interface QuoteManagerOption {
   profile_id: string;
   initials: string;
@@ -742,8 +760,9 @@ export async function createQuoteNotification(params: {
   }
 }
 
-export async function listQuoteAccountsNotificationRecipientOptions(
-  supabase: ReturnType<typeof createAdminClient>
+export async function listQuoteNotificationRecipientOptions(
+  supabase: ReturnType<typeof createAdminClient>,
+  teamFilter: 'accounts' | 'additional' | 'all' = 'all'
 ): Promise<QuoteNotificationRecipientOption[]> {
   const quoteUserIds = Array.from(await getUsersWithModuleAccess('quotes', undefined, supabase));
   if (quoteUserIds.length === 0) {
@@ -755,7 +774,6 @@ export async function listQuoteAccountsNotificationRecipientOptions(
     .from('profiles')
     .select('id, full_name, employee_id, team_id')
     .in('id', quoteUserIds)
-    .eq('team_id', 'accounts')
     .order('full_name', { ascending: true });
 
   if (error) {
@@ -763,36 +781,183 @@ export async function listQuoteAccountsNotificationRecipientOptions(
   }
 
   return ((data || []) as QuoteNotificationRecipientOption[])
-    .filter(profile => !hiddenIds.has(profile.id));
+    .filter(profile => !hiddenIds.has(profile.id))
+    .filter(profile => {
+      if (teamFilter === 'all') return true;
+      return teamFilter === 'accounts' ? profile.team_id === 'accounts' : profile.team_id !== 'accounts';
+    });
+}
+
+export async function listQuoteAccountsNotificationRecipientOptions(
+  supabase: ReturnType<typeof createAdminClient>
+): Promise<QuoteNotificationRecipientOption[]> {
+  return listQuoteNotificationRecipientOptions(supabase, 'accounts');
+}
+
+export async function listQuoteAdditionalNotificationRecipientOptions(
+  supabase: ReturnType<typeof createAdminClient>
+): Promise<QuoteNotificationRecipientOption[]> {
+  return listQuoteNotificationRecipientOptions(supabase, 'additional');
+}
+
+export async function listQuoteUserNotificationRecipientOptions(
+  supabase: ReturnType<typeof createAdminClient>
+): Promise<QuoteNotificationRecipientOption[]> {
+  return listQuoteNotificationRecipientOptions(supabase, 'all');
+}
+
+export async function replaceQuoteNotificationRecipients(
+  supabase: ReturnType<typeof createAdminClient>,
+  selections: Partial<Record<QuoteInvoiceNotificationType, string[]>>,
+  actorUserId: string
+) {
+  const notificationTypes = QUOTE_INVOICE_NOTIFICATION_TYPES.filter(type => Object.prototype.hasOwnProperty.call(selections, type));
+  if (notificationTypes.length === 0) return;
+
+  const rows = notificationTypes.flatMap(notificationType => {
+    const profileIds = Array.from(new Set((selections[notificationType] || []).filter(Boolean)));
+    return profileIds.map(profileId => ({
+      profile_id: profileId,
+      notification_type: notificationType,
+      created_by: actorUserId,
+      updated_by: actorUserId,
+    }));
+  });
+
+  const { error: deleteError } = await supabase
+    .from('quote_invoice_notification_recipients')
+    .delete()
+    .in('notification_type', notificationTypes);
+
+  if (deleteError) throw deleteError;
+
+  if (rows.length === 0) return;
+
+  const { error: insertError } = await supabase
+    .from('quote_invoice_notification_recipients')
+    .insert(rows);
+
+  if (insertError) throw insertError;
 }
 
 export async function getSelectedQuoteInvoiceNotificationRecipientIds(
-  supabase: ReturnType<typeof createAdminClient>
-): Promise<string[]> {
-  const { data, error } = await supabase
+  supabase: ReturnType<typeof createAdminClient>,
+  notificationType?: QuoteInvoiceNotificationType
+): Promise<Record<QuoteInvoiceNotificationType, string[]> | string[]> {
+  let query = supabase
     .from('quote_invoice_notification_recipients')
-    .select('profile_id');
+    .select('profile_id, notification_type');
+
+  if (notificationType) {
+    query = query.eq('notification_type', notificationType);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw error;
   }
 
-  return (data || []).map(row => row.profile_id);
+  if (notificationType) {
+    return (data || []).map(row => row.profile_id);
+  }
+
+  const selections: Record<QuoteInvoiceNotificationType, string[]> = {
+    invoice_request: [],
+    invoice_added: [],
+    quote_sent_copy: [],
+    start_alert_copy: [],
+  };
+
+  for (const row of data || []) {
+    const notificationType = (row.notification_type || 'invoice_request') as QuoteInvoiceNotificationType;
+    if (QUOTE_INVOICE_NOTIFICATION_TYPES.includes(notificationType)) {
+      selections[notificationType].push(row.profile_id);
+    }
+  }
+
+  return selections;
+}
+
+export async function getQuoteInvoiceNotificationRecipientIds(
+  supabase: ReturnType<typeof createAdminClient>,
+  notificationType: QuoteInvoiceNotificationType,
+  excludeUserIds: Array<string | null | undefined> = []
+): Promise<string[]> {
+  const [accountsRecipients, additionalRecipients, selectedRecipientIds] = await Promise.all([
+    listQuoteAccountsNotificationRecipientOptions(supabase),
+    listQuoteAdditionalNotificationRecipientOptions(supabase),
+    getSelectedQuoteInvoiceNotificationRecipientIds(supabase, notificationType),
+  ]);
+
+  const eligibleIds = new Set([...accountsRecipients, ...additionalRecipients].map(profile => profile.id));
+  const excludedIds = new Set(excludeUserIds.filter((id): id is string => Boolean(id)));
+
+  return (selectedRecipientIds as string[])
+    .filter(profileId => eligibleIds.has(profileId))
+    .filter(profileId => !excludedIds.has(profileId));
+}
+
+export async function getQuoteNotificationRecipientEmails(
+  supabase: ReturnType<typeof createAdminClient>,
+  notificationType: QuoteInvoiceNotificationType,
+  excludeUserIds: Array<string | null | undefined> = []
+): Promise<string[]> {
+  const recipientIds = await getQuoteInvoiceNotificationRecipientIds(supabase, notificationType, excludeUserIds);
+  const emails = await Promise.all(recipientIds.map(async recipientId => {
+    const { data } = await supabase.auth.admin.getUserById(recipientId);
+    return normalizeEmailAddress(data.user?.email);
+  }));
+
+  return Array.from(new Set(emails.filter((email): email is string => Boolean(email))));
 }
 
 export async function getQuoteAccountsRecipientIds(
   supabase: ReturnType<typeof createAdminClient>,
   excludeUserId?: string | null
 ): Promise<string[]> {
-  const [eligibleRecipients, selectedRecipientIds] = await Promise.all([
-    listQuoteAccountsNotificationRecipientOptions(supabase),
-    getSelectedQuoteInvoiceNotificationRecipientIds(supabase),
-  ]);
-  const eligibleIds = new Set(eligibleRecipients.map(profile => profile.id));
+  return getQuoteInvoiceNotificationRecipientIds(supabase, 'invoice_request', [excludeUserId]);
+}
 
-  return selectedRecipientIds
-    .filter(profileId => eligibleIds.has(profileId))
-    .filter(profileId => profileId !== excludeUserId);
+export async function loadQuoteModuleSettings(
+  supabase: ReturnType<typeof createAdminClient>
+): Promise<QuoteModuleSettings> {
+  const { data, error } = await supabase
+    .from('quote_module_settings')
+    .select('default_start_alert_days, default_estimated_duration_days')
+    .eq('id', true)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  return {
+    default_start_alert_days: data?.default_start_alert_days ?? null,
+    default_estimated_duration_days: data?.default_estimated_duration_days ?? null,
+  };
+}
+
+export async function upsertQuoteModuleSettings(
+  supabase: ReturnType<typeof createAdminClient>,
+  settings: QuoteModuleSettings,
+  actorUserId: string
+): Promise<QuoteModuleSettings> {
+  const { data, error } = await supabase
+    .from('quote_module_settings')
+    .upsert({
+      id: true,
+      default_start_alert_days: settings.default_start_alert_days,
+      default_estimated_duration_days: settings.default_estimated_duration_days,
+      updated_by: actorUserId,
+    })
+    .select('default_start_alert_days, default_estimated_duration_days')
+    .single();
+
+  if (error) throw error;
+
+  return {
+    default_start_alert_days: data.default_start_alert_days ?? null,
+    default_estimated_duration_days: data.default_estimated_duration_days ?? null,
+  };
 }
 
 export {

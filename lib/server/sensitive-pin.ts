@@ -38,6 +38,7 @@ interface SensitivePinTokenRow {
 
 export interface SensitivePinStatus {
   configured: boolean;
+  pin_length: 4 | 6 | null;
   must_reset: boolean;
   locked_until: string | null;
 }
@@ -72,6 +73,11 @@ function getUnlockExpiry(): string {
 
 function getLockExpiry(): string {
   return new Date(Date.now() + PIN_LOCK_MINUTES * 60 * 1000).toISOString();
+}
+
+function getStoredPinLength(row: SensitivePinRow | null | undefined): 4 | 6 | null {
+  const length = row?.pin_length;
+  return length === 4 || length === 6 ? length : null;
 }
 
 export function validateSensitivePin(pin: string): { valid: boolean; error?: string; length?: 4 | 6 } {
@@ -181,6 +187,7 @@ export async function getCurrentSensitivePinStatus(): Promise<SensitivePinStatus
   const row = await getSensitivePinRow(current.profile.id);
   return {
     configured: Boolean(row?.pin_hash && row?.pin_salt && row?.pin_length),
+    pin_length: getStoredPinLength(row),
     must_reset: row?.must_reset === true,
     locked_until: row?.locked_until || null,
   };
@@ -464,6 +471,7 @@ export async function getSensitiveModulePinState(moduleName: ModuleName): Promis
   const pinRow = await getSensitivePinRow(current.profile.id);
   const pinStatus = {
     configured: Boolean(pinRow?.pin_hash && pinRow?.pin_salt && pinRow?.pin_length),
+    pin_length: getStoredPinLength(pinRow),
     must_reset: pinRow?.must_reset === true,
     locked_until: pinRow?.locked_until || null,
   };

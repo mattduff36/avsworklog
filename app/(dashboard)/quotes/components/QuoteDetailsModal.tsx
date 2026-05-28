@@ -834,8 +834,8 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
         ) : (
           <>
             <DialogHeader>
-              <div className="flex items-center justify-between">
-                <DialogTitle className="text-white flex items-center gap-2">
+              <div className="flex min-w-0 items-center justify-between">
+                <DialogTitle className="flex min-w-0 flex-wrap items-center gap-2 text-white">
                   <span className="font-mono text-avs-yellow">{quote.quote_reference}</span>
                   <Badge variant="outline" className={statusConfig?.color}>
                     {statusConfig?.label}
@@ -1883,7 +1883,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
       </DialogContent>
     </Dialog>
     <Dialog open={ramsDialogOpen} onOpenChange={setRamsDialogOpen}>
-      <DialogContent className="bg-slate-900 border-slate-700 text-white">
+      <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto bg-slate-900 border-slate-700 text-white">
         <DialogHeader>
           <DialogTitle>Trigger RAMS</DialogTitle>
           <DialogDescription className="text-muted-foreground">

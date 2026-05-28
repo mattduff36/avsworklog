@@ -1,9 +1,9 @@
 'use client';
 
 import Image from 'next/image';
+import { Camera, Trash2, UserCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Camera, Trash2, UserCircle2 } from 'lucide-react';
 import type { ProfileIdentityPayload } from '@/types/profile';
 
 interface ProfileIdentityCardProps {
@@ -11,6 +11,7 @@ interface ProfileIdentityCardProps {
   onSelectAvatarFile: (file: File) => void;
   onRemoveAvatar: () => void;
   isAvatarBusy: boolean;
+  description?: string;
 }
 
 function getInitials(fullName: string): string {
@@ -25,6 +26,7 @@ export function ProfileIdentityCard({
   onSelectAvatarFile,
   onRemoveAvatar,
   isAvatarBusy,
+  description = 'Personal overview, settings, quick links, and support shortcuts.',
 }: ProfileIdentityCardProps) {
   const initials = getInitials(profile.full_name);
 
@@ -32,7 +34,7 @@ export function ProfileIdentityCard({
     <Card className="border-border">
       <CardHeader className="pb-2">
         <CardTitle>My Profile</CardTitle>
-        <CardDescription>Personal overview, settings, quick links, and support shortcuts.</CardDescription>
+        <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] lg:items-start">

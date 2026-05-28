@@ -28,6 +28,7 @@ interface QuotesTableProps {
   onRowClick: (quote: Quote) => void;
   statusFilter: QuoteStatus | 'all';
   onStatusFilterChange: (s: QuoteStatus | 'all') => void;
+  managerFilter?: string;
 }
 
 type SortField = 'quote_reference' | 'customer' | 'quote_date' | 'total' | 'status';
@@ -48,7 +49,11 @@ const PO_FILTER_OPTIONS = [
 ] as const;
 
 function formatCurrency(value: number | null | undefined) {
-  return `£${Number(value ?? 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`;
+  const amount = Number(value ?? 0);
+  return `£${amount.toLocaleString('en-GB', {
+    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 function quoteMatchesStatus(quote: Quote, status: QuoteStatus) {
@@ -72,12 +77,60 @@ function getBillingStatusConfig(status: NonNullable<Quote['invoice_summary']>['s
   }
 }
 
+function getInvoiceProgress(quote: Quote) {
+  const total = Number(quote.total || 0);
+  const invoicedTotal = Number(quote.invoice_summary?.invoicedTotal || 0);
+  const pendingRequestedTotal = Number(quote.invoice_summary?.pendingRequestedTotal || 0);
+  const invoicedPercent = total > 0
+    ? Math.min(100, Math.max(0, Math.round((invoicedTotal / total) * 100)))
+    : 0;
+  const pendingPercent = total > 0
+    ? Math.min(100 - invoicedPercent, Math.max(0, Math.round((pendingRequestedTotal / total) * 100)))
+    : 0;
+
+  return {
+    invoicedTotal,
+    pendingRequestedTotal,
+    invoicedPercent,
+    pendingPercent,
+  };
+}
+
+function InvoiceProgressBadge({ quote }: { quote: Quote }) {
+  const { invoicedTotal, pendingRequestedTotal, invoicedPercent, pendingPercent } = getInvoiceProgress(quote);
+
+  return (
+    <div
+      className="relative inline-flex min-w-[150px] overflow-hidden rounded-full border border-emerald-500/30 bg-slate-800 text-xs font-semibold text-emerald-100"
+      title={`${formatCurrency(invoicedTotal)} invoiced${pendingRequestedTotal > 0 ? `, ${formatCurrency(pendingRequestedTotal)} pending request` : ''}`}
+    >
+      <span
+        className="absolute inset-y-0 left-0 bg-emerald-500/35"
+        style={{ width: `${invoicedPercent}%` }}
+      />
+      {pendingPercent > 0 ? (
+        <span
+          className="absolute inset-y-0 bg-violet-500/45"
+          style={{
+            left: `${invoicedPercent}%`,
+            width: `${pendingPercent}%`,
+          }}
+        />
+      ) : null}
+      <span className="relative z-10 w-full px-3 py-1 text-center">
+        {formatCurrency(invoicedTotal)}
+      </span>
+    </div>
+  );
+}
+
 export function QuotesTable({
   quotes,
   statusCounts: providedStatusCounts,
   onRowClick,
   statusFilter,
   onStatusFilterChange,
+  managerFilter = 'all',
 }: QuotesTableProps) {
   const [search, setSearch] = useState('');
   const [poFilter, setPoFilter] = useState<'all' | 'with_po' | 'without_po'>('all');
@@ -104,6 +157,10 @@ export function QuotesTable({
 
     if (statusFilter !== 'all') {
       list = list.filter(q => quoteMatchesStatus(q, statusFilter));
+    }
+
+    if (managerFilter !== 'all') {
+      list = list.filter(q => q.requester_id === managerFilter);
     }
 
     if (poFilter === 'with_po') {
@@ -147,7 +204,7 @@ export function QuotesTable({
     });
 
     return list;
-  }, [quotes, search, statusFilter, poFilter, invoiceFilter, sortField, sortDir]);
+  }, [quotes, search, statusFilter, managerFilter, poFilter, invoiceFilter, sortField, sortDir]);
 
   function toggleSort(field: SortField) {
     if (sortField === field) {
@@ -215,71 +272,77 @@ export function QuotesTable({
             className="pl-9 bg-slate-800 border-slate-600 text-white placeholder:text-muted-foreground"
           />
         </div>
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-          <Select value={poFilter} onValueChange={(value: 'all' | 'with_po' | 'without_po') => setPoFilter(value)}>
-            <SelectTrigger className="w-full bg-slate-800 border-slate-600 text-white sm:w-[140px]">
-              <SelectValue placeholder="PO" />
-            </SelectTrigger>
-            <SelectContent>
-              {PO_FILTER_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={invoiceFilter}
-            onValueChange={(value: 'all' | 'not_invoiced' | 'ready_to_invoice' | 'partially_invoiced' | 'invoiced') => setInvoiceFilter(value)}
-          >
-            <SelectTrigger className="w-full bg-slate-800 border-slate-600 text-white sm:w-[150px]">
-              <SelectValue placeholder="Billing" />
-            </SelectTrigger>
-            <SelectContent>
-              {BILLING_FILTER_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {hasSecondaryFilters ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setPoFilter('all');
-                setInvoiceFilter('all');
-              }}
-              className="border-slate-600 text-muted-foreground hover:bg-slate-700/50"
-            >
-              Reset Filters
-            </Button>
-          ) : null}
-        </div>
       </div>
 
-      {/* Status filter chips */}
-      <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Workflow Status</p>
-        <div className="flex flex-wrap gap-2">
-        {statusFilterOptions.map(s => {
-          const cfg = s === 'all' ? { label: 'All', color: '' } : getQuoteStatusConfig(s);
-          const count = statusCounts[s] || 0;
-          const isActive = statusFilter === s;
-          return (
-            <Button
-              key={s}
-              variant={isActive ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => onStatusFilterChange(s)}
-              className={isActive
-                ? 'bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90'
-                : 'border-slate-600 text-muted-foreground hover:bg-slate-700/50'
-              }
+      {/* Status and secondary filters */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div className="space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Workflow Status</p>
+          <div className="flex flex-wrap gap-2">
+            {statusFilterOptions.map(s => {
+              const cfg = s === 'all' ? { label: 'All', color: '' } : getQuoteStatusConfig(s);
+              const count = statusCounts[s] || 0;
+              const isActive = statusFilter === s;
+              return (
+                <Button
+                  key={s}
+                  variant={isActive ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => onStatusFilterChange(s)}
+                  className={isActive
+                    ? 'bg-slate-600 text-white hover:bg-slate-500'
+                    : 'border-slate-600 text-muted-foreground hover:bg-slate-700/50'
+                  }
+                >
+                  {cfg.label} {count > 0 && <span className="ml-1 opacity-70">({count})</span>}
+                </Button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="w-full space-y-2 lg:w-auto">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Select PO / Billing</p>
+          <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+            <Select value={poFilter} onValueChange={(value: 'all' | 'with_po' | 'without_po') => setPoFilter(value)}>
+              <SelectTrigger className="w-full bg-slate-800 border-slate-600 text-white sm:w-[140px]">
+                <SelectValue placeholder="PO" />
+              </SelectTrigger>
+              <SelectContent>
+                {PO_FILTER_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={invoiceFilter}
+              onValueChange={(value: 'all' | 'not_invoiced' | 'ready_to_invoice' | 'partially_invoiced' | 'invoiced') => setInvoiceFilter(value)}
             >
-              {cfg.label} {count > 0 && <span className="ml-1 opacity-70">({count})</span>}
-            </Button>
-          );
-        })}
+              <SelectTrigger className="w-full bg-slate-800 border-slate-600 text-white sm:w-[150px]">
+                <SelectValue placeholder="Billing" />
+              </SelectTrigger>
+              <SelectContent>
+                {BILLING_FILTER_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {hasSecondaryFilters ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setPoFilter('all');
+                  setInvoiceFilter('all');
+                }}
+                className="border-slate-600 text-muted-foreground hover:bg-slate-700/50"
+              >
+                Reset Filters
+              </Button>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -289,9 +352,8 @@ export function QuotesTable({
           <thead>
             <tr className="bg-slate-800/80 border-b border-slate-700">
               <th className="text-left px-4 py-3 font-semibold text-muted-foreground cursor-pointer hover:text-white" onClick={() => toggleSort('quote_reference')}>
-                Reference {renderSortIcon('quote_reference')}
+                Job Number {renderSortIcon('quote_reference')}
               </th>
-              <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Version</th>
               <th className="text-left px-4 py-3 font-semibold text-muted-foreground cursor-pointer hover:text-white" onClick={() => toggleSort('customer')}>
                 Customer {renderSortIcon('customer')}
               </th>
@@ -307,13 +369,12 @@ export function QuotesTable({
                 Status {renderSortIcon('status')}
               </th>
               <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Invoiced</th>
-              <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Balance</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-700/50">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={10} className="text-center py-12 text-muted-foreground">
+                <td colSpan={8} className="text-center py-12 text-muted-foreground">
                   {search ? 'No quotes match your search.' : 'No quotes yet. Create your first quote to get started.'}
                 </td>
               </tr>
@@ -350,14 +411,13 @@ export function QuotesTable({
                           <span>{quote.quote_reference}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-xs text-slate-300">
-                        <span>{quote.version_label || 'Original'}</span>
-                      </td>
                       <td className="px-4 py-3 text-white">{quote.customer?.company_name || '—'}</td>
-                      <td className="px-4 py-3 text-slate-300 text-xs truncate max-w-[200px]">{quote.subject_line || '—'}</td>
+                      <td className="px-4 py-3 text-slate-300 text-xs max-w-[240px]">
+                        <span className="line-clamp-2 leading-snug">{quote.subject_line || '—'}</span>
+                      </td>
                       <td className="px-4 py-3 text-slate-300 text-xs">{format(new Date(quote.quote_date), 'dd/MM/yyyy')}</td>
                       <td className="px-4 py-3 text-right font-semibold text-white">
-                        £{Number(quote.total || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                        {formatCurrency(quote.total)}
                       </td>
                       <td className="px-4 py-3 text-xs text-slate-300">{quote.po_number || '—'}</td>
                       <td className="px-4 py-3">
@@ -369,9 +429,8 @@ export function QuotesTable({
                           <Badge variant="outline" className={billingCfg.color}>{billingCfg.label}</Badge>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-xs text-slate-300">{formatCurrency(quote.invoice_summary?.invoicedTotal)}</td>
                       <td className="px-4 py-3 text-xs text-slate-300">
-                        {formatCurrency(quote.invoice_summary?.remainingBalance ?? quote.total)}
+                        <InvoiceProgressBadge quote={quote} />
                       </td>
                     </tr>
                     {isExpanded ? previousVersions.map(version => {
@@ -389,14 +448,13 @@ export function QuotesTable({
                               <span>{version.quote_reference}</span>
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-xs">
-                            <span>{version.version_label || 'Original'}</span>
-                          </td>
                           <td className="px-4 py-3">{version.customer?.company_name || quote.customer?.company_name || '—'}</td>
-                          <td className="px-4 py-3 text-xs truncate max-w-[200px]">{version.subject_line || '—'}</td>
+                          <td className="px-4 py-3 text-xs max-w-[240px]">
+                            <span className="line-clamp-2 leading-snug">{version.subject_line || '—'}</span>
+                          </td>
                           <td className="px-4 py-3 text-xs">{format(new Date(version.quote_date), 'dd/MM/yyyy')}</td>
                           <td className="px-4 py-3 text-right font-medium">
-                            £{Number(version.total || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                            {formatCurrency(version.total)}
                           </td>
                           <td className="px-4 py-3 text-xs">{version.po_number || '—'}</td>
                           <td className="px-4 py-3">
@@ -408,9 +466,8 @@ export function QuotesTable({
                               <Badge variant="outline" className={versionBillingCfg.color}>{versionBillingCfg.label}</Badge>
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-xs">{formatCurrency(version.invoice_summary?.invoicedTotal)}</td>
                           <td className="px-4 py-3 text-xs">
-                            {formatCurrency(version.invoice_summary?.remainingBalance ?? version.total)}
+                            <InvoiceProgressBadge quote={version} />
                           </td>
                         </tr>
                       );
@@ -479,10 +536,7 @@ export function QuotesTable({
                   </span>
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Invoiced: {formatCurrency(quote.invoice_summary?.invoicedTotal)}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Remaining: {formatCurrency(quote.invoice_summary?.remainingBalance ?? quote.total)}
+                  <InvoiceProgressBadge quote={quote} />
                 </div>
                 {isExpanded && previousVersions.length > 0 ? (
                   <div className="space-y-2 border-t border-slate-700/60 pt-3">

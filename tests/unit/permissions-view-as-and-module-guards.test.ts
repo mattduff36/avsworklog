@@ -144,8 +144,11 @@ describe('module guard alignment checks', () => {
   });
 
   it('keeps biometric settings but removes account switcher settings from profile hub', () => {
-    const source = readSource('app/(dashboard)/profile/page.tsx');
-    expect(source).toContain('ProfileBiometricsCard');
-    expect(source).not.toContain('AccountSwitcherSettingsCard');
+    const profileSource = readSource('app/(dashboard)/profile/page.tsx');
+    const securityTabSource = readSource('components/profile/ProfileSecurityTab.tsx');
+
+    expect(securityTabSource).toContain('ProfileBiometricsCard');
+    expect(profileSource).not.toContain('AccountSwitcherSettingsCard');
+    expect(securityTabSource).not.toContain('AccountSwitcherSettingsCard');
   });
 });

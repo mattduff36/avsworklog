@@ -2,11 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import {
+  type QuoteInvoiceNotificationType,
   getSelectedQuoteInvoiceNotificationRecipientIds,
+  listQuoteAdditionalNotificationRecipientOptions,
   listQuoteAccountsNotificationRecipientOptions,
+  replaceQuoteNotificationRecipients,
 } from '@/lib/server/quote-workflow';
 import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
 import { isEffectiveRoleAdminOrSuper } from '@/lib/utils/rbac';
+
+const INVOICE_NOTIFICATION_TYPES: QuoteInvoiceNotificationType[] = ['invoice_request', 'invoice_added'];
 
 async function requireQuoteSettingsContext() {
   const supabase = await createClient();
@@ -38,16 +43,30 @@ export async function GET() {
     if (context.response) return context.response;
 
     const admin = createAdminClient();
-    const eligibleRecipients = await listQuoteAccountsNotificationRecipientOptions(admin);
-    const selectedRecipientIds = context.canManage
-      ? await getSelectedQuoteInvoiceNotificationRecipientIds(admin)
-      : [];
-    const eligibleIds = new Set(eligibleRecipients.map(recipient => recipient.id));
+    const [accountsRecipients, additionalRecipients, selectedNotifications] = await Promise.all([
+      listQuoteAccountsNotificationRecipientOptions(admin),
+      listQuoteAdditionalNotificationRecipientOptions(admin),
+      context.canManage
+        ? getSelectedQuoteInvoiceNotificationRecipientIds(admin)
+        : {
+          invoice_request: [],
+          invoice_added: [],
+        },
+    ]);
+    const accountsIds = new Set(accountsRecipients.map(recipient => recipient.id));
+    const additionalIds = new Set(additionalRecipients.map(recipient => recipient.id));
+    const selectedByType = selectedNotifications as Record<QuoteInvoiceNotificationType, string[]>;
 
     return NextResponse.json({
       can_manage: context.canManage,
-      eligible_recipients: eligibleRecipients,
-      selected_recipient_ids: selectedRecipientIds.filter(id => eligibleIds.has(id)),
+      accounts_recipients: accountsRecipients,
+      additional_recipients: additionalRecipients,
+      eligible_recipients: accountsRecipients,
+      selected_recipient_ids: selectedByType.invoice_request.filter(id => accountsIds.has(id)),
+      selected_notifications: {
+        invoice_request: selectedByType.invoice_request.filter(id => accountsIds.has(id) || additionalIds.has(id)),
+        invoice_added: selectedByType.invoice_added.filter(id => additionalIds.has(id)),
+      },
     });
   } catch (error) {
     console.error('Error fetching quote notification settings:', error);
@@ -63,48 +82,62 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Only admins can manage quote notification settings.' }, { status: 403 });
     }
 
-    const body = await request.json() as { recipient_ids?: unknown };
-    const recipientIds = Array.isArray(body.recipient_ids)
+    const body = await request.json() as {
+      recipient_ids?: unknown;
+      selected_notifications?: Partial<Record<QuoteInvoiceNotificationType, unknown>>;
+    };
+    const legacyRecipientIds = Array.isArray(body.recipient_ids)
       ? Array.from(new Set(body.recipient_ids.filter((id): id is string => typeof id === 'string' && id.trim().length > 0).map(id => id.trim())))
       : [];
+    const selectedNotifications = INVOICE_NOTIFICATION_TYPES.reduce<Record<QuoteInvoiceNotificationType, string[]>>((acc, type) => {
+      const rawIds = body.selected_notifications?.[type];
+      if (Array.isArray(rawIds)) {
+        acc[type] = Array.from(new Set(rawIds.filter((id): id is string => typeof id === 'string' && id.trim().length > 0).map(id => id.trim())));
+      }
+      return acc;
+    }, {
+      invoice_request: legacyRecipientIds,
+      invoice_added: [],
+      quote_sent_copy: [],
+      start_alert_copy: [],
+    });
 
-    if (recipientIds.length === 0) {
+    const admin = createAdminClient();
+    const [accountsRecipients, additionalRecipients] = await Promise.all([
+      listQuoteAccountsNotificationRecipientOptions(admin),
+      listQuoteAdditionalNotificationRecipientOptions(admin),
+    ]);
+    const accountsIds = new Set(accountsRecipients.map(recipient => recipient.id));
+    const additionalIds = new Set(additionalRecipients.map(recipient => recipient.id));
+
+    const selectedAccountsRecipientIds = selectedNotifications.invoice_request.filter(id => accountsIds.has(id));
+    if (selectedAccountsRecipientIds.length === 0) {
       return NextResponse.json({ error: 'Select at least one Accounts recipient.' }, { status: 400 });
     }
 
-    const admin = createAdminClient();
-    const eligibleRecipients = await listQuoteAccountsNotificationRecipientOptions(admin);
-    const eligibleIds = new Set(eligibleRecipients.map(recipient => recipient.id));
-    const invalidRecipientIds = recipientIds.filter(id => !eligibleIds.has(id));
+    const invoiceRequestEligibleIds = new Set([...accountsIds, ...additionalIds]);
+    const invalidInvoiceRequestIds = selectedNotifications.invoice_request.filter(id => !invoiceRequestEligibleIds.has(id));
+    const invalidInvoiceAddedIds = selectedNotifications.invoice_added.filter(id => !additionalIds.has(id));
 
-    if (invalidRecipientIds.length > 0) {
+    if (invalidInvoiceRequestIds.length > 0 || invalidInvoiceAddedIds.length > 0) {
       return NextResponse.json(
-        { error: 'Selected recipients must be Accounts team users with Quotes access.' },
+        { error: 'Selected recipients must be users with Quotes access in the correct notification section.' },
         { status: 400 }
       );
     }
 
-    const { error: deleteError } = await admin
-      .from('quote_invoice_notification_recipients')
-      .delete()
-      .not('profile_id', 'is', null);
-
-    if (deleteError) throw deleteError;
-
-    const { error: insertError } = await admin
-      .from('quote_invoice_notification_recipients')
-      .insert(recipientIds.map(profileId => ({
-        profile_id: profileId,
-        created_by: context.userId,
-        updated_by: context.userId,
-      })));
-
-    if (insertError) throw insertError;
+    await replaceQuoteNotificationRecipients(admin, {
+      invoice_request: selectedNotifications.invoice_request,
+      invoice_added: selectedNotifications.invoice_added,
+    }, context.userId);
 
     return NextResponse.json({
       can_manage: true,
-      eligible_recipients: eligibleRecipients,
-      selected_recipient_ids: recipientIds,
+      accounts_recipients: accountsRecipients,
+      additional_recipients: additionalRecipients,
+      eligible_recipients: accountsRecipients,
+      selected_recipient_ids: selectedAccountsRecipientIds,
+      selected_notifications: selectedNotifications,
     });
   } catch (error) {
     console.error('Error saving quote notification settings:', error);

@@ -1746,7 +1746,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
 
       {/* Mark In Progress Modal */}
       <Dialog open={showStatusModal} onOpenChange={setShowStatusModal}>
-        <DialogContent className="bg-white dark:bg-slate-900 border-border text-foreground max-w-lg">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto bg-white dark:bg-slate-900 border-border text-foreground max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-foreground text-xl">Mark Task In Progress</DialogTitle>
             <DialogDescription className="text-muted-foreground">
@@ -1802,7 +1802,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
 
       {/* On Hold Modal */}
       <Dialog open={showOnHoldModal} onOpenChange={setShowOnHoldModal}>
-        <DialogContent className="bg-white dark:bg-slate-900 border-border text-foreground max-w-lg">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto bg-white dark:bg-slate-900 border-border text-foreground max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-foreground text-xl">Put Task On Hold</DialogTitle>
             <DialogDescription className="text-muted-foreground">
@@ -1855,7 +1855,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
 
       {/* Resume Task Modal */}
       <Dialog open={showResumeModal} onOpenChange={setShowResumeModal}>
-        <DialogContent className="bg-white dark:bg-slate-900 border-border text-foreground max-w-lg">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto bg-white dark:bg-slate-900 border-border text-foreground max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-foreground text-xl">Resume Task</DialogTitle>
             <DialogDescription className="text-muted-foreground">

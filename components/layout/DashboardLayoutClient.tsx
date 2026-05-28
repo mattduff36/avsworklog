@@ -320,7 +320,7 @@ function DashboardLayoutShell({
       <MobileNavBar />
 
       <Dialog open={tabletModeInfoOpen} onOpenChange={(open) => !open && dismissTabletModeInfo()}>
-        <DialogContent className="max-w-lg border-border text-white p-7 sm:p-8 gap-5">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto border-border text-white p-7 sm:p-8 gap-5">
           <DialogHeader className="space-y-3">
             <DialogTitle className="text-xl">Information</DialogTitle>
             <DialogDescription className="text-base leading-relaxed">

@@ -56,7 +56,7 @@ export function MobileTextSizeDialog({ open, onOpenChange }: MobileTextSizeDialo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="mx-4 max-w-sm border border-slate-700 bg-slate-900 text-white shadow-2xl">
+      <DialogContent className="mx-4 max-h-[calc(100dvh-1rem)] w-[calc(100vw-2rem)] max-w-sm overflow-y-auto border border-slate-700 bg-slate-900 text-white shadow-2xl">
         <DialogHeader className="space-y-3 text-left">
           <DialogTitle className="text-xl text-white">Text size</DialogTitle>
           <DialogDescription className="text-slate-300">

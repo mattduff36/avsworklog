@@ -579,15 +579,15 @@ export default function TimesheetsPage() {
       
       {/* Header */}
       <div className="bg-slate-900 rounded-lg p-6 border border-border">
-        <div className="flex items-center justify-between mb-4">
-          <div>
+        <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
             <h1 className="text-3xl font-bold text-white mb-2">Timesheets</h1>
             <p className="text-muted-foreground">
               Manage your weekly timesheets
             </p>
           </div>
-          <Link href="/timesheets/new">
-            <Button className="bg-timesheet hover:bg-timesheet-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg">
+          <Link href="/timesheets/new" className="w-full sm:w-auto">
+            <Button className="w-full bg-timesheet hover:bg-timesheet-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg sm:w-auto">
               <Plus className="h-4 w-4 mr-2" />
               New Timesheet
             </Button>
@@ -823,10 +823,10 @@ export default function TimesheetsPage() {
               }}
             >
               <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center space-x-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex min-w-0 items-center space-x-3">
                     {getStatusIcon(timesheet.status)}
-                    <div>
+                    <div className="min-w-0">
                       <CardTitle className="text-lg text-white">
                         Week Ending {formatDate(timesheet.week_ending)}
                       </CardTitle>
@@ -841,7 +841,7 @@ export default function TimesheetsPage() {
                       </CardDescription>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                     {getStatusBadge(timesheet.status)}
                     {isElevatedUser && (
                       <Button
@@ -858,7 +858,7 @@ export default function TimesheetsPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-between text-sm">
+                <div className="flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
                   <div className="text-muted-foreground">
                     {timesheet.submitted_at
                       ? `Submitted ${formatDate(timesheet.submitted_at)}`

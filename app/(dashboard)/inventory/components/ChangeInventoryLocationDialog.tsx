@@ -82,7 +82,7 @@ export function ChangeInventoryLocationDialog({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen && !isSaving && !isUnsetting) onClose(); }}>
-      <DialogContent className="max-w-lg border-slate-700 bg-slate-900 text-white">
+      <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto border-slate-700 bg-slate-900 text-white">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>{hasActiveExistingLocation ? 'Change Inventory Location' : 'Set Inventory Location'}</DialogTitle>

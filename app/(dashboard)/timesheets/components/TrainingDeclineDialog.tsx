@@ -29,7 +29,7 @@ export function TrainingDeclineDialog({
 }: TrainingDeclineDialogProps) {
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !pending && !nextOpen && onCancel()}>
-      <DialogContent className="max-w-md border-border bg-white dark:bg-slate-900">
+      <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-md overflow-y-auto border-border bg-white dark:bg-slate-900">
         <DialogHeader>
           <DialogTitle className="text-foreground">Remove Training Booking?</DialogTitle>
           <DialogDescription className="text-muted-foreground">

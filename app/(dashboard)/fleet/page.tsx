@@ -398,15 +398,15 @@ function FleetContent() {
     <AppPageShell>
       {/* Header */}
       <div className={`bg-white dark:bg-slate-900 rounded-lg border border-border ${tabletModeEnabled ? 'p-5 md:p-6' : 'p-6'}`}>
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
             <h1 className="text-3xl font-bold text-foreground mb-2">Fleet Management</h1>
             <p className="text-muted-foreground">
               Manage vans, HGVs, plant machinery, and fleet operations
             </p>
           </div>
           <Button
-            className={`bg-fleet hover:bg-fleet-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg ${tabletModeEnabled ? 'min-h-11 text-base px-4 [&_svg]:size-5' : ''}`}
+            className={`w-full bg-fleet hover:bg-fleet-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg sm:w-auto ${tabletModeEnabled ? 'min-h-11 text-base px-4 [&_svg]:size-5' : ''}`}
             onClick={() => setHeaderAddAssetOpen(true)}
           >
             <Plus className="h-4 w-4 mr-2" />

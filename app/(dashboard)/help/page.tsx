@@ -613,11 +613,11 @@ export default function HelpPage() {
           <h1 className="text-3xl font-bold text-foreground mb-2">
             Help & FAQ
           </h1>
-          <div className="flex items-baseline justify-between gap-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
             <p className="text-muted-foreground">
               Find answers to common questions and submit suggestions
             </p>
-            <p className="shrink-0 text-xs text-muted-foreground tabular-nums">
+            <p className="text-xs text-muted-foreground tabular-nums sm:shrink-0">
               {getPublicReleaseVersionLabel()}
             </p>
           </div>
@@ -1326,7 +1326,7 @@ export default function HelpPage() {
       </Tabs>
 
       <Dialog open={cacheGuideOpen} onOpenChange={setCacheGuideOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-2xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Guided Cache and Site-Data Clear Steps</DialogTitle>
             <DialogDescription>

@@ -538,7 +538,7 @@ export function AbsenceReasonsContent() {
       </Tabs>
 
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="border-border max-w-3xl">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-3xl overflow-y-auto border-border">
           <DialogHeader>
             <DialogTitle className="text-foreground">Add Absence Reason</DialogTitle>
             <DialogDescription className="text-slate-400/90">
@@ -595,7 +595,7 @@ export function AbsenceReasonsContent() {
       </Dialog>
 
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="border-border max-w-3xl">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-3xl overflow-y-auto border-border">
           <DialogHeader>
             <DialogTitle className="text-foreground">Edit Absence Reason</DialogTitle>
             <DialogDescription className="text-slate-400/90">Update the reason details</DialogDescription>
@@ -676,7 +676,7 @@ export function AbsenceReasonsContent() {
       </Dialog>
 
       <Dialog open={showDisableDialog} onOpenChange={setShowDisableDialog}>
-        <DialogContent className="border-border max-w-3xl">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-3xl overflow-y-auto border-border">
           <DialogHeader>
             <DialogTitle className="text-foreground">Disable Absence Reason</DialogTitle>
             <DialogDescription className="text-slate-400/90">

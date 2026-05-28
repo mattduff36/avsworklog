@@ -474,12 +474,12 @@ function HgvInspectionsContent() {
     <AppPageShell>
       <div className={`bg-slate-900 rounded-lg border border-border ${tabletModeEnabled ? 'p-5 md:p-6' : 'p-6'}`}>
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-          <div>
+          <div className="min-w-0">
             <h1 className="text-3xl font-bold text-white mb-2">HGV Daily Checks</h1>
             <p className="text-muted-foreground">Daily 26-point HGV safety checks</p>
           </div>
-          <Link href="/hgv-inspections/new">
-            <Button className={`bg-hgv-inspection hover:bg-hgv-inspection-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg ${tabletModeEnabled ? 'min-h-11 text-base px-4 [&_svg]:size-5' : ''}`}>
+          <Link href="/hgv-inspections/new" className="w-full md:w-auto">
+            <Button className={`w-full bg-hgv-inspection hover:bg-hgv-inspection-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg md:w-auto ${tabletModeEnabled ? 'min-h-11 text-base px-4 [&_svg]:size-5' : ''}`}>
               <Plus className="h-4 w-4 mr-2" />
               New Daily Check
             </Button>
@@ -488,8 +488,8 @@ function HgvInspectionsContent() {
 
         {canViewCrossUserInspections && employees.length > 0 && (
           <div className="pt-4 border-t border-border">
-            <div className={`flex items-center gap-3 ${tabletModeEnabled ? 'max-w-none flex-wrap' : 'max-w-md'}`}>
-            <Label className="text-white text-sm flex items-center gap-2 whitespace-nowrap">
+            <div className={`flex flex-col gap-3 sm:flex-row sm:items-center ${tabletModeEnabled ? 'max-w-none flex-wrap' : 'max-w-md'}`}>
+            <Label className="text-white text-sm flex items-center gap-2">
               <User className="h-4 w-4" />
               View daily checks for:
             </Label>
@@ -517,9 +517,9 @@ function HgvInspectionsContent() {
         <Card className="border-border">
           <CardContent className="pt-6">
             <div className={`grid grid-cols-1 gap-6 ${tabletModeEnabled ? 'md:grid-cols-1' : 'md:grid-cols-2'}`}>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <Filter className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-slate-400 mr-2">Filter by status:</span>
+                <span className="text-sm text-slate-400 sm:mr-2">Filter by status:</span>
                 <div className="flex gap-2 flex-wrap">
                   {(['all', 'draft', 'submitted'] as InspectionStatusFilter[]).map((filter) => (
                     <Button
@@ -537,9 +537,9 @@ function HgvInspectionsContent() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
                 <Filter className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-slate-400 mr-2 whitespace-nowrap">Filter by HGV:</span>
+                <span className="text-sm text-slate-400 sm:mr-2">Filter by HGV:</span>
                 <Select value={normalizedHgvFilter || 'all'} onValueChange={setHgvFilter}>
                   <SelectTrigger className={`${tabletModeEnabled ? 'min-h-11 text-base' : 'h-9'} border-border text-white bg-slate-900/50`}>
                     <SelectValue placeholder="All HGVs" />

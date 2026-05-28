@@ -233,7 +233,7 @@ export function ReminderModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden">
+      <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-2xl overflow-hidden">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <div className="p-2 bg-blue-100 dark:bg-blue-950 rounded">

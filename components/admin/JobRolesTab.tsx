@@ -406,7 +406,7 @@ export function JobRolesTab() {
 
       {/* Add Role Dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent className="border-border text-white max-w-md">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-md overflow-y-auto border-border text-white">
           <DialogHeader>
             <DialogTitle>Add New Role</DialogTitle>
             <DialogDescription className="text-muted-foreground">
@@ -511,7 +511,7 @@ export function JobRolesTab() {
 
       {/* Edit Role Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="border-border text-white max-w-md">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-md overflow-y-auto border-border text-white">
           <DialogHeader>
             <DialogTitle>Edit Role</DialogTitle>
             <DialogDescription className="text-muted-foreground">Update role details</DialogDescription>
@@ -604,7 +604,7 @@ export function JobRolesTab() {
 
       {/* Delete Role Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent className="border-border text-white">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto border-border text-white">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-red-500" />

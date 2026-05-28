@@ -3937,9 +3937,45 @@ export type Database = {
           },
         ]
       }
+      quote_module_settings: {
+        Row: {
+          id: boolean
+          default_start_alert_days: number | null
+          default_estimated_duration_days: number | null
+          updated_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: boolean
+          default_start_alert_days?: number | null
+          default_estimated_duration_days?: number | null
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: boolean
+          default_start_alert_days?: number | null
+          default_estimated_duration_days?: number | null
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'quote_module_settings_updated_by_fkey'
+            columns: ['updated_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       quote_invoice_notification_recipients: {
         Row: {
           profile_id: string
+          notification_type: string
           created_by: string | null
           updated_by: string | null
           created_at: string
@@ -3947,6 +3983,7 @@ export type Database = {
         }
         Insert: {
           profile_id: string
+          notification_type?: string
           created_by?: string | null
           updated_by?: string | null
           created_at?: string
@@ -3954,6 +3991,7 @@ export type Database = {
         }
         Update: {
           profile_id?: string
+          notification_type?: string
           created_by?: string | null
           updated_by?: string | null
           created_at?: string

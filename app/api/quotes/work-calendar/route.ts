@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { addDays, format, subDays } from 'date-fns';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { loadQuoteModuleSettings } from '@/lib/server/quote-workflow';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
 
@@ -98,6 +100,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const title = typeof body.title === 'string' ? body.title.trim() : '';
     const startDate = normalizeDate(typeof body.start_date === 'string' ? body.start_date : null, new Date());
+    const moduleSettings = await loadQuoteModuleSettings(createAdminClient());
+    const estimatedDurationDays = typeof body.estimated_duration_days === 'undefined'
+      ? moduleSettings.default_estimated_duration_days ?? 1
+      : normalizeDuration(body.estimated_duration_days);
 
     if (!title) return NextResponse.json({ error: 'Enter a calendar entry title.' }, { status: 400 });
 
@@ -108,7 +114,7 @@ export async function POST(request: NextRequest) {
         summary: typeof body.summary === 'string' && body.summary.trim() ? body.summary.trim() : null,
         quote_id: typeof body.quote_id === 'string' && body.quote_id.trim() ? body.quote_id.trim() : null,
         start_date: startDate,
-        estimated_duration_days: normalizeDuration(body.estimated_duration_days),
+        estimated_duration_days: estimatedDurationDays,
         created_by: user.id,
         updated_by: user.id,
       })

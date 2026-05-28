@@ -7,12 +7,14 @@ const {
   mockAppendQuoteTimelineEvent,
   mockCreateQuoteNotification,
   mockFetchQuoteBundle,
+  mockGetQuoteInvoiceNotificationRecipientIds,
 } = vi.hoisted(() => ({
   mockCreateClient: vi.fn(),
   mockCreateAdminClient: vi.fn(),
   mockAppendQuoteTimelineEvent: vi.fn(),
   mockCreateQuoteNotification: vi.fn(),
   mockFetchQuoteBundle: vi.fn(),
+  mockGetQuoteInvoiceNotificationRecipientIds: vi.fn(),
 }));
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -31,12 +33,14 @@ vi.mock('@/lib/server/quote-workflow', () => ({
   appendQuoteTimelineEvent: mockAppendQuoteTimelineEvent,
   createQuoteNotification: mockCreateQuoteNotification,
   fetchQuoteBundle: mockFetchQuoteBundle,
+  getQuoteInvoiceNotificationRecipientIds: mockGetQuoteInvoiceNotificationRecipientIds,
 }));
 
 describe('POST /api/quotes/[id]/invoices', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCreateAdminClient.mockReturnValue({});
+    mockGetQuoteInvoiceNotificationRecipientIds.mockResolvedValue([]);
     mockCreateClient.mockResolvedValue({
       auth: {
         getUser: vi.fn().mockResolvedValue({

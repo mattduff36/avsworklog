@@ -116,17 +116,17 @@ export default function CustomersPage() {
     <AppPageShell>
       <SensitiveModuleSessionManager moduleLabel="Customers" access={sensitiveAccess} />
       <div className="bg-white dark:bg-slate-900 rounded-lg border border-border p-6">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-avs-yellow/10">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-avs-yellow/10">
               <Building2 className="h-5 w-5 text-avs-yellow" />
             </div>
-            <div>
+            <div className="min-w-0">
               <h1 className="text-3xl font-bold text-foreground">Customers</h1>
               <p className="text-muted-foreground">Manage your customer directory and key contact records.</p>
             </div>
           </div>
-          <Button onClick={() => { setEditingCustomer(null); setFormOpen(true); }} className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90 font-semibold">
+          <Button onClick={() => { setEditingCustomer(null); setFormOpen(true); }} className="w-full bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90 font-semibold sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             Add Customer
           </Button>

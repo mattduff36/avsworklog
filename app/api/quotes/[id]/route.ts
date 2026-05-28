@@ -10,6 +10,7 @@ import {
   calculateQuoteTotals,
   createQuoteNotification,
   fetchQuoteBundle,
+  getQuoteNotificationRecipientEmails,
   sendQuoteRamsRequestEmail,
   sendQuoteToCustomerEmail,
 } from '@/lib/server/quote-workflow';
@@ -149,10 +150,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         );
       }
 
+      const quoteCopyEmails = await getQuoteNotificationRecipientEmails(admin, 'quote_sent_copy', [user.id, current.quote.requester_id]);
       const emailResult = await sendQuoteToCustomerEmail(current, [
         current.quote.manager_email || '',
-        'rob@avsquires.co.uk',
-        'charlotte@avsquires.co.uk',
+        ...quoteCopyEmails,
       ], user.email);
 
       if (!emailResult.success) {
@@ -229,10 +230,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         );
       }
 
+      const quoteCopyEmails = await getQuoteNotificationRecipientEmails(admin, 'quote_sent_copy', [user.id, current.quote.requester_id]);
       const emailResult = await sendQuoteToCustomerEmail(current, [
         current.quote.manager_email || '',
-        'rob@avsquires.co.uk',
-        'charlotte@avsquires.co.uk',
+        ...quoteCopyEmails,
       ], user.email);
 
       if (!emailResult.success) {

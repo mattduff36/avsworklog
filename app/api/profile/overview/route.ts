@@ -4,9 +4,20 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { PROFILE_HUB_PRD_EPIC_ID } from '@/lib/profile/epic';
 import { canEditOwnBasicProfileFields } from '@/lib/profile/permissions';
 import { buildFrequentQuickLinks, buildRecentQuickLinks } from '@/lib/profile/quick-links';
+import { getPermissionLevelsForUser, getPermissionModules } from '@/lib/server/team-permissions';
 import { fetchCarryoverMapForFinancialYear, getEffectiveAllowance } from '@/lib/utils/absence-carryover';
 import { getCurrentFinancialYear } from '@/lib/utils/date';
+import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
+import { getEffectiveRole } from '@/lib/utils/view-as';
 import type { ProfileOverviewPayload } from '@/types/profile';
+import {
+  ALL_MODULES,
+  MODULE_DESCRIPTIONS,
+  MODULE_DISPLAY_NAMES,
+  PERMISSION_LEVEL_LABELS,
+  type ModuleName,
+  type PermissionAccessLevel,
+} from '@/types/roles';
 
 interface InspectionRow {
   id: string;
@@ -20,6 +31,232 @@ interface InspectionItemSummaryRow {
 
 interface WorkshopTaskSummaryRow {
   inspection_id: string | null;
+}
+
+interface ManagerProfileRow {
+  id: string;
+  full_name: string | null;
+  email?: string | null;
+  phone_number?: string | null;
+}
+
+interface ProjectAssignmentRow {
+  id: string;
+  status: string;
+  assigned_at: string | null;
+  signed_at: string | null;
+  document: ProjectDocumentRow | ProjectDocumentRow[] | null;
+}
+
+interface ProjectDocumentRow {
+  id?: string | null;
+  title?: string | null;
+  document_type?: { name?: string | null; required_signature?: boolean | null } | Array<{
+    name?: string | null;
+    required_signature?: boolean | null;
+  }> | null;
+}
+
+interface FaqCategoryRow {
+  id: string;
+  name: string;
+  slug: string;
+  module_name: string | null;
+}
+
+interface FaqArticleRow {
+  id: string;
+  title: string;
+  summary: string | null;
+  category_id: string;
+  category?: FaqCategoryRow | FaqCategoryRow[] | null;
+}
+
+function isModuleName(value: string | null | undefined): value is ModuleName {
+  return ALL_MODULES.includes(value as ModuleName);
+}
+
+function getRelationValue<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] || null;
+  return value || null;
+}
+
+function normalizeProjectStatus(status: string): ProfileOverviewPayload['project_assignments'][number]['status'] {
+  if (status === 'signed' || status === 'read') return status;
+  return 'pending';
+}
+
+async function buildManagerSummaries(
+  admin: ReturnType<typeof createAdminClient>,
+  profileRow: Record<string, unknown>,
+  teamValue: Record<string, unknown> | null
+): Promise<ProfileOverviewPayload['managers']> {
+  const managerSources = new Map<string, ProfileOverviewPayload['managers'][number]['source']>();
+  const addManager = (
+    id: string | null | undefined,
+    source: ProfileOverviewPayload['managers'][number]['source']
+  ) => {
+    if (!id || id === profileRow.id || managerSources.has(id)) return;
+    managerSources.set(id, source);
+  };
+
+  addManager(profileRow.line_manager_id as string | null | undefined, 'line_manager');
+  addManager(profileRow.secondary_manager_id as string | null | undefined, 'secondary_manager');
+  addManager(teamValue?.manager_1_profile_id as string | null | undefined, 'team_manager');
+  addManager(teamValue?.manager_2_profile_id as string | null | undefined, 'team_manager');
+
+  const managerIds = Array.from(managerSources.keys());
+  if (managerIds.length === 0) return [];
+
+  const { data, error } = await admin
+    .from('profiles')
+    .select('id, full_name, email, phone_number')
+    .in('id', managerIds);
+
+  if (error) throw error;
+
+  return ((data || []) as ManagerProfileRow[]).map((manager) => ({
+    id: manager.id,
+    full_name: manager.full_name || 'Unnamed manager',
+    email: manager.email || null,
+    phone_number: manager.phone_number || null,
+    source: managerSources.get(manager.id) || 'team_manager',
+  }));
+}
+
+async function buildProjectAssignmentSummaries(
+  admin: ReturnType<typeof createAdminClient>,
+  userId: string
+): Promise<ProfileOverviewPayload['project_assignments']> {
+  const { data, error } = await admin
+    .from('rams_assignments')
+    .select(`
+      id,
+      status,
+      assigned_at,
+      signed_at,
+      document:rams_documents!rams_assignments_rams_document_id_fkey(
+        id,
+        title,
+        document_type:project_document_types(name, required_signature)
+      )
+    `)
+    .eq('employee_id', userId)
+    .order('assigned_at', { ascending: false })
+    .limit(4);
+
+  if (error) throw error;
+
+  return ((data || []) as unknown as ProjectAssignmentRow[])
+    .map((assignment) => ({
+      ...assignment,
+      document: getRelationValue(assignment.document),
+    }))
+    .filter((assignment) => assignment.document?.id)
+    .map((assignment) => {
+      const documentType = getRelationValue(assignment.document?.document_type);
+      return {
+        id: assignment.id,
+        document_id: String(assignment.document?.id),
+        title: String(assignment.document?.title || 'Untitled project document'),
+        document_type_name: documentType?.name || null,
+        required_signature: documentType?.required_signature ?? true,
+        status: normalizeProjectStatus(assignment.status),
+        assigned_at: assignment.assigned_at,
+        signed_at: assignment.signed_at,
+      };
+    });
+}
+
+async function buildPermissionSummary(
+  admin: ReturnType<typeof createAdminClient>,
+  userId: string
+): Promise<ProfileOverviewPayload['permission_summary']> {
+  const [effectiveRole, modules] = await Promise.all([
+    getEffectiveRole(),
+    getPermissionModules(admin),
+  ]);
+  const hasFullAccess = hasEffectiveRoleFullAccess(effectiveRole);
+  const permissionLevels = hasFullAccess
+    ? ALL_MODULES.reduce<Record<ModuleName, PermissionAccessLevel>>((acc, moduleName) => {
+        acc[moduleName] = 5;
+        return acc;
+      }, {} as Record<ModuleName, PermissionAccessLevel>)
+    : await getPermissionLevelsForUser(userId, effectiveRole.role_id, admin, effectiveRole.team_id);
+
+  const modulesByName = new Map(modules.map((module) => [module.module_name, module]));
+  const accessibleModules = ALL_MODULES
+    .map((moduleName) => {
+      const accessLevel = (permissionLevels[moduleName] || 0) as PermissionAccessLevel;
+      const moduleInfo = modulesByName.get(moduleName);
+      return {
+        module_name: moduleName,
+        display_name: moduleInfo?.display_name || MODULE_DISPLAY_NAMES[moduleName],
+        description: moduleInfo?.description || MODULE_DESCRIPTIONS[moduleName],
+        access_level: accessLevel,
+        access_label: PERMISSION_LEVEL_LABELS[accessLevel],
+        requires_sensitive_pin: moduleInfo?.requires_sensitive_pin === true,
+      };
+    })
+    .filter((module) => module.access_level > 0);
+
+  return {
+    effective_team_name: effectiveRole.team_name,
+    has_sensitive_module_access: accessibleModules.some((module) => module.requires_sensitive_pin),
+    modules: accessibleModules,
+  };
+}
+
+async function buildHelpArticleSummaries(
+  admin: ReturnType<typeof createAdminClient>,
+  accessibleModules: ModuleName[]
+): Promise<ProfileOverviewPayload['help_articles']> {
+  const { data: categories, error: categoriesError } = await admin
+    .from('faq_categories')
+    .select('id, name, slug, module_name')
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true });
+
+  if (categoriesError) throw categoriesError;
+
+  const accessibleModuleSet = new Set(accessibleModules);
+  const filteredCategories = ((categories || []) as FaqCategoryRow[]).filter((category) => {
+    if (!category.module_name) return true;
+    return isModuleName(category.module_name) && accessibleModuleSet.has(category.module_name);
+  });
+  const categoryIds = filteredCategories.map((category) => category.id);
+  if (categoryIds.length === 0) return [];
+
+  const { data: articles, error: articlesError } = await admin
+    .from('faq_articles')
+    .select(`
+      id,
+      title,
+      summary,
+      category_id,
+      category:faq_categories(id, name, slug, module_name)
+    `)
+    .eq('is_published', true)
+    .in('category_id', categoryIds)
+    .order('sort_order', { ascending: true })
+    .limit(6);
+
+  if (articlesError) throw articlesError;
+
+  return ((articles || []) as FaqArticleRow[])
+    .map((article) => {
+      const category = getRelationValue(article.category);
+      if (!category) return null;
+      return {
+        id: article.id,
+        title: article.title,
+        summary: article.summary,
+        category_name: category.name,
+        category_slug: category.slug,
+        module_name: isModuleName(category.module_name) ? category.module_name : null,
+      };
+    })
+    .filter((article): article is ProfileOverviewPayload['help_articles'][number] => Boolean(article));
 }
 
 export async function GET() {
@@ -63,7 +300,16 @@ export async function GET() {
           must_change_password,
           annual_holiday_allowance_days,
           super_admin,
-          team:org_teams!profiles_team_id_fkey(id, name),
+          line_manager_id,
+          secondary_manager_id,
+          emergency_contact_name,
+          emergency_contact_phone,
+          emergency_contact_relationship,
+          secondary_emergency_contact_name,
+          secondary_emergency_contact_phone,
+          secondary_emergency_contact_relationship,
+          employer_profile_notes,
+          team:org_teams!profiles_team_id_fkey(id, name, manager_1_profile_id, manager_2_profile_id),
           role:roles(name, display_name, role_class, is_manager_admin, is_super_admin)
         `)
         .eq('id', user.id)
@@ -231,12 +477,23 @@ export async function GET() {
       }
     }
 
+    const [managers, projectAssignments, permissionSummary] = await Promise.all([
+      buildManagerSummaries(admin, profileRow, teamValue as Record<string, unknown> | null),
+      buildProjectAssignmentSummaries(admin, user.id),
+      buildPermissionSummary(admin, user.id),
+    ]);
+    const helpArticles = await buildHelpArticleSummaries(
+      admin,
+      permissionSummary.modules.map((module) => module.module_name)
+    );
+
     const response: ProfileOverviewPayload = {
       prd_epic_id: PROFILE_HUB_PRD_EPIC_ID,
       profile: typedProfile as ProfileOverviewPayload['profile'],
       can_edit_basic_fields: canEditOwnBasicProfileFields(
         typedProfile as Parameters<typeof canEditOwnBasicProfileFields>[0]
       ),
+      managers,
       timesheets: (timesheets || []) as ProfileOverviewPayload['timesheets'],
       inspections: mergedInspections,
       absences: ((absences || []) as Array<Record<string, unknown>>).map((absence) => ({
@@ -258,6 +515,9 @@ export async function GET() {
         pending_total: pendingTotal,
         remaining: allowance - approvedTaken - pendingTotal,
       },
+      project_assignments: projectAssignments,
+      permission_summary: permissionSummary,
+      help_articles: helpArticles,
       quick_links: {
         recent: buildRecentQuickLinks((visits || []) as Array<{ path: string; visited_at: string }>, 5),
         frequent: buildFrequentQuickLinks((visits || []) as Array<{ path: string; visited_at: string }>, 5),

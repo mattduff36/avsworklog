@@ -37,6 +37,7 @@ describe('POST /api/sensitive-access/renew', () => {
       expires_at: '2026-05-28T13:20:00.000Z',
       pin_status: {
         configured: true,
+        pin_length: 4,
         must_reset: false,
         locked_until: null,
       },

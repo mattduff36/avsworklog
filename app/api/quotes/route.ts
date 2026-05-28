@@ -11,6 +11,7 @@ import {
   getInitialsFromName,
   getInvoiceSummary,
   getQuoteManagerOption,
+  loadQuoteModuleSettings,
 } from '@/lib/server/quote-workflow';
 import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
 
@@ -360,6 +361,9 @@ export async function POST(request: NextRequest) {
       fallbackInitials: initials,
     });
 
+    const moduleSettings = await loadQuoteModuleSettings(admin);
+    const startAlertDays = normalizedStartAlertDays ?? moduleSettings.default_start_alert_days;
+    const estimatedDurationDays = normalizedEstimatedDurationDays ?? moduleSettings.default_estimated_duration_days;
     const items = pricingMode === 'attachments_only' ? [] : normalizedItems
       .filter(item => isMeaningfulLineItem(item))
       .map(({ originalIndex: _originalIndex, ...item }) => item);
@@ -395,8 +399,8 @@ export async function POST(request: NextRequest) {
       custom_footer_text: normalizeOptionalString(quoteData.custom_footer_text),
       version_notes: normalizeOptionalString(quoteData.version_notes),
       start_date: normalizeOptionalString(quoteData.start_date),
-      start_alert_days: normalizedStartAlertDays,
-      estimated_duration_days: normalizedEstimatedDurationDays,
+      start_alert_days: startAlertDays,
+      estimated_duration_days: estimatedDurationDays,
       pricing_mode: pricingMode,
       subtotal: totals.subtotal,
       total: totals.total,

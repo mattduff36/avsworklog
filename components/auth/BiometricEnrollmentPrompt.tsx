@@ -185,7 +185,7 @@ export function BiometricEnrollmentPrompt({
         if (!working) void handleDismiss();
       }}
     >
-      <DialogContent className="w-[calc(100vw-2rem)] max-w-2xl border-border p-7 text-white sm:p-9">
+      <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-2rem)] max-w-2xl overflow-y-auto border-border p-7 text-white sm:p-9">
         <DialogHeader className="space-y-5 text-left">
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-avs-yellow text-slate-950">
             <Fingerprint className="h-9 w-9" />

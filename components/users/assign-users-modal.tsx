@@ -157,7 +157,7 @@ function AssignUsersModalContent({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (nextOpen ? onOpenChange(true) : handleClose())}>
-      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-4xl lg:max-w-5xl">
+      <DialogContent className="flex max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] flex-col sm:max-w-4xl lg:max-w-5xl">
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>

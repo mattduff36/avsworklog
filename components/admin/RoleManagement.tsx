@@ -1513,7 +1513,7 @@ export function RoleManagement() {
       )}
 
       <Dialog open={confirmUserSaveOpen} onOpenChange={setConfirmUserSaveOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-3xl overflow-hidden">
           <DialogHeader>
             <DialogTitle>Confirm Permission Level Changes</DialogTitle>
             <DialogDescription>

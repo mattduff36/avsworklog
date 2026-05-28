@@ -927,8 +927,8 @@ export default function ViewTimesheetPage() {
 
       <Card className="">
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
               <CardTitle>{isPlantV2Timesheet ? 'Plant Time Entries' : 'Time Entries'}</CardTitle>
               <CardDescription>
                 {isPlantV2Timesheet
@@ -941,7 +941,7 @@ export default function ViewTimesheetPage() {
               </CardDescription>
             </div>
             {!editing && ((timesheet.status === 'draft' || timesheet.status === 'rejected') || canEditApproved) && !isEndState && (
-              <Button variant="outline" onClick={() => setEditing(true)}>
+              <Button variant="outline" onClick={() => setEditing(true)} className="w-full sm:w-auto">
                 <Edit2 className="h-4 w-4 mr-2" />
                 Edit
               </Button>

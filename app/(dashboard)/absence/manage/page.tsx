@@ -1445,7 +1445,7 @@ export default function AdminAbsencePage() {
 
       {/* Create Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="border-border max-w-3xl">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-3xl overflow-y-auto border-border">
           <DialogHeader>
             <DialogTitle className="text-foreground">Create Absence Entry</DialogTitle>
             <DialogDescription className="text-slate-400/90">
@@ -1618,7 +1618,7 @@ export default function AdminAbsencePage() {
       />
 
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent className="border-border max-w-3xl">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-3xl overflow-y-auto border-border">
           <DialogHeader>
             <DialogTitle className="text-foreground">Delete Absence</DialogTitle>
             <DialogDescription className="text-slate-400/90">
@@ -1641,7 +1641,7 @@ export default function AdminAbsencePage() {
 
       {isProtectedTabGateEnabled ? (
         <Dialog open={showPasswordDialog} onOpenChange={(open) => { if (!open) handlePasswordDialogClose(); }}>
-          <DialogContent className="border-border max-w-sm" onOpenAutoFocus={(e) => { e.preventDefault(); setTimeout(() => passwordInputRef.current?.focus(), 0); }}>
+          <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-sm overflow-y-auto border-border" onOpenAutoFocus={(e) => { e.preventDefault(); setTimeout(() => passwordInputRef.current?.focus(), 0); }}>
             <DialogHeader>
               <DialogTitle className="text-foreground flex items-center gap-2">
                 <Lock className="h-5 w-5 text-absence" />

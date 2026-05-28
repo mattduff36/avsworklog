@@ -10,6 +10,7 @@ const {
   mockAppendQuoteTimelineEvent,
   mockSendQuoteToCustomerEmail,
   mockSendQuoteRamsRequestEmail,
+  mockGetQuoteNotificationRecipientEmails,
   mockQuoteUpdate,
   mockListRemainingVersions,
 } = vi.hoisted(() => ({
@@ -19,6 +20,7 @@ const {
   mockAppendQuoteTimelineEvent: vi.fn(),
   mockSendQuoteToCustomerEmail: vi.fn(),
   mockSendQuoteRamsRequestEmail: vi.fn(),
+  mockGetQuoteNotificationRecipientEmails: vi.fn(),
   mockQuoteUpdate: vi.fn(),
   mockListRemainingVersions: vi.fn(),
 }));
@@ -41,6 +43,7 @@ vi.mock('@/lib/server/quote-workflow', async () => {
     ...actual,
     appendQuoteTimelineEvent: mockAppendQuoteTimelineEvent,
     fetchQuoteBundle: mockFetchQuoteBundle,
+    getQuoteNotificationRecipientEmails: mockGetQuoteNotificationRecipientEmails,
     sendQuoteRamsRequestEmail: mockSendQuoteRamsRequestEmail,
     sendQuoteToCustomerEmail: mockSendQuoteToCustomerEmail,
   };
@@ -50,6 +53,7 @@ describe('PATCH /api/quotes/[id]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSendQuoteToCustomerEmail.mockResolvedValue({ success: true });
+    mockGetQuoteNotificationRecipientEmails.mockResolvedValue(['ops-copy@avsquires.co.uk']);
     mockCreateAdminClient.mockReturnValue({
       storage: {
         from: vi.fn(() => ({
@@ -191,7 +195,7 @@ describe('PATCH /api/quotes/[id]', () => {
     expect(response.status).toBe(200);
     expect(mockSendQuoteToCustomerEmail).toHaveBeenCalledWith(
       expect.anything(),
-      ['manager@avsquires.co.uk', 'rob@avsquires.co.uk', 'charlotte@avsquires.co.uk'],
+      ['manager@avsquires.co.uk', 'ops-copy@avsquires.co.uk'],
       'sender@avsquires.co.uk'
     );
     expect(mockQuoteUpdate).toHaveBeenCalledWith(expect.objectContaining({

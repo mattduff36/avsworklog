@@ -302,12 +302,12 @@ export default function WorkshopTasksPage() {
   return (
     <div className="space-y-6">
       <div className={`bg-white dark:bg-slate-900 rounded-lg border border-border ${tabletModeEnabled ? 'p-5 md:p-6' : 'p-6'}`}>
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
             <h1 className="text-3xl font-bold text-foreground mb-2">Workshop Tasks</h1>
             <p className="text-muted-foreground">Track van, HGV, and plant repairs and workshop work</p>
           </div>
-          <Button onClick={() => setShowAddModal(true)} className={`bg-workshop hover:bg-workshop-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg ${tabletModeEnabled ? 'min-h-11 text-base px-4 [&_svg]:size-5' : ''}`}><Plus className="h-4 w-4 mr-2" />New Task</Button>
+          <Button onClick={() => setShowAddModal(true)} className={`w-full bg-workshop hover:bg-workshop-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg sm:w-auto ${tabletModeEnabled ? 'min-h-11 text-base px-4 [&_svg]:size-5' : ''}`}><Plus className="h-4 w-4 mr-2" />New Task</Button>
         </div>
       </div>
 
@@ -387,7 +387,7 @@ export default function WorkshopTasksPage() {
               </CardHeader>
               <CardContent>
                 <Tabs value={categoryTaxonomyMode} onValueChange={(v) => setCategoryTaxonomyMode(v as 'van' | 'plant' | 'hgv')}>
-                  <TabsList className="grid w-full grid-cols-3">
+                  <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3">
                     <TabsTrigger value="van">Van Categories</TabsTrigger>
                     <TabsTrigger value="plant">Plant Categories</TabsTrigger>
                     <TabsTrigger value="hgv">HGV Categories</TabsTrigger>

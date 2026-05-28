@@ -243,11 +243,11 @@ export function WeekSelector({
     <div className="max-w-2xl mx-auto space-y-6">
       <Card className="">
         <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-full bg-timesheet/10 flex items-center justify-center">
+          <div className="flex items-start gap-3">
+            <div className="h-12 w-12 shrink-0 rounded-full bg-timesheet/10 flex items-center justify-center">
               <Calendar className="h-6 w-6 text-timesheet" />
             </div>
-            <div>
+            <div className="min-w-0">
               <CardTitle className="text-2xl text-foreground">Select Week Ending Date</CardTitle>
               <CardDescription className="text-muted-foreground">
                 Choose the Sunday for the week you want to record
@@ -288,7 +288,7 @@ export function WeekSelector({
               <SelectTrigger
                 id="week-ending"
                 aria-label="Week Ending Date (Sunday)"
-                className="h-16 text-2xl bg-white dark:bg-slate-900 border-border text-foreground"
+                className="h-auto min-h-16 py-3 text-xl bg-white dark:bg-slate-900 border-border text-foreground sm:text-2xl"
               >
                 <SelectValue placeholder="Select week ending Sunday" />
               </SelectTrigger>

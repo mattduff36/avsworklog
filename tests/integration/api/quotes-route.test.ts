@@ -14,6 +14,7 @@ const {
   mockGetInitialsFromName,
   mockGetInvoiceSummary,
   mockGetQuoteManagerOption,
+  mockLoadQuoteModuleSettings,
 } = vi.hoisted(() => ({
   mockCreateClient: vi.fn(),
   mockCreateAdminClient: vi.fn(),
@@ -24,6 +25,7 @@ const {
   mockGetInitialsFromName: vi.fn(),
   mockGetInvoiceSummary: vi.fn(),
   mockGetQuoteManagerOption: vi.fn(),
+  mockLoadQuoteModuleSettings: vi.fn(),
 }));
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -46,6 +48,7 @@ vi.mock('@/lib/server/quote-workflow', () => ({
   getInitialsFromName: mockGetInitialsFromName,
   getInvoiceSummary: mockGetInvoiceSummary,
   getQuoteManagerOption: mockGetQuoteManagerOption,
+  loadQuoteModuleSettings: mockLoadQuoteModuleSettings,
 }));
 
 function createQueryableResult<T>(rows: T[]) {
@@ -214,6 +217,10 @@ describe('POST /api/quotes', () => {
       initials: 'MD',
     });
     mockGetInitialsFromName.mockReturnValue('MD');
+    mockLoadQuoteModuleSettings.mockResolvedValue({
+      default_start_alert_days: null,
+      default_estimated_duration_days: null,
+    });
     mockFetchQuoteBundle.mockResolvedValue({
       quote: { id: 'quote-1', quote_reference: '80000-MD' },
       lineItems: [],
@@ -352,5 +359,72 @@ describe('POST /api/quotes', () => {
       total: 0,
     }));
     expect(lineItemInsert).not.toHaveBeenCalled();
+  });
+
+  it('applies quote module defaults when schedule fields are blank', async () => {
+    const quoteInsert = vi.fn().mockResolvedValue({ error: null });
+    const lineItemInsert = vi.fn().mockResolvedValue({ error: null });
+    const profileSingle = vi.fn().mockResolvedValue({
+      data: { id: 'manager-1', full_name: 'Matt Duffill' },
+      error: null,
+    });
+    const profileEq = vi.fn().mockReturnValue({ single: profileSingle });
+
+    mockLoadQuoteModuleSettings.mockResolvedValue({
+      default_start_alert_days: 7,
+      default_estimated_duration_days: 3,
+    });
+    mockCreateClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1' } },
+          error: null,
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'quotes') {
+          return { insert: quoteInsert };
+        }
+
+        if (table === 'quote_line_items') {
+          return { insert: lineItemInsert };
+        }
+
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    } as unknown as SupabaseClient);
+    mockCreateAdminClient.mockReturnValue({
+      from: vi.fn((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn(() => ({
+              eq: profileEq,
+            })),
+          };
+        }
+
+        throw new Error(`Unexpected admin table: ${table}`);
+      }),
+    });
+
+    const response = await POST(new NextRequest('http://localhost/api/quotes', {
+      method: 'POST',
+      body: JSON.stringify({
+        customer_id: 'customer-1',
+        manager_profile_id: 'manager-1',
+        quote_date: '2026-03-24',
+        pricing_mode: 'attachments_only',
+        start_alert_days: '',
+        estimated_duration_days: '',
+        line_items: [],
+      }),
+      headers: { 'Content-Type': 'application/json' },
+    }));
+
+    expect(response.status).toBe(201);
+    expect(quoteInsert).toHaveBeenCalledWith(expect.objectContaining({
+      start_alert_days: 7,
+      estimated_duration_days: 3,
+    }));
   });
 });

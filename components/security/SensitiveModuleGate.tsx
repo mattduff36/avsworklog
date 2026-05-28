@@ -1,10 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { type Ref, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { KeyRound, LockKeyhole, Loader2, ShieldCheck } from 'lucide-react';
+import { LockKeyhole, Loader2, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,6 +24,7 @@ const ACTIVITY_EVENT_NAMES = ['pointerdown', 'keydown', 'input', 'wheel'] as con
 
 interface SensitivePinStatus {
   configured: boolean;
+  pin_length: 4 | 6 | null;
   must_reset: boolean;
   locked_until: string | null;
 }
@@ -273,6 +273,80 @@ export function SensitiveModuleSessionManager({
   );
 }
 
+function PinDigitEntry({
+  id,
+  label,
+  value,
+  length,
+  onChange,
+  inputRef,
+  describedBy,
+  disabled = false,
+  autoComplete = 'off',
+}: {
+  id: string;
+  label: string;
+  value: string;
+  length: 4 | 6;
+  onChange: (value: string) => void;
+  inputRef: Ref<HTMLInputElement>;
+  describedBy?: string;
+  disabled?: boolean;
+  autoComplete?: string;
+}) {
+  const slots = Array.from({ length }, (_, index) => index);
+
+  return (
+    <div className="space-y-3">
+      <Label htmlFor={id} className="sr-only">
+        {label}
+      </Label>
+      <div className="relative mx-auto w-fit" onClick={() => {
+        if (typeof inputRef === 'function') return;
+        inputRef?.current?.focus();
+      }}>
+        <Input
+          ref={inputRef}
+          id={id}
+          type="password"
+          inputMode="numeric"
+          autoComplete={autoComplete}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          disabled={disabled}
+          aria-label={label}
+          aria-describedby={describedBy}
+          className="absolute inset-0 z-10 h-full w-full cursor-text border-0 bg-transparent p-0 text-transparent caret-transparent opacity-0"
+        />
+        <div
+          className={`grid gap-2 sm:gap-3 ${length === 4 ? 'grid-cols-4' : 'grid-cols-6'}`}
+          aria-hidden="true"
+        >
+          {slots.map((slot) => {
+            const filled = value.length > slot;
+            const active = value.length === slot && !disabled;
+
+            return (
+              <div
+                key={slot}
+                className={`flex h-14 w-11 items-center justify-center rounded-2xl border text-xl font-semibold shadow-inner transition-all sm:h-16 sm:w-14 ${
+                  filled
+                    ? 'border-avs-yellow/70 bg-avs-yellow/15 text-white shadow-avs-yellow/10'
+                    : active
+                      ? 'border-avs-yellow bg-slate-900/90 ring-4 ring-avs-yellow/10'
+                      : 'border-slate-600/70 bg-slate-900/70 text-slate-500'
+                }`}
+              >
+                {filled ? '*' : ''}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function SensitiveModuleGate({
   moduleLabel,
   access,
@@ -286,38 +360,106 @@ export function SensitiveModuleGate({
   const [verificationCode, setVerificationCode] = useState('');
   const [setupEmail, setSetupEmail] = useState('');
   const [setupPending, setSetupPending] = useState(false);
+  const [setupPinLength, setSetupPinLength] = useState<4 | 6>(4);
   const [working, setWorking] = useState(false);
   const pinInputRef = useRef<HTMLInputElement>(null);
+  const setupPinInputRef = useRef<HTMLInputElement>(null);
+  const confirmSetupPinInputRef = useRef<HTMLInputElement>(null);
+  const verificationInputRef = useRef<HTMLInputElement>(null);
   const pinStatus = access.state?.pin_status;
   const setupRequired = !pinStatus?.configured || pinStatus.must_reset;
-  const pinCanUnlock = pin.length === 4 || pin.length === 6;
+  const configuredPinLength = pinStatus?.pin_length === 4 || pinStatus?.pin_length === 6 ? pinStatus.pin_length : null;
+  const pinEntryLength = configuredPinLength ?? 6;
+  const pinCanUnlock = configuredPinLength ? pin.length === configuredPinLength : pin.length === 4 || pin.length === 6;
 
   useEffect(() => {
     if (!setupRequired) {
       pinInputRef.current?.focus();
+      return;
     }
-  }, [setupRequired]);
 
-  async function handleUnlock() {
-    if (working || !pinCanUnlock) return;
+    if (setupPending) {
+      verificationInputRef.current?.focus();
+    } else {
+      setupPinInputRef.current?.focus();
+    }
+  }, [setupPending, setupRequired]);
+
+  async function handleUnlock(candidatePin = pin) {
+    const candidateCanUnlock = configuredPinLength
+      ? candidatePin.length === configuredPinLength
+      : candidatePin.length === 4 || candidatePin.length === 6;
+
+    if (working || !candidateCanUnlock) return;
 
     setWorking(true);
     try {
-      const unlocked = await access.unlock(pin);
-      if (unlocked) {
-        setPin('');
-      }
+      await access.unlock(candidatePin);
+      setPin('');
     } finally {
       setWorking(false);
+      window.setTimeout(() => pinInputRef.current?.focus(), 0);
     }
   }
 
-  async function requestPinSetup() {
-    if (setupPin !== confirmSetupPin) {
-      toast.error('PINs do not match');
+  function handlePinChange(nextValue: string) {
+    const nextPin = nextValue.replace(/\D/g, '').slice(0, pinEntryLength);
+    setPin(nextPin);
+
+    if (configuredPinLength && nextPin.length === configuredPinLength && !working) {
+      void handleUnlock(nextPin);
+    }
+  }
+
+  function handleSetupPinLengthChange(nextLength: 4 | 6) {
+    setSetupPinLength(nextLength);
+    setSetupPin((current) => current.slice(0, nextLength));
+    setConfirmSetupPin('');
+    window.setTimeout(() => setupPinInputRef.current?.focus(), 0);
+  }
+
+  function handleSetupPinChange(nextValue: string) {
+    const nextPin = nextValue.replace(/\D/g, '').slice(0, setupPinLength);
+    setSetupPin(nextPin);
+    setConfirmSetupPin('');
+
+    if (nextPin.length === setupPinLength) {
+      window.setTimeout(() => confirmSetupPinInputRef.current?.focus(), 0);
+    }
+  }
+
+  function handleConfirmSetupPinChange(nextValue: string) {
+    const nextPin = nextValue.replace(/\D/g, '').slice(0, setupPinLength);
+    setConfirmSetupPin(nextPin);
+
+    if (nextPin.length === setupPinLength && setupPin.length === setupPinLength && !working) {
+      void requestPinSetup(setupPin, nextPin);
+    }
+  }
+
+  function handleVerificationCodeChange(nextValue: string) {
+    const nextCode = nextValue.replace(/\D/g, '').slice(0, 6);
+    setVerificationCode(nextCode);
+
+    if (nextCode.length === 6 && !working) {
+      void confirmPinSetup(nextCode);
+    }
+  }
+
+  async function requestPinSetup(candidateSetupPin = setupPin, candidateConfirmSetupPin = confirmSetupPin) {
+    if (working) return;
+
+    if (candidateSetupPin.length !== setupPinLength || candidateConfirmSetupPin.length !== setupPinLength) {
       return;
     }
-    if (!/^\d{4}$|^\d{6}$/.test(setupPin)) {
+
+    if (candidateSetupPin !== candidateConfirmSetupPin) {
+      toast.error('PINs do not match');
+      setConfirmSetupPin('');
+      window.setTimeout(() => confirmSetupPinInputRef.current?.focus(), 0);
+      return;
+    }
+    if (!/^\d{4}$|^\d{6}$/.test(candidateSetupPin)) {
       toast.error('PIN must be either 4 or 6 digits');
       return;
     }
@@ -327,7 +469,7 @@ export function SensitiveModuleGate({
       const response = await fetch('/api/me/sensitive-pin/setup/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin: setupPin }),
+        body: JSON.stringify({ pin: candidateSetupPin }),
       });
       const payload = await response.json();
       if (!response.ok) {
@@ -336,7 +478,7 @@ export function SensitiveModuleGate({
 
       if (payload.requiresVerification === false) {
         toast.success('Sensitive PIN set');
-        const unlocked = await access.unlock(setupPin);
+        const unlocked = await access.unlock(candidateSetupPin);
         if (unlocked) {
           setSetupPin('');
           setConfirmSetupPin('');
@@ -357,13 +499,15 @@ export function SensitiveModuleGate({
     }
   }
 
-  async function confirmPinSetup() {
+  async function confirmPinSetup(candidateCode = verificationCode) {
+    if (working || candidateCode.length !== 6) return;
+
     setWorking(true);
     try {
       const response = await fetch('/api/me/sensitive-pin/setup/confirm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: verificationCode }),
+        body: JSON.stringify({ code: candidateCode }),
       });
       const payload = await response.json();
       if (!response.ok) {
@@ -390,120 +534,160 @@ export function SensitiveModuleGate({
 
   return (
     <div className="flex min-h-[calc(100vh-11rem)] items-center justify-center px-4 py-8">
-      <Card className="relative flex w-full max-w-[640px] overflow-hidden border-border bg-slate-950/75 shadow-2xl shadow-black/30 md:aspect-[3/2]">
-        <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-avs-yellow/70 to-transparent" />
+      <Card className="relative flex w-full max-w-[580px] overflow-hidden rounded-[2rem] border border-slate-700/70 bg-slate-950/95 shadow-2xl shadow-black/40">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(241,214,74,0.16),_transparent_36%),linear-gradient(145deg,_rgba(15,23,42,0.2),_rgba(2,6,23,0.9))]" />
+        <div className="pointer-events-none absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-avs-yellow/80 to-transparent" />
         <div className="flex w-full flex-col justify-center">
-          <CardHeader className="pb-4 text-center">
-            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-2xl border border-avs-yellow/30 bg-avs-yellow/15 text-avs-yellow shadow-lg shadow-avs-yellow/10">
+          <CardHeader className="relative px-6 pb-4 pt-8 text-center sm:px-10">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-avs-yellow/35 bg-avs-yellow/15 text-avs-yellow shadow-lg shadow-avs-yellow/10">
               {setupRequired ? <ShieldCheck className="h-6 w-6" /> : <LockKeyhole className="h-6 w-6" />}
             </div>
-            <CardTitle className="text-2xl">
-              {setupRequired ? 'Set Sensitive PIN' : `${moduleLabel} Requires Sensitive PIN`}
+            <CardTitle className="text-3xl">
+              {setupRequired ? 'Set Sensitive PIN' : 'Verify your identity'}
             </CardTitle>
-            <CardDescription className="mx-auto max-w-md">
+            <CardDescription className="mx-auto max-w-md text-base leading-6 text-slate-300">
               {setupRequired
                 ? `Create a 4 or 6 digit PIN to unlock protected modules for 20 minutes on this session.`
-                : `Enter your sensitive access PIN to unlock all protected modules for 20 minutes on this session.`}
+                : `Enter your ${configuredPinLength ? `${configuredPinLength}-digit ` : ''}sensitive access PIN to unlock ${moduleLabel} for 20 minutes.`}
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4 px-6 pb-6">
+          <CardContent className="relative space-y-4 px-6 pb-8 sm:px-10">
             {setupRequired ? (
-              <div className="space-y-4">
+              <div className="mx-auto max-w-md space-y-5 text-center">
                 {!setupPending ? (
                   <>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="space-y-1.5">
-                        <Label htmlFor="sensitive-module-setup-pin">New PIN</Label>
-                        <Input
-                          id="sensitive-module-setup-pin"
-                          type="password"
-                          inputMode="numeric"
-                          autoComplete="off"
-                          value={setupPin}
-                          onChange={(event) => setSetupPin(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                          placeholder="4 or 6 digits"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="sensitive-module-confirm-pin">Confirm PIN</Label>
-                        <Input
-                          id="sensitive-module-confirm-pin"
-                          type="password"
-                          inputMode="numeric"
-                          autoComplete="off"
-                          value={confirmSetupPin}
-                          onChange={(event) => setConfirmSetupPin(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                          placeholder="Repeat PIN"
-                        />
-                      </div>
+                    <div className="mx-auto flex w-fit rounded-full border border-slate-700/70 bg-slate-900/80 p-1 shadow-inner">
+                      {[4, 6].map((length) => (
+                        <button
+                          key={length}
+                          type="button"
+                          aria-pressed={setupPinLength === length}
+                          onClick={() => handleSetupPinLengthChange(length as 4 | 6)}
+                          className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                            setupPinLength === length
+                              ? 'bg-avs-yellow text-slate-950 shadow shadow-avs-yellow/15'
+                              : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                          }`}
+                        >
+                          {length} digit
+                        </button>
+                      ))}
                     </div>
-                    <p className="text-center text-xs text-muted-foreground">
-                      This PIN cannot be the same or similar to your normal account password.
-                    </p>
-                    <Button
-                      type="button"
-                      onClick={() => void requestPinSetup()}
-                      disabled={working || !setupPin || !confirmSetupPin}
-                      className="mx-auto w-fit bg-avs-yellow text-slate-900 hover:bg-[#d1b82f] disabled:opacity-60"
+
+                    <div className="space-y-4 rounded-2xl border border-slate-800/80 bg-slate-950/45 p-4">
+                      <p className="text-sm font-medium text-slate-200">Choose your new PIN</p>
+                      <PinDigitEntry
+                        id="sensitive-module-setup-pin"
+                        label="New sensitive PIN"
+                        value={setupPin}
+                        length={setupPinLength}
+                        onChange={handleSetupPinChange}
+                        inputRef={setupPinInputRef}
+                        disabled={working}
+                        describedBy="sensitive-module-setup-help"
+                      />
+                    </div>
+
+                    <div className="space-y-4 rounded-2xl border border-slate-800/80 bg-slate-950/45 p-4">
+                      <p className="text-sm font-medium text-slate-200">Confirm your PIN</p>
+                      <PinDigitEntry
+                        id="sensitive-module-confirm-pin"
+                        label="Confirm sensitive PIN"
+                        value={confirmSetupPin}
+                        length={setupPinLength}
+                        onChange={handleConfirmSetupPinChange}
+                        inputRef={confirmSetupPinInputRef}
+                        disabled={working || setupPin.length !== setupPinLength}
+                        describedBy="sensitive-module-setup-help"
+                      />
+                    </div>
+
+                    <div
+                      id="sensitive-module-setup-help"
+                      className="flex min-h-6 items-center justify-center text-sm text-slate-400"
+                      aria-live="polite"
                     >
-                      {working ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
-                      Set PIN and Unlock Protected Modules
-                    </Button>
+                      {working ? (
+                        <span className="inline-flex items-center gap-2 text-avs-yellow">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Setting PIN...
+                        </span>
+                      ) : setupPin.length === setupPinLength ? (
+                        'Re-enter the same PIN to finish setup.'
+                      ) : (
+                        'This PIN cannot match your normal account password.'
+                      )}
+                    </div>
                   </>
                 ) : (
-                  <div className="space-y-3 rounded-xl border border-avs-yellow/35 bg-avs-yellow/10 p-4">
-                    <p className="text-center text-sm text-foreground">
+                  <div className="space-y-5 rounded-2xl border border-avs-yellow/35 bg-avs-yellow/10 p-5">
+                    <p className="text-center text-sm text-slate-200">
                       Enter the 6-digit verification code sent to {setupEmail || 'your email address'}.
                     </p>
-                    <Input
+                    <PinDigitEntry
+                      id="sensitive-module-verification-code"
+                      label="Verification code"
                       value={verificationCode}
-                      onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                      inputMode="numeric"
+                      length={6}
+                      onChange={handleVerificationCodeChange}
+                      inputRef={verificationInputRef}
+                      disabled={working}
                       autoComplete="one-time-code"
-                      placeholder="123456"
-                      className="mx-auto max-w-48 text-center text-lg tracking-[0.35em]"
+                      describedBy="sensitive-module-verification-help"
                     />
-                    <Button
-                      type="button"
-                      onClick={() => void confirmPinSetup()}
-                      disabled={working || verificationCode.length !== 6}
-                      className="w-full bg-avs-yellow text-slate-900 hover:bg-[#d1b82f] disabled:opacity-60"
+                    <div
+                      id="sensitive-module-verification-help"
+                      className="flex min-h-6 items-center justify-center text-sm text-slate-300"
+                      aria-live="polite"
                     >
-                      {working ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                      Set PIN and Unlock Protected Modules
-                    </Button>
+                      {working ? (
+                        <span className="inline-flex items-center gap-2 text-avs-yellow">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Verifying code...
+                        </span>
+                      ) : (
+                        'The code submits automatically after the final digit.'
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
             ) : (
               <form
-                className="mx-auto grid max-w-md gap-3"
+                className="mx-auto grid max-w-md gap-5 text-center"
                 onSubmit={(event) => {
                   event.preventDefault();
                   void handleUnlock();
                 }}
               >
-                <div className="space-y-1.5">
-                  <Label htmlFor="sensitive-module-pin">Sensitive PIN</Label>
-                  <Input
-                    ref={pinInputRef}
+                <div className="space-y-4">
+                  <PinDigitEntry
                     id="sensitive-module-pin"
-                    type="password"
-                    inputMode="numeric"
-                    autoComplete="off"
+                    label="Sensitive PIN"
                     value={pin}
-                    onChange={(event) => setPin(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                    placeholder="4 or 6 digits"
+                    length={pinEntryLength}
+                    onChange={handlePinChange}
+                    inputRef={pinInputRef}
+                    disabled={working}
+                    describedBy="sensitive-module-pin-help"
                   />
                 </div>
-                <Button
-                  type="submit"
-                  disabled={working || !pinCanUnlock}
-                  className="mx-auto w-fit bg-avs-yellow text-slate-900 hover:bg-[#d1b82f] disabled:opacity-60"
+                <div
+                  id="sensitive-module-pin-help"
+                  className="flex min-h-6 items-center justify-center text-sm text-slate-400"
+                  aria-live="polite"
                 >
-                  {working ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LockKeyhole className="mr-2 h-4 w-4" />}
-                  Unlock {moduleLabel}
-                </Button>
+                  {working ? (
+                    <span className="inline-flex items-center gap-2 text-avs-yellow">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Verifying PIN...
+                    </span>
+                  ) : pinCanUnlock && !configuredPinLength ? (
+                    'Press Enter to unlock.'
+                  ) : (
+                    'The PIN submits automatically after the final digit.'
+                  )}
+                </div>
               </form>
             )}
           </CardContent>

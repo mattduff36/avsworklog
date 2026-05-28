@@ -70,7 +70,7 @@ export function MoveInventoryDialog({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen && !saving) onClose(); }}>
-      <DialogContent className="max-w-lg bg-slate-900 text-white border-slate-700">
+      <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto bg-slate-900 text-white border-slate-700">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>{isBulkMove ? `Move ${items.length} Items` : 'Move Inventory Item'}</DialogTitle>

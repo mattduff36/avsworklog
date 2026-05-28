@@ -263,7 +263,7 @@ export function CategoryRecipientsDialog({
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-border text-white max-w-lg">
+      <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto border-border text-white">
         <DialogHeader>
           <DialogTitle className="text-xl flex items-center gap-2">
             <Users className="h-5 w-5" />

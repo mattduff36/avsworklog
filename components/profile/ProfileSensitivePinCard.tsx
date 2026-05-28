@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 
 interface SensitivePinStatus {
   configured: boolean;
+  pin_length: 4 | 6 | null;
   must_reset: boolean;
   locked_until: string | null;
 }

@@ -2107,7 +2107,7 @@ export function CivilsTimesheet({
 
       {/* Signature Dialog */}
       <Dialog open={showSignatureDialog} onOpenChange={setShowSignatureDialog}>
-        <DialogContent className="border-border text-white max-w-lg">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto border-border text-white">
           <DialogHeader>
             <DialogTitle className="text-white text-xl">Sign Timesheet</DialogTitle>
             <DialogDescription className="text-muted-foreground">
@@ -2134,7 +2134,7 @@ export function CivilsTimesheet({
 
       {/* Error Dialog */}
       <Dialog open={showErrorDialog} onOpenChange={setShowErrorDialog}>
-        <DialogContent className="bg-slate-900 border-red-500/50 text-white max-w-md">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-md overflow-y-auto bg-slate-900 border-red-500/50 text-white">
           <DialogHeader>
             <div className="flex items-center gap-3 mb-2">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500/20 border border-red-500/50">
@@ -2162,7 +2162,7 @@ export function CivilsTimesheet({
 
       {/* Bank Holiday Warning Dialog */}
       <Dialog open={showBankHolidayWarning} onOpenChange={setShowBankHolidayWarning}>
-        <DialogContent className="bg-slate-900 border-yellow-500/50 text-white max-w-md">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-md overflow-y-auto bg-slate-900 border-yellow-500/50 text-white">
           <DialogHeader>
             <div className="flex items-center gap-3 mb-2">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-yellow-500/20 border border-yellow-500/50">

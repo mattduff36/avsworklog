@@ -394,11 +394,11 @@ export default function FAQEditorPage() {
     <AppPageShell>
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-blue-100 dark:bg-blue-950 rounded-lg">
+        <div className="flex items-start gap-3">
+          <div className="shrink-0 p-3 bg-blue-100 dark:bg-blue-950 rounded-lg">
             <HelpCircle className="h-6 w-6 text-blue-600" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-3xl font-bold text-foreground mb-2">
               FAQ Editor
             </h1>
@@ -426,14 +426,14 @@ export default function FAQEditorPage() {
         <TabsContent value="categories">
           <Card className="">
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
                   <CardTitle className="text-foreground">Categories</CardTitle>
                   <CardDescription className="text-muted-foreground">
                     Organize FAQ articles into categories
                   </CardDescription>
                 </div>
-                <Button onClick={openAddCategory} className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900">
+                <Button onClick={openAddCategory} className="w-full bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900 sm:w-auto">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Category
                 </Button>
@@ -454,10 +454,10 @@ export default function FAQEditorPage() {
                   {categories.map((category) => (
                     <div
                       key={category.id}
-                      className="flex items-center justify-between p-4 rounded-lg border border-border bg-slate-50 dark:bg-slate-800"
+                      className="flex flex-col gap-3 p-4 rounded-lg border border-border bg-slate-50 dark:bg-slate-800 sm:flex-row sm:items-center sm:justify-between"
                     >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
                           <h3 className="font-medium text-foreground">
                             {category.name}
                           </h3>
@@ -482,7 +482,7 @@ export default function FAQEditorPage() {
                           </p>
                         )}
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 self-end sm:self-auto">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -513,16 +513,16 @@ export default function FAQEditorPage() {
         <TabsContent value="articles">
           <Card className="">
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
                   <CardTitle className="text-foreground">Articles</CardTitle>
                   <CardDescription className="text-muted-foreground">
                     Manage FAQ content
                   </CardDescription>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
                   <Select value={selectedCategoryFilter} onValueChange={setSelectedCategoryFilter}>
-                    <SelectTrigger className="w-48 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900">
+                    <SelectTrigger className="w-full bg-slate-50 dark:bg-slate-800 dark:text-slate-100 text-slate-900 sm:w-48">
                       <SelectValue placeholder="Filter by category" />
                     </SelectTrigger>
                     <SelectContent>
@@ -536,7 +536,7 @@ export default function FAQEditorPage() {
                   </Select>
                   <Button 
                     onClick={openAddArticle} 
-                    className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900"
+                    className="w-full bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900 sm:w-auto"
                     disabled={categories.length === 0}
                   >
                     <Plus className="h-4 w-4 mr-2" />
@@ -614,7 +614,7 @@ export default function FAQEditorPage() {
 
       {/* Category Dialog */}
       <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
-        <DialogContent className="">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-foreground">
               {editingCategory ? 'Edit Category' : 'Add Category'}
@@ -715,7 +715,7 @@ export default function FAQEditorPage() {
 
       {/* Article Dialog */}
       <Dialog open={articleDialogOpen} onOpenChange={setArticleDialogOpen}>
-        <DialogContent className="max-w-3xl bg-white dark:bg-slate-900 border-border max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-3xl overflow-y-auto bg-white dark:bg-slate-900 border-border">
           <DialogHeader>
             <DialogTitle className="text-foreground">
               {editingArticle ? 'Edit Article' : 'Add Article'}

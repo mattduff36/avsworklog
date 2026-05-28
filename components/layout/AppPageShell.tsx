@@ -50,18 +50,22 @@ export function AppPageHeader({
   return (
     <div className={cn('rounded-lg border border-border bg-white p-6 dark:bg-slate-900', className)}>
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div className="flex items-start gap-3">
+        <div className="flex min-w-0 items-start gap-3">
           {icon ? (
-            <div className={cn('rounded-lg bg-avs-yellow/15 p-2 text-avs-yellow', iconContainerClassName)}>
+            <div className={cn('shrink-0 rounded-lg bg-avs-yellow/15 p-2 text-avs-yellow', iconContainerClassName)}>
               {icon}
             </div>
           ) : null}
-          <div className="space-y-1">
-            <h1 className="text-3xl font-bold text-foreground">{title}</h1>
+          <div className="min-w-0 space-y-1">
+            <h1 className="break-words text-3xl font-bold text-foreground">{title}</h1>
             {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
           </div>
         </div>
-        {actions ? <div className="shrink-0">{actions}</div> : null}
+        {actions ? (
+          <div className="flex w-full min-w-0 flex-wrap gap-2 md:w-auto md:shrink-0 md:justify-end">
+            {actions}
+          </div>
+        ) : null}
       </div>
     </div>
   );

@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { appendQuoteTimelineEvent, createQuoteNotification, fetchQuoteBundle } from '@/lib/server/quote-workflow';
+import {
+  appendQuoteTimelineEvent,
+  createQuoteNotification,
+  fetchQuoteBundle,
+  getQuoteInvoiceNotificationRecipientIds,
+} from '@/lib/server/quote-workflow';
 import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
 
 type InvoiceFieldErrors = Record<string, string>;
@@ -293,6 +298,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     });
 
     const managerRecipientId = refreshedBundle.quote.requester_id || linkedRequest?.requested_by || null;
+    const additionalRecipientIds = await getQuoteInvoiceNotificationRecipientIds(admin, 'invoice_added', [
+      user.id,
+      managerRecipientId,
+    ]);
     if (managerRecipientId && managerRecipientId !== user.id) {
       try {
         await createQuoteNotification({
@@ -311,6 +320,27 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         });
       } catch (notificationError) {
         console.error('Failed to notify quote manager about invoice details:', notificationError);
+      }
+    }
+
+    if (additionalRecipientIds.length > 0) {
+      try {
+        await createQuoteNotification({
+          senderId: user.id,
+          recipientIds: additionalRecipientIds,
+          subject: `Invoice details added: ${refreshedBundle.quote.quote_reference}`,
+          body: [
+            `Invoice details have been added to quote ${refreshedBundle.quote.quote_reference}.`,
+            '',
+            `Invoice number: ${invoice.invoice_number}`,
+            `Amount: £${Number(invoice.amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`,
+            `Date: ${invoice.invoice_date}`,
+            `Scope: ${invoice.invoice_scope === 'full' ? 'Full invoice' : 'Partial invoice'}`,
+          ].join('\n'),
+          sendEmail: true,
+        });
+      } catch (notificationError) {
+        console.error('Failed to notify quote invoice notification recipients:', notificationError);
       }
     }
 

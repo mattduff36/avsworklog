@@ -365,7 +365,7 @@ export function TeamsTab() {
       </Card>
 
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent className="border-border text-white">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto border-border text-white">
           <DialogHeader>
             <DialogTitle>Add Team</DialogTitle>
             <DialogDescription className="text-muted-foreground">
@@ -501,7 +501,7 @@ export function TeamsTab() {
       </Dialog>
 
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="border-border text-white">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto border-border text-white">
           <DialogHeader>
             <DialogTitle>Edit Team</DialogTitle>
             <DialogDescription className="text-muted-foreground">

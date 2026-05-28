@@ -225,7 +225,7 @@ export function AbsenceEditDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-border max-w-3xl">
+      <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-3xl overflow-y-auto border-border">
         <DialogHeader>
           <DialogTitle className="text-foreground">Edit Booking</DialogTitle>
           <DialogDescription className="text-slate-400/90">

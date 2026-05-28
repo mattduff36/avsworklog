@@ -250,7 +250,7 @@ export function AssignRecipientsModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[700px] max-h-[85vh] bg-white dark:bg-slate-900 border-border z-[100]">
+      <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto bg-white dark:bg-slate-900 border-border z-[100] sm:max-w-[700px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>

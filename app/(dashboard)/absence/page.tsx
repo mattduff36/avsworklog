@@ -1104,8 +1104,8 @@ export default function AbsencePage() {
     <AppPageShell>
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
-        <div className="flex items-start justify-between gap-4">
-          <div>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
             <h1 className="text-3xl font-bold text-foreground mb-2">
               Absence & Leave
             </h1>
@@ -1116,17 +1116,17 @@ export default function AbsencePage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
             {canOpenManageLink && (
-              <Link href="/absence/manage">
-                <Button variant="outline" className="border-border text-muted-foreground">
+              <Link href="/absence/manage" className="w-full sm:w-auto">
+                <Button variant="outline" className="w-full justify-center border-border text-muted-foreground sm:w-auto">
                   <Settings className="h-4 w-4 mr-2" />
                   Manage Absence
                 </Button>
               </Link>
             )}
             <Button
-              className="bg-absence hover:bg-absence-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
+              className="w-full justify-center bg-absence hover:bg-absence-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg sm:w-auto"
               onClick={() => setShowRequestDialog(true)}
               disabled={isSelectedFinancialYearClosed || !canRequestLeave}
             >
@@ -1176,171 +1176,173 @@ export default function AbsencePage() {
       </Card>
       
       <Dialog open={showRequestDialog} onOpenChange={setShowRequestDialog}>
-        <DialogContent className="border-border max-w-3xl">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-3xl flex-col gap-0 overflow-hidden border-border p-0 sm:max-h-[90vh] sm:w-full sm:gap-6 sm:p-6">
+          <DialogHeader className="px-4 pt-4 text-left sm:px-0 sm:pt-0">
             <DialogTitle className="text-foreground">Request Leave</DialogTitle>
             <DialogDescription className="text-slate-400/90">
               Submit leave dates for approval in the current booking window.
             </DialogDescription>
           </DialogHeader>
-          <AllowanceDetailsPanel summary={summary} loading={loadingSummary} />
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="rounded-lg border border-[hsl(var(--absence-primary)/0.25)] bg-[hsl(var(--absence-primary)/0.06)] p-4 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="reason" className="text-foreground font-medium">Absence reason</Label>
-                  <p className="text-xs text-slate-400/90">Choose the leave type for this request.</p>
-                  <Select value={selectedReasonId} onValueChange={setSelectedReasonId}>
-                    <SelectTrigger id="reason" className="bg-slate-950 border-border text-foreground">
-                      <SelectValue placeholder="Select reason" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableRequestReasons.map((reason) => (
-                        <SelectItem key={reason.id} value={reason.id}>
-                          {reason.name} ({reason.is_paid ? 'Paid' : 'Unpaid'})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+          <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-0 sm:py-0">
+              <AllowanceDetailsPanel summary={summary} loading={loadingSummary} />
+              <div className="rounded-lg border border-[hsl(var(--absence-primary)/0.25)] bg-[hsl(var(--absence-primary)/0.06)] p-4 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="reason" className="text-foreground font-medium">Absence reason</Label>
+                    <p className="text-xs text-slate-400/90">Choose the leave type for this request.</p>
+                    <Select value={selectedReasonId} onValueChange={setSelectedReasonId}>
+                      <SelectTrigger id="reason" className="bg-slate-950 border-border text-foreground">
+                        <SelectValue placeholder="Select reason" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableRequestReasons.map((reason) => (
+                          <SelectItem key={reason.id} value={reason.id}>
+                            {reason.name} ({reason.is_paid ? 'Paid' : 'Unpaid'})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-foreground font-medium">Duration options</Label>
+                    <p className="text-xs text-slate-400/90">Tick for a half-day request.</p>
+                    <div className="flex items-center gap-2 rounded-md border border-border bg-slate-950 px-3 py-2">
+                      <input
+                        type="checkbox"
+                        checked={isHalfDay}
+                        onChange={(e) => {
+                          setIsHalfDay(e.target.checked);
+                          if (e.target.checked) {
+                            setEndDate('');
+                          }
+                        }}
+                        className="rounded border-border"
+                      />
+                      <span className="text-sm text-slate-400/90">Half Day</span>
+                    </div>
+                    {isHalfDay && (
+                      <div className="flex gap-3 pt-1">
+                        <label className="flex items-center gap-1 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="session"
+                            value="AM"
+                            checked={halfDaySession === 'AM'}
+                            onChange={() => setHalfDaySession('AM')}
+                            className="text-purple-500"
+                          />
+                          <span className="text-sm text-slate-400/90">AM</span>
+                        </label>
+                        <label className="flex items-center gap-1 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="session"
+                            value="PM"
+                            checked={halfDaySession === 'PM'}
+                            onChange={() => setHalfDaySession('PM')}
+                            className="text-purple-500"
+                          />
+                          <span className="text-sm text-slate-400/90">PM</span>
+                        </label>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label className="text-foreground font-medium">Duration options</Label>
-                  <p className="text-xs text-slate-400/90">Tick for a half-day request.</p>
-                  <div className="flex items-center gap-2 rounded-md border border-border bg-slate-950 px-3 py-2">
-                    <input
-                      type="checkbox"
-                      checked={isHalfDay}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="startDate" className="text-foreground font-medium">First day off</Label>
+                    <p className="text-xs text-slate-400/90">
+                      Select the first day you will be away from work.
+                    </p>
+                    <Input
+                      id="startDate"
+                      type="date"
+                      value={startDate}
                       onChange={(e) => {
-                        setIsHalfDay(e.target.checked);
-                        if (e.target.checked) {
+                        setStartDate(e.target.value);
+                        if (endDate && endDate < e.target.value) {
                           setEndDate('');
                         }
                       }}
-                      className="rounded border-border"
+                      min={formatDateISO(new Date())}
+                      max={bookingMaxDate}
+                      required
+                      className="bg-slate-950 border-border text-foreground"
                     />
-                    <span className="text-sm text-slate-400/90">Half Day</span>
+                    <p className="text-xs text-slate-400/90 mt-1">
+                      Booking window currently ends on {formatDate(bookingMaxDate)}.
+                    </p>
                   </div>
-                  {isHalfDay && (
-                    <div className="flex gap-3 pt-1">
-                      <label className="flex items-center gap-1 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="session"
-                          value="AM"
-                          checked={halfDaySession === 'AM'}
-                          onChange={() => setHalfDaySession('AM')}
-                          className="text-purple-500"
-                        />
-                        <span className="text-sm text-slate-400/90">AM</span>
-                      </label>
-                      <label className="flex items-center gap-1 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="session"
-                          value="PM"
-                          checked={halfDaySession === 'PM'}
-                          onChange={() => setHalfDaySession('PM')}
-                          className="text-purple-500"
-                        />
-                        <span className="text-sm text-slate-400/90">PM</span>
-                      </label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="endDate" className="text-foreground font-medium">Last day off</Label>
+                    <p className="text-xs text-slate-400/90">
+                      Leave blank for a single day. Disabled for half-day requests.
+                    </p>
+                    <Input
+                      id="endDate"
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      min={startDate || formatDateISO(new Date())}
+                      max={bookingMaxDate}
+                      disabled={!startDate || isHalfDay}
+                      className="bg-slate-950 border-border text-foreground"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="notes" className="text-foreground font-medium">Notes (optional)</Label>
+                  <p className="text-xs text-slate-400/90">Add any context your manager should see.</p>
+                  <Input
+                    id="notes"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Add any additional information..."
+                    className="bg-slate-950 border-border text-foreground"
+                  />
+                </div>
+              </div>
+
+              {startDate && (
+                <div className="bg-slate-800/30 p-4 rounded-lg space-y-2">
+                  <h4 className="font-semibold text-foreground">Request Summary</h4>
+                  <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+                    <div>
+                      <span className="text-muted-foreground">Requested Days:</span>
+                      <span className="ml-2 text-foreground font-medium">{requestedDays}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Approved Taken:</span>
+                      <span className="ml-2 text-foreground font-medium">{displayApprovedTaken}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Pending:</span>
+                      <span className="ml-2 text-foreground font-medium">{displayPendingTotal}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Projected Remaining:</span>
+                      <span className={`ml-2 font-medium ${projectedRemaining < 0 ? 'text-red-400' : 'text-green-400'}`}>
+                        {projectedRemaining}
+                      </span>
+                    </div>
+                  </div>
+                  {deductsAllowance && projectedRemaining < ANNUAL_LEAVE_MIN_REMAINING_DAYS && (
+                    <div className="flex items-start gap-2 bg-red-500/20 p-3 rounded border border-red-500/30">
+                      <AlertTriangle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
+                      <p className="text-sm text-red-300">
+                        This request exceeds the allowed 2-day annual leave buffer. Please adjust the dates or contact your manager.
+                      </p>
                     </div>
                   )}
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="startDate" className="text-foreground font-medium">First day off</Label>
-                  <p className="text-xs text-slate-400/90">
-                    Select the first day you will be away from work.
-                  </p>
-                  <Input
-                    id="startDate"
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => {
-                      setStartDate(e.target.value);
-                      if (endDate && endDate < e.target.value) {
-                        setEndDate('');
-                      }
-                    }}
-                    min={formatDateISO(new Date())}
-                    max={bookingMaxDate}
-                    required
-                    className="bg-slate-950 border-border text-foreground"
-                  />
-                  <p className="text-xs text-slate-400/90 mt-1">
-                    Booking window currently ends on {formatDate(bookingMaxDate)}.
-                  </p>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="endDate" className="text-foreground font-medium">Last day off</Label>
-                  <p className="text-xs text-slate-400/90">
-                    Leave blank for a single day. Disabled for half-day requests.
-                  </p>
-                  <Input
-                    id="endDate"
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    min={startDate || formatDateISO(new Date())}
-                    max={bookingMaxDate}
-                    disabled={!startDate || isHalfDay}
-                    className="bg-slate-950 border-border text-foreground"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="notes" className="text-foreground font-medium">Notes (optional)</Label>
-                <p className="text-xs text-slate-400/90">Add any context your manager should see.</p>
-                <Input
-                  id="notes"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Add any additional information..."
-                  className="bg-slate-950 border-border text-foreground"
-                />
-              </div>
+              )}
             </div>
 
-            {startDate && (
-              <div className="bg-slate-800/30 p-4 rounded-lg space-y-2">
-                <h4 className="font-semibold text-foreground">Request Summary</h4>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Requested Days:</span>
-                    <span className="ml-2 text-foreground font-medium">{requestedDays}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Approved Taken:</span>
-                    <span className="ml-2 text-foreground font-medium">{displayApprovedTaken}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Pending:</span>
-                    <span className="ml-2 text-foreground font-medium">{displayPendingTotal}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Projected Remaining:</span>
-                    <span className={`ml-2 font-medium ${projectedRemaining < 0 ? 'text-red-400' : 'text-green-400'}`}>
-                      {projectedRemaining}
-                    </span>
-                  </div>
-                </div>
-                {deductsAllowance && projectedRemaining < ANNUAL_LEAVE_MIN_REMAINING_DAYS && (
-                  <div className="flex items-start gap-2 bg-red-500/20 p-3 rounded border border-red-500/30">
-                    <AlertTriangle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
-                    <p className="text-sm text-red-300">
-                      This request exceeds the allowed 2-day annual leave buffer. Please adjust the dates or contact your manager.
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <DialogFooter>
+            <DialogFooter className="border-t border-border bg-card px-4 py-3 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0">
               <Button type="button" variant="outline" onClick={() => setShowRequestDialog(false)} className="border-border text-muted-foreground">
                 Cancel
               </Button>
@@ -1663,7 +1665,7 @@ export default function AbsencePage() {
       
       {/* Day Click Modal */}
       <Dialog open={showDayModal} onOpenChange={setShowDayModal}>
-        <DialogContent className="border-border max-w-6xl">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-6xl overflow-hidden border-border">
           <DialogHeader>
             <DialogTitle className="text-foreground">
               {selectedDate && format(selectedDate, 'EEEE, MMMM d, yyyy')}
@@ -1786,7 +1788,7 @@ export default function AbsencePage() {
           }
         }}
       >
-        <DialogContent className="border-border max-w-3xl">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-3xl overflow-y-auto border-border">
           <DialogHeader>
             <DialogTitle className="text-foreground">Contact line manager</DialogTitle>
             <DialogDescription className="text-slate-400/90">

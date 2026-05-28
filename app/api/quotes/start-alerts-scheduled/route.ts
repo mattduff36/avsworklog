@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import {
   createQuoteNotification,
+  getQuoteInvoiceNotificationRecipientIds,
   sendQuoteStartAlertEmail,
 } from '@/lib/server/quote-workflow';
 
@@ -95,6 +96,7 @@ async function handleQuoteStartAlerts(request: NextRequest, method: 'GET' | 'POS
       });
 
       if (emailResult.success) {
+        const copyRecipientIds = await getQuoteInvoiceNotificationRecipientIds(admin, 'start_alert_copy', [quote.requester_id]);
         await admin
           .from('quotes')
           .update({ start_alert_sent_at: new Date().toISOString() })
@@ -106,6 +108,16 @@ async function handleQuoteStartAlerts(request: NextRequest, method: 'GET' | 'POS
           subject: `Job start reminder: ${quote.quote_reference}`,
           body: `This quote is due to start on ${quote.start_date}.`,
         });
+
+        if (copyRecipientIds.length > 0) {
+          await createQuoteNotification({
+            senderId: quote.requester_id || quote.created_by || quote.updated_by || quote.id,
+            recipientIds: copyRecipientIds,
+            subject: `Job start reminder: ${quote.quote_reference}`,
+            body: `Quote ${quote.quote_reference} is due to start on ${quote.start_date}.`,
+            sendEmail: true,
+          });
+        }
 
         processed += 1;
       }

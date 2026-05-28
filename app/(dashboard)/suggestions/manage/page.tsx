@@ -191,11 +191,11 @@ export default function SuggestionsManagePage() {
     <AppPageShell>
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-yellow-100 dark:bg-yellow-950 rounded-lg">
+        <div className="flex items-start gap-3">
+          <div className="shrink-0 p-3 bg-yellow-100 dark:bg-yellow-950 rounded-lg">
             <Lightbulb className="h-6 w-6 text-yellow-600" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-3xl font-bold text-foreground mb-2">
               Manage Suggestions
             </h1>
@@ -285,10 +285,10 @@ export default function SuggestionsManagePage() {
                   className="p-4 rounded-lg border border-border bg-slate-50 dark:bg-slate-800 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                   onClick={() => openDetailDialog(suggestion)}
                 >
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="flex min-w-0 items-start gap-4">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-medium text-foreground truncate">
+                      <div className="mb-1 flex flex-wrap items-center gap-2">
+                        <h3 className="min-w-0 font-medium text-foreground">
                           {suggestion.title}
                         </h3>
                         <Badge className={`${SUGGESTION_STATUS_COLORS[suggestion.status]} text-white shrink-0`}>
@@ -299,7 +299,7 @@ export default function SuggestionsManagePage() {
                       <p className="text-sm text-muted-foreground dark:text-muted-foreground line-clamp-2">
                         {suggestion.body}
                       </p>
-                      <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                      <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <User className="h-3 w-3" />
                           {suggestion.user?.full_name || 'Unknown'}

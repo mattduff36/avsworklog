@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useQueryState } from 'nuqs';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
@@ -19,6 +20,8 @@ import {
   ArrowLeft,
   Loader2, 
   Bell, 
+  BellOff,
+  ExternalLink,
   Search, 
   AlertTriangle, 
   CheckCircle2, 
@@ -35,7 +38,7 @@ import { formatDateTime } from '@/lib/utils/date';
 import { isNetworkFetchError } from '@/lib/utils/http-error';
 import { toast } from 'sonner';
 import type { NotificationItem } from '@/types/messages';
-import type { NotificationPreference, NotificationModuleKey } from '@/types/notifications';
+import type { NotificationModule, NotificationPreference, NotificationModuleKey } from '@/types/notifications';
 import { NOTIFICATION_MODULES } from '@/types/notifications';
 import { NuqsClientAdapter } from '@/components/providers/NuqsClientAdapter';
 import { ToolboxTalkPdfDialog } from '@/components/messages/ToolboxTalkPdfDialog';
@@ -62,11 +65,116 @@ function buildToolboxTalkPdfUrl(pdfFilePath: string) {
   return `/api/toolbox-talk-pdf/${pdfFilePath}`;
 }
 
+function resolveNotificationModuleKey(notification: NotificationItem): NotificationModuleKey {
+  const createdVia = notification.created_via ?? '';
+
+  if (notification.type === 'TOOLBOX_TALK') return 'toolbox_talks';
+  if (createdVia === 'sensitive_pin_security') return 'sensitive_pin_security';
+  if (createdVia === 'maintenance_reminder') return 'maintenance';
+  if (createdVia.includes('quote')) return 'quotes';
+  if (
+    createdVia === 'absence_contact_line_manager'
+    || createdVia === 'timesheet_training_decline'
+    || createdVia.startsWith('processed_absence_')
+  ) {
+    return 'approvals';
+  }
+  if (notification.type === 'REMINDER') return 'reminders';
+
+  return 'general_notifications';
+}
+
+function buildProfileNotificationSettingsHref(moduleKey?: NotificationModuleKey) {
+  const baseHref = '/profile?tab=settings&settingsTab=notifications';
+  return moduleKey ? `${baseHref}#notification-preference-${moduleKey}` : baseHref;
+}
+
+interface NotificationPreferencePromptProps {
+  module: NotificationModule;
+  isSaving: boolean;
+  isLoading: boolean;
+  isInAppDisabled: boolean;
+  onDisable: () => void;
+}
+
+function NotificationPreferencePrompt({
+  module,
+  isSaving,
+  isLoading,
+  isInAppDisabled,
+  onDisable,
+}: NotificationPreferencePromptProps) {
+  return (
+    <div className="relative overflow-hidden rounded-xl border border-avs-yellow/30 bg-gradient-to-br from-avs-yellow/15 via-slate-50 to-white p-4 shadow-sm dark:from-avs-yellow/10 dark:via-slate-900 dark:to-slate-950">
+      <div className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-avs-yellow/20 blur-3xl" />
+      <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-avs-yellow/20 text-avs-yellow ring-1 ring-avs-yellow/30 dark:bg-avs-yellow/15">
+            <BellOff className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <h4 className="text-sm font-semibold text-foreground">
+              Want to stop seeing these notifications?
+            </h4>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              {isInAppDisabled ? (
+                <>
+                  {module.label} in-app notifications are already disabled. You can manage email and in-app preferences from your profile.
+                </>
+              ) : (
+                <>
+                  Disable <span className="font-medium text-foreground">{module.label}</span> in-app notifications now, or review all notification settings in your profile.
+                </>
+              )}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex shrink-0 flex-col gap-2 sm:min-w-48">
+          <Button
+            type="button"
+            onClick={onDisable}
+            disabled={isLoading || isSaving || isInAppDisabled}
+            className="w-full gap-2 bg-avs-yellow text-slate-950 shadow-sm hover:bg-avs-yellow-hover disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : isInAppDisabled ? (
+              'Already disabled'
+            ) : (
+              `Disable ${module.label}`
+            )}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            asChild
+            className="w-full gap-2 border-border bg-white/70 hover:bg-white dark:bg-slate-950/60 dark:hover:bg-slate-900"
+          >
+            <Link href={buildProfileNotificationSettingsHref(module.key)}>
+              Profile settings
+              <ExternalLink className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface NotificationDetailPaneProps {
   notification: NotificationItem | null;
+  notificationModule: NotificationModule | null;
   className?: string;
   isMarkingRead: boolean;
+  isLoadingPreferences: boolean;
+  isSavingPreference: boolean;
+  isModuleInAppDisabled: boolean;
   onBack: () => void;
+  onDisableModuleNotifications: () => void;
   onSignToolboxTalk: (notification: NotificationItem) => void;
   onViewAttachedPDF: (url: string, title: string) => void;
   getStatusBadge: (status: string) => React.ReactNode;
@@ -74,9 +182,14 @@ interface NotificationDetailPaneProps {
 
 function NotificationDetailPane({
   notification,
+  notificationModule,
   className = '',
   isMarkingRead,
+  isLoadingPreferences,
+  isSavingPreference,
+  isModuleInAppDisabled,
   onBack,
+  onDisableModuleNotifications,
   onSignToolboxTalk,
   onViewAttachedPDF,
   getStatusBadge,
@@ -137,8 +250,8 @@ function NotificationDetailPane({
         </div>
       </CardHeader>
 
-      <CardContent className="flex-1 overflow-y-auto p-0">
-        <div className="space-y-6 p-6">
+      <CardContent className="flex flex-1 overflow-y-auto p-0">
+        <div className="flex min-h-full w-full flex-col gap-6 p-6">
           {isMarkingRead && (
             <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin text-avs-yellow" />
@@ -224,6 +337,18 @@ function NotificationDetailPane({
                     Read and sign
                   </Button>
               </div>
+            </div>
+          )}
+
+          {notificationModule && (
+            <div className="mt-auto pt-2">
+              <NotificationPreferencePrompt
+                module={notificationModule}
+                isLoading={isLoadingPreferences}
+                isSaving={isSavingPreference}
+                isInAppDisabled={isModuleInAppDisabled}
+                onDisable={onDisableModuleNotifications}
+              />
             </div>
           )}
         </div>
@@ -577,17 +702,32 @@ function NotificationsContent() {
     return Icon;
   };
 
+  const selectedNotificationModuleKey = selectedNotification
+    ? resolveNotificationModuleKey(selectedNotification)
+    : null;
+  const selectedNotificationModule = selectedNotificationModuleKey
+    ? availableModules.find((module) => module.key === selectedNotificationModuleKey) ?? null
+    : null;
+  const selectedNotificationPreference = selectedNotificationModule
+    ? getPreference(selectedNotificationModule.key)
+    : null;
+
+  function handleDisableSelectedModuleNotifications() {
+    if (!selectedNotificationModule) return;
+    void updatePreference(selectedNotificationModule.key, 'notify_in_app', false);
+  }
+
   const isLoadingNotifications = loading || isRefreshingNotifications;
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-blue-100 dark:bg-blue-950 rounded-lg">
+        <div className="flex items-start gap-3">
+          <div className="shrink-0 p-3 bg-blue-100 dark:bg-blue-950 rounded-lg">
             <Bell className="h-6 w-6 text-blue-600" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-3xl font-bold text-foreground mb-1">
               Notifications
             </h1>
@@ -601,7 +741,7 @@ function NotificationsContent() {
       {/* Main Content */}
       <div>
         <Tabs value={activeTab} onValueChange={(value) => void setTabParam(value)} className="w-full">
-            <TabsList className="grid w-full max-w-2xl grid-cols-3 bg-slate-100 dark:bg-slate-800 p-0">
+            <TabsList className="grid w-full max-w-2xl grid-cols-1 bg-slate-100 dark:bg-slate-800 p-0 sm:grid-cols-3">
               <TabsTrigger value="all" className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900">
                 <Bell className="h-4 w-4" />
                 All Notifications
@@ -720,8 +860,15 @@ function NotificationsContent() {
 
                   <NotificationDetailPane
                     notification={selectedNotification}
+                    notificationModule={selectedNotificationModule}
                     isMarkingRead={Boolean(selectedNotification && markingReadId === selectedNotification.id)}
+                    isLoadingPreferences={loadingPrefs}
+                    isSavingPreference={Boolean(
+                      selectedNotificationModule && savingPrefModule === selectedNotificationModule.key
+                    )}
+                    isModuleInAppDisabled={selectedNotificationPreference?.notify_in_app === false}
                     onBack={() => setMobileDetailOpen(false)}
+                    onDisableModuleNotifications={handleDisableSelectedModuleNotifications}
                     onSignToolboxTalk={handleToolboxSignClick}
                     onViewAttachedPDF={(url, title) => setPdfDialog({ url, title })}
                     getStatusBadge={getStatusBadge}

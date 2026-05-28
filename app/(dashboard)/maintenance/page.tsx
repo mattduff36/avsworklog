@@ -124,8 +124,8 @@ function MaintenanceContent() {
     <AppPageShell>
       {/* Header */}
       <div className={`bg-white dark:bg-slate-900 rounded-lg border border-border ${tabletModeEnabled ? 'p-5 md:p-6' : 'p-6'}`}>
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
             <h1 className="text-3xl font-bold text-foreground mb-2">Maintenance &amp; Service</h1>
             <p className="text-muted-foreground">
               Track maintenance schedules, MOT, tax, and service status across all fleet assets

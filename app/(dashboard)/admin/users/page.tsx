@@ -1271,8 +1271,8 @@ export default function UsersAdminPage() {
     <AppPageShell width="wide" className="2xl:max-w-[92rem]">
       {/* Header */}
       <div className="bg-slate-900 rounded-lg p-6 border border-border">
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
             <h1 className="text-3xl font-bold text-white mb-2">User Management</h1>
             <p className="text-muted-foreground">
               Manage users, roles, and permissions
@@ -1281,7 +1281,7 @@ export default function UsersAdminPage() {
           {activeTab === 'users' && userStatusTab === 'active' && (
             <Button
               onClick={openAddDialog}
-              className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900"
+              className="w-full bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900 sm:w-auto"
             >
               <UserPlus className="h-4 w-4 mr-2" />
               Add User
@@ -1294,9 +1294,9 @@ export default function UsersAdminPage() {
       <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as TabType)} className="space-y-6">
         <TabsList className={`grid w-full ${
           canEditRolePermissions
-              ? 'max-w-2xl grid-cols-4'
+              ? 'max-w-2xl grid-cols-2 sm:grid-cols-4'
               : canManageRoleDefinitions
-                ? 'max-w-xl grid-cols-3'
+                ? 'max-w-xl grid-cols-1 sm:grid-cols-3'
                 : 'max-w-sm grid-cols-1'
         } bg-slate-100 dark:bg-slate-800 p-0`}>
           <TabsTrigger 
@@ -1776,7 +1776,7 @@ export default function UsersAdminPage() {
 
       {/* Add User Dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent className="border-border text-white max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="flex max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-5xl flex-col overflow-hidden border-border text-white">
           <DialogHeader>
             <DialogTitle>Add New User</DialogTitle>
             <DialogDescription className="text-muted-foreground">
@@ -2071,7 +2071,7 @@ export default function UsersAdminPage() {
 
       {/* Edit User Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="border-border text-white">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto border-border text-white">
           <DialogHeader>
             <DialogTitle>Edit User</DialogTitle>
             <DialogDescription className="text-muted-foreground">
@@ -2194,7 +2194,7 @@ export default function UsersAdminPage() {
 
       {/* Delete Options Dialog */}
       <Dialog open={deleteOptionsDialogOpen} onOpenChange={setDeleteOptionsDialogOpen}>
-        <DialogContent className="border-border text-white max-w-2xl">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-2xl overflow-y-auto border-border text-white">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-red-500" />
@@ -2357,7 +2357,7 @@ export default function UsersAdminPage() {
 
       {/* Reset Password Confirmation Dialog */}
       <Dialog open={resetPasswordDialogOpen} onOpenChange={setResetPasswordDialogOpen}>
-        <DialogContent className="border-border text-white">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto border-border text-white">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <KeyRound className="h-5 w-5 text-amber-500" />
@@ -2414,7 +2414,7 @@ export default function UsersAdminPage() {
 
       {/* Reset Sensitive PIN Confirmation Dialog */}
       <Dialog open={resetSensitivePinDialogOpen} onOpenChange={setResetSensitivePinDialogOpen}>
-        <DialogContent className="border-border text-white">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto border-border text-white">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5 text-yellow-300" />
@@ -2475,7 +2475,7 @@ export default function UsersAdminPage() {
 
       {/* Password Display Dialog */}
       <Dialog open={passwordDisplayDialogOpen} onOpenChange={setPasswordDisplayDialogOpen}>
-        <DialogContent className="border-border text-white max-w-lg">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto border-border text-white">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CheckCircle2 className="h-5 w-5 text-green-500" />

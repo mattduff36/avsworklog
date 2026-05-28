@@ -2669,7 +2669,7 @@ function NewInspectionContent() {
       <Dialog open={showAddVehicleDialog} onOpenChange={handleAddVehicleDialogOpenChange}>
         <DialogContent
           ref={addVehicleDialogContentRef}
-          className={`border-border text-white max-w-md ${tabletModeEnabled ? 'max-w-lg p-5 sm:p-6' : ''}`}
+          className={`max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto border-border text-white max-w-md ${tabletModeEnabled ? 'max-w-lg p-5 sm:p-6' : ''}`}
           onInteractOutside={(event) => {
             if (isAddVehicleFormDirty && !addingVehicle) {
               event.preventDefault();
@@ -2759,7 +2759,7 @@ function NewInspectionContent() {
         }
         setShowResolutionDialog(open);
       }}>
-        <DialogContent className="border-border text-white max-w-lg">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto border-border text-white">
           <DialogHeader>
             <DialogTitle className="text-white text-xl flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-amber-500" />
@@ -2850,7 +2850,7 @@ function NewInspectionContent() {
         }
         setShowRepeatDefectDialog(open);
       }}>
-        <DialogContent className="border-border text-white max-w-lg">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto border-border text-white">
           <DialogHeader>
             <DialogTitle className="text-white text-xl flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-amber-500" />
@@ -2920,7 +2920,7 @@ function NewInspectionContent() {
           setShowConfirmSubmitDialog(open);
         }}
       >
-        <DialogContent className="border-border text-white max-w-md">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-md overflow-y-auto border-border text-white">
           <DialogHeader>
             <DialogTitle className="text-white text-xl">Confirm Submission</DialogTitle>
             <DialogDescription className="text-muted-foreground">
@@ -3005,7 +3005,7 @@ function NewInspectionContent() {
 
       {/* Mileage Warning Confirmation Dialog */}
       <Dialog open={showMileageWarningDialog} onOpenChange={setShowMileageWarningDialog}>
-        <DialogContent className="border-border text-white max-w-md">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-md overflow-y-auto border-border text-white">
           <DialogHeader>
             <DialogTitle className="text-white text-xl flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-amber-500" />
@@ -3059,7 +3059,7 @@ function NewInspectionContent() {
       
       {/* Signature Dialog */}
       <Dialog open={showSignatureDialog} onOpenChange={setShowSignatureDialog}>
-        <DialogContent className="border-border text-white max-w-lg">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto border-border text-white">
           <DialogHeader>
             <DialogTitle className="text-white text-xl">Sign Daily Check</DialogTitle>
             <DialogDescription className="text-muted-foreground">

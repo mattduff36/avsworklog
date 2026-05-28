@@ -61,11 +61,11 @@ export default function AdminSettingsPage() {
   return (
     <AppPageShell>
       <div className="bg-slate-900 rounded-lg p-6 border border-border">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-avs-yellow/20 rounded-lg">
+        <div className="flex items-start gap-3">
+          <div className="shrink-0 p-3 bg-avs-yellow/20 rounded-lg">
             <SlidersHorizontal className="h-6 w-6 text-avs-yellow" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-3xl font-bold text-white mb-2">Admin Settings</h1>
             <p className="text-muted-foreground">
               Configure admin-only tools, overrides, and system-level controls.

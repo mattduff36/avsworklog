@@ -887,8 +887,8 @@ function ApprovalsContent() {
     <AppPageShell>
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
             <h1 className="text-3xl font-bold text-foreground mb-2">Approvals</h1>
             <p className="text-muted-foreground">
               Review and manage submissions
@@ -901,7 +901,7 @@ function ApprovalsContent() {
               statusFilter === 'rejected' ? 'destructive' :
               'secondary'
             }
-            className={`text-lg px-4 py-2 ${
+            className={`w-fit text-lg px-4 py-2 ${
               statusFilter === 'approved' ? 'bg-green-500/10 text-green-600 border-green-500/20' :
               statusFilter === 'processed' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
               statusFilter === 'adjusted' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
@@ -915,7 +915,7 @@ function ApprovalsContent() {
 
       <Card className="bg-white dark:bg-slate-900 border-border">
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="text-foreground flex items-center gap-2">
               <Filter className="h-4 w-4" />
               Filters
