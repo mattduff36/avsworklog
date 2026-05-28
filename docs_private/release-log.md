@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0526.20.3
+
+**GIT COMMIT MESSAGE**
+`chore(components): update repository files`
+
+**WHAT CHANGED**
+Update repository files.
+
+**COMMITS IN THIS RELEASE**
+- `chore(components): update repository files`
+
 ## 0526.20.2
 
 **GIT COMMIT MESSAGE**
