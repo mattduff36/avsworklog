@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { getWeekEnding, formatDateISO, getWeekEndingSundayOptions } from '@/lib/utils/date';
 import { Employee } from '@/types/common';
+import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 
 interface WeekSelectorProps {
   targetUserId: string;
@@ -110,7 +111,9 @@ export function WeekSelector({
           return fallback || current;
         });
       } catch (fetchError) {
-        console.error('Error preloading existing timesheet weeks:', fetchError);
+        if (!isAuthErrorStatus(getErrorStatus(fetchError)) && !isNetworkFetchError(fetchError)) {
+          console.error('Error preloading existing timesheet weeks:', fetchError);
+        }
       }
     };
 
@@ -222,8 +225,15 @@ export function WeekSelector({
         }, 500);
       }
     } catch (err) {
-      console.error('Error checking for existing timesheet:', err);
-      setError(err instanceof Error ? err.message : 'Failed to check for existing timesheets');
+      const isNetworkFailure = isNetworkFetchError(err);
+      if (!isAuthErrorStatus(getErrorStatus(err)) && !isNetworkFailure) {
+        console.error('Error checking for existing timesheet:', err);
+      }
+      if (isNetworkFailure) {
+        setError('Connection problem while checking existing timesheets. Please check your connection and try again.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to check for existing timesheets');
+      }
     } finally {
       setChecking(false);
     }

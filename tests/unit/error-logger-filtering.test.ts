@@ -65,6 +65,14 @@ describe('error logger filtering', () => {
     ).toBe(true);
   });
 
+  it('ignores handled timesheet duplicate check network failures', () => {
+    expect(
+      shouldIgnoreConsoleErrorForLogging(
+        'Error checking for existing timesheet: TypeError: Load failed'
+      )
+    ).toBe(true);
+  });
+
   it('keeps application type errors without a transient network marker', () => {
     expect(
       shouldIgnoreConsoleErrorForLogging(

@@ -243,13 +243,13 @@ export function SensitiveModuleGate({
                       </div>
                     </div>
                     <p className="text-center text-xs text-muted-foreground">
-                      This PIN cannot be the same as your normal account password. Admins are notified when it is set or changed.
+                      This PIN cannot be the same or similar to your normal account password.
                     </p>
                     <Button
                       type="button"
                       onClick={() => void requestPinSetup()}
                       disabled={working || !setupPin || !confirmSetupPin}
-                      className="w-full bg-avs-yellow text-slate-900 hover:bg-[#d1b82f] disabled:opacity-60"
+                      className="mx-auto w-fit bg-avs-yellow text-slate-900 hover:bg-[#d1b82f] disabled:opacity-60"
                     >
                       {working ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
                       Set PIN and Unlock Protected Modules

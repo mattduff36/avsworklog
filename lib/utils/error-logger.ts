@@ -96,6 +96,7 @@ export function shouldIgnoreConsoleErrorForLogging(errorMessage: string): boolea
     'failed to load pdf document:',
     'error fetching rams documents:',
     'error fetching notifications:',
+    'error checking for existing timesheet:',
   ].some((context) => normalized.includes(context));
 }
 
