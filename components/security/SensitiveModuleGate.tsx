@@ -287,10 +287,20 @@ export function SensitiveModuleGate({
   const [setupEmail, setSetupEmail] = useState('');
   const [setupPending, setSetupPending] = useState(false);
   const [working, setWorking] = useState(false);
+  const pinInputRef = useRef<HTMLInputElement>(null);
   const pinStatus = access.state?.pin_status;
   const setupRequired = !pinStatus?.configured || pinStatus.must_reset;
+  const pinCanUnlock = pin.length === 4 || pin.length === 6;
+
+  useEffect(() => {
+    if (!setupRequired) {
+      pinInputRef.current?.focus();
+    }
+  }, [setupRequired]);
 
   async function handleUnlock() {
+    if (working || !pinCanUnlock) return;
+
     setWorking(true);
     try {
       const unlocked = await access.unlock(pin);
@@ -466,10 +476,17 @@ export function SensitiveModuleGate({
                 )}
               </div>
             ) : (
-              <div className="mx-auto grid max-w-md gap-3">
+              <form
+                className="mx-auto grid max-w-md gap-3"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void handleUnlock();
+                }}
+              >
                 <div className="space-y-1.5">
                   <Label htmlFor="sensitive-module-pin">Sensitive PIN</Label>
                   <Input
+                    ref={pinInputRef}
                     id="sensitive-module-pin"
                     type="password"
                     inputMode="numeric"
@@ -480,15 +497,14 @@ export function SensitiveModuleGate({
                   />
                 </div>
                 <Button
-                  type="button"
-                  onClick={() => void handleUnlock()}
-                  disabled={working || (pin.length !== 4 && pin.length !== 6)}
+                  type="submit"
+                  disabled={working || !pinCanUnlock}
                   className="mx-auto w-fit bg-avs-yellow text-slate-900 hover:bg-[#d1b82f] disabled:opacity-60"
                 >
                   {working ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LockKeyhole className="mr-2 h-4 w-4" />}
                   Unlock {moduleLabel}
                 </Button>
-              </div>
+              </form>
             )}
           </CardContent>
         </div>
