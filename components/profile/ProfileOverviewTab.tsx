@@ -62,7 +62,7 @@ export function ProfileOverviewTab({
 
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(320px,1fr)_minmax(0,2fr)]">
-      <Card className="overflow-hidden border-border bg-slate-900/70">
+      <Card className="hidden overflow-hidden border-border bg-slate-900/70 xl:block">
         <CardContent className="p-4">
           <div className="relative aspect-square w-full overflow-hidden rounded-xl border border-border bg-slate-950/60">
             {profile.avatar_url ? (
@@ -86,7 +86,7 @@ export function ProfileOverviewTab({
       <div className="space-y-4">
         <Card className="overflow-hidden border-border bg-gradient-to-br from-slate-900 via-slate-900 to-avs-yellow/10">
           <CardContent className="p-5">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div className="hidden flex-col gap-4 xl:flex xl:flex-row xl:items-start xl:justify-between">
               <div className="space-y-3">
                 <Badge variant={roleBadge.variant} className={roleBadge.className}>
                   <Crown className="mr-1 h-3.5 w-3.5" />
@@ -105,21 +105,21 @@ export function ProfileOverviewTab({
               </div>
             </div>
 
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              <div className="rounded-lg border border-timesheet/40 bg-timesheet/10 p-3">
-                <CalendarDays className="mb-2 h-5 w-5 text-timesheet" />
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Leave remaining</p>
-                <p className="text-2xl font-semibold text-foreground">{annualLeaveSummary.remaining.toFixed(1)}</p>
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(6.25rem,1fr))] gap-3 sm:grid-cols-1 md:grid-cols-3 xl:mt-4">
+              <div className="min-w-0 rounded-lg border border-timesheet/40 bg-timesheet/10 p-2.5 sm:p-3">
+                <CalendarDays className="mb-2 h-4 w-4 text-timesheet sm:h-5 sm:w-5" />
+                <p className="truncate whitespace-nowrap text-[10px] uppercase tracking-wide text-muted-foreground sm:text-xs">Leave remaining</p>
+                <p className="text-3xl font-semibold text-foreground sm:text-2xl">{annualLeaveSummary.remaining.toFixed(1)}</p>
               </div>
-              <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
-                <PlaneTakeoff className="mb-2 h-5 w-5 text-amber-300" />
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Pending leave</p>
-                <p className="text-2xl font-semibold text-foreground">{annualLeaveSummary.pending_total.toFixed(1)}</p>
+              <div className="min-w-0 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2.5 sm:p-3">
+                <PlaneTakeoff className="mb-2 h-4 w-4 text-amber-300 sm:h-5 sm:w-5" />
+                <p className="truncate whitespace-nowrap text-[10px] uppercase tracking-wide text-muted-foreground sm:text-xs">Pending leave</p>
+                <p className="text-3xl font-semibold text-foreground sm:text-2xl">{annualLeaveSummary.pending_total.toFixed(1)}</p>
               </div>
-              <div className="rounded-lg border border-green-500/40 bg-green-500/10 p-3">
-                <ClipboardCheck className="mb-2 h-5 w-5 text-green-300" />
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Leave taken</p>
-                <p className="text-2xl font-semibold text-foreground">{annualLeaveSummary.approved_taken.toFixed(1)}</p>
+              <div className="min-w-0 rounded-lg border border-green-500/40 bg-green-500/10 p-2.5 sm:p-3">
+                <ClipboardCheck className="mb-2 h-4 w-4 text-green-300 sm:h-5 sm:w-5" />
+                <p className="truncate whitespace-nowrap text-[10px] uppercase tracking-wide text-muted-foreground sm:text-xs">Leave taken</p>
+                <p className="text-3xl font-semibold text-foreground sm:text-2xl">{annualLeaveSummary.approved_taken.toFixed(1)}</p>
               </div>
             </div>
           </CardContent>

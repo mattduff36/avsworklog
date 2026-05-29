@@ -283,6 +283,7 @@ function PinDigitEntry({
   describedBy,
   disabled = false,
   autoComplete = 'off',
+  autoFocus = false,
 }: {
   id: string;
   label: string;
@@ -293,6 +294,7 @@ function PinDigitEntry({
   describedBy?: string;
   disabled?: boolean;
   autoComplete?: string;
+  autoFocus?: boolean;
 }) {
   const slots = Array.from({ length }, (_, index) => index);
 
@@ -303,7 +305,7 @@ function PinDigitEntry({
       </Label>
       <div className="relative mx-auto w-fit" onClick={() => {
         if (typeof inputRef === 'function') return;
-        inputRef?.current?.focus();
+        inputRef?.current?.focus({ preventScroll: true });
       }}>
         <Input
           ref={inputRef}
@@ -311,6 +313,7 @@ function PinDigitEntry({
           type="password"
           inputMode="numeric"
           autoComplete={autoComplete}
+          autoFocus={autoFocus}
           value={value}
           onChange={(event) => onChange(event.target.value)}
           disabled={disabled}
@@ -329,7 +332,7 @@ function PinDigitEntry({
             return (
               <div
                 key={slot}
-                className={`flex h-14 w-11 items-center justify-center rounded-2xl border text-xl font-semibold shadow-inner transition-all sm:h-16 sm:w-14 ${
+                className={`flex h-12 w-10 items-center justify-center rounded-xl border text-lg font-semibold shadow-inner transition-all sm:h-16 sm:w-14 sm:rounded-2xl sm:text-xl ${
                   filled
                     ? 'border-avs-yellow/70 bg-avs-yellow/15 text-white shadow-avs-yellow/10'
                     : active
@@ -372,18 +375,34 @@ export function SensitiveModuleGate({
   const pinEntryLength = configuredPinLength ?? 6;
   const pinCanUnlock = configuredPinLength ? pin.length === configuredPinLength : pin.length === 4 || pin.length === 6;
 
+  const focusPinInput = useCallback((input: HTMLInputElement | null) => {
+    if (!input) return;
+
+    const focus = () => {
+      input.focus({ preventScroll: true });
+    };
+
+    focus();
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(focus);
+    } else {
+      window.setTimeout(focus, 0);
+    }
+    window.setTimeout(focus, 250);
+  }, []);
+
   useEffect(() => {
     if (!setupRequired) {
-      pinInputRef.current?.focus();
+      focusPinInput(pinInputRef.current);
       return;
     }
 
     if (setupPending) {
-      verificationInputRef.current?.focus();
+      focusPinInput(verificationInputRef.current);
     } else {
-      setupPinInputRef.current?.focus();
+      focusPinInput(setupPinInputRef.current);
     }
-  }, [setupPending, setupRequired]);
+  }, [focusPinInput, setupPending, setupRequired]);
 
   async function handleUnlock(candidatePin = pin) {
     const candidateCanUnlock = configuredPinLength
@@ -398,7 +417,7 @@ export function SensitiveModuleGate({
       setPin('');
     } finally {
       setWorking(false);
-      window.setTimeout(() => pinInputRef.current?.focus(), 0);
+      window.setTimeout(() => focusPinInput(pinInputRef.current), 0);
     }
   }
 
@@ -415,7 +434,7 @@ export function SensitiveModuleGate({
     setSetupPinLength(nextLength);
     setSetupPin((current) => current.slice(0, nextLength));
     setConfirmSetupPin('');
-    window.setTimeout(() => setupPinInputRef.current?.focus(), 0);
+    window.setTimeout(() => focusPinInput(setupPinInputRef.current), 0);
   }
 
   function handleSetupPinChange(nextValue: string) {
@@ -424,7 +443,7 @@ export function SensitiveModuleGate({
     setConfirmSetupPin('');
 
     if (nextPin.length === setupPinLength) {
-      window.setTimeout(() => confirmSetupPinInputRef.current?.focus(), 0);
+      window.setTimeout(() => focusPinInput(confirmSetupPinInputRef.current), 0);
     }
   }
 
@@ -456,7 +475,7 @@ export function SensitiveModuleGate({
     if (candidateSetupPin !== candidateConfirmSetupPin) {
       toast.error('PINs do not match');
       setConfirmSetupPin('');
-      window.setTimeout(() => confirmSetupPinInputRef.current?.focus(), 0);
+      window.setTimeout(() => focusPinInput(confirmSetupPinInputRef.current), 0);
       return;
     }
     if (!/^\d{4}$|^\d{6}$/.test(candidateSetupPin)) {
@@ -533,27 +552,27 @@ export function SensitiveModuleGate({
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-11rem)] items-center justify-center px-4 py-8">
-      <Card className="relative flex w-full max-w-[580px] overflow-hidden rounded-[2rem] border border-slate-700/70 bg-slate-950/95 shadow-2xl shadow-black/40">
+    <div className="flex min-h-[calc(100dvh_-_var(--top-nav-h,68px)_-_1rem)] items-start justify-center px-4 pb-8 pt-4 sm:min-h-[calc(100vh-11rem)] sm:items-center sm:py-8">
+      <Card className="relative flex w-full max-w-[580px] overflow-hidden rounded-3xl border border-slate-700/70 bg-slate-950/95 shadow-2xl shadow-black/40 sm:rounded-[2rem]">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(241,214,74,0.16),_transparent_36%),linear-gradient(145deg,_rgba(15,23,42,0.2),_rgba(2,6,23,0.9))]" />
         <div className="pointer-events-none absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-avs-yellow/80 to-transparent" />
         <div className="flex w-full flex-col justify-center">
-          <CardHeader className="relative px-6 pb-4 pt-8 text-center sm:px-10">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-avs-yellow/35 bg-avs-yellow/15 text-avs-yellow shadow-lg shadow-avs-yellow/10">
-              {setupRequired ? <ShieldCheck className="h-6 w-6" /> : <LockKeyhole className="h-6 w-6" />}
+          <CardHeader className="relative px-4 pb-3 pt-5 text-center sm:px-10 sm:pb-4 sm:pt-8">
+            <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-2xl border border-avs-yellow/35 bg-avs-yellow/15 text-avs-yellow shadow-lg shadow-avs-yellow/10 sm:mb-4 sm:h-14 sm:w-14">
+              {setupRequired ? <ShieldCheck className="h-5 w-5 sm:h-6 sm:w-6" /> : <LockKeyhole className="h-5 w-5 sm:h-6 sm:w-6" />}
             </div>
-            <CardTitle className="text-3xl">
+            <CardTitle className="text-2xl sm:text-3xl">
               {setupRequired ? 'Set Sensitive PIN' : 'Verify your identity'}
             </CardTitle>
-            <CardDescription className="mx-auto max-w-md text-base leading-6 text-slate-300">
+            <CardDescription className="mx-auto max-w-md text-sm leading-5 text-slate-300 sm:text-base sm:leading-6">
               {setupRequired
                 ? `Create a 4 or 6 digit PIN to unlock protected modules for 20 minutes on this session.`
                 : `Enter your ${configuredPinLength ? `${configuredPinLength}-digit ` : ''}sensitive access PIN to unlock ${moduleLabel} for 20 minutes.`}
             </CardDescription>
           </CardHeader>
-          <CardContent className="relative space-y-4 px-6 pb-8 sm:px-10">
+          <CardContent className="relative space-y-3 px-4 pb-5 sm:space-y-4 sm:px-10 sm:pb-8">
             {setupRequired ? (
-              <div className="mx-auto max-w-md space-y-5 text-center">
+              <div className="mx-auto max-w-md space-y-4 text-center sm:space-y-5">
                 {!setupPending ? (
                   <>
                     <div className="mx-auto flex w-fit rounded-full border border-slate-700/70 bg-slate-900/80 p-1 shadow-inner">
@@ -574,7 +593,7 @@ export function SensitiveModuleGate({
                       ))}
                     </div>
 
-                    <div className="space-y-4 rounded-2xl border border-slate-800/80 bg-slate-950/45 p-4">
+                    <div className="space-y-3 rounded-2xl border border-slate-800/80 bg-slate-950/45 p-3 sm:space-y-4 sm:p-4">
                       <p className="text-sm font-medium text-slate-200">Choose your new PIN</p>
                       <PinDigitEntry
                         id="sensitive-module-setup-pin"
@@ -585,10 +604,11 @@ export function SensitiveModuleGate({
                         inputRef={setupPinInputRef}
                         disabled={working}
                         describedBy="sensitive-module-setup-help"
+                        autoFocus={!setupPending}
                       />
                     </div>
 
-                    <div className="space-y-4 rounded-2xl border border-slate-800/80 bg-slate-950/45 p-4">
+                    <div className="space-y-3 rounded-2xl border border-slate-800/80 bg-slate-950/45 p-3 sm:space-y-4 sm:p-4">
                       <p className="text-sm font-medium text-slate-200">Confirm your PIN</p>
                       <PinDigitEntry
                         id="sensitive-module-confirm-pin"
@@ -620,7 +640,7 @@ export function SensitiveModuleGate({
                     </div>
                   </>
                 ) : (
-                  <div className="space-y-5 rounded-2xl border border-avs-yellow/35 bg-avs-yellow/10 p-5">
+                  <div className="space-y-4 rounded-2xl border border-avs-yellow/35 bg-avs-yellow/10 p-4 sm:space-y-5 sm:p-5">
                     <p className="text-center text-sm text-slate-200">
                       Enter the 6-digit verification code sent to {setupEmail || 'your email address'}.
                     </p>
@@ -633,6 +653,7 @@ export function SensitiveModuleGate({
                       inputRef={verificationInputRef}
                       disabled={working}
                       autoComplete="one-time-code"
+                      autoFocus
                       describedBy="sensitive-module-verification-help"
                     />
                     <div
@@ -670,6 +691,7 @@ export function SensitiveModuleGate({
                     inputRef={pinInputRef}
                     disabled={working}
                     describedBy="sensitive-module-pin-help"
+                    autoFocus
                   />
                 </div>
                 <div

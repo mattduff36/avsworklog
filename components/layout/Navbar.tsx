@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { 
   Activity,
+  House,
   Menu, 
   X, 
   Bell,
@@ -542,8 +543,9 @@ export function Navbar() {
             <div className="flex items-center h-16">
               <Link
                 href="/dashboard"
-                className="flex items-center group"
+                className="flex items-center gap-2 group"
               >
+                <House className="h-4 w-4 text-avs-yellow transition-colors group-hover:text-white" aria-hidden="true" />
                 <div className="text-xl font-bold text-white group-hover:text-avs-yellow transition-colors">
                   SQUIRES
                 </div>
@@ -559,9 +561,21 @@ export function Navbar() {
             {/* Mobile-only text logo */}
             <Link 
               href="/dashboard" 
-              className="md:hidden flex items-center mr-4 group"
+              className="md:hidden flex items-center gap-2 mr-4 group"
               onClick={() => setMobileMenuOpen(false)}
             >
+              <House className="h-4 w-4 text-avs-yellow transition-colors group-hover:text-white" aria-hidden="true" />
+              <div className="text-xl font-bold text-white group-hover:text-avs-yellow transition-colors">
+                SQUIRES
+              </div>
+            </Link>
+
+            {/* Desktop text logo */}
+            <Link
+              href="/dashboard"
+              className="hidden md:flex flex-shrink-0 items-center gap-2 mr-4 group"
+            >
+              <House className="h-4 w-4 text-avs-yellow transition-colors group-hover:text-white" aria-hidden="true" />
               <div className="text-xl font-bold text-white group-hover:text-avs-yellow transition-colors">
                 SQUIRES
               </div>
