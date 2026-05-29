@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0526.21.3
+
+**GIT COMMIT MESSAGE**
+`fix(errors): repair profile overview and hgv error handling`
+
+**WHAT CHANGED**
+Repair profile overview and hgv error handling.
+
+**COMMITS IN THIS RELEASE**
+- `fix(errors): repair profile overview and hgv error handling`
+
 ## 0526.21.2
 
 **GIT COMMIT MESSAGE**
