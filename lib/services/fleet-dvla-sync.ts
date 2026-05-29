@@ -46,6 +46,18 @@ export interface FleetSyncSummary {
 
 export const TEST_REGISTRATIONS = new Set(['TE57VAN', 'TE57HGV']);
 
+export function isExpectedFleetDvlaLookupFailure(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes('dvla api error') &&
+    (
+      normalized.includes('404') ||
+      normalized.includes('not found') ||
+      normalized.includes('vehicle not found')
+    )
+  );
+}
+
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === 'string') return error;
