@@ -2,6 +2,18 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0526.21.5
+
+**GIT COMMIT MESSAGE**
+`fix(errors): ignore expected dvla lookup misses`
+
+**WHAT CHANGED**
+Update sidebar navigation styling, fleet workflow, and 3 more areas. Ignore expected dvla lookup misses.
+
+**COMMITS IN THIS RELEASE**
+- `fix(layout): update sidebar navigation styling, fleet workflow, and 3 more areas`
+- `fix(errors): ignore expected dvla lookup misses`
+
 ## 0526.21.4
 
 **GIT COMMIT MESSAGE**
