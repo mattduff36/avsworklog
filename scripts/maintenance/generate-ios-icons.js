@@ -7,10 +7,13 @@ const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
 
-const sourceIcon = path.join(__dirname, '../public/icon-512x512.png');
-const outputDir = path.join(__dirname, '../public');
+const projectRoot = path.resolve(__dirname, '../..');
+const sourceIcon = path.join(projectRoot, 'public/images/logo.png');
+const outputDir = path.join(projectRoot, 'public');
 
 const iconSizes = [
+  { name: 'icon-192x192.png', size: 192 },
+  { name: 'icon-512x512.png', size: 512 },
   { name: 'apple-touch-icon.png', size: 180 },
   { name: 'apple-touch-icon-180x180.png', size: 180 },
   { name: 'apple-touch-icon-152x152.png', size: 152 },
@@ -32,8 +35,9 @@ async function generateIcons() {
       await sharp(sourceIcon)
         .resize(icon.size, icon.size, {
           fit: 'contain',
-          background: { r: 241, g: 214, b: 74, alpha: 1 } // #F1D64A (AVS yellow)
+          background: { r: 255, g: 255, b: 255, alpha: 1 },
         })
+        .flatten({ background: { r: 255, g: 255, b: 255 } })
         .png()
         .toFile(outputPath);
       
