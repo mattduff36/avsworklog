@@ -19,6 +19,7 @@ import { ProfileRecentSubmissionsTab } from '@/components/profile/ProfileRecentS
 import { ProfileSecurityTab } from '@/components/profile/ProfileSecurityTab';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { createStatusError, getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 import {
   NOTIFICATION_MODULES,
   type NotificationModuleKey,
@@ -140,16 +141,25 @@ function ProfilePageContent() {
     setLoadingOverview(true);
     try {
       const response = await fetch('/api/profile/overview', { cache: 'no-store' });
-      const payload = await response.json();
+      const payload = await response.json().catch(() => null) as (ProfileOverviewPayload & { error?: string }) | null;
       if (!response.ok) {
-        throw new Error(payload.error || 'Failed to load profile overview');
+        throw createStatusError(
+          payload?.error || `Failed to load profile overview (${response.status})`,
+          response.status
+        );
+      }
+      if (!payload) {
+        throw createStatusError('Failed to load profile overview', response.status);
       }
 
-      setOverview(payload as ProfileOverviewPayload);
-      setDetailsDraft(createDetailsDraft((payload as ProfileOverviewPayload).profile));
+      setOverview(payload);
+      setDetailsDraft(createDetailsDraft(payload.profile));
     } catch (error) {
       const errorContextId = 'profile-load-overview-error';
-      console.error('Error loading profile overview:', error, { errorContextId });
+      const errorStatus = getErrorStatus(error);
+      if (!isAuthErrorStatus(errorStatus) && !isNetworkFetchError(error)) {
+        console.error('Error loading profile overview:', error, { errorContextId });
+      }
       toast.error(error instanceof Error ? error.message : 'Failed to load profile', {
         id: errorContextId,
       });

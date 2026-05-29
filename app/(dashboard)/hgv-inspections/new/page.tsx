@@ -47,7 +47,7 @@ import { InspectionPhotoTiles } from '@/components/inspections/InspectionPhotoTi
 import { useInspectionPhotos } from '@/lib/hooks/useInspectionPhotos';
 import { getInspectionPhotoKey } from '@/lib/inspection-photos';
 import { getReadingDigitGrowthWarning } from '@/lib/utils/readingDigitGrowthWarning';
-import { getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
+import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 import { completeInspectionReminder } from '@/lib/client/complete-inspection-reminder';
 import { WORKSHOP_TASK_COMMENT_MIN_LENGTH } from '@/lib/workshop-tasks/validation';
 
@@ -355,7 +355,11 @@ function NewHgvInspectionContent() {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not merge with existing draft';
       if (!isAuthErrorStatus(getErrorStatus(err))) {
-        console.error('Failed to merge into existing HGV draft:', err, { errorContextId });
+        if (isNetworkFetchError(err)) {
+          console.warn('HGV draft merge temporarily unavailable:', err, { errorContextId });
+        } else {
+          console.error('Failed to merge into existing HGV draft:', err, { errorContextId });
+        }
       }
       if (showToast && !isAuthErrorStatus(getErrorStatus(err))) {
         toast.error(message, { id: errorContextId });

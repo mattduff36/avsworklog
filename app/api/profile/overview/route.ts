@@ -36,7 +36,6 @@ interface WorkshopTaskSummaryRow {
 interface ManagerProfileRow {
   id: string;
   full_name: string | null;
-  email?: string | null;
   phone_number?: string | null;
 }
 
@@ -110,15 +109,23 @@ async function buildManagerSummaries(
 
   const { data, error } = await admin
     .from('profiles')
-    .select('id, full_name, email, phone_number')
+    .select('id, full_name, phone_number')
     .in('id', managerIds);
 
   if (error) throw error;
 
+  const emailByManagerId = new Map<string, string | null>();
+  await Promise.all(
+    ((data || []) as ManagerProfileRow[]).map(async (manager) => {
+      const { data: authData, error: authError } = await admin.auth.admin.getUserById(manager.id);
+      emailByManagerId.set(manager.id, authError ? null : authData.user?.email || null);
+    })
+  );
+
   return ((data || []) as ManagerProfileRow[]).map((manager) => ({
     id: manager.id,
     full_name: manager.full_name || 'Unnamed manager',
-    email: manager.email || null,
+    email: emailByManagerId.get(manager.id) || null,
     phone_number: manager.phone_number || null,
     source: managerSources.get(manager.id) || 'team_manager',
   }));
