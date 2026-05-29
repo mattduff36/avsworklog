@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { createClient as createServerClient } from '@/lib/supabase/server';
-import { getEffectiveRole } from '@/lib/utils/view-as';
-import { canAccessDebugConsole } from '@/lib/utils/debug-access';
+import { createDebugAccessErrorBody, requireDebugConsoleAccess } from '@/lib/server/debug-console-access';
 import { logServerError } from '@/lib/utils/server-error-logger';
 
 type FleetItem = {
@@ -115,25 +113,9 @@ async function deleteReminderActionsForFleetItems(
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const effectiveRole = await getEffectiveRole();
-    const canAccessDebugTools = canAccessDebugConsole({
-      email: user.email,
-      isActualSuperAdmin: effectiveRole.is_actual_super_admin,
-      isViewingAs: effectiveRole.is_viewing_as,
-    });
-
-    if (!canAccessDebugTools) {
-      return NextResponse.json(
-        { error: 'Forbidden: Debug access required' },
-        { status: 403 }
-      );
+    const access = await requireDebugConsoleAccess();
+    if (!access.ok) {
+      return NextResponse.json(createDebugAccessErrorBody(access), { status: access.status });
     }
 
     const { searchParams } = new URL(request.url);
@@ -232,25 +214,9 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const effectiveRole = await getEffectiveRole();
-    const canAccessDebugTools = canAccessDebugConsole({
-      email: user.email,
-      isActualSuperAdmin: effectiveRole.is_actual_super_admin,
-      isViewingAs: effectiveRole.is_viewing_as,
-    });
-
-    if (!canAccessDebugTools) {
-      return NextResponse.json(
-        { error: 'Forbidden: Debug access required' },
-        { status: 403 }
-      );
+    const access = await requireDebugConsoleAccess();
+    if (!access.ok) {
+      return NextResponse.json(createDebugAccessErrorBody(access), { status: access.status });
     }
 
     const body = await request.json();
@@ -590,25 +556,13 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const access = await requireDebugConsoleAccess();
+    if (!access.ok) {
+      return NextResponse.json(createDebugAccessErrorBody(access), { status: access.status });
     }
-
-    const effectiveRole = await getEffectiveRole();
-    const canAccessDebugTools = canAccessDebugConsole({
-      email: user.email,
-      isActualSuperAdmin: effectiveRole.is_actual_super_admin,
-      isViewingAs: effectiveRole.is_viewing_as,
-    });
-
-    if (!canAccessDebugTools) {
-      return NextResponse.json(
-        { error: 'Forbidden: Debug access required' },
-        { status: 403 }
-      );
+    const actorProfileId = access.profileId;
+    if (!actorProfileId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await request.json();
@@ -709,7 +663,7 @@ export async function DELETE(request: NextRequest) {
               category_id: fullVehicle.category_id,
               status: fullVehicle.status,
               archive_reason: archive_reason || 'Test Data Cleanup',
-              archived_by: user.id,
+              archived_by: actorProfileId,
               vehicle_data: fullVehicle,
               maintenance_data: fullVehicle.vehicle_maintenance || null,
             });

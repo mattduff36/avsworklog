@@ -10,12 +10,21 @@ vi.mock('@/lib/utils/view-as');
 vi.mock('@/lib/utils/server-error-logger', () => ({
   logServerError: vi.fn(),
 }));
+vi.mock('@/lib/server/debug-console-access', () => ({
+  createDebugAccessErrorBody: (access: { error: string | null; code?: string; sensitive_access?: unknown }) => ({
+    error: access.error,
+    code: access.code,
+    sensitive_access: access.sensitive_access,
+  }),
+  requireDebugConsoleAccess: vi.fn(),
+}));
 
 import { GET } from '@/app/api/debug/user-analytics/route';
 import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
+import { requireDebugConsoleAccess } from '@/lib/server/debug-console-access';
 
 function createAnalyticsAdminMock() {
-  const eventLimit = vi.fn().mockResolvedValue({
+  const eventRange = vi.fn().mockResolvedValue({
     data: [
       {
         id: 'event-1',
@@ -39,10 +48,17 @@ function createAnalyticsAdminMock() {
     ],
     error: null,
   });
-  const eventOrder = vi.fn(() => ({ limit: eventLimit }));
-  const eventLte = vi.fn(() => ({ order: eventOrder }));
-  const eventGte = vi.fn(() => ({ lte: eventLte }));
-  const eventSelect = vi.fn(() => ({ gte: eventGte }));
+  const eventQuery = {
+    gte: vi.fn(),
+    lte: vi.fn(),
+    eq: vi.fn(),
+    order: vi.fn(),
+    range: eventRange,
+  };
+  eventQuery.gte.mockReturnValue(eventQuery);
+  eventQuery.lte.mockReturnValue(eventQuery);
+  eventQuery.eq.mockReturnValue(eventQuery);
+  eventQuery.order.mockReturnValue(eventQuery);
 
   const sessionLimit = vi.fn().mockResolvedValue({
     data: [
@@ -72,13 +88,14 @@ function createAnalyticsAdminMock() {
   return {
     from: vi.fn((table: string) => {
       if (table === 'user_usage_events') {
-        return { select: eventSelect };
+        return { select: vi.fn(() => eventQuery) };
       }
       if (table === 'user_usage_sessions') {
         return { select: sessionSelect };
       }
       throw new Error(`Unexpected table ${table}`);
     }),
+    eventRange,
   };
 }
 
@@ -89,6 +106,11 @@ describe('GET /api/debug/user-analytics', () => {
 
   it('returns 401 when the caller is not authenticated', async () => {
     vi.mocked(getCurrentAuthenticatedProfile).mockResolvedValue(null);
+    vi.mocked(requireDebugConsoleAccess).mockResolvedValue({
+      ok: false,
+      status: 401,
+      error: 'Unauthorized',
+    });
 
     const response = await GET(new NextRequest('http://localhost/api/debug/user-analytics'));
 
@@ -98,6 +120,7 @@ describe('GET /api/debug/user-analytics', () => {
   it('returns usage analytics for a debug-console user', async () => {
     const { createAdminClient } = await import('@/lib/supabase/admin');
     const { getEffectiveRole } = await import('@/lib/utils/view-as');
+    const adminMock = createAnalyticsAdminMock();
 
     vi.mocked(getCurrentAuthenticatedProfile).mockResolvedValue({
       profile: { id: 'admin-1', email: 'admin@example.com' },
@@ -115,7 +138,12 @@ describe('GET /api/debug/user-analytics', () => {
       team_id: null,
       team_name: null,
     });
-    vi.mocked(createAdminClient).mockReturnValue(createAnalyticsAdminMock() as never);
+    vi.mocked(requireDebugConsoleAccess).mockResolvedValue({
+      ok: true,
+      status: 200,
+      error: null,
+    });
+    vi.mocked(createAdminClient).mockReturnValue(adminMock as never);
 
     const response = await GET(new NextRequest('http://localhost/api/debug/user-analytics?range=7d'));
     const payload = await response.json();
@@ -127,6 +155,14 @@ describe('GET /api/debug/user-analytics', () => {
         uniqueUsers: 1,
         pageViews: 1,
         activeSessions: 1,
+      })
+    );
+    expect(payload.usageSummary.headline).toContain('1 people used the app');
+    expect(payload.topTeams[0]).toEqual(
+      expect.objectContaining({
+        label: 'Civils',
+        events: 1,
+        users: 1,
       })
     );
     expect(payload.topModules).toEqual([
@@ -142,5 +178,6 @@ describe('GET /api/debug/user-analytics', () => {
         sessionId: 'session-1',
       })
     );
+    expect(adminMock.eventRange).toHaveBeenCalledWith(0, 999);
   });
 });

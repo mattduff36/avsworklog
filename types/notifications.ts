@@ -145,6 +145,9 @@ export interface GetAllNotificationPreferencesResponse {
     user_id: string;
     full_name: string;
     role_name: string;
+    role_display_name: string;
+    role_class: 'admin' | 'manager' | 'employee' | null;
+    is_super_admin: boolean;
     preferences: NotificationPreference[];
   }>;
   error?: string;

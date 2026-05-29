@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
+import { requireDebugConsoleAccess } from '@/lib/server/debug-console-access';
 import {
   detectUsageDeviceType,
   getUsageModuleFromPath,
@@ -14,13 +14,13 @@ import {
   type UserUsageEventName,
   type UserUsageEventSource,
 } from '@/lib/analytics/events';
-import { canAccessDebugConsole } from '@/lib/utils/debug-access';
-import { getEffectiveRole } from '@/lib/utils/view-as';
 
 const MAX_BATCH_SIZE = 50;
 const MAX_TEXT_LENGTH = 300;
 const MAX_USER_AGENT_LENGTH = 2_048;
 const ACTIVE_SESSION_WINDOW_MINUTES = 5;
+const ANALYTICS_EVENT_BATCH_SIZE = 1_000;
+const RECENT_EVENT_STREAM_LIMIT = 100;
 
 interface CurrentProfileContext {
   profile: {
@@ -97,6 +97,26 @@ export interface UsageAnalyticsSummary {
   avgDurationMs: number | null;
 }
 
+export interface UsageAnalyticsBreakdown {
+  label: string;
+  events: number;
+  users: number;
+  sessions: number;
+  pageViews: number;
+}
+
+export interface UsageAnalyticsInsight {
+  title: string;
+  value: string;
+  detail: string;
+  tone: 'info' | 'success' | 'warning' | 'danger' | 'neutral';
+}
+
+export interface UsageAnalyticsPlainSummary {
+  headline: string;
+  highlights: UsageAnalyticsInsight[];
+}
+
 export interface UsageAnalyticsDebugPayload {
   success: true;
   generatedAt: string;
@@ -108,6 +128,10 @@ export interface UsageAnalyticsDebugPayload {
   topModules: Array<{ module: string; events: number; users: number }>;
   topPages: Array<{ path: string; views: number; users: number }>;
   topEvents: Array<{ eventName: string; events: number; users: number }>;
+  usageSummary: UsageAnalyticsPlainSummary;
+  topTeams: UsageAnalyticsBreakdown[];
+  roleBreakdown: UsageAnalyticsBreakdown[];
+  deviceBreakdown: UsageAnalyticsBreakdown[];
   activeSessions: Array<{
     id: string;
     userId: string | null;
@@ -143,6 +167,8 @@ export interface DebugAnalyticsAccessResult {
   ok: boolean;
   status: number;
   error: string | null;
+  code?: string;
+  sensitive_access?: unknown;
 }
 
 function normalizeText(value: unknown, maxLength = MAX_TEXT_LENGTH): string | null {
@@ -427,33 +453,7 @@ export async function trackServerUsageEvent(options: TrackServerUsageEventOption
 }
 
 export async function requireDebugAnalyticsAccess(): Promise<DebugAnalyticsAccessResult> {
-  const current = await getCurrentAuthenticatedProfile({ includeEmail: true });
-  if (!current) {
-    return {
-      ok: false,
-      status: 401,
-      error: 'Unauthorized',
-    };
-  }
-
-  const effectiveRole = await getEffectiveRole();
-  if (!canAccessDebugConsole({
-    email: current.profile.email,
-    isActualSuperAdmin: effectiveRole.is_actual_super_admin,
-    isViewingAs: effectiveRole.is_viewing_as,
-  })) {
-    return {
-      ok: false,
-      status: 403,
-      error: 'Forbidden',
-    };
-  }
-
-  return {
-    ok: true,
-    status: 200,
-    error: null,
-  };
+  return requireDebugConsoleAccess();
 }
 
 function getSingle<T>(value: T | T[] | null | undefined): T | null {
@@ -472,8 +472,142 @@ function addAggregate<K extends string>(
   map.set(key, current);
 }
 
+function addBreakdownAggregate(
+  map: Map<string, { label: string; events: number; users: Set<string>; sessions: Set<string>; pageViews: number }>,
+  key: string,
+  userId: string | null,
+  sessionId: string | null,
+  isPageView: boolean
+) {
+  const label = key || 'Unknown';
+  const current = map.get(label) || {
+    label,
+    events: 0,
+    users: new Set<string>(),
+    sessions: new Set<string>(),
+    pageViews: 0,
+  };
+  current.events += 1;
+  if (userId) current.users.add(userId);
+  if (sessionId) current.sessions.add(sessionId);
+  if (isPageView) current.pageViews += 1;
+  map.set(label, current);
+}
+
 function sortAggregates<T extends { events: number }>(items: T[], limit: number): T[] {
   return items.sort((a, b) => b.events - a.events).slice(0, limit);
+}
+
+function sortBreakdowns(
+  map: Map<string, { label: string; events: number; users: Set<string>; sessions: Set<string>; pageViews: number }>,
+  limit: number
+): UsageAnalyticsBreakdown[] {
+  return Array.from(map.values())
+    .map((entry) => ({
+      label: entry.label,
+      events: entry.events,
+      users: entry.users.size,
+      sessions: entry.sessions.size,
+      pageViews: entry.pageViews,
+    }))
+    .sort((a, b) => b.events - a.events)
+    .slice(0, limit);
+}
+
+function formatInsightNumber(value: number): string {
+  return value.toLocaleString('en-GB');
+}
+
+function formatInsightDuration(value: number | null): string {
+  if (value === null) return 'not enough data yet';
+  if (value < 1000) return `${value}ms`;
+  return `${(value / 1000).toFixed(1)}s`;
+}
+
+function buildUsagePlainSummary(params: {
+  summary: UsageAnalyticsSummary;
+  topModules: Array<{ module: string; events: number; users: number }>;
+  topTeams: UsageAnalyticsBreakdown[];
+  roleBreakdown: UsageAnalyticsBreakdown[];
+  deviceBreakdown: UsageAnalyticsBreakdown[];
+}): UsageAnalyticsPlainSummary {
+  const { summary, topModules, topTeams, roleBreakdown, deviceBreakdown } = params;
+  if (summary.totalEvents === 0) {
+    return {
+      headline: 'No usage has been recorded for the selected filters and date range.',
+      highlights: [
+        {
+          title: 'What this means',
+          value: 'No activity',
+          detail: 'Either the selected filters are too narrow, or users have not used the tracked parts of the app during this period.',
+          tone: 'neutral',
+        },
+      ],
+    };
+  }
+
+  const topModule = topModules[0] || null;
+  const topTeam = topTeams[0] || null;
+  const topRole = roleBreakdown[0] || null;
+  const topDevice = deviceBreakdown[0] || null;
+  const errorRate = summary.totalEvents > 0 ? (summary.errorEvents / summary.totalEvents) * 100 : 0;
+  const reliabilityTone: UsageAnalyticsInsight['tone'] = summary.errorEvents === 0
+    ? 'success'
+    : errorRate >= 5
+      ? 'danger'
+      : 'warning';
+
+  return {
+    headline: `${formatInsightNumber(summary.uniqueUsers)} people used the app in this range, creating ${formatInsightNumber(summary.totalEvents)} tracked events across ${formatInsightNumber(summary.sessionCount)} sessions.`,
+    highlights: [
+      {
+        title: 'Busiest app area',
+        value: topModule?.module || 'Unknown',
+        detail: topModule
+          ? `${formatInsightNumber(topModule.users)} users generated ${formatInsightNumber(topModule.events)} events here, making it the clearest signal of day-to-day usage.`
+          : 'There is not enough module data to identify the busiest area yet.',
+        tone: 'info',
+      },
+      {
+        title: 'Most active team',
+        value: topTeam?.label || 'Unknown team',
+        detail: topTeam
+          ? `${formatInsightNumber(topTeam.users)} users created ${formatInsightNumber(topTeam.events)} events and ${formatInsightNumber(topTeam.pageViews)} page views.`
+          : 'Team information was not available on the recorded events.',
+        tone: 'success',
+      },
+      {
+        title: 'Primary user group',
+        value: topRole?.label || 'Unknown role',
+        detail: topRole
+          ? `${formatInsightNumber(topRole.users)} users in this group account for ${formatInsightNumber(topRole.events)} events.`
+          : 'Role information was not available on the recorded events.',
+        tone: 'neutral',
+      },
+      {
+        title: 'Device pattern',
+        value: topDevice?.label || 'Unknown device',
+        detail: topDevice
+          ? `${formatInsightNumber(topDevice.events)} events came from ${topDevice.label}, which helps explain how people are accessing the app on site or in the office.`
+          : 'Device information was not available on the recorded events.',
+        tone: 'info',
+      },
+      {
+        title: 'Reliability signal',
+        value: `${formatInsightNumber(summary.errorEvents)} errors`,
+        detail: summary.errorEvents === 0
+          ? 'No client-observed error events were recorded in this range.'
+          : `${errorRate.toFixed(1)}% of tracked events were error events, so the error log should be reviewed alongside this usage picture.`,
+        tone: reliabilityTone,
+      },
+      {
+        title: 'Engagement signal',
+        value: `${formatInsightNumber(summary.pageViews)} page views`,
+        detail: `${formatInsightNumber(summary.activeSessions)} sessions are active now. Average measured event duration is ${formatInsightDuration(summary.avgDurationMs)}.`,
+        tone: summary.activeSessions > 0 ? 'success' : 'neutral',
+      },
+    ],
+  };
 }
 
 export async function getUserAnalyticsDebugPayload(params: URLSearchParams): Promise<UsageAnalyticsDebugPayload> {
@@ -486,103 +620,175 @@ export async function getUserAnalyticsDebugPayload(params: URLSearchParams): Pro
   const userFilter = normalizeText(params.get('userId'), 80);
 
   const admin = createAdminClient();
-  let eventQuery = admin
-    .from('user_usage_events')
+  const activeSince = new Date(Date.now() - ACTIVE_SESSION_WINDOW_MINUTES * 60 * 1000).toISOString();
+  const sessionsPromise = admin
+    .from('user_usage_sessions')
     .select(`
       id,
-      occurred_at,
-      event_name,
-      event_category,
-      module,
-      path,
-      normalized_path,
       user_id,
-      session_id,
-      duration_ms,
-      metadata,
-      profile:profiles!user_usage_events_user_id_fkey(
+      last_seen_at,
+      entry_path,
+      exit_path,
+      device_type,
+      browser_name,
+      event_count,
+      page_view_count,
+      profile:profiles!user_usage_sessions_user_id_fkey(
         full_name,
         team:org_teams!profiles_team_id_fkey(name),
         role:roles(display_name)
-      ),
-      session:user_usage_sessions(device_type)
+      )
     `)
-    .gte('occurred_at', start.toISOString())
-    .lte('occurred_at', end.toISOString())
-    .order('occurred_at', { ascending: false })
-    .limit(1000);
+    .gte('last_seen_at', activeSince)
+    .order('last_seen_at', { ascending: false })
+    .limit(25);
 
-  if (moduleFilter && moduleFilter !== 'all') {
-    eventQuery = eventQuery.eq('module', moduleFilter);
-  }
-  if (eventFilter && eventFilter !== 'all') {
-    eventQuery = eventQuery.eq('event_name', eventFilter);
-  }
-  if (userFilter && userFilter !== 'all') {
-    eventQuery = eventQuery.eq('user_id', userFilter);
-  }
-
-  const activeSince = new Date(Date.now() - ACTIVE_SESSION_WINDOW_MINUTES * 60 * 1000).toISOString();
-  const [eventsResult, sessionsResult] = await Promise.all([
-    eventQuery,
-    admin
-      .from('user_usage_sessions')
-      .select(`
-        id,
-        user_id,
-        last_seen_at,
-        entry_path,
-        exit_path,
-        device_type,
-        browser_name,
-        event_count,
-        page_view_count,
-        profile:profiles!user_usage_sessions_user_id_fkey(
-          full_name,
-          team:org_teams!profiles_team_id_fkey(name),
-          role:roles(display_name)
-        )
-      `)
-      .gte('last_seen_at', activeSince)
-      .order('last_seen_at', { ascending: false })
-      .limit(25),
-  ]);
-
-  if (eventsResult.error) {
-    throw new Error(eventsResult.error.message);
-  }
-  if (sessionsResult.error) {
-    throw new Error(sessionsResult.error.message);
-  }
-
-  const rawEvents = (eventsResult.data || []) as Array<Record<string, unknown>>;
-  const rawSessions = (sessionsResult.data || []) as Array<Record<string, unknown>>;
+  const recentEvents: Array<Record<string, unknown>> = [];
+  let totalEvents = 0;
+  let offset = 0;
+  let hasMoreEvents = true;
   const uniqueUsers = new Set<string>();
   const uniqueSessions = new Set<string>();
   const moduleMap = new Map<string, { label: string; events: number; users: Set<string> }>();
   const pageMap = new Map<string, { label: string; events: number; users: Set<string> }>();
   const eventMap = new Map<string, { label: string; events: number; users: Set<string> }>();
+  const teamMap = new Map<string, { label: string; events: number; users: Set<string>; sessions: Set<string>; pageViews: number }>();
+  const roleMap = new Map<string, { label: string; events: number; users: Set<string>; sessions: Set<string>; pageViews: number }>();
+  const deviceMap = new Map<string, { label: string; events: number; users: Set<string>; sessions: Set<string>; pageViews: number }>();
+  let pageViews = 0;
+  let errorEvents = 0;
   let durationTotal = 0;
   let durationCount = 0;
 
-  for (const event of rawEvents) {
-    const userId = typeof event.user_id === 'string' ? event.user_id : null;
-    const sessionId = typeof event.session_id === 'string' ? event.session_id : null;
-    if (userId) uniqueUsers.add(userId);
-    if (sessionId) uniqueSessions.add(sessionId);
+  while (hasMoreEvents) {
+    let eventQuery = admin
+      .from('user_usage_events')
+      .select(`
+        id,
+        occurred_at,
+        event_name,
+        event_category,
+        module,
+        path,
+        normalized_path,
+        user_id,
+        session_id,
+        duration_ms,
+        metadata,
+        profile:profiles!user_usage_events_user_id_fkey(
+          full_name,
+          team:org_teams!profiles_team_id_fkey(name),
+          role:roles(display_name)
+        ),
+        session:user_usage_sessions(device_type)
+      `)
+      .gte('occurred_at', start.toISOString())
+      .lte('occurred_at', end.toISOString());
 
-    const durationMs = typeof event.duration_ms === 'number' ? event.duration_ms : null;
-    if (durationMs !== null) {
-      durationTotal += durationMs;
-      durationCount += 1;
+    if (moduleFilter && moduleFilter !== 'all') {
+      eventQuery = eventQuery.eq('module', moduleFilter);
+    }
+    if (eventFilter && eventFilter !== 'all') {
+      eventQuery = eventQuery.eq('event_name', eventFilter);
+    }
+    if (userFilter && userFilter !== 'all') {
+      eventQuery = eventQuery.eq('user_id', userFilter);
     }
 
-    addAggregate(moduleMap, (typeof event.module === 'string' && event.module) || 'unknown', userId);
-    addAggregate(eventMap, (typeof event.event_name === 'string' && event.event_name) || 'unknown', userId);
-    if (event.event_name === 'page_view') {
-      addAggregate(pageMap, (typeof event.normalized_path === 'string' && event.normalized_path) || 'unknown', userId);
+    const eventsResult = await eventQuery
+      .order('occurred_at', { ascending: false })
+      .range(offset, offset + ANALYTICS_EVENT_BATCH_SIZE - 1);
+    if (eventsResult.error) {
+      throw new Error(eventsResult.error.message);
     }
+
+    const eventBatch = (eventsResult.data || []) as Array<Record<string, unknown>>;
+    totalEvents += eventBatch.length;
+    if (recentEvents.length < RECENT_EVENT_STREAM_LIMIT) {
+      recentEvents.push(...eventBatch.slice(0, RECENT_EVENT_STREAM_LIMIT - recentEvents.length));
+    }
+
+    for (const event of eventBatch) {
+      const userId = typeof event.user_id === 'string' ? event.user_id : null;
+      const sessionId = typeof event.session_id === 'string' ? event.session_id : null;
+      const eventName = typeof event.event_name === 'string' ? event.event_name : 'unknown';
+      const isPageView = eventName === 'page_view';
+      const profile = getSingle(event.profile as Record<string, unknown> | Record<string, unknown>[] | null);
+      const team = getSingle(profile?.team as Record<string, unknown> | Record<string, unknown>[] | null);
+      const role = getSingle(profile?.role as Record<string, unknown> | Record<string, unknown>[] | null);
+      const session = getSingle(event.session as Record<string, unknown> | Record<string, unknown>[] | null);
+      const teamName = typeof team?.name === 'string' ? team.name : 'Unknown team';
+      const roleName = typeof role?.display_name === 'string' ? role.display_name : 'Unknown role';
+      const deviceType = typeof session?.device_type === 'string' ? session.device_type : 'unknown';
+
+      if (userId) uniqueUsers.add(userId);
+      if (sessionId) uniqueSessions.add(sessionId);
+      if (isPageView) pageViews += 1;
+      if (event.event_category === 'error') errorEvents += 1;
+
+      const durationMs = typeof event.duration_ms === 'number' ? event.duration_ms : null;
+      if (durationMs !== null) {
+        durationTotal += durationMs;
+        durationCount += 1;
+      }
+
+      addAggregate(moduleMap, (typeof event.module === 'string' && event.module) || 'unknown', userId);
+      addAggregate(eventMap, eventName, userId);
+      if (isPageView) {
+        addAggregate(pageMap, (typeof event.normalized_path === 'string' && event.normalized_path) || 'unknown', userId);
+      }
+      addBreakdownAggregate(teamMap, teamName, userId, sessionId, isPageView);
+      addBreakdownAggregate(roleMap, roleName, userId, sessionId, isPageView);
+      addBreakdownAggregate(deviceMap, deviceType, userId, sessionId, isPageView);
+    }
+
+    hasMoreEvents = eventBatch.length === ANALYTICS_EVENT_BATCH_SIZE;
+    offset += ANALYTICS_EVENT_BATCH_SIZE;
   }
+
+  const sessionsResult = await sessionsPromise;
+  if (sessionsResult.error) {
+    throw new Error(sessionsResult.error.message);
+  }
+
+  const rawSessions = (sessionsResult.data || []) as Array<Record<string, unknown>>;
+  const summary: UsageAnalyticsSummary = {
+    totalEvents,
+    uniqueUsers: uniqueUsers.size,
+    sessionCount: uniqueSessions.size,
+    pageViews,
+    errorEvents,
+    activeSessions: rawSessions.length,
+    avgDurationMs: durationCount > 0 ? Math.round(durationTotal / durationCount) : null,
+  };
+  const topModules = sortAggregates(
+    Array.from(moduleMap.values()).map((entry) => ({
+      module: entry.label,
+      events: entry.events,
+      users: entry.users.size,
+    })),
+    10
+  );
+  const topPages = sortAggregates(
+    Array.from(pageMap.values()).map((entry) => ({
+      path: entry.label,
+      views: entry.events,
+      users: entry.users.size,
+      events: entry.events,
+    })),
+    10
+  ).map(({ path, views, users }) => ({ path, views, users }));
+  const topEvents = sortAggregates(
+    Array.from(eventMap.values()).map((entry) => ({
+      eventName: entry.label,
+      events: entry.events,
+      users: entry.users.size,
+    })),
+    10
+  );
+  const topTeams = sortBreakdowns(teamMap, 10);
+  const roleBreakdown = sortBreakdowns(roleMap, 10);
+  const deviceBreakdown = sortBreakdowns(deviceMap, 10);
 
   return {
     success: true,
@@ -591,40 +797,14 @@ export async function getUserAnalyticsDebugPayload(params: URLSearchParams): Pro
       start: start.toISOString(),
       end: end.toISOString(),
     },
-    summary: {
-      totalEvents: rawEvents.length,
-      uniqueUsers: uniqueUsers.size,
-      sessionCount: uniqueSessions.size,
-      pageViews: rawEvents.filter((event) => event.event_name === 'page_view').length,
-      errorEvents: rawEvents.filter((event) => event.event_category === 'error').length,
-      activeSessions: rawSessions.length,
-      avgDurationMs: durationCount > 0 ? Math.round(durationTotal / durationCount) : null,
-    },
-    topModules: sortAggregates(
-      Array.from(moduleMap.values()).map((entry) => ({
-        module: entry.label,
-        events: entry.events,
-        users: entry.users.size,
-      })),
-      10
-    ),
-    topPages: sortAggregates(
-      Array.from(pageMap.values()).map((entry) => ({
-        path: entry.label,
-        views: entry.events,
-        users: entry.users.size,
-        events: entry.events,
-      })),
-      10
-    ).map(({ path, views, users }) => ({ path, views, users })),
-    topEvents: sortAggregates(
-      Array.from(eventMap.values()).map((entry) => ({
-        eventName: entry.label,
-        events: entry.events,
-        users: entry.users.size,
-      })),
-      10
-    ),
+    summary,
+    topModules,
+    topPages,
+    topEvents,
+    usageSummary: buildUsagePlainSummary({ summary, topModules, topTeams, roleBreakdown, deviceBreakdown }),
+    topTeams,
+    roleBreakdown,
+    deviceBreakdown,
     activeSessions: rawSessions.map((session) => {
       const profile = getSingle(session.profile as Record<string, unknown> | Record<string, unknown>[] | null);
       const team = getSingle(profile?.team as Record<string, unknown> | Record<string, unknown>[] | null);
@@ -644,7 +824,7 @@ export async function getUserAnalyticsDebugPayload(params: URLSearchParams): Pro
         pageViewCount: typeof session.page_view_count === 'number' ? session.page_view_count : 0,
       };
     }),
-    recentEvents: rawEvents.slice(0, 100).map((event) => {
+    recentEvents: recentEvents.map((event) => {
       const profile = getSingle(event.profile as Record<string, unknown> | Record<string, unknown>[] | null);
       const team = getSingle(profile?.team as Record<string, unknown> | Record<string, unknown>[] | null);
       const role = getSingle(profile?.role as Record<string, unknown> | Record<string, unknown>[] | null);

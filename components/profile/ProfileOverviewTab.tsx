@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { AlertTriangle, CalendarDays, ClipboardCheck, Crown, PlaneTakeoff } from 'lucide-react';
-import { Badge, type BadgeProps } from '@/components/ui/badge';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import type {
   ProfileAnnualLeaveSummary,
@@ -32,23 +32,27 @@ function formatManagerSource(source: ProfileManagerSummary['source']): string {
 }
 
 function getRoleBadgeProps(profile: ProfileIdentityPayload): {
-  variant: BadgeProps['variant'];
-  className?: string;
+  className: string;
 } {
   const roleLabel = `${profile.role?.display_name || ''} ${profile.role?.name || ''}`.toLowerCase();
   if (profile.role?.role_class === 'admin' || roleLabel.includes('admin')) {
-    return { variant: 'destructive' };
+    return {
+      className: 'border-red-500/40 bg-red-500/15 text-red-300 hover:bg-red-500/20',
+    };
   }
   if (roleLabel.includes('supervisor')) {
     return {
-      variant: 'outline',
       className: 'border-sky-400/50 bg-sky-500/20 text-sky-200 hover:bg-sky-500/30',
     };
   }
   if (profile.role?.role_class === 'manager' || roleLabel.includes('manager')) {
-    return { variant: 'warning' };
+    return {
+      className: 'border-amber-500/40 bg-amber-500/15 text-amber-300 hover:bg-amber-500/20',
+    };
   }
-  return { variant: 'secondary' };
+  return {
+    className: 'border-slate-500/40 bg-slate-500/15 text-slate-200 hover:bg-slate-500/20',
+  };
 }
 
 export function ProfileOverviewTab({
@@ -88,7 +92,7 @@ export function ProfileOverviewTab({
           <CardContent className="p-5">
             <div className="hidden flex-col gap-4 xl:flex xl:flex-row xl:items-start xl:justify-between">
               <div className="space-y-3">
-                <Badge variant={roleBadge.variant} className={roleBadge.className}>
+                <Badge variant="outline" className={roleBadge.className}>
                   <Crown className="mr-1 h-3.5 w-3.5" />
                   {profile.role?.display_name || 'No role assigned'}
                 </Badge>
@@ -106,20 +110,20 @@ export function ProfileOverviewTab({
             </div>
 
             <div className="grid grid-cols-[repeat(auto-fit,minmax(6.25rem,1fr))] gap-3 sm:grid-cols-1 md:grid-cols-3 xl:mt-4">
-              <div className="min-w-0 rounded-lg border border-timesheet/40 bg-timesheet/10 p-2.5 sm:p-3">
-                <CalendarDays className="mb-2 h-4 w-4 text-timesheet sm:h-5 sm:w-5" />
-                <p className="truncate whitespace-nowrap text-[10px] uppercase tracking-wide text-muted-foreground sm:text-xs">Leave remaining</p>
-                <p className="text-3xl font-semibold text-foreground sm:text-2xl">{annualLeaveSummary.remaining.toFixed(1)}</p>
+              <div className="min-w-0 rounded-lg border border-timesheet/40 bg-timesheet/10 p-3">
+                <CalendarDays className="mb-2 h-5 w-5 text-timesheet" />
+                <p className="truncate whitespace-nowrap text-xs uppercase tracking-wide text-muted-foreground">Leave remaining</p>
+                <p className="text-4xl font-semibold text-foreground sm:text-2xl">{annualLeaveSummary.remaining.toFixed(1)}</p>
               </div>
-              <div className="min-w-0 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2.5 sm:p-3">
-                <PlaneTakeoff className="mb-2 h-4 w-4 text-amber-300 sm:h-5 sm:w-5" />
-                <p className="truncate whitespace-nowrap text-[10px] uppercase tracking-wide text-muted-foreground sm:text-xs">Pending leave</p>
-                <p className="text-3xl font-semibold text-foreground sm:text-2xl">{annualLeaveSummary.pending_total.toFixed(1)}</p>
+              <div className="min-w-0 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
+                <PlaneTakeoff className="mb-2 h-5 w-5 text-amber-300" />
+                <p className="truncate whitespace-nowrap text-xs uppercase tracking-wide text-muted-foreground">Pending leave</p>
+                <p className="text-4xl font-semibold text-foreground sm:text-2xl">{annualLeaveSummary.pending_total.toFixed(1)}</p>
               </div>
-              <div className="min-w-0 rounded-lg border border-green-500/40 bg-green-500/10 p-2.5 sm:p-3">
-                <ClipboardCheck className="mb-2 h-4 w-4 text-green-300 sm:h-5 sm:w-5" />
-                <p className="truncate whitespace-nowrap text-[10px] uppercase tracking-wide text-muted-foreground sm:text-xs">Leave taken</p>
-                <p className="text-3xl font-semibold text-foreground sm:text-2xl">{annualLeaveSummary.approved_taken.toFixed(1)}</p>
+              <div className="min-w-0 rounded-lg border border-green-500/40 bg-green-500/10 p-3">
+                <ClipboardCheck className="mb-2 h-5 w-5 text-green-300" />
+                <p className="truncate whitespace-nowrap text-xs uppercase tracking-wide text-muted-foreground">Leave taken</p>
+                <p className="text-4xl font-semibold text-foreground sm:text-2xl">{annualLeaveSummary.approved_taken.toFixed(1)}</p>
               </div>
             </div>
           </CardContent>
@@ -127,20 +131,20 @@ export function ProfileOverviewTab({
 
         <div className="grid gap-4 lg:grid-cols-2">
           <Card>
-            <CardContent className="p-3">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Team manager(s)</p>
+            <CardContent className="p-4 sm:p-3">
+              <p className="text-sm uppercase tracking-wide text-muted-foreground sm:text-xs">Team manager(s)</p>
               {managers.length > 0 ? (
-                <div className="mt-2 space-y-2">
+                <div className="mt-3 space-y-2 sm:mt-2">
                   {managers.map((manager) => (
-                    <div key={`${manager.source}-${manager.id}`} className="rounded-lg border border-border bg-slate-900/30 p-2.5">
-                      <p className="text-sm font-medium text-foreground">{manager.full_name}</p>
-                      <p className="text-xs text-muted-foreground">{formatManagerSource(manager.source)}</p>
+                    <div key={`${manager.source}-${manager.id}`} className="rounded-lg border border-border bg-slate-900/30 p-3 sm:p-2.5">
+                      <p className="text-base font-medium text-foreground sm:text-sm">{manager.full_name}</p>
+                      <p className="text-sm text-muted-foreground sm:text-xs">{formatManagerSource(manager.source)}</p>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="mt-3 flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <AlertTriangle className="h-3.5 w-3.5" />
+                <p className="mt-3 flex items-center gap-2 text-base text-muted-foreground sm:gap-1.5 sm:text-sm">
+                  <AlertTriangle className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
                   No manager assigned
                 </p>
               )}
@@ -148,12 +152,12 @@ export function ProfileOverviewTab({
           </Card>
 
           <Card>
-            <CardContent className="p-3">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Training</p>
-              <div className="mt-2 rounded-lg border border-avs-yellow/40 bg-avs-yellow/10 p-3">
-                <ClipboardCheck className="mb-2 h-5 w-5 text-avs-yellow" />
-                <p className="text-sm font-medium text-foreground">Training info</p>
-                <p className="text-xs text-muted-foreground">Coming soon...</p>
+            <CardContent className="p-4 sm:p-3">
+              <p className="text-sm uppercase tracking-wide text-muted-foreground sm:text-xs">Training</p>
+              <div className="mt-3 rounded-lg border border-avs-yellow/40 bg-avs-yellow/10 p-4 sm:mt-2 sm:p-3">
+                <ClipboardCheck className="mb-2 h-6 w-6 text-avs-yellow sm:h-5 sm:w-5" />
+                <p className="text-base font-medium text-foreground sm:text-sm">Training info</p>
+                <p className="text-sm text-muted-foreground sm:text-xs">Coming soon...</p>
               </div>
             </CardContent>
           </Card>

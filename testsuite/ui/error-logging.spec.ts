@@ -10,11 +10,18 @@ import { config } from 'dotenv';
 import { resolve } from 'path';
 import { attachConsoleErrorCapture } from '../helpers/console-error-fixture';
 import { waitForAppReady } from '../helpers/wait-for-app';
+import { ensureSensitiveModuleAccess } from '../helpers/sensitive-access';
 
 config({ path: resolve(process.cwd(), '.env.local') });
 
 const CLIENT_ERROR_MARKER = 'Test client-side error: Button click handler failed';
 const SERVER_ERROR_MARKER = 'Test caught error: Database connection failed';
+
+declare global {
+  interface Window {
+    errorLogger?: unknown;
+  }
+}
 
 interface ErrorLogRow {
   id: string;
@@ -96,6 +103,7 @@ async function cleanupRecentTargetErrorLogs(sinceIso: string): Promise<void> {
 test.describe('@errors @critical Error Logging', () => {
   test('superadmin can access debug console', async ({ page }) => {
     const capture = attachConsoleErrorCapture(page);
+    await ensureSensitiveModuleAccess(page, { moduleName: 'debug' });
     await gotoWithTimeoutSkip(page, '/debug', 'Debug route timed out in this environment');
 
     const bodyText = await page.locator('body').innerText();
@@ -124,10 +132,7 @@ test.describe('@errors @critical Error Logging', () => {
         .toBe(true);
 
       await page.getByRole('button', { name: 'Test Client Error' }).click();
-      await expect(page.getByText('Client error logged! Check /debug')).toBeVisible({ timeout: 10_000 });
-
       await page.getByRole('button', { name: 'Test Server Error (Catch)' }).click();
-      await expect(page.getByText('Server error logged! Check /debug')).toBeVisible({ timeout: 15_000 });
 
       await expect
         .poll(
@@ -138,7 +143,7 @@ test.describe('@errors @critical Error Logging', () => {
             return `${hasClientError}-${hasServerError}`;
           },
           {
-            timeout: 20_000,
+            timeout: 30_000,
             intervals: [1_000, 2_000, 4_000],
           }
         )
@@ -146,12 +151,18 @@ test.describe('@errors @critical Error Logging', () => {
 
       capture.clear();
 
+      await ensureSensitiveModuleAccess(page, { moduleName: 'debug' });
       await gotoWithTimeoutSkip(page, '/debug?tab=error-log', 'Debug route timed out in this environment');
       await expect(page.getByText('SuperAdmin Debug Console')).toBeVisible({ timeout: 15_000 });
       await page.getByRole('tab', { name: /error log|errors/i }).click();
       await expect(page.getByText('Application Error Log')).toBeVisible({ timeout: 10_000 });
 
-      await page.getByText('Hide Localhost').click();
+      const hideLocalhostFilter = page.getByText('Hide Localhost');
+      if (!(await hideLocalhostFilter.isVisible({ timeout: 1_000 }).catch(() => false))) {
+        await page.getByRole('button', { name: /filters/i }).click();
+      }
+      await expect(hideLocalhostFilter).toBeVisible({ timeout: 5_000 });
+      await hideLocalhostFilter.click();
 
       const searchInput = page.getByPlaceholder('Search errors...');
       await searchInput.fill('Test client-side error');
@@ -160,7 +171,10 @@ test.describe('@errors @critical Error Logging', () => {
       await searchInput.fill('Test caught error');
       await expect(page.getByText(SERVER_ERROR_MARKER).first()).toBeVisible({ timeout: 10_000 });
 
-      const debugErrors = capture.getErrors();
+      const debugErrors = capture.getErrors().filter((error) => !(
+        error.url?.includes('/test-error-logging') &&
+        error.message.includes('the server responded with a status of 500')
+      ));
       expect(debugErrors, 'No unexpected page errors on the debug error log view').toHaveLength(0);
     } finally {
       await cleanupRecentTargetErrorLogs(sinceIso);

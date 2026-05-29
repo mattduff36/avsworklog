@@ -9,7 +9,8 @@ import { AppPageShell } from '@/components/layout/AppPageShell';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BarChart3, Bug, Car, History, RefreshCw, Send } from 'lucide-react';
+import { SensitiveModuleGate, SensitiveModuleSessionManager, useSensitiveModuleAccess } from '@/components/security/SensitiveModuleGate';
+import { BarChart3, Bug, Car, History, RefreshCw, Send, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { canAccessDebugConsole } from '@/lib/utils/debug-access';
 
@@ -21,6 +22,12 @@ const TestFleetDebugPanel = dynamic(() => import('./components/TestFleetDebugPan
 const UserAnalyticsDebugPanel = dynamic(() => import('./components/UserAnalyticsDebugPanel').then((mod) => ({ default: mod.UserAnalyticsDebugPanel })));
 
 type DebugTab = 'error-log' | 'audit-log' | 'usage-analytics' | 'dvla-sync' | 'test-fleet' | 'notification-settings';
+
+interface DebugTabConfig {
+  value: DebugTab;
+  label: string;
+  icon: LucideIcon;
+}
 
 const DEBUG_TAB_ALIASES: Record<string, DebugTab> = {
   errors: 'error-log',
@@ -37,7 +44,16 @@ const DEBUG_TAB_ALIASES: Record<string, DebugTab> = {
   'notification-settings': 'notification-settings',
 };
 
-const tabTriggerClassName = 'gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground';
+const DEBUG_TABS: DebugTabConfig[] = [
+  { value: 'error-log', label: 'Error Log', icon: Bug },
+  { value: 'audit-log', label: 'Audit Log', icon: History },
+  { value: 'usage-analytics', label: 'Usage Analytics', icon: BarChart3 },
+  { value: 'dvla-sync', label: 'DVLA Sync', icon: RefreshCw },
+  { value: 'test-fleet', label: 'Test Fleet', icon: Car },
+  { value: 'notification-settings', label: 'Notification Settings', icon: Send },
+];
+
+const tabTriggerClassName = 'min-h-10 gap-2 px-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground lg:px-3';
 
 export default function DebugPage() {
   const { profile, loading: authLoading, isActualSuperAdmin, isViewingAs } = useAuth();
@@ -49,6 +65,9 @@ export default function DebugPage() {
     email: profile?.email,
     isActualSuperAdmin,
     isViewingAs,
+  });
+  const sensitiveAccess = useSensitiveModuleAccess('debug', {
+    enabled: Boolean(profile && canAccessDebugTools),
   });
 
   useEffect(() => {
@@ -103,8 +122,21 @@ export default function DebugPage() {
     );
   }
 
+  if (sensitiveAccess.loading) {
+    return <PageLoader message="Checking sensitive debug access..." />;
+  }
+
+  if (!sensitiveAccess.canAccess) {
+    return (
+      <AppPageShell width="wide">
+        <SensitiveModuleGate moduleLabel="Debug Console" access={sensitiveAccess} />
+      </AppPageShell>
+    );
+  }
+
   return (
     <AppPageShell width="wide">
+      <SensitiveModuleSessionManager moduleLabel="Debug Console" access={sensitiveAccess} />
       <div className="rounded-lg bg-gradient-to-r from-red-600 to-orange-500 p-6 text-white shadow-sm">
         <div className="flex items-center gap-3">
           <Bug className="h-6 w-6 md:h-8 md:w-8" />
@@ -116,31 +148,19 @@ export default function DebugPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as DebugTab)} className="space-y-6">
-        <TabsList className="h-auto flex-wrap justify-start gap-0 p-1.5">
-          <TabsTrigger value="error-log" className={tabTriggerClassName}>
-            <Bug className="h-4 w-4 flex-shrink-0" />
-            Error Log
-          </TabsTrigger>
-          <TabsTrigger value="audit-log" className={tabTriggerClassName}>
-            <History className="h-4 w-4 flex-shrink-0" />
-            Audit Log
-          </TabsTrigger>
-          <TabsTrigger value="usage-analytics" className={tabTriggerClassName}>
-            <BarChart3 className="h-4 w-4 flex-shrink-0" />
-            Usage Analytics
-          </TabsTrigger>
-          <TabsTrigger value="dvla-sync" className={tabTriggerClassName}>
-            <RefreshCw className="h-4 w-4 flex-shrink-0" />
-            DVLA Sync
-          </TabsTrigger>
-          <TabsTrigger value="test-fleet" className={tabTriggerClassName}>
-            <Car className="h-4 w-4 flex-shrink-0" />
-            Test Fleet
-          </TabsTrigger>
-          <TabsTrigger value="notification-settings" className={tabTriggerClassName}>
-            <Send className="h-4 w-4 flex-shrink-0" />
-            Notification Settings
-          </TabsTrigger>
+        <TabsList className="grid h-auto w-full grid-cols-6 gap-1 bg-slate-900/50 p-1 lg:flex lg:w-auto lg:flex-wrap lg:justify-start lg:gap-0 lg:p-1.5">
+          {DEBUG_TABS.map(({ value, label, icon: Icon }) => (
+            <TabsTrigger
+              key={value}
+              value={value}
+              className={tabTriggerClassName}
+              aria-label={label}
+              title={label}
+            >
+              <Icon className="h-4 w-4 flex-shrink-0" />
+              <span className="hidden lg:inline">{label}</span>
+            </TabsTrigger>
+          ))}
         </TabsList>
 
         <TabsContent value="error-log">

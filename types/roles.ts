@@ -261,6 +261,8 @@ export type ModuleName =
   | 'inventory'
   | 'reminders';
 
+export type SensitiveAccessModuleName = ModuleName | 'debug';
+
 export const ALL_MODULES: ModuleName[] = [
   'timesheets',
   'inspections',

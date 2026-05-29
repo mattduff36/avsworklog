@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { canAccessDebugConsole, isCharlotteDebugAccessUser } from '@/lib/utils/debug-access';
+import { ALL_MODULES } from '@/types/roles';
 
 describe('isCharlotteDebugAccessUser', () => {
   it('matches Charlotte email case-insensitively', () => {
@@ -50,5 +51,11 @@ describe('canAccessDebugConsole', () => {
         isViewingAs: false,
       })
     ).toBe(false);
+  });
+});
+
+describe('hidden debug sensitive module', () => {
+  it('does not expose debug as a permission matrix module', () => {
+    expect(ALL_MODULES).not.toContain('debug');
   });
 });

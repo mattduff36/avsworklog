@@ -169,12 +169,12 @@ export function ProfileBiometricsCard() {
     <Card>
       <CardHeader>
         <div className="flex items-start gap-3">
-          <div className="rounded-lg bg-avs-yellow/15 p-2 text-avs-yellow">
-            <Fingerprint className="h-5 w-5" />
+          <div className="rounded-lg bg-avs-yellow/15 p-3 text-avs-yellow sm:p-2">
+            <Fingerprint className="h-6 w-6 sm:h-5 sm:w-5" />
           </div>
           <div>
             <CardTitle>Biometrics</CardTitle>
-            <CardDescription>
+            <CardDescription className="text-base sm:text-sm">
               Check or update biometric login for this browser and device.
             </CardDescription>
           </div>
@@ -182,57 +182,57 @@ export function ProfileBiometricsCard() {
       </CardHeader>
       <CardContent className="space-y-4">
         {loading ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 text-base text-muted-foreground sm:text-sm">
             <Loader2 className="h-4 w-4 animate-spin" />
             <span>Checking biometric status...</span>
           </div>
         ) : (
           <div className="grid gap-3 md:grid-cols-2">
-            <div className="rounded-md border border-border bg-slate-900/30 p-3">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Device</p>
-              <p className="mt-1 text-sm font-medium text-foreground">{deviceLabel}</p>
+            <div className="rounded-lg border border-border bg-slate-900/30 p-4 sm:rounded-md sm:p-3">
+              <p className="text-sm uppercase tracking-wide text-muted-foreground sm:text-xs">Device</p>
+              <p className="mt-1 text-base font-medium text-foreground sm:text-sm">{deviceLabel}</p>
             </div>
-            <div className="rounded-md border border-border bg-slate-900/30 p-3">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Browser support</p>
-              <p className="mt-1 text-sm font-medium text-foreground">
+            <div className="rounded-lg border border-border bg-slate-900/30 p-4 sm:rounded-md sm:p-3">
+              <p className="text-sm uppercase tracking-wide text-muted-foreground sm:text-xs">Browser support</p>
+              <p className="mt-1 text-base font-medium text-foreground sm:text-sm">
                 {biometricSupported ? 'Supported' : 'Not available'}
               </p>
             </div>
-            <div className="rounded-md border border-border bg-slate-900/30 p-3">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Login credential</p>
-              <p className="mt-1 text-sm font-medium text-foreground">
+            <div className="rounded-lg border border-border bg-slate-900/30 p-4 sm:rounded-md sm:p-3">
+              <p className="text-sm uppercase tracking-wide text-muted-foreground sm:text-xs">Login credential</p>
+              <p className="mt-1 text-base font-medium text-foreground sm:text-sm">
                 {isConfigured ? 'Enabled on this device' : 'Not configured'}
               </p>
             </div>
-            <div className="rounded-md border border-border bg-slate-900/30 p-3">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Saved credentials</p>
-              <p className="mt-1 text-sm font-medium text-foreground">
+            <div className="rounded-lg border border-border bg-slate-900/30 p-4 sm:rounded-md sm:p-3">
+              <p className="text-sm uppercase tracking-wide text-muted-foreground sm:text-xs">Saved credentials</p>
+              <p className="mt-1 text-base font-medium text-foreground sm:text-sm">
                 {status?.credential_count ?? 0} active on this device
               </p>
             </div>
           </div>
         )}
 
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground sm:text-xs">
           Biometric login uses this device&apos;s platform authenticator, such as Windows Hello,
           Touch ID, or Face ID. Removing it only revokes this browser/device credential.
         </p>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="grid gap-2 sm:flex sm:flex-wrap">
           <Button
             type="button"
             onClick={() => void handleEnableBiometrics()}
             disabled={!canEnable || working}
-            className="bg-avs-yellow text-slate-900 hover:bg-[#d1b82f] disabled:opacity-60"
+            className="h-14 bg-avs-yellow text-base font-semibold text-slate-900 hover:bg-[#d1b82f] disabled:opacity-60 sm:h-9 sm:text-sm"
           >
-            {working && !isConfigured ? 'Setting up...' : 'Enable biometrics'}
+            {working && !isConfigured ? 'Setting up...' : isConfigured ? 'Enabled' : 'Enable biometrics'}
           </Button>
           <Button
             type="button"
             variant="outline"
             onClick={() => void handleRemoveBiometrics()}
             disabled={!canRemove || working}
-            className="border-border bg-slate-900/40 text-foreground hover:bg-slate-800"
+            className="h-14 border-red-500/50 bg-red-500/80 text-base font-semibold text-white hover:bg-red-500 sm:h-9 sm:text-sm"
           >
             {working && isConfigured ? 'Removing...' : 'Remove biometrics'}
           </Button>

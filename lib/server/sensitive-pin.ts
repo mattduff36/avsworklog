@@ -3,8 +3,10 @@ import { promisify } from 'node:util';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
 import { verifyUserPassword } from '@/lib/server/password-auth';
-import type { ModuleName } from '@/types/roles';
+import type { SensitiveAccessModuleName } from '@/types/roles';
 import { notifyAdminsOfSensitivePinEvent } from '@/lib/server/sensitive-pin-notifications';
+
+export type CurrentAuthenticatedProfile = NonNullable<Awaited<ReturnType<typeof getCurrentAuthenticatedProfile>>>;
 
 const pbkdf2Async = promisify(pbkdf2);
 const PIN_HASH_ITERATIONS = 210_000;
@@ -44,7 +46,7 @@ export interface SensitivePinStatus {
 }
 
 export interface SensitiveModulePinState {
-  module_name: ModuleName;
+  module_name: SensitiveAccessModuleName;
   required: boolean;
   unlocked: boolean;
   expires_at: string | null;
@@ -197,6 +199,10 @@ export async function requestSensitivePinVerification(params: {
   pin: string;
   purpose: SensitivePinPurpose;
 }): Promise<{ email: string }> {
+  if (params.purpose !== 'setup') {
+    throw new Error('Sensitive PIN changes and resets must be started by an administrator');
+  }
+
   const current = await getCurrentAuthenticatedProfile({ includeEmail: true });
   if (!current) throw new Error('Unauthorized');
   if (!current.profile.email) {
@@ -267,7 +273,7 @@ export async function setupSensitivePinWithoutEmailVerification(params: {
 
   const existing = await getSensitivePinRow(current.profile.id);
   if (existing?.pin_hash && !existing.must_reset) {
-    throw new Error('Use the change PIN flow for an existing sensitive PIN');
+    throw new Error('Ask an administrator to reset your sensitive PIN before setting a new one');
   }
 
   const validation = validateSensitivePin(params.pin);
@@ -335,6 +341,10 @@ export async function confirmSensitivePinVerification(params: {
   code: string;
   purpose: SensitivePinPurpose;
 }): Promise<{ eventType: 'set' | 'changed' }> {
+  if (params.purpose !== 'setup') {
+    throw new Error('Sensitive PIN changes and resets must be started by an administrator');
+  }
+
   const current = await getCurrentAuthenticatedProfile({ includeEmail: true });
   if (!current) throw new Error('Unauthorized');
 
@@ -455,8 +465,11 @@ export async function adminResetSensitivePin(params: {
   });
 }
 
-export async function getSensitiveModulePinState(moduleName: ModuleName): Promise<SensitiveModulePinState> {
-  const current = await getCurrentAuthenticatedProfile();
+export async function getSensitiveModulePinState(
+  moduleName: SensitiveAccessModuleName,
+  currentContext?: CurrentAuthenticatedProfile
+): Promise<SensitiveModulePinState> {
+  const current = currentContext ?? await getCurrentAuthenticatedProfile();
   if (!current) throw new Error('Unauthorized');
 
   const admin = createAdminClient();
@@ -519,10 +532,11 @@ export async function getSensitiveModulePinState(moduleName: ModuleName): Promis
 }
 
 export async function unlockSensitiveModuleWithPin(params: {
-  moduleName: ModuleName;
+  moduleName: SensitiveAccessModuleName;
   pin: string;
+  currentContext?: CurrentAuthenticatedProfile;
 }): Promise<SensitiveModulePinState> {
-  const current = await getCurrentAuthenticatedProfile();
+  const current = params.currentContext ?? await getCurrentAuthenticatedProfile();
   if (!current) throw new Error('Unauthorized');
 
   const validation = validateSensitivePin(params.pin);
@@ -578,7 +592,7 @@ export async function unlockSensitiveModuleWithPin(params: {
     throw new Error(protectedModulesError.message);
   }
 
-  const unlockRows = ((protectedModules || []) as Array<{ module_name: ModuleName }>)
+  const unlockRows = ((protectedModules || []) as Array<{ module_name: SensitiveAccessModuleName }>)
     .map((module) => ({
       profile_id: current.profile.id,
       session_id: current.validation.session!.id,
@@ -609,11 +623,14 @@ export async function unlockSensitiveModuleWithPin(params: {
     }),
   ]);
 
-  return getSensitiveModulePinState(params.moduleName);
+  return getSensitiveModulePinState(params.moduleName, current);
 }
 
-export async function renewSensitiveModuleAccess(moduleName: ModuleName): Promise<SensitiveModulePinState> {
-  const current = await getCurrentAuthenticatedProfile();
+export async function renewSensitiveModuleAccess(
+  moduleName: SensitiveAccessModuleName,
+  currentContext?: CurrentAuthenticatedProfile
+): Promise<SensitiveModulePinState> {
+  const current = currentContext ?? await getCurrentAuthenticatedProfile();
   if (!current) throw new Error('Unauthorized');
 
   const sessionId = current.validation.session?.id;
@@ -647,5 +664,5 @@ export async function renewSensitiveModuleAccess(moduleName: ModuleName): Promis
 
   if (updateError) throw new Error(updateError.message);
 
-  return getSensitiveModulePinState(moduleName);
+  return getSensitiveModulePinState(moduleName, current);
 }

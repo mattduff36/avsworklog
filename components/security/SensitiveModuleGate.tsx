@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import type { ModuleName } from '@/types/roles';
+import type { SensitiveAccessModuleName } from '@/types/roles';
 
 const SENSITIVE_ACCESS_HEARTBEAT_MS = 5 * 60 * 1000;
 const SENSITIVE_ACCESS_IDLE_WARNING_MS = 10 * 60 * 1000;
@@ -30,7 +30,7 @@ interface SensitivePinStatus {
 }
 
 interface SensitiveModuleState {
-  module_name: ModuleName;
+  module_name: SensitiveAccessModuleName;
   required: boolean;
   unlocked: boolean;
   expires_at: string | null;
@@ -46,11 +46,21 @@ export interface SensitiveModuleAccessState {
   renew: () => Promise<boolean>;
 }
 
-export function useSensitiveModuleAccess(moduleName: ModuleName): SensitiveModuleAccessState {
+export function useSensitiveModuleAccess(
+  moduleName: SensitiveAccessModuleName,
+  options?: { enabled?: boolean }
+): SensitiveModuleAccessState {
   const [loading, setLoading] = useState(true);
   const [state, setState] = useState<SensitiveModuleState | null>(null);
+  const enabled = options?.enabled ?? true;
 
   const refresh = useCallback(async () => {
+    if (!enabled) {
+      setState(null);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await fetch(`/api/sensitive-access/status?module=${encodeURIComponent(moduleName)}`, {
@@ -67,7 +77,7 @@ export function useSensitiveModuleAccess(moduleName: ModuleName): SensitiveModul
     } finally {
       setLoading(false);
     }
-  }, [moduleName]);
+  }, [enabled, moduleName]);
 
   useEffect(() => {
     void refresh();

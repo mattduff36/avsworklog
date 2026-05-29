@@ -8,11 +8,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Activity, BarChart3, Clock, Eye, Loader2, RefreshCw, Route, Search, Users } from 'lucide-react';
+import { Activity, BarChart3, BriefcaseBusiness, Building2, Clock, Eye, Gauge, Loader2, Monitor, RefreshCw, Route, Search, TrendingUp, Users } from 'lucide-react';
 import { toast } from 'sonner';
-import type { UsageAnalyticsPayload } from '../types';
+import type { UsageAnalyticsBreakdown, UsageAnalyticsInsight, UsageAnalyticsPayload } from '../types';
 
 type AnalyticsRange = '24h' | '7d' | '30d' | '90d';
+type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning';
 
 const EVENT_FILTERS = [
   { value: 'all', label: 'All events' },
@@ -50,23 +51,167 @@ function formatDuration(value: number | null): string {
   return `${(value / 1000).toFixed(1)}s`;
 }
 
+function formatLabel(value: string): string {
+  return value
+    .split(/[-_/\s]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function getInsightClasses(tone: UsageAnalyticsInsight['tone']): string {
+  switch (tone) {
+    case 'success':
+      return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100';
+    case 'warning':
+      return 'border-amber-500/30 bg-amber-500/10 text-amber-100';
+    case 'danger':
+      return 'border-red-500/30 bg-red-500/10 text-red-100';
+    case 'info':
+      return 'border-blue-500/30 bg-blue-500/10 text-blue-100';
+    default:
+      return 'border-slate-500/30 bg-slate-500/10 text-slate-100';
+  }
+}
+
+function getRoleBadgeMeta(roleName: string | null): { variant: BadgeVariant; className?: string; label: string } {
+  const label = roleName || 'Unknown role';
+  const normalized = label.toLowerCase();
+  if (normalized.includes('admin')) return { variant: 'destructive', label };
+  if (normalized.includes('manager')) return { variant: 'warning', label };
+  if (normalized.includes('supervisor')) {
+    return {
+      variant: 'outline',
+      className: 'border-sky-400/50 bg-sky-500/20 text-sky-200 hover:bg-sky-500/30',
+      label,
+    };
+  }
+  return { variant: 'secondary', label };
+}
+
+function getEventBadgeClass(eventCategory: string): string {
+  switch (eventCategory) {
+    case 'navigation':
+      return 'border-blue-500/30 bg-blue-500/10 text-blue-300';
+    case 'auth':
+      return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300';
+    case 'error':
+      return 'border-red-500/30 bg-red-500/10 text-red-300';
+    case 'performance':
+      return 'border-purple-500/30 bg-purple-500/10 text-purple-300';
+    default:
+      return 'border-slate-500/30 bg-slate-500/10 text-slate-300';
+  }
+}
+
+function getDeviceBadgeClass(deviceType: string | null): string {
+  switch ((deviceType || '').toLowerCase()) {
+    case 'mobile':
+      return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300';
+    case 'tablet':
+      return 'border-purple-500/30 bg-purple-500/10 text-purple-300';
+    case 'desktop':
+      return 'border-blue-500/30 bg-blue-500/10 text-blue-300';
+    default:
+      return 'border-slate-500/30 bg-slate-500/10 text-slate-300';
+  }
+}
+
+function getModuleBadgeClass(moduleName: string | null): string {
+  const normalized = (moduleName || '').toLowerCase();
+  if (normalized.includes('timesheet')) return 'border-[hsl(var(--timesheet-primary)/0.30)] bg-[hsl(var(--timesheet-primary)/0.10)] text-timesheet';
+  if (normalized.includes('hgv')) return 'border-[hsl(var(--hgv-inspection-primary)/0.30)] bg-[hsl(var(--hgv-inspection-primary)/0.10)] text-hgv-inspection';
+  if (normalized.includes('plant')) return 'border-[hsl(var(--plant-inspection-primary)/0.30)] bg-[hsl(var(--plant-inspection-primary)/0.10)] text-plant-inspection';
+  if (normalized.includes('inspection')) return 'border-[hsl(var(--inspection-primary)/0.30)] bg-[hsl(var(--inspection-primary)/0.10)] text-inspection';
+  if (normalized.includes('absence')) return 'border-[hsl(var(--absence-primary)/0.30)] bg-[hsl(var(--absence-primary)/0.10)] text-absence';
+  if (normalized.includes('fleet') || normalized.includes('van')) return 'border-[hsl(var(--fleet-primary)/0.30)] bg-[hsl(var(--fleet-primary)/0.10)] text-fleet';
+  if (normalized.includes('workshop')) return 'border-[hsl(var(--workshop-primary)/0.30)] bg-[hsl(var(--workshop-primary)/0.10)] text-workshop';
+  if (normalized.includes('inventory')) return 'border-[hsl(var(--inventory-primary)/0.30)] bg-[hsl(var(--inventory-primary)/0.10)] text-inventory';
+  if (normalized.includes('report')) return 'border-[hsl(var(--report-primary)/0.30)] bg-[hsl(var(--report-primary)/0.10)] text-report';
+  if (normalized.includes('debug') || normalized.includes('error')) return 'border-[hsl(var(--debug-primary)/0.30)] bg-[hsl(var(--debug-primary)/0.10)] text-red-300';
+  if (normalized.includes('rams') || normalized.includes('project')) return 'border-[hsl(var(--rams-primary)/0.30)] bg-[hsl(var(--rams-primary)/0.10)] text-rams';
+  return 'border-slate-500/30 bg-slate-500/10 text-slate-300';
+}
+
 interface StatCardProps {
   title: string;
   value: string;
   description: string;
   icon: ReactNode;
+  accentClassName?: string;
 }
 
-function StatCard({ title, value, description, icon }: StatCardProps) {
+function StatCard({ title, value, description, icon, accentClassName = 'text-muted-foreground' }: StatCardProps) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <div className="text-muted-foreground">{icon}</div>
+        <div className={accentClassName}>{icon}</div>
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">{value}</div>
         <p className="text-xs text-muted-foreground">{description}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function BreakdownPreview({
+  title,
+  icon,
+  items,
+}: {
+  title: string;
+  icon: ReactNode;
+  items: UsageAnalyticsBreakdown[];
+}) {
+  return (
+    <div className="rounded-xl border border-slate-700/70 bg-slate-950/35 p-3">
+      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-100">
+        <span className="text-avs-yellow">{icon}</span>
+        {title}
+      </div>
+      <div className="space-y-2">
+        {items.slice(0, 3).map((item) => (
+          <div key={item.label} className="flex items-center justify-between gap-3">
+            <span className="truncate text-sm text-slate-200">{item.label}</span>
+            <span className="shrink-0 text-xs text-muted-foreground">
+              {formatNumber(item.users)} users / {formatNumber(item.events)} events
+            </span>
+          </div>
+        ))}
+        {items.length === 0 ? <p className="text-sm text-muted-foreground">No data yet.</p> : null}
+      </div>
+    </div>
+  );
+}
+
+function UsageSummarySection({ payload }: { payload: UsageAnalyticsPayload }) {
+  return (
+    <Card className="overflow-hidden border-avs-yellow/20 bg-slate-950/60">
+      <div className="pointer-events-none h-1 bg-gradient-to-r from-orange-500 to-red-600" />
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <TrendingUp className="h-5 w-5 text-avs-yellow" />
+          Usage Summary
+        </CardTitle>
+        <CardDescription>{payload.usageSummary.headline}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {payload.usageSummary.highlights.map((insight) => (
+            <div key={insight.title} className={`rounded-xl border p-4 ${getInsightClasses(insight.tone)}`}>
+              <p className="text-xs font-semibold uppercase tracking-wide opacity-80">{insight.title}</p>
+              <p className="mt-2 text-xl font-bold">{insight.value}</p>
+              <p className="mt-2 text-sm leading-5 opacity-85">{insight.detail}</p>
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+          <BreakdownPreview title="Team usage" icon={<Building2 className="h-4 w-4" />} items={payload.topTeams} />
+          <BreakdownPreview title="Role usage" icon={<BriefcaseBusiness className="h-4 w-4" />} items={payload.roleBreakdown} />
+          <BreakdownPreview title="Device usage" icon={<Monitor className="h-4 w-4" />} items={payload.deviceBreakdown} />
+        </div>
       </CardContent>
     </Card>
   );
@@ -207,13 +352,15 @@ export function UserAnalyticsDebugPanel() {
 
       {payload ? (
         <>
+          <UsageSummarySection payload={payload} />
+
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
-            <StatCard title="Events" value={formatNumber(payload.summary.totalEvents)} description="Tracked usage events" icon={<Activity className="h-4 w-4" />} />
-            <StatCard title="Users" value={formatNumber(payload.summary.uniqueUsers)} description="Unique users in range" icon={<Users className="h-4 w-4" />} />
-            <StatCard title="Sessions" value={formatNumber(payload.summary.sessionCount)} description="Sessions with events" icon={<Clock className="h-4 w-4" />} />
-            <StatCard title="Page Views" value={formatNumber(payload.summary.pageViews)} description="Navigation page views" icon={<Eye className="h-4 w-4" />} />
-            <StatCard title="Active Now" value={formatNumber(payload.summary.activeSessions)} description="Seen in last 5 minutes" icon={<Route className="h-4 w-4" />} />
-            <StatCard title="Avg Duration" value={formatDuration(payload.summary.avgDurationMs)} description="For events with duration" icon={<Clock className="h-4 w-4" />} />
+            <StatCard title="Events" value={formatNumber(payload.summary.totalEvents)} description="Tracked usage events" icon={<Activity className="h-4 w-4" />} accentClassName="text-avs-yellow" />
+            <StatCard title="Users" value={formatNumber(payload.summary.uniqueUsers)} description="Unique users in range" icon={<Users className="h-4 w-4" />} accentClassName="text-blue-500" />
+            <StatCard title="Sessions" value={formatNumber(payload.summary.sessionCount)} description="Sessions with events" icon={<Clock className="h-4 w-4" />} accentClassName="text-sky-500" />
+            <StatCard title="Page Views" value={formatNumber(payload.summary.pageViews)} description="Navigation page views" icon={<Eye className="h-4 w-4" />} accentClassName="text-inspection" />
+            <StatCard title="Active Now" value={formatNumber(payload.summary.activeSessions)} description="Seen in last 5 minutes" icon={<Route className="h-4 w-4" />} accentClassName="text-emerald-500" />
+            <StatCard title="Avg Duration" value={formatDuration(payload.summary.avgDurationMs)} description="For events with duration" icon={<Gauge className="h-4 w-4" />} accentClassName="text-amber-500" />
           </div>
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
@@ -228,7 +375,7 @@ export function UserAnalyticsDebugPanel() {
                 ) : (
                   payload.topModules.map((module) => (
                     <div key={module.module} className="flex items-center justify-between rounded-md border p-2">
-                      <span className="font-mono text-sm">{module.module}</span>
+                      <Badge variant="outline" className={getModuleBadgeClass(module.module)}>{formatLabel(module.module)}</Badge>
                       <div className="flex gap-2">
                         <Badge variant="secondary">{formatNumber(module.events)} events</Badge>
                         <Badge variant="outline">{formatNumber(module.users)} users</Badge>
@@ -272,7 +419,7 @@ export function UserAnalyticsDebugPanel() {
                 ) : (
                   payload.topEvents.map((event) => (
                     <div key={event.eventName} className="flex items-center justify-between rounded-md border p-2">
-                      <span className="font-mono text-sm">{event.eventName}</span>
+                      <span className="font-mono text-sm">{formatLabel(event.eventName)}</span>
                       <Badge variant="secondary">{formatNumber(event.events)}</Badge>
                     </div>
                   ))
@@ -303,11 +450,15 @@ export function UserAnalyticsDebugPanel() {
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <p className="font-medium">{session.userName}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {session.roleName || 'Unknown role'}{session.teamName ? ` • ${session.teamName}` : ''}
-                          </p>
+                          <div className="mt-1 flex flex-wrap items-center gap-2">
+                            {(() => {
+                              const roleBadge = getRoleBadgeMeta(session.roleName);
+                              return <Badge variant={roleBadge.variant} className={roleBadge.className}>{roleBadge.label}</Badge>;
+                            })()}
+                            {session.teamName ? <span className="text-xs text-muted-foreground">{session.teamName}</span> : null}
+                          </div>
                         </div>
-                        <Badge variant="outline">{session.deviceType || 'unknown'}</Badge>
+                        <Badge variant="outline" className={getDeviceBadgeClass(session.deviceType)}>{session.deviceType || 'unknown'}</Badge>
                       </div>
                       <p className="mt-2 truncate font-mono text-xs text-muted-foreground">{session.exitPath || session.entryPath || 'No path'}</p>
                       <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
@@ -335,8 +486,8 @@ export function UserAnalyticsDebugPanel() {
                   selectedSessionEvents.map((event) => (
                     <div key={event.id} className="rounded-md border p-3">
                       <div className="flex items-center gap-2">
-                        <Badge variant={event.eventCategory === 'error' ? 'destructive' : 'secondary'}>{event.eventName}</Badge>
-                        {event.module ? <Badge variant="outline">{event.module}</Badge> : null}
+                        <Badge variant="outline" className={getEventBadgeClass(event.eventCategory)}>{formatLabel(event.eventName)}</Badge>
+                        {event.module ? <Badge variant="outline" className={getModuleBadgeClass(event.module)}>{formatLabel(event.module)}</Badge> : null}
                         <span className="ml-auto text-xs text-muted-foreground">{formatDateTime(event.occurredAt)}</span>
                       </div>
                       <p className="mt-2 truncate font-mono text-xs text-muted-foreground">{event.path || 'No path'}</p>
@@ -359,9 +510,13 @@ export function UserAnalyticsDebugPanel() {
                 payload.recentEvents.map((event) => (
                   <div key={event.id} className="rounded-md border p-3">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant={event.eventCategory === 'error' ? 'destructive' : 'secondary'}>{event.eventName}</Badge>
-                      {event.module ? <Badge variant="outline">{event.module}</Badge> : null}
-                      {event.deviceType ? <Badge variant="outline">{event.deviceType}</Badge> : null}
+                      <Badge variant="outline" className={getEventBadgeClass(event.eventCategory)}>{formatLabel(event.eventName)}</Badge>
+                      {event.module ? <Badge variant="outline" className={getModuleBadgeClass(event.module)}>{formatLabel(event.module)}</Badge> : null}
+                      {event.deviceType ? <Badge variant="outline" className={getDeviceBadgeClass(event.deviceType)}>{event.deviceType}</Badge> : null}
+                      {event.roleName ? (() => {
+                        const roleBadge = getRoleBadgeMeta(event.roleName);
+                        return <Badge variant={roleBadge.variant} className={roleBadge.className}>{roleBadge.label}</Badge>;
+                      })() : null}
                       <span className="ml-auto text-xs text-muted-foreground">{formatDateTime(event.occurredAt)}</span>
                     </div>
                     <div className="mt-2 grid gap-1 text-xs text-muted-foreground md:grid-cols-2">

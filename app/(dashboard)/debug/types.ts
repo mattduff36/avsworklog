@@ -77,6 +77,26 @@ export interface UsageAnalyticsSummary {
   avgDurationMs: number | null;
 }
 
+export interface UsageAnalyticsBreakdown {
+  label: string;
+  events: number;
+  users: number;
+  sessions: number;
+  pageViews: number;
+}
+
+export interface UsageAnalyticsInsight {
+  title: string;
+  value: string;
+  detail: string;
+  tone: 'info' | 'success' | 'warning' | 'danger' | 'neutral';
+}
+
+export interface UsageAnalyticsPlainSummary {
+  headline: string;
+  highlights: UsageAnalyticsInsight[];
+}
+
 export interface UsageAnalyticsPayload {
   success: true;
   generatedAt: string;
@@ -88,6 +108,10 @@ export interface UsageAnalyticsPayload {
   topModules: Array<{ module: string; events: number; users: number }>;
   topPages: Array<{ path: string; views: number; users: number }>;
   topEvents: Array<{ eventName: string; events: number; users: number }>;
+  usageSummary: UsageAnalyticsPlainSummary;
+  topTeams: UsageAnalyticsBreakdown[];
+  roleBreakdown: UsageAnalyticsBreakdown[];
+  deviceBreakdown: UsageAnalyticsBreakdown[];
   activeSessions: Array<{
     id: string;
     userId: string | null;

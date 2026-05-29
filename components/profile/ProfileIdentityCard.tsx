@@ -58,7 +58,7 @@ export function ProfileIdentityCard({
   return (
     <Card className="border-border">
       <CardHeader className="px-4 !pb-0 pt-4 sm:px-6 sm:!pb-2 sm:pt-6">
-        <CardTitle className="text-xl sm:text-2xl">{profile.full_name}&apos;s Profile</CardTitle>
+        <CardTitle className="text-2xl sm:text-2xl">{profile.full_name}&apos;s Profile</CardTitle>
         <CardDescription className="hidden sm:block">{description}</CardDescription>
       </CardHeader>
       <CardContent className="px-4 pb-4 pt-1 sm:px-6 sm:pb-6 sm:pt-0">
@@ -98,8 +98,8 @@ export function ProfileIdentityCard({
 
                 <DialogContent className="w-[calc(100vw-2rem)] max-w-xs gap-4 border-border p-4 text-white sm:max-w-sm">
                   <DialogHeader>
-                    <DialogTitle>Avatar image</DialogTitle>
-                    <DialogDescription>Add, change, or remove your profile image.</DialogDescription>
+                    <DialogTitle className="text-2xl sm:text-lg">Avatar image</DialogTitle>
+                    <DialogDescription className="text-base sm:text-sm">Add, change, or remove your profile image.</DialogDescription>
                   </DialogHeader>
                   <div className="grid gap-2">
                     <input
@@ -115,9 +115,9 @@ export function ProfileIdentityCard({
                       variant="outline"
                       disabled={isAvatarBusy}
                       onClick={() => avatarInputRef.current?.click()}
-                      className="w-full border-border bg-slate-900/40 text-foreground hover:bg-slate-800"
+                      className="h-12 w-full border-border bg-slate-900/40 text-base text-foreground hover:bg-slate-800 sm:h-9 sm:text-sm"
                     >
-                      <ImagePlus className="h-4 w-4" />
+                      <ImagePlus className="h-5 w-5 sm:h-4 sm:w-4" />
                       {profile.avatar_url ? 'Change image' : 'Add image'}
                     </Button>
 
@@ -127,9 +127,9 @@ export function ProfileIdentityCard({
                         variant="outline"
                         disabled={isAvatarBusy}
                         onClick={handleRemoveAvatarClick}
-                        className="w-full border-red-500/50 bg-red-500/10 text-red-200 hover:bg-red-500/20 hover:text-red-100"
+                        className="h-12 w-full border-red-500/50 bg-red-500/10 text-base text-red-200 hover:bg-red-500/20 hover:text-red-100 sm:h-9 sm:text-sm"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-5 w-5 sm:h-4 sm:w-4" />
                         Delete image
                       </Button>
                     ) : null}
@@ -137,7 +137,7 @@ export function ProfileIdentityCard({
                 </DialogContent>
               </Dialog>
 
-              <div className="min-w-0 justify-self-stretch space-y-1 text-[10px] font-medium leading-4 text-foreground sm:flex-1 sm:text-sm sm:leading-5">
+              <div className="min-w-0 justify-self-stretch space-y-1 text-sm font-semibold leading-5 text-foreground sm:flex-1 sm:text-sm sm:leading-5">
                 <p className="truncate whitespace-nowrap">
                   {profile.team?.name || 'Unassigned team'} · {profile.role?.display_name || 'No role'}
                 </p>

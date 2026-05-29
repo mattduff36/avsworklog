@@ -9,6 +9,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { AppPageShell } from '@/components/layout/AppPageShell';
 import { NuqsClientAdapter } from '@/components/providers/NuqsClientAdapter';
 import { PROFILE_HUB_PRD_EPIC_ID } from '@/lib/profile/epic';
+import { cn } from '@/lib/utils/cn';
 import { ProfileHelpTab } from '@/components/profile/ProfileHelpTab';
 import { ProfileIdentityCard } from '@/components/profile/ProfileIdentityCard';
 import { type ProfileDetailsDraft, ProfileMyDetailsTab } from '@/components/profile/ProfileMyDetailsTab';
@@ -38,15 +39,57 @@ const PROFILE_SETTINGS_TABS: ProfileSettingsTab[] = [
   'permissions',
 ];
 
+const PROFILE_NAV_ITEMS: Array<{
+  value: ProfilePageTab;
+  label: string;
+  icon: typeof IdCard;
+}> = [
+  { value: 'overview', label: 'Overview', icon: IdCard },
+  { value: 'recent', label: 'Recent Submissions', icon: ClipboardList },
+  { value: 'settings', label: 'Settings', icon: Settings },
+  { value: 'help', label: 'Help', icon: CircleHelp },
+];
+
 const SETTINGS_NAV_ITEMS: Array<{
   value: ProfileSettingsTab;
   label: string;
   icon: typeof UserRound;
+  tileClassName: string;
+  activeClassName: string;
+  iconClassName: string;
 }> = [
-  { value: 'my-details', label: 'My details', icon: UserRound },
-  { value: 'notifications', label: 'Notifications', icon: Bell },
-  { value: 'security', label: 'Security', icon: ShieldCheck },
-  { value: 'permissions', label: 'Permissions', icon: SlidersHorizontal },
+  {
+    value: 'my-details',
+    label: 'My details',
+    icon: UserRound,
+    tileClassName: 'bg-sky-500/[0.06] hover:bg-sky-500/[0.12]',
+    activeClassName: 'bg-sky-500/30',
+    iconClassName: 'bg-sky-500/15 text-sky-300',
+  },
+  {
+    value: 'notifications',
+    label: 'Notifications',
+    icon: Bell,
+    tileClassName: 'bg-amber-500/[0.06] hover:bg-amber-500/[0.12]',
+    activeClassName: 'bg-amber-500/30',
+    iconClassName: 'bg-amber-500/15 text-amber-300',
+  },
+  {
+    value: 'security',
+    label: 'Security',
+    icon: ShieldCheck,
+    tileClassName: 'bg-emerald-500/[0.06] hover:bg-emerald-500/[0.12]',
+    activeClassName: 'bg-emerald-500/30',
+    iconClassName: 'bg-emerald-500/15 text-emerald-300',
+  },
+  {
+    value: 'permissions',
+    label: 'Permissions',
+    icon: SlidersHorizontal,
+    tileClassName: 'bg-violet-500/[0.06] hover:bg-violet-500/[0.12]',
+    activeClassName: 'bg-violet-500/30',
+    iconClassName: 'bg-violet-500/15 text-violet-300',
+  },
 ];
 
 const EMPTY_DETAILS_DRAFT: ProfileDetailsDraft = {
@@ -492,7 +535,30 @@ function ProfilePageContent() {
         }}
         className="space-y-4"
       >
-        <TabsList className="w-full justify-start">
+        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-slate-700/70 bg-slate-700/70 sm:hidden">
+          {PROFILE_NAV_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.value;
+
+            return (
+              <button
+                key={item.value}
+                type="button"
+                aria-pressed={isActive}
+                onClick={() => void setTabParam(item.value)}
+                className={cn(
+                  'flex min-h-16 items-center justify-center gap-2 bg-slate-800/80 px-3 py-4 text-center text-base font-semibold text-white transition-colors hover:bg-slate-700/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-avs-yellow focus-visible:ring-inset',
+                  isActive && 'bg-avs-yellow text-slate-950 hover:bg-avs-yellow/90'
+                )}
+              >
+                <Icon className="h-5 w-5 shrink-0" />
+                <span className="whitespace-nowrap">{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <TabsList className="hidden w-full justify-start sm:flex">
           <TabsTrigger value="overview" className="gap-2">
             <IdCard className="h-4 w-4" />
             Overview
@@ -572,21 +638,34 @@ function ProfilePageContent() {
                 </TabsContent>
               </div>
 
-              <TabsList className="order-first flex h-auto w-full flex-wrap items-stretch justify-start gap-2 bg-slate-900/50 p-2 lg:order-none lg:sticky lg:top-4 lg:flex-col">
-                {SETTINGS_NAV_ITEMS.map((item) => {
+              <div className="order-first grid h-auto w-full grid-cols-4 overflow-hidden rounded-xl border border-slate-700/70 bg-slate-900/40 lg:order-none lg:sticky lg:top-4 lg:grid-cols-1">
+                {SETTINGS_NAV_ITEMS.map((item, index) => {
                   const Icon = item.icon;
+                  const isActive = activeSettingsTab === item.value;
                   return (
-                    <TabsTrigger
+                    <button
                       key={item.value}
-                      value={item.value}
-                      className="min-h-11 flex-1 justify-start gap-2 px-3 lg:w-full lg:flex-none"
+                      type="button"
+                      aria-pressed={isActive}
+                      onClick={() => {
+                        void setTabParam('settings');
+                        void setSettingsTabParam(item.value);
+                      }}
+                      className={cn(
+                        'group relative flex min-h-16 flex-col items-center justify-center gap-1 border-slate-700/70 p-2 text-center text-[10px] font-semibold text-slate-100 transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-avs-yellow focus-visible:ring-inset sm:min-h-20 sm:gap-2 sm:text-sm lg:w-full',
+                        index < SETTINGS_NAV_ITEMS.length - 1 && 'border-r lg:border-b lg:border-r-0',
+                        item.tileClassName,
+                        isActive && item.activeClassName
+                      )}
                     >
-                      <Icon className="h-4 w-4" />
-                      {item.label}
-                    </TabsTrigger>
+                      <span className={`relative z-10 flex h-8 w-8 items-center justify-center rounded-lg transition-transform group-hover:scale-105 sm:h-9 sm:w-9 ${item.iconClassName}`}>
+                        <Icon className="h-5 w-5" />
+                      </span>
+                      <span className="relative z-10 hidden whitespace-nowrap leading-tight min-[390px]:block lg:block">{item.label}</span>
+                    </button>
                   );
                 })}
-              </TabsList>
+              </div>
             </div>
           </Tabs>
         </TabsContent>

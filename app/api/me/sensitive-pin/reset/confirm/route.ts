@@ -1,20 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { confirmSensitivePinVerification } from '@/lib/server/sensitive-pin';
+import { NextResponse } from 'next/server';
 
-export async function POST(request: NextRequest) {
-  try {
-    const body = (await request.json().catch(() => null)) as { code?: string } | null;
-    const result = await confirmSensitivePinVerification({
-      code: typeof body?.code === 'string' ? body.code : '',
-      purpose: 'reset',
-    });
-
-    return NextResponse.json({ success: true, eventType: result.eventType });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unable to confirm PIN reset';
-    return NextResponse.json(
-      { error: message },
-      { status: message === 'Unauthorized' ? 401 : 400 }
-    );
-  }
+export async function POST() {
+  return NextResponse.json(
+    { error: 'Sensitive PIN resets must be started by an administrator.' },
+    { status: 403 }
+  );
 }

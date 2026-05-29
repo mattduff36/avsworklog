@@ -3,12 +3,13 @@ import {
   getUserAnalyticsDebugPayload,
   requireDebugAnalyticsAccess,
 } from '@/lib/server/user-analytics';
+import { createDebugAccessErrorBody } from '@/lib/server/debug-console-access';
 import { logServerError } from '@/lib/utils/server-error-logger';
 
 export async function GET(request: NextRequest) {
   const access = await requireDebugAnalyticsAccess();
   if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+    return NextResponse.json(createDebugAccessErrorBody(access), { status: access.status });
   }
 
   try {

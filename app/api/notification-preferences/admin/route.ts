@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
         full_name,
         employee_id,
         is_placeholder,
-        role:roles(name)
+        role:roles(name, display_name, role_class, is_super_admin)
       `)
       .order('full_name');
 
@@ -65,12 +65,24 @@ export async function GET(request: NextRequest) {
     // Build response with users and their preferences
     const visibleProfiles = await filterHiddenSystemTestAccountProfiles(adminClient, profiles || []);
 
-    const users = visibleProfiles.map(p => ({
+    const users = visibleProfiles.map(p => {
+      const role = p.role as {
+        name?: string | null;
+        display_name?: string | null;
+        role_class?: 'admin' | 'manager' | 'employee' | null;
+        is_super_admin?: boolean | null;
+      } | null;
+
+      return {
       user_id: p.id,
       full_name: p.full_name,
-      role_name: (p.role as { name?: string } | null)?.name || 'unknown',
+      role_name: role?.name || 'unknown',
+      role_display_name: role?.display_name || role?.name || 'Unknown',
+      role_class: role?.role_class || null,
+      is_super_admin: role?.is_super_admin === true,
       preferences: (allPrefs || []).filter(pref => pref.user_id === p.id),
-    }));
+      };
+    });
 
     const response: GetAllNotificationPreferencesResponse = {
       success: true,
