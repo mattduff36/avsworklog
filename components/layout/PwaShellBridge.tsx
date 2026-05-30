@@ -23,31 +23,8 @@ function isStandalonePwa() {
   return hasStandaloneDisplayMode || isIOSStandalonePwa();
 }
 
-function isPlainLeftClick(event: MouseEvent) {
-  return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
-}
-
 function syncStandaloneAttribute() {
   document.documentElement.toggleAttribute('data-standalone-pwa', isStandalonePwa());
-}
-
-function getInternalAppLink(event: MouseEvent) {
-  if (event.defaultPrevented || !isPlainLeftClick(event)) return null;
-  if (!(event.target instanceof Element)) return null;
-
-  const anchor = event.target.closest<HTMLAnchorElement>('a[href]');
-  if (!anchor) return null;
-  if (anchor.target && anchor.target !== '_self') return null;
-  if (anchor.hasAttribute('download')) return null;
-
-  const url = new URL(anchor.href, window.location.href);
-  if (url.origin !== window.location.origin) return null;
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/_next/')) return null;
-  if (`${url.pathname}${url.search}` === `${window.location.pathname}${window.location.search}` && url.hash) {
-    return null;
-  }
-
-  return url.href;
 }
 
 export function PwaShellBridge() {
@@ -65,21 +42,6 @@ export function PwaShellBridge() {
       standaloneMedia.removeEventListener('change', syncStandaloneAttribute);
       document.documentElement.removeAttribute('data-standalone-pwa');
     };
-  }, []);
-
-  useEffect(() => {
-    if (!isIOSStandalonePwa()) return;
-
-    function handleClick(event: MouseEvent) {
-      const href = getInternalAppLink(event);
-      if (!href) return;
-
-      event.preventDefault();
-      window.location.href = href;
-    }
-
-    document.addEventListener('click', handleClick, true);
-    return () => document.removeEventListener('click', handleClick, true);
   }, []);
 
   return null;

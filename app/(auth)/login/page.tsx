@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import type { PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/browser';
 import { useAuth } from '@/lib/hooks/useAuth';
 import {
@@ -37,6 +38,7 @@ function isSafeRedirectTarget(value: string | null): value is string {
 }
 
 export default function LoginPage() {
+  const router = useRouter();
   const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -96,7 +98,7 @@ export default function LoginPage() {
   }
 
   function redirectAfterAuth(target: string): void {
-    window.location.replace(target);
+    router.replace(target);
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -106,10 +108,11 @@ export default function LoginPage() {
 
     try {
       const deviceId = getOrCreateWebAuthnDeviceId();
-      const { error } = await signIn(email, password, {
+      const { data, error } = await signIn(email, password, {
         rememberMe,
         deviceId,
         deviceLabel: getWebAuthnDeviceLabel(),
+        deferRedirect: true,
       });
 
       if (error) {
@@ -120,6 +123,7 @@ export default function LoginPage() {
       clearRetiredAccountSwitchClientState();
 
       localStorage.setItem('rememberMe', rememberMe ? 'true' : 'false');
+      redirectAfterAuth(getPostLoginRedirect(data));
     } catch {
       setError('An unexpected error occurred');
     } finally {

@@ -61,6 +61,7 @@
     "typecheck:tests": "tsc --noEmit -p tsconfig.tests.json",
     "test:guard:vehicle-inspections": "node scripts/guards/no-vehicle-inspections.mjs",
     "verify:data-safety": "tsx scripts/verification/verify-inspection-data-safety.ts",
+    "verify:pwa-head": "tsx scripts/verify-pwa-head.ts",
     "ci:inspections": "npm run typecheck && npm run lint && npm run test:guard:vehicle-inspections && npm run test:run -- tests/unit/inspections && npm run build"
   },
   "dependencies": {

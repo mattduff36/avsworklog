@@ -56,9 +56,10 @@ describe('PwaShellBridge', () => {
     document.documentElement.removeAttribute('data-standalone-pwa');
   });
 
-  it('captures iOS standalone app links before Next Link can hand them to Safari', () => {
+  it('marks iOS standalone mode for safe-area styling without intercepting app links', () => {
     const nextLinkClick = vi.fn((event: ReactMouseEvent<HTMLAnchorElement>) => {
-      expect(event.defaultPrevented).toBe(true);
+      expect(event.defaultPrevented).toBe(false);
+      event.preventDefault();
     });
 
     renderBridgeWithLink(
@@ -69,8 +70,9 @@ describe('PwaShellBridge', () => {
 
     fireEvent.click(screen.getByRole('link', { name: 'Timesheets' }), { button: 0 });
 
+    expect(document.documentElement.hasAttribute('data-standalone-pwa')).toBe(true);
     expect(nextLinkClick).toHaveBeenCalledTimes(1);
-    expect(window.location.pathname).toBe('/timesheets');
+    expect(window.location.pathname).toBe('/dashboard');
   });
 
   it('does not hijack external links', () => {

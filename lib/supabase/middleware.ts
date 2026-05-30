@@ -177,7 +177,7 @@ export async function updateSession(request: NextRequest) {
   const session = await getMiddlewareSession(request)
   await getSupabaseUser(request, response)
   const hasLegacyCookie = hasLegacySupabaseSessionCookie(request)
-  const publicPaths = ['/login', '/change-password', '/offline']
+  const publicPaths = ['/login', '/change-password', '/offline', '/pwa-debug']
   const isPublicPath = publicPaths.some((path) => request.nextUrl.pathname.startsWith(path))
   const isApiRoute = request.nextUrl.pathname.startsWith('/api/')
   const isAuthRoute = request.nextUrl.pathname.startsWith('/api/auth/')

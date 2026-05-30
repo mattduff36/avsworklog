@@ -142,7 +142,7 @@ interface AuthProviderProps {
 
 type BrowserSupabaseClient = SupabaseClient<Database>;
 
-const PUBLIC_PATHS = ['/login', '/change-password', '/offline'];
+const PUBLIC_PATHS = ['/login', '/change-password', '/offline', '/pwa-debug'];
 const AUTH_SCOPED_QUERY_KEYS = [
   'permission-snapshot',
   'absence-secondary-permissions',
