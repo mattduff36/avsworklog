@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { SectionLoader } from '@/components/ui/section-loader';
+import { DashboardLoadingScreen } from '@/components/ui/dashboard-loading-screen';
 import { AppPageShell } from '@/components/layout/AppPageShell';
 import { MobileTextSizeDialog } from '@/components/layout/MobileTextSizeDialog';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
@@ -403,6 +404,10 @@ export default function DashboardPage() {
   const getManagementTileBadgeCount = (href: string) => managementTileBadgeCountByHref[href] || 0;
   const isDashboardLoading = permissionsLoading || !profile?.id;
 
+  if (isDashboardLoading) {
+    return <DashboardLoadingScreen />;
+  }
+
   return (
     <AppPageShell className="space-y-8">
       
@@ -467,11 +472,8 @@ export default function DashboardPage() {
 
       {/* Quick Actions - Square Button Grid */}
       <div>
-        {isDashboardLoading ? (
-          <SectionLoader message="Loading dashboard..." />
-        ) : (
-          <TooltipProvider>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+        <TooltipProvider>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
               {/* Active Forms */}
               {renderedQuickActionTiles.map((formType, index) => {
               const Icon = formType.icon;
@@ -537,9 +539,8 @@ export default function DashboardPage() {
                 </Link>
               );
               })}
-            </div>
-          </TooltipProvider>
-        )}
+          </div>
+        </TooltipProvider>
       </div>
 
       {/* Manager/Admin Quick Access - Smaller Tiles */}
