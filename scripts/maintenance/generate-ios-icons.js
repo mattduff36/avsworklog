@@ -18,6 +18,7 @@ const iconSizes = [
   { name: 'apple-touch-icon-180x180.png', size: 180 },
   { name: 'apple-touch-icon-152x152.png', size: 152 },
   { name: 'apple-touch-icon-167x167.png', size: 167 },
+  { name: 'apple-touch-icon-120x120.png', size: 120 },
 ];
 
 const cacheBustedAliases = [
@@ -27,7 +28,54 @@ const cacheBustedAliases = [
   { source: 'apple-touch-icon-180x180.png', name: `apple-touch-icon-avs-yellow-${iosIconVersion}-180x180.png` },
   { source: 'apple-touch-icon-152x152.png', name: `apple-touch-icon-avs-yellow-${iosIconVersion}-152x152.png` },
   { source: 'apple-touch-icon-167x167.png', name: `apple-touch-icon-avs-yellow-${iosIconVersion}-167x167.png` },
+  { source: 'apple-touch-icon.png', name: 'apple-touch-icon-precomposed.png' },
+  { source: 'apple-touch-icon-180x180.png', name: 'apple-touch-icon-180x180-precomposed.png' },
+  { source: 'apple-touch-icon-152x152.png', name: 'apple-touch-icon-152x152-precomposed.png' },
+  { source: 'apple-touch-icon-167x167.png', name: 'apple-touch-icon-167x167-precomposed.png' },
+  { source: 'apple-touch-icon-120x120.png', name: 'apple-touch-icon-120x120-precomposed.png' },
 ];
+
+async function createFaviconIco() {
+  const sizes = [16, 32, 48, 256];
+  const images = await Promise.all(
+    sizes.map(async (size) => ({
+      size,
+      png: await sharp(sourceIcon)
+        .resize(size, size, {
+          fit: 'contain',
+          background: { ...avsYellow, alpha: 1 },
+        })
+        .flatten({ background: avsYellow })
+        .png()
+        .toBuffer(),
+    }))
+  );
+  const headerSize = 6 + images.length * 16;
+  const totalSize = headerSize + images.reduce((sum, image) => sum + image.png.length, 0);
+  const ico = Buffer.alloc(totalSize);
+
+  ico.writeUInt16LE(0, 0);
+  ico.writeUInt16LE(1, 2);
+  ico.writeUInt16LE(images.length, 4);
+
+  let imageOffset = headerSize;
+  images.forEach((image, index) => {
+    const entryOffset = 6 + index * 16;
+    ico[entryOffset] = image.size === 256 ? 0 : image.size;
+    ico[entryOffset + 1] = image.size === 256 ? 0 : image.size;
+    ico[entryOffset + 2] = 0;
+    ico[entryOffset + 3] = 0;
+    ico.writeUInt16LE(1, entryOffset + 4);
+    ico.writeUInt16LE(32, entryOffset + 6);
+    ico.writeUInt32LE(image.png.length, entryOffset + 8);
+    ico.writeUInt32LE(imageOffset, entryOffset + 12);
+    image.png.copy(ico, imageOffset);
+    imageOffset += image.png.length;
+  });
+
+  fs.writeFileSync(path.join(outputDir, 'favicon.ico'), ico);
+  console.log('✅ Generated: favicon.ico (yellow AVS override)');
+}
 
 async function generateIcons() {
   console.log('🍎 Generating iOS PWA icons...\n');
@@ -72,6 +120,8 @@ async function generateIcons() {
       process.exit(1);
     }
   }
+
+  await createFaviconIco();
 
   console.log('\n✨ All iOS icons generated successfully!');
 }
