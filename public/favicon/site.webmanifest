@@ -1,6 +1,9 @@
 {
   "name": "A&V Squires Plant Company LTD",
   "short_name": "A&V Squires",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
   "icons": [
     {
       "src": "/icon-avs-yellow-20260529-192x192.png",

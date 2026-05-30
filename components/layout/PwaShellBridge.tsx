@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 function isStandalonePwa() {
@@ -20,6 +21,8 @@ function syncStandaloneAttribute() {
 }
 
 export function PwaShellBridge() {
+  const router = useRouter();
+
   useEffect(() => {
     syncStandaloneAttribute();
 
@@ -49,12 +52,12 @@ export function PwaShellBridge() {
       if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/_next/')) return;
 
       event.preventDefault();
-      window.location.assign(`${url.pathname}${url.search}${url.hash}`);
+      router.push(`${url.pathname}${url.search}${url.hash}`);
     }
 
-    document.addEventListener('click', handleClick, true);
-    return () => document.removeEventListener('click', handleClick, true);
-  }, []);
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, [router]);
 
   return null;
 }
