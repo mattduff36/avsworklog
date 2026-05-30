@@ -17,6 +17,8 @@ config({ path: resolve(process.cwd(), '.env.local') });
 const CLIENT_ERROR_MARKER = 'Test client-side error: Button click handler failed';
 const SERVER_ERROR_MARKER = 'Test caught error: Database connection failed';
 
+test.describe.configure({ mode: 'serial' });
+
 declare global {
   interface Window {
     errorLogger?: unknown;

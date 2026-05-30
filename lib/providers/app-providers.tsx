@@ -3,6 +3,7 @@
 import { Analytics } from '@vercel/analytics/react';
 import dynamic from 'next/dynamic';
 import { Toaster } from '@/components/ui/sonner';
+import { PwaShellBridge } from '@/components/layout/PwaShellBridge';
 import { AuthProvider } from '@/lib/providers/auth-provider';
 import { QueryProvider } from '@/lib/providers/query-provider';
 
@@ -24,6 +25,7 @@ interface AppProvidersProps {
 export function AppProviders({ children, shouldLoadAnalytics }: AppProvidersProps) {
   return (
     <>
+      <PwaShellBridge />
       <ErrorLoggerInit />
       <DeploymentVersionChecker />
       <QueryProvider>
