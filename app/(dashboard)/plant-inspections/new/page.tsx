@@ -24,7 +24,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, dialogContentViewportClassName } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Send, CheckCircle2, XCircle, AlertCircle, AlertTriangle, Info, User, Camera, ArrowLeft } from 'lucide-react';
@@ -2177,7 +2177,7 @@ function NewPlantInspectionContent() {
           setShowConfirmSubmitDialog(open);
         }}
       >
-        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-md overflow-y-auto border-border text-white">
+        <DialogContent className={dialogContentViewportClassName({ size: 'md', className: 'border-border text-white' })}>
           <DialogHeader>
             <DialogTitle className="text-white text-xl">Confirm Submission</DialogTitle>
             <DialogDescription className="text-muted-foreground">
@@ -2236,7 +2236,7 @@ function NewPlantInspectionContent() {
         }
         setShowRepeatDefectDialog(open);
       }}>
-        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto border-border text-white">
+        <DialogContent className={dialogContentViewportClassName({ size: 'lg', className: 'border-border text-white' })}>
           <DialogHeader>
             <DialogTitle className="text-white text-xl flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-amber-500" />
@@ -2296,7 +2296,7 @@ function NewPlantInspectionContent() {
       </Dialog>
 
       <Dialog open={showDigitGrowthWarningDialog} onOpenChange={setShowDigitGrowthWarningDialog}>
-        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-md overflow-y-auto border-border text-white">
+        <DialogContent className={dialogContentViewportClassName({ size: 'md', className: 'border-border text-white' })}>
           <DialogHeader>
             <DialogTitle className="text-white text-xl">Confirm Hours Entry</DialogTitle>
             <DialogDescription className="text-muted-foreground">
@@ -2334,7 +2334,7 @@ function NewPlantInspectionContent() {
       
       {/* Signature Dialog */}
       <Dialog open={showSignatureDialog} onOpenChange={setShowSignatureDialog}>
-        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto border-border text-white">
+        <DialogContent className={dialogContentViewportClassName({ size: 'lg', className: 'border-border text-white' })}>
           <DialogHeader>
             <DialogTitle className="text-white text-xl">Sign Daily Check</DialogTitle>
             <DialogDescription className="text-muted-foreground">

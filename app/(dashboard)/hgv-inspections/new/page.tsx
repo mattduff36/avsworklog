@@ -21,7 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, dialogContentViewportClassName } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -1911,7 +1911,7 @@ function NewHgvInspectionContent() {
         }
         setShowRepeatDefectDialog(open);
       }}>
-        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto border-border text-white">
+        <DialogContent className={dialogContentViewportClassName({ size: 'lg', className: 'border-border text-white' })}>
           <DialogHeader>
             <DialogTitle className="text-white text-xl flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-amber-500" />
@@ -1971,7 +1971,7 @@ function NewHgvInspectionContent() {
       </Dialog>
 
       <Dialog open={showDigitGrowthWarningDialog} onOpenChange={setShowDigitGrowthWarningDialog}>
-        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-md overflow-y-auto border-border text-white">
+        <DialogContent className={dialogContentViewportClassName({ size: 'md', className: 'border-border text-white' })}>
           <DialogHeader>
             <DialogTitle className="text-white text-xl">Confirm KM Entry</DialogTitle>
             <DialogDescription className="text-muted-foreground">
@@ -2010,7 +2010,7 @@ function NewHgvInspectionContent() {
       </Dialog>
 
       <Dialog open={showSignatureDialog} onOpenChange={setShowSignatureDialog}>
-        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto border-border text-white">
+        <DialogContent className={dialogContentViewportClassName({ size: 'lg', className: 'border-border text-white' })}>
           <DialogHeader>
             <DialogTitle className="text-white text-xl">Sign Daily Check</DialogTitle>
             <DialogDescription className="text-muted-foreground">

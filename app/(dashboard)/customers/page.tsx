@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
-import { AppPageShell } from '@/components/layout/AppPageShell';
+import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
 import { Building2, Plus, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
@@ -115,23 +115,21 @@ export default function CustomersPage() {
   return (
     <AppPageShell>
       <SensitiveModuleSessionManager moduleLabel="Customers" access={sensitiveAccess} />
-      <div className="bg-white dark:bg-slate-900 rounded-lg border border-border p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-avs-yellow/10">
-              <Building2 className="h-5 w-5 text-avs-yellow" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-3xl font-bold text-foreground">Customers</h1>
-              <p className="text-muted-foreground">Manage your customer directory and key contact records.</p>
-            </div>
-          </div>
+      <AppPageHeader
+        title="Customers"
+        description="Manage your customer directory and key contact records."
+        icon={<Building2 className="h-5 w-5 text-avs-yellow" />}
+        iconContainerClassName="flex h-10 w-10 items-center justify-center bg-avs-yellow/10 p-0"
+        contentClassName="sm:flex-row sm:items-center sm:justify-between"
+        headingClassName="space-y-0"
+        descriptionClassName="text-base"
+        actions={(
           <Button onClick={() => { setEditingCustomer(null); setFormOpen(true); }} className="w-full bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90 font-semibold sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             Add Customer
           </Button>
-        </div>
-      </div>
+        )}
+      />
 
       <Tabs value={pageTab} onValueChange={(value) => setPageTab(value as 'overview' | 'settings')}>
         <TabsList>

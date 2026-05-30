@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -74,6 +74,113 @@ async function uploadClientQuoteAttachments(quoteId: string, files?: File[]) {
     isClientVisible: true,
     attachmentPurpose: 'client_pricing',
   })));
+}
+
+function getCompactManagerLabel(label: string) {
+  return label.trim().split(/\s+/)[0] || label;
+}
+
+interface ManagerFilterTabsProps {
+  managerFilter: string;
+  activeManagerOptions: QuoteManagerOption[];
+  onManagerFilterChange: (nextManagerId: string) => void;
+}
+
+function ManagerFilterTabs({
+  managerFilter,
+  activeManagerOptions,
+  onManagerFilterChange,
+}: ManagerFilterTabsProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const measurementRef = useRef<HTMLDivElement>(null);
+  const [useCompactLabels, setUseCompactLabels] = useState(false);
+
+  const updateCompactMode = useCallback(() => {
+    const container = containerRef.current;
+    const measurement = measurementRef.current;
+
+    if (!container || !measurement) return;
+
+    const availableWidth = Math.floor(container.clientWidth);
+    const fullLabelWidth = Math.ceil(measurement.scrollWidth);
+
+    setUseCompactLabels(fullLabelWidth > availableWidth);
+  }, []);
+
+  useEffect(() => {
+    const animationFrame = window.requestAnimationFrame(updateCompactMode);
+    const container = containerRef.current;
+    const measurement = measurementRef.current;
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', updateCompactMode);
+      return () => {
+        window.cancelAnimationFrame(animationFrame);
+        window.removeEventListener('resize', updateCompactMode);
+      };
+    }
+
+    const resizeObserver = new ResizeObserver(() => {
+      window.requestAnimationFrame(updateCompactMode);
+    });
+
+    if (container) resizeObserver.observe(container);
+    if (measurement) resizeObserver.observe(measurement);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      resizeObserver.disconnect();
+    };
+  }, [activeManagerOptions, updateCompactMode]);
+
+  return (
+    <div ref={containerRef} className="relative mt-3 flex w-full justify-end overflow-hidden">
+      <div
+        ref={measurementRef}
+        aria-hidden="true"
+        className="pointer-events-none invisible absolute right-0 top-0 inline-flex min-h-9 w-max max-w-none flex-nowrap items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground"
+      >
+        <span className="inline-flex min-h-8 items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-center text-sm font-medium leading-tight">
+          All Quotes
+        </span>
+        {activeManagerOptions.map(option => {
+          const managerLabel = option.profile?.full_name || option.signoff_name || option.initials;
+
+          return (
+            <span
+              key={option.profile_id}
+              className="inline-flex min-h-8 items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-center text-sm font-medium leading-tight"
+            >
+              {managerLabel}
+            </span>
+          );
+        })}
+      </div>
+
+      <Tabs value={managerFilter} onValueChange={onManagerFilterChange} className="max-w-full">
+        <TabsList className="h-auto max-w-full flex-nowrap justify-end overflow-x-auto">
+          <TabsTrigger value="all" className="gap-2 whitespace-nowrap">
+            {useCompactLabels ? 'All' : 'All Quotes'}
+          </TabsTrigger>
+          {activeManagerOptions.map(option => {
+            const managerLabel = option.profile?.full_name || option.signoff_name || option.initials;
+            const compactManagerLabel = getCompactManagerLabel(managerLabel);
+
+            return (
+              <TabsTrigger
+                key={option.profile_id}
+                value={option.profile_id}
+                className="gap-2 whitespace-nowrap"
+                title={managerLabel}
+              >
+                {useCompactLabels ? compactManagerLabel : managerLabel}
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
+      </Tabs>
+    </div>
+  );
 }
 
 export default function QuotesPage() {
@@ -371,20 +478,11 @@ export default function QuotesPage() {
         </TabsList>
 
         {pageTab === 'overview' ? (
-          <div className="mt-3 flex justify-end">
-            <Tabs value={managerFilter} onValueChange={handleManagerFilterChange}>
-              <TabsList className="h-auto flex-wrap">
-                <TabsTrigger value="all" className="gap-2">
-                  All Quotes
-                </TabsTrigger>
-                {activeManagerOptions.map(option => (
-                  <TabsTrigger key={option.profile_id} value={option.profile_id} className="gap-2">
-                    {option.profile?.full_name || option.signoff_name || option.initials}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-          </div>
+          <ManagerFilterTabs
+            managerFilter={managerFilter}
+            activeManagerOptions={activeManagerOptions}
+            onManagerFilterChange={handleManagerFilterChange}
+          />
         ) : null}
 
         <TabsContent value="overview" className="space-y-6 mt-0">

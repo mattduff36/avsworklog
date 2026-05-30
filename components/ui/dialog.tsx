@@ -32,6 +32,45 @@ interface DialogContentProps extends React.ComponentPropsWithoutRef<typeof Dialo
   hideCloseButton?: boolean
 }
 
+type DialogContentSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | '6xl'
+type DialogContentScroll = 'body' | 'content' | 'viewport'
+
+interface DialogContentViewportClassNameOptions {
+  size?: DialogContentSize
+  scroll?: DialogContentScroll
+  className?: string
+}
+
+const DIALOG_CONTENT_SIZE_CLASSNAME: Record<DialogContentSize, string> = {
+  sm: 'max-w-sm',
+  md: 'max-w-md',
+  lg: 'max-w-lg',
+  xl: 'max-w-xl',
+  '2xl': 'max-w-2xl',
+  '3xl': 'max-w-3xl',
+  '4xl': 'max-w-4xl',
+  '5xl': 'max-w-5xl',
+  '6xl': 'max-w-6xl',
+}
+
+const DIALOG_CONTENT_SCROLL_CLASSNAME: Record<DialogContentScroll, string> = {
+  body: 'max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto',
+  content: 'flex max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] flex-col overflow-hidden',
+  viewport: 'max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)]',
+}
+
+function dialogContentViewportClassName({
+  size,
+  scroll = 'body',
+  className,
+}: DialogContentViewportClassNameOptions = {}) {
+  return cn(
+    DIALOG_CONTENT_SCROLL_CLASSNAME[scroll],
+    size ? DIALOG_CONTENT_SIZE_CLASSNAME[size] : null,
+    className,
+  )
+}
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   DialogContentProps
@@ -124,4 +163,5 @@ export {
   DialogFooter,
   DialogTitle,
   DialogDescription,
+  dialogContentViewportClassName,
 }

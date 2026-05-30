@@ -14,15 +14,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, Clock, CheckCircle2, XCircle, User, Filter, Calendar, Package, LayoutGrid, Table2, Settings2 } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { FileText, Clock, CheckCircle2, XCircle, User, Filter, Calendar, Package } from 'lucide-react';
+import { ColumnVisibilityMenu, DataViewToggle } from '@/components/ui/data-view-controls';
 import Link from 'next/link';
 import { formatDate } from '@/lib/utils/date';
 import { Timesheet } from '@/types/timesheet';
@@ -1093,55 +1086,25 @@ function ApprovalsContent() {
               <>
                 {/* Toolbar: Columns + View Toggle - Desktop Only */}
                 <div className="hidden md:flex items-center justify-end gap-2">
-                  {timesheetViewMode === 'table' && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm" className="border-slate-600">
-                          <Settings2 className="h-4 w-4 mr-2" />
-                          Columns
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56 bg-slate-900 border border-border">
-                        <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuCheckboxItem checked={columnVisibility.employeeId} onCheckedChange={() => toggleColumn('employeeId')}>
-                          Employee ID
-                        </DropdownMenuCheckboxItem>
-                        <DropdownMenuCheckboxItem checked={columnVisibility.totalHours} onCheckedChange={() => toggleColumn('totalHours')}>
-                          Total Hours
-                        </DropdownMenuCheckboxItem>
-                        <DropdownMenuCheckboxItem checked={columnVisibility.jobNumber} onCheckedChange={() => toggleColumn('jobNumber')}>
-                          Job Number
-                        </DropdownMenuCheckboxItem>
-                        <DropdownMenuCheckboxItem checked={columnVisibility.status} onCheckedChange={() => toggleColumn('status')}>
-                          Status
-                        </DropdownMenuCheckboxItem>
-                        <DropdownMenuCheckboxItem checked={columnVisibility.submittedAt} onCheckedChange={() => toggleColumn('submittedAt')}>
-                          Submitted
-                        </DropdownMenuCheckboxItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                  <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-0">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => { setTimesheetViewMode('table'); localStorage.setItem('approvals-ts-view-mode', 'table'); }}
-                      className={`h-8 px-3 ${timesheetViewMode === 'table' ? 'bg-white text-slate-900' : 'text-muted-foreground hover:text-white'}`}
-                    >
-                      <Table2 className="h-4 w-4 mr-1.5" />
-                      Table
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => { setTimesheetViewMode('cards'); localStorage.setItem('approvals-ts-view-mode', 'cards'); }}
-                      className={`h-8 px-3 ${timesheetViewMode === 'cards' ? 'bg-white text-slate-900' : 'text-muted-foreground hover:text-white'}`}
-                    >
-                      <LayoutGrid className="h-4 w-4 mr-1.5" />
-                      Cards
-                    </Button>
-                  </div>
+                  {timesheetViewMode === 'table' ? (
+                    <ColumnVisibilityMenu
+                      options={[
+                        { id: 'employeeId', label: 'Employee ID', checked: columnVisibility.employeeId },
+                        { id: 'totalHours', label: 'Total Hours', checked: columnVisibility.totalHours },
+                        { id: 'jobNumber', label: 'Job Number', checked: columnVisibility.jobNumber },
+                        { id: 'status', label: 'Status', checked: columnVisibility.status },
+                        { id: 'submittedAt', label: 'Submitted', checked: columnVisibility.submittedAt },
+                      ]}
+                      onToggle={toggleColumn}
+                    />
+                  ) : null}
+                  <DataViewToggle
+                    value={timesheetViewMode}
+                    onValueChange={(nextViewMode) => {
+                      setTimesheetViewMode(nextViewMode);
+                      localStorage.setItem('approvals-ts-view-mode', nextViewMode);
+                    }}
+                  />
                 </div>
 
                 {/* Table View - Desktop Only */}
@@ -1289,58 +1252,26 @@ function ApprovalsContent() {
               <>
                 {/* Toolbar: Columns + View Toggle - Desktop Only */}
                 <div className="hidden md:flex items-center justify-end gap-2">
-                  {absenceViewMode === 'table' && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm" className="border-slate-600">
-                          <Settings2 className="h-4 w-4 mr-2" />
-                          Columns
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56 bg-slate-900 border border-border">
-                        <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuCheckboxItem checked={absenceColumnVisibility.employeeId} onCheckedChange={() => toggleAbsenceColumn('employeeId')}>
-                          Employee ID
-                        </DropdownMenuCheckboxItem>
-                        <DropdownMenuCheckboxItem checked={absenceColumnVisibility.reason} onCheckedChange={() => toggleAbsenceColumn('reason')}>
-                          Reason
-                        </DropdownMenuCheckboxItem>
-                        <DropdownMenuCheckboxItem checked={absenceColumnVisibility.duration} onCheckedChange={() => toggleAbsenceColumn('duration')}>
-                          Duration
-                        </DropdownMenuCheckboxItem>
-                        <DropdownMenuCheckboxItem checked={absenceColumnVisibility.remainingAllowance} onCheckedChange={() => toggleAbsenceColumn('remainingAllowance')}>
-                          Remaining Allowance
-                        </DropdownMenuCheckboxItem>
-                        <DropdownMenuCheckboxItem checked={absenceColumnVisibility.paidStatus} onCheckedChange={() => toggleAbsenceColumn('paidStatus')}>
-                          Paid / Unpaid
-                        </DropdownMenuCheckboxItem>
-                        <DropdownMenuCheckboxItem checked={absenceColumnVisibility.submittedAt} onCheckedChange={() => toggleAbsenceColumn('submittedAt')}>
-                          Submitted
-                        </DropdownMenuCheckboxItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                  <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-0">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => { setAbsenceViewMode('table'); localStorage.setItem('approvals-abs-view-mode', 'table'); }}
-                      className={`h-8 px-3 ${absenceViewMode === 'table' ? 'bg-white text-slate-900' : 'text-muted-foreground hover:text-white'}`}
-                    >
-                      <Table2 className="h-4 w-4 mr-1.5" />
-                      Table
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => { setAbsenceViewMode('cards'); localStorage.setItem('approvals-abs-view-mode', 'cards'); }}
-                      className={`h-8 px-3 ${absenceViewMode === 'cards' ? 'bg-white text-slate-900' : 'text-muted-foreground hover:text-white'}`}
-                    >
-                      <LayoutGrid className="h-4 w-4 mr-1.5" />
-                      Cards
-                    </Button>
-                  </div>
+                  {absenceViewMode === 'table' ? (
+                    <ColumnVisibilityMenu
+                      options={[
+                        { id: 'employeeId', label: 'Employee ID', checked: absenceColumnVisibility.employeeId },
+                        { id: 'reason', label: 'Reason', checked: absenceColumnVisibility.reason },
+                        { id: 'duration', label: 'Duration', checked: absenceColumnVisibility.duration },
+                        { id: 'remainingAllowance', label: 'Remaining Allowance', checked: absenceColumnVisibility.remainingAllowance },
+                        { id: 'paidStatus', label: 'Paid / Unpaid', checked: absenceColumnVisibility.paidStatus },
+                        { id: 'submittedAt', label: 'Submitted', checked: absenceColumnVisibility.submittedAt },
+                      ]}
+                      onToggle={toggleAbsenceColumn}
+                    />
+                  ) : null}
+                  <DataViewToggle
+                    value={absenceViewMode}
+                    onValueChange={(nextViewMode) => {
+                      setAbsenceViewMode(nextViewMode);
+                      localStorage.setItem('approvals-abs-view-mode', nextViewMode);
+                    }}
+                  />
                 </div>
 
                 {/* Table View - Desktop Only */}

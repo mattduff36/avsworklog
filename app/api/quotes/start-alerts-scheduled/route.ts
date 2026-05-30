@@ -24,6 +24,7 @@ async function handleQuoteStartAlerts(request: NextRequest, method: 'GET' | 'POS
     const admin = createAdminClient();
     const today = new Date();
     const todayIso = today.toISOString().slice(0, 10);
+    const todayStart = new Date(`${todayIso}T00:00:00Z`);
     const limit = Math.min(
       Math.max(Number.parseInt(request.nextUrl.searchParams.get('limit') || '100', 10) || 100, 1),
       250
@@ -80,8 +81,8 @@ async function handleQuoteStartAlerts(request: NextRequest, method: 'GET' | 'POS
         continue;
       }
 
-      const startDate = new Date(`${quote.start_date}T00:00:00`);
-      const diffDays = Math.ceil((startDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      const startDate = new Date(`${quote.start_date}T00:00:00Z`);
+      const diffDays = Math.ceil((startDate.getTime() - todayStart.getTime()) / (1000 * 60 * 60 * 24));
       if (diffDays > quote.start_alert_days || diffDays < 0) {
         continue;
       }

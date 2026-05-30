@@ -6,7 +6,7 @@ import { fetchAbsenceMessage, updateAbsenceMessage } from '@/lib/client/absence-
 import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { fetchEmployeeWorkShift, fetchWorkShiftMatrix } from '@/lib/client/work-shifts';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { AppPageShell } from '@/components/layout/AppPageShell';
+import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -862,33 +862,24 @@ export default function AdminAbsencePage() {
   
   return (
     <AppPageShell width="wide">
-      {/* Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div className="flex items-start gap-4">
-            <BackButton />
-            <div>
-              <h1 className="text-3xl font-bold text-foreground mb-2">
-                Absence Management
-              </h1>
-              <p className="text-muted-foreground">
-                View and manage all employee absences
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-2">
-            {canAddEditBookings ? (
-              <Button
-                onClick={() => setShowCreateDialog(true)}
-                className="w-full sm:w-auto bg-absence hover:bg-absence-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Create Absence
-              </Button>
-            ) : null}
-          </div>
-        </div>
-      </div>
+      <AppPageHeader
+        title="Absence Management"
+        description="View and manage all employee absences"
+        leading={<BackButton />}
+        headingClassName="space-y-0"
+        titleClassName="mb-2"
+        descriptionClassName="text-base"
+        actionsClassName="flex-col sm:w-auto sm:flex-row"
+        actions={canAddEditBookings ? (
+          <Button
+            onClick={() => setShowCreateDialog(true)}
+            className="w-full sm:w-auto bg-absence hover:bg-absence-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Create Absence
+          </Button>
+        ) : null}
+      />
 
       {isAdmin && (
         <div className="rounded-lg border border-[hsl(var(--absence-primary)/0.25)] bg-[hsl(var(--absence-primary)/0.06)] p-4">

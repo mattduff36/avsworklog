@@ -24,7 +24,7 @@ import { clearClientServiceOutage } from '@/lib/app-auth/client-service-health';
 import { fetchAbsenceMessage } from '@/lib/client/absence-message';
 import { fetchCurrentWorkShift, fetchWorkShiftMatrix } from '@/lib/client/work-shifts';
 import { canOpenAbsenceManageArea } from '@/types/absence-permissions';
-import { AppPageShell } from '@/components/layout/AppPageShell';
+import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -1102,21 +1102,19 @@ export default function AbsencePage() {
   
   return (
     <AppPageShell>
-      {/* Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
-            <h1 className="text-3xl font-bold text-foreground mb-2">
-              Absence & Leave
-            </h1>
-            <p className="text-muted-foreground">
-              {canOpenManageLink
-                ? 'Manage annual leave and view absence records'
-                : 'Request annual leave and view your absence records'}
-            </p>
-          </div>
-
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+      <AppPageHeader
+        title="Absence & Leave"
+        description={canOpenManageLink
+          ? 'Manage annual leave and view absence records'
+          : 'Request annual leave and view your absence records'
+        }
+        contentClassName="sm:flex-row sm:items-start sm:justify-between"
+        headingClassName="space-y-0"
+        titleClassName="mb-2"
+        descriptionClassName="text-base"
+        actionsClassName="flex-col sm:w-auto sm:flex-row sm:items-center"
+        actions={(
+          <>
             {canOpenManageLink && (
               <Link href="/absence/manage" className="w-full sm:w-auto">
                 <Button variant="outline" className="w-full justify-center border-border text-muted-foreground sm:w-auto">
@@ -1133,9 +1131,9 @@ export default function AbsencePage() {
               <Plus className="h-4 w-4 mr-2" />
               Request Leave
             </Button>
-          </div>
-        </div>
-      </div>
+          </>
+        )}
+      />
       
       {/* Summary Card */}
       <Card className="bg-gradient-to-br from-[hsl(var(--absence-primary))] to-[hsl(var(--absence-dark))] border-0 text-white">

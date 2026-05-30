@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createPortal } from 'react-dom';
-import { AppPageShell } from '@/components/layout/AppPageShell';
+import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PageLoader } from '@/components/ui/page-loader';
@@ -23,6 +23,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  dialogContentViewportClassName,
 } from '@/components/ui/dialog';
 import {
   Select,
@@ -1270,26 +1271,25 @@ export default function UsersAdminPage() {
 
   return (
     <AppPageShell width="wide" className="2xl:max-w-[92rem]">
-      {/* Header */}
-      <div className="bg-slate-900 rounded-lg p-6 border border-border">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <h1 className="text-3xl font-bold text-white mb-2">User Management</h1>
-            <p className="text-muted-foreground">
-              Manage users, roles, and permissions
-            </p>
-          </div>
-          {activeTab === 'users' && userStatusTab === 'active' && (
-            <Button
-              onClick={openAddDialog}
-              className="w-full bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900 sm:w-auto"
-            >
-              <UserPlus className="h-4 w-4 mr-2" />
-              Add User
-            </Button>
-          )}
-        </div>
-      </div>
+      <AppPageHeader
+        title="User Management"
+        description="Manage users, roles, and permissions"
+        className="bg-slate-900"
+        contentClassName="sm:flex-row sm:items-center sm:justify-between"
+        headingClassName="space-y-0"
+        titleClassName="mb-2 text-white"
+        descriptionClassName="text-base"
+        actionsClassName="sm:w-auto"
+        actions={activeTab === 'users' && userStatusTab === 'active' ? (
+          <Button
+            onClick={openAddDialog}
+            className="w-full bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900 sm:w-auto"
+          >
+            <UserPlus className="h-4 w-4 mr-2" />
+            Add User
+          </Button>
+        ) : null}
+      />
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as TabType)} className="space-y-6">
@@ -1775,7 +1775,7 @@ export default function UsersAdminPage() {
 
       {/* Add User Dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent className="flex max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-5xl flex-col overflow-hidden border-border text-white">
+        <DialogContent className={dialogContentViewportClassName({ size: '5xl', scroll: 'content', className: 'border-border text-white' })}>
           <DialogHeader>
             <DialogTitle>Add New User</DialogTitle>
             <DialogDescription className="text-muted-foreground">
@@ -2070,7 +2070,7 @@ export default function UsersAdminPage() {
 
       {/* Edit User Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto border-border text-white">
+        <DialogContent className={dialogContentViewportClassName({ className: 'border-border text-white' })}>
           <DialogHeader>
             <DialogTitle>Edit User</DialogTitle>
             <DialogDescription className="text-muted-foreground">
@@ -2193,7 +2193,7 @@ export default function UsersAdminPage() {
 
       {/* Delete Options Dialog */}
       <Dialog open={deleteOptionsDialogOpen} onOpenChange={setDeleteOptionsDialogOpen}>
-        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-2xl overflow-y-auto border-border text-white">
+        <DialogContent className={dialogContentViewportClassName({ size: '2xl', className: 'border-border text-white' })}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-red-500" />
@@ -2356,7 +2356,7 @@ export default function UsersAdminPage() {
 
       {/* Reset Password Confirmation Dialog */}
       <Dialog open={resetPasswordDialogOpen} onOpenChange={setResetPasswordDialogOpen}>
-        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto border-border text-white">
+        <DialogContent className={dialogContentViewportClassName({ className: 'border-border text-white' })}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <KeyRound className="h-5 w-5 text-amber-500" />
@@ -2413,7 +2413,7 @@ export default function UsersAdminPage() {
 
       {/* Reset Sensitive PIN Confirmation Dialog */}
       <Dialog open={resetSensitivePinDialogOpen} onOpenChange={setResetSensitivePinDialogOpen}>
-        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto border-border text-white">
+        <DialogContent className={dialogContentViewportClassName({ className: 'border-border text-white' })}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5 text-yellow-300" />
@@ -2474,7 +2474,7 @@ export default function UsersAdminPage() {
 
       {/* Password Display Dialog */}
       <Dialog open={passwordDisplayDialogOpen} onOpenChange={setPasswordDisplayDialogOpen}>
-        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto border-border text-white">
+        <DialogContent className={dialogContentViewportClassName({ size: 'lg', className: 'border-border text-white' })}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CheckCircle2 className="h-5 w-5 text-green-500" />

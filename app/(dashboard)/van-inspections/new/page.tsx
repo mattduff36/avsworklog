@@ -17,7 +17,7 @@ import { isUuid } from '@/lib/utils/uuid';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, dialogContentViewportClassName } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Save, Send, CheckCircle2, XCircle, AlertCircle, Info, User, Plus, Check, Camera, AlertTriangle } from 'lucide-react';
@@ -2669,7 +2669,7 @@ function NewInspectionContent() {
       <Dialog open={showAddVehicleDialog} onOpenChange={handleAddVehicleDialogOpenChange}>
         <DialogContent
           ref={addVehicleDialogContentRef}
-          className={`max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto border-border text-white max-w-md ${tabletModeEnabled ? 'max-w-lg p-5 sm:p-6' : ''}`}
+          className={dialogContentViewportClassName({ size: 'md', className: `border-border text-white ${tabletModeEnabled ? 'max-w-lg p-5 sm:p-6' : ''}` })}
           onInteractOutside={(event) => {
             if (isAddVehicleFormDirty && !addingVehicle) {
               event.preventDefault();
@@ -2759,7 +2759,7 @@ function NewInspectionContent() {
         }
         setShowResolutionDialog(open);
       }}>
-        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto border-border text-white">
+        <DialogContent className={dialogContentViewportClassName({ size: 'lg', className: 'border-border text-white' })}>
           <DialogHeader>
             <DialogTitle className="text-white text-xl flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-amber-500" />
@@ -2850,7 +2850,7 @@ function NewInspectionContent() {
         }
         setShowRepeatDefectDialog(open);
       }}>
-        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto border-border text-white">
+        <DialogContent className={dialogContentViewportClassName({ size: 'lg', className: 'border-border text-white' })}>
           <DialogHeader>
             <DialogTitle className="text-white text-xl flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-amber-500" />
@@ -2920,7 +2920,7 @@ function NewInspectionContent() {
           setShowConfirmSubmitDialog(open);
         }}
       >
-        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-md overflow-y-auto border-border text-white">
+        <DialogContent className={dialogContentViewportClassName({ size: 'md', className: 'border-border text-white' })}>
           <DialogHeader>
             <DialogTitle className="text-white text-xl">Confirm Submission</DialogTitle>
             <DialogDescription className="text-muted-foreground">
@@ -3005,7 +3005,7 @@ function NewInspectionContent() {
 
       {/* Mileage Warning Confirmation Dialog */}
       <Dialog open={showMileageWarningDialog} onOpenChange={setShowMileageWarningDialog}>
-        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-md overflow-y-auto border-border text-white">
+        <DialogContent className={dialogContentViewportClassName({ size: 'md', className: 'border-border text-white' })}>
           <DialogHeader>
             <DialogTitle className="text-white text-xl flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-amber-500" />
@@ -3059,7 +3059,7 @@ function NewInspectionContent() {
       
       {/* Signature Dialog */}
       <Dialog open={showSignatureDialog} onOpenChange={setShowSignatureDialog}>
-        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto border-border text-white">
+        <DialogContent className={dialogContentViewportClassName({ size: 'lg', className: 'border-border text-white' })}>
           <DialogHeader>
             <DialogTitle className="text-white text-xl">Sign Daily Check</DialogTitle>
             <DialogDescription className="text-muted-foreground">

@@ -9,13 +9,13 @@ import { useBrowserSupabaseClient } from '@/lib/hooks/useBrowserSupabaseClient';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { AppPageShell } from '@/components/layout/AppPageShell';
+import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PageLoader } from '@/components/ui/page-loader';
 import { PanelLoader } from '@/components/ui/panel-loader';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, FileText, Clock, CheckCircle2, XCircle, Download, Trash2, Filter, Package, AlertTriangle, Loader2, LayoutGrid, Table2, Settings2 } from 'lucide-react';
+import { Plus, FileText, Clock, CheckCircle2, XCircle, Download, Trash2, Filter, Package, AlertTriangle, Loader2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { Timesheet } from '@/types/timesheet';
 import { TimesheetStatusFilter } from '@/types/common';
@@ -25,14 +25,7 @@ import {
 import { filterEmployeesBySelectedTeam } from '@/lib/utils/absence-admin';
 import { canShowTimesheetInList, hasAccountsTimesheetFullVisibilityOverride } from '@/lib/utils/timesheet-visibility';
 import { toast } from 'sonner';
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { ColumnVisibilityMenu, DataViewToggle } from '@/components/ui/data-view-controls';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -577,24 +570,24 @@ export default function TimesheetsPage() {
 
   return (
     <AppPageShell>
-      
-      {/* Header */}
-      <div className="bg-slate-900 rounded-lg p-6 border border-border">
-        <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <h1 className="text-3xl font-bold text-white mb-2">Timesheets</h1>
-            <p className="text-muted-foreground">
-              Manage your weekly timesheets
-            </p>
-          </div>
+      <AppPageHeader
+        title="Timesheets"
+        description="Manage your weekly timesheets"
+        className="bg-slate-900"
+        contentClassName="mb-4 sm:flex-row sm:items-center sm:justify-between"
+        headingClassName="space-y-0"
+        titleClassName="mb-2 text-white"
+        descriptionClassName="text-base"
+        actionsClassName="sm:w-auto"
+        actions={(
           <Link href="/timesheets/new" className="w-full sm:w-auto">
             <Button className="w-full bg-timesheet hover:bg-timesheet-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg sm:w-auto">
               <Plus className="h-4 w-4 mr-2" />
               New Timesheet
             </Button>
           </Link>
-        </div>
-      </div>
+        )}
+      />
 
       {isElevatedUser && (
         <Card className="border-border">
@@ -723,71 +716,25 @@ export default function TimesheetsPage() {
         <>
           {isElevatedUser && (
             <div className="hidden md:flex items-center justify-end gap-2">
-              {viewMode === 'table' && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="border-slate-600">
-                      <Settings2 className="h-4 w-4 mr-2" />
-                      Columns
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56 bg-slate-900 border border-border">
-                    <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuCheckboxItem
-                      checked={columnVisibility.employeeId}
-                      onCheckedChange={() => toggleColumn('employeeId')}
-                    >
-                      Employee ID
-                    </DropdownMenuCheckboxItem>
-                    <DropdownMenuCheckboxItem
-                      checked={columnVisibility.regNumber}
-                      onCheckedChange={() => toggleColumn('regNumber')}
-                    >
-                      Reg Number
-                    </DropdownMenuCheckboxItem>
-                    <DropdownMenuCheckboxItem
-                      checked={columnVisibility.status}
-                      onCheckedChange={() => toggleColumn('status')}
-                    >
-                      Status
-                    </DropdownMenuCheckboxItem>
-                    <DropdownMenuCheckboxItem
-                      checked={columnVisibility.submittedAt}
-                      onCheckedChange={() => toggleColumn('submittedAt')}
-                    >
-                      Submitted
-                    </DropdownMenuCheckboxItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
+              {viewMode === 'table' ? (
+                <ColumnVisibilityMenu
+                  options={[
+                    { id: 'employeeId', label: 'Employee ID', checked: columnVisibility.employeeId },
+                    { id: 'regNumber', label: 'Reg Number', checked: columnVisibility.regNumber },
+                    { id: 'status', label: 'Status', checked: columnVisibility.status },
+                    { id: 'submittedAt', label: 'Submitted', checked: columnVisibility.submittedAt },
+                  ]}
+                  onToggle={toggleColumn}
+                />
+              ) : null}
 
-              <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-0">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setViewMode('table');
-                    localStorage.setItem('timesheets-view-mode', 'table');
-                  }}
-                  className={`h-8 px-3 ${viewMode === 'table' ? 'bg-white text-slate-900' : 'text-muted-foreground hover:text-white'}`}
-                >
-                  <Table2 className="h-4 w-4 mr-1.5" />
-                  Table
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setViewMode('cards');
-                    localStorage.setItem('timesheets-view-mode', 'cards');
-                  }}
-                  className={`h-8 px-3 ${viewMode === 'cards' ? 'bg-white text-slate-900' : 'text-muted-foreground hover:text-white'}`}
-                >
-                  <LayoutGrid className="h-4 w-4 mr-1.5" />
-                  Cards
-                </Button>
-              </div>
+              <DataViewToggle
+                value={viewMode}
+                onValueChange={(nextViewMode) => {
+                  setViewMode(nextViewMode);
+                  localStorage.setItem('timesheets-view-mode', nextViewMode);
+                }}
+              />
             </div>
           )}
 

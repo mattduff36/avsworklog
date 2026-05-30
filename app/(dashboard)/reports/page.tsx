@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { PageLoader } from '@/components/ui/page-loader';
 import { PanelLoader } from '@/components/ui/panel-loader';
-import { AppPageShell } from '@/components/layout/AppPageShell';
+import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { toast } from 'sonner';
 import { useQueryState } from 'nuqs';
@@ -618,19 +618,11 @@ function ReportsContent() {
 
   return (
     <AppPageShell>
-      <div className="rounded-lg border border-border bg-white p-6 dark:bg-slate-900">
-        <div className="flex items-start gap-3">
-          <div className="rounded-lg bg-avs-yellow/15 p-2 text-avs-yellow">
-            <FileText className="h-5 w-5" />
-          </div>
-          <div className="space-y-1">
-            <h1 className="text-3xl font-bold text-foreground">Reports</h1>
-            <p className="text-sm text-muted-foreground">
-              Generate operational reports aligned to your current module and team permissions.
-            </p>
-          </div>
-        </div>
-      </div>
+      <AppPageHeader
+        title="Reports"
+        description="Generate operational reports aligned to your current module and team permissions."
+        icon={<FileText className="h-5 w-5" />}
+      />
 
       <Tabs
         value={activePageTab}
