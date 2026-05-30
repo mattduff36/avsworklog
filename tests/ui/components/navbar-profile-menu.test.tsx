@@ -167,9 +167,8 @@ describe('Navbar desktop burger menu', () => {
       isViewingAs: false,
     });
 
-    const { container } = render(<Navbar />);
-    const mobileMenuButton = container.querySelector('button.md\\:hidden');
-    expect(mobileMenuButton).toBeTruthy();
+    render(<Navbar />);
+    const mobileMenuButton = screen.getByRole('button', { name: /open navigation menu/i });
     await waitFor(() => {
       expect(screen.getByTestId('mobile-burger-notification-badge')).toBeInTheDocument();
     });
@@ -197,7 +196,7 @@ describe('Navbar desktop burger menu', () => {
       userChoice: Promise.resolve({ outcome: 'accepted' as const, platform: 'web' }),
     });
 
-    const { container } = render(<Navbar />);
+    render(<Navbar />);
 
     await waitFor(() => {
       expect(screen.getByTitle('Menu')).toBeInTheDocument();
@@ -205,8 +204,7 @@ describe('Navbar desktop burger menu', () => {
 
     window.dispatchEvent(beforeInstallEvent as Event);
 
-    const mobileMenuButton = container.querySelector('button.md\\:hidden');
-    expect(mobileMenuButton).toBeTruthy();
+    const mobileMenuButton = screen.getByRole('button', { name: /open navigation menu/i });
     fireEvent.click(mobileMenuButton as HTMLButtonElement);
 
     await waitFor(() => {
@@ -226,9 +224,8 @@ describe('Navbar desktop burger menu', () => {
       isViewingAs: true,
     });
 
-    const { container } = render(<Navbar />);
-    const mobileMenuButton = container.querySelector('button.md\\:hidden');
-    expect(mobileMenuButton).toBeTruthy();
+    render(<Navbar />);
+    const mobileMenuButton = screen.getByRole('button', { name: /open navigation menu/i });
 
     fireEvent.click(mobileMenuButton as HTMLButtonElement);
 

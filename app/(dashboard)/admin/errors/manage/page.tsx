@@ -7,6 +7,7 @@ import { AppPageShell } from '@/components/layout/AppPageShell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PageLoader } from '@/components/ui/page-loader';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -285,9 +286,7 @@ export default function ErrorReportsManagePage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-red-500" />
-            </div>
+            <PanelLoader message="Loading error reports..." accent="debug" className="py-8" />
           ) : filteredReports.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -410,10 +409,9 @@ export default function ErrorReportsManagePage() {
             <section className="rounded-xl border border-slate-800 bg-slate-900/80 p-4 shadow-sm">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <h3 className="text-sm font-semibold text-slate-100">History</h3>
-                {loadingDetail ? <Loader2 className="h-4 w-4 animate-spin text-red-400" /> : null}
               </div>
               {loadingDetail ? (
-                <p className="text-sm text-slate-400">Loading update history...</p>
+                <PanelLoader message="Loading update history..." accent="debug" className="py-4" />
               ) : reportUpdates.length > 0 ? (
                 <ScrollArea className="max-h-[32vh] pr-2">
                   <div className="space-y-2">

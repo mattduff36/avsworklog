@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Loader2, Wrench, Truck, HardHat, Settings } from 'lucide-react';
 import { PageLoader } from '@/components/ui/page-loader';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { useMaintenance } from '@/lib/hooks/useMaintenance';
 import { MaintenanceSettings } from '@/app/(dashboard)/maintenance/components/MaintenanceSettings';
@@ -18,11 +19,7 @@ import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 const MaintenanceOverview = dynamic(
   () => import('@/app/(dashboard)/maintenance/components/MaintenanceOverview').then(mod => ({ default: mod.MaintenanceOverview })),
   { 
-    loading: () => (
-      <div className="flex items-center justify-center p-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    ),
+    loading: () => <PanelLoader message="Loading maintenance overview..." accent="maintenance" className="py-12" />,
     ssr: false
   }
 );
@@ -151,9 +148,7 @@ function MaintenanceContent() {
 
         <TabsContent value="overview" className="space-y-6 mt-0">
           {showInitialMaintenanceLoading ? (
-            <div className="flex items-center justify-center min-h-[400px]">
-              <Loader2 className="h-8 w-8 animate-spin text-maintenance" />
-            </div>
+            <PanelLoader message="Loading maintenance..." accent="maintenance" className="min-h-[400px]" />
           ) : maintenanceError ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">

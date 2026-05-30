@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertTriangle, Bell, CheckSquare, Loader2, Mail, Search, Send, ShieldCheck, Users } from 'lucide-react';
 import {
@@ -470,9 +471,7 @@ export function NotificationSettingsDebugPanel() {
         )}
 
         {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
+          <PanelLoader message="Loading notification settings..." accent="debug" className="py-8" />
         ) : loadError ? (
           <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-red-100">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

@@ -6,13 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { SectionLoader } from '@/components/ui/section-loader';
-import { DashboardLoadingScreen } from '@/components/ui/dashboard-loading-screen';
+import { PageLoader } from '@/components/ui/page-loader';
 import { AppPageShell } from '@/components/layout/AppPageShell';
 import { MobileTextSizeDialog } from '@/components/layout/MobileTextSizeDialog';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
 import { 
   CheckCircle2,
   ChevronRight,
@@ -80,6 +80,8 @@ export default function DashboardPage() {
   const { tabletModeEnabled } = useTabletMode();
   const formTypes = getEnabledForms();
   const recoveryAttemptedRef = useRef(false);
+  const dashboardGreetingRef = useRef<HTMLHeadingElement | null>(null);
+  const dashboardFullGreetingMeasureRef = useRef<HTMLSpanElement | null>(null);
 
   const [pendingApprovals, setPendingApprovals] = useState<PendingApprovalCount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,6 +97,7 @@ export default function DashboardPage() {
   const [actionsUnassignedCount, setActionsUnassignedCount] = useState(0);
   const [badgesLoading, setBadgesLoading] = useState(true);
   const [metricsErrorStatus, setMetricsErrorStatus] = useState<number | null>(null);
+  const [showCompactGreeting, setShowCompactGreeting] = useState(false);
   const {
     enabledModuleSet: userPermissions,
     effectiveTeamName,
@@ -104,6 +107,7 @@ export default function DashboardPage() {
   } = usePermissionSnapshot();
   const {
     data: ramsSummary,
+    isLoading: ramsSummaryLoading,
     errorStatus: ramsErrorStatus,
     refetch: refetchRamsAssignmentSummary,
   } = useRamsAssignmentSummary(profile?.id);
@@ -120,6 +124,9 @@ export default function DashboardPage() {
   const roleLabel = effectiveRole?.display_name || (isSuperAdmin ? 'SuperAdmin' : (profile?.role?.display_name || 'No Role Assigned'));
   const dashboardTeamName = effectiveTeamName || profile?.team?.name || null;
   const headerSubtitle = dashboardTeamName ? `${dashboardTeamName} · ${roleLabel}` : roleLabel;
+  const dashboardDisplayName = profile?.full_name || 'there';
+  const dashboardFullGreeting = `Welcome back, ${dashboardDisplayName}`;
+  const dashboardGreeting = showCompactGreeting ? dashboardDisplayName : dashboardFullGreeting;
 
   const canViewApprovals = userPermissions.has('approvals');
   const canAccessDebugTools = canAccessDebugConsole({
@@ -281,6 +288,31 @@ export default function DashboardPage() {
     recoveryAttemptedRef.current = false;
   }, [profile?.id]);
 
+  useLayoutEffect(() => {
+    const heading = dashboardGreetingRef.current;
+    const fullGreetingMeasure = dashboardFullGreetingMeasureRef.current;
+
+    if (!heading || !fullGreetingMeasure) {
+      return;
+    }
+
+    const updateGreetingMode = () => {
+      const availableWidth = heading.clientWidth;
+      const fullGreetingWidth = fullGreetingMeasure.scrollWidth;
+      setShowCompactGreeting(fullGreetingWidth > availableWidth);
+    };
+
+    updateGreetingMode();
+
+    const resizeObserver = new ResizeObserver(updateGreetingMode);
+    resizeObserver.observe(heading);
+    resizeObserver.observe(fullGreetingMeasure);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [dashboardFullGreeting]);
+
   useEffect(() => {
     const authFailureStatus = [metricsErrorStatus, permissionsErrorStatus, ramsErrorStatus].find((status) =>
       isAuthErrorStatus(status)
@@ -405,7 +437,7 @@ export default function DashboardPage() {
   const isDashboardLoading = permissionsLoading || !profile?.id;
 
   if (isDashboardLoading) {
-    return <DashboardLoadingScreen />;
+    return <PageLoader message="Loading SquireApp" />;
   }
 
   return (
@@ -437,8 +469,15 @@ export default function DashboardPage() {
                 )}
               </Link>
               <div className="min-w-0 flex-1">
-                <h1 className="truncate text-3xl font-bold text-white">
-                  Welcome back, {profile?.full_name}
+                <h1 ref={dashboardGreetingRef} className="relative truncate text-3xl font-bold text-white">
+                  <span
+                    ref={dashboardFullGreetingMeasureRef}
+                    className="pointer-events-none absolute -z-10 whitespace-nowrap opacity-0"
+                    aria-hidden="true"
+                  >
+                    {dashboardFullGreeting}
+                  </span>
+                  {dashboardGreeting}
                 </h1>
                 <p className="mt-1 text-slate-400">
                   {headerSubtitle}
@@ -483,13 +522,15 @@ export default function DashboardPage() {
                 workshop: workshopPendingCount,
                 reminders: remindersPendingCount,
               };
+              const canHavePrimaryTileBadge = formType.id === 'maintenance' || formType.id in tileBadgeCountById;
+              const showPrimaryBadgeLoading = formType.id === 'rams'
+                ? ramsSummaryLoading
+                : badgesLoading && canHavePrimaryTileBadge;
               const badgeCount = tileBadgeCountById[formType.id] || 0;
-              const showBadge = formType.id === 'rams'
-                ? badgeCount > 0
-                : !badgesLoading && badgeCount > 0;
+              const showBadge = !showPrimaryBadgeLoading && badgeCount > 0;
               const showMaintenanceBadges =
                 formType.id === 'maintenance' &&
-                !badgesLoading &&
+                !showPrimaryBadgeLoading &&
                 (maintenanceDueSoonCount > 0 || maintenanceOverdueCount > 0);
               // Yellow backgrounds need dark text for contrast
               const needsDarkText = formType.color === 'avs-yellow';
@@ -505,7 +546,11 @@ export default function DashboardPage() {
                     className={`relative overflow-hidden bg-${formType.color} hover:opacity-90 hover:scale-105 transition-all duration-200 rounded-lg p-6 text-center shadow-lg ${isRemindersTile ? 'aspect-[2/1]' : 'aspect-square'} flex flex-col items-center justify-center space-y-3 cursor-pointer animate-tile-pop ${textColorClass}`}
                     style={{ animationDelay: `${index * 75}ms` }}
                   >
-                    {showMaintenanceBadges ? (
+                    {showPrimaryBadgeLoading ? (
+                      <div className="absolute top-2 right-2 bg-slate-500/80 rounded-full h-10 w-10 flex items-center justify-center shadow-lg ring-2 ring-white animate-pulse">
+                        <Loader2 className="h-5 w-5 animate-spin text-white" />
+                      </div>
+                    ) : showMaintenanceBadges ? (
                       <div className="absolute top-2 right-2 flex items-center gap-2">
                         {maintenanceDueSoonCount > 0 && (
                           <div className="bg-amber-500 text-white rounded-full h-10 w-10 flex items-center justify-center text-base font-bold shadow-lg ring-2 ring-white">

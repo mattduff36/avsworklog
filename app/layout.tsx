@@ -38,6 +38,14 @@ export const metadata: Metadata = {
       { url: appleTouchIcon167, sizes: "167x167", type: "image/png" },
       { url: appleTouchIcon120, sizes: "120x120", type: "image/png" },
     ],
+    other: [
+      {
+        rel: "apple-touch-icon-precomposed",
+        url: appleTouchIconPrecomposed,
+        sizes: "180x180",
+        type: "image/png",
+      },
+    ],
   },
   appleWebApp: {
     capable: true,
@@ -76,12 +84,6 @@ export default function RootLayout({
     >
       <head>
         <meta name="color-scheme" content="dark" />
-        <link rel="apple-touch-icon" sizes="180x180" href={appleTouchIcon} />
-        <link rel="apple-touch-icon" sizes="180x180" href={appleTouchIcon180} />
-        <link rel="apple-touch-icon" sizes="152x152" href={appleTouchIcon152} />
-        <link rel="apple-touch-icon" sizes="167x167" href={appleTouchIcon167} />
-        <link rel="apple-touch-icon" sizes="120x120" href={appleTouchIcon120} />
-        <link rel="apple-touch-icon-precomposed" sizes="180x180" href={appleTouchIconPrecomposed} />
       </head>
       <body className={`${inter.variable} font-sans antialiased`}>
         <AppProviders shouldLoadAnalytics={shouldLoadAnalytics}>{children}</AppProviders>

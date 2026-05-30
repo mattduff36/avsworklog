@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import {
   AlertTriangle,
   ArrowUpDown,
@@ -472,12 +473,7 @@ export function WorkshopTasksOverviewTab({
       </div>
 
       {showInitialLoading ? (
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <p>Loading tasks...</p>
-          </div>
-        </div>
+        <PanelLoader message="Loading tasks..." accent="workshop" className="min-h-[400px]" />
       ) : tabFilteredTasks.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">

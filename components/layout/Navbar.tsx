@@ -139,6 +139,8 @@ function checkStandaloneMode(): boolean {
   return isStandaloneDisplayMode || isIOSStandalone;
 }
 
+const MOBILE_MENU_ANIMATION_MS = 300;
+
 export function Navbar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -146,6 +148,7 @@ export function Navbar() {
   const clientServiceOutage = useClientServiceOutage();
   const { tabletModeEnabled, toggleTabletMode } = useTabletMode();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileMenuRendered, setMobileMenuRendered] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false); // Sidebar starts collapsed
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -197,6 +200,21 @@ export function Navbar() {
     setDesktopMenuOpen(false);
     setActiveNowDialogOpen(false);
   }, [tabletModeEnabled]);
+
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      setMobileMenuRendered(true);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setMobileMenuRendered(false);
+    }, MOBILE_MENU_ANIMATION_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [mobileMenuOpen]);
 
   useEffect(() => {
     activeNotificationUserIdRef.current = user?.id || null;
@@ -533,6 +551,28 @@ export function Navbar() {
       {/* Sidebar for Manager/Admin (desktop) */}
       {!tabletModeEnabled && <SidebarNav open={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />}
 
+      {!tabletModeEnabled && (
+        <button
+          type="button"
+          aria-label="Close navigation menu"
+          className={`fixed inset-0 z-[40] bg-black/50 backdrop-blur-xl transition-opacity duration-300 md:hidden ${
+            mobileMenuOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
+          }`}
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      {!tabletModeEnabled && (
+        <button
+          type="button"
+          aria-label="Close navigation menu"
+          className={`fixed inset-0 z-[40] hidden bg-black/50 transition-opacity duration-300 md:block ${
+            desktopMenuOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
+          }`}
+          onClick={() => setDesktopMenuOpen(false)}
+        />
+      )}
+
       <nav 
         className="bg-slate-900/50 backdrop-blur-xl border-b border-border/50 top-0 z-50 app-top-navbar"
       >
@@ -633,7 +673,7 @@ export function Navbar() {
                   onClick={() => {
                     const nextOpen = !desktopMenuOpen;
                     if (nextOpen) {
-                      requestAnimationFrame(() => updateDesktopMenuPosition());
+                      updateDesktopMenuPosition();
                       void fetchNotificationCount();
                     }
                     setDesktopMenuOpen(nextOpen);
@@ -773,8 +813,13 @@ export function Navbar() {
         </div>
 
         {/* Mobile menu */}
-        {!tabletModeEnabled && mobileMenuOpen && (
-          <div className="md:hidden border-t border-border/50 bg-slate-900/95 backdrop-blur-xl">
+        {!tabletModeEnabled && mobileMenuRendered && (
+          <div
+            aria-hidden={!mobileMenuOpen}
+            className={`md:hidden overflow-hidden border-t border-border/50 bg-slate-900/95 ${
+              mobileMenuOpen ? 'animate-mobile-menu-slide-down' : 'pointer-events-none animate-mobile-menu-slide-up'
+            }`}
+          >
             <div className="px-2 pt-2 pb-3">
               <div className={`grid gap-3 ${hasMobileManagementLinks ? 'grid-cols-2' : 'grid-cols-1'}`}>
                 <div className="space-y-1">

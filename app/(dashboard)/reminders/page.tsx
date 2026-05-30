@@ -3,12 +3,13 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, BellRing, CalendarClock, ClipboardCheck, Loader2, UserRound } from 'lucide-react';
+import { ArrowRight, BellRing, CalendarClock, ClipboardCheck, UserRound } from 'lucide-react';
 import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageLoader } from '@/components/ui/page-loader';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import type { ReminderWithAction } from '@/types/reminders';
 
@@ -114,8 +115,8 @@ export default function RemindersPage() {
 
       {loading ? (
         <Card className="border-border">
-          <CardContent className="flex items-center justify-center py-16">
-            <Loader2 className="h-6 w-6 animate-spin text-reminders" />
+          <CardContent>
+            <PanelLoader message="Loading reminders..." accent="reminders" className="py-16" />
           </CardContent>
         </Card>
       ) : reminders.length === 0 ? (

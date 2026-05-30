@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -825,10 +826,5 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function LoadingPanel({ label }: { label: string }) {
-  return (
-    <div className="flex items-center justify-center py-12">
-      <Loader2 className="mr-2 h-5 w-5 animate-spin text-avs-yellow" />
-      <span className="text-sm text-muted-foreground">{label}</span>
-    </div>
-  );
+  return <PanelLoader message={label} className="py-12" />;
 }

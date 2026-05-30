@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import {
   Shield,
   Plus,
@@ -227,11 +228,7 @@ export function JobRolesTab() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-      </div>
-    );
+    return <PanelLoader message="Loading job roles..." className="py-12" />;
   }
 
   return (

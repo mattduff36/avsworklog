@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import {
   Select,
   SelectContent,
@@ -814,9 +815,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
           <DialogTitle>Quote Details</DialogTitle>
         </DialogHeader>
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-avs-yellow" />
-          </div>
+          <PanelLoader message="Loading quote details..." className="py-12" />
         ) : !quote ? (
           <div className="space-y-4 py-8 text-center">
             <p className="text-sm text-red-200">{loadError || 'Unable to load quote details right now.'}</p>

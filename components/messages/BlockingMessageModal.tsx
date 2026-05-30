@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { Loader2, AlertCircle, Maximize2 } from 'lucide-react';
 import { toast } from 'sonner';
 import dynamic from 'next/dynamic';
@@ -15,14 +16,7 @@ const PDFViewer = dynamic(
   () => import('./PDFViewer').then((mod) => ({ default: mod.PDFViewer })),
   { 
     ssr: false,
-    loading: () => (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        <span className="ml-2 text-sm text-muted-foreground">
-          Preparing PDF viewer...
-        </span>
-      </div>
-    )
+    loading: () => <PanelLoader message="Preparing PDF viewer..." className="py-12" />
   }
 );
 
@@ -30,11 +24,7 @@ const SignaturePad = dynamic(
   () => import('@/components/forms/SignaturePad').then((mod) => ({ default: mod.SignaturePad })),
   {
     ssr: false,
-    loading: () => (
-      <div className="flex items-center justify-center rounded-md border border-border py-8">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-      </div>
-    ),
+    loading: () => <PanelLoader message="Loading signature pad..." className="rounded-md border border-border py-8" />,
   }
 );
 

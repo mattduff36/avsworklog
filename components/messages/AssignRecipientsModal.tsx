@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { TeamToggleMenu } from '@/components/ui/team-toggle-menu';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { Loader2, Send, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
@@ -333,9 +334,7 @@ export function AssignRecipientsModal({
 
             {/* Employees List */}
             {fetching ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              </div>
+              <PanelLoader message="Loading recipients..." className="py-8" />
             ) : (
               <ScrollArea className="h-[300px] pr-4">
                 <div className="space-y-2">

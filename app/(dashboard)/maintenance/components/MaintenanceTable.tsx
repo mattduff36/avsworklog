@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { LoadMorePagination } from '@/components/ui/load-more-pagination';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -742,10 +743,11 @@ export function MaintenanceTable({
               </div>
               
               {effectiveRetiredLoading ? (
-                <div className="text-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto mb-3" />
-                  <p className="text-muted-foreground">Loading retired {assetLabelPluralLower}...</p>
-                </div>
+                <PanelLoader
+                  message={`Loading retired ${assetLabelPluralLower}...`}
+                  accent="maintenance"
+                  className="py-12"
+                />
               ) : isHgvTable ? (
                 /* ── Retired HGVs (from hgvs table) ── */
                 retiredHgvs.length === 0 ? (

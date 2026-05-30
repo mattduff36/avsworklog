@@ -1,8 +1,9 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { FileText, Loader2, X } from 'lucide-react';
+import { FileText, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import {
   Dialog,
   DialogContent,
@@ -15,12 +16,7 @@ const PDFViewer = dynamic(
   () => import('./PDFViewer').then((mod) => ({ default: mod.PDFViewer })),
   {
     ssr: false,
-    loading: () => (
-      <div className="flex flex-1 items-center justify-center gap-3 py-16 text-muted-foreground">
-        <Loader2 className="h-6 w-6 animate-spin" />
-        <span className="text-sm">Preparing PDF viewer...</span>
-      </div>
-    ),
+    loading: () => <PanelLoader message="Preparing PDF viewer..." className="flex-1 py-16" />,
   }
 );
 

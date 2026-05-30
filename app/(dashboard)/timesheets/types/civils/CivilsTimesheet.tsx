@@ -16,7 +16,8 @@ import { MobileNumericTimeInput } from '@/components/timesheets/MobileNumericTim
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Save, Check, AlertCircle, XCircle, Home, User, Loader2 } from 'lucide-react';
+import { PanelLoader } from '@/components/ui/panel-loader';
+import { ArrowLeft, Save, Check, AlertCircle, XCircle, Home, User } from 'lucide-react';
 import Link from 'next/link';
 // Removed: getWeekEnding, formatDateISO - no longer needed (week comes from props)
 import { calculateStandardTimesheetHours, formatHours, roundTimeToNearestQuarterHour } from '@/lib/utils/time-calculations';
@@ -1403,14 +1404,7 @@ export function CivilsTimesheet({
     offDayKey !== currentOffDayKey;
 
   if (!existingTimesheetLoaded || waitingForOffDayData) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <Loader2 className="h-10 w-10 animate-spin text-timesheet mx-auto mb-3" />
-          <p className="text-muted-foreground text-sm">Loading timesheets...</p>
-        </div>
-      </div>
-    );
+    return <PanelLoader message="Loading timesheets..." accent="timesheet" className="min-h-[400px]" />;
   }
 
   return (

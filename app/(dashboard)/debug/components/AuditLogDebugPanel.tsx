@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { fetchAdminTeamDirectory } from '@/lib/admin/team-directory-client';
 import {
@@ -134,6 +135,7 @@ function AuditMetricCard({ metric }: { metric: AuditSummaryMetric }) {
 export function AuditLogDebugPanel({ supabase }: AuditLogDebugPanelProps) {
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [auditLogsLimit, setAuditLogsLimit] = useState(INITIAL_AUDIT_LOG_LIMIT);
+  const [auditLogsLoading, setAuditLogsLoading] = useState(true);
   const [loadingMoreAudits, setLoadingMoreAudits] = useState(false);
   const [expandedAudits, setExpandedAudits] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -169,6 +171,11 @@ export function AuditLogDebugPanel({ supabase }: AuditLogDebugPanelProps) {
 
   const fetchAuditLogs = async (limit?: number) => {
     const effectiveLimit = limit ?? auditLogsLimit;
+    const isInitialLoad = auditLogs.length === 0 && !limit;
+
+    if (isInitialLoad) {
+      setAuditLogsLoading(true);
+    }
 
     try {
       const { data: auditData, error } = await supabase
@@ -212,6 +219,10 @@ export function AuditLogDebugPanel({ supabase }: AuditLogDebugPanelProps) {
     } catch (error) {
       console.error('Error fetching audit logs:', error);
       toast.error('Failed to fetch audit logs');
+    } finally {
+      if (isInitialLoad) {
+        setAuditLogsLoading(false);
+      }
     }
   };
 
@@ -684,7 +695,9 @@ ${log.changes && Object.keys(log.changes).length > 0
           </div>
         )}
 
-        {auditLogs.length === 0 ? (
+        {auditLogsLoading ? (
+          <PanelLoader message="Loading audit logs..." accent="debug" className="py-8" />
+        ) : auditLogs.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <History className="h-12 w-12 mx-auto mb-3 opacity-50" />
             <p>No audit log entries found</p>

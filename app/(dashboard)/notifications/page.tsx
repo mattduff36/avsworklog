@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { 
   ArrowLeft,
   Loader2, 
@@ -777,9 +778,7 @@ function NotificationsContent() {
 
               {/* Notifications List */}
               {isLoadingNotifications ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-avs-yellow" />
-                </div>
+                <PanelLoader message="Loading notifications..." accent="reminders" className="py-12" />
               ) : filteredNotifications.length === 0 ? (
                 <Card className={mobileDetailOpen && selectedNotification ? 'hidden md:block' : undefined}>
                   <CardContent className="flex flex-col items-center justify-center py-12">
@@ -889,9 +888,7 @@ function NotificationsContent() {
                 </CardHeader>
                 <CardContent>
                   {loadingPrefs ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                    </div>
+                    <PanelLoader message="Loading notification preferences..." accent="reminders" className="py-8" />
                   ) : (
                     <div className="space-y-6">
                       {availableModules.map((module) => {
@@ -989,9 +986,7 @@ function NotificationsContent() {
                     </CardContent>
                   </Card>
                 ) : loadingAdminNotifications ? (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                  </div>
+                  <PanelLoader message="Loading user notifications..." accent="reminders" className="py-12" />
                 ) : adminNotifications.length === 0 ? (
                   <Card>
                     <CardContent className="p-8 text-center text-muted-foreground">

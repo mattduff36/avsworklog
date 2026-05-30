@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import {
   Dialog,
   DialogContent,
@@ -719,9 +720,7 @@ export default function HelpPage() {
 
           {/* FAQ Content */}
           {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-avs-yellow" />
-            </div>
+            <PanelLoader message="Loading help articles..." className="py-12" />
           ) : filteredArticles.length === 0 ? (
             <Card className="">
               <CardContent className="py-12 text-center">
@@ -1134,9 +1133,7 @@ export default function HelpPage() {
             </CardHeader>
             <CardContent>
               {loadingErrors ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-red-500" />
-                </div>
+                <PanelLoader message="Loading error reports..." className="py-8" />
               ) : myErrors.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -1280,9 +1277,7 @@ export default function HelpPage() {
             </CardHeader>
             <CardContent>
               {loadingSuggestions ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-avs-yellow" />
-                </div>
+                <PanelLoader message="Loading suggestions..." className="py-8" />
               ) : mySuggestions.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Lightbulb className="h-12 w-12 text-muted-foreground mx-auto mb-4" />

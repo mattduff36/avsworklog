@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import {
   Select,
   SelectContent,
@@ -191,10 +192,7 @@ export function TimesheetTypeExceptionsCard() {
 
         <div className="border border-slate-700 rounded-lg overflow-auto">
           {loadingMatrix ? (
-            <div className="flex items-center justify-center py-16 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin mr-2" />
-              Loading timesheet override matrix...
-            </div>
+            <PanelLoader message="Loading timesheet override matrix..." accent="timesheet" className="py-16" />
           ) : rows.length === 0 ? (
             <div className="py-14 text-center text-muted-foreground">
               No user overrides yet. Add a user to create their override row.

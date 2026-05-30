@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { Switch } from '@/components/ui/switch';
 import { FLEET_INSPECTION_OVERDUE_WORKFLOW_KEY } from '@/lib/config/reminder-workflows';
 import type { FleetInspectionWorkflowConfig } from '@/types/reminders';
@@ -91,11 +92,7 @@ export function FleetInspectionSettingsPanel({ onSaved }: FleetInspectionSetting
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-avs-yellow" />
-      </div>
-    );
+    return <PanelLoader message="Loading fleet inspection settings..." className="py-12" />;
   }
 
   return (

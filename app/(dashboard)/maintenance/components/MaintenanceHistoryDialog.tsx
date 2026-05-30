@@ -10,7 +10,8 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, History as HistoryIcon, User, Edit, ChevronDown, ChevronUp, Clock, FileText } from 'lucide-react';
+import { PanelLoader } from '@/components/ui/panel-loader';
+import { History as HistoryIcon, User, Edit, ChevronDown, ChevronUp, Clock, FileText } from 'lucide-react';
 import { useMaintenanceHistory } from '@/lib/hooks/useMaintenance';
 import { formatDateTime } from '@/lib/utils/date';
 import { formatMaintenanceDate } from '@/lib/utils/maintenanceCalculations';
@@ -340,9 +341,7 @@ export function MaintenanceHistoryDialog({
         </DialogHeader>
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-          </div>
+          <PanelLoader message="Loading maintenance history..." accent="maintenance" className="py-12" />
         ) : (
           <div className="space-y-4">
             {/* VES Vehicle Data Section - Show even if no history */}

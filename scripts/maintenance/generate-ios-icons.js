@@ -73,9 +73,7 @@ async function createFaviconIco() {
     imageOffset += image.png.length;
   });
 
-  fs.writeFileSync(path.join(outputDir, 'favicon.ico'), ico);
   fs.writeFileSync(path.join(projectRoot, 'app/favicon.ico'), ico);
-  console.log('✅ Generated: favicon.ico (yellow AVS override)');
   console.log('✅ Generated: app/favicon.ico (Next metadata override)');
 }
 

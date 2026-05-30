@@ -14,6 +14,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { SelectableCard, type ModuleVariant } from '@/components/ui/selectable-card';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import {
   buildAssignUsersTeamOptions,
   getAssignUsersBulkIds,
@@ -232,9 +233,10 @@ function AssignUsersModalContent({
             </div>
 
             {loading ? (
-              <div className="flex min-h-[360px] items-center justify-center rounded-lg border border-border">
-                <Loader2 className={cn('h-6 w-6 animate-spin', spinnerClassName)} />
-              </div>
+              <PanelLoader
+                message="Loading users..."
+                className={cn('min-h-[360px] rounded-lg border border-border', spinnerClassName)}
+              />
             ) : (
               <ScrollArea className="h-[420px] pr-4">
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-2">

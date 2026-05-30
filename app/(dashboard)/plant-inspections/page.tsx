@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PageLoader } from '@/components/ui/page-loader';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -725,12 +726,7 @@ function PlantInspectionsContent() {
       )}
 
       {showInitialLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="text-center">
-            <Loader2 className="h-10 w-10 animate-spin text-plant-inspection mx-auto mb-3" />
-            <p className="text-muted-foreground text-sm">Loading daily checks...</p>
-          </div>
-        </div>
+        <PanelLoader message="Loading daily checks..." accent="plant-inspection" className="py-20" />
       ) : inspections.length === 0 ? (
         <Card className="border-border">
           <CardContent className="flex flex-col items-center justify-center py-12">

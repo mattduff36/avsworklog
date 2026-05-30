@@ -891,6 +891,36 @@ button.bg-primary * {
   opacity: 0;
 }
 
+@keyframes mobile-menu-slide-down {
+  0% {
+    max-height: 0;
+    transform: translateY(-0.75rem);
+  }
+  100% {
+    max-height: calc(100dvh - var(--top-nav-h));
+    transform: translateY(0);
+  }
+}
+
+.animate-mobile-menu-slide-down {
+  animation: mobile-menu-slide-down 300ms ease-out forwards;
+}
+
+@keyframes mobile-menu-slide-up {
+  0% {
+    max-height: calc(100dvh - var(--top-nav-h));
+    transform: translateY(0);
+  }
+  100% {
+    max-height: 0;
+    transform: translateY(-0.75rem);
+  }
+}
+
+.animate-mobile-menu-slide-up {
+  animation: mobile-menu-slide-up 300ms ease-in forwards;
+}
+
 /* Workshop tasks module: ensure all module action buttons have a visible border */
 body.workshop-module-buttons [data-slot="button"] {
   border-width: 1px !important;

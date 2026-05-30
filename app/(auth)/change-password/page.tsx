@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Loader2, CheckCircle2, AlertCircle, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { validatePasswordStrength, getPasswordRequirements } from '@/lib/utils/password';
 import { loadClientAuthSession } from '@/lib/app-auth/client-session';
+import { PageLoader } from '@/components/ui/page-loader';
 
 interface AuthSessionResponse {
   authenticated: boolean;
@@ -144,11 +145,7 @@ export default function ChangePasswordPage() {
   const passwordStrength = getPasswordStrength(newPassword);
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-      </div>
-    );
+    return <PageLoader message="Checking password session..." />;
   }
 
   if (success) {

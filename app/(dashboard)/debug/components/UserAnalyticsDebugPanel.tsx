@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Activity, BarChart3, BriefcaseBusiness, Building2, Clock, Eye, Gauge, Loader2, Monitor, RefreshCw, Route, Search, TrendingUp, Users } from 'lucide-react';
 import { toast } from 'sonner';
@@ -219,7 +220,7 @@ function UsageSummarySection({ payload }: { payload: UsageAnalyticsPayload }) {
 
 export function UserAnalyticsDebugPanel() {
   const [payload, setPayload] = useState<UsageAnalyticsPayload | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<AnalyticsRange>('7d');
   const [moduleFilter, setModuleFilter] = useState('');
   const [eventFilter, setEventFilter] = useState('all');
@@ -535,8 +536,14 @@ export function UserAnalyticsDebugPanel() {
       ) : (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
-            {loading ? <Loader2 className="mx-auto mb-3 h-8 w-8 animate-spin" /> : <BarChart3 className="mx-auto mb-3 h-8 w-8 opacity-50" />}
-            <p>{loading ? 'Loading usage analytics...' : 'Usage analytics will appear here once events are recorded.'}</p>
+            {loading ? (
+              <PanelLoader message="Loading usage analytics..." accent="debug" />
+            ) : (
+              <>
+                <BarChart3 className="mx-auto mb-3 h-8 w-8 opacity-50" />
+                <p>Usage analytics will appear here once events are recorded.</p>
+              </>
+            )}
           </CardContent>
         </Card>
       )}

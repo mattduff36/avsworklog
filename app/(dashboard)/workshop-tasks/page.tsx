@@ -11,7 +11,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageLoader } from '@/components/ui/page-loader';
-import { Settings, Plus, CheckCircle2, Clock, AlertTriangle, Wrench, Pause, Loader2 } from 'lucide-react';
+import { PanelLoader } from '@/components/ui/panel-loader';
+import { Settings, Plus, CheckCircle2, Clock, AlertTriangle, Wrench, Pause } from 'lucide-react';
 import { ErrorDetailsResponse } from '@/types/error-details';
 import { WorkshopTasksOverviewTab } from './components/WorkshopTasksOverviewTab';
 import { WorkshopTaskStatusDialogs } from './components/WorkshopTaskStatusDialogs';
@@ -28,10 +29,11 @@ import { useWorkshopActiveWakeLock } from '@/lib/hooks/useWorkshopActiveWakeLock
 function ModalChunkLoader({ message }: { message: string }) {
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/55 backdrop-blur-[1px]">
-      <div className="flex items-center gap-3 rounded-lg border border-border bg-background px-4 py-3 shadow-xl">
-        <Loader2 className="h-5 w-5 animate-spin text-workshop" />
-        <span className="text-sm text-foreground">{message}</span>
-      </div>
+      <PanelLoader
+        message={message}
+        accent="workshop"
+        className="!min-h-0 rounded-lg border border-border bg-background px-5 py-4 shadow-xl"
+      />
     </div>
   );
 }
@@ -50,11 +52,11 @@ const SubcategoryDialog = dynamic(
 );
 const CategoryManagementPanel = dynamic(
   () => import('@/components/workshop-tasks/CategoryManagementPanel').then(m => ({ default: m.CategoryManagementPanel })),
-  { ssr: false, loading: () => <PageLoader message="Loading category settings..." /> },
+  { ssr: false, loading: () => <ModalChunkLoader message="Loading category settings..." /> },
 );
 const AttachmentManagementPanel = dynamic(
   () => import('@/components/workshop-tasks/AttachmentManagementPanel').then(m => ({ default: m.AttachmentManagementPanel })),
-  { ssr: false, loading: () => <PageLoader message="Loading attachment settings..." /> },
+  { ssr: false, loading: () => <ModalChunkLoader message="Loading attachment settings..." /> },
 );
 const MarkTaskCompleteDialog = dynamic(
   () => import('@/components/workshop-tasks/MarkTaskCompleteDialog').then(m => ({ default: m.MarkTaskCompleteDialog })),

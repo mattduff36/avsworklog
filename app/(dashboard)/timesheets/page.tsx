@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { AppPageShell } from '@/components/layout/AppPageShell';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PageLoader } from '@/components/ui/page-loader';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Plus, FileText, Clock, CheckCircle2, XCircle, Download, Trash2, Filter, Package, AlertTriangle, Loader2, LayoutGrid, Table2, Settings2 } from 'lucide-react';
@@ -693,12 +694,7 @@ export default function TimesheetsPage() {
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="text-center">
-            <Loader2 className="h-10 w-10 animate-spin text-timesheet mx-auto mb-3" />
-            <p className="text-muted-foreground text-sm">Loading timesheets...</p>
-          </div>
-        </div>
+        <PanelLoader message="Loading timesheets..." accent="timesheet" className="py-20" />
       ) : timesheets.length === 0 ? (
         <Card className="border-border">
           <CardContent className="flex flex-col items-center justify-center py-12">

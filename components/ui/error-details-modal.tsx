@@ -4,7 +4,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle, ExternalLink, Loader2, CheckCircle2, Clock, XCircle } from 'lucide-react';
+import { PanelLoader } from '@/components/ui/panel-loader';
+import { AlertTriangle, ExternalLink, CheckCircle2, Clock, XCircle } from 'lucide-react';
 import { ErrorDetailsResponse, SubcategoryTaskItem, PendingTaskItem } from '@/types/error-details';
 import Link from 'next/link';
 
@@ -27,9 +28,7 @@ export function ErrorDetailsModal({
     return (
       <Dialog open={open} onOpenChange={onClose}>
         <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-2xl overflow-y-auto">
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
+          <PanelLoader message="Loading details..." className="py-8" />
         </DialogContent>
       </Dialog>
     );

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PanelLoader } from '@/components/ui/panel-loader';
 
 interface SensitivePinStatus {
   configured: boolean;
@@ -98,10 +99,7 @@ export function ProfileSensitivePinCard() {
       </CardHeader>
       <CardContent className="relative space-y-4">
         {loading ? (
-          <div className="flex items-center gap-2 text-base text-muted-foreground sm:text-sm">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span>Checking sensitive PIN status...</span>
-          </div>
+          <PanelLoader message="Checking sensitive PIN status..." className="py-6" />
         ) : (
           <div className={canSetPin ? 'space-y-4' : 'grid gap-4 md:grid-cols-2'}>
             <div className="rounded-2xl border border-avs-yellow/35 bg-avs-yellow/10 p-4 shadow-inner shadow-avs-yellow/5 sm:rounded-md sm:border-border sm:bg-slate-900/30 sm:p-3">

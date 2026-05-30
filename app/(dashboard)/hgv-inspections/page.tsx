@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PageLoader } from '@/components/ui/page-loader';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { Clipboard, Clock, Download, Filter, Loader2, Plus, Trash2, User, LayoutGrid, Table2, Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
@@ -561,12 +562,7 @@ function HgvInspectionsContent() {
       )}
 
       {showInitialLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="text-center">
-            <Loader2 className="h-10 w-10 animate-spin text-hgv-inspection mx-auto mb-3" />
-            <p className="text-muted-foreground text-sm">Loading daily checks...</p>
-          </div>
-        </div>
+        <PanelLoader message="Loading daily checks..." accent="hgv-inspection" className="py-20" />
       ) : inspections.length === 0 ? (
         <Card className="border-border">
           <CardContent className="flex flex-col items-center justify-center py-12">

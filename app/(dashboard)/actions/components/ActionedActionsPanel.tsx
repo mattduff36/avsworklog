@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, Loader2, TriangleAlert } from 'lucide-react';
+import { CheckCircle2, TriangleAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { LoadMorePagination } from '@/components/ui/load-more-pagination';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import {
   Table,
   TableBody,
@@ -90,9 +91,7 @@ export function ActionedActionsPanel() {
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-avs-yellow" />
-          </div>
+          <PanelLoader message="Loading actioned reminders..." className="py-12" />
         ) : actions.length === 0 ? (
           <div className="rounded-lg border border-dashed border-slate-700 bg-slate-900/40 p-8 text-center">
             <TriangleAlert className="mx-auto h-6 w-6 text-muted-foreground" />

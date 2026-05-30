@@ -7,19 +7,16 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { AppPageShell } from '@/components/layout/AppPageShell';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Wrench, Truck, Settings, HardHat, Plus } from 'lucide-react';
+import { Wrench, Truck, Settings, HardHat, Plus } from 'lucide-react';
 import { logger } from '@/lib/utils/logger';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
+import { PanelLoader } from '@/components/ui/panel-loader';
 
 // Dynamic import for PlantTable
 const PlantTable = dynamic(
   () => import('@/app/(dashboard)/maintenance/components/PlantTable').then(mod => ({ default: mod.PlantTable })),
   { 
-    loading: () => (
-      <div className="flex items-center justify-center p-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    ),
+    loading: () => <PanelLoader message="Loading plant table..." accent="fleet" className="p-12" />,
     ssr: false
   }
 );
@@ -453,9 +450,7 @@ function FleetContent() {
           {assetTab === 'plant' && (
             <div className="space-y-6">
           {maintenanceLoading || (plantAssetsLoading && plantAssets.length === 0) ? (
-            <div className="flex items-center justify-center min-h-[400px]">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-            </div>
+            <PanelLoader message="Loading plant assets..." accent="fleet" className="min-h-[400px]" />
           ) : maintenanceError ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
@@ -480,9 +475,7 @@ function FleetContent() {
           {assetTab === 'vans' && (
             <div className="space-y-6">
               {maintenanceLoading || (vehiclesLoading && vehicles.length === 0) ? (
-                <div className="flex items-center justify-center min-h-[400px]">
-                  <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-                </div>
+                <PanelLoader message="Loading vans..." accent="fleet" className="min-h-[400px]" />
               ) : maintenanceError ? (
                 <Card>
                   <CardContent className="flex flex-col items-center justify-center py-12">
@@ -508,9 +501,7 @@ function FleetContent() {
           {assetTab === 'hgvs' && (
             <div className="space-y-6">
               {maintenanceLoading || (hgvAssetsLoading && hgvAssets.length === 0) ? (
-                <div className="flex items-center justify-center min-h-[400px]">
-                  <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-                </div>
+                <PanelLoader message="Loading HGVs..." accent="fleet" className="min-h-[400px]" />
               ) : maintenanceError ? (
                 <Card>
                   <CardContent className="flex flex-col items-center justify-center py-12">

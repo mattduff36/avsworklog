@@ -7,6 +7,7 @@ import { AppPageShell } from '@/components/layout/AppPageShell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PageLoader } from '@/components/ui/page-loader';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -441,9 +442,7 @@ export default function FAQEditorPage() {
             </CardHeader>
             <CardContent>
               {loadingCategories ? (
-                <div className="flex justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
-                </div>
+                <PanelLoader message="Loading FAQ categories..." className="py-8" />
               ) : categories.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <FolderOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -547,9 +546,7 @@ export default function FAQEditorPage() {
             </CardHeader>
             <CardContent>
               {loadingArticles ? (
-                <div className="flex justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
-                </div>
+                <PanelLoader message="Loading FAQ articles..." className="py-8" />
               ) : articles.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />

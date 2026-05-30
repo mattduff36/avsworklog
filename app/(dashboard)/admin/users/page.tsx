@@ -9,6 +9,7 @@ import { AppPageShell } from '@/components/layout/AppPageShell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PageLoader } from '@/components/ui/page-loader';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -69,17 +70,17 @@ import {
 
 const RoleManagement = dynamic(() => import('@/components/admin/RoleManagement').then(m => ({ default: m.RoleManagement })), { 
   ssr: false,
-  loading: () => <div className="flex items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin" /></div>
+  loading: () => <PanelLoader message="Loading role management..." className="py-12" />
 });
 
 const JobRolesTab = dynamic(() => import('@/components/admin/JobRolesTab').then(m => ({ default: m.JobRolesTab })), {
   ssr: false,
-  loading: () => <div className="flex items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin" /></div>
+  loading: () => <PanelLoader message="Loading job roles..." className="py-12" />
 });
 
 const TeamsTab = dynamic(() => import('@/components/admin/TeamsTab').then(m => ({ default: m.TeamsTab })), {
   ssr: false,
-  loading: () => <div className="flex items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin" /></div>
+  loading: () => <PanelLoader message="Loading teams..." className="py-12" />
 });
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
@@ -1522,9 +1523,7 @@ export default function UsersAdminPage() {
 
             {/* User Table */}
             {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-              </div>
+              <PanelLoader message="Loading users..." className="py-8" />
             ) : filteredUsers.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 {searchQuery

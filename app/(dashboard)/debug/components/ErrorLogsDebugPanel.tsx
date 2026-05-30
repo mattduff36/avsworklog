@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SelectableCard } from '@/components/ui/selectable-card';
 import {
@@ -228,6 +229,7 @@ function getErrorBadgeMeta(severity: ErrorSeverity): {
 
 export function ErrorLogsDebugPanel() {
   const [errorLogs, setErrorLogs] = useState<ErrorLogEntry[]>([]);
+  const [loadingErrorLogs, setLoadingErrorLogs] = useState(true);
   const [clearingErrors, setClearingErrors] = useState(false);
   const [confirmClearAll, setConfirmClearAll] = useState(false);
   const [expandedErrors, setExpandedErrors] = useState<string[]>([]);
@@ -243,6 +245,7 @@ export function ErrorLogsDebugPanel() {
   const [filterDeviceType, setFilterDeviceType] = useState<string>('all');
   const [filterComponent, setFilterComponent] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [errorSummaryExpanded, setErrorSummaryExpanded] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
 
   useEffect(() => {
@@ -271,6 +274,8 @@ export function ErrorLogsDebugPanel() {
   }, []);
 
   const fetchErrorLogs = async () => {
+    setLoadingErrorLogs(true);
+
     try {
       const response = await fetch('/api/debug/error-logs?limit=200', {
         cache: 'no-store',
@@ -346,6 +351,8 @@ export function ErrorLogsDebugPanel() {
       }
     } catch {
       toast.error('Error loading error logs');
+    } finally {
+      setLoadingErrorLogs(false);
     }
   };
 
@@ -581,16 +588,35 @@ ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional
         </div>
       </CardHeader>
       <CardContent>
-        <div className="mb-4 rounded-xl border border-slate-700/70 bg-slate-950/35 p-4">
-          <div className="mb-4 flex flex-col gap-1">
-            <p className="text-xs font-semibold uppercase tracking-wide text-avs-yellow">Error Summary</p>
-            <p className="text-sm text-slate-300">{errorSummaryHeadline}</p>
-          </div>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {errorSummaryMetrics.map((metric) => (
-              <ErrorSummaryMetricCard key={metric.title} metric={metric} />
-            ))}
-          </div>
+        <div className="mb-4 rounded-xl border border-slate-700/70 bg-slate-950/35">
+          <button
+            type="button"
+            onClick={() => setErrorSummaryExpanded((current) => !current)}
+            className="flex w-full items-center gap-2 px-3 py-3 text-left"
+            aria-expanded={errorSummaryExpanded}
+          >
+            {errorSummaryExpanded ? (
+              <ChevronDown className="h-4 w-4 shrink-0 text-avs-yellow" />
+            ) : (
+              <ChevronRight className="h-4 w-4 shrink-0 text-avs-yellow" />
+            )}
+            <AlertTriangle className="h-4 w-4 shrink-0 text-avs-yellow" />
+            <span className="shrink-0 text-sm font-semibold text-foreground">Error Summary</span>
+            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+              {errorSummaryHeadline}
+            </span>
+            <Badge variant="secondary" className="ml-auto shrink-0 text-xs">
+              {formatNumber(filteredErrorLogs.length)}
+            </Badge>
+          </button>
+
+          {errorSummaryExpanded && (
+            <div className="grid grid-cols-1 gap-3 border-t border-slate-700/70 p-3 md:grid-cols-2 xl:grid-cols-4">
+              {errorSummaryMetrics.map((metric) => (
+                <ErrorSummaryMetricCard key={metric.title} metric={metric} />
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="mb-4 rounded-xl border border-slate-700/70 bg-slate-950/35">
@@ -788,7 +814,9 @@ ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional
           </div>
         </div>
 
-        {errorLogs.length === 0 ? (
+        {loadingErrorLogs ? (
+          <PanelLoader message="Loading error logs..." accent="debug" className="py-8" />
+        ) : errorLogs.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <CheckCircle2 className="h-12 w-12 mx-auto mb-3 opacity-50 text-green-500" />
             <p className="font-semibold">No errors logged</p>

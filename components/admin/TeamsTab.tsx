@@ -21,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { Loader2, Plus, Edit, Trash2, Search, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -235,11 +236,7 @@ export function TeamsTab() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-      </div>
-    );
+    return <PanelLoader message="Loading teams..." className="py-12" />;
   }
 
   return (

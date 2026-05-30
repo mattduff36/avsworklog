@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { Bell, Loader2, X } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -119,9 +120,7 @@ export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
 
         {/* Content */}
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
+          <PanelLoader message="Loading notifications..." accent="reminders" className="py-12" />
         ) : notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
             <Bell className="h-10 w-10 text-slate-600 mb-3" />

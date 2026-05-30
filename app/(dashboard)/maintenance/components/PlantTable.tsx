@@ -33,6 +33,7 @@ import { AddAssetFlowDialog } from './add-asset/AddAssetFlowDialog';
 import { getStatusColorClass } from '@/lib/utils/maintenanceCalculations';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { toast } from 'sonner';
 import { Undo2, XCircle } from 'lucide-react';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
@@ -935,10 +936,7 @@ export function PlantTable({
               </div>
 
               {isLoading ? (
-                <div className="text-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto mb-3" />
-                  <p className="text-muted-foreground">Loading retired plant...</p>
-                </div>
+                <PanelLoader message="Loading retired plant..." accent="maintenance" className="py-12" />
               ) : !filteredRetiredPlant || filteredRetiredPlant.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <FolderClock className="h-12 w-12 mx-auto mb-3 text-slate-600" />

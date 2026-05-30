@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Label } from '@/components/ui/label';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { extractSuggestionTitleFromNotificationBody, parseSuggestionIdFromCreatedVia } from '@/lib/utils/suggestion-notifications';
@@ -277,10 +278,7 @@ export function ReminderModal({
               </div>
 
               {loadingSuggestionThread ? (
-                <div className="flex items-center justify-center py-6 text-muted-foreground">
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Loading suggestion thread...
-                </div>
+                <PanelLoader message="Loading suggestion thread..." accent="reminders" className="py-6" />
               ) : suggestionThreadError ? (
                 <div className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950/30 dark:border-amber-900 dark:text-amber-200">
                   {suggestionThreadError}

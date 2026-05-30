@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bell, CircleHelp, ClipboardList, IdCard, Loader2, Settings, ShieldCheck, SlidersHorizontal, UserRound } from 'lucide-react';
+import { Bell, CircleHelp, ClipboardList, IdCard, Settings, ShieldCheck, SlidersHorizontal, UserRound } from 'lucide-react';
 import { useQueryState } from 'nuqs';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
@@ -19,6 +19,7 @@ import { ProfilePermissionsTab } from '@/components/profile/ProfilePermissionsTa
 import { ProfileRecentSubmissionsTab } from '@/components/profile/ProfileRecentSubmissionsTab';
 import { ProfileSecurityTab } from '@/components/profile/ProfileSecurityTab';
 import { Card, CardContent } from '@/components/ui/card';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { createStatusError, getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 import {
@@ -487,8 +488,8 @@ function ProfilePageContent() {
     return (
       <div className="max-w-6xl">
         <Card>
-          <CardContent className="flex items-center justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-avs-yellow" />
+          <CardContent>
+            <PanelLoader message="Loading profile..." className="py-12" />
           </CardContent>
         </Card>
       </div>

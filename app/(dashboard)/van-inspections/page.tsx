@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
 import { PageLoader } from '@/components/ui/page-loader';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { getRecentVehicleIds, splitVehiclesByRecent } from '@/lib/utils/recentVehicles';
 import { isUuid } from '@/lib/utils/uuid';
 import { Label } from '@/components/ui/label';
@@ -769,12 +770,7 @@ function InspectionsContent() {
       )}
 
       {showInitialLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="text-center">
-            <Loader2 className="h-10 w-10 animate-spin text-inspection mx-auto mb-3" />
-            <p className="text-muted-foreground text-sm">Loading daily checks...</p>
-          </div>
-        </div>
+        <PanelLoader message="Loading daily checks..." accent="inspection" className="py-20" />
       ) : inspections.length === 0 ? (
         <Card className="border-border">
           <CardContent className="flex flex-col items-center justify-center py-12">

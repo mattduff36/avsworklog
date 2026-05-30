@@ -159,7 +159,7 @@ test.describe('@errors @critical Error Logging', () => {
 
       const hideLocalhostFilter = page.getByText('Hide Localhost');
       if (!(await hideLocalhostFilter.isVisible({ timeout: 1_000 }).catch(() => false))) {
-        await page.getByRole('button', { name: /filters/i }).click();
+        await page.getByRole('button', { name: /^filters\b/i }).click();
       }
       await expect(hideLocalhostFilter).toBeVisible({ timeout: 5_000 });
       await hideLocalhostFilter.click();

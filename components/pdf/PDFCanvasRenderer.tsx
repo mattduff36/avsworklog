@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import type { PDFDocumentProxy, PDFDocumentLoadingTask } from 'pdfjs-dist';
 import { getPdfLoadMessage, isExpectedPdfLoadError, isExpectedPdfRenderError } from '@/lib/pdf/render-errors';
 
@@ -197,12 +198,7 @@ export function PDFCanvasRenderer({ url, className }: PDFCanvasRendererProps) {
   }, [loading, pdfDoc, renderPages]);
 
   if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 gap-3">
-        <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
-        <span className="text-sm text-muted-foreground">Loading PDF...</span>
-      </div>
-    );
+    return <PanelLoader message="Loading PDF..." className="py-16" />;
   }
 
   if (error) {

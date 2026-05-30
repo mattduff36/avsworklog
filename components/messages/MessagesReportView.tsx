@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import {
   Table,
   TableBody,
@@ -14,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ArrowLeft, Loader2, Search, Filter, CheckCircle2, Clock, AlertTriangle, Trash2, FileDown, FileText } from 'lucide-react';
+import { ArrowLeft, Search, Filter, CheckCircle2, Clock, AlertTriangle, Trash2, FileDown, FileText } from 'lucide-react';
 import { formatDateTime } from '@/lib/utils/date';
 import { toast } from 'sonner';
 import type { MessageReportData } from '@/types/messages';
@@ -151,11 +152,7 @@ export function MessagesReportView() {
   );
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <PanelLoader message="Loading messages..." className="py-12" />;
   }
 
   return (

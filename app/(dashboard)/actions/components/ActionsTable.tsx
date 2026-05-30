@@ -6,7 +6,6 @@ import {
   ArrowUpDown,
   ChevronDown,
   ChevronUp,
-  Loader2,
   MoreHorizontal,
   Search,
   Settings2,
@@ -42,6 +41,7 @@ import {
   type ReminderActionFilterState,
   type ReminderAssignmentFilter,
 } from '@/lib/utils/reminder-action-filters';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import type { ReminderActionIgnoreDuration, ReminderActionWithAsset, ReminderAssetType } from '@/types/reminders';
 
 const ASSIGNMENT_FILTERS: Array<{ value: ReminderAssignmentFilter; label: string }> = [
@@ -478,9 +478,7 @@ export function ActionsTable({
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-avs-yellow" />
-        </div>
+        <PanelLoader message="Loading actions..." className="py-12" />
       ) : sortedActions.length === 0 ? (
         <div className="rounded-lg border border-dashed border-slate-700 bg-slate-900/40 p-8 text-center">
           <TriangleAlert className="mx-auto h-6 w-6 text-muted-foreground" />

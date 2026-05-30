@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { AlertTriangle, Car, Database, Loader2, RefreshCw, Search, ShieldCheck, Trash, Truck, Wrench } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AlertTriangle, Car, Loader2, RefreshCw, Search, Trash, Truck, Wrench } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { toast } from 'sonner';
 import { PurgeActions, TestVehicle } from '../types';
 
@@ -27,50 +28,6 @@ type VehicleIdsByFleetType = {
   hgvs: string[];
   plant: string[];
 };
-
-type TestFleetSummaryTone = 'info' | 'success' | 'warning' | 'danger' | 'neutral';
-
-interface TestFleetSummaryMetric {
-  title: string;
-  value: string;
-  detail: string;
-  tone: TestFleetSummaryTone;
-  icon: ReactNode;
-}
-
-function formatNumber(value: number): string {
-  return value.toLocaleString('en-GB');
-}
-
-function getTestFleetMetricClasses(tone: TestFleetSummaryTone): string {
-  switch (tone) {
-    case 'success':
-      return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100';
-    case 'warning':
-      return 'border-amber-500/30 bg-amber-500/10 text-amber-100';
-    case 'danger':
-      return 'border-red-500/30 bg-red-500/10 text-red-100';
-    case 'info':
-      return 'border-blue-500/30 bg-blue-500/10 text-blue-100';
-    default:
-      return 'border-slate-500/30 bg-slate-500/10 text-slate-100';
-  }
-}
-
-function TestFleetSummaryMetricCard({ metric }: { metric: TestFleetSummaryMetric }) {
-  return (
-    <div className={`rounded-xl border p-4 ${getTestFleetMetricClasses(metric.tone)}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide opacity-80">{metric.title}</p>
-          <p className="mt-2 text-xl font-bold">{metric.value}</p>
-        </div>
-        <span className="opacity-85">{metric.icon}</span>
-      </div>
-      <p className="mt-2 text-sm leading-5 opacity-85">{metric.detail}</p>
-    </div>
-  );
-}
 
 function getQuickPurgeTargetLabel(prefix: string, fleetType: 'vans' | 'hgvs' | 'plant' | 'all'): string {
   const normalizedPrefix = prefix.trim().toUpperCase();
@@ -115,7 +72,7 @@ function groupVehicleIdsByFleetType(vehicleIds: string[], vehicles: TestVehicle[
 export function TestFleetDebugPanel() {
   const [testVehicles, setTestVehicles] = useState<TestVehicle[]>([]);
   const [selectedVehicleIds, setSelectedVehicleIds] = useState<string[]>([]);
-  const [loadingTestVehicles, setLoadingTestVehicles] = useState(false);
+  const [loadingTestVehicles, setLoadingTestVehicles] = useState(true);
   const [purgePreview, setPurgePreview] = useState<Record<string, number> | null>(null);
   const [purging, setPurging] = useState(false);
   const [confirmQuickPurge, setConfirmQuickPurge] = useState(false);
@@ -132,48 +89,6 @@ export function TestFleetDebugPanel() {
   const quickPurgeTargetLabel = getQuickPurgeTargetLabel(TEST_FLEET_PREFIX, TEST_FLEET_TYPE);
   const selectedSelectionKey = getSelectionKey(selectedVehicleIds);
   const canHardDeleteSelectedFleet = selectedVehicleIds.length > 0 && purgedSelectionKey === selectedSelectionKey;
-  const fleetCounts = testVehicles.reduce(
-    (acc, vehicle) => {
-      if (vehicle.fleet_type === 'hgv') acc.hgvs += 1;
-      else if (vehicle.fleet_type === 'plant') acc.plant += 1;
-      else acc.vans += 1;
-      return acc;
-    },
-    { vans: 0, hgvs: 0, plant: 0 },
-  );
-  const purgePreviewTotal = purgePreview
-    ? Object.values(purgePreview).reduce((total, value) => total + Number(value), 0)
-    : 0;
-  const testFleetSummaryMetrics: TestFleetSummaryMetric[] = [
-    {
-      title: 'Matching test assets',
-      value: formatNumber(testVehicles.length),
-      detail: `${formatNumber(fleetCounts.vans)} vans, ${formatNumber(fleetCounts.hgvs)} HGVs, and ${formatNumber(fleetCounts.plant)} plant assets match ${TEST_FLEET_PREFIX}.`,
-      tone: testVehicles.length > 0 ? 'info' : 'neutral',
-      icon: <Car className="h-5 w-5" />,
-    },
-    {
-      title: 'Selected assets',
-      value: formatNumber(selectedVehicleIds.length),
-      detail: selectedVehicleIds.length > 0 ? 'These assets are staged for preview, purge, or hard delete actions.' : 'Select assets before previewing or purging linked records.',
-      tone: selectedVehicleIds.length > 0 ? 'warning' : 'neutral',
-      icon: <ShieldCheck className="h-5 w-5" />,
-    },
-    {
-      title: 'Previewed records',
-      value: purgePreview ? formatNumber(purgePreviewTotal) : 'Not previewed',
-      detail: purgePreview ? 'Linked records found by the latest preview and ready for controlled purge.' : 'Run Preview Counts before purging to see the affected record volume.',
-      tone: purgePreviewTotal > 0 ? 'danger' : 'neutral',
-      icon: <Database className="h-5 w-5" />,
-    },
-    {
-      title: 'Hard delete status',
-      value: canHardDeleteSelectedFleet ? 'Unlocked' : 'Locked',
-      detail: canHardDeleteSelectedFleet ? 'Selected records have been purged, so hard delete is available for the same selection.' : 'Hard delete unlocks only after selected linked records have been purged.',
-      tone: canHardDeleteSelectedFleet ? 'danger' : 'success',
-      icon: <AlertTriangle className="h-5 w-5" />,
-    },
-  ];
 
   const clearQuickPurgeConfirmation = () => {
     if (quickPurgeConfirmTimeoutRef.current) {
@@ -463,20 +378,6 @@ export function TestFleetDebugPanel() {
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="rounded-xl border border-slate-700/70 bg-slate-950/35 p-4">
-          <div className="mb-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-avs-yellow">Fleet Cleanup Summary</p>
-            <p className="mt-1 text-sm text-slate-300">
-              Manage the isolated {TEST_FLEET_PREFIX} test fleet without touching real operational assets.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {testFleetSummaryMetrics.map((metric) => (
-              <TestFleetSummaryMetricCard key={metric.title} metric={metric} />
-            ))}
-          </div>
-        </div>
-
         {testVehicles.length > 0 && (
           <div className="space-y-3 rounded-xl border border-slate-700/70 bg-slate-950/35 p-4">
             <div className="flex items-center justify-between">
@@ -543,7 +444,9 @@ export function TestFleetDebugPanel() {
           </div>
         )}
 
-        {testVehicles.length === 0 && !loadingTestVehicles && (
+        {testVehicles.length === 0 && loadingTestVehicles ? (
+          <PanelLoader message="Loading test fleet..." accent="debug" className="py-8" />
+        ) : testVehicles.length === 0 && !loadingTestVehicles && (
           <div className="text-center py-8 text-muted-foreground">
             <Car className="h-12 w-12 mx-auto mb-3 opacity-50" />
             <p>No fleet items found matching prefix &quot;{TEST_FLEET_PREFIX}&quot;</p>

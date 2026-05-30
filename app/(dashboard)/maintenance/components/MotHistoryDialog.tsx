@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { formatMileage } from '@/lib/utils/maintenanceCalculations';
 import { 
   FileText, 
@@ -19,8 +20,7 @@ import {
   ChevronDown,
   ChevronUp,
   Gauge,
-  MapPin,
-  Loader2
+  MapPin
 } from 'lucide-react';
 
 interface MotHistoryDialogProps {
@@ -138,10 +138,7 @@ const [motData, setMotData] = useState<MotData | null>(null);
         </DialogHeader>
 
         {loading ? (
-          <div className="text-center py-12">
-            <Loader2 className="h-12 w-12 mx-auto mb-3 animate-spin text-blue-400" />
-            <p className="text-muted-foreground">Loading MOT history from GOV.UK...</p>
-          </div>
+          <PanelLoader message="Loading MOT history from GOV.UK..." accent="maintenance" className="py-12" />
         ) : error ? (
           <div className="text-center py-12 text-muted-foreground">
             {vehicleNotFound ? (

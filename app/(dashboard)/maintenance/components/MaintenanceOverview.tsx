@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertTriangle, Calendar, Wrench, ChevronDown, ChevronUp, Loader2, Clock, CheckCircle2, MessageSquare, Pause, Play, Undo2, Briefcase, Info, RefreshCw, Bell } from 'lucide-react';
 import type { VehicleMaintenanceWithStatus, MaintenanceCategory, CategoryResponsibility } from '@/types/maintenance';
@@ -1447,9 +1448,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
           {isExpanded && (
             <div className="mt-4 pt-4 border-t border-border" onClick={(e) => e.stopPropagation()}>
               {!historyResolved ? (
-                <div className="flex items-center justify-center py-6">
-                  <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
-                </div>
+                <PanelLoader message="Loading related workshop task..." accent="maintenance" className="py-6" />
               ) : !relatedTask ? (
                 <p className="text-sm text-muted-foreground py-4 text-center">No active workshop task found</p>
               ) : (

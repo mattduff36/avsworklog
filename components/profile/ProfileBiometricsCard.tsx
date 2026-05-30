@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/browser';
-import { Fingerprint, Loader2 } from 'lucide-react';
+import { Fingerprint } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   canUsePlatformAuthenticator,
@@ -17,6 +17,7 @@ import {
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PanelLoader } from '@/components/ui/panel-loader';
 
 interface WebAuthnOptionsResponse {
   challenge?: string;
@@ -182,10 +183,7 @@ export function ProfileBiometricsCard() {
       </CardHeader>
       <CardContent className="space-y-4">
         {loading ? (
-          <div className="flex items-center gap-2 text-base text-muted-foreground sm:text-sm">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span>Checking biometric status...</span>
-          </div>
+          <PanelLoader message="Checking biometric status..." className="py-6" />
         ) : (
           <div className="grid gap-3 md:grid-cols-2">
             <div className="rounded-lg border border-border bg-slate-900/30 p-4 sm:rounded-md sm:p-3">

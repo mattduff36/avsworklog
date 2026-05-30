@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { TeamToggleMenu } from '@/components/ui/team-toggle-menu';
 import { Loader2, Save, Users, X, Search } from 'lucide-react';
@@ -275,9 +276,7 @@ export function CategoryRecipientsDialog({
         </DialogHeader>
         
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-          </div>
+          <PanelLoader message="Loading reminder recipients..." accent="maintenance" className="py-12" />
         ) : (
           <div className="space-y-4">
             {/* Search */}

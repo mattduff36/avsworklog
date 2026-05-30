@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { 
   Wrench, 
   ClipboardCheck, 
@@ -1139,9 +1140,7 @@ export default function VanHistoryPage({
             </CardHeader>
             <CardContent>
               {motLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-                </div>
+                <PanelLoader message="Loading MOT history..." accent="fleet" className="py-12" />
               ) : !motData || motData.tests?.length === 0 ? (
                 <div className="text-center py-12">
                   <ClipboardCheck className="h-16 w-16 text-gray-400 mx-auto mb-4" />

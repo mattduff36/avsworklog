@@ -8,18 +8,39 @@ import { useBrowserSupabaseClient } from '@/lib/hooks/useBrowserSupabaseClient';
 import { AppPageShell } from '@/components/layout/AppPageShell';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageLoader } from '@/components/ui/page-loader';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SensitiveModuleGate, SensitiveModuleSessionManager, useSensitiveModuleAccess } from '@/components/security/SensitiveModuleGate';
 import { BarChart3, Bug, Car, History, RefreshCw, Send, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { canAccessDebugConsole } from '@/lib/utils/debug-access';
 
-const AuditLogDebugPanel = dynamic(() => import('./components/AuditLogDebugPanel').then((mod) => ({ default: mod.AuditLogDebugPanel })));
-const DVLASyncDebugPanel = dynamic(() => import('./components/DVLASyncDebugPanel').then((mod) => ({ default: mod.DVLASyncDebugPanel })));
-const ErrorLogsDebugPanel = dynamic(() => import('./components/ErrorLogsDebugPanel').then((mod) => ({ default: mod.ErrorLogsDebugPanel })));
-const NotificationSettingsDebugPanel = dynamic(() => import('./components/NotificationSettingsDebugPanel').then((mod) => ({ default: mod.NotificationSettingsDebugPanel })));
-const TestFleetDebugPanel = dynamic(() => import('./components/TestFleetDebugPanel').then((mod) => ({ default: mod.TestFleetDebugPanel })));
-const UserAnalyticsDebugPanel = dynamic(() => import('./components/UserAnalyticsDebugPanel').then((mod) => ({ default: mod.UserAnalyticsDebugPanel })));
+const debugTabLoading = () => <PanelLoader message="Loading debug tab..." accent="debug" className="min-h-[320px]" />;
+
+const AuditLogDebugPanel = dynamic(
+  () => import('./components/AuditLogDebugPanel').then((mod) => ({ default: mod.AuditLogDebugPanel })),
+  { loading: debugTabLoading },
+);
+const DVLASyncDebugPanel = dynamic(
+  () => import('./components/DVLASyncDebugPanel').then((mod) => ({ default: mod.DVLASyncDebugPanel })),
+  { loading: debugTabLoading },
+);
+const ErrorLogsDebugPanel = dynamic(
+  () => import('./components/ErrorLogsDebugPanel').then((mod) => ({ default: mod.ErrorLogsDebugPanel })),
+  { loading: debugTabLoading },
+);
+const NotificationSettingsDebugPanel = dynamic(
+  () => import('./components/NotificationSettingsDebugPanel').then((mod) => ({ default: mod.NotificationSettingsDebugPanel })),
+  { loading: debugTabLoading },
+);
+const TestFleetDebugPanel = dynamic(
+  () => import('./components/TestFleetDebugPanel').then((mod) => ({ default: mod.TestFleetDebugPanel })),
+  { loading: debugTabLoading },
+);
+const UserAnalyticsDebugPanel = dynamic(
+  () => import('./components/UserAnalyticsDebugPanel').then((mod) => ({ default: mod.UserAnalyticsDebugPanel })),
+  { loading: debugTabLoading },
+);
 
 type DebugTab = 'error-log' | 'audit-log' | 'usage-analytics' | 'dvla-sync' | 'test-fleet' | 'notification-settings';
 

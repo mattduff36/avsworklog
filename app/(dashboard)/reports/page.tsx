@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { PageLoader } from '@/components/ui/page-loader';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { AppPageShell } from '@/components/layout/AppPageShell';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { toast } from 'sonner';
@@ -870,7 +871,7 @@ function ReportsContent() {
                   </Button>
 
                   {suggestionsLoading && (
-                    <p className="text-sm text-muted-foreground">Loading report suggestions...</p>
+                    <PanelLoader message="Loading report suggestions..." accent="reports" className="py-6" />
                   )}
 
                   {!suggestionsLoading && userSuggestedReports.length > 0 && (

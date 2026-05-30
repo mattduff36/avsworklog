@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { BackButton } from '@/components/ui/back-button';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { AlertCircle, Save, Send, User } from 'lucide-react';
 import { DAY_NAMES } from '@/types/timesheet';
 import { formatHours, roundTimeToNearestQuarterHour } from '@/lib/utils/time-calculations';
@@ -425,11 +426,7 @@ export function PlantTimesheetV2({
   };
 
   if (initialExistingId && !existingTimesheetLoaded) {
-    return (
-      <div className="flex items-center justify-center min-h-[320px]">
-        <p className="text-muted-foreground">Loading plant timesheet...</p>
-      </div>
-    );
+    return <PanelLoader message="Loading plant timesheet..." accent="timesheet" className="min-h-[320px]" />;
   }
 
   return (
