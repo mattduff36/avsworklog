@@ -2,7 +2,7 @@
 
 import { type Ref, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { LockKeyhole, Loader2, ShieldCheck } from 'lucide-react';
+import { Check, Delete, LockKeyhole, Loader2, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -21,6 +21,33 @@ import type { SensitiveAccessModuleName } from '@/types/roles';
 const SENSITIVE_ACCESS_HEARTBEAT_MS = 5 * 60 * 1000;
 const SENSITIVE_ACCESS_IDLE_WARNING_MS = 10 * 60 * 1000;
 const ACTIVITY_EVENT_NAMES = ['pointerdown', 'keydown', 'input', 'wheel'] as const;
+const NATIVE_KEYBOARD_DETECTION_MS = 750;
+const NATIVE_KEYBOARD_MIN_VIEWPORT_SHRINK_PX = 120;
+
+type PinEntryTarget = 'unlock' | 'setup' | 'confirm' | 'verification';
+
+function focusWithoutScroll(input: HTMLInputElement) {
+  try {
+    input.focus({ preventScroll: true });
+  } catch {
+    input.focus();
+  }
+}
+
+function getVisualViewportHeight() {
+  return typeof window !== 'undefined' ? window.visualViewport?.height ?? null : null;
+}
+
+function isTouchMobileDevice() {
+  if (typeof window === 'undefined') return false;
+
+  const hasTouchPoints = window.navigator.maxTouchPoints > 0;
+  const hasTouchEvent = 'ontouchstart' in window;
+  const coarsePointer = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+  const mobileWidth = typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 1024px)').matches;
+
+  return (hasTouchPoints || hasTouchEvent || coarsePointer) && (coarsePointer || mobileWidth);
+}
 
 interface SensitivePinStatus {
   configured: boolean;
@@ -290,10 +317,13 @@ function PinDigitEntry({
   length,
   onChange,
   inputRef,
+  onActivate,
   describedBy,
   disabled = false,
   autoComplete = 'off',
   autoFocus = false,
+  customEntryActive = false,
+  visuallyActive = true,
 }: {
   id: string;
   label: string;
@@ -301,10 +331,13 @@ function PinDigitEntry({
   length: 4 | 6;
   onChange: (value: string) => void;
   inputRef: Ref<HTMLInputElement>;
+  onActivate: () => void;
   describedBy?: string;
   disabled?: boolean;
   autoComplete?: string;
   autoFocus?: boolean;
+  customEntryActive?: boolean;
+  visuallyActive?: boolean;
 }) {
   const slots = Array.from({ length }, (_, index) => index);
 
@@ -313,23 +346,33 @@ function PinDigitEntry({
       <Label htmlFor={id} className="sr-only">
         {label}
       </Label>
-      <div className="relative mx-auto w-fit" onClick={() => {
-        if (typeof inputRef === 'function') return;
-        inputRef?.current?.focus({ preventScroll: true });
-      }}>
+      <div
+        className="relative mx-auto w-fit"
+        onClick={() => {
+          if (!disabled) {
+            onActivate();
+          }
+        }}
+      >
         <Input
           ref={inputRef}
           id={id}
-          type="password"
-          inputMode="numeric"
+          type="tel"
+          inputMode={customEntryActive ? 'none' : 'numeric'}
+          pattern="[0-9]*"
           autoComplete={autoComplete}
-          autoFocus={autoFocus}
+          autoFocus={!customEntryActive && autoFocus}
           value={value}
           onChange={(event) => onChange(event.target.value)}
           disabled={disabled}
+          readOnly={customEntryActive}
+          tabIndex={customEntryActive ? -1 : undefined}
           aria-label={label}
           aria-describedby={describedBy}
-          className="absolute inset-0 z-10 h-full w-full cursor-text border-0 bg-transparent p-0 text-transparent caret-transparent opacity-0"
+          aria-readonly={customEntryActive}
+          className={`absolute inset-0 z-10 h-full w-full border-0 bg-transparent p-0 text-transparent caret-transparent opacity-0 ${
+            customEntryActive ? 'pointer-events-none cursor-default' : 'cursor-text'
+          }`}
         />
         <div
           className={`grid gap-2 sm:gap-3 ${length === 4 ? 'grid-cols-4' : 'grid-cols-6'}`}
@@ -337,7 +380,7 @@ function PinDigitEntry({
         >
           {slots.map((slot) => {
             const filled = value.length > slot;
-            const active = value.length === slot && !disabled;
+            const active = visuallyActive && value.length === slot && !disabled;
 
             return (
               <div
@@ -360,6 +403,98 @@ function PinDigitEntry({
   );
 }
 
+function SensitiveNumericKeypad({
+  value,
+  disabled,
+  onDigit,
+  onBackspace,
+  onConfirm,
+  confirmDisabled = false,
+}: {
+  value: string;
+  disabled?: boolean;
+  onDigit: (digit: string) => void;
+  onBackspace: () => void;
+  onConfirm?: () => void;
+  confirmDisabled?: boolean;
+}) {
+  const keys = [
+    { digit: '1', letters: '' },
+    { digit: '2', letters: 'ABC' },
+    { digit: '3', letters: 'DEF' },
+    { digit: '4', letters: 'GHI' },
+    { digit: '5', letters: 'JKL' },
+    { digit: '6', letters: 'MNO' },
+    { digit: '7', letters: 'PQRS' },
+    { digit: '8', letters: 'TUV' },
+    { digit: '9', letters: 'WXYZ' },
+  ];
+  const keyClassName =
+    'flex min-h-14 flex-col items-center justify-center rounded-xl bg-slate-200/85 text-slate-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_1px_8px_rgba(0,0,0,0.2)] transition active:scale-[0.98] active:bg-white disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-16 sm:rounded-2xl';
+
+  return (
+    <div
+      className="fixed inset-x-0 bottom-0 z-[80] mx-auto max-w-[680px] rounded-t-[2rem] border border-white/10 bg-slate-950/85 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] pt-3 shadow-[0_-20px_60px_rgba(0,0,0,0.45)] backdrop-blur-2xl sm:px-6"
+      role="group"
+      aria-label="Custom numeric PIN keypad"
+      onMouseDown={(event) => event.preventDefault()}
+    >
+      <div className="mx-auto mb-3 h-1 w-12 rounded-full bg-white/20" aria-hidden="true" />
+      <div className="mx-auto grid max-w-[560px] grid-cols-3 gap-2.5 sm:gap-3">
+        {keys.map((key) => (
+          <button
+            key={key.digit}
+            type="button"
+            className={keyClassName}
+            onClick={() => onDigit(key.digit)}
+            disabled={disabled}
+            aria-label={`Enter ${key.digit}`}
+          >
+            <span className="text-2xl font-semibold leading-none sm:text-3xl">{key.digit}</span>
+            {key.letters ? (
+              <span className="mt-1 text-[0.6rem] font-bold tracking-[0.22em] text-slate-700">{key.letters}</span>
+            ) : (
+              <span className="mt-1 text-[0.6rem]" aria-hidden="true">&nbsp;</span>
+            )}
+          </button>
+        ))}
+        {onConfirm ? (
+          <button
+            type="button"
+            className={`${keyClassName} bg-avs-yellow/90`}
+            onClick={onConfirm}
+            disabled={disabled || confirmDisabled}
+            aria-label="Confirm PIN"
+          >
+            <Check className="h-7 w-7" />
+          </button>
+        ) : (
+          <div aria-hidden="true" />
+        )}
+        <button
+          type="button"
+          className={keyClassName}
+          onClick={() => onDigit('0')}
+          disabled={disabled}
+          aria-label="Enter 0"
+        >
+          <span className="text-2xl font-semibold leading-none sm:text-3xl">0</span>
+          <span className="mt-1 text-[0.6rem]" aria-hidden="true">&nbsp;</span>
+        </button>
+        <button
+          type="button"
+          className="flex min-h-14 items-center justify-center rounded-xl text-slate-100 transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-16 sm:rounded-2xl"
+          onClick={onBackspace}
+          disabled={disabled || value.length === 0}
+          aria-label="Delete last digit"
+        >
+          <Delete className="h-8 w-8" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function SensitiveModuleGate({
   moduleLabel,
   access,
@@ -375,59 +510,150 @@ export function SensitiveModuleGate({
   const [setupPending, setSetupPending] = useState(false);
   const [setupPinLength, setSetupPinLength] = useState<4 | 6>(4);
   const [working, setWorking] = useState(false);
+  const [activePinTarget, setActivePinTarget] = useState<PinEntryTarget | null>(null);
+  const [customKeypadTarget, setCustomKeypadTarget] = useState<PinEntryTarget | null>(null);
   const pinInputRef = useRef<HTMLInputElement>(null);
   const setupPinInputRef = useRef<HTMLInputElement>(null);
   const confirmSetupPinInputRef = useRef<HTMLInputElement>(null);
   const verificationInputRef = useRef<HTMLInputElement>(null);
+  const customKeypadTargetRef = useRef<PinEntryTarget | null>(null);
+  const focusAttemptIdRef = useRef(0);
+  const focusDetectionTimerRef = useRef<number | null>(null);
+  const workingRef = useRef(false);
   const pinStatus = access.state?.pin_status;
   const setupRequired = !pinStatus?.configured || pinStatus.must_reset;
   const configuredPinLength = pinStatus?.pin_length === 4 || pinStatus?.pin_length === 6 ? pinStatus.pin_length : null;
   const pinEntryLength = configuredPinLength ?? 6;
   const pinCanUnlock = configuredPinLength ? pin.length === configuredPinLength : pin.length === 4 || pin.length === 6;
+  const customKeypadVisible = customKeypadTarget !== null;
 
-  const focusPinInput = useCallback((input: HTMLInputElement | null) => {
+  useEffect(() => {
+    customKeypadTargetRef.current = customKeypadTarget;
+  }, [customKeypadTarget]);
+
+  useEffect(() => {
+    workingRef.current = working;
+  }, [working]);
+
+  const beginWorking = useCallback(() => {
+    if (workingRef.current) return false;
+    workingRef.current = true;
+    setWorking(true);
+    return true;
+  }, []);
+
+  const endWorking = useCallback(() => {
+    workingRef.current = false;
+    setWorking(false);
+  }, []);
+
+  const focusPinInput = useCallback((input: HTMLInputElement | null, target: PinEntryTarget) => {
     if (!input) return;
 
-    const focus = () => {
-      input.focus({ preventScroll: true });
-    };
+    setActivePinTarget(target);
 
-    focus();
-    if (typeof requestAnimationFrame === 'function') {
-      requestAnimationFrame(focus);
-    } else {
-      window.setTimeout(focus, 0);
+    if (customKeypadTargetRef.current) {
+      setCustomKeypadTarget(target);
+      return;
     }
-    window.setTimeout(focus, 250);
+
+    if (!isTouchMobileDevice()) {
+      focusWithoutScroll(input);
+      setCustomKeypadTarget(null);
+      return;
+    }
+
+    const attemptId = focusAttemptIdRef.current + 1;
+    focusAttemptIdRef.current = attemptId;
+
+    if (focusDetectionTimerRef.current !== null) {
+      window.clearTimeout(focusDetectionTimerRef.current);
+    }
+
+    const startingViewportHeight = getVisualViewportHeight();
+    focusWithoutScroll(input);
+
+    focusDetectionTimerRef.current = window.setTimeout(() => {
+      if (focusAttemptIdRef.current !== attemptId) return;
+
+      const endingViewportHeight = getVisualViewportHeight();
+      const nativeKeyboardLikelyOpen =
+        startingViewportHeight !== null &&
+        endingViewportHeight !== null &&
+        startingViewportHeight - endingViewportHeight >= NATIVE_KEYBOARD_MIN_VIEWPORT_SHRINK_PX;
+
+      if (nativeKeyboardLikelyOpen) {
+        setCustomKeypadTarget(null);
+        return;
+      }
+
+      input.blur();
+      setActivePinTarget(target);
+      setCustomKeypadTarget(target);
+    }, NATIVE_KEYBOARD_DETECTION_MS);
   }, []);
 
   useEffect(() => {
     if (!setupRequired) {
-      focusPinInput(pinInputRef.current);
+      focusPinInput(pinInputRef.current, 'unlock');
       return;
     }
 
     if (setupPending) {
-      focusPinInput(verificationInputRef.current);
+      focusPinInput(verificationInputRef.current, 'verification');
     } else {
-      focusPinInput(setupPinInputRef.current);
+      focusPinInput(setupPinInputRef.current, 'setup');
     }
   }, [focusPinInput, setupPending, setupRequired]);
+
+  useEffect(() => {
+    return () => {
+      if (focusDetectionTimerRef.current !== null) {
+        window.clearTimeout(focusDetectionTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const visualViewport = window.visualViewport;
+    if (!visualViewport) return;
+
+    let previousHeight = visualViewport.height;
+    const handleViewportResize = () => {
+      const nextHeight = visualViewport.height;
+      if (
+        isTouchMobileDevice() &&
+        previousHeight - nextHeight >= NATIVE_KEYBOARD_MIN_VIEWPORT_SHRINK_PX
+      ) {
+        setCustomKeypadTarget(null);
+      }
+      previousHeight = nextHeight;
+    };
+
+    visualViewport.addEventListener('resize', handleViewportResize);
+    return () => visualViewport.removeEventListener('resize', handleViewportResize);
+  }, []);
 
   async function handleUnlock(candidatePin = pin) {
     const candidateCanUnlock = configuredPinLength
       ? candidatePin.length === configuredPinLength
       : candidatePin.length === 4 || candidatePin.length === 6;
 
-    if (working || !candidateCanUnlock) return;
+    if (!candidateCanUnlock || !beginWorking()) return;
 
-    setWorking(true);
+    let unlocked = false;
     try {
-      await access.unlock(candidatePin);
+      unlocked = await access.unlock(candidatePin);
       setPin('');
+      if (unlocked) {
+        setCustomKeypadTarget(null);
+        setActivePinTarget(null);
+      }
     } finally {
-      setWorking(false);
-      window.setTimeout(() => focusPinInput(pinInputRef.current), 0);
+      endWorking();
+      if (!unlocked) {
+        window.setTimeout(() => focusPinInput(pinInputRef.current, 'unlock'), 0);
+      }
     }
   }
 
@@ -435,7 +661,7 @@ export function SensitiveModuleGate({
     const nextPin = nextValue.replace(/\D/g, '').slice(0, pinEntryLength);
     setPin(nextPin);
 
-    if (configuredPinLength && nextPin.length === configuredPinLength && !working) {
+    if (configuredPinLength && nextPin.length === configuredPinLength && !workingRef.current) {
       void handleUnlock(nextPin);
     }
   }
@@ -444,7 +670,7 @@ export function SensitiveModuleGate({
     setSetupPinLength(nextLength);
     setSetupPin((current) => current.slice(0, nextLength));
     setConfirmSetupPin('');
-    window.setTimeout(() => focusPinInput(setupPinInputRef.current), 0);
+    window.setTimeout(() => focusPinInput(setupPinInputRef.current, 'setup'), 0);
   }
 
   function handleSetupPinChange(nextValue: string) {
@@ -453,7 +679,7 @@ export function SensitiveModuleGate({
     setConfirmSetupPin('');
 
     if (nextPin.length === setupPinLength) {
-      window.setTimeout(() => focusPinInput(confirmSetupPinInputRef.current), 0);
+      window.setTimeout(() => focusPinInput(confirmSetupPinInputRef.current, 'confirm'), 0);
     }
   }
 
@@ -461,7 +687,7 @@ export function SensitiveModuleGate({
     const nextPin = nextValue.replace(/\D/g, '').slice(0, setupPinLength);
     setConfirmSetupPin(nextPin);
 
-    if (nextPin.length === setupPinLength && setupPin.length === setupPinLength && !working) {
+    if (nextPin.length === setupPinLength && setupPin.length === setupPinLength && !workingRef.current) {
       void requestPinSetup(setupPin, nextPin);
     }
   }
@@ -470,13 +696,13 @@ export function SensitiveModuleGate({
     const nextCode = nextValue.replace(/\D/g, '').slice(0, 6);
     setVerificationCode(nextCode);
 
-    if (nextCode.length === 6 && !working) {
+    if (nextCode.length === 6 && !workingRef.current) {
       void confirmPinSetup(nextCode);
     }
   }
 
   async function requestPinSetup(candidateSetupPin = setupPin, candidateConfirmSetupPin = confirmSetupPin) {
-    if (working) return;
+    if (workingRef.current) return;
 
     if (candidateSetupPin.length !== setupPinLength || candidateConfirmSetupPin.length !== setupPinLength) {
       return;
@@ -485,7 +711,7 @@ export function SensitiveModuleGate({
     if (candidateSetupPin !== candidateConfirmSetupPin) {
       toast.error('PINs do not match');
       setConfirmSetupPin('');
-      window.setTimeout(() => focusPinInput(confirmSetupPinInputRef.current), 0);
+      window.setTimeout(() => focusPinInput(confirmSetupPinInputRef.current, 'confirm'), 0);
       return;
     }
     if (!/^\d{4}$|^\d{6}$/.test(candidateSetupPin)) {
@@ -493,7 +719,7 @@ export function SensitiveModuleGate({
       return;
     }
 
-    setWorking(true);
+    if (!beginWorking()) return;
     try {
       const response = await fetch('/api/me/sensitive-pin/setup/request', {
         method: 'POST',
@@ -511,6 +737,8 @@ export function SensitiveModuleGate({
         if (unlocked) {
           setSetupPin('');
           setConfirmSetupPin('');
+          setCustomKeypadTarget(null);
+          setActivePinTarget(null);
         } else {
           await access.refresh();
         }
@@ -524,14 +752,13 @@ export function SensitiveModuleGate({
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to set sensitive PIN');
     } finally {
-      setWorking(false);
+      endWorking();
     }
   }
 
   async function confirmPinSetup(candidateCode = verificationCode) {
-    if (working || candidateCode.length !== 6) return;
+    if (candidateCode.length !== 6 || !beginWorking()) return;
 
-    setWorking(true);
     try {
       const response = await fetch('/api/me/sensitive-pin/setup/confirm', {
         method: 'POST',
@@ -551,18 +778,71 @@ export function SensitiveModuleGate({
         setVerificationCode('');
         setSetupEmail('');
         setSetupPending(false);
+        setCustomKeypadTarget(null);
+        setActivePinTarget(null);
       } else {
         await access.refresh();
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to confirm verification code');
     } finally {
-      setWorking(false);
+      endWorking();
     }
   }
 
+  const getTargetValue = (target: PinEntryTarget) => {
+    switch (target) {
+      case 'unlock':
+        return pin;
+      case 'setup':
+        return setupPin;
+      case 'confirm':
+        return confirmSetupPin;
+      case 'verification':
+        return verificationCode;
+    }
+  };
+
+  const updateTargetValue = (target: PinEntryTarget, nextValue: string) => {
+    switch (target) {
+      case 'unlock':
+        handlePinChange(nextValue);
+        return;
+      case 'setup':
+        handleSetupPinChange(nextValue);
+        return;
+      case 'confirm':
+        handleConfirmSetupPinChange(nextValue);
+        return;
+      case 'verification':
+        handleVerificationCodeChange(nextValue);
+        return;
+    }
+  };
+
+  const handleCustomKeypadDigit = (digit: string) => {
+    if (!customKeypadTarget || workingRef.current) return;
+    updateTargetValue(customKeypadTarget, `${getTargetValue(customKeypadTarget)}${digit}`);
+  };
+
+  const handleCustomKeypadBackspace = () => {
+    if (!customKeypadTarget || workingRef.current) return;
+    updateTargetValue(customKeypadTarget, getTargetValue(customKeypadTarget).slice(0, -1));
+  };
+
+  const customKeypadValue = customKeypadTarget ? getTargetValue(customKeypadTarget) : '';
+  const customKeypadCanConfirmUnlock =
+    customKeypadTarget === 'unlock' && !configuredPinLength && (pin.length === 4 || pin.length === 6);
+
   return (
-    <div className="flex min-h-[calc(100dvh_-_var(--top-nav-h,68px)_-_1rem)] items-start justify-center px-4 pb-8 pt-4 sm:min-h-[calc(100vh-11rem)] sm:items-center sm:py-8">
+    <>
+    <div
+      className={`flex min-h-[calc(100dvh_-_var(--top-nav-h,68px)_-_1rem)] items-start justify-center overflow-y-auto px-4 pt-4 transition-[padding] sm:min-h-[calc(100vh-11rem)] ${
+        customKeypadVisible
+          ? 'pb-[calc(21rem+env(safe-area-inset-bottom,0px))] sm:items-start sm:pb-[calc(22rem+env(safe-area-inset-bottom,0px))] sm:pt-8'
+          : 'pb-8 sm:items-center sm:py-8'
+      }`}
+    >
       <Card className="relative flex w-full max-w-[580px] overflow-hidden rounded-3xl border border-slate-700/70 bg-slate-950/95 shadow-2xl shadow-black/40 sm:rounded-[2rem]">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(241,214,74,0.16),_transparent_36%),linear-gradient(145deg,_rgba(15,23,42,0.2),_rgba(2,6,23,0.9))]" />
         <div className="pointer-events-none absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-avs-yellow/80 to-transparent" />
@@ -612,9 +892,12 @@ export function SensitiveModuleGate({
                         length={setupPinLength}
                         onChange={handleSetupPinChange}
                         inputRef={setupPinInputRef}
+                        onActivate={() => focusPinInput(setupPinInputRef.current, 'setup')}
                         disabled={working}
                         describedBy="sensitive-module-setup-help"
                         autoFocus={!setupPending}
+                        customEntryActive={customKeypadTarget === 'setup'}
+                        visuallyActive={activePinTarget === 'setup'}
                       />
                     </div>
 
@@ -627,8 +910,11 @@ export function SensitiveModuleGate({
                         length={setupPinLength}
                         onChange={handleConfirmSetupPinChange}
                         inputRef={confirmSetupPinInputRef}
+                        onActivate={() => focusPinInput(confirmSetupPinInputRef.current, 'confirm')}
                         disabled={working || setupPin.length !== setupPinLength}
                         describedBy="sensitive-module-setup-help"
+                        customEntryActive={customKeypadTarget === 'confirm'}
+                        visuallyActive={activePinTarget === 'confirm'}
                       />
                     </div>
 
@@ -661,10 +947,13 @@ export function SensitiveModuleGate({
                       length={6}
                       onChange={handleVerificationCodeChange}
                       inputRef={verificationInputRef}
+                      onActivate={() => focusPinInput(verificationInputRef.current, 'verification')}
                       disabled={working}
                       autoComplete="one-time-code"
                       autoFocus
                       describedBy="sensitive-module-verification-help"
+                      customEntryActive={customKeypadTarget === 'verification'}
+                      visuallyActive={activePinTarget === 'verification'}
                     />
                     <div
                       id="sensitive-module-verification-help"
@@ -699,9 +988,12 @@ export function SensitiveModuleGate({
                     length={pinEntryLength}
                     onChange={handlePinChange}
                     inputRef={pinInputRef}
+                    onActivate={() => focusPinInput(pinInputRef.current, 'unlock')}
                     disabled={working}
                     describedBy="sensitive-module-pin-help"
                     autoFocus
+                    customEntryActive={customKeypadTarget === 'unlock'}
+                    visuallyActive={activePinTarget === 'unlock'}
                   />
                 </div>
                 <div
@@ -717,7 +1009,7 @@ export function SensitiveModuleGate({
                   ) : pinCanUnlock && !configuredPinLength ? (
                     'Press Enter to unlock.'
                   ) : (
-                    'The PIN submits automatically after the final digit.'
+                    null
                   )}
                 </div>
               </form>
@@ -726,5 +1018,16 @@ export function SensitiveModuleGate({
         </div>
       </Card>
     </div>
+    {customKeypadTarget ? (
+      <SensitiveNumericKeypad
+        value={customKeypadValue}
+        disabled={working}
+        onDigit={handleCustomKeypadDigit}
+        onBackspace={handleCustomKeypadBackspace}
+        onConfirm={customKeypadTarget === 'unlock' && !configuredPinLength ? () => void handleUnlock() : undefined}
+        confirmDisabled={!customKeypadCanConfirmUnlock}
+      />
+    ) : null}
+    </>
   );
 }
