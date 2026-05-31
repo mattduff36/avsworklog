@@ -34,6 +34,16 @@ function originMatchesRequest(request: NextRequest): boolean {
   }
 }
 
+function isTransientUsageAnalyticsError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  const lowerMessage = message.toLowerCase();
+
+  return (
+    lowerMessage.includes('502 bad gateway') ||
+    (lowerMessage.includes('cloudflare') && lowerMessage.includes('<html'))
+  );
+}
+
 export async function POST(request: NextRequest) {
   try {
     if (!originMatchesRequest(request)) {
@@ -62,6 +72,18 @@ export async function POST(request: NextRequest) {
       prd_epic_id: USER_ANALYTICS_PRD_EPIC_ID,
     });
   } catch (error) {
+    if (isTransientUsageAnalyticsError(error)) {
+      return NextResponse.json(
+        {
+          success: false,
+          inserted: 0,
+          transient: true,
+          error: 'Usage analytics temporarily unavailable',
+        },
+        { status: 202 }
+      );
+    }
+
     await logServerError({
       error: error as Error,
       request,

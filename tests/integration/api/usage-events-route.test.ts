@@ -12,8 +12,9 @@ vi.mock('@/lib/utils/server-error-logger', () => ({
 
 import { POST } from '@/app/api/me/usage-events/route';
 import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
+import { logServerError } from '@/lib/utils/server-error-logger';
 
-function createAdminClientMock() {
+function createAdminClientMock(options: { upsertError?: { message: string } | null } = {}) {
   const maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
   const selectExistingSession = vi.fn(() => ({
     eq: vi.fn(() => ({ maybeSingle })),
@@ -22,7 +23,7 @@ function createAdminClientMock() {
   const insertSession = vi.fn(() => ({
     select: vi.fn(() => ({ single: singleCreatedSession })),
   }));
-  const upsertEvents = vi.fn().mockResolvedValue({ error: null });
+  const upsertEvents = vi.fn().mockResolvedValue({ error: options.upsertError || null });
 
   return {
     maybeSingle,
@@ -127,5 +128,60 @@ describe('POST /api/me/usage-events', () => {
         ignoreDuplicates: true,
       }
     );
+  });
+
+  it('treats transient upstream telemetry failures as accepted without logging a production error', async () => {
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+    const adminMock = createAdminClientMock({
+      upsertError: {
+        message: `<html>
+<head><title>502 Bad Gateway</title></head>
+<body>
+<center><h1>502 Bad Gateway</h1></center>
+<hr><center>cloudflare</center>
+</body>
+</html>`,
+      },
+    });
+
+    vi.mocked(createAdminClient).mockReturnValue(adminMock.client as never);
+    vi.mocked(getCurrentAuthenticatedProfile).mockResolvedValue({
+      profile: { id: 'user-1' },
+      validation: {
+        session: { id: 'app-session-1' },
+      },
+    } as never);
+
+    const response = await POST(
+      new NextRequest('http://localhost/api/me/usage-events', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          origin: 'http://localhost',
+        },
+        body: JSON.stringify({
+          clientSessionId: 'client-session-1',
+          events: [
+            {
+              eventName: 'page_view',
+              clientEventId: 'event-1',
+              clientSessionId: 'client-session-1',
+              occurredAt: '2026-05-28T08:00:00.000Z',
+              path: '/quotes',
+            },
+          ],
+        }),
+      })
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(202);
+    expect(payload).toEqual({
+      success: false,
+      inserted: 0,
+      transient: true,
+      error: 'Usage analytics temporarily unavailable',
+    });
+    expect(logServerError).not.toHaveBeenCalled();
   });
 });
