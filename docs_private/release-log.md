@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0526.29.2
+
+**GIT COMMIT MESSAGE**
+`fix(api): handle transient usage telemetry errors`
+
+**WHAT CHANGED**
+Handle transient usage telemetry errors.
+
+**COMMITS IN THIS RELEASE**
+- `fix(api): handle transient usage telemetry errors`
+
 ## 0526.29.1
 
 **GIT COMMIT MESSAGE**
