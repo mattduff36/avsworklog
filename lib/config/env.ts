@@ -27,6 +27,12 @@ const envSchema = z.object({
   RESEND_API_KEY_2: z.string().min(1).optional(),
   RESEND_FROM_EMAIL_2: z.string().min(1).optional(),
   ADMIN_EMAIL: z.string().email().optional(),
+
+  // Quote AI Assist (Optional - server-side only)
+  QUOTE_OPENAI_API_KEY: z.string().min(1).optional(),
+  OPENAI_API_KEY: z.string().min(1).optional(),
+  QUOTE_AI_PROVIDER: z.enum(['openai']).optional(),
+  QUOTE_AI_MODEL: z.string().min(1).optional(),
   
   // Vercel Analytics (Optional)
   NEXT_PUBLIC_VERCEL_ANALYTICS_ID: z.string().optional(),

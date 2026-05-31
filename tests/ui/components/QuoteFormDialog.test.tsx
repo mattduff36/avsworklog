@@ -1,5 +1,5 @@
 /// <reference types="@testing-library/jest-dom/vitest" />
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import { QuoteFormDialog } from '@/app/(dashboard)/quotes/components/QuoteFormDialog';
@@ -12,6 +12,10 @@ vi.mock('@/lib/hooks/useAuth', () => ({
 }));
 
 describe('QuoteFormDialog', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   const baseProps = {
     open: true,
     onClose: vi.fn(),
@@ -108,6 +112,55 @@ describe('QuoteFormDialog', () => {
     expect(screen.queryByText('Requester Initials')).not.toBeInTheDocument();
     expect(screen.queryByText('Approver')).not.toBeInTheDocument();
     expect(screen.queryByText('Manager Email')).not.toBeInTheDocument();
+  });
+
+  it('generates and applies a beta AI quote draft', async () => {
+    mockUseAuth.mockReturnValue({
+      profile: {
+        id: 'manager-1',
+        full_name: 'Manager Example',
+      },
+    });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        subject_line: 'Installation of signage posts - Middlebeck Way',
+        project_description: 'Install six sets of signage posts along Middlebeck Way, with final positions to be confirmed.',
+        scope: '- Mobilise two operatives and HIAB vehicle.\n- Excavate post holes and spread spoil locally.\n- Concrete sleeves and install posts.',
+        caveats: ['Confirm final positions before issue.'],
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<QuoteFormDialog {...baseProps} />);
+
+    expect(screen.getByText('Beta feature')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /open ai helper/i }));
+    fireEvent.change(screen.getByLabelText('Customer email'), {
+      target: {
+        value: 'Would you be able to quote me for installing six sets of posts along Middlebeck Way?',
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /generate draft/i }));
+
+    expect(await screen.findByText('Installation of signage posts - Middlebeck Way')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /apply to quote/i }));
+
+    expect(
+      (screen.getByPlaceholderText('e.g. Supply of Fence Panels & Accessories') as HTMLInputElement).value
+    ).toBe('Installation of signage posts - Middlebeck Way');
+    expect(
+      (screen.getByPlaceholderText('Brief customer-facing summary') as HTMLTextAreaElement).value
+    ).toContain('Install six sets of signage posts');
+    expect(
+      (screen.getByPlaceholderText('Describe the included scope of works') as HTMLTextAreaElement).value
+    ).toContain('Mobilise two operatives');
+    expect(fetchMock).toHaveBeenCalledWith('/api/quotes/assist', expect.objectContaining({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    }));
   });
 
   it('adds contact names to duplicate customer names in the customer selector', () => {
