@@ -1,73 +1,31 @@
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
-import {
-  findVanInspectionOverlap,
-  formatVanInspectionDayList,
-  getInspectionDaysFromRows,
-  getStartedVanInspectionDays,
-} from '@/lib/utils/van-inspection-overlap';
 
-describe('van inspection overlap helpers', () => {
-  it('collects unique started days from checkbox state keys', () => {
-    expect(
-      getStartedVanInspectionDays({
-        '1-1': 'ok',
-        '1-2': 'attention',
-        '4-3': 'na',
-      })
-    ).toEqual([1, 4]);
+describe('van daily inspection conversion artifacts', () => {
+  it('uses a single-day van PDF table instead of weekday columns', () => {
+    const pdfSource = readFileSync(
+      resolve(process.cwd(), 'lib/pdf/van-inspection-pdf.tsx'),
+      'utf-8'
+    );
+
+    expect(pdfSource).toContain('PASS');
+    expect(pdfSource).toContain('FAIL');
+    expect(pdfSource).toContain('COMMENTS');
+    expect(pdfSource).not.toContain('WEEK ENDING');
+    expect(pdfSource).not.toContain('MON');
+    expect(pdfSource).not.toContain('TUE');
+    expect(pdfSource).not.toContain('WED');
   });
 
-  it('ignores read-only locked defect items when collecting started days', () => {
-    expect(
-      getStartedVanInspectionDays(
-        {
-          '1-2': 'attention',
-          '2-2': 'attention',
-          '3-2': 'attention',
-          '3-4': 'ok',
-        },
-        { ignoredItemNumbers: [2] }
-      )
-    ).toEqual([3]);
-  });
+  it('keeps the migration action relink verification for the known Tuesday action', () => {
+    const migrationSource = readFileSync(
+      resolve(process.cwd(), 'supabase/migrations/20260601_van_inspections_daily_split.sql'),
+      'utf-8'
+    );
 
-  it('groups unique day rows by inspection id', () => {
-    const result = getInspectionDaysFromRows([
-      { inspection_id: 'a', day_of_week: 3 },
-      { inspection_id: 'a', day_of_week: 1 },
-      { inspection_id: 'a', day_of_week: 3 },
-      { inspection_id: 'b', day_of_week: 7 },
-      { inspection_id: 'b', day_of_week: null },
-    ]);
-
-    expect(result.get('a')).toEqual([1, 3]);
-    expect(result.get('b')).toEqual([7]);
-  });
-
-  it('prioritizes submitted overlaps over drafts', () => {
-    const conflict = findVanInspectionOverlap([1, 2, 3], [
-      { id: 'draft-1', status: 'draft', days: [1, 2], updated_at: '2026-04-09T10:00:00.000Z' },
-      { id: 'submitted-1', status: 'submitted', days: [3], updated_at: '2026-04-09T09:00:00.000Z' },
-    ]);
-
-    expect(conflict).toEqual({
-      id: 'submitted-1',
-      status: 'submitted',
-      overlappingDays: [3],
-      inspectionDays: [3],
-      conflictCount: 2,
-    });
-  });
-
-  it('returns null when selected days do not overlap', () => {
-    const conflict = findVanInspectionOverlap([4, 5], [
-      { id: 'draft-1', status: 'draft', days: [1, 2, 3] },
-    ]);
-
-    expect(conflict).toBeNull();
-  });
-
-  it('formats day names for conflict messages', () => {
-    expect(formatVanInspectionDayList([1, 3, 7])).toBe('Monday, Wednesday, Sunday');
+    expect(migrationSource).toContain('1579a56c-2baa-4168-a59e-3e921a78588c');
+    expect(migrationSource).toContain('e26747ef-1ef0-4fef-a6f9-4e6810f9d058');
+    expect(migrationSource).toContain('original_day_of_week = 2');
   });
 });

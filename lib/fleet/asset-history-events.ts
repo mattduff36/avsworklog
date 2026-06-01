@@ -139,11 +139,6 @@ function getMeterLabel(value: number | null, assetType: AssetHistoryAssetType) {
   return `${formattedValue} miles`;
 }
 
-function getDailyTaskRangeLabel(startDate: string, endDate: string | null) {
-  if (endDate && endDate !== startDate) return `${startDate} - ${endDate}`;
-  return startDate;
-}
-
 function formatNamePart(part: string) {
   if (!part) return part;
   if (part !== part.toLowerCase() && part !== part.toUpperCase()) return part;
@@ -223,10 +218,7 @@ function buildDailyTaskRows(
   return dailyTasks.map((dailyTask) => {
     const timestamp = dailyTask.submitted_at || dailyTask.inspection_date;
     const defectCount = dailyTask.defect_count || 0;
-    const inspectionRange = getDailyTaskRangeLabel(
-      dailyTask.inspection_date,
-      dailyTask.inspection_end_date
-    );
+    const inspectionRange = dailyTask.inspection_date;
 
     return {
       id: `daily-task-${dailyTask.id}`,

@@ -89,11 +89,6 @@ function getDailyCheckStatusClassName(inspection: DailyCheckHistoryItem) {
     : 'bg-green-500/10 text-green-300 border-green-500/30';
 }
 
-function formatInspectionRange(startDate: string, endDate: string | null) {
-  if (endDate && endDate !== startDate) return `${formatDate(startDate)} - ${formatDate(endDate)}`;
-  return formatDate(startDate);
-}
-
 function formatDistance(value: number | null, assetType: AssetType) {
   if (value == null) return `${assetConfig[assetType].distanceLabel} not set`;
 
@@ -239,7 +234,7 @@ export function DailyChecksHistoryTab({ assetId, assetType }: DailyChecksHistory
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <div className="text-sm font-semibold text-white">
-                        {formatInspectionRange(inspection.inspection_date, inspection.inspection_end_date)}
+                        {formatDate(inspection.inspection_date)}
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">
                         {inspection.profile?.full_name ? `${inspection.profile.full_name} - ` : ''}

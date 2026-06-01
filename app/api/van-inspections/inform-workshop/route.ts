@@ -5,6 +5,7 @@ import {
   FALLBACK_SUBCATEGORY 
 } from '@/lib/utils/inspectionWorkshopRouting';
 import { getInspectionRouteActorAccess } from '@/lib/server/inspection-route-access';
+import { getVanInspectionsMaintenanceResponse } from '@/lib/server/van-inspections-maintenance';
 import { WORKSHOP_TASK_COMMENT_MIN_LENGTH } from '@/lib/workshop-tasks/validation';
 
 /**
@@ -32,6 +33,11 @@ export async function POST(request: NextRequest) {
     const { access, errorResponse } = await getInspectionRouteActorAccess('inspections');
     if (errorResponse || !access) {
       return errorResponse ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const maintenanceResponse = getVanInspectionsMaintenanceResponse();
+    if (maintenanceResponse) {
+      return maintenanceResponse;
     }
 
     // Parse request body

@@ -193,7 +193,6 @@ async function loadLatestInspectionDates(
     .eq('status', 'submitted')
     .in(assetKey, assetIds)
     .order(assetKey, { ascending: true })
-    .order('inspection_end_date', { ascending: false })
     .order('inspection_date', { ascending: false });
 
   if (error) {
@@ -207,7 +206,7 @@ async function loadLatestInspectionDates(
       continue;
     }
 
-    const lastSubmittedAt = row.inspection_end_date || row.inspection_date;
+    const lastSubmittedAt = row.inspection_date;
     if (lastSubmittedAt) {
       latestByAsset.set(assetId, lastSubmittedAt);
     }

@@ -58,20 +58,17 @@ test.describe('Van Daily Checks — Navigation', () => {
     await waitForAppReady(page);
     const startUrl = page.url();
 
-    // Look for any daily-check/inspection link in the nav
-    const inspLink = page.getByRole('link', { name: /daily check|inspection/i }).first();
-    if (await inspLink.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await inspLink.click();
-      await waitForAppReady(page);
-      const url = page.url();
+    const inspLink = page.locator('a[href="/van-inspections"]').first();
+    await expect(inspLink).toBeAttached({ timeout: 5_000 });
 
-      // Depending on role permissions/navigation setup, this may land on different daily check hubs.
-      // Validate user left dashboard and did not fall to an error route.
-      expect(url).not.toContain('/login');
-      expect(url).not.toContain('/404');
-      expect(url).not.toContain('/500');
-      test.skip(url === startUrl, 'Daily check navigation item is not actionable in this environment');
-    }
+    await page.goto('/van-inspections');
+    await waitForAppReady(page);
+    const url = page.url();
+
+    expect(url).not.toBe(startUrl);
+    expect(url).not.toContain('/login');
+    expect(url).not.toContain('/404');
+    expect(url).not.toContain('/500');
   });
 
   test('no 404 on /van-inspections', async ({ page }) => {
@@ -130,5 +127,14 @@ test.describe('Van Daily Checks — Renamed Text Verification', () => {
     }
 
     expect(actionCount).toBeGreaterThan(0);
+  });
+
+  test('new inspection page uses a single daily date selector', async ({ page }) => {
+    await page.goto('/van-inspections/new');
+    await waitForAppReady(page);
+
+    await expect(page.locator('input[type="date"]#weekEnding')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('body')).toContainText(/Daily Check Date/i);
+    await expect(page.locator('body')).not.toContainText(/Week Ending \(Sunday\)/i);
   });
 });

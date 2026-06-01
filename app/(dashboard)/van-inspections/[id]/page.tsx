@@ -712,8 +712,8 @@ export default function ViewInspectionPage() {
 
   const defectCount = items.filter(item => item.status === 'attention').length;
   const okCount = items.filter(item => item.status === 'ok').length;
-  // Check if this is a weekly inspection (has day_of_week data)
-  const isWeeklyInspection = items.length > 0 && items[0].day_of_week !== null;
+  // Van inspections are daily checks; day_of_week is retained only for item/photo compatibility.
+  const isWeeklyInspection = false;
   const inspectionReference = formatReferenceId(inspection.id);
   const linkedTaskReferences = linkedTasks
     .map((task) => ({
@@ -764,11 +764,7 @@ export default function ViewInspectionPage() {
             <div>
               <h1 className="text-xl md:text-3xl font-bold text-foreground">Van Daily Check</h1>
               <p className="text-sm md:text-base text-muted-foreground">
-                {inspection.vans?.reg_number} • {
-                  inspection.inspection_end_date && inspection.inspection_end_date !== inspection.inspection_date
-                    ? `${formatDate(inspection.inspection_date)} - ${formatDate(inspection.inspection_end_date)}`
-                    : formatDate(inspection.inspection_date)
-                }
+                {inspection.vans?.reg_number} • {formatDate(inspection.inspection_date)}
               </p>
               {inspectionReference && (
                 <div className="mt-1 text-xs md:text-sm text-slate-500 dark:text-slate-400/80">

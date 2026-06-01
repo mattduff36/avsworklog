@@ -14,15 +14,25 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
 import { getRecentVehicleIds, recordRecentVehicleId, splitVehiclesByRecent } from '@/lib/utils/recentVehicles';
 import { isUuid } from '@/lib/utils/uuid';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, dialogContentViewportClassName } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { PageLoader } from '@/components/ui/page-loader';
-import { Save, Send, CheckCircle2, XCircle, AlertCircle, Info, User, Plus, Check, Camera, AlertTriangle } from 'lucide-react';
-import { BackButton } from '@/components/ui/back-button';
-import { formatDateISO, formatDate, getWeekEnding } from '@/lib/utils/date';
+import { Send, CheckCircle2, XCircle, AlertCircle, Info, User, Plus, Camera, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { formatDateISO, formatDate, getDayOfWeek } from '@/lib/utils/date';
 import { INSPECTION_ITEMS, InspectionStatus, getChecklistForCategory } from '@/types/inspection';
 import { checkMileageSanity, formatMileage, type MileageSanityResult } from '@/lib/utils/mileageSanity';
 import { getReadingDigitGrowthWarning } from '@/lib/utils/readingDigitGrowthWarning';
@@ -39,18 +49,15 @@ import { triggerShakeAnimation } from '@/lib/utils/animations';
 import { InspectionPhotoTiles } from '@/components/inspections/InspectionPhotoTiles';
 import { useInspectionPhotos } from '@/lib/hooks/useInspectionPhotos';
 import { getInspectionPhotoKey } from '@/lib/inspection-photos';
-import {
-  findVanInspectionOverlap,
-  formatVanInspectionDayList,
-  getInspectionDaysFromRows,
-  getStartedVanInspectionDays,
-  type VanInspectionDayRow,
-  type VanInspectionOverlapConflict,
-} from '@/lib/utils/van-inspection-overlap';
 import { isClientSessionPausedError } from '@/lib/app-auth/session-error';
 import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 import { completeInspectionReminder } from '@/lib/client/complete-inspection-reminder';
 import { WORKSHOP_TASK_COMMENT_MIN_LENGTH } from '@/lib/workshop-tasks/validation';
+import {
+  isVanInspectionsMaintenancePaused,
+  VAN_INSPECTIONS_MAINTENANCE_MESSAGE,
+  VAN_INSPECTIONS_MAINTENANCE_TITLE,
+} from '@/lib/config/van-inspections-maintenance';
 
 // Dynamic imports for heavy components - loaded only when needed
 const PhotoUpload = dynamic(() => import('@/components/forms/PhotoUpload'), { ssr: false });
@@ -113,11 +120,13 @@ type LockedDefectItem = {
 type PreviousDefect = PreviousDefectSummary;
 type RecentCompletedDefect = { completedAt: string };
 
-type ExistingInspectionConflict = VanInspectionOverlapConflict;
+type ExistingInspectionConflict = { id: string; status: 'draft' | 'submitted' };
+type PendingNavigation = { type: 'href'; href: string } | { type: 'back' };
 type LoadPreviousDefectsOptions = {
   mode?: 'replace' | 'merge';
   baseCheckboxStates?: Record<string, InspectionStatus>;
   baseComments?: Record<string, string>;
+  inspectionDateOverride?: string;
 };
 
 const STICKY_NAV_OFFSET_PX = 96;
@@ -153,6 +162,7 @@ function NewInspectionContent() {
     isSuperAdmin,
   });
   const { tabletModeEnabled } = useTabletMode();
+  const inspectionsPaused = isVanInspectionsMaintenancePaused();
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
   if (typeof window !== 'undefined' && !supabaseRef.current) {
     supabaseRef.current = createClient();
@@ -188,7 +198,6 @@ function NewInspectionContent() {
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
   const [, setSignature] = useState<string | null>(null);
   const [showConfirmSubmitDialog, setShowConfirmSubmitDialog] = useState(false);
-  const [savingDraftFromConfirm, setSavingDraftFromConfirm] = useState(false);
   const [showAddVehicleDialog, setShowAddVehicleDialog] = useState(false);
   const [newVehicleReg, setNewVehicleReg] = useState('');
   const [newVehicleCategoryId, setNewVehicleCategoryId] = useState('');
@@ -198,10 +207,14 @@ function NewInspectionContent() {
   const existingInspectionIdRef = useRef<string | null>(null);
   existingInspectionIdRef.current = existingInspectionId;
   const inspectionWriteInProgressRef = useRef(false);
+  const allowNavigationRef = useRef(false);
   const draftSavePromiseRef = useRef<Promise<string | null> | null>(null);
   const activeDraftLoadIdRef = useRef<string | null>(null);
   const loadedDraftIdRef = useRef<string | null>(null);
   const loadPreviousDefectsRef = useRef<((selectedVehicleId: string, options?: LoadPreviousDefectsOptions) => Promise<void>) | null>(null);
+  const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation | null>(null);
+  const [showDiscardDraftDialog, setShowDiscardDraftDialog] = useState(false);
+  const [discardingDraft, setDiscardingDraft] = useState(false);
   
   // Manager-specific states
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -271,6 +284,15 @@ function NewInspectionContent() {
 
     const pendingDraftSave = (async () => {
       const { silent = false } = options;
+      if (inspectionsPaused) {
+        if (!silent) {
+          toast.info(VAN_INSPECTIONS_MAINTENANCE_TITLE, {
+            id: 'van-inspections-maintenance-draft-save',
+            description: VAN_INSPECTIONS_MAINTENANCE_MESSAGE,
+          });
+        }
+        return null;
+      }
       if (!user || !selectedEmployeeId || !vehicleId) {
         if (!silent) toast.error('Select a vehicle, employee and week before adding photos', {
           id: 'van-inspections-new-validation-photos-core-fields',
@@ -288,7 +310,7 @@ function NewInspectionContent() {
         return null;
       }
       if (!weekEnding || weekEnding.trim() === '') {
-        if (!silent) toast.error('Select a week ending date before adding photos', {
+        if (!silent) toast.error('Select an inspection date before adding photos', {
           id: 'van-inspections-new-validation-photos-week-required',
         });
         return null;
@@ -300,15 +322,11 @@ function NewInspectionContent() {
       inspectionWriteInProgressRef.current = true;
       setSavingDraftForPhoto(true);
       try {
-        const weekEndDate = new Date(weekEnding + 'T00:00:00');
-        const startDate = new Date(weekEndDate);
-        startDate.setDate(weekEndDate.getDate() - 6);
-
         if (existingInspectionId) {
           const draftPayload: Database['public']['Tables']['van_inspections']['Update'] = {
             van_id: vehicleId,
             user_id: selectedEmployeeId,
-            inspection_date: formatDateISO(startDate),
+            inspection_date: weekEnding,
             inspection_end_date: weekEnding,
             current_mileage: getParsedMileage(),
             status: 'draft',
@@ -348,15 +366,9 @@ function NewInspectionContent() {
           return existingInspectionId;
         }
 
-        const currentStartedDays = getCurrentStartedDays();
-        const conflict = await findExistingInspectionConflict(currentStartedDays);
+        const conflict = await findExistingInspectionConflict();
         if (conflict) {
-          const canReuseExactDraft =
-            conflict.status === 'draft' &&
-            conflict.conflictCount === 1 &&
-            hasExactMatchingDays(conflict.inspectionDays, currentStartedDays);
-
-          if (canReuseExactDraft) {
+          if (conflict.status === 'draft') {
             const merged = await mergeIntoExistingDraft(conflict.id, { showToast: !silent });
             return merged ? conflict.id : null;
           }
@@ -369,7 +381,7 @@ function NewInspectionContent() {
           .insert({
             van_id: vehicleId,
             user_id: selectedEmployeeId,
-            inspection_date: formatDateISO(startDate),
+            inspection_date: weekEnding,
             inspection_end_date: weekEnding,
             current_mileage: getParsedMileage(),
             status: 'draft' as const,
@@ -394,16 +406,8 @@ function NewInspectionContent() {
       } catch (err) {
         const errorContextId = 'van-inspections-new-silent-draft-save-error';
         if (!existingInspectionId && isDuplicateInspectionError(err)) {
-          const currentStartedDays = getCurrentStartedDays();
-          const conflict = await findExistingInspectionConflict(currentStartedDays);
-          const canReuseExactDraft = Boolean(
-            conflict &&
-            conflict.status === 'draft' &&
-            conflict.conflictCount === 1 &&
-            hasExactMatchingDays(conflict.inspectionDays, currentStartedDays)
-          );
-
-          if (conflict && canReuseExactDraft) {
+          const conflict = await findExistingInspectionConflict();
+          if (conflict && conflict.status === 'draft') {
             const merged = await mergeIntoExistingDraft(conflict.id, { showToast: !silent });
             return merged ? conflict.id : null;
           }
@@ -441,7 +445,7 @@ function NewInspectionContent() {
   };
 
   const autoSaveDraftRef = useRef<(() => Promise<string | null>) | null>(null);
-  autoSaveDraftRef.current = () => ensureDraftSaved({ silent: true });
+  autoSaveDraftRef.current = () => inspectionsPaused ? Promise.resolve(null) : ensureDraftSaved({ silent: true });
 
   const isAddVehicleFormDirty = Boolean(newVehicleReg.trim() || newVehicleCategoryId);
 
@@ -564,7 +568,9 @@ function NewInspectionContent() {
 
       setExistingInspectionId(id);
       setVehicleId(inspectionData.vans?.id || '');
-      setWeekEnding(inspection.inspection_end_date || formatDateISO(getWeekEnding()));
+      const loadedInspectionDate = inspection.inspection_date || formatDateISO(new Date());
+      setWeekEnding(loadedInspectionDate);
+      setActiveDay(String(getDayOfWeek(new Date(`${loadedInspectionDate}T00:00:00`)) - 1));
       setCurrentMileage(inspection.current_mileage?.toString() || '');
       setSelectedEmployeeId(inspection.user_id);
 
@@ -572,7 +578,8 @@ function NewInspectionContent() {
       const newComments: Record<string, string> = {};
       
       (items as InspectionItem[] | null)?.forEach((item: InspectionItem) => {
-        const key = `${item.day_of_week}-${item.item_number}`;
+        const itemDayOfWeek = item.day_of_week || getDayOfWeek(new Date(`${loadedInspectionDate}T00:00:00`));
+        const key = `${itemDayOfWeek}-${item.item_number}`;
         newCheckboxStates[key] = item.status;
         if (item.comments) {
           newComments[key] = item.comments;
@@ -626,7 +633,7 @@ function NewInspectionContent() {
 
   useEffect(() => {
     const persistDraft = () => {
-      if (loadingRef.current || savingDraftForPhoto || inspectionWriteInProgressRef.current || draftSavePromiseRef.current) return;
+      if (loadingRef.current || savingDraftForPhoto || inspectionWriteInProgressRef.current || draftSavePromiseRef.current || allowNavigationRef.current) return;
       void autoSaveDraftRef.current?.();
     };
 
@@ -702,77 +709,52 @@ function NewInspectionContent() {
     return itemNumbers;
   }, [loggedDefects]);
 
-  const getCurrentStartedDays = useCallback(
-    () => getStartedVanInspectionDays(checkboxStates, {
-      ignoredItemNumbers: getLoggedDefectItemNumbers(),
-    }),
-    [checkboxStates, getLoggedDefectItemNumbers]
-  );
-
   const buildCurrentInspectionItemsPayload = useCallback((inspectionId: string) => {
     type InspectionItemInsert = Database['public']['Tables']['inspection_items']['Insert'];
     const items: InspectionItemInsert[] = [];
-    const startedDays = new Set(getCurrentStartedDays());
+    if (!weekEnding) return items;
 
-    for (let dayOfWeek = 1; dayOfWeek <= 7; dayOfWeek++) {
-      if (!startedDays.has(dayOfWeek)) continue;
-
-      currentChecklist.forEach((item, index) => {
-        const itemNumber = index + 1;
-        const key = `${dayOfWeek}-${itemNumber}`;
-        if (checkboxStates[key]) {
-          items.push({
-            inspection_id: inspectionId,
-            item_number: itemNumber,
-            item_description: item,
-            day_of_week: dayOfWeek,
-            status: checkboxStates[key],
-            comments: comments[key] || null,
-          });
-        }
-      });
-    }
+    const dayOfWeek = getDayOfWeek(new Date(weekEnding + 'T00:00:00'));
+    currentChecklist.forEach((item, index) => {
+      const itemNumber = index + 1;
+      const key = `${dayOfWeek}-${itemNumber}`;
+      if (checkboxStates[key]) {
+        items.push({
+          inspection_id: inspectionId,
+          item_number: itemNumber,
+          item_description: item,
+          day_of_week: dayOfWeek,
+          status: checkboxStates[key],
+          comments: comments[key] || null,
+        });
+      }
+    });
 
     return items;
-  }, [checkboxStates, comments, currentChecklist, getCurrentStartedDays]);
-
-  const hasExactMatchingDays = useCallback((left: number[], right: number[]) => {
-    if (left.length !== right.length) return false;
-    return left.every((day, index) => day === right[index]);
-  }, []);
+  }, [checkboxStates, comments, currentChecklist, weekEnding]);
 
   const applyInspectionConflictMessage = useCallback((conflict: ExistingInspectionConflict) => {
-    const dayLabel = formatVanInspectionDayList(conflict.overlappingDays);
-
     if (conflict.status === 'submitted') {
-      setError(`This employee already has a submitted van inspection covering ${dayLabel} in the selected week.`);
-      toast.info(`A daily check has already been submitted for ${dayLabel}.`);
+      setError('This employee already has a submitted van inspection for the selected date.');
+      toast.info('A daily check has already been submitted for this date.');
       return;
     }
 
-    if (conflict.conflictCount > 1) {
-      setError(`This employee already has multiple van drafts covering ${dayLabel} in the selected week. Open an existing draft instead of creating another overlapping one.`);
-      toast.info('Overlapping van draft days already exist for this employee and week.');
-      return;
-    }
-
-    setError(`This employee already has a van draft covering ${dayLabel} in the selected week. Continue that draft or clear the overlapping day here.`);
-    toast.info(`An existing van draft already covers ${dayLabel}.`);
+    setError('This employee already has a van draft for the selected date. Continue that draft instead of creating another one.');
+    toast.info('An existing van draft already covers this date.');
   }, []);
 
-  const findExistingInspectionConflict = useCallback(async (
-    currentDays: number[] = getCurrentStartedDays()
-  ): Promise<ExistingInspectionConflict | null> => {
-    if (!vehicleId || !weekEnding || !selectedEmployeeId || !isUuid(vehicleId) || currentDays.length === 0) {
+  const findExistingInspectionConflict = useCallback(async (): Promise<ExistingInspectionConflict | null> => {
+    if (!vehicleId || !weekEnding || !selectedEmployeeId || !isUuid(vehicleId)) {
       return null;
     }
 
     let inspectionsQuery = supabase
       .from('van_inspections')
-      .select('id, status, updated_at, created_at')
+      .select('id, status')
       .eq('van_id', vehicleId)
       .eq('user_id', selectedEmployeeId)
-      .eq('inspection_end_date', weekEnding);
+      .eq('inspection_date', weekEnding);
 
     if (existingInspectionId) {
       inspectionsQuery = inspectionsQuery.neq('id', existingInspectionId);
@@ -798,38 +780,16 @@ function NewInspectionContent() {
       return null;
     }
 
-    if (!inspections || inspections.length === 0) {
+    const conflict = inspections?.[0];
+    if (!conflict) {
       return null;
     }
 
-    const inspectionIds = inspections.map((inspection) => inspection.id);
-    const { data: inspectionItems, error: itemsError } = await supabase
-      .from('inspection_items')
-      .select('inspection_id, day_of_week')
-      .in('inspection_id', inspectionIds);
-
-    if (itemsError) {
-      console.error('Failed to load van inspection day coverage:', itemsError, {
-        errorContextId: 'van-inspections-new-check-existing-items-error',
-      });
-      return null;
-    }
-
-    const daysByInspection = getInspectionDaysFromRows(
-      ((inspectionItems || []) as VanInspectionDayRow[])
-    );
-
-    return findVanInspectionOverlap(
-      currentDays,
-      inspections.map((inspection) => ({
-        id: inspection.id,
-        status: inspection.status === 'draft' ? 'draft' : 'submitted',
-        days: daysByInspection.get(inspection.id) || [],
-        updated_at: inspection.updated_at,
-        created_at: inspection.created_at,
-      }))
-    );
-  }, [existingInspectionId, getCurrentStartedDays, selectedEmployeeId, supabase, vehicleId, weekEnding]);
+    return {
+      id: conflict.id,
+      status: conflict.status === 'draft' ? 'draft' : 'submitted',
+    };
+  }, [existingInspectionId, selectedEmployeeId, supabase, vehicleId, weekEnding]);
 
   const mergeIntoExistingDraft = useCallback(async (
     inspectionId: string,
@@ -840,7 +800,7 @@ function NewInspectionContent() {
 
     if (!selectedEmployeeId || !vehicleId || !weekEnding) {
       if (showToast) {
-        toast.error('Select a vehicle, employee and week before continuing', {
+        toast.error('Select a vehicle, employee and inspection date before continuing', {
           id: 'van-inspections-new-validation-merge-draft-core-fields',
         });
       }
@@ -855,15 +815,12 @@ function NewInspectionContent() {
       return false;
     }
 
-    const weekEndDate = new Date(weekEnding + 'T00:00:00');
-    const startDate = new Date(weekEndDate);
-    startDate.setDate(weekEndDate.getDate() - 6);
     const draftMileage = currentMileage.trim() === '' ? null : parseInt(currentMileage, 10);
 
     const payload: Database['public']['Tables']['van_inspections']['Update'] = {
       van_id: vehicleId,
       user_id: selectedEmployeeId,
-      inspection_date: formatDateISO(startDate),
+      inspection_date: weekEnding,
       inspection_end_date: weekEnding,
       current_mileage: Number.isNaN(draftMileage) || draftMileage === null || draftMileage < 0 ? null : draftMileage,
       status: 'draft',
@@ -904,7 +861,7 @@ function NewInspectionContent() {
       setExistingInspectionId(inspectionId);
       window.history.replaceState(null, '', `/van-inspections/new?id=${inspectionId}`);
       if (showToast) {
-        toast.info('Merged with the existing draft for this van and week.');
+        toast.info('Merged with the existing draft for this van and date.');
       }
       return true;
     } catch (err) {
@@ -924,6 +881,105 @@ function NewInspectionContent() {
     vehicleId,
     weekEnding,
   ]);
+
+  const discardDraftById = useCallback(async (inspectionId: string, showToast = true): Promise<boolean> => {
+    try {
+      const response = await fetch(`/api/van-inspections/${inspectionId}/discard`, { method: 'DELETE' });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null) as { error?: string } | null;
+        throw new Error(body?.error || 'Failed to discard draft');
+      }
+
+      if (existingInspectionId === inspectionId) {
+        setExistingInspectionId(null);
+        setPhotoUploadItem(null);
+        window.history.replaceState(null, '', '/van-inspections/new');
+      }
+
+      if (showToast) {
+        toast.success('Draft discarded');
+      }
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to discard draft';
+      const errorContextId = 'van-inspections-new-discard-draft-error';
+      console.error('Failed to discard van draft:', err, { errorContextId });
+      toast.error(message, { id: errorContextId });
+      return false;
+    }
+  }, [existingInspectionId]);
+
+  const navigateWithoutPrompt = useCallback((navigation: PendingNavigation) => {
+    allowNavigationRef.current = true;
+    if (navigation.type === 'back') {
+      if (window.history.length > 1) {
+        router.back();
+      } else {
+        router.push('/van-inspections');
+      }
+      return;
+    }
+    router.push(navigation.href);
+  }, [router]);
+
+  const requestNavigation = useCallback((navigation: PendingNavigation) => {
+    if (!existingInspectionId || inspectionWriteInProgressRef.current || allowNavigationRef.current) {
+      navigateWithoutPrompt(navigation);
+      return;
+    }
+    setPendingNavigation(navigation);
+    setShowDiscardDraftDialog(true);
+  }, [existingInspectionId, navigateWithoutPrompt]);
+
+  useEffect(() => {
+    if (!existingInspectionId) return;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (inspectionWriteInProgressRef.current || allowNavigationRef.current) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [existingInspectionId]);
+
+  useEffect(() => {
+    if (!existingInspectionId) return;
+
+    const handleDocumentClick = (event: MouseEvent) => {
+      if (inspectionWriteInProgressRef.current || allowNavigationRef.current) return;
+
+      const target = event.target as HTMLElement | null;
+      const anchor = target?.closest('a[href]') as HTMLAnchorElement | null;
+      if (!anchor) return;
+      if (anchor.hasAttribute('download') || anchor.target === '_blank') return;
+
+      const rawHref = anchor.getAttribute('href');
+      if (!rawHref || rawHref.startsWith('#') || rawHref.startsWith('mailto:') || rawHref.startsWith('tel:')) {
+        return;
+      }
+
+      const nextUrl = new URL(rawHref, window.location.origin);
+      const currentUrl = new URL(window.location.href);
+      if (nextUrl.origin !== currentUrl.origin) return;
+
+      const nextPathWithSearch = `${nextUrl.pathname}${nextUrl.search}`;
+      const currentPathWithSearch = `${currentUrl.pathname}${currentUrl.search}`;
+      if (nextPathWithSearch === currentPathWithSearch) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      requestNavigation({ type: 'href', href: nextPathWithSearch });
+    };
+
+    document.addEventListener('click', handleDocumentClick, true);
+    return () => {
+      document.removeEventListener('click', handleDocumentClick, true);
+    };
+  }, [existingInspectionId, requestNavigation]);
 
   // Fetch baseline mileage for sanity checking
   const fetchBaselineMileage = async (selectedVehicleId: string) => {
@@ -1128,16 +1184,14 @@ function NewInspectionContent() {
 
         setLoggedDefects(loggedMap);
 
+        const lockedInspectionDate = options.inspectionDateOverride || weekEnding || formatDateISO(new Date());
+        const lockedDayOfWeek = getDayOfWeek(new Date(`${lockedInspectionDate}T00:00:00`));
         loggedMap.forEach((loggedInfo, key) => {
           const [itemNumStr] = key.split('-');
           const itemNum = parseInt(itemNumStr);
-          
-          // Mark as defective for all 7 days
-          for (let day = 1; day <= 7; day++) {
-            const stateKey = `${day}-${itemNum}`;
-            nextCheckboxStates[stateKey] = 'attention';
-            nextComments[stateKey] = loggedInfo.comment;
-          }
+          const stateKey = `${lockedDayOfWeek}-${itemNum}`;
+          nextCheckboxStates[stateKey] = 'attention';
+          nextComments[stateKey] = loggedInfo.comment;
         });
       } else {
         setLoggedDefects(new Map());
@@ -1154,7 +1208,7 @@ function NewInspectionContent() {
       setCheckboxStates(mode === 'merge' ? baseCheckboxStates : {});
       setComments(mode === 'merge' ? baseComments : {});
     }
-  }, []);
+  }, [weekEnding]);
   loadPreviousDefectsRef.current = loadPreviousDefects;
 
   // Format UK registration plates (LLNNLLL -> LLNN LLL)
@@ -1170,7 +1224,7 @@ function NewInspectionContent() {
   };
 
   const handleStatusChange = (itemNumber: number, status: InspectionStatus) => {
-    const dayOfWeek = parseInt(activeDay) + 1; // Convert 0-6 to 1-7
+    const dayOfWeek = getDayOfWeek(new Date(`${weekEnding || formatDateISO(new Date())}T00:00:00`));
     const key = `${dayOfWeek}-${itemNumber}`;
     
     // Mark checklist as started (locks vehicle/date fields)
@@ -1217,13 +1271,13 @@ function NewInspectionContent() {
   };
 
   const handleCommentChange = (itemNumber: number, comment: string) => {
-    const dayOfWeek = parseInt(activeDay) + 1; // Convert 0-6 to 1-7
+    const dayOfWeek = getDayOfWeek(new Date(`${weekEnding || formatDateISO(new Date())}T00:00:00`));
     const key = `${dayOfWeek}-${itemNumber}`;
     setComments(prev => ({ ...prev, [key]: comment }));
   };
 
   const handleMarkAllPass = () => {
-    const dayOfWeek = parseInt(activeDay) + 1; // Convert 0-6 to 1-7
+    const dayOfWeek = getDayOfWeek(new Date(`${weekEnding || formatDateISO(new Date())}T00:00:00`));
     const allPassStates: Record<string, InspectionStatus> = {};
     currentChecklist.forEach((_, index) => {
       const key = `${dayOfWeek}-${index + 1}`;
@@ -1240,6 +1294,14 @@ function NewInspectionContent() {
   };
 
   const handleSubmit = () => {
+    if (inspectionsPaused) {
+      toast.info(VAN_INSPECTIONS_MAINTENANCE_TITLE, {
+        id: 'van-inspections-maintenance-submit',
+        description: VAN_INSPECTIONS_MAINTENANCE_MESSAGE,
+      });
+      return;
+    }
+
     // For NEW submissions (not editing existing), show confirmation dialog first
     if (!existingInspectionId) {
       setShowConfirmSubmitDialog(true);
@@ -1250,17 +1312,52 @@ function NewInspectionContent() {
     validateAndSubmit();
   };
 
+  const handleBackButtonClick = () => {
+    requestNavigation({ type: 'back' });
+  };
+
+  const handleStayOnPage = () => {
+    setPendingNavigation(null);
+    setShowDiscardDraftDialog(false);
+  };
+
+  const handleDiscardAndContinueNavigation = async () => {
+    if (!pendingNavigation) {
+      setShowDiscardDraftDialog(false);
+      return;
+    }
+
+    if (!existingInspectionId) {
+      setShowDiscardDraftDialog(false);
+      const nextNavigation = pendingNavigation;
+      setPendingNavigation(null);
+      navigateWithoutPrompt(nextNavigation);
+      return;
+    }
+
+    setDiscardingDraft(true);
+    const discarded = await discardDraftById(existingInspectionId, false);
+    setDiscardingDraft(false);
+    if (!discarded) {
+      return;
+    }
+
+    setShowDiscardDraftDialog(false);
+    const nextNavigation = pendingNavigation;
+    setPendingNavigation(null);
+    navigateWithoutPrompt(nextNavigation);
+  };
+
   const scrollToTarget = (el: Element | null) =>
     scrollAndHighlightValidationTarget(el, STICKY_NAV_OFFSET_PX);
 
-  const openDayAndScrollToChecklistTarget = (dayOfWeek: number, selector: string) => {
-    setActiveDay(String(dayOfWeek - 1));
-    requestAnimationFrame(() => {
-      scrollToTarget(document.querySelector(selector));
-    });
-  };
-
   const validateAndSubmit = () => {
+    if (inspectionsPaused) {
+      setShowConfirmSubmitDialog(false);
+      setError(VAN_INSPECTIONS_MAINTENANCE_MESSAGE);
+      return;
+    }
+
     if (!vehicleId) {
       setError('Please select a vehicle');
       setShowConfirmSubmitDialog(false);
@@ -1299,63 +1396,24 @@ function NewInspectionContent() {
       return;
     }
 
-    // Validate week ending is a Sunday
-    const weekEndDate = new Date(weekEnding + 'T00:00:00');
-    if (weekEndDate.getDay() !== 0) {
-      setError('Week ending must be a Sunday');
+    if (!weekEnding || weekEnding.trim() === '') {
+      setError('Please select an inspection date');
       setShowConfirmSubmitDialog(false);
       scrollToTarget(document.getElementById('weekEnding'));
       return;
     }
 
-    // Validate: at least 1 day must be fully completed, and any started day must be finished
-    const { completedDays, partiallyCompleteDayKey } = (() => {
-      let completed = 0;
-      const loggedDefectItemNumbers = getLoggedDefectItemNumbers();
-      for (let dayOfWeek = 1; dayOfWeek <= 7; dayOfWeek += 1) {
-        let userEditableItemCount = 0;
-        let completedItemCount = 0;
-        let firstMissingKey: string | null = null;
-        for (let itemNumber = 1; itemNumber <= currentChecklist.length; itemNumber += 1) {
-          const key = `${dayOfWeek}-${itemNumber}`;
-          const isLoggedDefectItem = loggedDefectItemNumbers.has(itemNumber);
-          if (checkboxStates[key]) {
-            completedItemCount++;
-            if (!isLoggedDefectItem) {
-              userEditableItemCount++;
-            }
-          } else if (!firstMissingKey) {
-            firstMissingKey = key;
-          }
-        }
+    const inspectionDayOfWeek = getDayOfWeek(new Date(`${weekEnding}T00:00:00`));
+    const firstMissingItemNumber = currentChecklist.findIndex((_, index) => {
+      const key = `${inspectionDayOfWeek}-${index + 1}`;
+      return !checkboxStates[key];
+    }) + 1;
 
-        // Locked/read-only defects are prefilled for every day. They should not
-        // make an otherwise empty day count as started.
-        if (userEditableItemCount === 0) {
-          continue;
-        }
-
-        if (completedItemCount === currentChecklist.length) {
-          completed++;
-        } else if (firstMissingKey) {
-          return { completedDays: completed, partiallyCompleteDayKey: firstMissingKey };
-        }
-      }
-      return { completedDays: completed, partiallyCompleteDayKey: null };
-    })();
-
-    if (partiallyCompleteDayKey) {
-      const [dayOfWeek] = partiallyCompleteDayKey.split('-').map(Number);
-      const dayName = DAY_NAMES[dayOfWeek - 1] || `Day ${dayOfWeek}`;
-      setError(`${dayName} is partially completed. Please finish all items for that day or clear it entirely.`);
+    if (firstMissingItemNumber > 0) {
+      const missingKey = `${inspectionDayOfWeek}-${firstMissingItemNumber}`;
+      setError('Please complete all checklist items before submitting');
       setShowConfirmSubmitDialog(false);
-      openDayAndScrollToChecklistTarget(dayOfWeek, `[data-checklist-item="${partiallyCompleteDayKey}"]`);
-      return;
-    }
-
-    if (completedDays === 0) {
-      setError('Please complete at least one day before submitting');
-      setShowConfirmSubmitDialog(false);
+      scrollToTarget(document.querySelector(`[data-checklist-item="${missingKey}"]`));
       return;
     }
 
@@ -1373,10 +1431,9 @@ function NewInspectionContent() {
         !comments[keyStr]
       ) {
         if (!firstDefectWithoutCommentKey) firstDefectWithoutCommentKey = keyStr;
-        const [dayOfWeek, itemNumber] = keyStr.split('-').map(Number);
-        const dayName = DAY_NAMES[dayOfWeek - 1] || `Day ${dayOfWeek}`;
+        const [, itemNumber] = keyStr.split('-').map(Number);
         const itemName = currentChecklist[itemNumber - 1] || `Item ${itemNumber}`;
-        defectsWithoutComments.push(`${itemName} (${dayName})`);
+        defectsWithoutComments.push(itemName);
       }
     });
 
@@ -1389,9 +1446,7 @@ function NewInspectionContent() {
       setShowConfirmSubmitDialog(false);
       const keyToScroll: string = firstDefectWithoutCommentKey ?? '';
       if (keyToScroll) {
-        const parts = keyToScroll.split('-');
-        const dayOfWeek = parts.length >= 1 ? Number(parts[0]) : 1;
-        openDayAndScrollToChecklistTarget(dayOfWeek, `[data-comment-input="${keyToScroll}"]`);
+        scrollToTarget(document.querySelector(`[data-comment-input="${keyToScroll}"]`));
       }
       return;
     }
@@ -1425,6 +1480,11 @@ function NewInspectionContent() {
   };
 
   const handleAddVehicle = async () => {
+    if (inspectionsPaused) {
+      setError(VAN_INSPECTIONS_MAINTENANCE_MESSAGE);
+      return;
+    }
+
     if (!newVehicleReg.trim()) {
       setError('Please enter a registration number');
       return;
@@ -1503,6 +1563,15 @@ function NewInspectionContent() {
   };
 
   const saveInspection = async (status: 'draft' | 'submitted', signatureData?: string) => {
+    if (inspectionsPaused) {
+      setError(VAN_INSPECTIONS_MAINTENANCE_MESSAGE);
+      toast.info(VAN_INSPECTIONS_MAINTENANCE_TITLE, {
+        id: 'van-inspections-maintenance-save',
+        description: VAN_INSPECTIONS_MAINTENANCE_MESSAGE,
+      });
+      return;
+    }
+
     if (!user || !selectedEmployeeId || !vehicleId) return;
     if (!isUuid(vehicleId)) {
       setError(INVALID_VAN_SELECTION_MESSAGE);
@@ -1513,9 +1582,9 @@ function NewInspectionContent() {
       return;
     }
     
-    // Validate week ending is provided
+    // Validate inspection date is provided
     if (!weekEnding || weekEnding.trim() === '') {
-      setError('Please select a week ending date');
+      setError('Please select an inspection date');
       return;
     }
 
@@ -1536,16 +1605,9 @@ function NewInspectionContent() {
     setLoading(true);
 
     try {
-      const currentStartedDays = getCurrentStartedDays();
-      const conflict = await findExistingInspectionConflict(currentStartedDays);
+      const conflict = await findExistingInspectionConflict();
       if (conflict) {
-        const canReuseExactDraft =
-          !existingInspectionId &&
-          conflict.status === 'draft' &&
-          conflict.conflictCount === 1 &&
-          hasExactMatchingDays(conflict.inspectionDays, currentStartedDays);
-
-        if (canReuseExactDraft) {
+        if (!existingInspectionId && conflict.status === 'draft') {
           const merged = await mergeIntoExistingDraft(conflict.id);
           if (merged) {
             if (status === 'submitted') {
@@ -1559,17 +1621,12 @@ function NewInspectionContent() {
         return;
       }
 
-      // Calculate inspection start date (Monday of the week)
-      const weekEndDate = new Date(weekEnding + 'T00:00:00');
-      const startDate = new Date(weekEndDate);
-      startDate.setDate(weekEndDate.getDate() - 6); // Go back 6 days to Monday
-      
       // Create inspection record
       type InspectionInsert = Database['public']['Tables']['van_inspections']['Insert'];
       const inspectionData: InspectionInsert = {
         van_id: vehicleId,
         user_id: selectedEmployeeId, // Use selected employee ID (can be manager's own ID or another employee's)
-        inspection_date: formatDateISO(startDate),
+        inspection_date: weekEnding,
         inspection_end_date: weekEnding,
         current_mileage: mileageValue,
         status,
@@ -1667,7 +1724,7 @@ function NewInspectionContent() {
         const inspectionUpdate: InspectionUpdate = {
           van_id: vehicleId,
           user_id: selectedEmployeeId,
-          inspection_date: formatDateISO(startDate),
+          inspection_date: weekEnding,
           inspection_end_date: weekEnding,
           current_mileage: mileageValue,
           status,
@@ -1733,6 +1790,7 @@ function NewInspectionContent() {
           const defects = Array.from(groupedDefects.values()).map(group => ({
             item_number: group.item_number,
             item_description: group.item_description,
+            dayOfWeek: group.days[0],
             days: group.days,
             comment: group.comments.length > 0 ? group.comments[0] : '',
             primaryInspectionItemId: group.item_ids[0]
@@ -1907,26 +1965,19 @@ function NewInspectionContent() {
       }
 
       // Navigate back to inspections list
+      allowNavigationRef.current = true;
       router.push('/van-inspections');
     } catch (err) {
       const errorContextId = 'van-inspections-new-save-inspection-error';
       if (!existingInspectionId && isDuplicateInspectionError(err)) {
-        const currentStartedDays = getCurrentStartedDays();
-        const conflict = await findExistingInspectionConflict(currentStartedDays);
-        const canReuseExactDraft = Boolean(
-          conflict &&
-          conflict.status === 'draft' &&
-          conflict.conflictCount === 1 &&
-          hasExactMatchingDays(conflict.inspectionDays, currentStartedDays)
-        );
-
-        if (conflict && canReuseExactDraft) {
+        const conflict = await findExistingInspectionConflict();
+        if (conflict && conflict.status === 'draft') {
           const merged = await mergeIntoExistingDraft(conflict.id, { showToast: false });
           if (merged) {
             if (status === 'submitted') {
               toast.info('An existing draft was found and updated. Submit again to finish this daily check.');
             } else {
-              toast.info('Your changes were saved into the existing draft for this van and week.');
+              toast.info('Your changes were saved into the existing draft for this van and date.');
             }
             return;
           }
@@ -2004,19 +2055,67 @@ function NewInspectionContent() {
     }
   };
 
-  // Calculate progress based on user-started days only. Locked/read-only defects
-  // are shown on every day, but they should not make empty days count as started.
-  const startedDaySet = new Set(getCurrentStartedDays());
-  const startedDayCount = startedDaySet.size;
-  const totalItems = currentChecklist.length * (startedDayCount || 7);
-  const completedItems = Object.keys(checkboxStates).filter((key) => {
-    const [dayValue] = key.split('-');
-    return startedDaySet.has(Number(dayValue));
+  const currentInspectionDayOfWeek = getDayOfWeek(new Date(`${weekEnding || formatDateISO(new Date())}T00:00:00`));
+  const totalItems = currentChecklist.length;
+  const completedItems = currentChecklist.filter((_, index) => {
+    const key = `${currentInspectionDayOfWeek}-${index + 1}`;
+    return Boolean(checkboxStates[key]);
   }).length;
   const progressPercent = Math.round((completedItems / totalItems) * 100);
 
   if (showPermissionLoader) {
     return <PageLoader message="Loading van inspection form..." />;
+  }
+
+  if (inspectionsPaused) {
+    return (
+      <div className={`space-y-4 max-w-4xl ${tabletModeEnabled ? 'pb-36' : 'pb-32 md:pb-6'}`}>
+        <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-border">
+          <div className="flex items-center space-x-3">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleBackButtonClick}
+              className="ui-component border-2 border-slate-600 text-slate-200 bg-slate-900/50 hover:bg-slate-800 hover:border-slate-500 hover:text-white"
+              aria-label="Back"
+              title="Back"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-xl md:text-3xl font-bold text-foreground">Van Daily Checks Paused</h1>
+              <p className="text-sm text-muted-foreground hidden md:block">
+                Daily check writes are temporarily unavailable while the update is applied.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <Alert className="border-amber-500/40 bg-amber-500/10 text-amber-100">
+          <AlertTriangle className="h-4 w-4 text-amber-300" />
+          <AlertTitle>{VAN_INSPECTIONS_MAINTENANCE_TITLE}</AlertTitle>
+          <AlertDescription>{VAN_INSPECTIONS_MAINTENANCE_MESSAGE}</AlertDescription>
+        </Alert>
+
+        <Card className="border-amber-500/30 bg-slate-900">
+          <CardHeader>
+            <CardTitle className="text-white">No van checks can be created or edited right now</CardTitle>
+            <CardDescription>
+              Existing submitted checks remain available from the Van Daily Checks list. Please return once the update is complete.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              type="button"
+              onClick={() => router.push('/van-inspections')}
+              className="bg-inspection hover:bg-inspection/90 text-slate-900 font-semibold"
+            >
+              Back to Van Daily Checks
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
@@ -2026,7 +2125,16 @@ function NewInspectionContent() {
       <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-border">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-3">
-            <BackButton fallbackHref="/van-inspections" />
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleBackButtonClick}
+              className="ui-component border-2 border-slate-600 text-slate-200 bg-slate-900/50 hover:bg-slate-800 hover:border-slate-500 hover:text-white"
+              aria-label="Back"
+              title="Back"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
             <div>
               <h1 className="text-xl md:text-3xl font-bold text-foreground">
                 {existingInspectionId ? 'Edit Van Daily Check' : 'New Van Daily Check'}
@@ -2062,12 +2170,20 @@ function NewInspectionContent() {
         </div>
       )}
 
+      {inspectionsPaused && (
+        <Alert className="border-amber-500/40 bg-amber-500/10 text-amber-100">
+          <AlertTriangle className="h-4 w-4 text-amber-300" />
+          <AlertTitle>{VAN_INSPECTIONS_MAINTENANCE_TITLE}</AlertTitle>
+          <AlertDescription>{VAN_INSPECTIONS_MAINTENANCE_MESSAGE}</AlertDescription>
+        </Alert>
+      )}
+
       {/* Van Details Card */}
       <Card className="">
         <CardHeader className="pb-4">
           <CardTitle className="text-foreground">Daily Check Details</CardTitle>
           <CardDescription className="text-muted-foreground">
-            {weekEnding ? `Week ending: ${formatDate(weekEnding)}` : 'Select a date'}
+            {weekEnding ? `Date: ${formatDate(weekEnding)}` : 'Select a date'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -2078,7 +2194,7 @@ function NewInspectionContent() {
                 <User className="h-4 w-4" />
                 Creating daily check for
               </Label>
-              <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+              <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId} disabled={inspectionsPaused}>
                 <SelectTrigger id="selectedEmployeeId" className="h-12 text-base bg-slate-900/50 border-slate-600 text-white">
                   <SelectValue placeholder="Select employee..." />
                 </SelectTrigger>
@@ -2104,7 +2220,7 @@ function NewInspectionContent() {
               </Label>
               <Select 
                 value={vehicleId} 
-                disabled={checklistStarted}
+                disabled={inspectionsPaused || checklistStarted}
                 onValueChange={(value) => {
                   if (value === 'add-new') {
                     // Don't set the value, just open the dialog
@@ -2148,7 +2264,7 @@ function NewInspectionContent() {
                   }
                 }}
               >
-                <SelectTrigger id="vehicle" className="h-12 text-base bg-slate-900/50 border-slate-600 text-white" disabled={checklistStarted}>
+                <SelectTrigger id="vehicle" className="h-12 text-base bg-slate-900/50 border-slate-600 text-white" disabled={inspectionsPaused || checklistStarted}>
                   <SelectValue placeholder="Select a van" />
                 </SelectTrigger>
                 <SelectContent className="border-border max-h-[300px] md:max-h-[400px] dark:text-slate-100 text-slate-900">
@@ -2196,40 +2312,27 @@ function NewInspectionContent() {
 
             <div className="space-y-2">
               <Label htmlFor="weekEnding" className="text-foreground text-base flex items-center gap-2">
-                Week Ending (Sunday)
+                Daily Check Date
                 <span className="text-red-400">*</span>
               </Label>
-              <Select
+              <Input
+                id="weekEnding"
+                type="date"
                 value={weekEnding}
-                disabled={checklistStarted}
-                onValueChange={(value) => {
+                max={formatDateISO(new Date())}
+                disabled={inspectionsPaused || checklistStarted}
+                onChange={(event) => {
                   setError('');
-                  setWeekEnding(value);
-                }}
-              >
-                <SelectTrigger id="weekEnding" className="h-12 text-base bg-slate-900/50 border-slate-600 text-white">
-                  <SelectValue placeholder="Select a Sunday" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[280px] md:max-h-[280px]">
-                  {(() => {
-                    const sundays: Date[] = [];
-                    const nextSunday = getWeekEnding();
-                    for (let i = 0; i < 12; i++) {
-                      const d = new Date(nextSunday);
-                      d.setDate(d.getDate() - i * 7);
-                      sundays.push(d);
+                  setWeekEnding(event.target.value);
+                  if (event.target.value) {
+                    setActiveDay(String(getDayOfWeek(new Date(`${event.target.value}T00:00:00`)) - 1));
+                    if (vehicleId) {
+                      void loadPreviousDefects(vehicleId, { mode: 'merge', inspectionDateOverride: event.target.value });
                     }
-                    return sundays.map((d) => {
-                      const iso = formatDateISO(d);
-                      return (
-                        <SelectItem key={iso} value={iso}>
-                          {formatDate(iso)}
-                        </SelectItem>
-                      );
-                    });
-                  })()}
-                </SelectContent>
-              </Select>
+                  }
+                }}
+                className="h-12 text-base bg-slate-900/50 border-slate-600 text-white"
+              />
             </div>
           </div>
 
@@ -2252,6 +2355,7 @@ function NewInspectionContent() {
               className={`h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground ${
                 activeMileageWarningMessage && !mileageConfirmed ? 'border-amber-500' : ''
               }`}
+              disabled={inspectionsPaused}
               required
             />
             {activeMileageWarningMessage && !mileageConfirmed && (
@@ -2285,7 +2389,7 @@ function NewInspectionContent() {
             <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
               <p className="text-sm text-blue-400">
                 <Info className="h-4 w-4 inline mr-2" />
-                Van and week ending are locked once you start filling the checklist. Save or leave the page to unlock.
+                Van and date are locked once you start filling the checklist. Leave the page to discard this draft.
               </p>
             </div>
           )}
@@ -2298,41 +2402,12 @@ function NewInspectionContent() {
         <CardHeader className="pb-3">
           <CardTitle className="text-foreground">{currentChecklist.length}-Point Safety Check</CardTitle>
           <CardDescription className="text-muted-foreground">
-            Mark each item as Pass or Fail for each day
+            Mark each item as Pass or Fail for {formatDate(weekEnding)}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 p-4 md:p-6">
           
           <Tabs value={activeDay} onValueChange={setActiveDay} className="w-full">
-            <TabsList className="grid w-full grid-cols-7 bg-slate-900/50 p-1 rounded-lg mb-4">
-              {DAY_NAMES.map((day, index) => {
-                const dayOfWeek = index + 1;
-                const isComplete = startedDaySet.has(dayOfWeek) &&
-                  currentChecklist.every((_, itemIndex) => {
-                    const itemNumber = itemIndex + 1;
-                    const key = `${dayOfWeek}-${itemNumber}`;
-                    return checkboxStates[key] !== undefined;
-                  });
-                
-                return (
-                  <TabsTrigger 
-                    key={index} 
-                    value={index.toString()} 
-                    className={`text-xs py-3 data-[state=active]:bg-inspection data-[state=active]:text-slate-900 text-muted-foreground ${
-                      isComplete 
-                        ? 'data-[state=active]:border-2 data-[state=active]:border-green-500 border-2 border-green-500/50' 
-                        : 'data-[state=active]:border-2 data-[state=active]:border-white'
-                    }`}
-                  >
-                    {day.substring(0, 3)}
-                    {isComplete && (
-                      <Check className="h-3 w-3 ml-1" />
-                    )}
-                  </TabsTrigger>
-                );
-              })}
-            </TabsList>
-
             {DAY_NAMES.map((_day, dayIndex) => (
               <TabsContent key={dayIndex} value={dayIndex.toString()} className="mt-0">
                 {/* Mark All Pass Button - Mobile */}
@@ -2385,8 +2460,8 @@ function NewInspectionContent() {
                       <button
                         key={status}
                         type="button"
-                        onClick={() => !isLogged && handleStatusChange(itemNumber, status)}
-                        disabled={isLogged}
+                        onClick={() => !inspectionsPaused && !isLogged && handleStatusChange(itemNumber, status)}
+                        disabled={inspectionsPaused || isLogged}
                         className={`flex items-center justify-center h-12 rounded-xl border-3 transition-all ${
                           getStatusColor(status, currentStatus === status)
                         } ${isLogged ? 'opacity-60 cursor-not-allowed' : ''}`}
@@ -2405,13 +2480,13 @@ function NewInspectionContent() {
                       <Textarea
                         data-comment-input={key}
                         value={comments[key] || ''}
-                        onChange={(e) => !isLogged && handleCommentChange(itemNumber, e.target.value)}
+                        onChange={(e) => !inspectionsPaused && !isLogged && handleCommentChange(itemNumber, e.target.value)}
                         placeholder={isLogged ? '' : 'Add details...'}
                         className={`w-full min-h-[80px] text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground ${
                           currentStatus === 'attention' && !comments[key] && !isLogged ? 'border-red-500' : ''
                         } ${isLogged ? 'cursor-not-allowed opacity-70' : ''}`}
                         required={currentStatus === 'attention' && !isLogged}
-                        readOnly={isLogged}
+                        readOnly={inspectionsPaused || isLogged}
                       />
                     </div>
                   )}
@@ -2419,7 +2494,7 @@ function NewInspectionContent() {
                   {currentStatus === 'attention' && !isLogged && (
                     <InspectionPhotoTiles
                       photos={itemPhotos}
-                      onManage={async () => {
+                      onManage={inspectionsPaused ? undefined : async () => {
                         const id = await ensureDraftSaved();
                         if (id) setPhotoUploadItem({ itemNumber, dayOfWeek });
                       }}
@@ -2491,8 +2566,8 @@ function NewInspectionContent() {
                             <button
                               key={status}
                               type="button"
-                              onClick={() => !isLogged && handleStatusChange(itemNumber, status)}
-                              disabled={isLogged}
+                              onClick={() => !inspectionsPaused && !isLogged && handleStatusChange(itemNumber, status)}
+                              disabled={inspectionsPaused || isLogged}
                               className={`flex items-center justify-center w-12 h-12 rounded-lg border-2 transition-all ${
                                 getStatusColor(status, currentStatus === status)
                               } ${isLogged ? 'opacity-60 cursor-not-allowed' : ''}`}
@@ -2507,12 +2582,12 @@ function NewInspectionContent() {
                         <Input
                           data-comment-input={key}
                           value={comments[key] || ''}
-                          onChange={(e) => !isLogged && handleCommentChange(itemNumber, e.target.value)}
+                          onChange={(e) => !inspectionsPaused && !isLogged && handleCommentChange(itemNumber, e.target.value)}
                           placeholder={isLogged ? '' : (currentStatus === 'attention' ? 'Required for defects' : 'Optional notes')}
                           className={`bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground ${
                             currentStatus === 'attention' && !comments[key] && !isLogged ? 'border-red-500' : ''
                           } ${isLogged ? 'cursor-not-allowed opacity-70' : ''}`}
-                          readOnly={isLogged}
+                          readOnly={inspectionsPaused || isLogged}
                         />
                       </td>
                       <td className="p-3 text-center align-middle">
@@ -2525,7 +2600,7 @@ function NewInspectionContent() {
                               const id = await ensureDraftSaved();
                               if (id) setPhotoUploadItem({ itemNumber, dayOfWeek });
                             }}
-                            disabled={savingDraftForPhoto}
+                            disabled={inspectionsPaused || savingDraftForPhoto}
                             title={itemPhotos.length > 0 ? `${itemPhotos.length} photo(s) saved` : 'Add photo'}
                             className={`h-10 min-w-24 gap-1.5 text-xs ${
                               itemPhotos.length > 0
@@ -2565,6 +2640,7 @@ function NewInspectionContent() {
                   placeholder="Do not add any notes regarding a reported defect. Only add additional notes NOT linked to a defect..."
                   className="min-h-[100px] bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground"
                   maxLength={500}
+                  disabled={inspectionsPaused}
                 />
                 <p className="text-xs text-muted-foreground">
                   {inspectorComments.length}/500 characters
@@ -2578,6 +2654,7 @@ function NewInspectionContent() {
                     id="inform-workshop"
                     checked={informWorkshop}
                     onCheckedChange={(checked) => setInformWorkshop(checked === true)}
+                    disabled={inspectionsPaused}
                     className="mt-0.5 border-slate-500 data-[state=checked]:bg-workshop data-[state=checked]:border-workshop"
                   />
                   <div className="flex-1">
@@ -2621,17 +2698,8 @@ function NewInspectionContent() {
           {/* Desktop Action Buttons */}
           <div className={tabletModeEnabled ? 'hidden' : 'hidden md:flex flex-row gap-3 justify-end pt-4'}>
             <Button
-              variant="outline"
-              onClick={() => saveInspection('draft')}
-              disabled={loading || !vehicleId || (informWorkshop && inspectorComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH)}
-              className="border-slate-600 text-white hover:bg-slate-800"
-            >
-              <Save className="h-4 w-4 mr-2" />
-              {loading ? 'Saving...' : 'Save Draft'}
-            </Button>
-            <Button
               onClick={handleSubmit}
-              disabled={loading || !vehicleId || (informWorkshop && inspectorComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH)}
+              disabled={inspectionsPaused || loading || !vehicleId || (informWorkshop && inspectorComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH)}
               className="bg-inspection hover:bg-inspection/90 text-slate-900 font-semibold"
             >
               <Send className="h-4 w-4 mr-2" />
@@ -2644,25 +2712,14 @@ function NewInspectionContent() {
 
       {/* Mobile Sticky Footer */}
       <div className={`${tabletModeEnabled ? 'fixed bottom-0 left-0 right-0' : 'md:hidden fixed bottom-0 left-0 right-0'} bg-slate-900/95 backdrop-blur-xl border-t border-border/50 p-4 z-20`}>
-        <div className="flex gap-3">
-          <Button
-            variant="outline"
-            onClick={() => saveInspection('draft')}
-            disabled={loading || !vehicleId || (informWorkshop && inspectorComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH)}
-            className="flex-1 h-14 border-slate-600 text-white hover:bg-slate-800"
-          >
-            <Save className="h-5 w-5 mr-2" />
-            Save Draft
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={loading || !vehicleId || (informWorkshop && inspectorComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH)}
-            className="flex-1 h-14 bg-inspection hover:bg-inspection/90 text-slate-900 font-semibold text-base"
-          >
-            <Send className="h-5 w-5 mr-2" />
-            Submit
-          </Button>
-        </div>
+        <Button
+          onClick={handleSubmit}
+          disabled={inspectionsPaused || loading || !vehicleId || (informWorkshop && inspectorComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH)}
+          className="w-full h-14 bg-inspection hover:bg-inspection/90 text-slate-900 font-semibold text-base"
+        >
+          <Send className="h-5 w-5 mr-2" />
+          {loading ? 'Submitting...' : 'Submit Daily Check'}
+        </Button>
       </div>
 
       {/* Add Van Dialog */}
@@ -2701,7 +2758,7 @@ function NewInspectionContent() {
                 onBlur={(e) => setNewVehicleReg(formatRegistration(e.target.value))}
                 placeholder="e.g., BG21 EXH"
                 className="h-12 text-base bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground uppercase"
-                disabled={addingVehicle}
+                disabled={inspectionsPaused || addingVehicle}
               />
             </div>
             <div className="space-y-2">
@@ -2711,7 +2768,7 @@ function NewInspectionContent() {
               <Select 
                 value={newVehicleCategoryId || undefined} 
                 onValueChange={(value) => setNewVehicleCategoryId(value || '')}
-                disabled={addingVehicle}
+                disabled={inspectionsPaused || addingVehicle}
               >
                 <SelectTrigger className="h-12 text-base bg-slate-900/50 border-slate-600 text-white">
                   <SelectValue placeholder="Select category" />
@@ -2734,14 +2791,14 @@ function NewInspectionContent() {
                 setNewVehicleReg('');
                 setNewVehicleCategoryId('');
               }}
-              disabled={addingVehicle}
+              disabled={inspectionsPaused || addingVehicle}
               className="border-slate-600 text-white hover:bg-slate-800"
             >
               {isAddVehicleFormDirty ? 'Discard Changes' : 'Cancel'}
             </Button>
             <Button
               onClick={handleAddVehicle}
-              disabled={addingVehicle || !newVehicleReg.trim() || !newVehicleCategoryId}
+              disabled={inspectionsPaused || addingVehicle || !newVehicleReg.trim() || !newVehicleCategoryId}
               className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900 font-semibold"
             >
               {addingVehicle ? 'Adding...' : 'Add Van'}
@@ -2909,12 +2966,44 @@ function NewInspectionContent() {
         </DialogContent>
       </Dialog>
 
+      <AlertDialog
+        open={showDiscardDraftDialog}
+        onOpenChange={(open) => {
+          setShowDiscardDraftDialog(open);
+          if (!open) setPendingNavigation(null);
+        }}
+      >
+        <AlertDialogContent className="border-border text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard draft inspection?</AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              Leaving this page will discard your hidden van draft so it does not block another check for this van today.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleStayOnPage} disabled={discardingDraft}>
+              Stay on page
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async (event) => {
+                event.preventDefault();
+                await handleDiscardAndContinueNavigation();
+              }}
+              disabled={discardingDraft}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {discardingDraft ? 'Discarding...' : 'Discard and leave'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Confirmation Dialog - NEW SUBMISSIONS ONLY */}
       <Dialog 
         open={showConfirmSubmitDialog} 
         onOpenChange={(open) => {
-          // Prevent closing while saving draft or if validation errors exist
-          if (!open && (savingDraftFromConfirm || error)) return;
+          // Prevent closing while validation errors exist
+          if (!open && error) return;
           // Clear error when dialog closes normally
           if (!open) setError('');
           setShowConfirmSubmitDialog(open);
@@ -2943,15 +3032,12 @@ function NewInspectionContent() {
             
             <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 mb-4">
               <p className="text-slate-200">
-                Have you finished using this van for the week?
+                Have you completed this van daily check for {weekEnding ? formatDate(weekEnding) : 'the selected date'}?
               </p>
             </div>
             <div className="space-y-2 text-sm text-muted-foreground">
               <p>
-                Van inspections should be submitted <strong className="text-white">weekly</strong> when you&apos;re done using the van.
-              </p>
-              <p className="text-amber-400">
-                Still using this van this week? Select &apos;Save Draft&apos; instead.
+                Submit this check once every required checklist item has been completed for the selected day.
               </p>
             </div>
           </div>
@@ -2962,38 +3048,13 @@ function NewInspectionContent() {
                 setError(''); // Clear validation errors
                 setShowConfirmSubmitDialog(false);
               }}
-              disabled={savingDraftFromConfirm}
               className="border-slate-600 text-white hover:bg-slate-800"
             >
               Cancel
             </Button>
             <Button
-              variant="outline"
-              onClick={async () => {
-                setSavingDraftFromConfirm(true);
-                try {
-                  await saveInspection('draft');
-                  // If save succeeds, saveInspection navigates away, so dialog closes automatically
-                  // If save fails, error is shown and we keep dialog open
-                } catch (error) {
-                  // Error is already handled in saveInspection
-                  // Keep dialog open so user can see the error and try again
-                  console.error('Failed to save draft:', error);
-                } finally {
-                  // Only reset loading state if we're still on the page (save failed)
-                  // If navigation happened, component unmounts so this doesn't matter
-                  setSavingDraftFromConfirm(false);
-                }
-              }}
-              disabled={savingDraftFromConfirm || loading || (informWorkshop && inspectorComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH)}
-              className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
-            >
-              <Save className="h-4 w-4 mr-2" />
-              {savingDraftFromConfirm ? 'Saving...' : 'Save Draft'}
-            </Button>
-            <Button
               onClick={validateAndSubmit}
-              disabled={savingDraftFromConfirm || (informWorkshop && inspectorComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH)}
+              disabled={inspectionsPaused || (informWorkshop && inspectorComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH)}
               className="bg-inspection hover:bg-inspection/90 text-slate-900 font-semibold"
             >
               <Send className="h-4 w-4 mr-2" />

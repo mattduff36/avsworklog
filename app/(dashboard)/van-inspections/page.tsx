@@ -10,6 +10,7 @@ import { AppPageShell } from '@/components/layout/AppPageShell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
 import { PageLoader } from '@/components/ui/page-loader';
 import { PanelLoader } from '@/components/ui/panel-loader';
@@ -18,7 +19,7 @@ import { isUuid } from '@/lib/utils/uuid';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Clipboard, Clock, User, Download, Trash2, Filter, FileText, Truck, Loader2 } from 'lucide-react';
+import { Plus, Clipboard, Clock, User, Download, Trash2, Filter, FileText, Truck, Loader2, AlertTriangle } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { toast } from 'sonner';
 import { VanInspection } from '@/types/inspection';
@@ -45,6 +46,11 @@ import {
 } from './components/VanInspectionsListTable';
 import { NuqsClientAdapter } from '@/components/providers/NuqsClientAdapter';
 import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
+import {
+  isVanInspectionsMaintenancePaused,
+  VAN_INSPECTIONS_MAINTENANCE_MESSAGE,
+  VAN_INSPECTIONS_MAINTENANCE_TITLE,
+} from '@/lib/config/van-inspections-maintenance';
 
 interface InspectionWithVehicle extends VanInspection {
   vans: {
@@ -146,6 +152,7 @@ function InspectionsContent() {
   const [columnVisibility, setColumnVisibility] = useState<VanInspectionsColumnVisibility>(
     DEFAULT_VAN_INSPECTIONS_COLUMN_VISIBILITY
   );
+  const inspectionsPaused = isVanInspectionsMaintenancePaused();
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
   if (typeof window !== 'undefined' && !supabaseRef.current) {
     supabaseRef.current = createClient();
@@ -645,13 +652,37 @@ function InspectionsContent() {
               Daily safety check sheets
             </p>
           </div>
-          <Link href="/van-inspections/new" className="w-full md:w-auto">
-            <Button className={`w-full bg-inspection hover:bg-inspection-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg md:w-auto ${tabletModeEnabled ? 'min-h-11 text-base px-4 [&_svg]:size-5' : ''}`}>
+          <Link
+            href={inspectionsPaused ? '#' : '/van-inspections/new'}
+            aria-disabled={inspectionsPaused}
+            className={`w-full md:w-auto ${inspectionsPaused ? 'pointer-events-none' : ''}`}
+          >
+            <Button
+              disabled={inspectionsPaused}
+              className={`w-full bg-inspection hover:bg-inspection-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg md:w-auto ${tabletModeEnabled ? 'min-h-11 text-base px-4 [&_svg]:size-5' : ''}`}
+            >
               <Plus className="h-4 w-4 mr-2" />
               New Daily Check
             </Button>
           </Link>
         </div>
+        {inspectionsPaused && (
+          <Alert className="mb-4 border-amber-500/40 bg-amber-500/10 text-amber-100">
+            <AlertTriangle className="h-4 w-4 text-amber-300" />
+            <AlertTitle>{VAN_INSPECTIONS_MAINTENANCE_TITLE}</AlertTitle>
+            <AlertDescription>{VAN_INSPECTIONS_MAINTENANCE_MESSAGE}</AlertDescription>
+          </Alert>
+        )}
+        {inspectionsPaused && (
+          <Card className="mb-4 border-amber-500/30 bg-slate-950/70">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-white">Van checks are in read-only mode</CardTitle>
+              <CardDescription>
+                You can review existing van checks below, but new drafts, edits, submissions, deletes, defect sync, and workshop notifications are paused until the update is complete.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        )}
         
         {/* Manager: Employee Filter */}
         {canViewCrossUserInspections && employees.length > 0 && (
@@ -772,8 +803,15 @@ function InspectionsContent() {
             <p className="text-slate-400 mb-4">
               Create your first van daily check
             </p>
-            <Link href="/van-inspections/new">
-              <Button className="bg-inspection hover:bg-inspection-dark text-white transition-all duration-200 active:scale-95">
+            <Link
+              href={inspectionsPaused ? '#' : '/van-inspections/new'}
+              aria-disabled={inspectionsPaused}
+              className={inspectionsPaused ? 'pointer-events-none' : undefined}
+            >
+              <Button
+                disabled={inspectionsPaused}
+                className="bg-inspection hover:bg-inspection-dark text-white transition-all duration-200 active:scale-95"
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 Create Daily Check
               </Button>
@@ -853,10 +891,7 @@ function InspectionsContent() {
                           </span>
                         )}
                         {inspection.vans?.van_categories?.name && `${inspection.vans.van_categories.name} • `}
-                        {inspection.inspection_end_date && inspection.inspection_end_date !== inspection.inspection_date
-                          ? `${formatDate(inspection.inspection_date)} - ${formatDate(inspection.inspection_end_date)}`
-                          : formatDate(inspection.inspection_date)
-                        }
+                        {formatDate(inspection.inspection_date)}
                       </CardDescription>
                     </div>
                   </div>
