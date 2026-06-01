@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.0.3
+
+**GIT COMMIT MESSAGE**
+`chore(app): update repository files`
+
+**WHAT CHANGED**
+Update repository files.
+
+**COMMITS IN THIS RELEASE**
+- `chore(app): update repository files`
+
 ## 0626.0.2
 
 **GIT COMMIT MESSAGE**
