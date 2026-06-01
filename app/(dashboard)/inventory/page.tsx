@@ -50,6 +50,7 @@ export default function InventoryPage() {
   const [groups, setGroups] = useState<InventoryItemGroup[]>([]);
   const [categories, setCategories] = useState<InventoryItemCategory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [inventoryLoadError, setInventoryLoadError] = useState<string | null>(null);
   const [pageTab, setPageTab] = useState<'overview' | 'locations' | 'settings'>('overview');
   const [overviewTab, setOverviewTab] = useState<'small_tools' | 'minor_plant' | 'retired'>('small_tools');
   const [settingsTab, setSettingsTab] = useState<'categories' | 'groups'>('categories');
@@ -116,9 +117,12 @@ export default function InventoryPage() {
       setFleetAssets(fleetAssetsPayload.assets || []);
       setCategories(categoriesPayload.categories || []);
       setGroups(groupsPayload.groups || []);
+      setInventoryLoadError(null);
     } catch (error) {
       console.error('Error fetching inventory data:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to load inventory');
+      const errorMessage = getInventoryLoadErrorMessage(error);
+      setInventoryLoadError(errorMessage);
+      toast.error(errorMessage, { id: 'inventory-load-error' });
     } finally {
       setLoading(false);
     }
@@ -485,6 +489,22 @@ export default function InventoryPage() {
     ? null
     : inventoryContext?.user_location?.location?.name || null;
 
+  if (inventoryLoadError && !inventoryContext) {
+    return (
+      <AppPageShell width="wide">
+        <AppPageHeader
+          title="Inventory"
+          description="Set your location, view assigned inventory, and claim or move items."
+          icon={<PackageSearch className="h-5 w-5" />}
+        />
+
+        <div className="mx-auto max-w-2xl">
+          <InventoryLoadErrorNotice message={inventoryLoadError} onRetry={fetchInventoryData} />
+        </div>
+      </AppPageShell>
+    );
+  }
+
   if (!isManagerOrAdmin) {
     return (
       <AppPageShell width="wide">
@@ -498,6 +518,10 @@ export default function InventoryPage() {
             </Button>
           ) : null}
         />
+
+        {inventoryLoadError ? (
+          <InventoryLoadErrorNotice message={inventoryLoadError} onRetry={fetchInventoryData} />
+        ) : null}
 
         <InventoryEmployeeView
           items={items}
@@ -557,6 +581,10 @@ export default function InventoryPage() {
           </div>
         )}
       />
+
+      {inventoryLoadError ? (
+        <InventoryLoadErrorNotice message={inventoryLoadError} onRetry={fetchInventoryData} />
+      ) : null}
 
       <div className="hidden grid-cols-5 gap-2 min-[430px]:grid lg:gap-4">
         <SummaryCard label="Active Items" value={summary.total} icon={<PackageSearch className="h-5 w-5" />} />
@@ -782,6 +810,51 @@ export default function InventoryPage() {
         onUnset={handleUnsetUserLocation}
       />
     </AppPageShell>
+  );
+}
+
+function getInventoryLoadErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : '';
+
+  if (
+    error instanceof TypeError ||
+    message.toLowerCase().includes('failed to fetch') ||
+    message.toLowerCase().includes('networkerror')
+  ) {
+    return 'Inventory is unavailable. Check your internet connection or try again shortly.';
+  }
+
+  return message || 'Failed to load inventory. Please try again.';
+}
+
+interface InventoryLoadErrorNoticeProps {
+  message: string;
+  onRetry: () => Promise<void>;
+}
+
+function InventoryLoadErrorNotice({ message, onRetry }: InventoryLoadErrorNoticeProps) {
+  return (
+    <Card className="border-amber-500/30 bg-amber-500/10">
+      <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="mt-0.5 h-5 w-5 flex-none text-amber-300" />
+          <div>
+            <div className="font-medium text-amber-100">Inventory could not be loaded</div>
+            <p className="mt-1 text-sm text-amber-100/80">
+              {message}
+            </p>
+          </div>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => { void onRetry(); }}
+          className="border-amber-400/40 text-amber-100 hover:bg-amber-500/10"
+        >
+          Retry
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
