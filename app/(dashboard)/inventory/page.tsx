@@ -10,7 +10,7 @@ import { PageLoader } from '@/components/ui/page-loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
-import { AlertTriangle, CheckCircle2, MapPin, PackageSearch, Plus, Settings, Truck } from 'lucide-react';
+import { AlertTriangle, Archive, CheckCircle2, MapPin, PackageSearch, Plus, Settings, Truck } from 'lucide-react';
 import { toast } from 'sonner';
 import { ChangeInventoryLocationDialog } from './components/ChangeInventoryLocationDialog';
 import { InventoryCategoriesPanel } from './components/InventoryCategoriesPanel';
@@ -19,6 +19,7 @@ import { InventoryEmployeeView } from './components/InventoryEmployeeView';
 import { InventoryGroupsPanel } from './components/InventoryGroupsPanel';
 import { InventoryLocationDialog } from './components/InventoryLocationDialog';
 import { InventoryLocationsPanel } from './components/InventoryLocationsPanel';
+import { InventoryRetireItemDialog } from './components/InventoryRetireItemDialog';
 import { InventoryTable } from './components/InventoryTable';
 import { MoveInventoryDialog } from './components/MoveInventoryDialog';
 import { checkIntervalMonthsToDays, getInventoryCheckStatus } from './utils';
@@ -33,6 +34,7 @@ import type {
   InventoryLocation,
   InventoryLocationFormData,
   InventoryMovePayload,
+  InventoryRetireReason,
 } from './types';
 
 export default function InventoryPage() {
@@ -41,6 +43,7 @@ export default function InventoryPage() {
   const searchParams = useSearchParams();
 
   const [items, setItems] = useState<InventoryItem[]>([]);
+  const [retiredItems, setRetiredItems] = useState<InventoryItem[]>([]);
   const [locations, setLocations] = useState<InventoryLocation[]>([]);
   const [fleetAssets, setFleetAssets] = useState<FleetAssetOption[]>([]);
   const [inventoryContext, setInventoryContext] = useState<InventoryContext | null>(null);
@@ -48,12 +51,13 @@ export default function InventoryPage() {
   const [categories, setCategories] = useState<InventoryItemCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [pageTab, setPageTab] = useState<'overview' | 'locations' | 'settings'>('overview');
-  const [overviewTab, setOverviewTab] = useState<'small_tools' | 'minor_plant'>('small_tools');
+  const [overviewTab, setOverviewTab] = useState<'small_tools' | 'minor_plant' | 'retired'>('small_tools');
   const [settingsTab, setSettingsTab] = useState<'categories' | 'groups'>('categories');
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
   const [changeLocationDialogOpen, setChangeLocationDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [retiringItem, setRetiringItem] = useState<InventoryItem | null>(null);
   const [editingLocation, setEditingLocation] = useState<InventoryLocation | null>(null);
   const [movingItems, setMovingItems] = useState<InventoryItem[]>([]);
   const [restoringMinorPlantItems, setRestoringMinorPlantItems] = useState(false);
@@ -68,11 +72,17 @@ export default function InventoryPage() {
       }
 
       const isManagerOrAdmin = contextPayload.is_manager_or_admin === true;
-      const [{ items: inventoryItems }, locationsResponse, fleetAssetsResponse, categoriesResponse, groupsResponse] = await Promise.all([
+      const [{ items: inventoryItems }, { items: retiredInventoryItems }, locationsResponse, fleetAssetsResponse, categoriesResponse, groupsResponse] = await Promise.all([
         fetchAllPaginatedItems<InventoryItem>('/api/inventory', 'inventory', {
           limit: 500,
           errorMessage: 'Failed to fetch inventory items',
         }),
+        isManagerOrAdmin
+          ? fetchAllPaginatedItems<InventoryItem>('/api/inventory?status=retired', 'inventory', {
+            limit: 500,
+            errorMessage: 'Failed to fetch retired inventory items',
+          })
+          : Promise.resolve({ items: [] as InventoryItem[], firstPagePayload: null }),
         fetch('/api/inventory/locations', { cache: 'no-store' }),
         fetch('/api/inventory/fleet-assets', { cache: 'no-store' }),
         fetch('/api/inventory/categories', { cache: 'no-store' }),
@@ -101,6 +111,7 @@ export default function InventoryPage() {
 
       setInventoryContext(contextPayload);
       setItems(inventoryItems);
+      setRetiredItems(retiredInventoryItems);
       setLocations(locationsPayload.locations || []);
       setFleetAssets(fleetAssetsPayload.assets || []);
       setCategories(categoriesPayload.categories || []);
@@ -152,7 +163,7 @@ export default function InventoryPage() {
     }
 
     setPageTab('overview');
-    setOverviewTab(requestedOverview === 'minor-plant' ? 'minor_plant' : 'small_tools');
+    setOverviewTab(requestedOverview === 'retired' ? 'retired' : requestedOverview === 'minor-plant' ? 'minor_plant' : 'small_tools');
   }, [searchParams]);
 
   const summary = useMemo(() => {
@@ -236,18 +247,34 @@ export default function InventoryPage() {
     await fetchInventoryData();
   }
 
-  async function handleRemoveItem(item: InventoryItem) {
-    if (!window.confirm(`Delete inventory item ${item.item_number} - ${item.name}?`)) return;
-
+  async function handleRetireItem(item: InventoryItem, reason: InventoryRetireReason) {
     const response = await fetch(`/api/inventory/${item.id}`, {
       method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ retire_reason: reason }),
     });
-    await parseJsonResponse(response, 'Failed to delete inventory item');
-    toast.success('Inventory item deleted');
+    await parseJsonResponse(response, 'Failed to retire inventory item');
+    toast.success('Inventory item retired', {
+      description: `${item.item_number} moved to Retired Items.`,
+    });
     setSelectedItemIds((current) => {
       const next = new Set(current);
       next.delete(item.id);
       return next;
+    });
+    setRetiringItem(null);
+    await fetchInventoryData();
+  }
+
+  async function handleRestoreItem(item: InventoryItem) {
+    const response = await fetch(`/api/inventory/${item.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'active' }),
+    });
+    await parseJsonResponse(response, 'Failed to restore inventory item');
+    toast.success('Inventory item restored', {
+      description: `${item.item_number} returned to active inventory.`,
     });
     await fetchInventoryData();
   }
@@ -553,7 +580,7 @@ export default function InventoryPage() {
             return;
           }
           setPageTab('overview');
-          router.push(overviewTab === 'minor_plant' ? '/inventory?overview=minor-plant' : '/inventory', { scroll: false });
+              router.push(overviewTab === 'retired' ? '/inventory?overview=retired' : overviewTab === 'minor_plant' ? '/inventory?overview=minor-plant' : '/inventory', { scroll: false });
         }}
       >
         <TabsList>
@@ -599,9 +626,9 @@ export default function InventoryPage() {
           <Tabs
             value={overviewTab}
             onValueChange={(value) => {
-              const nextOverviewTab = value as 'small_tools' | 'minor_plant';
+              const nextOverviewTab = value as 'small_tools' | 'minor_plant' | 'retired';
               setOverviewTab(nextOverviewTab);
-              router.push(nextOverviewTab === 'minor_plant' ? '/inventory?overview=minor-plant' : '/inventory', { scroll: false });
+              router.push(nextOverviewTab === 'retired' ? '/inventory?overview=retired' : nextOverviewTab === 'minor_plant' ? '/inventory?overview=minor-plant' : '/inventory', { scroll: false });
             }}
           >
             <div className="flex justify-end">
@@ -614,6 +641,10 @@ export default function InventoryPage() {
                   <Truck className="h-4 w-4" />
                   Minor Plant
                 </TabsTrigger>
+                <TabsTrigger value="retired" className="gap-2">
+                  <Archive className="h-4 w-4" />
+                  Retired Items ({retiredItems.length})
+                </TabsTrigger>
               </TabsList>
             </div>
 
@@ -623,7 +654,7 @@ export default function InventoryPage() {
                 selectedItemIds={selectedItemIds}
                 onSelectedItemIdsChange={setSelectedItemIds}
                 onEdit={(item) => { setEditingItem(item); setItemDialogOpen(true); }}
-                onDelete={handleRemoveItem}
+                onDelete={setRetiringItem}
                 onMove={setMovingItems}
                 onOpenDetails={(item) => router.push('/inventory/items/' + item.id + '?fromTab=overview')}
                 locationFilterLocations={locations}
@@ -638,7 +669,7 @@ export default function InventoryPage() {
                 selectedItemIds={selectedItemIds}
                 onSelectedItemIdsChange={setSelectedItemIds}
                 onEdit={(item) => { setEditingItem(item); setItemDialogOpen(true); }}
-                onDelete={handleRemoveItem}
+                onDelete={setRetiringItem}
                 onMove={setMovingItems}
                 onBulkAction={handleRestoreMinorPlantToPlant}
                 bulkActionLabel={restoringMinorPlantItems ? 'Moving to Plant Assets...' : 'Move to Plant Assets'}
@@ -647,6 +678,22 @@ export default function InventoryPage() {
                 categoryLabels={categoryLabels}
                 tableLabel="minor plant"
                 showMinorPlantDetails
+              />
+            </TabsContent>
+
+            <TabsContent value="retired" className="mt-4">
+              <InventoryTable
+                items={retiredItems}
+                selectedItemIds={new Set()}
+                onSelectedItemIdsChange={() => {}}
+                onMove={() => {}}
+                onRestore={handleRestoreItem}
+                onOpenDetails={(item) => router.push('/inventory/items/' + item.id + '?fromTab=overview&overview=retired')}
+                locationFilterLocations={locations}
+                categoryLabels={categoryLabels}
+                tableLabel="retired inventory"
+                showMinorPlantDetails={retiredItems.some((item) => item.category === 'minor_plant')}
+                retiredMode
               />
             </TabsContent>
           </Tabs>
@@ -708,6 +755,13 @@ export default function InventoryPage() {
         fleetAssets={fleetAssets}
         onClose={() => { setLocationDialogOpen(false); setEditingLocation(null); }}
         onSubmit={editingLocation ? handleUpdateLocation : handleCreateLocation}
+      />
+
+      <InventoryRetireItemDialog
+        open={Boolean(retiringItem)}
+        item={retiringItem}
+        onOpenChange={(open) => { if (!open) setRetiringItem(null); }}
+        onRetire={handleRetireItem}
       />
 
       <MoveInventoryDialog

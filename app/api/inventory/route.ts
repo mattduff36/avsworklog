@@ -195,6 +195,11 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const limit = Math.min(Math.max(Number.parseInt(searchParams.get('limit') || '500', 10) || 500, 1), 1000);
     const offset = Math.max(Number.parseInt(searchParams.get('offset') || '0', 10) || 0, 0);
+    const requestedStatus = searchParams.get('status') === 'retired' ? 'retired' : 'active';
+
+    if (requestedStatus === 'retired' && access.isManagerOrAdmin !== true) {
+      return NextResponse.json({ error: 'Manager or admin access required' }, { status: 403 });
+    }
 
     const admin = createAdminClient();
     const { data, error } = await admin
@@ -204,8 +209,8 @@ export async function GET(request: NextRequest) {
         location:inventory_locations(*),
         minor_plant_detail:inventory_minor_plant_details(*)
       `)
-      .eq('status', 'active')
-      .order('name', { ascending: true })
+      .eq('status', requestedStatus)
+      .order(requestedStatus === 'retired' ? 'retired_at' : 'name', { ascending: requestedStatus !== 'retired' })
       .range(offset, offset + limit - 1);
 
     if (error) throw error;
@@ -279,7 +284,7 @@ export async function POST(request: NextRequest) {
         location_id: locationId,
         last_checked_at: cleanOptionalDate(body.last_checked_at),
         check_interval_days: body.check_interval_days || null,
-        status: body.status || 'active',
+        status: 'active',
         created_by: access.userId,
         updated_by: access.userId,
       })

@@ -47,7 +47,9 @@ export function getInventoryDueDate(lastCheckedAt: string | null, intervalMonths
 
 export function formatInventoryDate(value: string | null): string {
   if (!value) return 'Not checked';
-  return format(new Date(`${value}T00:00:00`), 'dd MMM yyyy');
+  const parsedDate = new Date(value.includes('T') ? value : `${value}T00:00:00`);
+  if (Number.isNaN(parsedDate.getTime())) return 'Not checked';
+  return format(parsedDate, 'dd MMM yyyy');
 }
 
 export function getCheckStatusLabel(status: InventoryCheckStatus): string {

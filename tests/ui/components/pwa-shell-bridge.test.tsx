@@ -63,6 +63,7 @@ describe('PwaShellBridge', () => {
     });
 
     renderBridgeWithLink(
+      // eslint-disable-next-line @next/next/no-html-link-for-pages -- This test verifies native anchor click handling.
       <a href="/timesheets" onClick={nextLinkClick}>
         Timesheets
       </a>

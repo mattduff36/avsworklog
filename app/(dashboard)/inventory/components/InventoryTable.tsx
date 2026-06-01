@@ -22,10 +22,11 @@ import {
 import {
   ChevronDown,
   ChevronUp,
+  Archive,
   MapPin,
   PackageSearch,
+  RotateCcw,
   Search,
-  Trash2,
   Truck,
 } from 'lucide-react';
 import {
@@ -36,7 +37,7 @@ import {
   getInventoryCheckStatus,
   getInventoryDueDate,
 } from '../utils';
-import { formatInventoryCategoryLabel, type InventoryCheckStatus, type InventoryItem, type InventoryLocation } from '../types';
+import { formatInventoryCategoryLabel, type InventoryCheckStatus, type InventoryItem, type InventoryLocation, type InventoryRetireReason } from '../types';
 import { useLoadMorePagination } from '@/lib/hooks/useLoadMorePagination';
 
 type InventoryFilter = 'all' | InventoryCheckStatus | 'yard' | 'noloc';
@@ -50,6 +51,7 @@ interface InventoryTableProps {
   onSelectedItemIdsChange: (selectedItemIds: Set<string>) => void;
   onEdit?: (item: InventoryItem) => void;
   onDelete?: (item: InventoryItem) => void;
+  onRestore?: (item: InventoryItem) => void;
   onMove: (items: InventoryItem[]) => void;
   onBulkAction?: (items: InventoryItem[]) => void;
   bulkActionLabel?: string;
@@ -58,6 +60,7 @@ interface InventoryTableProps {
   categoryLabels?: Record<string, string>;
   tableLabel?: string;
   showMinorPlantDetails?: boolean;
+  retiredMode?: boolean;
 }
 
 const filters: Array<{ value: InventoryFilter; label: string }> = [
@@ -74,6 +77,13 @@ function getStatusBadgeClass(status: InventoryCheckStatus): string {
   if (status === 'due_soon') return 'border-amber-500/30 bg-amber-500/10 text-amber-300';
   if (status === 'needs_check') return 'border-blue-500/30 bg-blue-500/10 text-blue-300';
   return 'border-green-500/30 bg-green-500/10 text-green-300';
+}
+
+function getRetireReasonBadgeClass(reason: InventoryRetireReason | null): string {
+  if (reason === 'Sold' || reason === 'Returned') return 'border-green-500/30 bg-green-500/10 text-green-200';
+  if (reason === 'Scrapped' || reason === 'Damaged') return 'border-red-500/30 bg-red-500/10 text-red-200';
+  if (reason === 'Lost') return 'border-amber-500/30 bg-amber-500/10 text-amber-200';
+  return 'border-slate-500/30 bg-slate-500/10 text-slate-200';
 }
 
 function isNoLocationItem(item: InventoryItem): boolean {
@@ -129,6 +139,7 @@ export function InventoryTable({
   onSelectedItemIdsChange,
   onEdit,
   onDelete,
+  onRestore,
   onMove,
   onBulkAction,
   bulkActionLabel,
@@ -137,6 +148,7 @@ export function InventoryTable({
   categoryLabels,
   tableLabel = 'inventory',
   showMinorPlantDetails = false,
+  retiredMode = false,
 }: InventoryTableProps) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<InventoryFilter>('all');
@@ -154,11 +166,14 @@ export function InventoryTable({
       const linkedVanNickname = getVanLocationNickname(item) || '';
       const serialNumber = item.minor_plant_detail?.serial_number || '';
       const checkStatus = getInventoryCheckStatus(item);
+      const retireReason = item.retire_reason || '';
 
       if (locationFilterId !== ALL_LOCATIONS_FILTER && item.location_id !== locationFilterId) return false;
-      if (filter === 'yard' && locationName.toLowerCase() !== 'yard') return false;
-      if (filter === 'noloc' && item.location_id) return false;
-      if (filter !== 'all' && filter !== 'yard' && filter !== 'noloc' && checkStatus !== filter) return false;
+      if (!retiredMode) {
+        if (filter === 'yard' && locationName.toLowerCase() !== 'yard') return false;
+        if (filter === 'noloc' && item.location_id) return false;
+        if (filter !== 'all' && filter !== 'yard' && filter !== 'noloc' && checkStatus !== filter) return false;
+      }
 
       if (!query) return true;
       return (
@@ -166,7 +181,8 @@ export function InventoryTable({
         serialNumber.toLowerCase().includes(query) ||
         item.name.toLowerCase().includes(query) ||
         locationName.toLowerCase().includes(query) ||
-        linkedVanNickname.toLowerCase().includes(query)
+        linkedVanNickname.toLowerCase().includes(query) ||
+        retireReason.toLowerCase().includes(query)
       );
     });
 
@@ -175,16 +191,20 @@ export function InventoryTable({
         ? a.location?.name || ''
         : sortField === 'serial_number'
           ? a.minor_plant_detail?.serial_number || ''
-          : a[sortField] || '';
+          : retiredMode && sortField === 'last_checked_at'
+            ? a.retired_at || ''
+            : a[sortField] || '';
       const bValue = sortField === 'location'
         ? b.location?.name || ''
         : sortField === 'serial_number'
           ? b.minor_plant_detail?.serial_number || ''
-          : b[sortField] || '';
+          : retiredMode && sortField === 'last_checked_at'
+            ? b.retired_at || ''
+            : b[sortField] || '';
       const compare = String(aValue).localeCompare(String(bValue), undefined, { sensitivity: 'base' });
       return sortDir === 'asc' ? compare : -compare;
     });
-  }, [filter, items, locationFilterId, search, sortDir, sortField]);
+  }, [filter, items, locationFilterId, retiredMode, search, sortDir, sortField]);
 
   const {
     visibleItems,
@@ -192,11 +212,12 @@ export function InventoryTable({
   } = useLoadMorePagination(filteredItems, { resetKey: paginationKey });
 
   const selectedItems = useMemo(
-    () => visibleItems.filter((item) => selectedItemIds.has(item.id)),
-    [visibleItems, selectedItemIds]
+    () => retiredMode ? [] : visibleItems.filter((item) => selectedItemIds.has(item.id)),
+    [retiredMode, visibleItems, selectedItemIds]
   );
 
   useEffect(() => {
+    if (retiredMode) return;
     const visibleItemIds = new Set(visibleItems.map((item) => item.id));
     const nextSelectedItemIds = new Set(
       Array.from(selectedItemIds).filter((itemId) => visibleItemIds.has(itemId))
@@ -205,7 +226,7 @@ export function InventoryTable({
     if (nextSelectedItemIds.size !== selectedItemIds.size) {
       onSelectedItemIdsChange(nextSelectedItemIds);
     }
-  }, [onSelectedItemIdsChange, selectedItemIds, visibleItems]);
+  }, [onSelectedItemIdsChange, retiredMode, selectedItemIds, visibleItems]);
 
   function toggleSort(field: SortField) {
     if (sortField === field) {
@@ -240,7 +261,8 @@ export function InventoryTable({
     onSelectedItemIdsChange(next);
   }
 
-  const allVisibleSelected = visibleItems.length > 0 && visibleItems.every((item) => selectedItemIds.has(item.id));
+  const allVisibleSelected = !retiredMode && visibleItems.length > 0 && visibleItems.every((item) => selectedItemIds.has(item.id));
+  const emptyColSpan = (showSerialNumberColumn ? 8 : 7) - (retiredMode ? 1 : 0);
 
   return (
     <TooltipProvider delayDuration={150}>
@@ -269,25 +291,32 @@ export function InventoryTable({
       </div>
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div className="space-y-2">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Inventory Filters</p>
-          <div className="flex flex-wrap gap-2">
-            {filters.map((filterOption) => (
-              <Button
-                key={filterOption.value}
-                variant={filter === filterOption.value ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setFilter(filterOption.value)}
-                className={filter === filterOption.value
-                  ? 'bg-inventory text-white hover:bg-inventory-dark'
-                  : 'border-slate-600 text-muted-foreground hover:bg-slate-700/50'
-                }
-              >
-                {filterOption.label}
-              </Button>
-            ))}
+        {!retiredMode ? (
+          <div className="space-y-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Inventory Filters</p>
+            <div className="flex flex-wrap gap-2">
+              {filters.map((filterOption) => (
+                <Button
+                  key={filterOption.value}
+                  variant={filter === filterOption.value ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setFilter(filterOption.value)}
+                  className={filter === filterOption.value
+                    ? 'bg-inventory text-white hover:bg-inventory-dark'
+                    : 'border-slate-600 text-muted-foreground hover:bg-slate-700/50'
+                  }
+                >
+                  {filterOption.label}
+                </Button>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Retired Items</p>
+            <p className="text-sm text-muted-foreground">Search retired inventory by ID, name, location, or retirement reason.</p>
+          </div>
+        )}
 
         {showLocationFilter ? (
           <div className="w-full space-y-2 lg:w-72">
@@ -313,13 +342,15 @@ export function InventoryTable({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-700 bg-slate-800/80">
-              <th className="w-10 px-4 py-3 text-left">
-                <Checkbox
-                  checked={allVisibleSelected}
-                  onCheckedChange={(checked) => toggleVisibleItems(checked === true)}
-                  aria-label="Select visible inventory items"
-                />
-              </th>
+              {!retiredMode ? (
+                <th className="w-10 px-4 py-3 text-left">
+                  <Checkbox
+                    checked={allVisibleSelected}
+                    onCheckedChange={(checked) => toggleVisibleItems(checked === true)}
+                    aria-label="Select visible inventory items"
+                  />
+                </th>
+              ) : null}
               <th className="cursor-pointer px-4 py-3 text-left font-semibold text-muted-foreground hover:text-white" onClick={() => toggleSort('item_number')}>
                 ID {renderSortIcon('item_number')}
               </th>
@@ -335,16 +366,16 @@ export function InventoryTable({
                 Location {renderSortIcon('location')}
               </th>
               <th className="w-28 cursor-pointer px-4 py-3 text-left font-semibold text-muted-foreground hover:text-white" onClick={() => toggleSort('last_checked_at')}>
-                Last Checked {renderSortIcon('last_checked_at')}
+                {retiredMode ? 'Retired' : 'Last Checked'} {renderSortIcon('last_checked_at')}
               </th>
-              <th className="w-36 px-4 py-3 text-left font-semibold text-muted-foreground">Check Status</th>
+              <th className="w-36 px-4 py-3 text-left font-semibold text-muted-foreground">{retiredMode ? 'Reason' : 'Check Status'}</th>
               <th className="w-36 px-4 py-3 text-right font-semibold text-muted-foreground">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-700/50">
             {filteredItems.length === 0 ? (
               <tr>
-                <td colSpan={showSerialNumberColumn ? 8 : 7} className="py-12 text-center text-muted-foreground">
+                <td colSpan={emptyColSpan} className="py-12 text-center text-muted-foreground">
                   {search ? `No ${tableLabel} items match your search.` : `No ${tableLabel} items found.`}
                 </td>
               </tr>
@@ -357,14 +388,16 @@ export function InventoryTable({
                     className={onOpenDetails ? 'cursor-pointer transition-colors hover:bg-slate-800/50' : 'transition-colors hover:bg-slate-800/50'}
                     onClick={() => onOpenDetails?.(item)}
                   >
-                    <td className="px-4 py-3">
-                      <Checkbox
-                        checked={selectedItemIds.has(item.id)}
-                        onClick={(event) => event.stopPropagation()}
-                        onCheckedChange={(checked) => toggleSelected(item.id, checked === true)}
-                        aria-label={`Select ${item.name}`}
-                      />
-                    </td>
+                    {!retiredMode ? (
+                      <td className="px-4 py-3">
+                        <Checkbox
+                          checked={selectedItemIds.has(item.id)}
+                          onClick={(event) => event.stopPropagation()}
+                          onCheckedChange={(checked) => toggleSelected(item.id, checked === true)}
+                          aria-label={`Select ${item.name}`}
+                        />
+                      </td>
+                    ) : null}
                     <td className="px-4 py-3 font-medium text-white">{item.item_number}</td>
                     {showSerialNumberColumn ? (
                       <td className="px-4 py-3 text-slate-300">{item.minor_plant_detail?.serial_number || 'Not recorded'}</td>
@@ -380,36 +413,50 @@ export function InventoryTable({
                     </td>
                     <td className="px-4 py-3 text-slate-300">{renderLocationDetails(item)}</td>
                     <td className="w-28 px-4 py-3 text-slate-300">
-                      <div>{formatInventoryDate(item.last_checked_at)}</div>
-                      {item.last_checked_at ? (
+                      <div>{formatInventoryDate(retiredMode ? item.retired_at : item.last_checked_at)}</div>
+                      {!retiredMode && item.last_checked_at ? (
                         <div className="whitespace-nowrap text-[11px] leading-4 text-muted-foreground">Due {getInventoryDueDate(item.last_checked_at, getInventoryCheckIntervalMonths(item))}</div>
                       ) : null}
                     </td>
                     <td className="w-36 px-4 py-3">
-                      <Badge variant="outline" className={`whitespace-nowrap ${getStatusBadgeClass(checkStatus)}`}>
-                        {getCheckStatusLabel(checkStatus)}
-                      </Badge>
+                      {retiredMode ? (
+                        <Badge variant="outline" className={`whitespace-nowrap ${getRetireReasonBadgeClass(item.retire_reason)}`}>
+                          {item.retire_reason || 'Other'}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className={`whitespace-nowrap ${getStatusBadgeClass(checkStatus)}`}>
+                          {getCheckStatusLabel(checkStatus)}
+                        </Badge>
+                      )}
                     </td>
                     <td className="w-36 px-4 py-3">
                       <div className="flex justify-end gap-2">
-                        <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); onMove([item]); }} className="border-slate-600">
-                          Move
-                        </Button>
-                        {onEdit ? (
+                        {!retiredMode ? (
+                          <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); onMove([item]); }} className="border-slate-600">
+                            Move
+                          </Button>
+                        ) : null}
+                        {!retiredMode && onEdit ? (
                           <Button size="sm" onClick={(event) => { event.stopPropagation(); onEdit(item); }} className="bg-inventory text-white hover:bg-inventory-dark">
                             Edit
                           </Button>
                         ) : null}
-                        {onDelete ? (
+                        {retiredMode && onRestore ? (
+                          <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); onRestore(item); }} className="border-green-500/40 text-green-200 hover:bg-green-500/10">
+                            <RotateCcw className="mr-2 h-4 w-4" />
+                            Restore
+                          </Button>
+                        ) : null}
+                        {!retiredMode && onDelete ? (
                           <Button
                             onClick={(event) => { event.stopPropagation(); onDelete(item); }}
                             variant="ghost"
                             size="sm"
                             className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950"
-                            aria-label={`Delete ${item.name}`}
-                            title="Delete item"
+                            aria-label={`Retire ${item.name}`}
+                            title="Retire item"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Archive className="h-4 w-4" />
                           </Button>
                         ) : null}
                       </div>
@@ -438,12 +485,14 @@ export function InventoryTable({
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex gap-3">
-                    <Checkbox
-                      checked={selectedItemIds.has(item.id)}
-                      onClick={(event) => event.stopPropagation()}
-                      onCheckedChange={(checked) => toggleSelected(item.id, checked === true)}
-                      aria-label={`Select ${item.name}`}
-                    />
+                    {!retiredMode ? (
+                      <Checkbox
+                        checked={selectedItemIds.has(item.id)}
+                        onClick={(event) => event.stopPropagation()}
+                        onCheckedChange={(checked) => toggleSelected(item.id, checked === true)}
+                        aria-label={`Select ${item.name}`}
+                      />
+                    ) : null}
                     <div>
                       <div className="flex items-center gap-2 font-semibold text-white">
                         <PackageSearch className="h-4 w-4 text-inventory" />
@@ -460,39 +509,53 @@ export function InventoryTable({
                       ) : null}
                     </div>
                   </div>
-                  <Badge variant="outline" className={getStatusBadgeClass(checkStatus)}>
-                    {getCheckStatusLabel(checkStatus)}
-                  </Badge>
+                  {retiredMode ? (
+                    <Badge variant="outline" className={getRetireReasonBadgeClass(item.retire_reason)}>
+                      {item.retire_reason || 'Other'}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className={getStatusBadgeClass(checkStatus)}>
+                      {getCheckStatusLabel(checkStatus)}
+                    </Badge>
+                  )}
                 </div>
                 <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
                   <div className="flex items-start gap-1">
                     <MapPin className="mt-0.5 h-3 w-3" />
                     {renderLocationDetails(item)}
                   </div>
-                  <span>Last: {formatInventoryDate(item.last_checked_at)}</span>
-                  {item.last_checked_at ? (
+                  <span>{retiredMode ? 'Retired' : 'Last'}: {formatInventoryDate(retiredMode ? item.retired_at : item.last_checked_at)}</span>
+                  {!retiredMode && item.last_checked_at ? (
                     <span>Due: {getInventoryDueDate(item.last_checked_at, getInventoryCheckIntervalMonths(item))}</span>
                   ) : null}
                 </div>
                 <div className="mt-4 flex gap-2">
-                  <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); onMove([item]); }} className="flex-1 border-slate-600">
-                    Move
-                  </Button>
-                  {onEdit ? (
+                  {!retiredMode ? (
+                    <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); onMove([item]); }} className="flex-1 border-slate-600">
+                      Move
+                    </Button>
+                  ) : null}
+                  {!retiredMode && onEdit ? (
                     <Button size="sm" onClick={(event) => { event.stopPropagation(); onEdit(item); }} className="flex-1 bg-inventory text-white hover:bg-inventory-dark">
                       Edit
                     </Button>
                   ) : null}
-                  {onDelete ? (
+                  {retiredMode && onRestore ? (
+                    <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); onRestore(item); }} className="flex-1 border-green-500/40 text-green-200 hover:bg-green-500/10">
+                      <RotateCcw className="mr-2 h-4 w-4" />
+                      Restore
+                    </Button>
+                  ) : null}
+                  {!retiredMode && onDelete ? (
                     <Button
                       onClick={(event) => { event.stopPropagation(); onDelete(item); }}
                       variant="ghost"
                       size="sm"
                       className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950"
-                      aria-label={`Delete ${item.name}`}
-                      title="Delete item"
+                      aria-label={`Retire ${item.name}`}
+                      title="Retire item"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Archive className="h-4 w-4" />
                     </Button>
                   ) : null}
                 </div>

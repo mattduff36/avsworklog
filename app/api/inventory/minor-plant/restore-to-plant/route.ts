@@ -106,7 +106,10 @@ export async function POST(request: NextRequest) {
 
       await client.query(`
         UPDATE public.inventory_items
-        SET status = 'inactive',
+        SET status = 'retired',
+            retired_at = NOW(),
+            retire_reason = 'Returned',
+            retired_by = $2,
             updated_by = $2,
             updated_at = NOW()
         WHERE id = $1

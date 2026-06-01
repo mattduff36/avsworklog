@@ -28,7 +28,6 @@ import {
   type InventoryItemCategory,
   type InventoryItemFormData,
   type InventoryLocation,
-  type InventoryStatus,
 } from '../types';
 import { CHECK_INTERVAL_MONTHS, formatInventoryLocationOptionLabel, getInventoryCheckIntervalMonths } from '../utils';
 
@@ -201,23 +200,11 @@ export function InventoryItemDialog({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Status</Label>
-                <Select
-                  value={form.status}
-                  onValueChange={(value) => updateField('status', value as InventoryStatus)}
-                >
-                  <SelectTrigger className="bg-slate-800 border-slate-600">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
+            {isEditing ? (
+              <div className="rounded-md border border-slate-700 bg-slate-800/50 p-3 text-xs text-slate-300">
+                Use the table action to retire inventory items so a retirement reason is recorded.
               </div>
-            </div>
+            ) : null}
           </div>
 
           <DialogFooter>

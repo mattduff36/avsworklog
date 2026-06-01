@@ -2321,7 +2321,11 @@ export type Database = {
           category: 'hired_plant' | 'signs' | 'minor_plant' | 'van_stock' | 'tools' | 'equipment' | 'unknown'
           location_id: string | null
           last_checked_at: string | null
-          status: 'active' | 'inactive'
+          check_interval_days: number | null
+          status: 'active' | 'retired'
+          retired_at: string | null
+          retire_reason: 'Sold' | 'Scrapped' | 'Lost' | 'Damaged' | 'Returned' | 'Other' | null
+          retired_by: string | null
           source: string | null
           source_reference: string | null
           created_at: string
@@ -2337,7 +2341,11 @@ export type Database = {
           category?: 'hired_plant' | 'signs' | 'minor_plant' | 'van_stock' | 'tools' | 'equipment' | 'unknown'
           location_id?: string | null
           last_checked_at?: string | null
-          status?: 'active' | 'inactive'
+          check_interval_days?: number | null
+          status?: 'active' | 'retired'
+          retired_at?: string | null
+          retire_reason?: 'Sold' | 'Scrapped' | 'Lost' | 'Damaged' | 'Returned' | 'Other' | null
+          retired_by?: string | null
           source?: string | null
           source_reference?: string | null
           created_at?: string
@@ -2353,7 +2361,11 @@ export type Database = {
           category?: 'hired_plant' | 'signs' | 'minor_plant' | 'van_stock' | 'tools' | 'equipment' | 'unknown'
           location_id?: string | null
           last_checked_at?: string | null
-          status?: 'active' | 'inactive'
+          check_interval_days?: number | null
+          status?: 'active' | 'retired'
+          retired_at?: string | null
+          retire_reason?: 'Sold' | 'Scrapped' | 'Lost' | 'Damaged' | 'Returned' | 'Other' | null
+          retired_by?: string | null
           source?: string | null
           source_reference?: string | null
           created_at?: string

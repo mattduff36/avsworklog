@@ -1,6 +1,8 @@
 export type InventoryCategory = string;
 
-export type InventoryStatus = 'active' | 'inactive';
+export type InventoryStatus = 'active' | 'retired';
+
+export type InventoryRetireReason = 'Sold' | 'Scrapped' | 'Lost' | 'Damaged' | 'Returned' | 'Other';
 
 export type InventoryCheckStatus = 'ok' | 'due_soon' | 'overdue' | 'needs_check';
 
@@ -55,6 +57,9 @@ export interface InventoryItem {
   last_checked_at: string | null;
   check_interval_days: number | null;
   status: InventoryStatus;
+  retired_at: string | null;
+  retire_reason: InventoryRetireReason | null;
+  retired_by: string | null;
   source: string | null;
   source_reference: string | null;
   source_location_hint?: string | null;
@@ -160,6 +165,19 @@ export const INVENTORY_CATEGORY_LABELS: Record<string, string> = {
   equipment: 'Equipment',
   unknown: 'Unknown',
 };
+
+export const INVENTORY_RETIRE_REASONS: InventoryRetireReason[] = [
+  'Sold',
+  'Scrapped',
+  'Lost',
+  'Damaged',
+  'Returned',
+  'Other',
+];
+
+export function isInventoryRetireReason(value: unknown): value is InventoryRetireReason {
+  return typeof value === 'string' && INVENTORY_RETIRE_REASONS.includes(value as InventoryRetireReason);
+}
 
 export function formatInventoryCategoryLabel(
   category: InventoryCategory,

@@ -28,7 +28,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const admin = createAdminClient();
     const [{ data: item, error: itemError }, { data: location, error: locationError }] = await Promise.all([
-      admin.from('inventory_items').select('id, location_id').eq('id', id).single(),
+      admin.from('inventory_items').select('id, location_id, status').eq('id', id).single(),
       admin.from('inventory_locations').select('id, is_active').eq('id', destinationLocationId).single(),
     ]);
 
@@ -40,6 +40,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
     if (locationError || !location?.is_active) {
       return NextResponse.json({ error: 'Destination location not found' }, { status: 404 });
+    }
+
+    if (item.status !== 'active') {
+      return NextResponse.json({ error: 'Retired inventory items cannot be moved' }, { status: 400 });
     }
 
     if (item.location_id === destinationLocationId) {

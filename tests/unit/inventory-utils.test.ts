@@ -3,6 +3,7 @@ import {
   CHECK_INTERVAL_DAYS,
   CHECK_INTERVAL_MONTHS,
   formatInventoryCheckIntervalMonths,
+  formatInventoryDate,
   getInventoryCheckIntervalDays,
   getInventoryCheckIntervalMonths,
   getInventoryCheckStatus,
@@ -20,6 +21,12 @@ describe('inventory utils', () => {
     expect(getInventoryCheckIntervalMonths({ check_interval_days: 90 })).toBe(3);
     expect(formatInventoryCheckIntervalMonths(3)).toBe('3 months');
     expect(getInventoryDueDate('2026-01-01', 3)).toBe('01 Apr 2026');
+  });
+
+  it('formats date-only and timestamp inventory dates', () => {
+    expect(formatInventoryDate('2026-06-01')).toBe('01 Jun 2026');
+    expect(formatInventoryDate('2026-06-01T14:08:25.330Z')).toBe('01 Jun 2026');
+    expect(formatInventoryDate('not-a-date')).toBe('Not checked');
   });
 
   it('calculates due soon and overdue against per-item intervals', () => {

@@ -12,10 +12,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
-import { AlertTriangle, CalendarCheck, Clock, MapPin, PackageSearch } from 'lucide-react';
+import { AlertTriangle, CalendarCheck, Clock, Download, Loader2, MapPin, PackageSearch } from 'lucide-react';
 import { toast } from 'sonner';
 import type { InventoryItem, InventoryItemGroupSummary } from '../../types';
+import { InventoryCheckModal, type InventoryChecklistSubmitPayload } from '../../components/InventoryCheckModal';
+import {
+  INVENTORY_CHECK_OVERALL_STATUS_LABELS,
+  getInventoryChecklistSummary,
+  type InventoryCheckOverallStatus,
+  type InventoryChecklistItemResult,
+} from '@/lib/checklists/inventory-service-checklist';
 import {
   CHECK_INTERVAL_MONTHS,
   checkIntervalMonthsToDays,
@@ -53,6 +59,9 @@ interface InventoryCheck {
   checked_at: string;
   interval_days: number;
   note: string | null;
+  checklist_version: string | null;
+  checklist_items: InventoryChecklistItemResult[] | null;
+  overall_status: InventoryCheckOverallStatus | null;
   created_at: string;
   checked_by_profile: MovementProfile | null;
 }
@@ -75,6 +84,7 @@ function formatTimestamp(value: string): string {
 }
 
 function getStatusBadgeClass(item: InventoryItem): string {
+  if (item.status === 'retired') return 'border-slate-500/30 bg-slate-500/10 text-slate-200';
   const status = getInventoryCheckStatus(item);
   if (status === 'overdue') return 'border-red-500/30 bg-red-500/10 text-red-300';
   if (status === 'due_soon') return 'border-amber-500/30 bg-amber-500/10 text-amber-300';
@@ -89,9 +99,11 @@ export default function InventoryItemDetailPage() {
   const [loading, setLoading] = useState(true);
   const [intervalMonths, setIntervalMonths] = useState('');
   const [checkedAt, setCheckedAt] = useState(new Date().toISOString().slice(0, 10));
-  const [checkNote, setCheckNote] = useState('');
+  const [showCheckModal, setShowCheckModal] = useState(false);
+  const [checkModalSession, setCheckModalSession] = useState(0);
   const [savingInterval, setSavingInterval] = useState(false);
   const [savingCheck, setSavingCheck] = useState(false);
+  const [downloadingCheckId, setDownloadingCheckId] = useState<string | null>(null);
 
   const fetchHistory = useCallback(async () => {
     try {
@@ -142,26 +154,49 @@ export default function InventoryItemDetailPage() {
     }
   }
 
-  async function handleRecordCheck(event: React.FormEvent) {
-    event.preventDefault();
+  async function handleRecordCheck(checkPayload: InventoryChecklistSubmitPayload) {
     setSavingCheck(true);
     try {
       const response = await fetch(`/api/inventory/${itemId}/checks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          checked_at: checkedAt,
-          note: checkNote,
-        }),
+        body: JSON.stringify(checkPayload),
       });
       await parseResponse(response, 'Failed to record check');
       toast.success('Inventory check recorded');
-      setCheckNote('');
+      setShowCheckModal(false);
+      setCheckedAt(new Date().toISOString().slice(0, 10));
       await fetchHistory();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to record check');
     } finally {
       setSavingCheck(false);
+    }
+  }
+
+  async function handleDownloadCheckPdf(checkId: string) {
+    setDownloadingCheckId(checkId);
+    try {
+      const response = await fetch(`/api/inventory/${itemId}/checks/${checkId}/pdf`);
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to download checklist PDF');
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `inventory-check-${checkId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success('Checklist PDF downloaded');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to download checklist PDF');
+    } finally {
+      setDownloadingCheckId(null);
     }
   }
 
@@ -180,6 +215,7 @@ export default function InventoryItemDetailPage() {
   const { item, movements, checks, group } = payload;
   const checkStatus = getInventoryCheckStatus(item);
   const intervalMonthsValue = getInventoryCheckIntervalMonths(item);
+  const isRetired = item.status === 'retired';
 
   return (
     <AppPageShell width="wide">
@@ -191,7 +227,7 @@ export default function InventoryItemDetailPage() {
           icon={<PackageSearch className="h-5 w-5" />}
           actions={(
             <Badge variant="outline" className={getStatusBadgeClass(item)}>
-              {getCheckStatusLabel(checkStatus)}
+              {isRetired ? 'Retired' : getCheckStatusLabel(checkStatus)}
             </Badge>
           )}
         />
@@ -228,6 +264,22 @@ export default function InventoryItemDetailPage() {
         </Card>
       </div>
 
+      {isRetired ? (
+        <Card className="border-slate-500/30 bg-slate-500/10">
+          <CardContent className="flex flex-col gap-2 p-4 text-sm text-slate-100 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+              <div>
+                <div className="font-medium">This inventory item is retired.</div>
+                <div className="text-slate-300">
+                  Reason: {item.retire_reason || 'Other'} · Retired: {formatInventoryDate(item.retired_at)}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <Tabs defaultValue="overview">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -242,6 +294,12 @@ export default function InventoryItemDetailPage() {
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <DetailRow label="Status" value={item.status} />
+              {isRetired ? (
+                <>
+                  <DetailRow label="Retired Date" value={formatInventoryDate(item.retired_at)} />
+                  <DetailRow label="Retirement Reason" value={item.retire_reason || 'Other'} />
+                </>
+              ) : null}
               <DetailRow label="Category" value={item.category.replace(/_/g, ' ')} />
               <DetailRow label="Source" value={item.source || 'Not recorded'} />
               <DetailRow label="Source Reference" value={item.source_reference || 'Not recorded'} />
@@ -280,39 +338,37 @@ export default function InventoryItemDetailPage() {
                     onChange={(event) => setIntervalMonths(event.target.value)}
                     placeholder={`Default ${CHECK_INTERVAL_MONTHS}`}
                     className="bg-slate-800 border-slate-600"
+                    disabled={isRetired}
                   />
                 </div>
-                <Button type="submit" variant="outline" disabled={savingInterval}>
+                <Button type="submit" variant="outline" disabled={savingInterval || isRetired}>
                   Save Interval
                 </Button>
               </form>
 
-              <form className="space-y-3" onSubmit={handleRecordCheck}>
-                <div className="space-y-2">
-                  <Label htmlFor="checked_at">Record Check Date</Label>
-                  <Input
-                    id="checked_at"
-                    type="date"
-                    value={checkedAt}
-                    onChange={(event) => setCheckedAt(event.target.value)}
-                    className="bg-slate-800 border-slate-600"
-                  />
+              <div className="space-y-3 rounded-lg border border-slate-700 bg-slate-800/40 p-4">
+                <div>
+                  <div className="font-medium text-white">Service Checklist</div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {isRetired
+                      ? 'Retired items must be restored before new checks can be recorded.'
+                      : 'Record Pass, Fail, or N/A against the inventory service checklist. Failed items require comments.'
+                    }
+                  </p>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="check_note">Check Note</Label>
-                  <Textarea
-                    id="check_note"
-                    value={checkNote}
-                    onChange={(event) => setCheckNote(event.target.value)}
-                    className="bg-slate-800 border-slate-600"
-                    rows={3}
-                  />
-                </div>
-                <Button type="submit" className="bg-inventory text-white hover:bg-inventory-dark" disabled={savingCheck || !checkedAt}>
+                <Button
+                  type="button"
+                  className="bg-inventory text-white hover:bg-inventory-dark"
+                  onClick={() => {
+                    setCheckModalSession((current) => current + 1);
+                    setShowCheckModal(true);
+                  }}
+                  disabled={savingCheck || !checkedAt || isRetired}
+                >
                   <CalendarCheck className="mr-2 h-4 w-4" />
                   Record Check
                 </Button>
-              </form>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -342,18 +398,18 @@ export default function InventoryItemDetailPage() {
             icon={<Clock className="h-5 w-5 text-inventory" />}
           >
             {checks.map((check) => (
-              <TimelineEntry
+              <InventoryCheckTimelineEntry
                 key={check.id}
-                title={`Checked ${formatInventoryDate(check.checked_at)}`}
-                meta={`${check.checked_by_profile?.full_name || 'Unknown user'} · interval ${formatInventoryCheckIntervalMonths(getInventoryCheckIntervalMonths({ check_interval_days: check.interval_days }))}`}
-                note={check.note}
+                check={check}
+                downloading={downloadingCheckId === check.id}
+                onDownloadPdf={() => handleDownloadCheckPdf(check.id)}
               />
             ))}
           </TimelineCard>
         </TabsContent>
       </Tabs>
 
-      {checkStatus === 'overdue' ? (
+      {!isRetired && checkStatus === 'overdue' ? (
         <Card className="border-red-500/30 bg-red-500/10">
           <CardContent className="flex items-center gap-2 p-4 text-sm text-red-100">
             <AlertTriangle className="h-4 w-4" />
@@ -361,6 +417,17 @@ export default function InventoryItemDetailPage() {
           </CardContent>
         </Card>
       ) : null}
+
+      <InventoryCheckModal
+        key={checkModalSession}
+        open={showCheckModal}
+        onOpenChange={setShowCheckModal}
+        itemName={item.name}
+        itemNumber={item.item_number}
+        initialCheckedAt={checkedAt}
+        saving={savingCheck}
+        onSubmit={handleRecordCheck}
+      />
     </AppPageShell>
   );
 }
@@ -406,11 +473,15 @@ function TimelineEntry({
   meta,
   note,
   badge,
+  actions,
+  children,
 }: {
   title: string;
   meta: string;
   note?: string | null;
   badge?: string | null;
+  actions?: ReactNode;
+  children?: ReactNode;
 }) {
   return (
     <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
@@ -419,9 +490,88 @@ function TimelineEntry({
           <div className="font-semibold text-white">{title}</div>
           <div className="text-xs text-muted-foreground">{meta}</div>
         </div>
-        {badge ? <Badge variant="outline" className="border-purple-500/30 bg-purple-500/10 text-purple-200">{badge}</Badge> : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {badge ? <Badge variant="outline" className="border-purple-500/30 bg-purple-500/10 text-purple-200">{badge}</Badge> : null}
+          {actions}
+        </div>
       </div>
       {note ? <p className="mt-3 text-sm text-slate-300">{note}</p> : null}
+      {children}
     </div>
+  );
+}
+
+function getOverallStatusBadgeClass(status: InventoryCheckOverallStatus): string {
+  if (status === 'fail') return 'border-red-500/30 bg-red-500/10 text-red-200';
+  if (status === 'partial') return 'border-amber-500/30 bg-amber-500/10 text-amber-200';
+  return 'border-green-500/30 bg-green-500/10 text-green-200';
+}
+
+function InventoryCheckTimelineEntry({
+  check,
+  downloading,
+  onDownloadPdf,
+}: {
+  check: InventoryCheck;
+  downloading: boolean;
+  onDownloadPdf: () => void;
+}) {
+  const checklistItems = Array.isArray(check.checklist_items) ? check.checklist_items : null;
+  const summary = checklistItems ? getInventoryChecklistSummary(checklistItems) : null;
+  const overallStatus = summary ? check.overall_status || (summary.fail > 0 ? 'fail' : 'pass') : null;
+  const failedItems = checklistItems?.filter((item) => item.status === 'attention') || [];
+
+  return (
+    <TimelineEntry
+      title={`Checked ${formatInventoryDate(check.checked_at)}`}
+      meta={`${check.checked_by_profile?.full_name || 'Unknown user'} · interval ${formatInventoryCheckIntervalMonths(getInventoryCheckIntervalMonths({ check_interval_days: check.interval_days }))}`}
+      note={check.note}
+      badge={null}
+      actions={checklistItems ? (
+        <>
+          {overallStatus ? (
+            <Badge variant="outline" className={getOverallStatusBadgeClass(overallStatus)}>
+              {INVENTORY_CHECK_OVERALL_STATUS_LABELS[overallStatus]}
+            </Badge>
+          ) : null}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 border-slate-600"
+            onClick={onDownloadPdf}
+            disabled={downloading}
+          >
+            {downloading ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Download className="mr-2 h-3.5 w-3.5" />}
+            PDF
+          </Button>
+        </>
+      ) : null}
+    >
+      {summary ? (
+        <div className="mt-3 space-y-3">
+          <div className="flex flex-wrap gap-2 text-xs">
+            <Badge variant="outline" className="border-green-500/30 bg-green-500/10 text-green-200">Pass {summary.pass}</Badge>
+            <Badge variant="outline" className="border-red-500/30 bg-red-500/10 text-red-200">Fail {summary.fail}</Badge>
+            <Badge variant="outline" className="border-slate-500/30 bg-slate-500/10 text-slate-200">N/A {summary.na}</Badge>
+            <Badge variant="outline" className="border-slate-500/30 bg-slate-500/10 text-slate-200">Total {summary.total}</Badge>
+          </div>
+
+          {failedItems.length > 0 ? (
+            <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-red-200">Failed Items</div>
+              <div className="mt-2 space-y-2">
+                {failedItems.map((item) => (
+                  <div key={item.item_number} className="text-sm text-red-50">
+                    <span className="font-medium">#{item.item_number} {item.label}</span>
+                    {item.comment ? <span className="text-red-100">: {item.comment}</span> : null}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </TimelineEntry>
   );
 }
