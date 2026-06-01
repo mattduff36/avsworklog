@@ -8,6 +8,7 @@ vi.mock('@/lib/server/app-auth/session', () => ({
 
 import { GET } from '@/app/api/dashboard/summary/route';
 import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
+import { DEBUG_ERROR_LOG_HIDDEN_ADMIN_EMAIL } from '@/lib/utils/error-log-filters';
 
 vi.mock('@/lib/supabase/server');
 vi.mock('@/lib/supabase/admin');
@@ -33,7 +34,7 @@ vi.mock('@/lib/server/absence-secondary-permissions', async (importOriginal) => 
 
 function createCountQuery(count: number) {
   const resolved = { count, error: null };
-  return createSupabaseQueryMock(resolved, ['eq', 'in']);
+  return createSupabaseQueryMock(resolved, ['eq', 'in', 'not', 'or']);
 }
 
 function createScopedRowsQuery<T extends Record<string, unknown>>(rows: T[]) {
@@ -487,6 +488,9 @@ describe('GET /api/dashboard/summary', () => {
       has_exception_row: false,
     } as never);
 
+    const errorLogsCountQuery = createCountQuery(7);
+    const selectErrorLogs = vi.fn(() => errorLogsCountQuery);
+
     const supabase = {
       auth: {
         getUser: vi.fn().mockResolvedValue({
@@ -496,7 +500,7 @@ describe('GET /api/dashboard/summary', () => {
       },
       from: (table: string) => {
         if (table === 'error_logs') {
-          return { select: () => createCountQuery(7) };
+          return { select: selectErrorLogs };
         }
         if (table === 'suggestions') {
           return {
@@ -529,6 +533,11 @@ describe('GET /api/dashboard/summary', () => {
 
     expect(response.status).toBe(200);
     expect(payload.metrics.badges.error_logs).toBe(7);
+    expect(selectErrorLogs).toHaveBeenCalledWith('id', { count: 'exact', head: true });
+    expect(errorLogsCountQuery.or).toHaveBeenCalledWith('page_url.is.null,page_url.not.ilike.%localhost%');
+    expect(errorLogsCountQuery.or).toHaveBeenCalledWith(
+      `user_email.is.null,user_email.neq.${DEBUG_ERROR_LOG_HIDDEN_ADMIN_EMAIL}`
+    );
   });
 
   it('returns workshop and maintenance tile badge counts without actions permission', async () => {

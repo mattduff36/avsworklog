@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
-import { completeReminderActionForAsset } from '@/lib/server/reminders/complete-reminder-action';
+import {
+  completeReminderActionForAsset,
+  completeVanDraftSubmissionReminder,
+} from '@/lib/server/reminders/complete-reminder-action';
 import { getReminderActionRequiredModule } from '@/lib/utils/reminder-action-permissions';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
@@ -12,6 +15,7 @@ const completeInspectionReminderSchema = z.object({
   assetType: z.enum(['van', 'plant', 'hgv']),
   assetId: z.string().trim().min(1),
   assignedTo: z.string().trim().uuid(),
+  draftInspectionId: z.string().trim().uuid().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -34,17 +38,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const result = await completeReminderActionForAsset({
-      admin: createAdminClient(),
+    const admin = createAdminClient();
+    const assetResult = await completeReminderActionForAsset({
+      admin,
       assetType,
       assetId: parsed.data.assetId,
       assignedTo: parsed.data.assignedTo,
       actionedBy: current.profile.id,
     });
+    const draftResult = parsed.data.draftInspectionId
+      ? await completeVanDraftSubmissionReminder({
+          admin,
+          draftInspectionId: parsed.data.draftInspectionId,
+          assignedTo: parsed.data.assignedTo,
+          actionedBy: current.profile.id,
+        })
+      : null;
 
     return NextResponse.json({
       success: true,
-      ...result,
+      actionedCount: assetResult.actionedCount + (draftResult?.actionedCount || 0),
+      cancelledCount: assetResult.cancelledCount + (draftResult?.cancelledCount || 0),
+      actionIds: Array.from(new Set([
+        ...assetResult.actionIds,
+        ...(draftResult?.actionIds || []),
+      ])),
+      assetResult,
+      draftResult,
     });
   } catch (error) {
     await logServerError({

@@ -3,6 +3,7 @@ import type { LucideIcon } from 'lucide-react';
 import type { ReminderAssetType } from '@/types/reminders';
 
 export const FLEET_INSPECTION_OVERDUE_WORKFLOW_KEY = 'fleet_inspection_overdue';
+export const VAN_DRAFT_SUBMISSION_WORKFLOW_KEY = 'van_draft_submission';
 
 export interface ReminderOverviewTabConfig {
   id: string;

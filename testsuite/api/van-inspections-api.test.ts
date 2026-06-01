@@ -39,6 +39,16 @@ describe('Van Inspections — Auth Guards (unauthenticated)', () => {
     expect(res.status).toBe(401);
   });
 
+  it('GET /api/van-inspections/previous-defects returns 401', async () => {
+    const res = await fetch(`${BASE_URL}/api/van-inspections/previous-defects`);
+    expect(res.status).toBe(401);
+  });
+
+  it('GET /api/van-inspections/recent-completed-defects returns 401', async () => {
+    const res = await fetch(`${BASE_URL}/api/van-inspections/recent-completed-defects`);
+    expect(res.status).toBe(401);
+  });
+
   it('POST /api/van-inspections/inform-workshop returns 401', async () => {
     const res = await fetch(`${BASE_URL}/api/van-inspections/inform-workshop`, {
       method: 'POST',
@@ -92,6 +102,18 @@ describe('Van Inspections — Response Schema', () => {
     const body = await res.json();
     expect(body).toHaveProperty('error');
   });
+
+  it('GET /api/van-inspections/previous-defects responds with JSON error for unauthed', async () => {
+    const res = await fetch(`${BASE_URL}/api/van-inspections/previous-defects`);
+    const body = await res.json();
+    expect(body).toHaveProperty('error');
+  });
+
+  it('GET /api/van-inspections/recent-completed-defects responds with JSON error for unauthed', async () => {
+    const res = await fetch(`${BASE_URL}/api/van-inspections/recent-completed-defects`);
+    const body = await res.json();
+    expect(body).toHaveProperty('error');
+  });
 });
 
 describe('Van Inspections — No 500 Errors', () => {
@@ -100,6 +122,8 @@ describe('Van Inspections — No 500 Errors', () => {
     { method: 'DELETE', path: '/api/van-inspections/fake-id/delete' },
     { method: 'DELETE', path: '/api/van-inspections/fake-id/discard' },
     { method: 'GET', path: '/api/van-inspections/locked-defects' },
+    { method: 'GET', path: '/api/van-inspections/previous-defects' },
+    { method: 'GET', path: '/api/van-inspections/recent-completed-defects' },
     { method: 'POST', path: '/api/van-inspections/inform-workshop' },
     { method: 'POST', path: '/api/van-inspections/sync-defect-tasks' },
   ];

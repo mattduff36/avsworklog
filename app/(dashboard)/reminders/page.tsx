@@ -11,6 +11,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { PageLoader } from '@/components/ui/page-loader';
 import { PanelLoader } from '@/components/ui/panel-loader';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
+import { VAN_DRAFT_SUBMISSION_WORKFLOW_KEY } from '@/lib/config/reminder-workflows';
+import { VAN_DRAFT_SUBMISSION_REMINDER_MESSAGE } from '@/lib/utils/van-draft-submission-reminders';
 import type { ReminderWithAction } from '@/types/reminders';
 
 interface RemindersResponse {
@@ -44,11 +46,20 @@ function formatDateTime(value: string | null | undefined): string {
 }
 
 function getLatestInspectionLabel(reminder: ReminderWithAction): string {
+  if (reminder.action.workflow_key === VAN_DRAFT_SUBMISSION_WORKFLOW_KEY) {
+    const value = reminder.action.metadata?.inspection_date;
+    return typeof value === 'string' ? formatDate(value) : 'Draft';
+  }
+
   const value = reminder.action.metadata?.last_submitted_inspection_date;
   return typeof value === 'string' ? formatDate(value) : 'Never';
 }
 
 function getOverdueLabel(reminder: ReminderWithAction): string {
+  if (reminder.action.workflow_key === VAN_DRAFT_SUBMISSION_WORKFLOW_KEY) {
+    return 'Draft ready';
+  }
+
   const lastSubmitted = reminder.action.metadata?.last_submitted_inspection_date;
   if (typeof lastSubmitted !== 'string') return 'Check required';
 
@@ -57,6 +68,10 @@ function getOverdueLabel(reminder: ReminderWithAction): string {
 }
 
 function getReminderInstruction(reminder: ReminderWithAction): string {
+  if (reminder.action.workflow_key === VAN_DRAFT_SUBMISSION_WORKFLOW_KEY) {
+    return VAN_DRAFT_SUBMISSION_REMINDER_MESSAGE;
+  }
+
   return `Please complete this ${reminder.task_name || 'assigned task'} as soon as possible. This reminder will disappear automatically once the task is complete.`;
 }
 

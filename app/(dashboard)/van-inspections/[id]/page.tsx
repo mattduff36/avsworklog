@@ -712,8 +712,6 @@ export default function ViewInspectionPage() {
 
   const defectCount = items.filter(item => item.status === 'attention').length;
   const okCount = items.filter(item => item.status === 'ok').length;
-  // Van inspections are daily checks; day_of_week is retained only for item/photo compatibility.
-  const isWeeklyInspection = false;
   const inspectionReference = formatReferenceId(inspection.id);
   const linkedTaskReferences = linkedTasks
     .map((task) => ({
@@ -728,31 +726,6 @@ export default function ViewInspectionPage() {
   const hasInformWorkshopTask = linkedTasks.some((task) => task.action_type === 'workshop_vehicle_task');
   const getPhotosForItem = (itemNumber: number, dayOfWeek: number | null) =>
     photoMap[getInspectionPhotoKey(itemNumber, dayOfWeek)] ?? [];
-
-  // For weekly inspections, group items by item_number to show in table format
-  const uniqueItems: Array<{ number: number; description: string }> = [];
-  if (isWeeklyInspection) {
-    const seenNumbers = new Set<number>();
-    items.forEach(item => {
-      if (!seenNumbers.has(item.item_number)) {
-        seenNumbers.add(item.item_number);
-        uniqueItems.push({
-          number: item.item_number,
-          description: item.item_description,
-        });
-      }
-    });
-    uniqueItems.sort((a, b) => a.number - b.number);
-  }
-
-  // Helper to get item status for a specific day
-  const getItemStatusForDay = (itemNumber: number, dayOfWeek: number): InspectionStatus | null => {
-    const item = items.find(i => i.item_number === itemNumber && i.day_of_week === dayOfWeek);
-    return item ? item.status : null;
-  };
-
-  // Day names for weekly view
-  const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -887,227 +860,147 @@ export default function ViewInspectionPage() {
         <CardContent className="space-y-6">
           {/* Desktop Table View */}
           <div className="hidden md:block overflow-x-auto">
-            {isWeeklyInspection ? (
-              /* Weekly Inspection Table - grouped by day */
-              <table className="w-full border-collapse border border-border">
-                <thead>
-                  <tr className="bg-slate-100 dark:bg-slate-800 border-b border-border">
-                    <th className="text-left p-2 w-12 font-medium border-r border-border">#</th>
-                    <th className="text-left p-2 font-medium border-r border-border">Item</th>
-                    {dayNames.map((day, index) => (
-                      <th key={index} className="text-center p-2 w-16 font-medium border-r border-border last:border-r-0">
-                        {day}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {uniqueItems.map((item) => (
-                    <tr key={item.number} className="border-b border-border hover:bg-secondary/20">
-                      <td className="p-2 text-sm text-muted-foreground font-medium border-r border-border">
-                        {item.number}
-                      </td>
-                      <td className="p-2 text-sm border-r border-border">
-                        {item.description}
-                      </td>
-                      {[1, 2, 3, 4, 5, 6, 7].map((dayOfWeek) => {
-                        const status = getItemStatusForDay(item.number, dayOfWeek);
-                        return (
-                          <td key={dayOfWeek} className="p-2 text-center border-r border-border last:border-r-0">
-                            {status ? (
-                              <div className="flex items-center justify-center">
-                                {getStatusIcon(status)}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              /* Standard Inspection Table - flat list */
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-2 w-12 font-medium">#</th>
-                    <th className="text-left p-2 font-medium">Item</th>
-                    <th className="text-center p-2 w-48 font-medium">Status</th>
-                    <th className="text-left p-2 font-medium">Comments</th>
-                    <th className="text-center p-2 w-24 font-medium">Photo</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((item) => (
-                    <tr key={item.id} className="border-b hover:bg-secondary/20">
-                      <td className="p-2 text-sm text-muted-foreground">{item.item_number}</td>
-                      <td className="p-2 text-sm">{item.item_description}</td>
-                      <td className="p-2">
-                        {canEdit ? (
-                          <div className="flex items-center justify-center gap-2">
-                            {(['ok', 'defect', 'na'] as InspectionStatus[]).map((status) => (
-                              <button
-                                key={status}
-                                type="button"
-                                onClick={() => updateItem(item.item_number, 'status', status)}
-                                className={`flex items-center justify-center w-10 h-10 rounded border-2 transition-all ${
-                                  getStatusColor(status, item.status === status)
-                                }`}
-                                title={status.toUpperCase()}
-                              >
-                                {getStatusIcon(status)}
-                              </button>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-center">
-                            {getStatusIcon(item.status)}
-                          </div>
-                        )}
-                      </td>
-                      <td className="p-2">
-                        {canEdit ? (
-                          <Input
-                            value={item.comments || ''}
-                            onChange={(e) => updateItem(item.item_number, 'comments', e.target.value)}
-                            placeholder={item.status === 'attention' ? 'Required for defects' : 'Optional notes'}
-                            className={item.status === 'attention' && !item.comments ? 'border-red-300' : ''}
-                          />
-                        ) : (
-                          <span className="text-sm">{item.comments || '-'}</span>
-                        )}
-                      </td>
-                      <td className="p-2 text-center align-middle">
-                        {item.status === 'attention' ? (() => {
-                          const photos = getPhotosForItem(item.item_number, item.day_of_week);
-                          return (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setPhotoUploadItem({ itemNumber: item.item_number, dayOfWeek: item.day_of_week })}
-                              disabled={!canEdit}
-                              title={photos.length > 0 ? `${photos.length} photo(s) saved` : 'Add photo'}
-                              className={`h-10 min-w-24 gap-1.5 text-xs ${
-                                photos.length > 0
-                                  ? 'border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10'
-                                  : 'border-border text-muted-foreground hover:text-white'
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left p-2 w-12 font-medium">#</th>
+                  <th className="text-left p-2 font-medium">Item</th>
+                  <th className="text-center p-2 w-48 font-medium">Status</th>
+                  <th className="text-left p-2 font-medium">Comments</th>
+                  <th className="text-center p-2 w-24 font-medium">Photo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => (
+                  <tr key={item.id} className="border-b hover:bg-secondary/20">
+                    <td className="p-2 text-sm text-muted-foreground">{item.item_number}</td>
+                    <td className="p-2 text-sm">{item.item_description}</td>
+                    <td className="p-2">
+                      {canEdit ? (
+                        <div className="flex items-center justify-center gap-2">
+                          {(['ok', 'defect', 'na'] as InspectionStatus[]).map((status) => (
+                            <button
+                              key={status}
+                              type="button"
+                              onClick={() => updateItem(item.item_number, 'status', status)}
+                              className={`flex items-center justify-center w-10 h-10 rounded border-2 transition-all ${
+                                getStatusColor(status, item.status === status)
                               }`}
+                              title={status.toUpperCase()}
                             >
-                              <Camera className="h-3.5 w-3.5" />
-                              {photos.length > 0 ? `${photos.length} saved` : 'Add photo'}
-                            </Button>
-                          );
-                        })() : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+                              {getStatusIcon(status)}
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center">
+                          {getStatusIcon(item.status)}
+                        </div>
+                      )}
+                    </td>
+                    <td className="p-2">
+                      {canEdit ? (
+                        <Input
+                          value={item.comments || ''}
+                          onChange={(e) => updateItem(item.item_number, 'comments', e.target.value)}
+                          placeholder={item.status === 'attention' ? 'Required for defects' : 'Optional notes'}
+                          className={item.status === 'attention' && !item.comments ? 'border-red-300' : ''}
+                        />
+                      ) : (
+                        <span className="text-sm">{item.comments || '-'}</span>
+                      )}
+                    </td>
+                    <td className="p-2 text-center align-middle">
+                      {item.status === 'attention' ? (() => {
+                        const photos = getPhotosForItem(item.item_number, item.day_of_week);
+                        return (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPhotoUploadItem({ itemNumber: item.item_number, dayOfWeek: item.day_of_week })}
+                            disabled={!canEdit}
+                            title={photos.length > 0 ? `${photos.length} photo(s) saved` : 'Add photo'}
+                            className={`h-10 min-w-24 gap-1.5 text-xs ${
+                              photos.length > 0
+                                ? 'border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10'
+                                : 'border-border text-muted-foreground hover:text-white'
+                            }`}
+                          >
+                            <Camera className="h-3.5 w-3.5" />
+                            {photos.length > 0 ? `${photos.length} saved` : 'Add photo'}
+                          </Button>
+                        );
+                      })() : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
 
           {/* Mobile Card View */}
           <div className="md:hidden space-y-4">
-            {isWeeklyInspection ? (
-              /* Weekly Inspection - show items grouped by item number with days */
-              uniqueItems.map((item) => (
-                <Card key={item.number}>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm">
-                      {item.number}. {item.description}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <div className="grid grid-cols-7 gap-1">
-                      {dayNames.map((day, index) => {
-                        const dayOfWeek = index + 1;
-                        const status = getItemStatusForDay(item.number, dayOfWeek);
-                        return (
-                          <div key={index} className="flex flex-col items-center p-2 border border-border rounded">
-                            <span className="text-xs font-medium text-muted-foreground mb-1">
-                              {day}
-                            </span>
-                            {status ? (
-                              <div className="flex items-center justify-center">
-                                {getStatusIcon(status)}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground text-xs">-</span>
-                            )}
-                          </div>
-                        );
-                      })}
+            {items.map((item) => (
+              <Card key={item.id}>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm">
+                    {item.item_number}. {item.item_description}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {canEdit ? (
+                    <div className="flex items-center justify-center gap-3">
+                      {(['ok', 'defect', 'na'] as InspectionStatus[]).map((status) => (
+                        <button
+                          key={status}
+                          type="button"
+                          onClick={() => updateItem(item.item_number, 'status', status)}
+                          className={`flex flex-col items-center justify-center w-20 h-20 rounded border-2 transition-all ${
+                            getStatusColor(status, item.status === status)
+                          }`}
+                        >
+                          {getStatusIcon(status)}
+                        </button>
+                      ))}
                     </div>
-                  </CardContent>
-                </Card>
-              ))
-            ) : (
-              /* Standard Inspection - show flat list */
-              items.map((item) => (
-                <Card key={item.id}>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm">
-                      {item.item_number}. {item.item_description}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {canEdit ? (
-                      <div className="flex items-center justify-center gap-3">
-                        {(['ok', 'defect', 'na'] as InspectionStatus[]).map((status) => (
-                          <button
-                            key={status}
-                            type="button"
-                            onClick={() => updateItem(item.item_number, 'status', status)}
-                            className={`flex flex-col items-center justify-center w-20 h-20 rounded border-2 transition-all ${
-                              getStatusColor(status, item.status === status)
-                            }`}
-                          >
-                            {getStatusIcon(status)}
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center py-4">
-                        {getStatusIcon(item.status)}
-                      </div>
-                    )}
-                    {canEdit ? (
-                      <Input
-                        value={item.comments || ''}
-                        onChange={(e) => updateItem(item.item_number, 'comments', e.target.value)}
-                        placeholder={item.status === 'attention' ? 'Required for defects' : 'Optional notes'}
-                        className={item.status === 'attention' && !item.comments ? 'border-red-300' : ''}
-                      />
-                    ) : (
-                      item.comments && (
-                        <p className="text-sm text-muted-foreground">{item.comments}</p>
-                      )
-                    )}
-                    {/* Only show photo upload for defective items */}
-                    {item.status === 'attention' && (
-                      <InspectionPhotoTiles
-                        photos={getPhotosForItem(item.item_number, item.day_of_week)}
-                        onManage={
-                          canEdit
-                            ? () => setPhotoUploadItem({ itemNumber: item.item_number, dayOfWeek: item.day_of_week })
-                            : undefined
-                        }
-                        title={`Item #${item.item_number} photos`}
-                        description={`Uploaded photos for ${item.item_description}.`}
-                        emptyLabel="Add / View Photos"
-                        emptyHint="No photos saved yet"
-                        manageLabel="Add / View"
-                      />
-                    )}
-                  </CardContent>
-                </Card>
-              ))
-            )}
+                  ) : (
+                    <div className="flex items-center justify-center py-4">
+                      {getStatusIcon(item.status)}
+                    </div>
+                  )}
+                  {canEdit ? (
+                    <Input
+                      value={item.comments || ''}
+                      onChange={(e) => updateItem(item.item_number, 'comments', e.target.value)}
+                      placeholder={item.status === 'attention' ? 'Required for defects' : 'Optional notes'}
+                      className={item.status === 'attention' && !item.comments ? 'border-red-300' : ''}
+                    />
+                  ) : (
+                    item.comments && (
+                      <p className="text-sm text-muted-foreground">{item.comments}</p>
+                    )
+                  )}
+                  {/* Only show photo upload for defective items */}
+                  {item.status === 'attention' && (
+                    <InspectionPhotoTiles
+                      photos={getPhotosForItem(item.item_number, item.day_of_week)}
+                      onManage={
+                        canEdit
+                          ? () => setPhotoUploadItem({ itemNumber: item.item_number, dayOfWeek: item.day_of_week })
+                          : undefined
+                      }
+                      title={`Item #${item.item_number} photos`}
+                      description={`Uploaded photos for ${item.item_description}.`}
+                      emptyLabel="Add / View Photos"
+                      emptyHint="No photos saved yet"
+                      manageLabel="Add / View"
+                    />
+                  )}
+                </CardContent>
+              </Card>
+            ))}
           </div>
 
           {/* Action Buttons */}

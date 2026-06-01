@@ -4943,6 +4943,50 @@ export type Database = {
         Relationships: [
         ]
       }
+      service_health_events: {
+        Row: {
+          id: string
+          service: string
+          status: 'active' | 'recovered'
+          outage_started_at: string
+          outage_last_seen_at: string
+          recovered_at: string | null
+          recovery_error_log_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          service: string
+          status?: 'active' | 'recovered'
+          outage_started_at: string
+          outage_last_seen_at: string
+          recovered_at?: string | null
+          recovery_error_log_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          service?: string
+          status?: 'active' | 'recovered'
+          outage_started_at?: string
+          outage_last_seen_at?: string
+          recovered_at?: string | null
+          recovery_error_log_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'service_health_events_recovery_error_log_id_fkey'
+            columns: ['recovery_error_log_id']
+            isOneToOne: false
+            referencedRelation: 'error_logs'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       suggestion_updates: {
         Row: {
           id: string

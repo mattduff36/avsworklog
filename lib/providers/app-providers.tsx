@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/react';
 import dynamic from 'next/dynamic';
 import { Toaster } from '@/components/ui/sonner';
 import { PwaShellBridge } from '@/components/layout/PwaShellBridge';
+import { DatabaseOutageBlocker } from '@/components/system/DatabaseOutageBlocker';
 import { AuthProvider } from '@/lib/providers/auth-provider';
 import { QueryProvider } from '@/lib/providers/query-provider';
 
@@ -31,6 +32,7 @@ export function AppProviders({ children, shouldLoadAnalytics }: AppProvidersProp
       <QueryProvider>
         <AuthProvider>
           {children}
+          <DatabaseOutageBlocker />
           <Toaster />
           {shouldLoadAnalytics ? <Analytics /> : null}
         </AuthProvider>

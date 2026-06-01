@@ -294,7 +294,7 @@ function NewInspectionContent() {
         return null;
       }
       if (!user || !selectedEmployeeId || !vehicleId) {
-        if (!silent) toast.error('Select a vehicle, employee and week before adding photos', {
+        if (!silent) toast.error('Select a vehicle, employee and inspection date before adding photos', {
           id: 'van-inspections-new-validation-photos-core-fields',
         });
         return null;
@@ -1947,6 +1947,7 @@ function NewInspectionContent() {
             assetType: 'van',
             assetId: vehicleId,
             assignedTo: selectedEmployeeId,
+            draftInspectionId: inspection.id,
           });
         } catch (reminderError) {
           console.error('Error completing reminder after van daily check submission:', reminderError);
@@ -2396,7 +2397,7 @@ function NewInspectionContent() {
         </CardContent>
       </Card>
 
-      {/* Safety Check - shown once van and week ending are selected */}
+      {/* Safety Check - shown once van and inspection date are selected */}
       {vehicleId && weekEnding && (
       <Card className="">
         <CardHeader className="pb-3">

@@ -5,7 +5,7 @@ import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { mapReminderActionWithAsset } from '@/lib/server/reminders/generate-fleet-inspection-actions';
 import { getReminderActionRequiredModule } from '@/lib/utils/reminder-action-permissions';
-import { getReminderTaskLink, getReminderTaskName } from '@/lib/utils/reminder-task-links';
+import { getReminderTaskLinkForAction, getReminderTaskName } from '@/lib/utils/reminder-task-links';
 import type { ReminderWithAction } from '@/types/reminders';
 
 function uniqueValues(values: Array<string | null | undefined>): string[] {
@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
         moduleAccessByName.set(requiredModule, hasTaskAccess);
       }
 
-      const taskLink = hasTaskAccess ? getReminderTaskLink(action.asset_type) : null;
+      const taskLink = hasTaskAccess ? getReminderTaskLinkForAction(action) : null;
 
       reminders.push({
         ...row,

@@ -1,5 +1,9 @@
 import { createAdminClient } from '@/lib/supabase/admin';
-import { FLEET_INSPECTION_OVERDUE_WORKFLOW_KEY } from '@/lib/config/reminder-workflows';
+import {
+  FLEET_INSPECTION_OVERDUE_WORKFLOW_KEY,
+  VAN_DRAFT_SUBMISSION_WORKFLOW_KEY,
+} from '@/lib/config/reminder-workflows';
+import { getVanDraftSubmissionDedupeKey } from '@/lib/utils/van-draft-submission-reminders';
 import type { ReminderAssetType } from '@/types/reminders';
 
 type AdminClient = ReturnType<typeof createAdminClient>;
@@ -17,6 +21,14 @@ export interface CompleteReminderActionResult {
   actionedCount: number;
   cancelledCount: number;
   actionIds: string[];
+}
+
+export interface CompleteVanDraftSubmissionReminderInput {
+  admin: AdminClient;
+  draftInspectionId: string;
+  assignedTo: string;
+  actionedBy: string;
+  nowIso?: string;
 }
 
 export function getReminderAssetIdColumn(assetType: ReminderAssetType): 'van_id' | 'plant_id' | 'hgv_id' {
@@ -97,5 +109,76 @@ export async function completeReminderActionForAsset({
     actionedCount: (actionedRows || []).length,
     cancelledCount: (cancelledRows || []).length,
     actionIds: completedActionIds,
+  };
+}
+
+export async function completeVanDraftSubmissionReminder({
+  admin,
+  draftInspectionId,
+  assignedTo,
+  actionedBy,
+  nowIso = new Date().toISOString(),
+}: CompleteVanDraftSubmissionReminderInput): Promise<CompleteReminderActionResult> {
+  const { data: action, error: actionError } = await admin
+    .from('reminder_actions')
+    .select('id')
+    .eq('workflow_key', VAN_DRAFT_SUBMISSION_WORKFLOW_KEY)
+    .eq('dedupe_key', getVanDraftSubmissionDedupeKey(draftInspectionId))
+    .eq('status', 'open')
+    .maybeSingle();
+
+  if (actionError) throw actionError;
+
+  if (!action) {
+    return {
+      actionedCount: 0,
+      cancelledCount: 0,
+      actionIds: [],
+    };
+  }
+
+  const { data: actionedRows, error: actionedError } = await admin
+    .from('reminders')
+    .update({
+      status: 'actioned',
+      action_note: 'Completed by signed draft van daily check submission.',
+      actioned_at: nowIso,
+      actioned_by: actionedBy,
+      cancelled_at: null,
+      updated_at: nowIso,
+    })
+    .eq('action_id', action.id)
+    .eq('assigned_to', assignedTo)
+    .eq('status', 'pending')
+    .select('id');
+
+  if (actionedError) throw actionedError;
+
+  const actionedCount = (actionedRows || []).length;
+  if (actionedCount === 0) {
+    return {
+      actionedCount: 0,
+      cancelledCount: 0,
+      actionIds: [action.id],
+    };
+  }
+
+  const { error: resolveError } = await admin
+    .from('reminder_actions')
+    .update({
+      status: 'resolved',
+      resolved_at: nowIso,
+      resolved_by: actionedBy,
+      last_detected_at: nowIso,
+      updated_at: nowIso,
+    })
+    .eq('id', action.id);
+
+  if (resolveError) throw resolveError;
+
+  return {
+    actionedCount,
+    cancelledCount: 0,
+    actionIds: [action.id],
   };
 }

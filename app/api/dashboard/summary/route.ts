@@ -28,6 +28,7 @@ import {
   DASHBOARD_FLEET_INSPECTION_REFRESH_INTERVAL_MS,
   ensureFleetInspectionReminderActionsFresh,
 } from '@/lib/server/reminders/ensure-fleet-inspection-actions-fresh';
+import { DEBUG_ERROR_LOG_HIDDEN_ADMIN_EMAIL } from '@/lib/utils/error-log-filters';
 
 type PermissionMap = Record<(typeof ALL_MODULES)[number], boolean>;
 
@@ -493,7 +494,11 @@ export async function GET() {
     canAccessDebugTools
       ? resolveCountMetric(
           'error logs',
-          supabase.from('error_logs').select('id', { count: 'exact', head: true })
+          supabase
+            .from('error_logs')
+            .select('id', { count: 'exact', head: true })
+            .or('page_url.is.null,page_url.not.ilike.%localhost%')
+            .or(`user_email.is.null,user_email.neq.${DEBUG_ERROR_LOG_HIDDEN_ADMIN_EMAIL}`)
         )
       : Promise.resolve({ count: 0, error: null }),
     canViewMaintenance

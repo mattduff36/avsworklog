@@ -6,6 +6,7 @@ import {
 } from '@supabase/supabase-js'
 import { loadClientAuthSession, type ClientAuthSessionResponse } from '@/lib/app-auth/client-session'
 import { handleAuthFailureStatus } from '@/lib/app-auth/recovery-bridge'
+import { markDatabaseBackedSuccess, nudgeDatabaseHealthCheck } from '@/lib/database/client-health'
 import { getViewAsRoleId, getViewAsTeamId } from '@/lib/utils/view-as-cookie'
 import { withAuthOverrides } from '@/lib/supabase/with-auth-overrides'
 import { createStatusError, getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error'
@@ -160,6 +161,12 @@ export function createClient(): BrowserSupabaseClient {
 
           if (isAuthErrorStatus(response.status)) {
             void handleAuthFailureStatus(response.status, { fallbackToRedirect: false })
+          }
+
+          if (response.ok) {
+            markDatabaseBackedSuccess()
+          } else if (response.status >= 500) {
+            nudgeDatabaseHealthCheck()
           }
 
           return response

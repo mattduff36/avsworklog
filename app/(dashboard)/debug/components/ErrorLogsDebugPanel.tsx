@@ -27,6 +27,12 @@ import {
   XCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  DEFAULT_ERROR_LOG_FILTERS,
+  isHiddenAdminErrorLog,
+  isLocalhostErrorLog,
+  isVisibleWithDefaultErrorLogFilters,
+} from '@/lib/utils/error-log-filters';
 import { ErrorLogEntry } from '../types';
 
 type ErrorSeverity = 'urgent' | 'important' | 'medium' | 'low';
@@ -239,8 +245,8 @@ export function ErrorLogsDebugPanel() {
   const lastNotifiedErrorIdRef = useRef<string | null>(null);
   const clearAllConfirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [filterLocalhost, setFilterLocalhost] = useState(true);
-  const [filterAdminAccount, setFilterAdminAccount] = useState(true);
+  const [filterLocalhost, setFilterLocalhost] = useState<boolean>(DEFAULT_ERROR_LOG_FILTERS.hideLocalhost);
+  const [filterAdminAccount, setFilterAdminAccount] = useState<boolean>(DEFAULT_ERROR_LOG_FILTERS.hideAdminAccount);
   const [filterErrorType, setFilterErrorType] = useState<string>('all');
   const [filterDeviceType, setFilterDeviceType] = useState<string>('all');
   const [filterComponent, setFilterComponent] = useState<string>('all');
@@ -464,12 +470,16 @@ ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional
   const getFilteredErrorLogs = () => {
     let filtered = [...errorLogs];
 
-    if (filterLocalhost) {
-      filtered = filtered.filter((log) => !log.page_url.toLowerCase().includes('localhost'));
-    }
+    if (filterLocalhost && filterAdminAccount) {
+      filtered = filtered.filter(isVisibleWithDefaultErrorLogFilters);
+    } else {
+      if (filterLocalhost) {
+        filtered = filtered.filter((log) => !isLocalhostErrorLog(log));
+      }
 
-    if (filterAdminAccount) {
-      filtered = filtered.filter((log) => log.user_email !== 'admin@mpdee.co.uk');
+      if (filterAdminAccount) {
+        filtered = filtered.filter((log) => !isHiddenAdminErrorLog(log));
+      }
     }
 
     if (filterErrorType !== 'all') {

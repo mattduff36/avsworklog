@@ -3,12 +3,9 @@ import { createClient } from '@/lib/supabase/server';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { PDFDocument } from 'pdf-lib';
 import JSZip from 'jszip';
-import { InspectionPDF } from '@/lib/pdf/inspection-pdf';
 import { VanInspectionPDF } from '@/lib/pdf/van-inspection-pdf';
 import { PlantInspectionPDF } from '@/lib/pdf/plant-inspection-pdf';
 import { HgvInspectionPDF } from '@/lib/pdf/hgv-inspection-pdf';
-import { isVanCategory } from '@/lib/checklists/vehicle-checklists';
-import { getVehicleCategoryName } from '@/lib/utils/deprecation-logger';
 import type { VanInspection } from '@/types/inspection';
 import type { InspectionItem } from '@/types/inspection';
 import type { ModuleName } from '@/types/roles';
@@ -122,25 +119,12 @@ async function getScopedModuleProfileIds(
 }
 
 function resolveVanTemplate(inspection: VanInspectionWithRelations, items: InspectionItem[]) {
-  const vehicleType = getVehicleCategoryName({
-    van_categories: inspection.vehicle?.van_categories ?? null,
-    vehicle_type: inspection.vehicle?.vehicle_type ?? null,
+  return VanInspectionPDF({
+    inspection: inspection as unknown as VanInspection,
+    items,
+    vehicleReg: inspection.vehicle?.reg_number || undefined,
+    employeeName: inspection.profile?.full_name || undefined,
   });
-  const useVanTemplate = isVanCategory(vehicleType);
-
-  return useVanTemplate
-    ? VanInspectionPDF({
-        inspection: inspection as unknown as VanInspection,
-        items,
-        vehicleReg: inspection.vehicle?.reg_number || undefined,
-        employeeName: inspection.profile?.full_name || undefined,
-      })
-    : InspectionPDF({
-        inspection: inspection as unknown as VanInspection,
-        items,
-        vehicleReg: inspection.vehicle?.reg_number || undefined,
-        employeeName: inspection.profile?.full_name || undefined,
-      });
 }
 
 function resolvePlantTemplate(

@@ -4,12 +4,14 @@ interface CompleteInspectionReminderInput {
   assetType: ReminderAssetType;
   assetId: string;
   assignedTo: string;
+  draftInspectionId?: string;
 }
 
 export async function completeInspectionReminder({
   assetType,
   assetId,
   assignedTo,
+  draftInspectionId,
 }: CompleteInspectionReminderInput): Promise<void> {
   const response = await fetch('/api/reminders/complete-inspection-action', {
     method: 'POST',
@@ -20,6 +22,7 @@ export async function completeInspectionReminder({
       assetType,
       assetId,
       assignedTo,
+      draftInspectionId,
     }),
   });
 

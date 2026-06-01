@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { renderToStream } from '@react-pdf/renderer';
-import { InspectionPDF } from '@/lib/pdf/inspection-pdf';
 import { VanInspectionPDF } from '@/lib/pdf/van-inspection-pdf';
-import { isVanCategory } from '@/lib/checklists/vehicle-checklists';
 import { getProfileWithRole } from '@/lib/utils/permissions';
-import { getVehicleCategoryName } from '@/lib/utils/deprecation-logger';
 import { logServerError } from '@/lib/utils/server-error-logger';
 
 export const runtime = 'nodejs';
@@ -91,28 +88,13 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    // Determine which PDF template to use based on vehicle category
     type InspectionWithVehicle = { vehicle?: { van_categories?: { name: string } | null; vehicle_type?: string | null; reg_number?: string }; profile?: { full_name?: string } };
-const vehicle = (inspection as InspectionWithVehicle).vehicle;
-const vehicleType = getVehicleCategoryName(vehicle ?? {});
-    const useVanTemplate = isVanCategory(vehicleType);
-    
-    console.log(`PDF Generation - Vehicle Type: ${vehicleType}, Using Van Template: ${useVanTemplate}`);
-    
-    // Generate PDF using the appropriate template
-    const pdfComponent = useVanTemplate
-      ? VanInspectionPDF({
-          inspection,
-          items,
-          vehicleReg: (inspection as InspectionWithVehicle).vehicle?.reg_number,
-          employeeName: (inspection as InspectionWithVehicle).profile?.full_name,
-        })
-      : InspectionPDF({
-          inspection,
-          items,
-          vehicleReg: (inspection as InspectionWithVehicle).vehicle?.reg_number,
-          employeeName: (inspection as InspectionWithVehicle).profile?.full_name,
-        });
+    const pdfComponent = VanInspectionPDF({
+      inspection,
+      items,
+      vehicleReg: (inspection as InspectionWithVehicle).vehicle?.reg_number,
+      employeeName: (inspection as InspectionWithVehicle).profile?.full_name,
+    });
     
     const stream = await renderToStream(pdfComponent);
 
