@@ -529,7 +529,17 @@ export function InventoryTable({
                     <span>Due: {getInventoryDueDate(item.last_checked_at, getInventoryCheckIntervalMonths(item))}</span>
                   ) : null}
                 </div>
-                <div className="mt-4 flex gap-2">
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {onOpenDetails ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(event) => { event.stopPropagation(); onOpenDetails(item); }}
+                      className="flex-1 border-inventory/50 text-inventory hover:bg-inventory/10"
+                    >
+                      View / Check
+                    </Button>
+                  ) : null}
                   {!retiredMode ? (
                     <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); onMove([item]); }} className="flex-1 border-slate-600">
                       Move
