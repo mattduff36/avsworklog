@@ -37,15 +37,17 @@ export async function ensureTestVanMaintenanceRecord(
     return;
   }
 
-  const { error: insertError } = await maintenanceClient
+  const { error: upsertError } = await maintenanceClient
     .from('vehicle_maintenance')
-    .insert({
+    .upsert({
       van_id: vanId,
       current_mileage: 0,
+    }, {
+      onConflict: 'van_id',
     });
 
-  if (insertError) {
-    throw insertError;
+  if (upsertError) {
+    throw upsertError;
   }
 }
 
@@ -68,15 +70,17 @@ export async function ensureTestHgvMaintenanceRecord(
     return;
   }
 
-  const { error: insertError } = await maintenanceClient
+  const { error: upsertError } = await maintenanceClient
     .from('vehicle_maintenance')
-    .insert({
+    .upsert({
       hgv_id: hgvId,
       current_mileage: 0,
+    }, {
+      onConflict: 'hgv_id',
     });
 
-  if (insertError) {
-    throw insertError;
+  if (upsertError) {
+    throw upsertError;
   }
 }
 
@@ -99,14 +103,16 @@ export async function ensureTestPlantMaintenanceRecord(
     return;
   }
 
-  const { error: insertError } = await maintenanceClient
+  const { error: upsertError } = await maintenanceClient
     .from('vehicle_maintenance')
-    .insert({
+    .upsert({
       plant_id: plantId,
+    }, {
+      onConflict: 'plant_id',
     });
 
-  if (insertError) {
-    throw insertError;
+  if (upsertError) {
+    throw upsertError;
   }
 }
 

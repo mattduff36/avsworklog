@@ -64,6 +64,11 @@ type OpenReminderActionRow = Pick<ReminderActionRow, 'id' | 'dedupe_key' | 'meta
   reminders?: Array<Pick<ReminderRow, 'id' | 'status'>> | null;
 };
 
+type OpenReminderInspectionMetadataRow = Pick<
+  ReminderActionRow,
+  'asset_type' | 'van_id' | 'plant_id' | 'hgv_id' | 'metadata'
+>;
+
 export interface FleetInspectionGenerationSummary {
   inserted: number;
   updated: number;
@@ -78,6 +83,7 @@ export interface FleetInspectionGenerationOptions {
 }
 
 const REMINDER_WORKFLOW_KEY = FLEET_INSPECTION_OVERDUE_WORKFLOW_KEY;
+const INSPECTION_LOOKUP_PAGE_SIZE = 1000;
 
 function getIsoDateOnly(value: Date): string {
   return value.toISOString().slice(0, 10);
@@ -177,7 +183,7 @@ function buildOpenActionRecord(
   };
 }
 
-async function loadLatestInspectionDates(
+export async function loadLatestInspectionDates(
   admin: AdminClient,
   tableName: 'van_inspections' | 'plant_inspections' | 'hgv_inspections',
   assetKey: 'van_id' | 'plant_id' | 'hgv_id',
@@ -187,32 +193,123 @@ async function loadLatestInspectionDates(
     return new Map<string, string>();
   }
 
+  const latestByAsset = new Map<string, string>();
+  let pageStart = 0;
+
+  while (true) {
+    const { data, error } = await admin
+      .from(tableName)
+      .select(`${assetKey}, inspection_date`)
+      .eq('status', 'submitted')
+      .in(assetKey, assetIds)
+      .order(assetKey, { ascending: true })
+      .order('inspection_date', { ascending: false })
+      .range(pageStart, pageStart + INSPECTION_LOOKUP_PAGE_SIZE - 1);
+
+    if (error) {
+      throw error;
+    }
+
+    const rows = (data || []) as Array<Record<string, string | null>>;
+    for (const row of rows) {
+      const assetId = row[assetKey];
+      if (!assetId || latestByAsset.has(assetId)) {
+        continue;
+      }
+
+      const lastSubmittedAt = row.inspection_date;
+      if (lastSubmittedAt) {
+        latestByAsset.set(assetId, lastSubmittedAt);
+      }
+    }
+
+    if (rows.length < INSPECTION_LOOKUP_PAGE_SIZE) {
+      break;
+    }
+
+    pageStart += INSPECTION_LOOKUP_PAGE_SIZE;
+  }
+
+  return latestByAsset;
+}
+
+function getActionAssetId(action: OpenReminderInspectionMetadataRow): string | null {
+  if (action.asset_type === 'van') return action.van_id;
+  if (action.asset_type === 'plant') return action.plant_id;
+  if (action.asset_type === 'hgv') return action.hgv_id;
+  return null;
+}
+
+export async function hasOpenFleetInspectionActionsWithStaleInspectionMetadata(
+  admin: AdminClient,
+  params: {
+    thresholdDays: number;
+    today: Date;
+  },
+): Promise<boolean> {
   const { data, error } = await admin
-    .from(tableName)
-    .select(`${assetKey}, inspection_date, inspection_end_date, status`)
-    .eq('status', 'submitted')
-    .in(assetKey, assetIds)
-    .order(assetKey, { ascending: true })
-    .order('inspection_date', { ascending: false });
+    .from('reminder_actions')
+    .select('asset_type, van_id, plant_id, hgv_id, metadata')
+    .eq('workflow_key', REMINDER_WORKFLOW_KEY)
+    .eq('status', 'open');
 
   if (error) {
     throw error;
   }
 
-  const latestByAsset = new Map<string, string>();
-  for (const row of (data || []) as Array<Record<string, string | null>>) {
-    const assetId = row[assetKey];
-    if (!assetId || latestByAsset.has(assetId)) {
+  const actions = (data || []) as OpenReminderInspectionMetadataRow[];
+  const assetIdsByType = actions.reduce(
+    (accumulator, action) => {
+      const assetId = getActionAssetId(action);
+      if (assetId && action.asset_type) {
+        accumulator[action.asset_type].add(assetId);
+      }
+      return accumulator;
+    },
+    {
+      van: new Set<string>(),
+      plant: new Set<string>(),
+      hgv: new Set<string>(),
+    },
+  );
+
+  const [vanLatest, plantLatest, hgvLatest] = await Promise.all([
+    loadLatestInspectionDates(admin, 'van_inspections', 'van_id', Array.from(assetIdsByType.van)),
+    loadLatestInspectionDates(admin, 'plant_inspections', 'plant_id', Array.from(assetIdsByType.plant)),
+    loadLatestInspectionDates(admin, 'hgv_inspections', 'hgv_id', Array.from(assetIdsByType.hgv)),
+  ]);
+
+  for (const action of actions) {
+    const assetId = getActionAssetId(action);
+    if (!assetId) {
       continue;
     }
 
-    const lastSubmittedAt = row.inspection_date;
-    if (lastSubmittedAt) {
-      latestByAsset.set(assetId, lastSubmittedAt);
+    const latestByAsset = action.asset_type === 'van'
+      ? vanLatest
+      : action.asset_type === 'plant'
+        ? plantLatest
+        : hgvLatest;
+    const latestSubmittedAt = latestByAsset.get(assetId);
+    if (!latestSubmittedAt) {
+      continue;
+    }
+
+    const latestSubmittedDate = new Date(latestSubmittedAt);
+    const normalizedLatestSubmittedAt = Number.isNaN(latestSubmittedDate.getTime())
+      ? latestSubmittedAt
+      : getIsoDateOnly(latestSubmittedDate);
+    const previousLastSubmittedAt = getJsonStringValue(action.metadata, 'last_submitted_inspection_date');
+    const daysOverdue = Number.isNaN(latestSubmittedDate.getTime())
+      ? params.thresholdDays
+      : getDaysBetween(params.today, latestSubmittedDate);
+
+    if (previousLastSubmittedAt !== normalizedLatestSubmittedAt || daysOverdue < params.thresholdDays) {
+      return true;
     }
   }
 
-  return latestByAsset;
+  return false;
 }
 
 async function loadOverdueAssets(
@@ -445,6 +542,7 @@ export async function generateFleetInspectionReminderActions(
         status: 'resolved',
         resolved_at: nowIso,
         last_detected_at: nowIso,
+        updated_at: nowIso,
       })
       .in('id', actionIdsToResolve);
 

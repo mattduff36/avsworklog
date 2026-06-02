@@ -1,8 +1,12 @@
 import { createAdminClient } from '@/lib/supabase/admin';
-import { generateFleetInspectionReminderActions, type FleetInspectionGenerationSummary } from './generate-fleet-inspection-actions';
+import {
+  generateFleetInspectionReminderActions,
+  hasOpenFleetInspectionActionsWithStaleInspectionMetadata,
+  type FleetInspectionGenerationSummary,
+} from './generate-fleet-inspection-actions';
 import { loadFleetInspectionWorkflowSettings } from './fleet-inspection-workflow-settings';
 
-export const ACTIONS_PAGE_FLEET_INSPECTION_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+export const ACTIONS_PAGE_FLEET_INSPECTION_REFRESH_INTERVAL_MS = 0;
 export const DASHBOARD_FLEET_INSPECTION_REFRESH_INTERVAL_MS = 15 * 60 * 1000;
 
 export interface FleetInspectionFreshnessResult {
@@ -36,19 +40,26 @@ export async function ensureFleetInspectionReminderActionsFresh(params: {
 
   const lastGeneratedAt = settings.last_generated_at;
   const lastGeneratedDate = lastGeneratedAt ? new Date(lastGeneratedAt) : null;
-  const hasFreshGeneration = Boolean(
+  const hasFreshGeneration = params.staleAfterMs > 0 && Boolean(
     lastGeneratedDate &&
       isValidDate(lastGeneratedDate) &&
       now.getTime() - lastGeneratedDate.getTime() < params.staleAfterMs,
   );
 
   if (hasFreshGeneration) {
-    return {
-      refreshed: false,
-      reason: 'fresh',
-      lastGeneratedAt,
-      summary: null,
-    };
+    const hasStaleInspectionMetadata = await hasOpenFleetInspectionActionsWithStaleInspectionMetadata(admin, {
+      thresholdDays: settings.config.overdue_days_threshold,
+      today: now,
+    });
+
+    if (!hasStaleInspectionMetadata) {
+      return {
+        refreshed: false,
+        reason: 'fresh',
+        lastGeneratedAt,
+        summary: null,
+      };
+    }
   }
 
   const summary = await generateFleetInspectionReminderActions({ admin, nowIso });

@@ -76,6 +76,7 @@ function buildQuoteBundle(overrides: Partial<QuoteBundle['quote']> = {}): QuoteB
     invoiceRequests: [],
     versions: [],
     timeline: [],
+    selectedSecondaryContacts: [],
     invoiceSummary: {
       invoicedTotal: 0,
       pendingRequestedTotal: 0,
@@ -150,6 +151,54 @@ describe('sendQuoteToCustomerEmail', () => {
       cc: ['manager-copy@avsquires.co.uk'],
       reply_to: 'sender@avsquires.co.uk',
       subject: 'Quotation Q-001 - Concrete repairs',
+    }));
+  });
+
+  it('sends selected secondary customer contacts as CC recipients', async () => {
+    const { sendQuoteToCustomerEmail } = await import('@/lib/server/quote-workflow');
+
+    const result = await sendQuoteToCustomerEmail(
+      {
+        ...buildQuoteBundle(),
+        selectedSecondaryContacts: [
+          {
+            id: 'contact-1',
+            customer_id: 'customer-1',
+            name: 'Chris CC',
+            job_title: null,
+            email: 'chris@example.com',
+            phone: null,
+            created_at: '2026-06-02T10:00:00.000Z',
+            updated_at: '2026-06-02T10:00:00.000Z',
+            created_by: null,
+            updated_by: null,
+          },
+          {
+            id: 'contact-2',
+            customer_id: 'customer-1',
+            name: 'No Email',
+            job_title: null,
+            email: null,
+            phone: null,
+            created_at: '2026-06-02T10:00:00.000Z',
+            updated_at: '2026-06-02T10:00:00.000Z',
+            created_by: null,
+            updated_by: null,
+          },
+        ],
+      },
+      ['manager-copy@avsquires.co.uk', 'chris@example.com'],
+      'sender@avsquires.co.uk'
+    );
+
+    expect(result).toEqual({ success: true });
+
+    const [, init] = vi.mocked(global.fetch).mock.calls[0];
+    const body = JSON.parse(String(init?.body));
+
+    expect(body).toEqual(expect.objectContaining({
+      to: ['alex@example.com'],
+      cc: ['chris@example.com', 'manager-copy@avsquires.co.uk'],
     }));
   });
 });

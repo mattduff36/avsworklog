@@ -14,6 +14,12 @@ import {
   sendQuoteRamsRequestEmail,
   sendQuoteToCustomerEmail,
 } from '@/lib/server/quote-workflow';
+import {
+  copyQuoteCustomerContactRecipients,
+  normalizeSecondaryContactIds,
+  replaceQuoteCustomerContactRecipients,
+  validateSecondaryContactIdsForCustomer,
+} from '@/lib/server/quote-recipient-contacts';
 import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
 
 type QuoteFieldErrors = Record<string, string>;
@@ -43,6 +49,18 @@ function isMeaningfulLineItem(item: { description?: string; unit?: string; quant
     || Number(item.unit_rate || 0) !== 0
     || Number(item.quantity || 1) !== 1
   );
+}
+
+function getCustomerRecipientDescription(primaryEmail: string, secondaryContacts: Array<{ email: string | null }>) {
+  const ccEmails = Array.from(new Set(
+    secondaryContacts
+      .map(contact => contact.email?.trim())
+      .filter((email): email is string => Boolean(email))
+  ));
+
+  return ccEmails.length > 0
+    ? `${primaryEmail} with customer CC ${ccEmails.join(', ')}`
+    : primaryEmail;
 }
 
 interface RouteParams {
@@ -97,7 +115,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (sensitiveAccessResponse) return sensitiveAccessResponse;
 
     const body = await request.json();
-    const { action, line_items, manager_profile_id, approver_profile_id, ...quoteUpdates } = body as {
+    const { action, line_items, manager_profile_id, approver_profile_id, secondary_contact_ids, ...quoteUpdates } = body as {
       action?: string;
       manager_profile_id?: string;
       approver_profile_id?: string;
@@ -114,6 +132,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       estimated_duration_days?: number | null;
       pricing_mode?: 'itemized' | 'attachments_only';
       rams_comments?: string | null;
+      secondary_contact_ids?: unknown;
       [key: string]: unknown;
     };
 
@@ -133,12 +152,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const normalizedStartAlertDays = normalizeOptionalInteger(quoteUpdates.start_alert_days);
     const normalizedEstimatedDurationDays = normalizeOptionalInteger(quoteUpdates.estimated_duration_days);
     const pricingMode = quoteUpdates.pricing_mode === 'attachments_only' ? 'attachments_only' : 'itemized';
+    const normalizedSecondaryContactIds = normalizeSecondaryContactIds(secondary_contact_ids);
 
     if (action === 'submit_for_approval' || action === 'confirm_and_send') {
       const customerEmail = current.quote.attention_email?.trim() || current.quote.customer?.contact_email?.trim() || '';
       if (!customerEmail) {
         return NextResponse.json(
-          { error: 'Add a customer contact email before confirming this quote.' },
+          { error: 'Add a primary customer contact email before confirming this quote.' },
           { status: 400 }
         );
       }
@@ -159,6 +179,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       if (!emailResult.success) {
         return NextResponse.json({ error: emailResult.error || 'Failed to send quote email' }, { status: 500 });
       }
+      const recipientDescription = getCustomerRecipientDescription(customerEmail, current.selectedSecondaryContacts);
 
       const now = new Date().toISOString();
       const { error } = await supabase
@@ -181,7 +202,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         quoteReference: current.quote.quote_reference,
         eventType: 'confirmed_and_sent',
         title: 'Confirmed and sent',
-        description: `Quote emailed to ${customerEmail}.`,
+        description: `Quote emailed to primary recipient ${recipientDescription}.`,
         fromStatus: current.quote.status,
         toStatus: 'sent',
         actorUserId: user.id,
@@ -225,7 +246,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       const customerEmail = current.quote.attention_email?.trim() || current.quote.customer?.contact_email?.trim() || '';
       if (!customerEmail) {
         return NextResponse.json(
-          { error: 'Add a customer contact email before sending this quote.' },
+          { error: 'Add a primary customer contact email before sending this quote.' },
           { status: 400 }
         );
       }
@@ -239,6 +260,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       if (!emailResult.success) {
         return NextResponse.json({ error: emailResult.error || 'Failed to send quote email' }, { status: 500 });
       }
+      const recipientDescription = getCustomerRecipientDescription(customerEmail, current.selectedSecondaryContacts);
 
       const now = new Date().toISOString();
       const { error } = await supabase
@@ -261,7 +283,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         quoteReference: current.quote.quote_reference,
         eventType: 'approved_and_sent',
         title: 'Approved and sent',
-        description: `Quote emailed to ${customerEmail}.`,
+        description: `Quote emailed to primary recipient ${recipientDescription}.`,
         fromStatus: current.quote.status,
         toStatus: 'sent',
         actorUserId: user.id,
@@ -478,6 +500,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       };
 
       delete (insertPayload as { customer?: unknown }).customer;
+      delete (insertPayload as { selected_secondary_contact_ids?: unknown }).selected_secondary_contact_ids;
+      delete (insertPayload as { selected_secondary_contacts?: unknown }).selected_secondary_contacts;
 
       const { error: insertError } = await supabase
         .from('quotes')
@@ -509,6 +533,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
         if (lineError) throw lineError;
       }
+
+      await copyQuoteCustomerContactRecipients(
+        supabase,
+        newQuoteId,
+        current.selectedSecondaryContacts,
+        user.id
+      );
 
       await appendQuoteTimelineEvent(admin, {
         quoteId: newQuoteId,
@@ -544,6 +575,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         ? approver_profile_id.trim()
         : null;
       const customerId = typeof quoteUpdates.customer_id === 'string' ? quoteUpdates.customer_id.trim() : '';
+      const recipientCustomerId = customerId || current.quote.customer_id;
 
       if ('customer_id' in quoteUpdates && !customerId) {
         fieldErrors.customer_id = 'Select a customer.';
@@ -578,6 +610,17 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
             fieldErrors[`line_items.${item.originalIndex}.description`] = 'Enter a description for this line item.';
           }
         });
+      }
+
+      if (
+        (typeof secondary_contact_ids !== 'undefined' || 'customer_id' in quoteUpdates)
+        && recipientCustomerId
+        && normalizedSecondaryContactIds.length > 0
+      ) {
+        Object.assign(
+          fieldErrors,
+          await validateSecondaryContactIdsForCustomer(admin, recipientCustomerId, normalizedSecondaryContactIds)
+        );
       }
 
       if (Object.keys(fieldErrors).length > 0) {
@@ -748,6 +791,25 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
           const { error: lineInsertError } = await supabase.from('quote_line_items').insert(rows);
           if (lineInsertError) throw lineInsertError;
+        }
+      }
+
+      if (typeof secondary_contact_ids !== 'undefined' || 'customer_id' in quoteUpdates) {
+        const recipientFieldErrors = await replaceQuoteCustomerContactRecipients(
+          supabase,
+          id,
+          recipientCustomerId,
+          normalizedSecondaryContactIds,
+          user.id
+        );
+        if (Object.keys(recipientFieldErrors).length > 0) {
+          return NextResponse.json(
+            {
+              error: 'Please correct the highlighted fields and try again.',
+              field_errors: recipientFieldErrors,
+            },
+            { status: 400 }
+          );
         }
       }
 

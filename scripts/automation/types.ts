@@ -67,6 +67,8 @@ export interface AutomationReviewSummary {
   suggestions: AutomationReviewSuggestion[];
   monthlyReviewPath?: string;
   monthlyPromptPath?: string;
+  monthlySuggestionsPath?: string;
+  monthlyReview?: AutomationReviewArtifacts;
   advisorReviewPath?: string;
   monthlyReviewGenerated: boolean;
 }
@@ -103,6 +105,9 @@ export interface AutomationMemorySuggestion {
   lastSeenMonth: string;
   status: AutomationSuggestionStatus;
   statusReason?: string;
+  decisionAt?: string;
+  decisionReason?: string;
+  planPath?: string;
   implementedAt?: string;
   outcome?: AutomationSuggestionOutcome;
   source: 'deterministic' | 'advisor';
@@ -155,9 +160,12 @@ export interface AutomationMemory {
 }
 
 export interface AutomationReviewArtifacts {
+  monthKey: string;
   reviewPath: string;
   promptPath: string;
   metricsPath: string;
   suggestionsPath: string;
+  suggestions: AutomationMemorySuggestion[];
+  knowledgeDirectory: string;
   advisorReviewPath?: string;
 }

@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
+import {
+  fetchSecondaryContactsByCustomerId,
+  normalizeCustomerPayload,
+  replaceCustomerSecondaryContacts,
+} from '@/lib/server/customer-contacts';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -30,8 +35,14 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       }
       throw error;
     }
+    const contactsByCustomerId = await fetchSecondaryContactsByCustomerId(supabase, [id]);
 
-    return NextResponse.json({ customer: data });
+    return NextResponse.json({
+      customer: {
+        ...data,
+        secondary_contacts: contactsByCustomerId.get(id) || [],
+      },
+    });
   } catch (error) {
     console.error('Error fetching customer:', error);
     return NextResponse.json({ error: 'Failed to fetch customer' }, { status: 500 });
@@ -51,17 +62,35 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (sensitiveAccessResponse) return sensitiveAccessResponse;
 
     const body = await request.json();
+    const normalized = normalizeCustomerPayload(body);
+
+    if (Object.keys(normalized.fieldErrors).length > 0) {
+      return NextResponse.json(
+        {
+          error: 'Please correct the highlighted fields and try again.',
+          field_errors: normalized.fieldErrors,
+        },
+        { status: 400 }
+      );
+    }
 
     const { data, error } = await supabase
       .from('customers')
-      .update({ ...body, updated_by: user.id })
+      .update({ ...normalized.customer, updated_by: user.id })
       .eq('id', id)
       .select()
       .single();
 
     if (error) throw error;
+    await replaceCustomerSecondaryContacts(supabase, id, normalized.secondaryContacts, user.id);
+    const contactsByCustomerId = await fetchSecondaryContactsByCustomerId(supabase, [id]);
 
-    return NextResponse.json({ customer: data });
+    return NextResponse.json({
+      customer: {
+        ...data,
+        secondary_contacts: contactsByCustomerId.get(id) || [],
+      },
+    });
   } catch (error) {
     console.error('Error updating customer:', error);
     return NextResponse.json({ error: 'Failed to update customer' }, { status: 500 });

@@ -1,6 +1,7 @@
 import { spawnSync } from 'child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import path from 'path';
+import { runMonthlyAutomationFollowUp } from './monthly-follow-up';
 import { formatReviewForConsole, reviewAutomationRun } from './self-review';
 import type {
   AutomationCommandResult,
@@ -285,7 +286,7 @@ export class AutomationRun {
     return { status: result.status, stdout, stderr };
   }
 
-  finish(status: AutomationRunStatus, error?: unknown): void {
+  async finish(status: AutomationRunStatus, error?: unknown): Promise<void> {
     const endedAt = new Date();
     const artifacts = this.log.expectedArtifacts.map((artifact) => ({
       path: artifact.path,
@@ -312,5 +313,34 @@ export class AutomationRun {
     writeFileSync(this.markdownPath, renderMarkdown(reviewedLog), 'utf8');
     console.log(formatReviewForConsole(review));
     console.log(`Automation log written: ${path.relative(REPO_ROOT, this.markdownPath)}`);
+
+    if (review.monthlyReviewGenerated && review.monthlyReview && review.monthlyReview.suggestions.length > 0) {
+      try {
+        await runMonthlyAutomationFollowUp({
+          scriptName: review.scriptName,
+          monthKey: review.monthlyReview.monthKey,
+          reviewPath: review.monthlyReview.reviewPath,
+          suggestionsPath: review.monthlyReview.suggestionsPath,
+          suggestions: review.monthlyReview.suggestions,
+          knowledgeDirectory: review.monthlyReview.knowledgeDirectory,
+          repoRoot: REPO_ROOT,
+        });
+      } catch (followUpError) {
+        try {
+          writeFileSync(
+            review.monthlyReview.suggestionsPath,
+            JSON.stringify(review.monthlyReview.suggestions, null, 2),
+            'utf8'
+          );
+        } catch {
+          // Best effort only; the main workflow has already completed.
+        }
+        console.warn(
+          `Automation monthly follow-up skipped: ${redactSensitiveText(
+            followUpError instanceof Error ? followUpError.message : String(followUpError)
+          )}`
+        );
+      }
+    }
   }
 }

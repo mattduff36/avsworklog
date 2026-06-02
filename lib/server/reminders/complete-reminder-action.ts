@@ -82,15 +82,6 @@ export async function completeReminderActionForAsset({
 
   if (actionedError) throw actionedError;
 
-  const completedActionIds = Array.from(new Set((actionedRows || []).map((row) => row.action_id)));
-  if (completedActionIds.length === 0) {
-    return {
-      actionedCount: 0,
-      cancelledCount: 0,
-      actionIds,
-    };
-  }
-
   const { data: cancelledRows, error: cancelledError } = await admin
     .from('reminders')
     .update({
@@ -98,17 +89,29 @@ export async function completeReminderActionForAsset({
       cancelled_at: nowIso,
       updated_at: nowIso,
     })
-    .in('action_id', completedActionIds)
+    .in('action_id', actionIds)
     .eq('status', 'pending')
-    .neq('assigned_to', assignedTo)
     .select('id');
 
   if (cancelledError) throw cancelledError;
 
+  const { error: resolveError } = await admin
+    .from('reminder_actions')
+    .update({
+      status: 'resolved',
+      resolved_at: nowIso,
+      resolved_by: actionedBy,
+      last_detected_at: nowIso,
+      updated_at: nowIso,
+    })
+    .in('id', actionIds);
+
+  if (resolveError) throw resolveError;
+
   return {
     actionedCount: (actionedRows || []).length,
     cancelledCount: (cancelledRows || []).length,
-    actionIds: completedActionIds,
+    actionIds,
   };
 }
 

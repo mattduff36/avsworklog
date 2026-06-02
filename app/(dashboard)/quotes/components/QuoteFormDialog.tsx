@@ -20,7 +20,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { AlertTriangle, ExternalLink, Loader2, Plus, RefreshCw, Sparkles, Trash2, GripVertical, Upload, X } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { AlertTriangle, ChevronDown, ExternalLink, Loader2, Plus, RefreshCw, Sparkles, Trash2, GripVertical, Upload, X } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { cn } from '@/lib/utils/cn';
 import { getQuoteRichPasteText } from '@/lib/quotes/quote-rich-text';
@@ -44,6 +46,14 @@ interface Customer {
   county: string | null;
   postcode: string | null;
   default_validity_days: number;
+  secondary_contacts?: Array<{
+    id: string;
+    customer_id: string;
+    name: string | null;
+    job_title: string | null;
+    email: string | null;
+    phone: string | null;
+  }>;
 }
 
 interface ApproverOption {
@@ -124,6 +134,11 @@ function getCustomerSelectLabel(customer: Customer, duplicateCompanyNames: Set<s
   return companyName;
 }
 
+function getContactLabel(contact: NonNullable<Customer['secondary_contacts']>[number]): string {
+  const name = contact.name?.trim() || contact.email?.trim() || 'Unnamed contact';
+  return contact.job_title ? `${name} (${contact.job_title})` : name;
+}
+
 function isQuoteAssistDraft(value: unknown): value is QuoteAssistDraft {
   if (!value || typeof value !== 'object') {
     return false;
@@ -183,6 +198,7 @@ export function QuoteFormDialog({
     start_date: '',
     start_alert_days: '',
     estimated_duration_days: '',
+    secondary_contact_ids: [],
     line_items: [{ ...EMPTY_LINE_ITEM }],
   });
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
@@ -337,6 +353,7 @@ export function QuoteFormDialog({
         start_date: quote.start_date || '',
         start_alert_days: quote.start_alert_days || '',
         estimated_duration_days: quote.estimated_duration_days || '',
+        secondary_contact_ids: quote.selected_secondary_contact_ids || [],
         line_items: quote.line_items && quote.line_items.length > 0
           ? quote.line_items.map((li, i) => ({ ...li, sort_order: i }))
           : [{ ...EMPTY_LINE_ITEM }],
@@ -366,6 +383,7 @@ export function QuoteFormDialog({
         start_date: '',
         start_alert_days: '',
         estimated_duration_days: '',
+        secondary_contact_ids: [],
         line_items: [{ ...EMPTY_LINE_ITEM }],
       });
 
@@ -377,6 +395,7 @@ export function QuoteFormDialog({
         next.salutation = customer?.contact_name ? `Dear ${customer.contact_name.split(' ')[0]},` : '';
         next.validity_days = customer?.default_validity_days || 30;
         next.site_address = buildAddress(customer);
+        next.secondary_contact_ids = [];
       }
 
       setForm(next);
@@ -436,11 +455,23 @@ export function QuoteFormDialog({
     setForm(prev => ({
       ...prev,
       customer_id: customerId,
-      attention_name: customer?.contact_name || prev.attention_name,
-      attention_email: customer?.contact_email || prev.attention_email,
-      site_address: buildAddress(customer) || prev.site_address,
+      attention_name: customer?.contact_name || '',
+      attention_email: customer?.contact_email || '',
+      site_address: buildAddress(customer),
       validity_days: customer?.default_validity_days || prev.validity_days,
-      salutation: customer?.contact_name ? `Dear ${customer.contact_name.split(' ')[0]},` : prev.salutation,
+      salutation: customer?.contact_name ? `Dear ${customer.contact_name.split(' ')[0]},` : '',
+      secondary_contact_ids: [],
+    }));
+  }
+
+  function toggleSecondaryContact(contactId: string, checked: boolean) {
+    clearFieldError('secondary_contact_ids');
+    setSubmitError(null);
+    setForm(prev => ({
+      ...prev,
+      secondary_contact_ids: checked
+        ? Array.from(new Set([...prev.secondary_contact_ids, contactId]))
+        : prev.secondary_contact_ids.filter(id => id !== contactId),
     }));
   }
 
@@ -630,6 +661,11 @@ export function QuoteFormDialog({
   const subtotal = form.line_items.reduce((sum, li) => sum + Number(li.quantity) * Number(li.unit_rate), 0);
   const clientVisibleAttachments = existingAttachments.filter(attachment => attachment.is_client_visible);
   const canManageSavedAttachments = Boolean(quote?.id && quote.is_latest_version);
+  const selectedSecondaryContacts = (selectedCustomer?.secondary_contacts || [])
+    .filter(contact => form.secondary_contact_ids.includes(contact.id));
+  const contactEmailDisplay = selectedSecondaryContacts.length > 0
+    ? `${form.attention_email || selectedCustomer?.contact_email || 'Primary email'}, plus ${selectedSecondaryContacts.length} more...`
+    : form.attention_email || selectedCustomer?.contact_email || 'Select primary contact email';
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -873,13 +909,71 @@ export function QuoteFormDialog({
               </div>
               <div className="space-y-2">
                 <Label>Contact Email</Label>
-                <Input
-                  type="email"
-                  value={form.attention_email}
-                  onChange={e => updateField('attention_email', e.target.value)}
-                  className={getFieldClassName('attention_email')}
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className={cn(
+                        'flex min-h-10 w-full items-center justify-between gap-3 rounded-md border px-3 py-2 text-left text-sm',
+                        getFieldClassName('attention_email')
+                      )}
+                    >
+                      <span className={form.attention_email || selectedSecondaryContacts.length > 0 ? 'text-white' : 'text-muted-foreground'}>
+                        {contactEmailDisplay}
+                      </span>
+                      <ChevronDown className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-[min(32rem,calc(100vw-2rem))] border-slate-700 bg-slate-900 text-white">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="quote-primary-contact-email">Primary recipient</Label>
+                        <Input
+                          id="quote-primary-contact-email"
+                          type="email"
+                          value={form.attention_email}
+                          onChange={e => updateField('attention_email', e.target.value)}
+                          className={getFieldClassName('attention_email')}
+                        />
+                        <p className="text-xs text-muted-foreground">The primary contact is sent as the quote To recipient.</p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Customer CC recipients</p>
+                        {selectedCustomer?.secondary_contacts?.length ? (
+                          <div className="space-y-2">
+                            {selectedCustomer.secondary_contacts.map(contact => {
+                              const hasEmail = Boolean(contact.email?.trim());
+                              return (
+                                <label key={contact.id} className={cn(
+                                  'flex items-start gap-3 rounded-md border border-slate-700 bg-slate-950/30 p-2 text-sm',
+                                  !hasEmail && 'opacity-60'
+                                )}>
+                                  <Checkbox
+                                    checked={form.secondary_contact_ids.includes(contact.id)}
+                                    disabled={!hasEmail}
+                                    onCheckedChange={checked => toggleSecondaryContact(contact.id, checked === true)}
+                                    className="mt-0.5"
+                                  />
+                                  <span>
+                                    <span className="block text-white">{getContactLabel(contact)}</span>
+                                    <span className="block text-xs text-muted-foreground">
+                                      {contact.email || 'No email on file'}
+                                    </span>
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">No saved secondary contacts for this customer.</p>
+                        )}
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
                 {renderFieldError('attention_email')}
+                {renderFieldError('secondary_contact_ids')}
               </div>
             </div>
 

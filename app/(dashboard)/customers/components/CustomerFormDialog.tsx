@@ -20,8 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2 } from 'lucide-react';
-import type { Customer, CustomerFormData } from '../types';
+import { Loader2, Plus, Trash2 } from 'lucide-react';
+import type { Customer, CustomerContactFormData, CustomerFormData } from '../types';
 import { EMPTY_CUSTOMER_FORM } from '../types';
 
 interface CustomerFormDialogProps {
@@ -32,7 +32,7 @@ interface CustomerFormDialogProps {
 }
 
 export function CustomerFormDialog({ open, onClose, onSubmit, customer }: CustomerFormDialogProps) {
-  const [form, setForm] = useState<CustomerFormData>(EMPTY_CUSTOMER_FORM);
+  const [form, setForm] = useState<CustomerFormData>({ ...EMPTY_CUSTOMER_FORM, secondary_contacts: [] });
   const [saving, setSaving] = useState(false);
   const isEditing = !!customer;
 
@@ -54,14 +54,51 @@ export function CustomerFormDialog({ open, onClose, onSubmit, customer }: Custom
         default_validity_days: customer.default_validity_days,
         status: customer.status,
         notes: customer.notes || '',
+        secondary_contacts: (customer.secondary_contacts || []).map(contact => ({
+          id: contact.id,
+          name: contact.name || '',
+          job_title: contact.job_title || '',
+          email: contact.email || '',
+          phone: contact.phone || '',
+        })),
       });
     } else {
-      setForm(EMPTY_CUSTOMER_FORM);
+      setForm({ ...EMPTY_CUSTOMER_FORM, secondary_contacts: [] });
     }
   }, [customer, open]);
 
   function updateField<K extends keyof CustomerFormData>(key: K, value: CustomerFormData[K]) {
     setForm(prev => ({ ...prev, [key]: value }));
+  }
+
+  function updateSecondaryContact<K extends keyof CustomerContactFormData>(
+    index: number,
+    key: K,
+    value: CustomerContactFormData[K]
+  ) {
+    setForm(prev => ({
+      ...prev,
+      secondary_contacts: prev.secondary_contacts.map((contact, idx) => (
+        idx === index ? { ...contact, [key]: value } : contact
+      )),
+    }));
+  }
+
+  function addSecondaryContact() {
+    setForm(prev => ({
+      ...prev,
+      secondary_contacts: [
+        ...prev.secondary_contacts,
+        { name: '', job_title: '', email: '', phone: '' },
+      ],
+    }));
+  }
+
+  function removeSecondaryContact(index: number) {
+    setForm(prev => ({
+      ...prev,
+      secondary_contacts: prev.secondary_contacts.filter((_, idx) => idx !== index),
+    }));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -154,6 +191,84 @@ export function CustomerFormDialog({ open, onClose, onSubmit, customer }: Custom
                     className="bg-slate-800 border-slate-600"
                   />
                 </div>
+              </div>
+              <div className="mt-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <h5 className="text-xs font-semibold tracking-wide text-muted-foreground">Secondary Contact(s)</h5>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addSecondaryContact}
+                    className="border-slate-600 text-muted-foreground"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add another contact?
+                  </Button>
+                </div>
+
+                {form.secondary_contacts.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No secondary contacts added.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {form.secondary_contacts.map((contact, index) => (
+                      <div key={contact.id || index} className="rounded-lg border border-slate-700 bg-slate-950/30 p-3">
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                          <p className="text-sm font-medium text-white">Secondary Contact {index + 1}</p>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeSecondaryContact(index)}
+                            className="text-red-300 hover:bg-red-500/10 hover:text-red-200"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Remove
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor={`secondary_contact_name_${index}`}>Contact Name</Label>
+                            <Input
+                              id={`secondary_contact_name_${index}`}
+                              value={contact.name}
+                              onChange={e => updateSecondaryContact(index, 'name', e.target.value)}
+                              className="bg-slate-800 border-slate-600"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor={`secondary_contact_job_title_${index}`}>Job Title</Label>
+                            <Input
+                              id={`secondary_contact_job_title_${index}`}
+                              value={contact.job_title}
+                              onChange={e => updateSecondaryContact(index, 'job_title', e.target.value)}
+                              className="bg-slate-800 border-slate-600"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor={`secondary_contact_email_${index}`}>Email</Label>
+                            <Input
+                              id={`secondary_contact_email_${index}`}
+                              type="email"
+                              value={contact.email}
+                              onChange={e => updateSecondaryContact(index, 'email', e.target.value)}
+                              className="bg-slate-800 border-slate-600"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor={`secondary_contact_phone_${index}`}>Phone</Label>
+                            <Input
+                              id={`secondary_contact_phone_${index}`}
+                              value={contact.phone}
+                              onChange={e => updateSecondaryContact(index, 'phone', e.target.value)}
+                              className="bg-slate-800 border-slate-600"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 

@@ -71,7 +71,7 @@ async function main(): Promise<number> {
   if (!connectionString) {
     const error = new Error('POSTGRES_URL_NON_POOLING not found in .env.local');
     console.error('❌ POSTGRES_URL_NON_POOLING not found in .env.local');
-    run.finish('failed', error);
+    await run.finish('failed', error);
     return 1;
   }
 
@@ -249,7 +249,7 @@ async function main(): Promise<number> {
 
   if (issues.length === 0) {
     console.log('✅ All checks passed — DB schema is healthy.\n');
-    run.finish('passed');
+    await run.finish('passed');
     return 0;
   }
 
@@ -265,17 +265,17 @@ async function main(): Promise<number> {
 
   if (errors.length > 0) {
     console.log('Run "npm run db:validate" after fixing the issues above.\n');
-    run.finish('failed', `${errors.length} schema validation error(s) found`);
+    await run.finish('failed', `${errors.length} schema validation error(s) found`);
     return 1;
   }
 
-  run.finish('passed');
+  await run.finish('passed');
   return 0;
   } catch (error) {
     if (client && !hasDisconnected) {
       await client.end().catch(() => undefined);
     }
-    run.finish('failed', error);
+    await run.finish('failed', error);
     throw error;
   }
 }

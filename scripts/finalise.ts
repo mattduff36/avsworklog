@@ -815,7 +815,7 @@ async function main(): Promise<void> {
   try {
     if (options.help) {
       printHelp();
-      run.finish('passed');
+      await run.finish('passed');
       return;
     }
 
@@ -893,7 +893,7 @@ async function main(): Promise<void> {
       );
       console.log('Release version: would update locally before push if a bump is due');
       console.log(`Push: ${options.push ? 'would push current branch' : 'skipped'}`);
-      run.finish('passed');
+      await run.finish('passed');
       return;
     }
 
@@ -1078,9 +1078,9 @@ async function main(): Promise<void> {
     console.log(`- Release version: ${releaseVersion ? `bumped to ${releaseVersion}` : 'unchanged'}`);
     console.log(`- Push: ${pushedBranch ? `pushed ${pushedBranch}` : 'skipped'}`);
     printProgress('Finalise workflow complete.', 100);
-    run.finish('passed');
+    await run.finish('passed');
   } catch (error) {
-    run.finish('failed', error);
+    await run.finish('failed', error);
     throw error;
   } finally {
     automationRun = null;

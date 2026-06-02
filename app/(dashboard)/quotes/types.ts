@@ -8,6 +8,19 @@ export interface QuoteLineItem {
   sort_order: number;
 }
 
+export interface CustomerContact {
+  id: string;
+  customer_id: string;
+  name: string | null;
+  job_title: string | null;
+  email: string | null;
+  phone: string | null;
+  created_at?: string;
+  updated_at?: string;
+  created_by?: string | null;
+  updated_by?: string | null;
+}
+
 export interface QuoteAttachment {
   id: string;
   quote_id: string;
@@ -189,7 +202,10 @@ export interface Quote {
     city?: string | null;
     county?: string | null;
     postcode?: string | null;
+    secondary_contacts?: CustomerContact[];
   };
+  selected_secondary_contact_ids?: string[];
+  selected_secondary_contacts?: CustomerContact[];
   line_items?: QuoteLineItem[];
   attachments?: QuoteAttachment[];
   rams_documents?: QuoteRamsDocument[];
@@ -327,6 +343,7 @@ export interface QuoteFormData {
   start_date: string;
   start_alert_days: number | '';
   estimated_duration_days: number | '';
+  secondary_contact_ids: string[];
   line_items: QuoteLineItem[];
   attachment_files?: File[];
 }

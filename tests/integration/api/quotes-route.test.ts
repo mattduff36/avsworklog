@@ -229,6 +229,7 @@ describe('POST /api/quotes', () => {
       invoices: [],
       invoiceRequests: [],
       versions: [],
+      selectedSecondaryContacts: [],
       invoiceSummary: {
         invoicedTotal: 0,
         pendingRequestedTotal: 0,
@@ -359,6 +360,113 @@ describe('POST /api/quotes', () => {
       total: 0,
     }));
     expect(lineItemInsert).not.toHaveBeenCalled();
+  });
+
+  it('persists selected secondary customer contact recipients', async () => {
+    const quoteInsert = vi.fn().mockResolvedValue({ error: null });
+    const lineItemInsert = vi.fn().mockResolvedValue({ error: null });
+    const recipientDeleteEq = vi.fn().mockResolvedValue({ error: null });
+    const recipientInsert = vi.fn().mockResolvedValue({ error: null });
+    const profileSingle = vi.fn().mockResolvedValue({
+      data: { id: 'manager-1', full_name: 'Matt Duffill' },
+      error: null,
+    });
+    const profileEq = vi.fn().mockReturnValue({ single: profileSingle });
+    const contactIn = vi.fn().mockResolvedValue({
+      data: [{ id: 'contact-1' }, { id: 'contact-2' }],
+      error: null,
+    });
+    const contactEq = vi.fn().mockReturnValue({ in: contactIn });
+
+    mockCreateClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1' } },
+          error: null,
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'quotes') {
+          return { insert: quoteInsert };
+        }
+
+        if (table === 'quote_line_items') {
+          return { insert: lineItemInsert };
+        }
+
+        if (table === 'quote_customer_contact_recipients') {
+          return {
+            delete: vi.fn(() => ({
+              eq: recipientDeleteEq,
+            })),
+            insert: recipientInsert,
+          };
+        }
+
+        if (table === 'customer_contacts') {
+          return {
+            select: vi.fn(() => ({
+              eq: contactEq,
+            })),
+          };
+        }
+
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    } as unknown as SupabaseClient);
+
+    mockCreateAdminClient.mockReturnValue({
+      from: vi.fn((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn(() => ({
+              eq: profileEq,
+            })),
+          };
+        }
+
+        if (table === 'customer_contacts') {
+          return {
+            select: vi.fn(() => ({
+              eq: contactEq,
+            })),
+          };
+        }
+
+        throw new Error(`Unexpected admin table: ${table}`);
+      }),
+    });
+
+    const response = await POST(new NextRequest('http://localhost/api/quotes', {
+      method: 'POST',
+      body: JSON.stringify({
+        customer_id: 'customer-1',
+        manager_profile_id: 'manager-1',
+        quote_date: '2026-03-24',
+        pricing_mode: 'attachments_only',
+        secondary_contact_ids: ['contact-1', 'contact-2', 'contact-1'],
+        line_items: [],
+      }),
+      headers: { 'Content-Type': 'application/json' },
+    }));
+
+    expect(response.status).toBe(201);
+    const insertedQuoteId = quoteInsert.mock.calls[0][0].id;
+    expect(contactEq).toHaveBeenCalledWith('customer_id', 'customer-1');
+    expect(contactIn).toHaveBeenCalledWith('id', ['contact-1', 'contact-2']);
+    expect(recipientDeleteEq).toHaveBeenCalledWith('quote_id', insertedQuoteId);
+    expect(recipientInsert).toHaveBeenCalledWith([
+      {
+        quote_id: insertedQuoteId,
+        customer_contact_id: 'contact-1',
+        created_by: 'user-1',
+      },
+      {
+        quote_id: insertedQuoteId,
+        customer_contact_id: 'contact-2',
+        created_by: 'user-1',
+      },
+    ]);
   });
 
   it('applies quote module defaults when schedule fields are blank', async () => {

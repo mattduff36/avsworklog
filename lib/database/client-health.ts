@@ -11,6 +11,9 @@ export interface DatabaseHealthState {
   lastCheckedAt: number | null;
   lastHealthyAt: number | null;
   failureCount: number;
+  emulatedOutageActive: boolean;
+  emulatedOutageStartsAt: number | null;
+  emulatedOutageExpiresAt: number | null;
 }
 
 interface OutageRecoveryWindow {
@@ -35,6 +38,10 @@ const CLEAR_HEALTHY_GAP_MS = 10_000;
 const CLIENT_TIMEOUT_MS = 5_000;
 const FAILURES_TO_SHOW = 3;
 const HEALTHY_RESPONSES_TO_CLEAR = 2;
+const EMULATION_STORAGE_KEY = 'avs.databaseHealth.emulatedOutageExpiresAt';
+const EMULATION_SCHEDULE_STORAGE_KEY = 'avs.databaseHealth.emulatedOutageSchedule';
+
+export const DATABASE_OUTAGE_EMULATION_MS = 5 * 60_000;
 
 let state: DatabaseHealthState = {
   status: 'healthy',
@@ -44,6 +51,9 @@ let state: DatabaseHealthState = {
   lastCheckedAt: null,
   lastHealthyAt: null,
   failureCount: 0,
+  emulatedOutageActive: false,
+  emulatedOutageStartsAt: null,
+  emulatedOutageExpiresAt: null,
 };
 
 let recentFailures: number[] = [];
@@ -54,8 +64,11 @@ let lastActivityAt = Date.now();
 let probeInFlight: Promise<void> | null = null;
 let suspectTimer: ReturnType<typeof setTimeout> | null = null;
 let slowTimer: ReturnType<typeof setInterval> | null = null;
+let emulationTimer: ReturnType<typeof setTimeout> | null = null;
+let emulationStartTimer: ReturnType<typeof setTimeout> | null = null;
 let recoveryInFlight: Promise<void> | null = null;
 let clientId: string | null = null;
+let hasHydratedEmulation = false;
 
 const listeners = new Set<() => void>();
 
@@ -93,6 +106,225 @@ function hasRecentDbBackedSuccess(currentTime = now()): boolean {
 
 function shouldProbe(currentTime = now()): boolean {
   return isVisible() && isRecentlyActive(currentTime) && isBrowserOnline();
+}
+
+function clearEmulationTimer(): void {
+  if (emulationTimer) {
+    clearTimeout(emulationTimer);
+    emulationTimer = null;
+  }
+}
+
+function clearEmulationStartTimer(): void {
+  if (emulationStartTimer) {
+    clearTimeout(emulationStartTimer);
+    emulationStartTimer = null;
+  }
+}
+
+function readStoredEmulationExpiresAt(): number | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const storedValue = window.localStorage.getItem(EMULATION_STORAGE_KEY);
+    if (!storedValue) {
+      return null;
+    }
+
+    const expiresAt = Number(storedValue);
+    if (!Number.isFinite(expiresAt)) {
+      window.localStorage.removeItem(EMULATION_STORAGE_KEY);
+      return null;
+    }
+
+    return expiresAt;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredEmulationExpiresAt(expiresAt: number): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(EMULATION_STORAGE_KEY, String(expiresAt));
+  } catch {
+    // Storage failures should not stop the in-memory debug emulation.
+  }
+}
+
+function clearStoredEmulationExpiresAt(): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.localStorage.removeItem(EMULATION_STORAGE_KEY);
+  } catch {
+    // Ignore storage cleanup failures.
+  }
+}
+
+interface StoredEmulationSchedule {
+  startsAt: number;
+  durationMs: number;
+}
+
+function readStoredEmulationSchedule(): StoredEmulationSchedule | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const storedValue = window.localStorage.getItem(EMULATION_SCHEDULE_STORAGE_KEY);
+    if (!storedValue) {
+      return null;
+    }
+
+    const parsed = JSON.parse(storedValue) as Partial<StoredEmulationSchedule>;
+    if (
+      typeof parsed.startsAt !== 'number'
+      || typeof parsed.durationMs !== 'number'
+      || !Number.isFinite(parsed.startsAt)
+      || !Number.isFinite(parsed.durationMs)
+    ) {
+      window.localStorage.removeItem(EMULATION_SCHEDULE_STORAGE_KEY);
+      return null;
+    }
+
+    return {
+      startsAt: parsed.startsAt,
+      durationMs: parsed.durationMs,
+    };
+  } catch {
+    window.localStorage.removeItem(EMULATION_SCHEDULE_STORAGE_KEY);
+    return null;
+  }
+}
+
+function writeStoredEmulationSchedule(schedule: StoredEmulationSchedule): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(EMULATION_SCHEDULE_STORAGE_KEY, JSON.stringify(schedule));
+  } catch {
+    // Storage failures should not stop the in-memory debug emulation.
+  }
+}
+
+function clearStoredEmulationSchedule(): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.localStorage.removeItem(EMULATION_SCHEDULE_STORAGE_KEY);
+  } catch {
+    // Ignore storage cleanup failures.
+  }
+}
+
+function scheduleEmulationExpiry(expiresAt: number): void {
+  clearEmulationTimer();
+  const delayMs = Math.max(0, expiresAt - now());
+  emulationTimer = setTimeout(() => {
+    clearDatabaseOutageEmulation();
+  }, delayMs);
+}
+
+function scheduleEmulationStart(startsAt: number, durationMs: number): void {
+  clearEmulationStartTimer();
+  const delayMs = Math.max(0, startsAt - now());
+  emulationStartTimer = setTimeout(() => {
+    clearStoredEmulationSchedule();
+    setState({
+      emulatedOutageStartsAt: null,
+    });
+    activateDatabaseOutageEmulation(durationMs);
+  }, delayMs);
+}
+
+function applyDatabaseOutageEmulation(expiresAt: number, currentTime = now()): void {
+  const outageStartedAt = state.emulatedOutageActive && state.outageStartedAt
+    ? state.outageStartedAt
+    : currentTime;
+
+  recentFailures = Array.from({ length: FAILURES_TO_SHOW }, () => currentTime);
+  consecutiveHealthyResponses = 0;
+  lastHealthyResponseAt = null;
+  setState({
+    status: 'outage',
+    outageActive: true,
+    outageStartedAt,
+    outageConfirmedAt: state.outageConfirmedAt || currentTime,
+    lastCheckedAt: currentTime,
+    failureCount: FAILURES_TO_SHOW,
+    emulatedOutageActive: true,
+    emulatedOutageStartsAt: null,
+    emulatedOutageExpiresAt: expiresAt,
+  });
+  scheduleEmulationExpiry(expiresAt);
+}
+
+function hydrateStoredEmulation(): void {
+  if (hasHydratedEmulation) {
+    return;
+  }
+
+  hasHydratedEmulation = true;
+  const schedule = readStoredEmulationSchedule();
+  if (schedule) {
+    const currentTime = now();
+    const expiresAt = schedule.startsAt + schedule.durationMs;
+    if (expiresAt <= currentTime) {
+      clearStoredEmulationSchedule();
+    } else if (schedule.startsAt <= currentTime) {
+      clearStoredEmulationSchedule();
+      writeStoredEmulationExpiresAt(expiresAt);
+      applyDatabaseOutageEmulation(expiresAt, currentTime);
+      return;
+    } else {
+      setState({
+        emulatedOutageActive: false,
+        emulatedOutageStartsAt: schedule.startsAt,
+        emulatedOutageExpiresAt: expiresAt,
+      });
+      scheduleEmulationStart(schedule.startsAt, schedule.durationMs);
+      return;
+    }
+  }
+
+  const expiresAt = readStoredEmulationExpiresAt();
+  if (!expiresAt) {
+    return;
+  }
+
+  const currentTime = now();
+  if (expiresAt <= currentTime) {
+    clearStoredEmulationExpiresAt();
+    return;
+  }
+
+  applyDatabaseOutageEmulation(expiresAt, currentTime);
+}
+
+function shouldKeepEmulatedOutage(currentTime = now()): boolean {
+  if (!state.emulatedOutageActive || !state.emulatedOutageExpiresAt) {
+    return false;
+  }
+
+  if (state.emulatedOutageExpiresAt <= currentTime) {
+    clearDatabaseOutageEmulation();
+    return false;
+  }
+
+  return true;
 }
 
 function buildRecoveryWindow(recoveredAt: number): OutageRecoveryWindow | null {
@@ -182,6 +414,10 @@ function resetFailures(): void {
 }
 
 function recordHealthyResponse(currentTime = now()): void {
+  if (shouldKeepEmulatedOutage(currentTime)) {
+    return;
+  }
+
   lastDbBackedSuccessAt = currentTime;
 
   const recoveryWindow = state.outageActive ? buildRecoveryWindow(currentTime) : null;
@@ -263,6 +499,15 @@ async function fetchHealthEndpoint(): Promise<Response> {
 
 export async function runDatabaseHealthProbe(reason: DatabaseHealthProbeReason = 'nudge'): Promise<void> {
   const currentTime = now();
+  hydrateStoredEmulation();
+  if (shouldKeepEmulatedOutage(currentTime)) {
+    setState({
+      lastCheckedAt: currentTime,
+      failureCount: FAILURES_TO_SHOW,
+    });
+    return;
+  }
+
   if (!shouldProbe(currentTime)) {
     return;
   }
@@ -303,6 +548,10 @@ export async function runDatabaseHealthProbe(reason: DatabaseHealthProbeReason =
 }
 
 export function markDatabaseBackedSuccess(): void {
+  if (shouldKeepEmulatedOutage()) {
+    return;
+  }
+
   recordHealthyResponse();
 }
 
@@ -328,6 +577,7 @@ export function getDatabaseHealthState(): DatabaseHealthState {
 }
 
 export function subscribeToDatabaseHealth(listener: () => void): () => void {
+  hydrateStoredEmulation();
   listeners.add(listener);
   return () => {
     listeners.delete(listener);
@@ -338,6 +588,8 @@ export function startDatabaseHealthMonitor(): () => void {
   if (typeof window === 'undefined') {
     return () => undefined;
   }
+
+  hydrateStoredEmulation();
 
   const handleActivity = () => reportDatabaseHealthActivity();
   const handleVisibility = () => {
@@ -376,7 +628,80 @@ export function startDatabaseHealthMonitor(): () => void {
   };
 }
 
+export function activateDatabaseOutageEmulation(durationMs = DATABASE_OUTAGE_EMULATION_MS): void {
+  const currentTime = now();
+  const expiresAt = currentTime + durationMs;
+  clearEmulationStartTimer();
+  clearStoredEmulationSchedule();
+  writeStoredEmulationExpiresAt(expiresAt);
+  applyDatabaseOutageEmulation(expiresAt, currentTime);
+}
+
+export function scheduleDatabaseOutageEmulation(
+  delayMs: number,
+  durationMs = DATABASE_OUTAGE_EMULATION_MS,
+): void {
+  const currentTime = now();
+  const normalizedDelayMs = Math.max(0, delayMs);
+  if (normalizedDelayMs === 0) {
+    activateDatabaseOutageEmulation(durationMs);
+    return;
+  }
+
+  const startsAt = currentTime + normalizedDelayMs;
+  const expiresAt = startsAt + durationMs;
+  clearEmulationTimer();
+  clearEmulationStartTimer();
+  clearStoredEmulationExpiresAt();
+  writeStoredEmulationSchedule({ startsAt, durationMs });
+  resetFailures();
+  clearSuspectTimer();
+  setState({
+    status: 'healthy',
+    outageActive: false,
+    outageStartedAt: null,
+    outageConfirmedAt: null,
+    lastCheckedAt: currentTime,
+    failureCount: 0,
+    emulatedOutageActive: false,
+    emulatedOutageStartsAt: startsAt,
+    emulatedOutageExpiresAt: expiresAt,
+  });
+  scheduleEmulationStart(startsAt, durationMs);
+}
+
+export function clearDatabaseOutageEmulation(): void {
+  const wasEmulated = state.emulatedOutageActive || Boolean(state.emulatedOutageStartsAt);
+  clearEmulationStartTimer();
+  clearEmulationTimer();
+  clearStoredEmulationSchedule();
+  clearStoredEmulationExpiresAt();
+
+  if (!wasEmulated) {
+    return;
+  }
+
+  resetFailures();
+  clearSuspectTimer();
+  setState({
+    status: 'healthy',
+    outageActive: false,
+    outageStartedAt: null,
+    outageConfirmedAt: null,
+    lastCheckedAt: now(),
+    lastHealthyAt: now(),
+    failureCount: 0,
+    emulatedOutageActive: false,
+    emulatedOutageStartsAt: null,
+    emulatedOutageExpiresAt: null,
+  });
+}
+
 export function resetDatabaseHealthForTests(): void {
+  clearEmulationStartTimer();
+  clearEmulationTimer();
+  clearStoredEmulationSchedule();
+  clearStoredEmulationExpiresAt();
   state = {
     status: 'healthy',
     outageActive: false,
@@ -385,6 +710,9 @@ export function resetDatabaseHealthForTests(): void {
     lastCheckedAt: null,
     lastHealthyAt: null,
     failureCount: 0,
+    emulatedOutageActive: false,
+    emulatedOutageStartsAt: null,
+    emulatedOutageExpiresAt: null,
   };
   recentFailures = [];
   consecutiveHealthyResponses = 0;
@@ -399,5 +727,6 @@ export function resetDatabaseHealthForTests(): void {
   }
   recoveryInFlight = null;
   clientId = null;
+  hasHydratedEmulation = false;
   emitChange();
 }

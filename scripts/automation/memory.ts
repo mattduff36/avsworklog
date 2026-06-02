@@ -110,7 +110,7 @@ export function readAutomationReviewHistory(params: {
   };
 }
 
-function mergeSuggestions(
+export function mergeAutomationMemorySuggestions(
   existingSuggestions: AutomationMemorySuggestion[],
   nextSuggestions: AutomationMemorySuggestion[]
 ): AutomationMemorySuggestion[] {
@@ -127,6 +127,9 @@ function mergeSuggestions(
       ...suggestion,
       status: existing.status,
       statusReason: existing.statusReason,
+      decisionAt: existing.decisionAt,
+      decisionReason: existing.decisionReason,
+      planPath: existing.planPath,
       implementedAt: existing.implementedAt,
       outcome: existing.outcome,
       createdMonth: existing.createdMonth,
@@ -152,7 +155,7 @@ export function updateAutomationMemory(params: {
   return {
     ...params.memory,
     updatedAt: new Date().toISOString(),
-    suggestions: mergeSuggestions(params.memory.suggestions, params.suggestions),
+    suggestions: mergeAutomationMemorySuggestions(params.memory.suggestions, params.suggestions),
     prompts: upsertByMonth(params.memory.prompts, params.prompt),
     monthlyMetrics: upsertByMonth(params.memory.monthlyMetrics, params.metrics),
   };

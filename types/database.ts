@@ -1425,6 +1425,67 @@ export type Database = {
           },
         ]
       }
+      customer_contacts: {
+        Row: {
+          id: string
+          customer_id: string
+          name: string | null
+          job_title: string | null
+          email: string | null
+          phone: string | null
+          created_at: string
+          updated_at: string
+          created_by: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          customer_id: string
+          name?: string | null
+          job_title?: string | null
+          email?: string | null
+          phone?: string | null
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          customer_id?: string
+          name?: string | null
+          job_title?: string | null
+          email?: string | null
+          phone?: string | null
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'customer_contacts_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'customer_contacts_customer_id_fkey'
+            columns: ['customer_id']
+            isOneToOne: false
+            referencedRelation: 'customers'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'customer_contacts_updated_by_fkey'
+            columns: ['updated_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       dvla_sync_log: {
         Row: {
           id: string
@@ -4209,6 +4270,49 @@ export type Database = {
           },
           {
             foreignKeyName: 'quote_timeline_events_quote_id_fkey'
+            columns: ['quote_id']
+            isOneToOne: false
+            referencedRelation: 'quotes'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      quote_customer_contact_recipients: {
+        Row: {
+          quote_id: string
+          customer_contact_id: string
+          created_at: string
+          created_by: string | null
+        }
+        Insert: {
+          quote_id: string
+          customer_contact_id: string
+          created_at?: string
+          created_by?: string | null
+        }
+        Update: {
+          quote_id?: string
+          customer_contact_id?: string
+          created_at?: string
+          created_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'quote_customer_contact_recipients_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'quote_customer_contact_recipients_customer_contact_id_fkey'
+            columns: ['customer_contact_id']
+            isOneToOne: false
+            referencedRelation: 'customer_contacts'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'quote_customer_contact_recipients_quote_id_fkey'
             columns: ['quote_id']
             isOneToOne: false
             referencedRelation: 'quotes'

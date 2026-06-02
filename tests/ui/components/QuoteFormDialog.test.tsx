@@ -1,6 +1,6 @@
 /// <reference types="@testing-library/jest-dom/vitest" />
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { QuoteFormDialog } from '@/app/(dashboard)/quotes/components/QuoteFormDialog';
 import type { Quote } from '@/app/(dashboard)/quotes/types';
@@ -33,6 +33,16 @@ describe('QuoteFormDialog', () => {
         county: 'Nottinghamshire',
         postcode: 'NG1 1AA',
         default_validity_days: 30,
+        secondary_contacts: [
+          {
+            id: 'contact-1',
+            customer_id: 'customer-1',
+            name: 'Chris CC',
+            job_title: 'Buyer',
+            email: 'chris@example.com',
+            phone: null,
+          },
+        ],
       },
     ],
     managerOptions: [
@@ -206,6 +216,34 @@ describe('QuoteFormDialog', () => {
     expect(screen.getByText('Exolum [Matthew Fitzgerald]')).toBeInTheDocument();
     expect(screen.getByText('Exolum [Julian Posner]')).toBeInTheDocument();
     expect(screen.getByText('Johnsons Aggregates And Recycling Ltd')).toBeInTheDocument();
+  });
+
+  it('submits selected secondary customer contacts as quote CC recipients', async () => {
+    mockUseAuth.mockReturnValue({
+      profile: {
+        id: 'manager-1',
+        full_name: 'Manager Example',
+      },
+    });
+    (Element.prototype as unknown as { hasPointerCapture?: (pointerId: number) => boolean }).hasPointerCapture ??= () => false;
+    const onSubmit = vi.fn(async () => undefined);
+
+    render(<QuoteFormDialog {...baseProps} initialCustomerId="customer-1" onSubmit={onSubmit} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /alice@example.com/i }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: /chris cc/i }));
+    expect(screen.getByRole('button', { name: /alice@example.com, plus 1 more/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /create quote/i }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          secondary_contact_ids: ['contact-1'],
+        }),
+        false
+      );
+    });
   });
 
   it('shows open, replace, and remove controls for saved client attachments', () => {

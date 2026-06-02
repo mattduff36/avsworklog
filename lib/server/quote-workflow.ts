@@ -7,6 +7,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getUsersWithModuleAccess } from '@/lib/server/team-permissions';
 import { getHiddenSystemTestAccountIds } from '@/lib/server/system-test-accounts';
 import type { Database } from '@/types/database';
+import type { CustomerContactRow } from '@/lib/server/customer-contacts';
+import { fetchQuoteSelectedSecondaryContacts } from '@/lib/server/quote-recipient-contacts';
 import type { NotificationModuleKey } from '@/types/notifications';
 import {
   buildVersionLabel,
@@ -27,6 +29,7 @@ export type QuoteInvoiceRequestRow = Database['public']['Tables']['quote_invoice
 export type QuoteInvoiceAllocationRow = Database['public']['Tables']['quote_invoice_allocations']['Row'];
 export type QuoteManagerSeriesRow = Database['public']['Tables']['quote_manager_series']['Row'];
 export type QuoteTimelineEventRow = Database['public']['Tables']['quote_timeline_events']['Row'];
+export type QuoteCustomerContactRecipientRow = Database['public']['Tables']['quote_customer_contact_recipients']['Row'];
 export type RamsDocumentRow = Database['public']['Tables']['rams_documents']['Row'];
 
 export interface QuoteNotificationRecipientOption {
@@ -89,7 +92,10 @@ export interface QuoteBundle {
       city?: string | null;
       county?: string | null;
       postcode?: string | null;
+      secondary_contacts?: CustomerContactRow[];
     } | null;
+    selected_secondary_contact_ids?: string[];
+    selected_secondary_contacts?: CustomerContactRow[];
   };
   lineItems: QuoteLineItemRow[];
   attachments: QuoteAttachmentRow[];
@@ -98,6 +104,7 @@ export interface QuoteBundle {
   invoiceRequests: QuoteInvoiceRequestRow[];
   versions: QuoteRow[];
   timeline: Array<QuoteTimelineEventRow & { actor?: { id: string; full_name: string | null } | null }>;
+  selectedSecondaryContacts: CustomerContactRow[];
   invoiceSummary: InvoiceSummary;
 }
 
@@ -303,7 +310,8 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
         address_line_2,
         city,
         county,
-        postcode
+        postcode,
+        secondary_contacts:customer_contacts(*)
       )
     `)
     .eq('id', quoteId)
@@ -315,7 +323,7 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
 
   const typedQuote = quote as QuoteBundle['quote'];
 
-  const [lineItemsResult, attachmentsResult, ramsDocumentsResult, versionsResult, invoicesResult, invoiceRequestsResult, timelineResult] = await Promise.all([
+  const [lineItemsResult, attachmentsResult, ramsDocumentsResult, versionsResult, invoicesResult, invoiceRequestsResult, timelineResult, selectedContacts] = await Promise.all([
     supabase.from('quote_line_items').select('*').eq('quote_id', quoteId).order('sort_order', { ascending: true }),
     supabase.from('quote_attachments').select('*').eq('quote_id', quoteId).order('created_at', { ascending: false }),
     supabase.from('rams_documents').select('*').eq('quote_id', quoteId).order('created_at', { ascending: false }),
@@ -330,6 +338,7 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
       `)
       .eq('quote_thread_id', typedQuote.quote_thread_id)
       .order('created_at', { ascending: false }),
+    fetchQuoteSelectedSecondaryContacts(supabase, quoteId),
   ]);
 
   if (lineItemsResult.error) throw lineItemsResult.error;
@@ -367,12 +376,17 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
   });
 
   return {
-    quote: typedQuote,
+    quote: {
+      ...typedQuote,
+      selected_secondary_contact_ids: selectedContacts.map(contact => contact.id),
+      selected_secondary_contacts: selectedContacts,
+    },
     lineItems: (lineItemsResult.data || []) as QuoteLineItemRow[],
     attachments: (attachmentsResult.data || []) as QuoteAttachmentRow[],
     ramsDocuments: (ramsDocumentsResult.data || []) as RamsDocumentRow[],
     versions: (versionsResult.data || []) as QuoteRow[],
     timeline: (timelineResult.data || []) as QuoteBundle['timeline'],
+    selectedSecondaryContacts: selectedContacts,
     invoices: invoices.map(invoice => ({
       ...invoice,
       allocations: allocationsByInvoice.get(invoice.id) || [],
@@ -433,6 +447,24 @@ function getDefaultFromEmail(): string {
 function normalizeEmailAddress(value?: string | null): string | null {
   const email = value?.trim();
   return email && email.includes('@') ? email : null;
+}
+
+function uniqueEmailAddresses(values: Array<string | null | undefined>): string[] {
+  const seen = new Set<string>();
+  const emails: string[] = [];
+
+  values.forEach((value) => {
+    const email = normalizeEmailAddress(value);
+    if (!email) return;
+
+    const key = email.toLowerCase();
+    if (seen.has(key)) return;
+
+    seen.add(key);
+    emails.push(email);
+  });
+
+  return emails;
 }
 
 function escapeHtml(value: string): string {
@@ -532,6 +564,11 @@ export async function sendQuoteToCustomerEmail(
   if (!customerEmail) {
     return { success: false, error: 'Quote cannot be sent because the customer does not have a contact email.' };
   }
+  const customerCcEmails = bundle.selectedSecondaryContacts.map(contact => contact.email);
+  const ccEmails = uniqueEmailAddresses([
+    ...customerCcEmails,
+    ...cc,
+  ]).filter(email => email.toLowerCase() !== customerEmail.toLowerCase());
 
   const customerName = bundle.quote.attention_name || bundle.quote.customer?.contact_name || 'there';
   const subject = `Quotation ${bundle.quote.quote_reference} - ${bundle.quote.subject_line || bundle.quote.customer?.company_name || 'A&V Squires'}`;
@@ -555,7 +592,7 @@ export async function sendQuoteToCustomerEmail(
   return sendEmail({
     from: getDefaultFromEmail(),
     to: [customerEmail],
-    cc: cc.filter(Boolean),
+    cc: ccEmails,
     subject,
     html,
     replyTo: replyToEmail,

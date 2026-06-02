@@ -23,6 +23,15 @@ interface CustomersTableProps {
 type SortField = 'company_name' | 'contact_name' | 'city' | 'status' | 'created_at';
 type SortDir = 'asc' | 'desc';
 
+function getSecondaryContactSummary(customer: Customer): string {
+  const count = customer.secondary_contacts?.length || 0;
+  if (count === 0) {
+    return '';
+  }
+
+  return `${count} secondary contact${count === 1 ? '' : 's'}`;
+}
+
 export function CustomersTable({ customers, onRowClick }: CustomersTableProps) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
@@ -43,6 +52,12 @@ export function CustomersTable({ customers, onRowClick }: CustomersTableProps) {
         c.short_name?.toLowerCase().includes(q) ||
         c.contact_name?.toLowerCase().includes(q) ||
         c.contact_email?.toLowerCase().includes(q) ||
+        c.secondary_contacts?.some(contact => (
+          contact.name?.toLowerCase().includes(q) ||
+          contact.job_title?.toLowerCase().includes(q) ||
+          contact.email?.toLowerCase().includes(q) ||
+          contact.phone?.toLowerCase().includes(q)
+        )) ||
         c.city?.toLowerCase().includes(q) ||
         c.postcode?.toLowerCase().includes(q)
       );
@@ -157,8 +172,18 @@ export function CustomersTable({ customers, onRowClick }: CustomersTableProps) {
                     {customer.contact_job_title && (
                       <div className="text-xs text-muted-foreground">{customer.contact_job_title}</div>
                     )}
+                    {getSecondaryContactSummary(customer) && (
+                      <div className="text-xs text-slate-400">{getSecondaryContactSummary(customer)}</div>
+                    )}
                   </td>
-                  <td className="px-4 py-3 text-slate-300 text-xs">{customer.contact_email || '—'}</td>
+                  <td className="px-4 py-3 text-slate-300 text-xs">
+                    {customer.contact_email || '—'}
+                    {customer.secondary_contacts?.some(contact => contact.email) && (
+                      <div className="mt-1 text-muted-foreground">
+                        CC: {customer.secondary_contacts.filter(contact => contact.email).map(contact => contact.email).join(', ')}
+                      </div>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-slate-300 text-xs">{customer.contact_phone || '—'}</td>
                   <td className="px-4 py-3 text-slate-300 text-xs">
                     {[customer.city, customer.postcode].filter(Boolean).join(', ') || '—'}
@@ -213,6 +238,9 @@ export function CustomersTable({ customers, onRowClick }: CustomersTableProps) {
                   )}
                 </div>
               )}
+              {getSecondaryContactSummary(customer) && (
+                <div className="text-xs text-slate-400">{getSecondaryContactSummary(customer)}</div>
+              )}
               <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                 {customer.contact_email && (
                   <span className="flex items-center gap-1"><Mail className="h-3 w-3" /> {customer.contact_email}</span>
@@ -224,6 +252,11 @@ export function CustomersTable({ customers, onRowClick }: CustomersTableProps) {
                   <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {customer.city}</span>
                 )}
               </div>
+              {customer.secondary_contacts?.some(contact => contact.email) && (
+                <div className="text-xs text-muted-foreground">
+                  CC: {customer.secondary_contacts.filter(contact => contact.email).map(contact => contact.email).join(', ')}
+                </div>
+              )}
             </div>
           ))
         )}

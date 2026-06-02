@@ -702,7 +702,7 @@ async function main() {
       }, { totalFetched: 0, afterFiltering: 0, patternsFound: 0 });
       console.log(`\nReport written to: docs_private/error-analysis.md`);
       await clearErrorLogsAfterSuccessfulAnalysis();
-      run.finish('passed');
+      await run.finish('passed');
       return;
     }
 
@@ -721,7 +721,7 @@ async function main() {
       }, { totalFetched: rawErrors.length, filteredOut, afterFiltering: 0, patternsFound: 0 });
       console.log(`\nReport written to: docs_private/error-analysis.md`);
       await clearErrorLogsAfterSuccessfulAnalysis();
-      run.finish('passed');
+      await run.finish('passed');
       return;
     }
 
@@ -791,9 +791,9 @@ async function main() {
     console.log('\n=============================================');
     console.log('Report ready: docs_private/error-analysis.md');
     console.log('=============================================\n');
-    run.finish('passed');
+    await run.finish('passed');
   } catch (error) {
-    run.finish('failed', error);
+    await run.finish('failed', error);
     throw error;
   }
 }

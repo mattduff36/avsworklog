@@ -189,10 +189,13 @@ function writeMonthlyReview(
   saveAutomationMemory(knowledgeDirectory, nextMemory);
 
   return {
+    monthKey,
     reviewPath: reviewPackage.reviewPath,
     promptPath: reviewPackage.promptPath,
     metricsPath: reviewPackage.metricsPath,
     suggestionsPath: reviewPackage.suggestionsPath,
+    suggestions: reviewPackage.packageData.suggestions,
+    knowledgeDirectory,
     advisorReviewPath: reviewPackage.reviewPath,
   };
 }
@@ -229,6 +232,8 @@ export function reviewAutomationRun(params: {
     ...summary,
     monthlyReviewPath: monthlyReview?.reviewPath,
     monthlyPromptPath: monthlyReview?.promptPath,
+    monthlySuggestionsPath: monthlyReview?.suggestionsPath,
+    monthlyReview,
     advisorReviewPath: monthlyReview?.advisorReviewPath,
     monthlyReviewGenerated: Boolean(monthlyReview),
   };

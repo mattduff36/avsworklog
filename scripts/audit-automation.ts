@@ -170,10 +170,10 @@ async function main(): Promise<number> {
     }
 
     console.log(`\n${mode} audit complete.`);
-    run.finish('passed');
+    await run.finish('passed');
     return 0;
   } catch (error) {
-    run.finish('failed', error);
+    await run.finish('failed', error);
     console.error(error instanceof Error ? error.message : error);
     return 1;
   } finally {

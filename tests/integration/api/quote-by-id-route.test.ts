@@ -132,6 +132,7 @@ describe('PATCH /api/quotes/[id]', () => {
       attachments: [],
       invoices: [],
       versions: [],
+      selectedSecondaryContacts: [],
       invoiceSummary: {
         invoicedTotal: 0,
         remainingBalance: 0,
@@ -149,7 +150,7 @@ describe('PATCH /api/quotes/[id]', () => {
     const payload = await response.json();
 
     expect(response.status).toBe(400);
-    expect(payload.error).toBe('Add a customer contact email before confirming this quote.');
+    expect(payload.error).toBe('Add a primary customer contact email before confirming this quote.');
     expect(mockSendQuoteToCustomerEmail).not.toHaveBeenCalled();
   }, 15000);
 
@@ -177,6 +178,7 @@ describe('PATCH /api/quotes/[id]', () => {
       attachments: [],
       invoices: [],
       versions: [],
+      selectedSecondaryContacts: [],
       invoiceSummary: {
         invoicedTotal: 0,
         remainingBalance: 0,

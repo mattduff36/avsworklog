@@ -31,6 +31,14 @@ interface CustomerOption {
   county: string | null;
   postcode: string | null;
   default_validity_days: number;
+  secondary_contacts?: Array<{
+    id: string;
+    customer_id: string;
+    name: string | null;
+    job_title: string | null;
+    email: string | null;
+    phone: string | null;
+  }>;
 }
 
 interface ApproverOption {

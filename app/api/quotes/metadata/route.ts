@@ -40,7 +40,8 @@ export async function GET() {
           city,
           county,
           postcode,
-          default_validity_days
+          default_validity_days,
+          secondary_contacts:customer_contacts(*)
         `)
         .order('company_name', { ascending: true }),
     ]);

@@ -5,8 +5,9 @@ import { createElement, Fragment } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
+let mockPathname = '/dashboard';
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/dashboard',
+  usePathname: () => mockPathname,
 }));
 
 function jsonResponse(status: number, body: Record<string, unknown>): Response {
@@ -100,13 +101,16 @@ describe('database health client monitor', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-06-01T10:00:00.000Z'));
+    mockPathname = '/dashboard';
     setVisibilityState('visible');
     setOnline(true);
   });
 
   afterEach(async () => {
     const { resetDatabaseHealthForTests } = await import('@/lib/database/client-health');
-    resetDatabaseHealthForTests();
+    await act(async () => {
+      resetDatabaseHealthForTests();
+    });
     vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
@@ -181,19 +185,98 @@ describe('database health client monitor', () => {
       expect.objectContaining({ method: 'POST' })
     );
   });
+
+  it('supports a debug-only outage emulation that auto-clears after five minutes', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const {
+      activateDatabaseOutageEmulation,
+      DATABASE_OUTAGE_EMULATION_MS,
+      getDatabaseHealthState,
+      markDatabaseBackedSuccess,
+      runDatabaseHealthProbe,
+    } = await import('@/lib/database/client-health');
+
+    activateDatabaseOutageEmulation();
+    expect(getDatabaseHealthState()).toMatchObject({
+      status: 'outage',
+      outageActive: true,
+      emulatedOutageActive: true,
+      failureCount: 3,
+    });
+
+    markDatabaseBackedSuccess();
+    await runDatabaseHealthProbe('nudge');
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(getDatabaseHealthState().outageActive).toBe(true);
+
+    vi.advanceTimersByTime(DATABASE_OUTAGE_EMULATION_MS - 1);
+    expect(getDatabaseHealthState().emulatedOutageActive).toBe(true);
+
+    vi.advanceTimersByTime(1);
+    expect(getDatabaseHealthState()).toMatchObject({
+      status: 'healthy',
+      outageActive: false,
+      emulatedOutageActive: false,
+      failureCount: 0,
+    });
+  });
+
+  it('can delay debug outage emulation before starting the five minute timer', async () => {
+    vi.stubGlobal('fetch', vi.fn());
+
+    const {
+      DATABASE_OUTAGE_EMULATION_MS,
+      getDatabaseHealthState,
+      scheduleDatabaseOutageEmulation,
+    } = await import('@/lib/database/client-health');
+
+    scheduleDatabaseOutageEmulation(30_000);
+    expect(getDatabaseHealthState()).toMatchObject({
+      status: 'healthy',
+      outageActive: false,
+      emulatedOutageActive: false,
+      failureCount: 0,
+    });
+    expect(getDatabaseHealthState().emulatedOutageStartsAt).toBe(new Date('2026-06-01T10:00:30.000Z').getTime());
+
+    vi.advanceTimersByTime(29_999);
+    expect(getDatabaseHealthState().emulatedOutageActive).toBe(false);
+
+    vi.advanceTimersByTime(1);
+    expect(getDatabaseHealthState()).toMatchObject({
+      status: 'outage',
+      outageActive: true,
+      emulatedOutageActive: true,
+      failureCount: 3,
+    });
+    expect(getDatabaseHealthState().emulatedOutageStartsAt).toBeNull();
+
+    vi.advanceTimersByTime(DATABASE_OUTAGE_EMULATION_MS);
+    expect(getDatabaseHealthState()).toMatchObject({
+      status: 'healthy',
+      outageActive: false,
+      emulatedOutageActive: false,
+      failureCount: 0,
+    });
+  });
 });
 
 describe('DatabaseOutageBlocker', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-06-01T10:00:00.000Z'));
+    mockPathname = '/dashboard';
     setVisibilityState('visible');
     setOnline(true);
   });
 
   afterEach(async () => {
     const { resetDatabaseHealthForTests } = await import('@/lib/database/client-health');
-    resetDatabaseHealthForTests();
+    await act(async () => {
+      resetDatabaseHealthForTests();
+    });
     vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
@@ -207,14 +290,18 @@ describe('DatabaseOutageBlocker', () => {
 
     const { runDatabaseHealthProbe } = await import('@/lib/database/client-health');
     const { DatabaseOutageBlocker } = await import('@/components/system/DatabaseOutageBlocker');
-    render(
-      createElement(
-        Fragment,
-        null,
-        createElement('button', { type: 'button' }, 'Underlying action'),
-        createElement(DatabaseOutageBlocker)
-      )
-    );
+    setVisibilityState('hidden');
+    await act(async () => {
+      render(
+        createElement(
+          Fragment,
+          null,
+          createElement('button', { type: 'button' }, 'Underlying action'),
+          createElement(DatabaseOutageBlocker)
+        )
+      );
+    });
+    setVisibilityState('visible');
 
     await act(async () => {
       await runDatabaseHealthProbe('nudge');
@@ -226,6 +313,34 @@ describe('DatabaseOutageBlocker', () => {
     expect(screen.queryByRole('button', { name: /dismiss|close/i })).toBeNull();
     expect(fireEvent.pointerDown(screen.getByTestId('database-outage-blocker'))).toBe(false);
     expect(fireEvent.keyDown(document, { key: 'Tab' })).toBe(false);
+  });
+
+  it('lets debug emulation be manually ended from the warning overlay', async () => {
+    mockPathname = '/debug';
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(200, { ok: true })));
+
+    const { activateDatabaseOutageEmulation, getDatabaseHealthState } = await import('@/lib/database/client-health');
+    const { DatabaseOutageBlocker } = await import('@/components/system/DatabaseOutageBlocker');
+    setVisibilityState('hidden');
+    await act(async () => {
+      render(createElement(DatabaseOutageBlocker));
+    });
+    setVisibilityState('visible');
+
+    act(() => {
+      activateDatabaseOutageEmulation();
+    });
+
+    expect(screen.getByRole('alert').textContent).toContain('Database connection issue');
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /end emulation/i }));
+    });
+
+    expect(getDatabaseHealthState()).toMatchObject({
+      outageActive: false,
+      emulatedOutageActive: false,
+    });
+    expect(screen.queryByTestId('database-outage-blocker')).toBeNull();
   });
 });
 

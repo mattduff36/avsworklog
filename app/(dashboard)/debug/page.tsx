@@ -11,7 +11,7 @@ import { PageLoader } from '@/components/ui/page-loader';
 import { PanelLoader } from '@/components/ui/panel-loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SensitiveModuleGate, SensitiveModuleSessionManager, useSensitiveModuleAccess } from '@/components/security/SensitiveModuleGate';
-import { BarChart3, Bug, Car, History, RefreshCw, Send, type LucideIcon } from 'lucide-react';
+import { BarChart3, Bug, Car, FlaskConical, History, RefreshCw, Send, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { canAccessDebugConsole } from '@/lib/utils/debug-access';
 
@@ -29,6 +29,10 @@ const ErrorLogsDebugPanel = dynamic(
   () => import('./components/ErrorLogsDebugPanel').then((mod) => ({ default: mod.ErrorLogsDebugPanel })),
   { loading: debugTabLoading },
 );
+const EmulationTestsDebugPanel = dynamic(
+  () => import('./components/EmulationTestsDebugPanel').then((mod) => ({ default: mod.EmulationTestsDebugPanel })),
+  { loading: debugTabLoading },
+);
 const NotificationSettingsDebugPanel = dynamic(
   () => import('./components/NotificationSettingsDebugPanel').then((mod) => ({ default: mod.NotificationSettingsDebugPanel })),
   { loading: debugTabLoading },
@@ -42,7 +46,14 @@ const UserAnalyticsDebugPanel = dynamic(
   { loading: debugTabLoading },
 );
 
-type DebugTab = 'error-log' | 'audit-log' | 'usage-analytics' | 'dvla-sync' | 'test-fleet' | 'notification-settings';
+type DebugTab =
+  | 'error-log'
+  | 'audit-log'
+  | 'usage-analytics'
+  | 'dvla-sync'
+  | 'test-fleet'
+  | 'notification-settings'
+  | 'emulation-tests';
 
 interface DebugTabConfig {
   value: DebugTab;
@@ -63,6 +74,8 @@ const DEBUG_TAB_ALIASES: Record<string, DebugTab> = {
   'test-fleet': 'test-fleet',
   notifications: 'notification-settings',
   'notification-settings': 'notification-settings',
+  emulation: 'emulation-tests',
+  'emulation-tests': 'emulation-tests',
 };
 
 const DEBUG_TABS: DebugTabConfig[] = [
@@ -72,6 +85,7 @@ const DEBUG_TABS: DebugTabConfig[] = [
   { value: 'dvla-sync', label: 'DVLA Sync', icon: RefreshCw },
   { value: 'test-fleet', label: 'Test Fleet', icon: Car },
   { value: 'notification-settings', label: 'Notification Settings', icon: Send },
+  { value: 'emulation-tests', label: 'Emulation Tests', icon: FlaskConical },
 ];
 
 const tabTriggerClassName = 'min-h-10 gap-2 px-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground lg:px-3';
@@ -169,7 +183,7 @@ export default function DebugPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as DebugTab)} className="space-y-6">
-        <TabsList className="grid h-auto w-full grid-cols-6 gap-1 bg-slate-900/50 p-1 lg:flex lg:w-auto lg:flex-wrap lg:justify-start lg:gap-0 lg:p-1.5">
+        <TabsList className="grid h-auto w-full grid-cols-7 gap-1 bg-slate-900/50 p-1 lg:flex lg:w-auto lg:flex-wrap lg:justify-start lg:gap-0 lg:p-1.5">
           {DEBUG_TABS.map(({ value, label, icon: Icon }) => (
             <TabsTrigger
               key={value}
@@ -206,6 +220,10 @@ export default function DebugPage() {
 
         <TabsContent value="notification-settings">
           <NotificationSettingsDebugPanel />
+        </TabsContent>
+
+        <TabsContent value="emulation-tests">
+          <EmulationTestsDebugPanel />
         </TabsContent>
 
       </Tabs>

@@ -211,14 +211,19 @@ export default function CustomerHistoryPage({ params }: PageProps) {
             <CardTitle className="text-sm font-semibold text-muted-foreground">Contact Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
-            {customer.contact_name && (
-              <div>
-                <span className="font-medium text-white">{customer.contact_name}</span>
-                {customer.contact_job_title && (
-                  <span className="text-muted-foreground"> — {customer.contact_job_title}</span>
-                )}
-              </div>
-            )}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Primary Contact</p>
+              {customer.contact_name ? (
+                <div className="mt-1">
+                  <span className="font-medium text-white">{customer.contact_name}</span>
+                  {customer.contact_job_title && (
+                    <span className="text-muted-foreground"> — {customer.contact_job_title}</span>
+                  )}
+                </div>
+              ) : (
+                <p className="mt-1 text-muted-foreground">No primary contact name on file</p>
+              )}
+            </div>
             {customer.contact_email && (
               <div className="flex items-center gap-2 text-slate-300">
                 <Mail className="h-4 w-4 text-muted-foreground" />
@@ -231,6 +236,24 @@ export default function CustomerHistoryPage({ params }: PageProps) {
                 {customer.contact_phone}
               </div>
             )}
+
+            {customer.secondary_contacts?.length ? (
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Secondary Contacts</p>
+                <div className="space-y-2">
+                  {customer.secondary_contacts.map(contact => (
+                    <div key={contact.id} className="rounded-md border border-slate-700/70 bg-slate-950/30 p-2">
+                      <p className="font-medium text-white">{contact.name || 'Unnamed contact'}</p>
+                      {contact.job_title && <p className="text-xs text-muted-foreground">{contact.job_title}</p>}
+                      <div className="mt-1 flex flex-wrap gap-3 text-xs text-slate-300">
+                        {contact.email && <a href={`mailto:${contact.email}`} className="hover:text-avs-yellow">{contact.email}</a>}
+                        {contact.phone && <span>{contact.phone}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
 

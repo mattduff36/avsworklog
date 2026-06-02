@@ -13,6 +13,11 @@ import {
   getQuoteManagerOption,
   loadQuoteModuleSettings,
 } from '@/lib/server/quote-workflow';
+import {
+  normalizeSecondaryContactIds,
+  replaceQuoteCustomerContactRecipients,
+  validateSecondaryContactIdsForCustomer,
+} from '@/lib/server/quote-recipient-contacts';
 import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
 
 type QuoteFieldErrors = Record<string, string>;
@@ -79,7 +84,8 @@ export async function GET(request: NextRequest) {
           address_line_2,
           city,
           county,
-          postcode
+          postcode,
+          secondary_contacts:customer_contacts(*)
         )
       `)
       .order('created_at', { ascending: false })
@@ -132,7 +138,8 @@ export async function GET(request: NextRequest) {
             address_line_2,
             city,
             county,
-            postcode
+            postcode,
+            secondary_contacts:customer_contacts(*)
           )
         `)
         .in('quote_thread_id', threadIds)
@@ -272,6 +279,7 @@ export async function POST(request: NextRequest) {
       manager_profile_id,
       approver_profile_id,
       line_items,
+      secondary_contact_ids,
       ...quoteData
     } = body as {
       manager_profile_id?: string;
@@ -282,6 +290,7 @@ export async function POST(request: NextRequest) {
       signoff_name?: string;
       signoff_title?: string;
       line_items?: Array<{ description?: string; quantity: number; unit?: string; unit_rate: number; sort_order?: number }>;
+      secondary_contact_ids?: unknown;
       [key: string]: unknown;
     };
 
@@ -294,6 +303,7 @@ export async function POST(request: NextRequest) {
     const normalizedStartAlertDays = normalizeOptionalInteger(quoteData.start_alert_days);
     const normalizedEstimatedDurationDays = normalizeOptionalInteger(quoteData.estimated_duration_days);
     const pricingMode = quoteData.pricing_mode === 'attachments_only' ? 'attachments_only' : 'itemized';
+    const normalizedSecondaryContactIds = normalizeSecondaryContactIds(secondary_contact_ids);
 
     if (!customerId) {
       fieldErrors.customer_id = 'Select a customer.';
@@ -328,6 +338,10 @@ export async function POST(request: NextRequest) {
           fieldErrors[`line_items.${item.originalIndex}.description`] = 'Enter a description for this line item.';
         }
       });
+    }
+
+    if (customerId && normalizedSecondaryContactIds.length > 0) {
+      Object.assign(fieldErrors, await validateSecondaryContactIdsForCustomer(admin, customerId, normalizedSecondaryContactIds));
     }
 
     if (Object.keys(fieldErrors).length > 0) {
@@ -430,6 +444,25 @@ export async function POST(request: NextRequest) {
       if (lineItemError) throw lineItemError;
     }
 
+    if (normalizedSecondaryContactIds.length > 0) {
+      const recipientFieldErrors = await replaceQuoteCustomerContactRecipients(
+        supabase,
+        quoteId,
+        customerId,
+        normalizedSecondaryContactIds,
+        user.id
+      );
+      if (Object.keys(recipientFieldErrors).length > 0) {
+        return NextResponse.json(
+          {
+            error: 'Please correct the highlighted fields and try again.',
+            field_errors: recipientFieldErrors,
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     await appendQuoteTimelineEvent(admin, {
       quoteId,
       quoteThreadId: quoteId,
@@ -442,7 +475,14 @@ export async function POST(request: NextRequest) {
     });
 
     const bundle = await fetchQuoteBundle(admin, quoteId);
-    return NextResponse.json({ quote: { ...bundle.quote, line_items: bundle.lineItems, invoice_summary: bundle.invoiceSummary, timeline: bundle.timeline } }, { status: 201 });
+    return NextResponse.json({
+      quote: {
+        ...bundle.quote,
+        line_items: bundle.lineItems,
+        invoice_summary: bundle.invoiceSummary,
+        timeline: bundle.timeline,
+      },
+    }, { status: 201 });
   } catch (error) {
     console.error('Error creating quote:', error);
     const message = error instanceof Error ? error.message : 'Unable to create this quote right now.';
