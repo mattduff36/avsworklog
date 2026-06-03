@@ -20,6 +20,7 @@
     "audit:medium": "tsx scripts/audit-automation.ts --medium",
     "audit:all": "tsx scripts/audit-automation.ts --full",
     "audit:contrast": "tsx scripts/audit-input-contrast.ts",
+    "automation:followup:resolve": "tsx scripts/automation/resolve-monthly-follow-up.ts",
     "fix:contrast": "tsx scripts/fix-input-contrast.ts",
     "fixerrors": "tsx scripts/fixerrors.ts",
     "version:bump": "tsx scripts/bump-release-version.ts",

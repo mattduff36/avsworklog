@@ -1,7 +1,7 @@
 import { spawnSync } from 'child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import path from 'path';
-import { runMonthlyAutomationFollowUp } from './monthly-follow-up';
+import { writeMonthlyAutomationPendingFollowUp } from './monthly-follow-up';
 import { formatReviewForConsole, reviewAutomationRun } from './self-review';
 import type {
   AutomationCommandResult,
@@ -314,9 +314,9 @@ export class AutomationRun {
     console.log(formatReviewForConsole(review));
     console.log(`Automation log written: ${path.relative(REPO_ROOT, this.markdownPath)}`);
 
-    if (review.monthlyReviewGenerated && review.monthlyReview && review.monthlyReview.suggestions.length > 0) {
+    if (review.monthlyReviewGenerated && review.monthlyReview) {
       try {
-        await runMonthlyAutomationFollowUp({
+        writeMonthlyAutomationPendingFollowUp({
           scriptName: review.scriptName,
           monthKey: review.monthlyReview.monthKey,
           reviewPath: review.monthlyReview.reviewPath,

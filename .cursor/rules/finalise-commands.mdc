@@ -43,6 +43,12 @@ When retrying:
 - after success, return a short summary only
 
 After the command finishes:
+- If the command prints `Pending monthly follow-up artifact: <path>`:
+  1. Read the JSON file at `<path>`.
+  2. Use the `AskQuestion` tool to ask the user to approve, reject, or skip each suggestion in chat.
+  3. Run `npm run automation:followup:resolve -- --pending "<path>" --decision "<suggestion-id>=approve|reject|skip"` with one `--decision` argument for each answer.
+  4. Wait for the resolver to complete.
+  5. If the resolver prints `Cursor plan file: <path>`, tell the user the plan has been opened for review/build.
 - Return a short summary only.
 - The command writes a private automation run log and self-review summary under `docs_private/automation`.
 - Do not do extra repo analysis unless the command fails and needs diagnosis.

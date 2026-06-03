@@ -1,11 +1,11 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
-import { Writable } from 'stream';
+import { Readable, Writable } from 'stream';
 import { describe, expect, it } from 'vitest';
 import { renderAutomationAdvisorReview } from '@/scripts/automation/advisor-review';
 import { redactSensitiveText } from '@/scripts/automation/logger';
-import { runMonthlyAutomationFollowUp } from '@/scripts/automation/monthly-follow-up';
+import { runMonthlyAutomationFollowUp, writeMonthlyAutomationPendingFollowUp } from '@/scripts/automation/monthly-follow-up';
 import { updateAutomationMemory } from '@/scripts/automation/memory';
 import { reviewAutomationRun } from '@/scripts/automation/self-review';
 import type { AutomationMemory, AutomationMemorySuggestion, AutomationRunLog } from '@/scripts/automation/types';
@@ -69,6 +69,25 @@ function createOutputSink(): Writable {
       callback();
     },
   });
+}
+
+function createOutputCapture(): Writable & { getOutput: () => string; isTTY?: boolean } {
+  const chunks: string[] = [];
+  const output = new Writable({
+    write(chunk, _encoding, callback) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk.toString('utf8') : String(chunk));
+      callback();
+    },
+  }) as Writable & { getOutput: () => string; isTTY?: boolean };
+  output.isTTY = false;
+  output.getOutput = () => chunks.join('');
+  return output;
+}
+
+function createInput(lines: string[]): Readable & { isTTY?: boolean } {
+  const input = Readable.from(lines) as Readable & { isTTY?: boolean };
+  input.isTTY = false;
+  return input;
 }
 
 function readJson<T>(filePath: string): T {
@@ -458,9 +477,71 @@ describe('automation logging helpers', () => {
     }
   });
 
-  it('skips monthly follow-up prompts in non-interactive mode and leaves suggestions pending', async () => {
+  it('prints a visible monthly follow-up outcome when there are no advisor suggestions', async () => {
+    const fixture = createFollowUpFixture([]);
+    const output = createOutputCapture();
+
+    try {
+      const result = await runMonthlyAutomationFollowUp({
+        scriptName: 'finalise',
+        monthKey: '2026-06',
+        reviewPath: fixture.reviewPath,
+        suggestionsPath: fixture.suggestionsPath,
+        suggestions: [],
+        knowledgeDirectory: fixture.knowledgeDirectory,
+        repoRoot: fixture.root,
+        output,
+        isInteractive: false,
+      });
+      const renderedOutput = output.getOutput();
+
+      expect(result.decisions).toEqual([]);
+      expect(renderedOutput).toContain('Monthly automation advisor review for finalise (2026-06)');
+      expect(renderedOutput).toContain('Advisor suggestions: 0');
+      expect(renderedOutput).toContain('No monthly automation upgrade suggestions were found.');
+      expect(renderedOutput).toContain('docs_private/automation/reviews/finalise/2026-06/review.md');
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true });
+    }
+  });
+
+  it('writes a pending monthly follow-up artifact for chat resolution', () => {
     const suggestion = createMemorySuggestion();
     const fixture = createFollowUpFixture([suggestion]);
+    const output = createOutputCapture();
+
+    try {
+      const result = writeMonthlyAutomationPendingFollowUp({
+        scriptName: 'finalise',
+        monthKey: '2026-06',
+        reviewPath: fixture.reviewPath,
+        suggestionsPath: fixture.suggestionsPath,
+        suggestions: [suggestion],
+        knowledgeDirectory: fixture.knowledgeDirectory,
+        repoRoot: fixture.root,
+        output,
+      });
+      const renderedOutput = output.getOutput();
+
+      expect(result.pendingPath).toBe(path.join(fixture.root, 'docs_private', 'automation', 'follow-ups', 'finalise', '2026-06', 'pending-follow-up.json'));
+      expect(existsSync(result.pendingPath!)).toBe(true);
+      expect(renderedOutput).toContain('Pending monthly follow-up artifact:');
+      expect(renderedOutput).toContain('Use the chat follow-up flow to approve, decline, or skip each suggestion.');
+
+      const pending = readJson<{ scriptName: string; suggestions: AutomationMemorySuggestion[] }>(result.pendingPath!);
+      expect(pending.scriptName).toBe('finalise');
+      expect(pending.suggestions[0].id).toBe(suggestion.id);
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true });
+    }
+  });
+
+  it('forces monthly follow-up prompting outside CI even when streams are not TTYs', async () => {
+    const originalCi = process.env.CI;
+    delete process.env.CI;
+    const suggestion = createMemorySuggestion();
+    const fixture = createFollowUpFixture([suggestion]);
+    const output = createOutputCapture();
 
     try {
       const result = await runMonthlyAutomationFollowUp({
@@ -471,12 +552,47 @@ describe('automation logging helpers', () => {
         suggestions: [suggestion],
         knowledgeDirectory: fixture.knowledgeDirectory,
         repoRoot: fixture.root,
-        output: createOutputSink(),
+        input: createInput(['a\n']),
+        output,
+      });
+      const persistedSuggestions = readJson<AutomationMemorySuggestion[]>(fixture.suggestionsPath);
+
+      expect(result.mode).toBe('interactive');
+      expect(result.decisions[0]).toMatchObject({ suggestionId: suggestion.id, action: 'approve' });
+      expect(persistedSuggestions[0].status).toBe('approved');
+      expect(result.planPath).toBe(path.join(fixture.root, 'plans', 'automation', 'finalise-2026-06-upgrade-plan.md'));
+      expect(output.getOutput()).toContain('Suggestion 1/1: approve, decline, or skip? [a/d/s]');
+    } finally {
+      if (originalCi === undefined) {
+        delete process.env.CI;
+      } else {
+        process.env.CI = originalCi;
+      }
+      rmSync(fixture.root, { recursive: true, force: true });
+    }
+  });
+
+  it('skips monthly follow-up prompts in non-interactive mode and leaves suggestions pending', async () => {
+    const suggestion = createMemorySuggestion();
+    const fixture = createFollowUpFixture([suggestion]);
+    const output = createOutputCapture();
+
+    try {
+      const result = await runMonthlyAutomationFollowUp({
+        scriptName: 'finalise',
+        monthKey: '2026-06',
+        reviewPath: fixture.reviewPath,
+        suggestionsPath: fixture.suggestionsPath,
+        suggestions: [suggestion],
+        knowledgeDirectory: fixture.knowledgeDirectory,
+        repoRoot: fixture.root,
+        output,
         isInteractive: false,
       });
 
       const persistedSuggestions = readJson<AutomationMemorySuggestion[]>(fixture.suggestionsPath);
       const review = readFileSync(fixture.reviewPath, 'utf8');
+      const renderedOutput = output.getOutput();
 
       expect(result.mode).toBe('non-interactive');
       expect(result.decisions).toEqual([]);
@@ -485,6 +601,9 @@ describe('automation logging helpers', () => {
       expect(persistedSuggestions[0].decisionAt).toBeUndefined();
       expect(review).not.toContain('## User Decisions');
       expect(existsSync(path.join(fixture.knowledgeDirectory, 'finalise-memory.json'))).toBe(false);
+      expect(renderedOutput).toContain('Non-interactive monthly follow-up mode detected.');
+      expect(renderedOutput).toContain('Suggestions remain pending.');
+      expect(renderedOutput).toContain('Ready-to-use Cursor prompt:');
     } finally {
       rmSync(fixture.root, { recursive: true, force: true });
     }
