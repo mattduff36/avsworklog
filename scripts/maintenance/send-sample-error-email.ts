@@ -3,11 +3,20 @@
  * Run with: npx tsx scripts/send-sample-error-email.ts
  */
 
-const RESEND_API_KEY = 're_MFndUias_JKudBfyXWDkfuvhM3DMwxa1q';
-const FROM_EMAIL = 'SquiresApp <no-reply@squiresapp.com>';
+import { config } from 'dotenv';
+
+config({ path: '.env.local' });
+
+const RESEND_API_KEY = process.env.RESEND_API_KEY?.trim();
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL?.trim() || 'SquiresApp <no-reply@squiresapp.com>';
 const TO_EMAIL = 'admin@mpdee.co.uk';
 
 async function sendSampleEmail() {
+  if (!RESEND_API_KEY) {
+    console.error('❌ RESEND_API_KEY is not configured. Add it to .env.local before running this sample.');
+    process.exit(1);
+  }
+
   console.log('🚀 Generating sample error summary email...\n');
 
   // Sample error data

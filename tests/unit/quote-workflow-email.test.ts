@@ -301,3 +301,73 @@ describe('sendQuoteToCustomerEmail', () => {
     ]);
   });
 });
+
+describe('createQuoteNotification', () => {
+  it('uses visible channel toggles even when the legacy enabled flag is false', async () => {
+    const { createQuoteNotification } = await import('@/lib/server/quote-workflow');
+    const messageInsert = vi.fn(() => ({
+      select: vi.fn(() => ({
+        single: vi.fn().mockResolvedValue({ data: { id: 'message-1' }, error: null }),
+      })),
+    }));
+    const recipientInsert = vi.fn().mockResolvedValue({ error: null });
+
+    mockCreateAdminClient.mockReturnValue({
+      auth: {
+        admin: {
+          getUserById: vi.fn().mockResolvedValue({
+            data: { user: { email: 'recipient@example.com' } },
+            error: null,
+          }),
+        },
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'notification_preferences') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                in: vi.fn().mockResolvedValue({
+                  data: [
+                    {
+                      user_id: 'recipient-1',
+                      enabled: false,
+                      notify_in_app: true,
+                      notify_email: true,
+                    },
+                  ],
+                  error: null,
+                }),
+              })),
+            })),
+          };
+        }
+        if (table === 'messages') {
+          return { insert: messageInsert };
+        }
+        if (table === 'message_recipients') {
+          return { insert: recipientInsert };
+        }
+
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    });
+
+    await createQuoteNotification({
+      senderId: 'sender-1',
+      recipientIds: ['recipient-1'],
+      subject: 'Quote update',
+      body: 'A quote needs attention.',
+      sendEmail: true,
+    });
+
+    expect(messageInsert).toHaveBeenCalled();
+    expect(recipientInsert).toHaveBeenCalledWith([
+      {
+        message_id: 'message-1',
+        user_id: 'recipient-1',
+        status: 'PENDING',
+      },
+    ]);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+});

@@ -7,7 +7,12 @@ import { parseCommitsFromMessages, selectPrimaryCommitMessage } from '../lib/con
 import { AutomationRun } from './automation/logger';
 import { checkFinaliseBlockingActivity, formatBlockingActivity } from './finalise-activity-guard';
 import { getSkippableFinaliseTasks, type RecentFinaliseTaskRun } from './finalise-recent-tasks';
-import { formatReleaseVersionCommitMessage, summarizeFinaliseChanges } from './finalise-summary';
+import {
+  formatReleaseVersionCommitMessage,
+  getFinaliseTimingSummaryLines,
+  summarizeFinaliseChanges,
+  type FinaliseTimingEntry,
+} from './finalise-summary';
 
 config({ path: path.resolve(process.cwd(), '.env.local') });
 
@@ -264,6 +269,30 @@ function getPushModeDescription(options: FinaliseOptions): string {
 
 function printProgress(message: string, percent: number): void {
   console.log(`- ${message} [${percent}% complete]`);
+}
+
+async function timeFinaliseStep<T>(
+  timings: FinaliseTimingEntry[],
+  label: string,
+  action: () => Promise<T> | T
+): Promise<T> {
+  const startedAt = Date.now();
+  try {
+    const result = await action();
+    timings.push({
+      label,
+      durationMs: Date.now() - startedAt,
+      status: 'completed',
+    });
+    return result;
+  } catch (error) {
+    timings.push({
+      label,
+      durationMs: Date.now() - startedAt,
+      status: 'failed',
+    });
+    throw error;
+  }
 }
 
 function formatRecentTask(run: RecentFinaliseTaskRun): string {
@@ -899,13 +928,16 @@ async function main(): Promise<void> {
 
     console.log(`Starting finalise workflow (${getPushModeDescription(options)})`);
     printProgress('Workflow started.', 0);
+    const timingEntries: FinaliseTimingEntry[] = [];
 
     if (devServerProcesses.length > 0) {
       console.log(`\n==> Stop dev server (${devServerProcesses.length} process${devServerProcesses.length === 1 ? '' : 'es'})`);
       printProgress('Stopping repo dev server...', 5);
-      await run.step('Stop repo dev server', () => stopRepoDevServer(), {
-        processCount: devServerProcesses.length,
-      });
+      await timeFinaliseStep(timingEntries, 'Stop repo dev server', () =>
+        run.step('Stop repo dev server', () => stopRepoDevServer(), {
+          processCount: devServerProcesses.length,
+        })
+      );
       printProgress('Repo dev server stopped.', 10);
     } else {
       console.log('\n==> Stop dev server');
@@ -922,9 +954,11 @@ async function main(): Promise<void> {
         printProgress(`Reused recent migration run: ${formatRecentTask(recentMigrationRun)}.`, 20);
       } else {
         printProgress(`Running ${pendingMigrationFiles.length} pending migration${pendingMigrationFiles.length === 1 ? '' : 's'}...`, 12);
-        await run.step('Run pending local migrations', () => runPendingMigrations(pendingMigrationFiles), {
-          migrationFiles: pendingMigrationFiles,
-        });
+        await timeFinaliseStep(timingEntries, 'Run pending local migrations', () =>
+          run.step('Run pending local migrations', () => runPendingMigrations(pendingMigrationFiles), {
+            migrationFiles: pendingMigrationFiles,
+          })
+        );
         printProgress('Pending migrations applied.', 20);
       }
     } else {
@@ -939,7 +973,7 @@ async function main(): Promise<void> {
         printProgress(`Reused recent database validation: ${formatRecentTask(recentDbValidateRun)}.`, 25);
       } else {
         printProgress('Running database validation...', 22);
-        runCommand('npm', ['run', 'db:validate']);
+        await timeFinaliseStep(timingEntries, 'Run database validation', () => runCommand('npm', ['run', 'db:validate']));
         printProgress('Database validation passed.', 25);
       }
     } else {
@@ -957,7 +991,9 @@ async function main(): Promise<void> {
       const removedBuildOutput = await run.step('Remove clean build output', () => removeNextBuildOutput());
       printProgress(removedBuildOutput ? 'Removed .next build output.' : 'No .next build output to remove.', 30);
 
-      await run.step('Run clean production build', () => runCleanProductionBuildWithProgress());
+      await timeFinaliseStep(timingEntries, 'Run clean production build', () =>
+        run.step('Run clean production build', () => runCleanProductionBuildWithProgress())
+      );
     }
 
     if (options.full) {
@@ -993,7 +1029,9 @@ async function main(): Promise<void> {
             printProgress(`Reused recent Vitest test run: ${formatRecentTask(recentTestRun)}.`, 72);
           } else {
             printProgress('Running Vitest unit, integration, and component tests...', 60);
-            runCommand('npm', ['run', 'test:run'], { env: localTestEnv });
+            await timeFinaliseStep(timingEntries, 'Run Vitest test run', () =>
+              runCommand('npm', ['run', 'test:run'], { env: localTestEnv })
+            );
             printProgress('Vitest test run passed.', 72);
           }
           if (recentTestsuiteRun) {
@@ -1001,12 +1039,16 @@ async function main(): Promise<void> {
             printProgress(`Reused recent API and Playwright testsuite: ${formatRecentTask(recentTestsuiteRun)}.`, 84);
           } else {
             printProgress('Running API and Playwright testsuite...', 75);
-            runCommand('npm', ['run', 'testsuite'], { env: localTestEnv });
+            await timeFinaliseStep(timingEntries, 'Run API and Playwright testsuite', () =>
+              runCommand('npm', ['run', 'testsuite'], { env: localTestEnv })
+            );
             printProgress('Full automated test suite passed.', 84);
           }
         } finally {
           printProgress('Stopping local production server...', 85);
-          await run.step('Stop local production server', () => stopManagedProcess(testServer));
+          await timeFinaliseStep(timingEntries, 'Stop local production server', () =>
+            run.step('Stop local production server', () => stopManagedProcess(testServer))
+          );
           printProgress('Local production server stopped.', 86);
         }
       }
@@ -1028,7 +1070,9 @@ async function main(): Promise<void> {
 
     console.log('\n==> Commit workspace changes');
     printProgress('Committing workspace changes if needed...', 90);
-    const committed = commitAllChanges(changeSummary.commitMessage);
+    const committed = await timeFinaliseStep(timingEntries, 'Commit workspace changes', () =>
+      commitAllChanges(changeSummary.commitMessage)
+    );
     printProgress(
       committed ? `Created commit: ${changeSummary.commitMessage}` : 'No uncommitted changes, so no commit was created.',
       92
@@ -1041,8 +1085,10 @@ async function main(): Promise<void> {
     const releasePrimaryCommitMessage =
       getReleaseCommitPrimaryMessage(releaseBeforeSha, releaseAfterSha) ??
       (committed ? changeSummary.commitMessage : null);
-    runCommand('npm', ['run', 'version:bump', '--', releaseBeforeSha, releaseAfterSha]);
-    const releaseVersion = commitReleaseVersionChanges(releasePrimaryCommitMessage);
+    const releaseVersion = await timeFinaliseStep(timingEntries, 'Bump release version locally', () => {
+      runCommand('npm', ['run', 'version:bump', '--', releaseBeforeSha, releaseAfterSha]);
+      return commitReleaseVersionChanges(releasePrimaryCommitMessage);
+    });
     printProgress(
       releaseVersion
         ? `Created release version commit: ${formatReleaseVersionCommitMessage(releasePrimaryCommitMessage, releaseVersion).split(/\r?\n/u)[0]}`
@@ -1054,7 +1100,7 @@ async function main(): Promise<void> {
     if (options.push) {
       console.log('\n==> Push current branch');
       printProgress(`Pushing branch ${branch || '(detached HEAD)'}...`, 97);
-      pushedBranch = pushCurrentBranch();
+      pushedBranch = await timeFinaliseStep(timingEntries, 'Push current branch', () => pushCurrentBranch());
       printProgress(`Pushed ${pushedBranch}.`, 99);
     } else {
       console.log('\n==> Push current branch');
@@ -1077,6 +1123,8 @@ async function main(): Promise<void> {
     console.log(`- Commit: ${committed ? 'created' : 'skipped'}`);
     console.log(`- Release version: ${releaseVersion ? `bumped to ${releaseVersion}` : 'unchanged'}`);
     console.log(`- Push: ${pushedBranch ? `pushed ${pushedBranch}` : 'skipped'}`);
+    console.log('\n==> Timing summary');
+    getFinaliseTimingSummaryLines(timingEntries).forEach((line) => console.log(line));
     printProgress('Finalise workflow complete.', 100);
     await run.finish('passed');
   } catch (error) {

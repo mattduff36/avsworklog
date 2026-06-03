@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bell, CircleHelp, ClipboardList, IdCard, Settings, ShieldCheck, SlidersHorizontal, UserRound } from 'lucide-react';
+import { Bell, ClipboardList, IdCard, Settings, ShieldCheck, SlidersHorizontal, UserRound } from 'lucide-react';
 import { useQueryState } from 'nuqs';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
@@ -10,7 +10,6 @@ import { AppPageShell } from '@/components/layout/AppPageShell';
 import { NuqsClientAdapter } from '@/components/providers/NuqsClientAdapter';
 import { PROFILE_HUB_PRD_EPIC_ID } from '@/lib/profile/epic';
 import { cn } from '@/lib/utils/cn';
-import { ProfileHelpTab } from '@/components/profile/ProfileHelpTab';
 import { ProfileIdentityCard } from '@/components/profile/ProfileIdentityCard';
 import { type ProfileDetailsDraft, ProfileMyDetailsTab } from '@/components/profile/ProfileMyDetailsTab';
 import { ProfileNotificationsTab } from '@/components/profile/ProfileNotificationsTab';
@@ -29,10 +28,10 @@ import {
 } from '@/types/notifications';
 import type { ProfileOverviewPayload } from '@/types/profile';
 
-type ProfilePageTab = 'overview' | 'recent' | 'settings' | 'help';
+type ProfilePageTab = 'overview' | 'recent' | 'settings';
 type ProfileSettingsTab = 'my-details' | 'notifications' | 'security' | 'permissions';
 
-const PROFILE_PAGE_TABS: ProfilePageTab[] = ['overview', 'recent', 'settings', 'help'];
+const PROFILE_PAGE_TABS: ProfilePageTab[] = ['overview', 'recent', 'settings'];
 const PROFILE_SETTINGS_TABS: ProfileSettingsTab[] = [
   'my-details',
   'notifications',
@@ -48,7 +47,6 @@ const PROFILE_NAV_ITEMS: Array<{
   { value: 'overview', label: 'Overview', icon: IdCard },
   { value: 'recent', label: 'Recent Submissions', icon: ClipboardList },
   { value: 'settings', label: 'Settings', icon: Settings },
-  { value: 'help', label: 'Help', icon: CircleHelp },
 ];
 
 const SETTINGS_NAV_ITEMS: Array<{
@@ -572,10 +570,6 @@ function ProfilePageContent() {
             <Settings className="h-4 w-4" />
             Settings
           </TabsTrigger>
-          <TabsTrigger value="help" className="gap-2">
-            <CircleHelp className="h-4 w-4" />
-            Help
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-0">
@@ -584,6 +578,7 @@ function ProfilePageContent() {
             managers={overview.managers}
             annualLeaveSummary={overview.annual_leave_summary}
             permissionModules={overview.permission_summary.modules}
+            helpShortcuts={overview.help_shortcuts}
           />
         </TabsContent>
 
@@ -669,10 +664,6 @@ function ProfilePageContent() {
               </div>
             </div>
           </Tabs>
-        </TabsContent>
-
-        <TabsContent value="help" className="mt-0">
-          <ProfileHelpTab articles={overview.help_articles} />
         </TabsContent>
       </Tabs>
     </AppPageShell>

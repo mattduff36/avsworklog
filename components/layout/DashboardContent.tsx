@@ -45,7 +45,7 @@ export function DashboardContent({ children }: DashboardContentProps) {
   return (
     <div className={`transition-all duration-300 ${shouldApplySidebarOffset ? 'md:pl-16' : ''}`}>
       <main
-        className={`app-content relative z-10 pt-[calc(68px+2rem)] pb-8 md:py-8 ${
+        className={`app-content relative pt-[calc(68px+2rem)] pb-8 md:py-8 ${
           appWidescreenEnabled
             ? 'max-w-none mx-0'
             : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'

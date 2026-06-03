@@ -8,12 +8,14 @@ import { useQueryState } from 'nuqs';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { resolveNotificationToOpen } from '@/lib/utils/notification-helpers';
+import {
+  getNotificationPreference,
+  NotificationPreferencesCard,
+} from '@/components/notifications/NotificationPreferencesCard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PanelLoader } from '@/components/ui/panel-loader';
@@ -29,10 +31,7 @@ import {
   Info, 
   Settings,
   Users,
-  Wrench,
   FileText,
-  CheckSquare,
-  ClipboardCheck,
   PenLine
 } from 'lucide-react';
 import { formatDateTime } from '@/lib/utils/date';
@@ -47,16 +46,6 @@ import { ToolboxTalkPdfDialog } from '@/components/messages/ToolboxTalkPdfDialog
 // Dynamic imports for modal components
 const BlockingMessageModal = dynamic(() => import('@/components/messages/BlockingMessageModal').then(m => ({ default: m.BlockingMessageModal })), { ssr: false });
 const ReminderModal = dynamic(() => import('@/components/messages/ReminderModal').then(m => ({ default: m.ReminderModal })), { ssr: false });
-
-const MODULE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  'AlertTriangle': AlertTriangle,
-  'Wrench': Wrench,
-  'FileText': FileText,
-  'CheckSquare': CheckSquare,
-  'ClipboardCheck': ClipboardCheck,
-  'PenLine': PenLine,
-  'Bell': Bell,
-};
 
 function isDismissibleNotification(notification: NotificationItem) {
   return notification.type === 'REMINDER' || notification.type === 'NOTIFICATION';
@@ -96,6 +85,7 @@ interface NotificationPreferencePromptProps {
   isLoading: boolean;
   isInAppDisabled: boolean;
   onDisable: () => void;
+  variant?: 'card' | 'footer';
 }
 
 function NotificationPreferencePrompt({
@@ -104,10 +94,13 @@ function NotificationPreferencePrompt({
   isLoading,
   isInAppDisabled,
   onDisable,
+  variant = 'card',
 }: NotificationPreferencePromptProps) {
+  const isFooter = variant === 'footer';
+
   return (
-    <div className="relative overflow-hidden rounded-xl border border-avs-yellow/30 bg-gradient-to-br from-avs-yellow/15 via-slate-50 to-white p-4 shadow-sm dark:from-avs-yellow/10 dark:via-slate-900 dark:to-slate-950">
-      <div className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-avs-yellow/20 blur-3xl" />
+    <div className={isFooter ? 'relative' : 'relative overflow-hidden rounded-xl border border-avs-yellow/30 bg-gradient-to-br from-avs-yellow/15 via-slate-50 to-white p-4 shadow-sm dark:from-avs-yellow/10 dark:via-slate-900 dark:to-slate-950'}>
+      {!isFooter ? <div className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-avs-yellow/20 blur-3xl" /> : null}
       <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-avs-yellow/20 text-avs-yellow ring-1 ring-avs-yellow/30 dark:bg-avs-yellow/15">
@@ -216,9 +209,18 @@ function NotificationDetailPane({
   const isToolboxTalk = notification.type === 'TOOLBOX_TALK';
   const hasSigned = notification.status === 'SIGNED';
   const pdfUrl = notification.pdf_file_path ? buildToolboxTalkPdfUrl(notification.pdf_file_path) : null;
+  const preferencePrompt = notificationModule ? (
+    <NotificationPreferencePrompt
+      module={notificationModule}
+      isLoading={isLoadingPreferences}
+      isSaving={isSavingPreference}
+      isInAppDisabled={isModuleInAppDisabled}
+      onDisable={onDisableModuleNotifications}
+    />
+  ) : null;
 
   return (
-    <Card className={`flex min-h-[42rem] flex-col overflow-hidden border-border bg-white dark:bg-slate-900 ${className}`}>
+    <Card className={`relative flex min-h-[42rem] flex-col overflow-hidden border-border bg-white dark:bg-slate-900 md:h-full md:min-h-0 ${className}`}>
       <CardHeader className="border-b border-border">
         <div className="mb-3 md:hidden">
           <Button type="button" variant="outline" size="sm" onClick={onBack} className="gap-2">
@@ -251,7 +253,7 @@ function NotificationDetailPane({
         </div>
       </CardHeader>
 
-      <CardContent className="flex flex-1 overflow-y-auto p-0">
+      <CardContent className="flex min-h-0 flex-1 overflow-y-auto p-0 md:pb-36">
         <div className="flex min-h-full w-full flex-col gap-6 p-6">
           {isMarkingRead && (
             <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
@@ -341,19 +343,26 @@ function NotificationDetailPane({
             </div>
           )}
 
-          {notificationModule && (
-            <div className="mt-auto pt-2">
-              <NotificationPreferencePrompt
-                module={notificationModule}
-                isLoading={isLoadingPreferences}
-                isSaving={isSavingPreference}
-                isInAppDisabled={isModuleInAppDisabled}
-                onDisable={onDisableModuleNotifications}
-              />
+          {preferencePrompt && (
+            <div className="pt-2 md:hidden">
+              {preferencePrompt}
             </div>
           )}
         </div>
       </CardContent>
+
+      {preferencePrompt && (
+        <div className="hidden border-t border-border bg-slate-950/20 p-6 md:absolute md:bottom-0 md:left-0 md:right-0 md:block">
+          <NotificationPreferencePrompt
+            module={notificationModule!}
+            isLoading={isLoadingPreferences}
+            isSaving={isSavingPreference}
+            isInAppDisabled={isModuleInAppDisabled}
+            onDisable={onDisableModuleNotifications}
+            variant="footer"
+          />
+        </div>
+      )}
     </Card>
   );
 }
@@ -390,7 +399,7 @@ function NotificationsContent() {
   // Preferences state
   const [preferences, setPreferences] = useState<NotificationPreference[]>([]);
   const [loadingPrefs, setLoadingPrefs] = useState(true);
-  const [savingPrefModule, setSavingPrefModule] = useState<string | null>(null);
+  const [savingPrefModule, setSavingPrefModule] = useState<NotificationModuleKey | null>(null);
   
   // Admin state
   const [selectedUserId, setSelectedUserId] = useState<string>('all');
@@ -619,7 +628,7 @@ function NotificationsContent() {
         setPreferences(prev => {
           const existing = prev.find(p => p.module_key === moduleKey);
           if (existing) {
-            return prev.map(p => p.module_key === moduleKey ? { ...p, [field]: value } : p);
+            return prev.map(p => p.module_key === moduleKey ? data.preference : p);
           } else {
             return [...prev, data.preference];
           }
@@ -691,18 +700,6 @@ function NotificationsContent() {
     }
   }
 
-  const getPreference = (moduleKey: NotificationModuleKey) => {
-    return preferences.find(p => p.module_key === moduleKey) || {
-      notify_in_app: true,
-      notify_email: true,
-    };
-  };
-
-  const getModuleIcon = (iconName: string) => {
-    const Icon = MODULE_ICONS[iconName] || Bell;
-    return Icon;
-  };
-
   const selectedNotificationModuleKey = selectedNotification
     ? resolveNotificationModuleKey(selectedNotification)
     : null;
@@ -710,7 +707,7 @@ function NotificationsContent() {
     ? availableModules.find((module) => module.key === selectedNotificationModuleKey) ?? null
     : null;
   const selectedNotificationPreference = selectedNotificationModule
-    ? getPreference(selectedNotificationModule.key)
+    ? getNotificationPreference(preferences, selectedNotificationModule.key)
     : null;
 
   function handleDisableSelectedModuleNotifications() {
@@ -792,8 +789,8 @@ function NotificationsContent() {
                   </CardContent>
                 </Card>
               ) : (
-                <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-                  <Card className={`overflow-hidden border-border bg-white dark:bg-slate-900 ${mobileDetailOpen && selectedNotification ? 'hidden md:block' : ''}`}>
+                <div className="grid items-stretch gap-4 md:h-[calc(100dvh-28rem)] md:min-h-[32rem] md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+                  <Card className={`flex min-h-[42rem] flex-col overflow-hidden border-border bg-white dark:bg-slate-900 md:min-h-0 ${mobileDetailOpen && selectedNotification ? 'hidden md:flex' : ''}`}>
                     <CardHeader className="border-b border-border px-4 py-3">
                       <CardTitle className="text-base text-foreground">
                         Inbox
@@ -802,7 +799,7 @@ function NotificationsContent() {
                         {filteredNotifications.length} notification{filteredNotifications.length === 1 ? '' : 's'}
                       </CardDescription>
                     </CardHeader>
-                    <CardContent className="max-h-[42rem] overflow-y-auto p-0">
+                    <CardContent className="min-h-0 flex-1 overflow-y-auto p-0">
                       <div className="divide-y divide-border">
                         {filteredNotifications.map((notification) => {
                           const isSelected = selectedNotification?.id === notification.id;
@@ -879,72 +876,15 @@ function NotificationsContent() {
 
             {/* Preferences Tab */}
             <TabsContent value="preferences" className="space-y-4 mt-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-foreground">Notification Preferences</CardTitle>
-                  <CardDescription className="text-muted-foreground">
-                    Customize how you receive notifications for different modules
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {loadingPrefs ? (
-                    <PanelLoader message="Loading notification preferences..." accent="reminders" className="py-8" />
-                  ) : (
-                    <div className="space-y-6">
-                      {availableModules.map((module) => {
-                        const pref = getPreference(module.key);
-                        const Icon = getModuleIcon(module.icon);
-                        const isSaving = savingPrefModule === module.key;
-
-                        return (
-                          <div key={module.key} className="pb-6 border-b border-border last:border-0 last:pb-0">
-                            <div className="flex items-start gap-3 mb-4">
-                              <Icon className="h-5 w-5 text-muted-foreground mt-0.5" />
-                              <div className="flex-1">
-                                <h3 className="font-medium text-foreground">{module.label}</h3>
-                                <p className="text-sm text-muted-foreground">{module.description}</p>
-                              </div>
-                            </div>
-
-                            <div className="ml-8 space-y-3">
-                              <div className="flex items-center justify-between">
-                                <Label htmlFor={`${module.key}-in-app`} className="text-sm font-medium text-foreground dark:text-slate-200">
-                                  In-App Notifications
-                                </Label>
-                                <Switch
-                                  id={`${module.key}-in-app`}
-                                  checked={pref.notify_in_app}
-                                  onCheckedChange={(checked) => updatePreference(module.key, 'notify_in_app', checked)}
-                                  disabled={isSaving}
-                                />
-                              </div>
-                              
-                              <div className="flex items-center justify-between">
-                                <Label htmlFor={`${module.key}-email`} className="text-sm font-medium text-foreground dark:text-slate-200">
-                                  Email Notifications
-                                </Label>
-                                <Switch
-                                  id={`${module.key}-email`}
-                                  checked={pref.notify_email}
-                                  onCheckedChange={(checked) => updatePreference(module.key, 'notify_email', checked)}
-                                  disabled={isSaving}
-                                />
-                              </div>
-
-                              {isSaving && (
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  <Loader2 className="h-3 w-3 animate-spin" />
-                                  Saving...
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <NotificationPreferencesCard
+                title="Notification Preferences"
+                description="Customize how you receive notifications for different modules."
+                modules={availableModules}
+                preferences={preferences}
+                isLoadingPreferences={loadingPrefs}
+                savingPreferenceModules={savingPrefModule ? [savingPrefModule] : []}
+                onTogglePreference={updatePreference}
+              />
             </TabsContent>
 
             {/* Admin Tab */}
@@ -952,16 +892,26 @@ function NotificationsContent() {
               <TabsContent value="admin" className="space-y-4 mt-4">
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-foreground">View Notifications For</CardTitle>
+                    <CardTitle className="text-foreground">Admin Notification Viewer</CardTitle>
                     <CardDescription className="text-muted-foreground">
-                      Select a user to view their notification history
+                      Select a user to review their recent notification history.
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex items-center gap-3">
-                      <Users className="h-5 w-5 text-muted-foreground" />
+                    <div className="rounded-lg border border-border bg-slate-900/30 p-5 sm:p-4">
+                      <div className="mb-4 flex items-start gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-avs-yellow/30 bg-avs-yellow/10 text-avs-yellow">
+                          <Users className="h-5 w-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-lg font-semibold text-foreground sm:text-sm">View user notifications</p>
+                          <p className="text-sm text-muted-foreground sm:text-xs">
+                            Choose a user to inspect their inbox state and recent notification activity.
+                          </p>
+                        </div>
+                      </div>
                       <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                        <SelectTrigger className="w-full max-w-md">
+                        <SelectTrigger className="w-full max-w-md border-border bg-slate-950/50">
                           <SelectValue placeholder="Select user" />
                         </SelectTrigger>
                         <SelectContent className="max-h-[300px]">
@@ -980,63 +930,67 @@ function NotificationsContent() {
                 {/* Admin Notifications Display */}
                 {selectedUserId === 'all' ? (
                   <Card>
-                    <CardContent className="p-8 text-center text-muted-foreground">
-                      <Info className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <p>Select a user to view their notifications</p>
+                    <CardContent className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
+                      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl border border-border bg-slate-900/30">
+                        <Info className="h-7 w-7 text-muted-foreground" />
+                      </div>
+                      <p className="font-medium text-foreground">Select a user to view their notifications</p>
+                      <p className="mt-1 text-sm">Their notification history will appear here.</p>
                     </CardContent>
                   </Card>
                 ) : loadingAdminNotifications ? (
                   <PanelLoader message="Loading user notifications..." accent="reminders" className="py-12" />
                 ) : adminNotifications.length === 0 ? (
                   <Card>
-                    <CardContent className="p-8 text-center text-muted-foreground">
-                      <Bell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <p>This user has no notifications in the last 60 days</p>
+                    <CardContent className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
+                      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl border border-border bg-slate-900/30">
+                        <Bell className="h-7 w-7 text-muted-foreground" />
+                      </div>
+                      <p className="font-medium text-foreground">No recent notifications</p>
+                      <p className="mt-1 text-sm">This user has no notifications in the last 60 days.</p>
                     </CardContent>
                   </Card>
                 ) : (
                   <div className="space-y-3">
                     {adminNotifications.map((notification) => (
-                      <Card
+                      <button
                         key={notification.id}
-                        className="bg-white dark:bg-slate-900 border-border hover:shadow-lg transition-shadow cursor-pointer"
+                        type="button"
+                        className="block w-full rounded-lg border border-border bg-slate-900/30 p-4 text-left transition-colors hover:bg-slate-900/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-avs-yellow"
                         onClick={() => handleAdminNotificationClick(notification)}
                       >
-                        <CardContent className="p-4">
-                          <div className="flex items-start gap-4">
-                            <div className="mt-1">
-                              {notification.priority === 'HIGH' ? (
-                                <div className="p-2 bg-red-100 dark:bg-red-950 rounded">
-                                  <AlertTriangle className="h-5 w-5 text-red-600" />
-                                </div>
-                              ) : (
-                                <div className="p-2 bg-blue-100 dark:bg-blue-950 rounded">
-                                  <Bell className="h-5 w-5 text-blue-600" />
-                                </div>
-                              )}
+                        <div className="flex items-start gap-4">
+                          <div className="mt-1">
+                            {notification.priority === 'HIGH' ? (
+                              <div className="rounded-lg border border-red-500/30 bg-red-500/15 p-2">
+                                <AlertTriangle className="h-5 w-5 text-red-300" />
+                              </div>
+                            ) : (
+                              <div className="rounded-lg border border-sky-500/30 bg-sky-500/15 p-2">
+                                <Bell className="h-5 w-5 text-sky-300" />
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="mb-2 flex items-start justify-between gap-2">
+                              <h3 className="font-semibold text-foreground">
+                                {notification.subject}
+                              </h3>
+                              {getStatusBadge(notification.status)}
                             </div>
 
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between gap-2 mb-2">
-                                <h3 className="font-semibold text-foreground">
-                                  {notification.subject}
-                                </h3>
-                                {getStatusBadge(notification.status)}
-                              </div>
+                            <p className="mb-2 line-clamp-2 text-sm text-muted-foreground">
+                              {notification.body}
+                            </p>
 
-                              <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
-                                {notification.body}
-                              </p>
-
-                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <span>From: {notification.sender_name}</span>
-                                <span>•</span>
-                                <span>{formatDateTime(notification.created_at)}</span>
-                              </div>
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                              <span>From: {notification.sender_name}</span>
+                              <span>{formatDateTime(notification.created_at)}</span>
                             </div>
                           </div>
-                        </CardContent>
-                      </Card>
+                        </div>
+                      </button>
                     ))}
                   </div>
                 )}

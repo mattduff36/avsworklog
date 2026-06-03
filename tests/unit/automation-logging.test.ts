@@ -467,7 +467,8 @@ describe('automation logging helpers', () => {
 
       expect(result.planPath).toBe(path.join(fixture.root, 'plans', 'automation', 'finalise-2026-06-upgrade-plan.md'));
       expect(existsSync(result.planPath!)).toBe(true);
-      expect(readFileSync(result.planPath!, 'utf8')).toContain('Ready-To-Use Cursor Prompt');
+      expect(readFileSync(result.planPath!, 'utf8')).toContain('## Implementation Steps');
+      expect(readFileSync(result.planPath!, 'utf8')).toContain('Keep this plan file todo metadata aligned');
       expect(persistedSuggestions[0].status).toBe('approved');
       expect(persistedSuggestions[0].planPath).toBe('plans/automation/finalise-2026-06-upgrade-plan.md');
       expect(persistedMemory.suggestions[0].status).toBe('approved');

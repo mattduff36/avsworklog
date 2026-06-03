@@ -8,6 +8,7 @@ import { MessageBlockingCheck } from '@/components/messages/MessageBlockingCheck
 import { MobileNavBar } from '@/components/layout/MobileNavBar';
 import { PullToRefresh } from '@/components/layout/PullToRefresh';
 import { Button } from '@/components/ui/button';
+import { PageLoader } from '@/components/ui/page-loader';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { getAccentFromRoute } from '@/lib/theme/getAccentFromRoute';
 import { TabletModeProvider, useTabletMode } from '@/components/layout/tablet-mode-context';
@@ -91,6 +92,7 @@ function DashboardLayoutShell({
   const heartbeatIntervalRef = useRef<number | null>(null);
   const heartbeatOwnerTabIdRef = useRef<string>(createPageVisitTabId());
   const sessionStartedRef = useRef(false);
+  const showLoadingOnly = authLoading || !profile?.id;
   
   const getCurrentTrackedPath = useCallback(() => {
     if (!pathname) return '';
@@ -296,6 +298,10 @@ function DashboardLayoutShell({
       document.documentElement.removeAttribute('data-mobile-text-size');
     };
   }, []);
+
+  if (showLoadingOnly) {
+    return <PageLoader message="Loading SquireApp" />;
+  }
 
   return (
     <div 

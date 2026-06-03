@@ -4,7 +4,20 @@ export interface FinaliseChangeSummary {
   areas: string[];
 }
 
+export interface FinaliseTimingEntry {
+  label: string;
+  durationMs: number;
+  status?: 'completed' | 'failed' | 'reused' | 'skipped';
+}
+
+interface FinaliseTimingSummaryOptions {
+  limit?: number;
+  slowThresholdMs?: number;
+}
+
 const SKIP_VERSION_MARKER = '[skip version]';
+const DEFAULT_SLOW_TIMING_THRESHOLD_MS = 30_000;
+const DEFAULT_TIMING_SUMMARY_LIMIT = 5;
 
 interface ChangeDescriptor {
   scope: string;
@@ -234,4 +247,35 @@ export function formatReleaseVersionCommitMessage(primaryCommitMessage: string |
   const subject = primarySubject || `chore(release): publish ${version}`;
 
   return `${subject} ${SKIP_VERSION_MARKER}\n\nRelease version: ${version}`;
+}
+
+export function formatFinaliseDuration(durationMs: number): string {
+  if (durationMs < 1000) return `${durationMs}ms`;
+  const seconds = durationMs / 1000;
+  if (seconds < 60) return `${seconds.toFixed(1)}s`;
+  return `${(seconds / 60).toFixed(1)}m`;
+}
+
+export function getFinaliseTimingSummaryLines(
+  entries: FinaliseTimingEntry[],
+  options: FinaliseTimingSummaryOptions = {}
+): string[] {
+  const slowThresholdMs = options.slowThresholdMs ?? DEFAULT_SLOW_TIMING_THRESHOLD_MS;
+  const limit = options.limit ?? DEFAULT_TIMING_SUMMARY_LIMIT;
+  const slowEntries = entries
+    .filter((entry) => entry.durationMs >= slowThresholdMs)
+    .sort((left, right) => right.durationMs - left.durationMs)
+    .slice(0, limit);
+
+  if (slowEntries.length === 0) {
+    return [`Timing summary: no finalise steps exceeded ${formatFinaliseDuration(slowThresholdMs)}.`];
+  }
+
+  return [
+    `Timing summary (steps over ${formatFinaliseDuration(slowThresholdMs)}):`,
+    ...slowEntries.map((entry) => {
+      const status = entry.status && entry.status !== 'completed' ? ` (${entry.status})` : '';
+      return `- ${entry.label}: ${formatFinaliseDuration(entry.durationMs)}${status}`;
+    }),
+  ];
 }

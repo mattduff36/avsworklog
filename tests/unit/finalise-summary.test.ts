@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { formatReleaseVersionCommitMessage, summarizeFinaliseChanges } from '@/scripts/finalise-summary';
+import {
+  formatReleaseVersionCommitMessage,
+  getFinaliseTimingSummaryLines,
+  summarizeFinaliseChanges,
+} from '@/scripts/finalise-summary';
 
 describe('finalise change summaries', () => {
   it('describes finalise automation work instead of using a generic finalisation message', () => {
@@ -53,5 +57,23 @@ describe('finalise change summaries', () => {
     expect(formatReleaseVersionCommitMessage('fix(layout): hide sidebar scrollbar [skip version]', '0526.5.1')).toBe(
       'fix(layout): hide sidebar scrollbar [skip version]\n\nRelease version: 0526.5.1'
     );
+  });
+
+  it('summarises only slow finalise timing entries in descending order', () => {
+    expect(getFinaliseTimingSummaryLines([
+      { label: 'Commit workspace changes', durationMs: 1200 },
+      { label: 'Run clean production build', durationMs: 286_755 },
+      { label: 'Run API and Playwright testsuite', durationMs: 180_000 },
+    ])).toEqual([
+      'Timing summary (steps over 30.0s):',
+      '- Run clean production build: 4.8m',
+      '- Run API and Playwright testsuite: 3.0m',
+    ]);
+  });
+
+  it('prints a clear timing summary when no finalise steps are slow', () => {
+    expect(getFinaliseTimingSummaryLines([
+      { label: 'Commit workspace changes', durationMs: 1200 },
+    ])).toEqual(['Timing summary: no finalise steps exceeded 30.0s.']);
   });
 });

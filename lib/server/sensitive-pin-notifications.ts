@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getPrimaryResendEmailConfig } from '@/lib/server/resend-email-config';
 
 interface AdminProfileRow {
   id: string;
@@ -76,7 +77,7 @@ async function sendSensitivePinEmail(params: {
 }): Promise<void> {
   if (params.to.length === 0) return;
 
-  const apiKey = process.env.RESEND_API_KEY;
+  const { apiKey, fromEmail } = getPrimaryResendEmailConfig();
   if (!apiKey) {
     console.warn('RESEND_API_KEY not configured; sensitive PIN admin email skipped');
     return;
@@ -89,7 +90,7 @@ async function sendSensitivePinEmail(params: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: process.env.RESEND_FROM_EMAIL || 'AVS Worklog <onboarding@resend.dev>',
+      from: fromEmail,
       to: params.to,
       subject: params.subject,
       html: `

@@ -2,7 +2,7 @@ import pg from 'pg';
 import { renderToStream } from '@react-pdf/renderer';
 import { QuotePDF } from '@/lib/pdf/quote-pdf';
 import { loadSquiresLogoDataUrl } from '@/lib/pdf/squires-logo';
-import { getQuotesCustomersEmailConfig } from '@/lib/server/quotes-customers-email-config';
+import { getQuoteResendEmailConfig } from '@/lib/server/resend-email-config';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getUsersWithModuleAccess } from '@/lib/server/team-permissions';
 import { getHiddenSystemTestAccountIds } from '@/lib/server/system-test-accounts';
@@ -415,7 +415,7 @@ async function sendEmail(params: {
   html: string;
   attachments?: EmailAttachment[];
 }): Promise<{ success: boolean; error?: string }> {
-  const { apiKey, fromEmail } = getQuotesCustomersEmailConfig();
+  const { apiKey, fromEmail } = getQuoteResendEmailConfig();
   if (!apiKey) {
     return { success: false, error: 'Email service not configured' };
   }
@@ -446,7 +446,7 @@ async function sendEmail(params: {
 }
 
 function getDefaultFromEmail(): string {
-  return getQuotesCustomersEmailConfig().fromEmail;
+  return getQuoteResendEmailConfig().fromEmail;
 }
 
 function normalizeEmailAddress(value?: string | null): string | null {
@@ -766,11 +766,11 @@ export async function createQuoteNotification(params: {
   const preferenceByUserId = new Map((preferences || []).map(preference => [preference.user_id, preference]));
   const shouldNotifyInApp = (recipientId: string) => {
     const preference = preferenceByUserId.get(recipientId);
-    return preference?.enabled !== false && preference?.notify_in_app !== false;
+    return preference?.notify_in_app !== false;
   };
   const shouldNotifyByEmail = (recipientId: string) => {
     const preference = preferenceByUserId.get(recipientId);
-    return preference?.enabled !== false && preference?.notify_email !== false;
+    return preference?.notify_email !== false;
   };
 
   const inAppRecipientIds = recipientIds.filter(shouldNotifyInApp);

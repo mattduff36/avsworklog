@@ -56,25 +56,6 @@ interface ProjectDocumentRow {
   }> | null;
 }
 
-interface FaqCategoryRow {
-  id: string;
-  name: string;
-  slug: string;
-  module_name: string | null;
-}
-
-interface FaqArticleRow {
-  id: string;
-  title: string;
-  summary: string | null;
-  category_id: string;
-  category?: FaqCategoryRow | FaqCategoryRow[] | null;
-}
-
-function isModuleName(value: string | null | undefined): value is ModuleName {
-  return ALL_MODULES.includes(value as ModuleName);
-}
-
 function getRelationValue<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] || null;
   return value || null;
@@ -214,58 +195,6 @@ async function buildPermissionSummary(
   };
 }
 
-async function buildHelpArticleSummaries(
-  admin: ReturnType<typeof createAdminClient>,
-  accessibleModules: ModuleName[]
-): Promise<ProfileOverviewPayload['help_articles']> {
-  const { data: categories, error: categoriesError } = await admin
-    .from('faq_categories')
-    .select('id, name, slug, module_name')
-    .eq('is_active', true)
-    .order('sort_order', { ascending: true });
-
-  if (categoriesError) throw categoriesError;
-
-  const accessibleModuleSet = new Set(accessibleModules);
-  const filteredCategories = ((categories || []) as FaqCategoryRow[]).filter((category) => {
-    if (!category.module_name) return true;
-    return isModuleName(category.module_name) && accessibleModuleSet.has(category.module_name);
-  });
-  const categoryIds = filteredCategories.map((category) => category.id);
-  if (categoryIds.length === 0) return [];
-
-  const { data: articles, error: articlesError } = await admin
-    .from('faq_articles')
-    .select(`
-      id,
-      title,
-      summary,
-      category_id,
-      category:faq_categories(id, name, slug, module_name)
-    `)
-    .eq('is_published', true)
-    .in('category_id', categoryIds)
-    .order('sort_order', { ascending: true })
-    .limit(6);
-
-  if (articlesError) throw articlesError;
-
-  return ((articles || []) as FaqArticleRow[])
-    .map((article) => {
-      const category = getRelationValue(article.category);
-      if (!category) return null;
-      return {
-        id: article.id,
-        title: article.title,
-        summary: article.summary,
-        category_name: category.name,
-        category_slug: category.slug,
-        module_name: isModuleName(category.module_name) ? category.module_name : null,
-      };
-    })
-    .filter((article): article is ProfileOverviewPayload['help_articles'][number] => Boolean(article));
-}
-
 export async function GET() {
   const supabase = await createClient();
   const {
@@ -294,6 +223,8 @@ export async function GET() {
       { data: hgvInspections, error: hgvInspectionsError },
       { data: annualLeaveReason, error: annualLeaveReasonError },
       { data: visits, error: visitsError },
+      { count: unresolvedSuggestionsCount, error: unresolvedSuggestionsError },
+      { count: unresolvedErrorReportsCount, error: unresolvedErrorReportsError },
       carryoverByProfile,
     ] = await Promise.all([
       admin
@@ -365,6 +296,16 @@ export async function GET() {
         .gte('visited_at', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString())
         .order('visited_at', { ascending: false })
         .limit(500),
+      admin
+        .from('suggestions')
+        .select('id', { count: 'exact', head: true })
+        .eq('created_by', user.id)
+        .in('status', ['new', 'under_review', 'planned']),
+      admin
+        .from('error_reports')
+        .select('id', { count: 'exact', head: true })
+        .eq('created_by', user.id)
+        .in('status', ['new', 'investigating']),
       fetchCarryoverMapForFinancialYear(admin, fyStartYear, [user.id]),
     ]);
 
@@ -376,6 +317,8 @@ export async function GET() {
     if (hgvInspectionsError) throw hgvInspectionsError;
     if (annualLeaveReasonError) throw annualLeaveReasonError;
     if (visitsError) throw visitsError;
+    if (unresolvedSuggestionsError) throw unresolvedSuggestionsError;
+    if (unresolvedErrorReportsError) throw unresolvedErrorReportsError;
 
     const profileRow = (profile || {}) as Record<string, unknown>;
     const teamValueRaw = profileRow.team;
@@ -489,11 +432,6 @@ export async function GET() {
       buildProjectAssignmentSummaries(admin, user.id),
       buildPermissionSummary(admin, user.id),
     ]);
-    const helpArticles = await buildHelpArticleSummaries(
-      admin,
-      permissionSummary.modules.map((module) => module.module_name)
-    );
-
     const response: ProfileOverviewPayload = {
       prd_epic_id: PROFILE_HUB_PRD_EPIC_ID,
       profile: typedProfile as ProfileOverviewPayload['profile'],
@@ -524,7 +462,10 @@ export async function GET() {
       },
       project_assignments: projectAssignments,
       permission_summary: permissionSummary,
-      help_articles: helpArticles,
+      help_shortcuts: {
+        has_unresolved_suggestions: (unresolvedSuggestionsCount || 0) > 0,
+        has_unresolved_error_reports: (unresolvedErrorReportsCount || 0) > 0,
+      },
       quick_links: {
         recent: buildRecentQuickLinks((visits || []) as Array<{ path: string; visited_at: string }>, 5),
         frequent: buildFrequentQuickLinks((visits || []) as Array<{ path: string; visited_at: string }>, 5),

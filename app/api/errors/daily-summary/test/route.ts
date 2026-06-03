@@ -297,8 +297,11 @@ export async function POST(request: NextRequest) {
     `.trim();
 
     // Send email using Resend API
-    const resendApiKey = process.env.RESEND_API_KEY || 're_MFndUias_JKudBfyXWDkfuvhM3DMwxa1q';
+    const resendApiKey = process.env.RESEND_API_KEY?.trim();
     const fromEmail = process.env.RESEND_FROM_EMAIL || 'SquiresApp <no-reply@squiresapp.com>';
+    if (!resendApiKey) {
+      return NextResponse.json({ error: 'RESEND_API_KEY is not configured' }, { status: 500 });
+    }
 
     const emailResponse = await fetch('https://api.resend.com/emails', {
       method: 'POST',

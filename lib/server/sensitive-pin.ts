@@ -5,6 +5,7 @@ import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
 import { verifyUserPassword } from '@/lib/server/password-auth';
 import type { SensitiveAccessModuleName } from '@/types/roles';
 import { notifyAdminsOfSensitivePinEvent } from '@/lib/server/sensitive-pin-notifications';
+import { getPrimaryResendEmailConfig } from '@/lib/server/resend-email-config';
 
 export type CurrentAuthenticatedProfile = NonNullable<Awaited<ReturnType<typeof getCurrentAuthenticatedProfile>>>;
 
@@ -126,7 +127,7 @@ async function sendVerificationEmail(params: {
   purpose: SensitivePinPurpose;
   code: string;
 }): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
+  const { apiKey, fromEmail } = getPrimaryResendEmailConfig();
   if (!apiKey) {
     throw new Error('Email service is not configured');
   }
@@ -143,7 +144,7 @@ async function sendVerificationEmail(params: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: process.env.RESEND_FROM_EMAIL || 'AVS Worklog <onboarding@resend.dev>',
+      from: fromEmail,
       to: [params.to],
       subject: 'Sensitive access PIN verification',
       html: `

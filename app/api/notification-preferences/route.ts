@@ -115,6 +115,7 @@ export async function PUT(request: NextRequest) {
     } = {
       user_id: user.id,
       module_key,
+      enabled: true,
     };
 
     if (notify_in_app !== undefined) upsertData.notify_in_app = notify_in_app;

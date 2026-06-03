@@ -90,15 +90,6 @@ export interface ProfilePermissionSummaryItem {
   requires_sensitive_pin: boolean;
 }
 
-export interface ProfileHelpArticleSummaryItem {
-  id: string;
-  title: string;
-  summary: string | null;
-  category_name: string;
-  category_slug: string;
-  module_name: ModuleName | null;
-}
-
 export interface ProfileOverviewPayload {
   prd_epic_id: string;
   profile: ProfileIdentityPayload;
@@ -114,7 +105,10 @@ export interface ProfileOverviewPayload {
     has_sensitive_module_access: boolean;
     modules: ProfilePermissionSummaryItem[];
   };
-  help_articles: ProfileHelpArticleSummaryItem[];
+  help_shortcuts: {
+    has_unresolved_suggestions: boolean;
+    has_unresolved_error_reports: boolean;
+  };
   quick_links: {
     recent: QuickLinkItem[];
     frequent: QuickLinkItem[];
