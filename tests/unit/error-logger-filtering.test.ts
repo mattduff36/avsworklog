@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   shouldIgnoreConsoleErrorForLogging,
+  shouldIgnoreUnhandledPromiseRejectionForLogging,
   shouldIgnoreRuntimeErrorForLogging,
 } from '@/lib/utils/error-logger';
 
@@ -79,5 +80,15 @@ describe('error logger filtering', () => {
         'Error signing message: TypeError: Cannot read properties of undefined'
       )
     ).toBe(false);
+  });
+
+  it('ignores unhandled promise rejections caused by message-less browser events', () => {
+    const loadEvent = new Event('error');
+
+    expect(shouldIgnoreUnhandledPromiseRejectionForLogging(loadEvent)).toBe(true);
+  });
+
+  it('keeps unhandled promise rejections with actionable messages', () => {
+    expect(shouldIgnoreUnhandledPromiseRejectionForLogging(new Error('Cannot read properties of undefined'))).toBe(false);
   });
 });

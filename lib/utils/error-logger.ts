@@ -101,6 +101,87 @@ export function shouldIgnoreConsoleErrorForLogging(errorMessage: string): boolea
   ].some((context) => normalized.includes(context));
 }
 
+function asLoggingText(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  return null;
+}
+
+function isMessageLessBrowserEvent(reason: unknown): boolean {
+  if (!reason || typeof reason !== 'object' || reason instanceof Error) {
+    return false;
+  }
+
+  const reasonLike = reason as {
+    isTrusted?: unknown;
+    message?: unknown;
+    stack?: unknown;
+    target?: unknown;
+    currentTarget?: unknown;
+    type?: unknown;
+  };
+
+  if (asLoggingText(reasonLike.message) || asLoggingText(reasonLike.stack)) {
+    return false;
+  }
+
+  if (typeof Event !== 'undefined' && reason instanceof Event) {
+    return true;
+  }
+
+  const hasEventShape =
+    'isTrusted' in reasonLike &&
+    ('target' in reasonLike || 'currentTarget' in reasonLike || 'type' in reasonLike);
+
+  return reasonLike.isTrusted === true && hasEventShape;
+}
+
+export function shouldIgnoreUnhandledPromiseRejectionForLogging(reason: unknown): boolean {
+  const reasonLike = reason && typeof reason === 'object' ? reason as { message?: unknown; stack?: unknown } : null;
+  const message =
+    (reason instanceof Error ? asLoggingText(reason.message) : null) ||
+    asLoggingText(reasonLike?.message) ||
+    '';
+  const stack =
+    (reason instanceof Error ? asLoggingText(reason.stack) : null) ||
+    asLoggingText(reasonLike?.stack) ||
+    '';
+  const status = getErrorStatus(reason);
+
+  if (!message) {
+    return isMessageLessBrowserEvent(reason);
+  }
+
+  if (shouldIgnoreRuntimeErrorForLogging(message, stack)) {
+    return true;
+  }
+
+  if (message.includes('We could not verify your session, so data loading has been paused.')) {
+    return true;
+  }
+
+  if (message !== 'Unauthorized' && message !== 'Session is locked') {
+    return false;
+  }
+
+  if (isAuthErrorStatus(status)) {
+    return true;
+  }
+
+  return (
+    stack.includes('accessToken') ||
+    stack.includes('_getAccessToken') ||
+    stack.includes('setAuth') ||
+    stack.includes('SupabaseClient')
+  );
+}
+
 export interface ErrorLog {
   id: string;
   timestamp: string;
@@ -126,15 +207,7 @@ class ErrorLogger {
   private latestUserAction: Omit<UserActionMetadata, 'ageMs' | 'timestamp'> & { timestampMs: number } | null = null;
 
   private asText(value: unknown): string | null {
-    if (value === null || value === undefined) return null;
-    if (typeof value === 'string') {
-      const trimmed = value.trim();
-      return trimmed.length > 0 ? trimmed : null;
-    }
-    if (typeof value === 'number' || typeof value === 'boolean') {
-      return String(value);
-    }
-    return null;
+    return asLoggingText(value);
   }
 
   private truncate(value: string, maxLength = 140): string {
@@ -352,43 +425,7 @@ class ErrorLogger {
   }
 
   private shouldIgnoreUnhandledPromiseRejection(reason: unknown): boolean {
-    const reasonLike = reason && typeof reason === 'object' ? reason as { message?: unknown; stack?: unknown } : null;
-    const message =
-      (reason instanceof Error ? this.asText(reason.message) : null) ||
-      this.asText(reasonLike?.message) ||
-      '';
-    const stack =
-      (reason instanceof Error ? this.asText(reason.stack) : null) ||
-      this.asText(reasonLike?.stack) ||
-      '';
-    const status = getErrorStatus(reason);
-
-    if (!message) {
-      return false;
-    }
-
-    if (this.shouldIgnoreRuntimeError(message, stack)) {
-      return true;
-    }
-
-    if (message.includes('We could not verify your session, so data loading has been paused.')) {
-      return true;
-    }
-
-    if (message !== 'Unauthorized' && message !== 'Session is locked') {
-      return false;
-    }
-
-    if (isAuthErrorStatus(status)) {
-      return true;
-    }
-
-    return (
-      stack.includes('accessToken') ||
-      stack.includes('_getAccessToken') ||
-      stack.includes('setAuth') ||
-      stack.includes('SupabaseClient')
-    );
+    return shouldIgnoreUnhandledPromiseRejectionForLogging(reason);
   }
 
   private constructor() {
