@@ -564,11 +564,13 @@ export async function sendQuoteToCustomerEmail(
   if (!customerEmail) {
     return { success: false, error: 'Quote cannot be sent because the customer does not have a contact email.' };
   }
-  const customerCcEmails = bundle.selectedSecondaryContacts.map(contact => contact.email);
-  const ccEmails = uniqueEmailAddresses([
-    ...customerCcEmails,
-    ...cc,
-  ]).filter(email => email.toLowerCase() !== customerEmail.toLowerCase());
+  const toEmails = uniqueEmailAddresses([
+    customerEmail,
+    ...bundle.selectedSecondaryContacts.map(contact => contact.email),
+  ]);
+  const toEmailKeys = new Set(toEmails.map(email => email.toLowerCase()));
+  const ccEmails = uniqueEmailAddresses(cc)
+    .filter(email => !toEmailKeys.has(email.toLowerCase()));
 
   const customerName = bundle.quote.attention_name || bundle.quote.customer?.contact_name || 'there';
   const subject = `Quotation ${bundle.quote.quote_reference} - ${bundle.quote.subject_line || bundle.quote.customer?.company_name || 'A&V Squires'}`;
@@ -591,7 +593,7 @@ export async function sendQuoteToCustomerEmail(
 
   return sendEmail({
     from: getDefaultFromEmail(),
-    to: [customerEmail],
+    to: toEmails,
     cc: ccEmails,
     subject,
     html,

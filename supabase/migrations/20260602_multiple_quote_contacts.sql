@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS public.quote_customer_contact_recipients (
   PRIMARY KEY (quote_id, customer_contact_id)
 );
 
-COMMENT ON TABLE public.quote_customer_contact_recipients IS 'Saved secondary customer contacts selected as quote CC recipients.';
+COMMENT ON TABLE public.quote_customer_contact_recipients IS 'Saved secondary customer contacts selected as additional quote To recipients.';
 
 CREATE INDEX IF NOT EXISTS idx_customer_contacts_customer_id
   ON public.customer_contacts(customer_id);

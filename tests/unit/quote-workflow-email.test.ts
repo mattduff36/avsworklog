@@ -154,7 +154,7 @@ describe('sendQuoteToCustomerEmail', () => {
     }));
   });
 
-  it('sends selected secondary customer contacts as CC recipients', async () => {
+  it('sends selected secondary customer contacts as To recipients', async () => {
     const { sendQuoteToCustomerEmail } = await import('@/lib/server/quote-workflow');
 
     const result = await sendQuoteToCustomerEmail(
@@ -197,8 +197,8 @@ describe('sendQuoteToCustomerEmail', () => {
     const body = JSON.parse(String(init?.body));
 
     expect(body).toEqual(expect.objectContaining({
-      to: ['alex@example.com'],
-      cc: ['chris@example.com', 'manager-copy@avsquires.co.uk'],
+      to: ['alex@example.com', 'chris@example.com'],
+      cc: ['manager-copy@avsquires.co.uk'],
     }));
   });
 });

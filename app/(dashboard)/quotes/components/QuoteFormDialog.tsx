@@ -935,11 +935,11 @@ export function QuoteFormDialog({
                           onChange={e => updateField('attention_email', e.target.value)}
                           className={getFieldClassName('attention_email')}
                         />
-                        <p className="text-xs text-muted-foreground">The primary contact is sent as the quote To recipient.</p>
+                        <p className="text-xs text-muted-foreground">The primary contact is sent in the quote To field.</p>
                       </div>
 
                       <div className="space-y-2">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Customer CC recipients</p>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Additional customer To recipients</p>
                         {selectedCustomer?.secondary_contacts?.length ? (
                           <div className="space-y-2">
                             {selectedCustomer.secondary_contacts.map(contact => {

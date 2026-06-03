@@ -234,7 +234,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   const [replacingAttachmentId, setReplacingAttachmentId] = useState<string | null>(null);
   const activeQuoteId = currentQuoteId || quoteId || quote?.id || null;
   const recipientEmail = quote?.attention_email || quote?.customer?.contact_email || '';
-  const customerCcContacts = quote?.selected_secondary_contacts || [];
+  const customerToContacts = quote?.selected_secondary_contacts || [];
   const isLatestVersion = Boolean(quote?.is_latest_version);
   const isHistoricalVersion = Boolean(quote && !quote.is_latest_version);
   const canEditPoDetails = quote ? isLatestVersion && PO_EDITABLE_STATUSES.has(quote.status) : false;
@@ -875,11 +875,11 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                   <span className="text-muted-foreground">For the attention of</span>
                   <p className="text-white">{quote.attention_name || '—'}</p>
                   {quote.attention_email && <p className="text-xs text-muted-foreground">{quote.attention_email}</p>}
-                  {customerCcContacts.length > 0 && (
+                  {customerToContacts.length > 0 && (
                     <div className="mt-2 rounded-md border border-slate-700 bg-slate-950/30 p-2">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Customer CC</p>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Additional customer To</p>
                       <div className="mt-1 space-y-1">
-                        {customerCcContacts.map(contact => (
+                        {customerToContacts.map(contact => (
                           <p key={contact.id} className="text-xs text-slate-300">
                             {(contact.name || contact.email || 'Unnamed contact')}{contact.email ? ` <${contact.email}>` : ' (no email on file)'}
                           </p>

@@ -52,15 +52,13 @@ function isMeaningfulLineItem(item: { description?: string; unit?: string; quant
 }
 
 function getCustomerRecipientDescription(primaryEmail: string, secondaryContacts: Array<{ email: string | null }>) {
-  const ccEmails = Array.from(new Set(
+  const additionalToEmails = Array.from(new Set(
     secondaryContacts
       .map(contact => contact.email?.trim())
       .filter((email): email is string => Boolean(email))
   ));
 
-  return ccEmails.length > 0
-    ? `${primaryEmail} with customer CC ${ccEmails.join(', ')}`
-    : primaryEmail;
+  return [primaryEmail, ...additionalToEmails].join(', ');
 }
 
 interface RouteParams {
@@ -202,7 +200,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         quoteReference: current.quote.quote_reference,
         eventType: 'confirmed_and_sent',
         title: 'Confirmed and sent',
-        description: `Quote emailed to primary recipient ${recipientDescription}.`,
+        description: `Quote emailed to customer recipient(s): ${recipientDescription}.`,
         fromStatus: current.quote.status,
         toStatus: 'sent',
         actorUserId: user.id,
@@ -283,7 +281,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         quoteReference: current.quote.quote_reference,
         eventType: 'approved_and_sent',
         title: 'Approved and sent',
-        description: `Quote emailed to primary recipient ${recipientDescription}.`,
+        description: `Quote emailed to customer recipient(s): ${recipientDescription}.`,
         fromStatus: current.quote.status,
         toStatus: 'sent',
         actorUserId: user.id,

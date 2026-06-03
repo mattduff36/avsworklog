@@ -218,7 +218,7 @@ describe('QuoteFormDialog', () => {
     expect(screen.getByText('Johnsons Aggregates And Recycling Ltd')).toBeInTheDocument();
   });
 
-  it('submits selected secondary customer contacts as quote CC recipients', async () => {
+  it('submits selected secondary customer contacts as additional To recipients', async () => {
     mockUseAuth.mockReturnValue({
       profile: {
         id: 'manager-1',
