@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.2.3
+
+**GIT COMMIT MESSAGE**
+`chore(db): update database migrations, API routes, and 1 more areas`
+
+**WHAT CHANGED**
+Update database migrations, API routes, and 1 more areas.
+
+**COMMITS IN THIS RELEASE**
+- `chore(db): update database migrations, API routes, and 1 more areas`
+
 ## 0626.2.2
 
 **GIT COMMIT MESSAGE**
