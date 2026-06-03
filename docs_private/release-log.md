@@ -2,6 +2,18 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.2.4
+
+**GIT COMMIT MESSAGE**
+`fix(logging): ignore browser event promise noise`
+
+**WHAT CHANGED**
+Update test coverage. Ignore browser event promise noise.
+
+**COMMITS IN THIS RELEASE**
+- `test(tests): update test coverage`
+- `fix(logging): ignore browser event promise noise`
+
 ## 0626.2.3
 
 **GIT COMMIT MESSAGE**
