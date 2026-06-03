@@ -10,10 +10,16 @@ import {
   calculateQuoteTotals,
   createQuoteNotification,
   fetchQuoteBundle,
+  generateQuoteReferenceForManager,
+  getInitialsFromName,
+  getQuoteManagerOption,
   getQuoteNotificationRecipientEmails,
+  sendQuotePoRequestEmail,
   sendQuoteRamsRequestEmail,
   sendQuoteToCustomerEmail,
 } from '@/lib/server/quote-workflow';
+import { buildQuoteDisplayName } from '@/lib/quotes/quote-display-name';
+import { renderConfiguredQuoteEmailTemplate } from '@/lib/server/quote-email-templates';
 import {
   copyQuoteCustomerContactRecipients,
   normalizeSecondaryContactIds,
@@ -21,6 +27,7 @@ import {
   validateSecondaryContactIdsForCustomer,
 } from '@/lib/server/quote-recipient-contacts';
 import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
+import { canManageQuoteSage } from '@/lib/server/quote-sage-access';
 
 type QuoteFieldErrors = Record<string, string>;
 
@@ -61,6 +68,46 @@ function getCustomerRecipientDescription(primaryEmail: string, secondaryContacts
   return [primaryEmail, ...additionalToEmails].join(', ');
 }
 
+function normalizeEmailAddress(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const email = value.trim();
+  return email && email.includes('@') ? email : null;
+}
+
+function normalizeEmailList(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const seen = new Set<string>();
+  const emails: string[] = [];
+  value.forEach(item => {
+    const email = normalizeEmailAddress(item);
+    if (!email) return;
+
+    const key = email.toLowerCase();
+    if (seen.has(key)) return;
+
+    seen.add(key);
+    emails.push(email);
+  });
+
+  return emails;
+}
+
+function getQuoteCustomerRecipientEmails(current: Awaited<ReturnType<typeof fetchQuoteBundle>>): string[] {
+  const emails = normalizeEmailList([
+    current.quote.attention_email,
+    current.quote.customer?.contact_email,
+    ...current.selectedSecondaryContacts.map(contact => contact.email),
+  ]);
+
+  return emails;
+}
+
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
@@ -79,10 +126,12 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     if (sensitiveAccessResponse) return sensitiveAccessResponse;
 
     const bundle = await fetchQuoteBundle(admin, id);
+    const canManageSage = await canManageQuoteSage();
 
     return NextResponse.json({
       quote: {
         ...bundle.quote,
+        can_manage_sage: canManageSage,
         line_items: bundle.lineItems,
         attachments: bundle.attachments,
         rams_documents: bundle.ramsDocuments,
@@ -220,11 +269,17 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       if (error) throw error;
 
       if (current.quote.requester_id) {
+        const returnComments = String(quoteUpdates.return_comments || 'This quote has been returned for changes.');
+        const notificationTemplate = await renderConfiguredQuoteEmailTemplate(admin, 'quote_returned', {
+          quote_reference: current.quote.quote_reference,
+          quote_name: buildQuoteDisplayName(current.quote),
+          return_comments: returnComments,
+        });
         await createQuoteNotification({
           senderId: user.id,
           recipientIds: [current.quote.requester_id],
-          subject: `Quote returned: ${current.quote.quote_reference}`,
-          body: String(quoteUpdates.return_comments || 'This quote has been returned for changes.'),
+          subject: notificationTemplate.subject,
+          body: notificationTemplate.bodyText,
         });
       }
       await appendQuoteTimelineEvent(admin, {
@@ -286,6 +341,58 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         toStatus: 'sent',
         actorUserId: user.id,
         createdAt: now,
+      });
+    } else if (action === 'request_po') {
+      if (!current.quote.is_latest_version) {
+        return NextResponse.json({ error: 'Only the latest quote version can request a PO.' }, { status: 400 });
+      }
+
+      if (!current.quote.sent_at && !current.quote.customer_sent_at && current.quote.status !== 'sent') {
+        return NextResponse.json({ error: 'Send this quote to the customer before requesting a PO.' }, { status: 400 });
+      }
+
+      if (current.quote.po_number) {
+        return NextResponse.json({ error: 'A PO number has already been saved for this quote.' }, { status: 400 });
+      }
+
+      const selectedRecipientEmails = normalizeEmailList(quoteUpdates.po_request_recipient_emails);
+      if (selectedRecipientEmails.length === 0) {
+        return NextResponse.json({ error: 'Select at least one customer recipient for the PO request.' }, { status: 400 });
+      }
+
+      const allowedRecipientEmails = getQuoteCustomerRecipientEmails(current);
+      const allowedRecipientKeys = new Set(allowedRecipientEmails.map(email => email.toLowerCase()));
+      const invalidRecipientEmails = selectedRecipientEmails.filter(email => !allowedRecipientKeys.has(email.toLowerCase()));
+      if (invalidRecipientEmails.length > 0) {
+        return NextResponse.json({ error: 'PO request recipients must be saved customer contacts on this quote.' }, { status: 400 });
+      }
+
+      const { data: senderProfile } = await admin
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .maybeSingle();
+      const emailResult = await sendQuotePoRequestEmail({
+        bundle: current,
+        recipientEmails: selectedRecipientEmails,
+        senderEmail: user.email,
+        senderName: senderProfile?.full_name || null,
+      });
+
+      if (!emailResult.success) {
+        return NextResponse.json({ error: emailResult.error || 'Failed to send PO request email.' }, { status: 500 });
+      }
+
+      await appendQuoteTimelineEvent(admin, {
+        quoteId: id,
+        quoteThreadId: current.quote.quote_thread_id,
+        quoteReference: current.quote.quote_reference,
+        eventType: 'po_request_sent',
+        title: 'PO request sent',
+        description: `PO request emailed to ${selectedRecipientEmails.join(', ')}.`,
+        fromStatus: current.quote.status,
+        toStatus: current.quote.status,
+        actorUserId: user.id,
       });
     } else if (action === 'save_po_details') {
       const now = new Date().toISOString();
@@ -449,24 +556,67 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       const nextRevisionNumber = current.quote.revision_number + 1;
       const newQuoteId = crypto.randomUUID();
       const isDuplicate = action === 'duplicate';
-      const baseReference = isDuplicate ? buildVersionReference(current.quote.base_quote_reference, 'duplicate', nextRevisionNumber) : current.quote.base_quote_reference;
+      const duplicateManagerProfileId = isDuplicate
+        ? (typeof manager_profile_id === 'string' && manager_profile_id.trim()
+          ? manager_profile_id.trim()
+          : current.quote.requester_id || user.id)
+        : null;
+      let duplicateManagerName = current.quote.manager_name;
+      let duplicateManagerEmail = current.quote.manager_email;
+      let duplicateRequesterInitials = current.quote.requester_initials;
+      let duplicateSignoffName = current.quote.signoff_name;
+      let duplicateSignoffTitle = current.quote.signoff_title;
+
       const quoteReference = isDuplicate
-        ? baseReference
+        ? await (async () => {
+          const managerOption = await getQuoteManagerOption(duplicateManagerProfileId!);
+          const { data: managerProfile, error: managerProfileError } = await admin
+            .from('profiles')
+            .select('id, full_name')
+            .eq('id', duplicateManagerProfileId)
+            .single();
+
+          if (managerProfileError || !managerProfile) {
+            throw managerProfileError || new Error('Unable to load manager profile');
+          }
+
+          const generated = await generateQuoteReferenceForManager({
+            managerProfileId: duplicateManagerProfileId!,
+            fallbackInitials: managerOption?.initials
+              || current.quote.requester_initials
+              || getInitialsFromName(managerProfile.full_name || ''),
+          });
+
+          duplicateRequesterInitials = generated.initials;
+          duplicateManagerName = managerOption?.profile?.full_name || managerProfile.full_name || current.quote.manager_name;
+          duplicateManagerEmail = managerOption?.manager_email || current.quote.manager_email;
+          duplicateSignoffName = managerOption?.signoff_name || managerProfile.full_name || current.quote.signoff_name;
+          duplicateSignoffTitle = managerOption?.signoff_title || current.quote.signoff_title;
+
+          return generated.quoteReference;
+        })()
         : buildVersionReference(current.quote.base_quote_reference, revisionType, nextRevisionNumber);
+      const baseReference = isDuplicate ? quoteReference : current.quote.base_quote_reference;
 
       const insertPayload = {
         ...current.quote,
         id: newQuoteId,
         quote_reference: quoteReference,
-        base_quote_reference: isDuplicate ? quoteReference : current.quote.base_quote_reference,
+        base_quote_reference: baseReference,
         quote_thread_id: isDuplicate ? newQuoteId : current.quote.quote_thread_id,
         parent_quote_id: current.quote.id,
         revision_number: isDuplicate ? 0 : nextRevisionNumber,
-        revision_type: revisionType,
+        revision_type: isDuplicate ? 'original' : revisionType,
         version_label: isDuplicate ? 'Original' : buildVersionLabel(revisionType, nextRevisionNumber),
         version_notes: quoteUpdates.version_notes || null,
         is_latest_version: true,
         duplicate_source_quote_id: current.quote.id,
+        requester_id: isDuplicate ? duplicateManagerProfileId : current.quote.requester_id,
+        requester_initials: isDuplicate ? duplicateRequesterInitials : current.quote.requester_initials,
+        manager_name: isDuplicate ? duplicateManagerName : current.quote.manager_name,
+        manager_email: isDuplicate ? duplicateManagerEmail : current.quote.manager_email,
+        signoff_name: isDuplicate ? duplicateSignoffName : current.quote.signoff_name,
+        signoff_title: isDuplicate ? duplicateSignoffTitle : current.quote.signoff_title,
         status: 'draft',
         return_comments: null,
         returned_at: null,
@@ -545,7 +695,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         quoteReference,
         eventType: isDuplicate ? 'quote_duplicated' : 'version_created',
         title: isDuplicate ? 'Quote duplicated' : 'New version created',
-        description: quoteUpdates.version_notes ? String(quoteUpdates.version_notes) : null,
+        description: isDuplicate
+          ? `Duplicated from ${current.quote.quote_reference}.${quoteUpdates.version_notes ? ` ${String(quoteUpdates.version_notes)}` : ''}`
+          : (quoteUpdates.version_notes ? String(quoteUpdates.version_notes) : null),
         toStatus: 'draft',
         actorUserId: user.id,
       });
@@ -823,9 +975,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     const bundle = await fetchQuoteBundle(admin, id);
+    const canManageSage = await canManageQuoteSage();
     return NextResponse.json({
       quote: {
         ...bundle.quote,
+        can_manage_sage: canManageSage,
         line_items: bundle.lineItems,
         attachments: bundle.attachments,
         invoices: bundle.invoices,

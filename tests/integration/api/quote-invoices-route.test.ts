@@ -8,6 +8,8 @@ const {
   mockCreateQuoteNotification,
   mockFetchQuoteBundle,
   mockGetQuoteInvoiceNotificationRecipientIds,
+  mockCanManageQuoteSage,
+  mockRenderConfiguredQuoteEmailTemplate,
 } = vi.hoisted(() => ({
   mockCreateClient: vi.fn(),
   mockCreateAdminClient: vi.fn(),
@@ -15,6 +17,8 @@ const {
   mockCreateQuoteNotification: vi.fn(),
   mockFetchQuoteBundle: vi.fn(),
   mockGetQuoteInvoiceNotificationRecipientIds: vi.fn(),
+  mockCanManageQuoteSage: vi.fn(),
+  mockRenderConfiguredQuoteEmailTemplate: vi.fn(),
 }));
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -29,6 +33,10 @@ vi.mock('@/lib/server/sensitive-module-access', () => ({
   requireSensitiveModuleAccess: vi.fn().mockResolvedValue(null),
 }));
 
+vi.mock('@/lib/server/quote-sage-access', () => ({
+  canManageQuoteSage: mockCanManageQuoteSage,
+}));
+
 vi.mock('@/lib/server/quote-workflow', () => ({
   appendQuoteTimelineEvent: mockAppendQuoteTimelineEvent,
   createQuoteNotification: mockCreateQuoteNotification,
@@ -36,11 +44,21 @@ vi.mock('@/lib/server/quote-workflow', () => ({
   getQuoteInvoiceNotificationRecipientIds: mockGetQuoteInvoiceNotificationRecipientIds,
 }));
 
+vi.mock('@/lib/server/quote-email-templates', () => ({
+  renderConfiguredQuoteEmailTemplate: mockRenderConfiguredQuoteEmailTemplate,
+}));
+
 describe('POST /api/quotes/[id]/invoices', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCreateAdminClient.mockReturnValue({});
     mockGetQuoteInvoiceNotificationRecipientIds.mockResolvedValue([]);
+    mockCanManageQuoteSage.mockResolvedValue(true);
+    mockRenderConfiguredQuoteEmailTemplate.mockResolvedValue({
+      subject: 'Invoice details added: Q-001',
+      bodyText: 'Invoice details have been added.',
+      bodyHtml: 'Invoice details have been added.',
+    });
     mockCreateClient.mockResolvedValue({
       auth: {
         getUser: vi.fn().mockResolvedValue({
@@ -339,10 +357,118 @@ describe('POST /api/quotes/[id]/invoices', () => {
       fromStatus: 'completed_full',
       toStatus: 'completed_full',
     }));
+    expect(mockRenderConfiguredQuoteEmailTemplate).toHaveBeenCalledWith(expect.anything(), 'invoice_added', expect.objectContaining({
+      quote_reference: '40000-GH',
+      invoice_number: 'INV-004',
+      invoice_amount: '£50.00',
+    }));
     expect(mockCreateQuoteNotification).toHaveBeenCalledWith(expect.objectContaining({
       recipientIds: ['manager-1'],
-      subject: 'Invoice details added: 40000-GH',
+      subject: 'Invoice details added: Q-001',
+      body: 'Invoice details have been added.',
       sendEmail: true,
     }));
+  });
+});
+
+describe('PATCH /api/quotes/[id]/invoices', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCreateAdminClient.mockReturnValue({});
+    mockCanManageQuoteSage.mockResolvedValue(true);
+  });
+
+  it('marks an invoice as posted to Sage for Accounts/admin users', async () => {
+    const { PATCH } = await import('@/app/api/quotes/[id]/invoices/route');
+    const quoteInvoiceUpdate = vi.fn((payload: Record<string, unknown>) => ({
+      eq: vi.fn(() => ({
+        eq: vi.fn().mockResolvedValue({ error: null }),
+      })),
+      payload,
+    }));
+
+    mockCreateClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1' } },
+          error: null,
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'quote_invoices') {
+          return { update: quoteInvoiceUpdate };
+        }
+
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    });
+
+    mockFetchQuoteBundle
+      .mockResolvedValueOnce({
+        quote: {
+          id: 'quote-1',
+          quote_thread_id: 'thread-1',
+          quote_reference: 'Q-001',
+          status: 'completed_full',
+        },
+        invoices: [{
+          id: 'invoice-1',
+          invoice_number: 'INV-001',
+          amount: 250,
+          sage_posted_at: null,
+        }],
+        invoiceRequests: [],
+        invoiceSummary: {
+          invoicedTotal: 250,
+          remainingBalance: 0,
+          lastInvoiceAt: '2026-03-24',
+          status: 'invoiced',
+        },
+      })
+      .mockResolvedValueOnce({
+        quote: {
+          id: 'quote-1',
+          quote_thread_id: 'thread-1',
+          quote_reference: 'Q-001',
+          status: 'completed_full',
+        },
+        invoices: [{
+          id: 'invoice-1',
+          invoice_number: 'INV-001',
+          amount: 250,
+          sage_posted_at: '2026-03-24T10:00:00.000Z',
+        }],
+        invoiceRequests: [],
+        invoiceSummary: {
+          invoicedTotal: 250,
+          remainingBalance: 0,
+          lastInvoiceAt: '2026-03-24',
+          status: 'invoiced',
+        },
+      });
+
+    const request = new NextRequest('http://localhost/api/quotes/quote-1/invoices', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        action: 'toggle_sage',
+        invoice_id: 'invoice-1',
+        on_sage: true,
+      }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response = await PATCH(request, { params: Promise.resolve({ id: 'quote-1' }) });
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(quoteInvoiceUpdate).toHaveBeenCalledWith({
+      sage_posted_at: expect.any(String),
+      sage_posted_by: 'user-1',
+    });
+    expect(mockAppendQuoteTimelineEvent).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      eventType: 'invoice_marked_on_sage',
+      title: 'Invoice marked on Sage',
+    }));
+    expect(payload.can_manage_sage).toBe(true);
   });
 });

@@ -50,6 +50,8 @@ import {
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
+import { buildQuoteDisplayName, buildQuotePdfFilename } from '@/lib/quotes/quote-display-name';
+import { useAuth } from '@/lib/hooks/useAuth';
 import {
   deleteQuoteAttachment,
   getQuoteAttachmentUrl,
@@ -57,7 +59,7 @@ import {
   uploadQuoteAttachment,
 } from '../quote-attachment-client';
 import { FormattedQuoteText } from './FormattedQuoteText';
-import type { Quote, QuoteAttachment, QuoteCompletionStatus, QuoteRevisionType } from '../types';
+import type { Quote, QuoteAttachment, QuoteCompletionStatus, QuoteManagerOption, QuoteRevisionType } from '../types';
 import { getQuoteStatusConfig } from '../types';
 
 const PO_EDITABLE_STATUSES = new Set([
@@ -77,9 +79,40 @@ interface QuoteDetailsModalProps {
   onQuoteChange: (quoteId: string) => void;
   onEdit: (quote: Quote) => void;
   onRefresh: () => void;
+  managerOptions: QuoteManagerOption[];
 }
 
 type DetailFieldErrors = Record<string, string>;
+interface QuoteRecipientOption {
+  email: string;
+  label: string;
+}
+
+function buildQuoteRecipientOptions(quote: Quote | null): QuoteRecipientOption[] {
+  if (!quote) {
+    return [];
+  }
+
+  const options: QuoteRecipientOption[] = [];
+  const seen = new Set<string>();
+  const addOption = (email: string | null | undefined, label: string) => {
+    const normalizedEmail = email?.trim();
+    if (!normalizedEmail || !normalizedEmail.includes('@')) return;
+
+    const key = normalizedEmail.toLowerCase();
+    if (seen.has(key)) return;
+
+    seen.add(key);
+    options.push({ email: normalizedEmail, label });
+  };
+
+  addOption(quote.attention_email || quote.customer?.contact_email, quote.attention_name || quote.customer?.contact_name || 'Primary contact');
+  (quote.selected_secondary_contacts || []).forEach(contact => {
+    addOption(contact.email, contact.name || contact.email || 'Secondary contact');
+  });
+
+  return options;
+}
 
 function getTimelineEventMeta(eventType: string) {
   switch (eventType) {
@@ -114,6 +147,11 @@ function getTimelineEventMeta(eventType: string) {
         icon: FolderKanban,
         iconClassName: 'text-violet-300 bg-violet-500/10 border-violet-500/20',
       };
+    case 'po_request_sent':
+      return {
+        icon: Mail,
+        iconClassName: 'text-violet-300 bg-violet-500/10 border-violet-500/20',
+      };
     case 'rams_triggered':
       return {
         icon: FolderKanban,
@@ -144,6 +182,16 @@ function getTimelineEventMeta(eventType: string) {
       return {
         icon: Receipt,
         iconClassName: 'text-fuchsia-300 bg-fuchsia-500/10 border-fuchsia-500/20',
+      };
+    case 'invoice_marked_on_sage':
+      return {
+        icon: CheckCircle2,
+        iconClassName: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
+      };
+    case 'invoice_removed_from_sage':
+      return {
+        icon: CircleDot,
+        iconClassName: 'text-slate-300 bg-slate-500/10 border-slate-500/20',
       };
     case 'attachment_uploaded':
       return {
@@ -193,7 +241,8 @@ async function buildResponseError(response: Response, fallback: string) {
   return error;
 }
 
-export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdit, onRefresh }: QuoteDetailsModalProps) {
+export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdit, onRefresh, managerOptions }: QuoteDetailsModalProps) {
+  const { profile } = useAuth();
   const [quote, setQuote] = useState<Quote | null>(null);
   const [currentQuoteId, setCurrentQuoteId] = useState<string | null>(quoteId);
   const [activeTab, setActiveTab] = useState('overview');
@@ -218,6 +267,10 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   const [invoiceMatchesRequest, setInvoiceMatchesRequest] = useState(false);
   const [revisionType, setRevisionType] = useState<QuoteRevisionType>('revision');
   const [revisionNotes, setRevisionNotes] = useState('');
+  const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
+  const [duplicateManagerProfileId, setDuplicateManagerProfileId] = useState('');
+  const [poRequestDialogOpen, setPoRequestDialogOpen] = useState(false);
+  const [poRequestRecipientEmails, setPoRequestRecipientEmails] = useState<string[]>([]);
   const [ramsComments, setRamsComments] = useState('');
   const [ramsDialogOpen, setRamsDialogOpen] = useState(false);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
@@ -235,6 +288,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   const activeQuoteId = currentQuoteId || quoteId || quote?.id || null;
   const recipientEmail = quote?.attention_email || quote?.customer?.contact_email || '';
   const customerToContacts = quote?.selected_secondary_contacts || [];
+  const quoteDisplayName = quote ? buildQuoteDisplayName(quote) : '';
   const isLatestVersion = Boolean(quote?.is_latest_version);
   const isHistoricalVersion = Boolean(quote && !quote.is_latest_version);
   const canEditPoDetails = quote ? isLatestVersion && PO_EDITABLE_STATUSES.has(quote.status) : false;
@@ -245,6 +299,8 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   const canManageInvoices = isLatestVersion;
   const canManageAttachments = isLatestVersion;
   const canCreateVersions = isLatestVersion;
+  const canManageSage = Boolean(quote?.can_manage_sage);
+  const canRequestPo = Boolean(isLatestVersion && quote && !quote.po_number && recipientEmail && (quote.sent_at || quote.customer_sent_at || quote.status === 'sent'));
   const hasMultipleVersions = (quote?.versions?.length ?? 0) > 1;
   const availableToRequest = Number(quote?.invoice_summary?.availableToRequest ?? quote?.invoice_summary?.remainingBalance ?? quote?.total ?? 0);
   const suggestedInvoiceAmount = Number(quote?.invoice_summary?.remainingBalance ?? quote?.total ?? 0);
@@ -255,6 +311,14 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   const selectedInvoiceRequest = pendingInvoiceRequests.find(request => request.id === selectedInvoiceRequestId) || null;
   const pendingFullInvoiceRequest = pendingInvoiceRequests.find(request => request.requested_invoice_scope === 'full') || null;
   const billingStatusConfig = getBillingStatusConfig(quote?.invoice_summary?.status);
+  const duplicateManagerOptions = useMemo(
+    () => managerOptions.filter(option => option.is_active || option.profile_id === quote?.requester_id),
+    [managerOptions, quote?.requester_id]
+  );
+  const poRequestRecipientOptions = useMemo(() => buildQuoteRecipientOptions(quote), [quote]);
+  const poRequestPdfFilename = quote ? buildQuotePdfFilename(quote) : 'Quote.pdf';
+  const poRequestGreetingName = quote?.attention_name || quote?.customer?.contact_name || 'there';
+  const poRequestSenderName = profile?.full_name || 'user';
   const managerRequestCtaLabel = pendingInvoiceRequests.length > 0 ? 'Request Another Invoice' : 'Mark Ready To Invoice';
   const managerRequestControlsDisabled = !canManageInvoices || availableToRequest <= 0 || Boolean(pendingFullInvoiceRequest);
 
@@ -435,6 +499,8 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
     setInvoiceRequestComments('');
     setSelectedInvoiceRequestId((nextQuote.invoice_requests || []).find(request => request.status === 'pending')?.id || '');
     setInvoiceMatchesRequest(false);
+    setDuplicateManagerProfileId(nextQuote.requester_id || '');
+    setPoRequestRecipientEmails(buildQuoteRecipientOptions(nextQuote).map(option => option.email));
     setWorkflowError(null);
     setWorkflowFieldErrors({});
     setInvoiceRequestError(null);
@@ -512,6 +578,10 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
       setReplacingAttachmentId(null);
       setRamsDialogOpen(false);
       setRamsComments('');
+      setDuplicateDialogOpen(false);
+      setDuplicateManagerProfileId('');
+      setPoRequestDialogOpen(false);
+      setPoRequestRecipientEmails([]);
     }
   }, [open]);
 
@@ -519,7 +589,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
     updates: Record<string, unknown>,
     scope: 'workflow' | 'versions' | 'general' = 'workflow'
   ) {
-    if (!activeQuoteId) return;
+    if (!activeQuoteId) return false;
     setActionLoading(true);
     if (scope === 'workflow') {
       clearWorkflowError();
@@ -542,6 +612,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
       }
       toast.success('Quote updated');
       onRefresh();
+      return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to update this quote right now.';
       const fieldErrors = error instanceof Error && 'fieldErrors' in error
@@ -554,19 +625,48 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
       }
 
       toast.error(message);
+      return false;
     } finally {
       setActionLoading(false);
     }
   }
 
   async function callAction(action: string, payload?: Record<string, unknown>, scope: 'workflow' | 'versions' | 'general' = 'workflow') {
-    await updateQuote({ action, ...payload }, scope);
+    return updateQuote({ action, ...payload }, scope);
   }
 
   async function handleTriggerRams() {
-    await callAction('trigger_rams', { rams_comments: ramsComments.trim() || null });
-    setRamsDialogOpen(false);
-    setRamsComments('');
+    const ok = await callAction('trigger_rams', { rams_comments: ramsComments.trim() || null });
+    if (ok) {
+      setRamsDialogOpen(false);
+      setRamsComments('');
+    }
+  }
+
+  async function handleDuplicateQuote() {
+    const ok = await callAction('duplicate', {
+      version_notes: revisionNotes,
+      manager_profile_id: duplicateManagerProfileId || quote?.requester_id || null,
+    }, 'versions');
+    if (ok) {
+      setDuplicateDialogOpen(false);
+    }
+  }
+
+  function togglePoRequestRecipient(email: string, checked: boolean) {
+    setPoRequestRecipientEmails(prev => checked
+      ? Array.from(new Set([...prev, email]))
+      : prev.filter(item => item.toLowerCase() !== email.toLowerCase())
+    );
+  }
+
+  async function handlePoRequestEmail() {
+    const ok = await callAction('request_po', {
+      po_request_recipient_emails: poRequestRecipientEmails,
+    });
+    if (ok) {
+      setPoRequestDialogOpen(false);
+    }
   }
 
   async function handleAttachmentUpload(file: File) {
@@ -771,6 +871,38 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
     }
   }
 
+  async function toggleInvoiceSage(invoiceId: string, onSage: boolean) {
+    if (!activeQuoteId) return;
+
+    setActionLoading(true);
+    clearInvoiceError();
+    try {
+      const res = await fetch(`/api/quotes/${activeQuoteId}/invoices`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'toggle_sage',
+          invoice_id: invoiceId,
+          on_sage: onSage,
+        }),
+      });
+
+      if (!res.ok) {
+        throw await buildResponseError(res, 'Unable to update Sage status right now.');
+      }
+
+      toast.success(onSage ? 'Invoice marked on Sage' : 'Invoice removed from Sage');
+      await fetchQuote();
+      onRefresh();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to update Sage status right now.';
+      setInvoiceError(message);
+      toast.error(message);
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   async function deleteQuote() {
     if (!activeQuoteId || !quote || !canDeleteDraft) {
       return;
@@ -836,15 +968,15 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
             <DialogHeader>
               <div className="flex min-w-0 items-center justify-between">
                 <DialogTitle className="flex min-w-0 flex-wrap items-center gap-2 text-white">
-                  <span className="font-mono text-avs-yellow">{quote.quote_reference}</span>
-                  <Badge variant="outline" className={statusConfig?.color}>
-                    {statusConfig?.label}
-                  </Badge>
-                  {quote.commercial_status === 'closed' && (
-                    <Badge variant="outline" className="border-slate-300/30 text-slate-200 bg-slate-400/10">
-                      Archived
+                    <span className="font-mono text-sm text-avs-yellow">{quote.quote_reference}</span>
+                    <Badge variant="outline" className={statusConfig?.color}>
+                      {statusConfig?.label}
                     </Badge>
-                  )}
+                    {quote.commercial_status === 'closed' && (
+                      <Badge variant="outline" className="border-slate-300/30 text-slate-200 bg-slate-400/10">
+                        Archived
+                      </Badge>
+                    )}
                 </DialogTitle>
               </div>
             </DialogHeader>
@@ -1151,6 +1283,19 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                         className="border-slate-600 text-muted-foreground"
                       >
                         <FolderKanban className="mr-2 h-4 w-4" /> Save PO
+                      </Button>
+                    )}
+                    {canRequestPo && (
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setPoRequestRecipientEmails(poRequestRecipientOptions.map(option => option.email));
+                          setPoRequestDialogOpen(true);
+                        }}
+                        disabled={actionLoading || poRequestRecipientOptions.length === 0}
+                        className="border-slate-600 text-muted-foreground"
+                      >
+                        <Mail className="mr-2 h-4 w-4" /> Request PO
                       </Button>
                     )}
                     {canTriggerRams && (
@@ -1559,6 +1704,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                   <div className="space-y-2">
                     {quote.invoices?.length ? quote.invoices.map(invoice => {
                       const linkedRequest = quote.invoice_requests?.find(request => request.id === invoice.invoice_request_id) || null;
+                      const isOnSage = Boolean(invoice.sage_posted_at);
                       return (
                         <div key={invoice.id} className="rounded-lg border border-slate-700 bg-slate-800/30 p-4">
                           <div className="flex items-center justify-between gap-4">
@@ -1571,9 +1717,35 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                                 {linkedRequest ? `Marked ready: ${format(new Date(linkedRequest.requested_at), 'dd MMM yyyy')} • ` : ''}
                                 Added by Accounts: {format(new Date(invoice.created_at), 'dd MMM yyyy')}
                               </p>
+                              {invoice.sage_posted_at ? (
+                                <p className="text-xs text-emerald-300">
+                                  On Sage: {format(new Date(invoice.sage_posted_at), 'dd MMM yyyy')}
+                                </p>
+                              ) : null}
                             </div>
-                            <div className="text-right">
+                            <div className="space-y-2 text-right">
                               <p className="font-semibold text-white">£{Number(invoice.amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
+                              {canManageSage ? (
+                                <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-slate-600 px-2 py-1 text-xs text-slate-300 hover:bg-slate-700/60">
+                                  <input
+                                    type="checkbox"
+                                    checked={isOnSage}
+                                    disabled={actionLoading}
+                                    onChange={event => void toggleInvoiceSage(invoice.id, event.target.checked)}
+                                  />
+                                  On Sage
+                                </label>
+                              ) : (
+                                <Badge
+                                  variant="outline"
+                                  className={isOnSage
+                                    ? 'border-emerald-500/30 text-emerald-300 bg-emerald-500/10'
+                                    : 'border-slate-500/30 text-slate-300 bg-slate-500/10'
+                                  }
+                                >
+                                  {isOnSage ? 'On Sage' : 'Not on Sage'}
+                                </Badge>
+                              )}
                             </div>
                           </div>
                           {invoice.comments && <p className="mt-2 text-sm text-slate-300 whitespace-pre-wrap">{invoice.comments}</p>}
@@ -1725,7 +1897,10 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                     </Button>
                     <Button
                       variant="outline"
-                      onClick={() => callAction('duplicate', { version_notes: revisionNotes }, 'versions')}
+                      onClick={() => {
+                        setDuplicateManagerProfileId(quote.requester_id || '');
+                        setDuplicateDialogOpen(true);
+                      }}
                       disabled={actionLoading || !canCreateVersions}
                       className="border-slate-600 text-muted-foreground"
                     >
@@ -1892,6 +2067,114 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
             </div>
           </>
         )}
+      </DialogContent>
+    </Dialog>
+    <Dialog open={poRequestDialogOpen} onOpenChange={setPoRequestDialogOpen}>
+      <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto bg-slate-900 border-slate-700 text-white sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Request purchase order</DialogTitle>
+          <DialogDescription className="text-muted-foreground">
+            Review the recipients and email preview before sending the attached quote PDF.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="rounded-md border border-slate-700 bg-slate-950/30 p-3 text-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Subject</p>
+            <p className="mt-1 text-white">{quoteDisplayName || quote?.quote_reference || 'Quote'}</p>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Customer recipients</p>
+            {poRequestRecipientOptions.length > 0 ? (
+              <div className="space-y-2">
+                {poRequestRecipientOptions.map(option => (
+                  <label key={option.email} className="flex items-start gap-3 rounded-md border border-slate-700 bg-slate-950/30 p-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={poRequestRecipientEmails.some(email => email.toLowerCase() === option.email.toLowerCase())}
+                      onChange={event => togglePoRequestRecipient(option.email, event.target.checked)}
+                      className="mt-1"
+                    />
+                    <span>
+                      <span className="block text-white">{option.label}</span>
+                      <span className="block text-xs text-muted-foreground">{option.email}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-amber-300">No saved customer email recipients are available for this quote.</p>
+            )}
+          </div>
+
+          <div className="rounded-md border border-slate-700 bg-slate-950/30 p-3 text-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Email preview</p>
+            <div className="mt-2 space-y-3 whitespace-pre-wrap text-slate-200">
+              <p>Hello {poRequestGreetingName},</p>
+              <p>Please can I have a purchase order for the attached quotation.</p>
+              <p>Kind Regards<br />{poRequestSenderName}</p>
+            </div>
+          </div>
+
+          <div className="rounded-md border border-slate-700 bg-slate-950/30 p-3 text-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Attachment</p>
+            <p className="mt-1 text-slate-200">{poRequestPdfFilename}</p>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setPoRequestDialogOpen(false)} className="border-slate-600 text-muted-foreground">
+            Cancel
+          </Button>
+          <Button
+            onClick={() => void handlePoRequestEmail()}
+            disabled={actionLoading || poRequestRecipientEmails.length === 0}
+            className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90"
+          >
+            {actionLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...</> : 'Send PO request'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    <Dialog open={duplicateDialogOpen} onOpenChange={setDuplicateDialogOpen}>
+      <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto bg-slate-900 border-slate-700 text-white sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Duplicate quote</DialogTitle>
+          <DialogDescription className="text-muted-foreground">
+            This creates a new standalone quote with the next quote number from the selected manager series.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="rounded-md border border-slate-700 bg-slate-950/30 p-3 text-sm">
+            <p className="text-muted-foreground">Source quote</p>
+            <p className="font-medium text-white">{quoteDisplayName || quote?.quote_reference || 'Current quote'}</p>
+          </div>
+          <div className="space-y-2">
+            <Label>Number series manager</Label>
+            <Select value={duplicateManagerProfileId} onValueChange={setDuplicateManagerProfileId}>
+              <SelectTrigger className="bg-slate-800 border-slate-600">
+                <SelectValue placeholder="Use original quote manager" />
+              </SelectTrigger>
+              <SelectContent>
+                {duplicateManagerOptions.map(option => (
+                  <SelectItem key={option.profile_id} value={option.profile_id}>
+                    {(option.profile?.full_name || option.signoff_name || option.initials)} ({option.initials})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Leave as the original manager unless the copied quote belongs under a different manager.
+            </p>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setDuplicateDialogOpen(false)} className="border-slate-600 text-muted-foreground">
+            Cancel
+          </Button>
+          <Button onClick={() => void handleDuplicateQuote()} disabled={actionLoading} className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90">
+            {actionLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Duplicating...</> : 'Duplicate quote'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
     <Dialog open={ramsDialogOpen} onOpenChange={setRamsDialogOpen}>

@@ -3818,6 +3818,41 @@ export type Database = {
           },
         ]
       }
+      quote_email_templates: {
+        Row: {
+          template_key: string
+          subject_template: string
+          body_template: string
+          updated_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          template_key: string
+          subject_template: string
+          body_template: string
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          template_key?: string
+          subject_template?: string
+          body_template?: string
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'quote_email_templates_updated_by_fkey'
+            columns: ['updated_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       quote_invoice_allocations: {
         Row: {
           id: string
@@ -3874,6 +3909,8 @@ export type Database = {
           invoice_scope: 'full' | 'partial'
           comments: string
           created_by: string
+          sage_posted_at: string | null
+          sage_posted_by: string | null
           created_at: string
           updated_at: string
         }
@@ -3887,6 +3924,8 @@ export type Database = {
           invoice_scope?: 'full' | 'partial'
           comments?: string | null
           created_by?: string | null
+          sage_posted_at?: string | null
+          sage_posted_by?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -3900,6 +3939,8 @@ export type Database = {
           invoice_scope?: 'full' | 'partial'
           comments?: string | null
           created_by?: string | null
+          sage_posted_at?: string | null
+          sage_posted_by?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -3914,6 +3955,13 @@ export type Database = {
           {
             foreignKeyName: 'quote_invoices_created_by_fkey'
             columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'quote_invoices_sage_posted_by_fkey'
+            columns: ['sage_posted_by']
             isOneToOne: false
             referencedRelation: 'profiles'
             referencedColumns: ['id']

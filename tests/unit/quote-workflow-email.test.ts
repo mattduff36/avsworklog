@@ -102,6 +102,15 @@ beforeEach(() => {
         download: vi.fn(),
       })),
     },
+    from: vi.fn((table: string) => {
+      if (table === 'quote_email_templates') {
+        return {
+          select: vi.fn().mockResolvedValue({ data: [], error: null }),
+        };
+      }
+
+      throw new Error(`Unexpected table: ${table}`);
+    }),
   });
   mockLoadSquiresLogoDataUrl.mockResolvedValue(null);
   mockQuotePDF.mockReturnValue({ type: 'quote-pdf' });
@@ -150,8 +159,13 @@ describe('sendQuoteToCustomerEmail', () => {
       to: ['alex@example.com'],
       cc: ['manager-copy@avsquires.co.uk'],
       reply_to: 'sender@avsquires.co.uk',
-      subject: 'Quotation Q-001 - Concrete repairs',
+      subject: 'Q-001 - Acme Ltd - 1 Road Lane - Concrete repairs',
     }));
+    expect(body.attachments).toEqual([
+      expect.objectContaining({
+        filename: 'Q-001 - Acme Ltd - 1 Road Lane - Concrete repairs.pdf',
+      }),
+    ]);
   });
 
   it('sends selected secondary customer contacts as To recipients', async () => {
@@ -200,5 +214,90 @@ describe('sendQuoteToCustomerEmail', () => {
       to: ['alex@example.com', 'chris@example.com'],
       cc: ['manager-copy@avsquires.co.uk'],
     }));
+  });
+
+  it('sends PO request emails with the quote-name subject and PDF attachment', async () => {
+    const { sendQuotePoRequestEmail } = await import('@/lib/server/quote-workflow');
+
+    const result = await sendQuotePoRequestEmail({
+      bundle: buildQuoteBundle(),
+      recipientEmails: ['alex@example.com', ' alex@example.com '],
+      senderEmail: 'sender@avsquires.co.uk',
+      senderName: 'Matt Duffill',
+    });
+
+    expect(result).toEqual({ success: true });
+
+    const [, init] = vi.mocked(global.fetch).mock.calls[0];
+    const body = JSON.parse(String(init?.body));
+
+    expect(body).toEqual(expect.objectContaining({
+      from: 'Quotes <quotes@example.com>',
+      to: ['alex@example.com'],
+      reply_to: 'sender@avsquires.co.uk',
+      subject: 'Q-001 - Acme Ltd - 1 Road Lane - Concrete repairs',
+    }));
+    expect(String(body.html)).toContain('Please can I have a purchase order for the attached quotation.');
+    expect(String(body.html)).toContain('Kind Regards<br>Matt Duffill');
+    expect(body.attachments).toEqual([
+      expect.objectContaining({
+        filename: 'Q-001 - Acme Ltd - 1 Road Lane - Concrete repairs.pdf',
+      }),
+    ]);
+  });
+
+  it('uses configured PO request wording while keeping recipients and attachments unchanged', async () => {
+    mockCreateAdminClient.mockReturnValue({
+      storage: {
+        from: vi.fn(() => ({
+          download: vi.fn(),
+        })),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'quote_email_templates') {
+          return {
+            select: vi.fn().mockResolvedValue({
+              data: [{
+                template_key: 'po_request',
+                subject_template: 'PO needed for {quote_reference}',
+                body_template: 'Hi {contact_name},\nPlease send a PO to {sender_name}.',
+                updated_by: null,
+                updated_at: null,
+                created_at: '2026-06-03T10:00:00.000Z',
+              }],
+              error: null,
+            }),
+          };
+        }
+
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    });
+
+    const { sendQuotePoRequestEmail } = await import('@/lib/server/quote-workflow');
+
+    const result = await sendQuotePoRequestEmail({
+      bundle: buildQuoteBundle(),
+      recipientEmails: ['alex@example.com'],
+      senderEmail: 'sender@avsquires.co.uk',
+      senderName: 'Matt Duffill',
+    });
+
+    expect(result).toEqual({ success: true });
+
+    const [, init] = vi.mocked(global.fetch).mock.calls[0];
+    const body = JSON.parse(String(init?.body));
+
+    expect(body).toEqual(expect.objectContaining({
+      to: ['alex@example.com'],
+      reply_to: 'sender@avsquires.co.uk',
+      subject: 'PO needed for Q-001',
+    }));
+    expect(String(body.html)).toContain('Hi Alex Customer,<br>Please send a PO to Matt Duffill.');
+    expect(body.attachments).toEqual([
+      expect.objectContaining({
+        filename: 'Q-001 - Acme Ltd - 1 Road Lane - Concrete repairs.pdf',
+      }),
+    ]);
   });
 });

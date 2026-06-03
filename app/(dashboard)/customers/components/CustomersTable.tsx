@@ -13,6 +13,7 @@ import {
   Phone,
   MapPin,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { Customer } from '../types';
 
 interface CustomersTableProps {
@@ -30,6 +31,10 @@ function getSecondaryContactSummary(customer: Customer): string {
   }
 
   return `${count} secondary contact${count === 1 ? '' : 's'}`;
+}
+
+function isTestCustomerName(name: string | null | undefined) {
+  return name?.toLowerCase().includes('test customer') ?? false;
 }
 
 export function CustomersTable({ customers, onRowClick }: CustomersTableProps) {
@@ -162,9 +167,13 @@ export function CustomersTable({ customers, onRowClick }: CustomersTableProps) {
                   className="hover:bg-slate-800/50 cursor-pointer transition-colors"
                 >
                   <td className="px-4 py-3">
-                    <div className="font-medium text-white">{customer.company_name}</div>
+                    <div className={cn('font-medium text-white', isTestCustomerName(customer.company_name) && 'text-red-300')}>
+                      {customer.company_name}
+                    </div>
                     {customer.short_name && customer.short_name !== customer.company_name && (
-                      <div className="text-xs text-muted-foreground">{customer.short_name}</div>
+                      <div className={cn('text-xs text-muted-foreground', isTestCustomerName(customer.short_name) && 'text-red-300')}>
+                        {customer.short_name}
+                      </div>
                     )}
                   </td>
                   <td className="px-4 py-3 text-slate-300">
@@ -220,7 +229,9 @@ export function CustomersTable({ customers, onRowClick }: CustomersTableProps) {
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-2">
                   <Building2 className="h-4 w-4 text-avs-yellow" />
-                  <span className="font-semibold text-white">{customer.company_name}</span>
+                  <span className={cn('font-semibold text-white', isTestCustomerName(customer.company_name) && 'text-red-300')}>
+                    {customer.company_name}
+                  </span>
                 </div>
                 <Badge variant="outline" className={
                   customer.status === 'active'

@@ -6,6 +6,11 @@ import { getQuotesCustomersEmailConfig } from '@/lib/server/quotes-customers-ema
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getUsersWithModuleAccess } from '@/lib/server/team-permissions';
 import { getHiddenSystemTestAccountIds } from '@/lib/server/system-test-accounts';
+import { buildQuoteDisplayName, buildQuotePdfFilename } from '@/lib/quotes/quote-display-name';
+import {
+  plainQuoteEmailTextToHtml,
+  renderConfiguredQuoteEmailTemplate,
+} from '@/lib/server/quote-email-templates';
 import type { Database } from '@/types/database';
 import type { CustomerContactRow } from '@/lib/server/customer-contacts';
 import { fetchQuoteSelectedSecondaryContacts } from '@/lib/server/quote-recipient-contacts';
@@ -476,8 +481,16 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
-function plainTextToHtml(value: string): string {
-  return escapeHtml(value).replace(/\n/g, '<br>');
+function renderQuoteWorkflowEmailHtml(bodyHtml: string, heading?: string): string {
+  return `
+    <!DOCTYPE html>
+    <html>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937; max-width: 640px; margin: 0 auto; padding: 24px;">
+        ${heading ? `<h2 style="margin-bottom: 16px;">${escapeHtml(heading)}</h2>` : ''}
+        <div>${bodyHtml}</div>
+      </body>
+    </html>
+  `;
 }
 
 export async function renderQuotePdfAttachment(
@@ -524,7 +537,7 @@ export async function renderQuotePdfAttachment(
   }
 
   return {
-    filename: `Quote_${bundle.quote.quote_reference.replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`,
+    filename: buildQuotePdfFilename(bundle.quote),
     content: Buffer.concat(chunks).toString('base64'),
   };
 }
@@ -573,32 +586,60 @@ export async function sendQuoteToCustomerEmail(
     .filter(email => !toEmailKeys.has(email.toLowerCase()));
 
   const customerName = bundle.quote.attention_name || bundle.quote.customer?.contact_name || 'there';
-  const subject = `Quotation ${bundle.quote.quote_reference} - ${bundle.quote.subject_line || bundle.quote.customer?.company_name || 'A&V Squires'}`;
-  const pricingCopy = bundle.quote.pricing_mode === 'attachments_only'
-    ? '<p>Pricing and supporting details are included in the attached documents.</p>'
-    : '';
-  const html = `
-    <!DOCTYPE html>
-    <html>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937; max-width: 640px; margin: 0 auto; padding: 24px;">
-        <h2 style="margin-bottom: 16px;">Quotation ${bundle.quote.quote_reference}</h2>
-        <p>Hello ${customerName},</p>
-        <p>Please find attached our quotation for <strong>${bundle.quote.subject_line || 'the requested works'}</strong>.</p>
-        ${pricingCopy}
-        <p>If you have any queries, please reply to this email and we will be happy to help.</p>
-        <p>Kind regards,<br>${bundle.quote.signoff_name || 'A&V Squires'}${bundle.quote.signoff_title ? `<br>${bundle.quote.signoff_title}` : ''}</p>
-      </body>
-    </html>
-  `;
+  const template = await renderConfiguredQuoteEmailTemplate(createAdminClient(), 'customer_quote', {
+    quote_reference: bundle.quote.quote_reference,
+    quote_name: buildQuoteDisplayName(bundle.quote),
+    contact_name: customerName,
+    customer_name: bundle.quote.customer?.company_name || 'Unknown customer',
+    subject_line: bundle.quote.subject_line || 'the requested works',
+    pricing_note: bundle.quote.pricing_mode === 'attachments_only'
+      ? 'Pricing and supporting details are included in the attached documents.'
+      : '',
+    signoff_name: bundle.quote.signoff_name || 'A&V Squires',
+    signoff_title: bundle.quote.signoff_title || '',
+  });
 
   return sendEmail({
     from: getDefaultFromEmail(),
     to: toEmails,
     cc: ccEmails,
-    subject,
-    html,
+    subject: template.subject,
+    html: renderQuoteWorkflowEmailHtml(template.bodyHtml, `Quotation ${bundle.quote.quote_reference}`),
     replyTo: replyToEmail,
     attachments: [quotePdfAttachment, ...clientAttachments],
+  });
+}
+
+export async function sendQuotePoRequestEmail(params: {
+  bundle: QuoteBundle;
+  recipientEmails: string[];
+  senderEmail?: string | null;
+  senderName?: string | null;
+}) {
+  const replyToEmail = normalizeEmailAddress(params.senderEmail) || normalizeEmailAddress(params.bundle.quote.manager_email);
+  const quotePdfAttachment = await renderQuotePdfAttachment(params.bundle, replyToEmail);
+  const toEmails = uniqueEmailAddresses(params.recipientEmails);
+  if (toEmails.length === 0) {
+    return { success: false, error: 'Select at least one customer email for the PO request.' };
+  }
+
+  const customerName = params.bundle.quote.attention_name || params.bundle.quote.customer?.contact_name || 'there';
+  const senderName = params.senderName || params.bundle.quote.manager_name || params.bundle.quote.signoff_name || 'A&V Squires';
+  const template = await renderConfiguredQuoteEmailTemplate(createAdminClient(), 'po_request', {
+    quote_reference: params.bundle.quote.quote_reference,
+    quote_name: buildQuoteDisplayName(params.bundle.quote),
+    contact_name: customerName,
+    customer_name: params.bundle.quote.customer?.company_name || 'Unknown customer',
+    sender_name: senderName,
+  });
+
+  return sendEmail({
+    from: getDefaultFromEmail(),
+    to: toEmails,
+    subject: template.subject,
+    html: renderQuoteWorkflowEmailHtml(template.bodyHtml),
+    replyTo: replyToEmail,
+    attachments: [quotePdfAttachment],
   });
 }
 
@@ -609,20 +650,18 @@ export async function sendQuoteApprovalRequestEmail(params: {
   customerName: string;
   subjectLine: string;
 }) {
+  const template = await renderConfiguredQuoteEmailTemplate(createAdminClient(), 'approval_request', {
+    quote_reference: params.quoteReference,
+    quote_name: params.quoteReference,
+    manager_name: params.managerName,
+    customer_name: params.customerName,
+    subject_line: params.subjectLine,
+  });
+
   return sendEmail({
     to: [params.approverEmail],
-    subject: `Quote approval required: ${params.quoteReference}`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937; max-width: 640px; margin: 0 auto; padding: 24px;">
-          <h2>Quote approval required</h2>
-          <p>${params.managerName} has submitted quote <strong>${params.quoteReference}</strong> for approval.</p>
-          <p><strong>Customer:</strong> ${params.customerName}</p>
-          <p><strong>Scope:</strong> ${params.subjectLine}</p>
-        </body>
-      </html>
-    `,
+    subject: template.subject,
+    html: renderQuoteWorkflowEmailHtml(template.bodyHtml, 'Quote approval required'),
   });
 }
 
@@ -640,30 +679,37 @@ export async function sendQuoteRamsRequestEmail(params: {
   estimatedDurationDays?: number | null;
   ramsComments?: string | null;
 }) {
+  const template = await renderConfiguredQuoteEmailTemplate(createAdminClient(), 'rams_request', {
+    quote_reference: params.quoteReference,
+    quote_name: params.quoteReference,
+    customer_name: params.customerName,
+    po_number: params.poNumber,
+    subject_line: params.subjectLine,
+    scope: params.scope || '',
+    scope_block: params.scope ? `Scope:\n${params.scope}` : '',
+    manager_name: params.managerName,
+    site_address: params.siteAddress || '',
+    site_address_block: params.siteAddress ? `Site Address:\n${params.siteAddress}` : '',
+    start_date: params.startDate || '',
+    start_date_block: params.startDate ? `Start Date: ${params.startDate}` : '',
+    estimated_duration_days: params.estimatedDurationDays !== null && typeof params.estimatedDurationDays !== 'undefined'
+      ? `${params.estimatedDurationDays} day(s)`
+      : '',
+    estimated_duration_block: params.estimatedDurationDays !== null && typeof params.estimatedDurationDays !== 'undefined'
+      ? `Estimated Duration: ${params.estimatedDurationDays} day(s)`
+      : '',
+    internal_notes: params.internalNotes || '',
+    internal_notes_block: params.internalNotes ? `Internal Notes:\n${params.internalNotes}` : '',
+    completion_comments: params.completionComments || '',
+    completion_comments_block: params.completionComments ? `Completion Notes:\n${params.completionComments}` : '',
+    rams_comments: params.ramsComments || '',
+    rams_comments_block: params.ramsComments ? `Additional RAMS Comments:\n${params.ramsComments}` : '',
+  });
+
   return sendEmail({
     to: ['conway@avsquires.co.uk'],
-    subject: `RAMS required for ${params.quoteReference}`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937; max-width: 640px; margin: 0 auto; padding: 24px;">
-          <h2>RAMS requested</h2>
-          <p>The following job now requires RAMS to be produced.</p>
-          <p><strong>Quote:</strong> ${params.quoteReference}</p>
-          <p><strong>Customer:</strong> ${params.customerName}</p>
-          <p><strong>PO Number:</strong> ${params.poNumber}</p>
-          <p><strong>Title:</strong> ${params.subjectLine}</p>
-          ${params.scope ? `<p><strong>Scope:</strong><br>${params.scope.replace(/\n/g, '<br>')}</p>` : ''}
-          <p><strong>Manager:</strong> ${params.managerName}</p>
-          ${params.siteAddress ? `<p><strong>Site Address:</strong><br>${params.siteAddress.replace(/\n/g, '<br>')}</p>` : ''}
-          ${params.startDate ? `<p><strong>Start Date:</strong> ${params.startDate}</p>` : ''}
-          ${params.estimatedDurationDays !== null && typeof params.estimatedDurationDays !== 'undefined' ? `<p><strong>Estimated Duration:</strong> ${params.estimatedDurationDays} day(s)</p>` : ''}
-          ${params.internalNotes ? `<p><strong>Internal Notes:</strong><br>${params.internalNotes.replace(/\n/g, '<br>')}</p>` : ''}
-          ${params.completionComments ? `<p><strong>Completion Notes:</strong><br>${params.completionComments.replace(/\n/g, '<br>')}</p>` : ''}
-          ${params.ramsComments ? `<p><strong>Additional RAMS Comments:</strong><br>${params.ramsComments.replace(/\n/g, '<br>')}</p>` : ''}
-        </body>
-      </html>
-    `,
+    subject: template.subject,
+    html: renderQuoteWorkflowEmailHtml(template.bodyHtml, 'RAMS requested'),
   });
 }
 
@@ -675,21 +721,19 @@ export async function sendQuoteStartAlertEmail(params: {
   subjectLine: string;
   startDate: string;
 }) {
+  const template = await renderConfiguredQuoteEmailTemplate(createAdminClient(), 'start_alert', {
+    quote_reference: params.quoteReference,
+    quote_name: params.quoteReference,
+    manager_name: params.managerName,
+    customer_name: params.customerName,
+    subject_line: params.subjectLine,
+    start_date: params.startDate,
+  });
+
   return sendEmail({
     to: [params.to],
-    subject: `Upcoming job start: ${params.quoteReference}`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937; max-width: 640px; margin: 0 auto; padding: 24px;">
-          <h2>Job start reminder</h2>
-          <p>Hello ${params.managerName},</p>
-          <p>This is a reminder that quote <strong>${params.quoteReference}</strong> is due to start on <strong>${params.startDate}</strong>.</p>
-          <p><strong>Customer:</strong> ${params.customerName}</p>
-          <p><strong>Scope:</strong> ${params.subjectLine}</p>
-        </body>
-      </html>
-    `,
+    subject: template.subject,
+    html: renderQuoteWorkflowEmailHtml(template.bodyHtml, 'Job start reminder'),
   });
 }
 
@@ -783,15 +827,7 @@ export async function createQuoteNotification(params: {
   const emailResult = await sendEmail({
     to: emailTo,
     subject: params.subject,
-    html: `
-      <!DOCTYPE html>
-      <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937; max-width: 640px; margin: 0 auto; padding: 24px;">
-          <h2>${escapeHtml(params.subject)}</h2>
-          <p>${plainTextToHtml(params.body)}</p>
-        </body>
-      </html>
-    `,
+    html: renderQuoteWorkflowEmailHtml(plainQuoteEmailTextToHtml(params.body), params.subject),
   });
 
   if (!emailResult.success) {

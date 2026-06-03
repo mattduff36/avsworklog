@@ -8,6 +8,8 @@ import {
   getQuoteAccountsRecipientIds,
 } from '@/lib/server/quote-workflow';
 import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
+import { buildQuoteDisplayName } from '@/lib/quotes/quote-display-name';
+import { renderConfiguredQuoteEmailTemplate } from '@/lib/server/quote-email-templates';
 
 type InvoiceRequestFieldErrors = Record<string, string>;
 
@@ -149,19 +151,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     try {
+      const notificationTemplate = await renderConfiguredQuoteEmailTemplate(admin, 'invoice_request', {
+        quote_reference: bundle.quote.quote_reference,
+        quote_name: buildQuoteDisplayName(bundle.quote),
+        customer_name: bundle.quote.customer?.company_name || 'Unknown customer',
+        invoice_amount: `£${normalizedAmount.toLocaleString('en-GB', { minimumFractionDigits: 2 })}`,
+        invoice_date: normalizedDate,
+        invoice_scope: normalizedScope === 'full' ? 'Full invoice' : 'Partial invoice',
+        invoice_comments: normalizedComments || '',
+        invoice_comments_block: normalizedComments ? `Comments: ${normalizedComments}` : '',
+      });
       await createQuoteNotification({
         senderId: user.id,
         recipientIds,
-        subject: `Ready to invoice: ${bundle.quote.quote_reference}`,
-        body: [
-          `Quote ${bundle.quote.quote_reference} is ready to invoice.`,
-          '',
-          `Customer: ${bundle.quote.customer?.company_name || 'Unknown customer'}`,
-          `Amount: £${normalizedAmount.toLocaleString('en-GB', { minimumFractionDigits: 2 })}`,
-          `Date: ${normalizedDate}`,
-          `Scope: ${normalizedScope === 'full' ? 'Full invoice' : 'Partial invoice'}`,
-          normalizedComments ? `Comments: ${normalizedComments}` : null,
-        ].filter(Boolean).join('\n'),
+        subject: notificationTemplate.subject,
+        body: notificationTemplate.bodyText,
         sendEmail: true,
       });
     } catch (error) {

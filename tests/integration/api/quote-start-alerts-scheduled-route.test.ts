@@ -6,11 +6,13 @@ const {
   mockCreateQuoteNotification,
   mockGetQuoteInvoiceNotificationRecipientIds,
   mockSendQuoteStartAlertEmail,
+  mockRenderConfiguredQuoteEmailTemplate,
 } = vi.hoisted(() => ({
   mockCreateAdminClient: vi.fn(),
   mockCreateQuoteNotification: vi.fn(),
   mockGetQuoteInvoiceNotificationRecipientIds: vi.fn(),
   mockSendQuoteStartAlertEmail: vi.fn(),
+  mockRenderConfiguredQuoteEmailTemplate: vi.fn(),
 }));
 
 vi.mock('@/lib/supabase/admin', () => ({
@@ -23,6 +25,10 @@ vi.mock('@/lib/server/quote-workflow', () => ({
   sendQuoteStartAlertEmail: mockSendQuoteStartAlertEmail,
 }));
 
+vi.mock('@/lib/server/quote-email-templates', () => ({
+  renderConfiguredQuoteEmailTemplate: mockRenderConfiguredQuoteEmailTemplate,
+}));
+
 describe('/api/quotes/start-alerts-scheduled', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -30,6 +36,11 @@ describe('/api/quotes/start-alerts-scheduled', () => {
     mockSendQuoteStartAlertEmail.mockResolvedValue({ success: true });
     mockGetQuoteInvoiceNotificationRecipientIds.mockResolvedValue(['copy-1']);
     mockCreateQuoteNotification.mockResolvedValue(undefined);
+    mockRenderConfiguredQuoteEmailTemplate.mockResolvedValue({
+      subject: 'Job start reminder: Q-001',
+      bodyText: 'Quote Q-001 is due to start today.',
+      bodyHtml: 'Quote Q-001 is due to start today.',
+    });
   });
 
   it('notifies configured copy recipients when a start alert is sent', async () => {
@@ -88,8 +99,15 @@ describe('/api/quotes/start-alerts-scheduled', () => {
 
     expect(response.status).toBe(200);
     expect(mockGetQuoteInvoiceNotificationRecipientIds).toHaveBeenCalledWith(expect.anything(), 'start_alert_copy', ['manager-1']);
+    expect(mockRenderConfiguredQuoteEmailTemplate).toHaveBeenCalledWith(expect.anything(), 'start_alert_copy', expect.objectContaining({
+      quote_reference: 'Q-001',
+      customer_name: 'Acme Ltd',
+      subject_line: 'Fence repairs',
+    }));
     expect(mockCreateQuoteNotification).toHaveBeenCalledWith(expect.objectContaining({
       recipientIds: ['copy-1'],
+      subject: 'Job start reminder: Q-001',
+      body: 'Quote Q-001 is due to start today.',
       sendEmail: true,
     }));
     expect(update).toHaveBeenCalledWith(expect.objectContaining({

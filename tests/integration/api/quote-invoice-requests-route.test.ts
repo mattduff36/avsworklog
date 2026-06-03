@@ -8,6 +8,7 @@ const {
   mockCreateQuoteNotification,
   mockFetchQuoteBundle,
   mockGetQuoteAccountsRecipientIds,
+  mockRenderConfiguredQuoteEmailTemplate,
 } = vi.hoisted(() => ({
   mockCreateClient: vi.fn(),
   mockCreateAdminClient: vi.fn(),
@@ -15,6 +16,7 @@ const {
   mockCreateQuoteNotification: vi.fn(),
   mockFetchQuoteBundle: vi.fn(),
   mockGetQuoteAccountsRecipientIds: vi.fn(),
+  mockRenderConfiguredQuoteEmailTemplate: vi.fn(),
 }));
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -36,9 +38,18 @@ vi.mock('@/lib/server/quote-workflow', () => ({
   getQuoteAccountsRecipientIds: mockGetQuoteAccountsRecipientIds,
 }));
 
+vi.mock('@/lib/server/quote-email-templates', () => ({
+  renderConfiguredQuoteEmailTemplate: mockRenderConfiguredQuoteEmailTemplate,
+}));
+
 describe('POST /api/quotes/[id]/invoice-requests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRenderConfiguredQuoteEmailTemplate.mockResolvedValue({
+      subject: 'Ready to invoice: Q-001',
+      bodyText: 'Quote Q-001 is ready to invoice.',
+      bodyHtml: 'Quote Q-001 is ready to invoice.',
+    });
     mockCreateAdminClient.mockReturnValue({
       from: vi.fn(() => ({
         update: vi.fn(() => ({
@@ -197,9 +208,15 @@ describe('POST /api/quotes/[id]/invoice-requests', () => {
     const response = await POST(request, { params: Promise.resolve({ id: 'quote-1' }) });
 
     expect(response.status).toBe(201);
+    expect(mockRenderConfiguredQuoteEmailTemplate).toHaveBeenCalledWith(expect.anything(), 'invoice_request', expect.objectContaining({
+      quote_reference: '40000-GH',
+      invoice_amount: '£50.00',
+      invoice_scope: 'Partial invoice',
+    }));
     expect(mockCreateQuoteNotification).toHaveBeenCalledWith(expect.objectContaining({
       recipientIds: ['accounts-1'],
-      subject: 'Ready to invoice: 40000-GH',
+      subject: 'Ready to invoice: Q-001',
+      body: 'Quote Q-001 is ready to invoice.',
       sendEmail: true,
     }));
     expect(mockAppendQuoteTimelineEvent).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({

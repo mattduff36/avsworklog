@@ -5,6 +5,7 @@ import {
   getQuoteInvoiceNotificationRecipientIds,
   sendQuoteStartAlertEmail,
 } from '@/lib/server/quote-workflow';
+import { renderConfiguredQuoteEmailTemplate } from '@/lib/server/quote-email-templates';
 
 async function handleQuoteStartAlerts(request: NextRequest, method: 'GET' | 'POST') {
   const startedAt = Date.now();
@@ -98,6 +99,13 @@ async function handleQuoteStartAlerts(request: NextRequest, method: 'GET' | 'POS
 
       if (emailResult.success) {
         const copyRecipientIds = await getQuoteInvoiceNotificationRecipientIds(admin, 'start_alert_copy', [quote.requester_id]);
+        const notificationTemplate = await renderConfiguredQuoteEmailTemplate(admin, 'start_alert_copy', {
+          quote_reference: quote.quote_reference,
+          quote_name: quote.quote_reference,
+          start_date: quote.start_date,
+          customer_name: customer?.company_name || 'Unknown customer',
+          subject_line: quote.subject_line || 'No subject provided',
+        });
         await admin
           .from('quotes')
           .update({ start_alert_sent_at: new Date().toISOString() })
@@ -106,16 +114,16 @@ async function handleQuoteStartAlerts(request: NextRequest, method: 'GET' | 'POS
         await createQuoteNotification({
           senderId: quote.requester_id || quote.created_by || quote.updated_by || quote.id,
           recipientIds: quote.requester_id ? [quote.requester_id] : [],
-          subject: `Job start reminder: ${quote.quote_reference}`,
-          body: `This quote is due to start on ${quote.start_date}.`,
+          subject: notificationTemplate.subject,
+          body: notificationTemplate.bodyText,
         });
 
         if (copyRecipientIds.length > 0) {
           await createQuoteNotification({
             senderId: quote.requester_id || quote.created_by || quote.updated_by || quote.id,
             recipientIds: copyRecipientIds,
-            subject: `Job start reminder: ${quote.quote_reference}`,
-            body: `Quote ${quote.quote_reference} is due to start on ${quote.start_date}.`,
+            subject: notificationTemplate.subject,
+            body: notificationTemplate.bodyText,
             sendEmail: true,
           });
         }

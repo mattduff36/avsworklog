@@ -5,6 +5,7 @@ import { QuotePDF } from '@/lib/pdf/quote-pdf';
 import { loadSquiresLogoDataUrl } from '@/lib/pdf/squires-logo';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
+import { buildQuotePdfContentDisposition } from '@/lib/quotes/quote-display-name';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -26,7 +27,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // Fetch quote
     const { data: quote, error: quoteError } = await supabase
       .from('quotes')
-      .select('*')
+      .select(`
+        *,
+        customer:customers(company_name)
+      `)
       .eq('id', id)
       .single();
 
@@ -82,12 +86,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
     const pdfBytes = new Uint8Array(Buffer.concat(chunks));
 
-    const filename = `Quote_${quote.quote_reference.replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`;
+    const contentDisposition = buildQuotePdfContentDisposition(quote);
 
     return new NextResponse(pdfBytes, {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Disposition': contentDisposition,
       },
     });
   } catch (error) {

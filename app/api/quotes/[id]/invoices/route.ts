@@ -8,6 +8,9 @@ import {
   getQuoteInvoiceNotificationRecipientIds,
 } from '@/lib/server/quote-workflow';
 import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
+import { canManageQuoteSage } from '@/lib/server/quote-sage-access';
+import { buildQuoteDisplayName } from '@/lib/quotes/quote-display-name';
+import { renderConfiguredQuoteEmailTemplate } from '@/lib/server/quote-email-templates';
 
 type InvoiceFieldErrors = Record<string, string>;
 
@@ -32,14 +35,93 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     if (sensitiveAccessResponse) return sensitiveAccessResponse;
 
     const bundle = await fetchQuoteBundle(createAdminClient(), id);
+    const canManageSage = await canManageQuoteSage();
     return NextResponse.json({
       invoices: bundle.invoices,
       invoice_requests: bundle.invoiceRequests,
       invoice_summary: bundle.invoiceSummary,
+      can_manage_sage: canManageSage,
     });
   } catch (error) {
     console.error('Error fetching quote invoices:', error);
     return NextResponse.json({ error: 'Unable to load invoices right now.' }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: NextRequest, { params }: RouteParams) {
+  try {
+    const { id } = await params;
+    const supabase = await createClient();
+    const admin = createAdminClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'You must be signed in to use quotes.' }, { status: 401 });
+    }
+
+    const sensitiveAccessResponse = await requireSensitiveModuleAccess('quotes');
+    if (sensitiveAccessResponse) return sensitiveAccessResponse;
+
+    if (!await canManageQuoteSage()) {
+      return NextResponse.json({ error: 'Only Accounts or admin users can update Sage status.' }, { status: 403 });
+    }
+
+    const body = await request.json() as {
+      action?: string;
+      invoice_id?: string;
+      on_sage?: boolean;
+    };
+
+    if (body.action !== 'toggle_sage' || !body.invoice_id) {
+      return NextResponse.json({ error: 'Unsupported invoice action.' }, { status: 400 });
+    }
+
+    const bundleBeforeUpdate = await fetchQuoteBundle(admin, id);
+    const invoice = bundleBeforeUpdate.invoices.find(item => item.id === body.invoice_id);
+    if (!invoice) {
+      return NextResponse.json({ error: 'Invoice not found for this quote.' }, { status: 404 });
+    }
+
+    const nextSagePostedAt = body.on_sage === true ? new Date().toISOString() : null;
+    const { error: updateError } = await supabase
+      .from('quote_invoices')
+      .update({
+        sage_posted_at: nextSagePostedAt,
+        sage_posted_by: nextSagePostedAt ? user.id : null,
+      })
+      .eq('id', body.invoice_id)
+      .eq('quote_id', id);
+
+    if (updateError) throw updateError;
+
+    const refreshedBundle = await fetchQuoteBundle(admin, id);
+    await appendQuoteTimelineEvent(admin, {
+      quoteId: id,
+      quoteThreadId: refreshedBundle.quote.quote_thread_id,
+      quoteReference: refreshedBundle.quote.quote_reference,
+      eventType: nextSagePostedAt ? 'invoice_marked_on_sage' : 'invoice_removed_from_sage',
+      title: nextSagePostedAt ? 'Invoice marked on Sage' : 'Invoice removed from Sage',
+      description: `${invoice.invoice_number} • £${Number(invoice.amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`,
+      fromStatus: refreshedBundle.quote.status,
+      toStatus: refreshedBundle.quote.status,
+      actorUserId: user.id,
+    });
+
+    return NextResponse.json({
+      invoices: refreshedBundle.invoices,
+      invoice_requests: refreshedBundle.invoiceRequests,
+      invoice_summary: refreshedBundle.invoiceSummary,
+      can_manage_sage: true,
+    });
+  } catch (error) {
+    console.error('Error updating quote invoice Sage status:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Unable to update Sage status right now.' },
+      { status: 500 }
+    );
   }
 }
 
@@ -302,20 +384,24 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       user.id,
       managerRecipientId,
     ]);
+    const invoiceAddedTemplate = await renderConfiguredQuoteEmailTemplate(admin, 'invoice_added', {
+      quote_reference: refreshedBundle.quote.quote_reference,
+      quote_name: buildQuoteDisplayName(refreshedBundle.quote),
+      customer_name: refreshedBundle.quote.customer?.company_name || 'Unknown customer',
+      invoice_number: invoice.invoice_number,
+      invoice_amount: `£${Number(invoice.amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`,
+      invoice_date: invoice.invoice_date,
+      invoice_scope: invoice.invoice_scope === 'full' ? 'Full invoice' : 'Partial invoice',
+      invoice_comments: invoice.comments || '',
+      invoice_comments_block: invoice.comments ? `Comments: ${invoice.comments}` : '',
+    });
     if (managerRecipientId && managerRecipientId !== user.id) {
       try {
         await createQuoteNotification({
           senderId: user.id,
           recipientIds: [managerRecipientId],
-          subject: `Invoice details added: ${refreshedBundle.quote.quote_reference}`,
-          body: [
-            `Invoice details have been added to quote ${refreshedBundle.quote.quote_reference}.`,
-            '',
-            `Invoice number: ${invoice.invoice_number}`,
-            `Amount: £${Number(invoice.amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`,
-            `Date: ${invoice.invoice_date}`,
-            `Scope: ${invoice.invoice_scope === 'full' ? 'Full invoice' : 'Partial invoice'}`,
-          ].join('\n'),
+          subject: invoiceAddedTemplate.subject,
+          body: invoiceAddedTemplate.bodyText,
           sendEmail: true,
         });
       } catch (notificationError) {
@@ -328,15 +414,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         await createQuoteNotification({
           senderId: user.id,
           recipientIds: additionalRecipientIds,
-          subject: `Invoice details added: ${refreshedBundle.quote.quote_reference}`,
-          body: [
-            `Invoice details have been added to quote ${refreshedBundle.quote.quote_reference}.`,
-            '',
-            `Invoice number: ${invoice.invoice_number}`,
-            `Amount: £${Number(invoice.amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`,
-            `Date: ${invoice.invoice_date}`,
-            `Scope: ${invoice.invoice_scope === 'full' ? 'Full invoice' : 'Partial invoice'}`,
-          ].join('\n'),
+          subject: invoiceAddedTemplate.subject,
+          body: invoiceAddedTemplate.bodyText,
           sendEmail: true,
         });
       } catch (notificationError) {

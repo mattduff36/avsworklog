@@ -63,6 +63,8 @@ export interface QuoteInvoice {
   invoice_scope: 'full' | 'partial';
   comments: string | null;
   created_by: string | null;
+  sage_posted_at: string | null;
+  sage_posted_by: string | null;
   created_at: string;
   updated_at: string;
   allocations?: QuoteInvoiceAllocation[];
@@ -190,6 +192,8 @@ export interface Quote {
   sent_at: string | null;
   accepted_at: string | null;
   invoiced_at: string | null;
+  sage_status?: QuoteSageStatus;
+  can_manage_sage?: boolean;
   // Joined
   customer?: {
     id: string;
@@ -230,6 +234,12 @@ export interface QuoteListSummary {
   accepted_quotes: number;
   accepted_value: number;
 }
+
+export type QuoteSageStatus =
+  | 'no_invoices'
+  | 'not_on_sage'
+  | 'part_on_sage'
+  | 'on_sage';
 
 export type QuoteRevisionType =
   | 'original'

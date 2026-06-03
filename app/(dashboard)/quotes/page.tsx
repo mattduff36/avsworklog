@@ -54,7 +54,7 @@ function isQuotePageTab(value: string): value is QuotePageTab {
 }
 
 function isQuoteSettingsSubTab(value: string): value is QuoteSettingsSubTab {
-  return ['notifications', 'managers', 'sending', 'schedule', 'admin-tools'].includes(value);
+  return ['notifications', 'managers', 'sending', 'schedule', 'templates', 'admin-tools'].includes(value);
 }
 
 function buildFormRequestError(payload: { error?: string; field_errors?: Record<string, string> }, fallback: string) {
@@ -522,6 +522,7 @@ export default function QuotesPage() {
         onQuoteChange={handleOpenQuoteDetails}
         onEdit={handleEditFromModal}
         onRefresh={fetchData}
+        managerOptions={managerOptions}
       />
 
       <QuoteFormDialog

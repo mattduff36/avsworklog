@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Bell, CalendarClock, Loader2, Plus, Save, Send, Trash2, UserCog, Wrench } from 'lucide-react';
+import { Bell, CalendarClock, Loader2, Mail, Plus, Save, Send, Trash2, UserCog, Wrench } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PanelLoader } from '@/components/ui/panel-loader';
 import {
@@ -30,7 +31,7 @@ import {
 } from '@/components/ui/select';
 import type { Quote, QuoteManagerOption } from '../../types';
 
-export type QuoteSettingsSubTab = 'notifications' | 'managers' | 'sending' | 'schedule' | 'admin-tools';
+export type QuoteSettingsSubTab = 'notifications' | 'managers' | 'sending' | 'schedule' | 'templates' | 'admin-tools';
 
 type QuoteNotificationType = 'invoice_request' | 'invoice_added' | 'quote_sent_copy' | 'start_alert_copy';
 
@@ -66,6 +67,25 @@ interface QuoteManagerSettingsPayload {
   approvers: ApproverOption[];
 }
 
+interface QuoteEmailTemplate {
+  template_key: string;
+  label: string;
+  description: string;
+  placeholders: string[];
+  sample_context: Record<string, string>;
+  default_subject_template: string;
+  default_body_template: string;
+  subject_template: string;
+  body_template: string;
+  updated_by: string | null;
+  updated_at: string | null;
+}
+
+interface QuoteEmailTemplatesPayload {
+  can_manage: boolean;
+  templates: QuoteEmailTemplate[];
+}
+
 interface QuoteSettingsTabProps {
   activeTab: QuoteSettingsSubTab;
   onTabChange: (tab: QuoteSettingsSubTab) => void;
@@ -79,6 +99,7 @@ const SETTINGS_TABS: Array<{ value: QuoteSettingsSubTab; label: string; icon: ty
   { value: 'managers', label: 'Managers', icon: UserCog },
   { value: 'sending', label: 'Sending', icon: Send },
   { value: 'schedule', label: 'Schedule', icon: CalendarClock },
+  { value: 'templates', label: 'Templates', icon: Mail },
   { value: 'admin-tools', label: 'Admin Tools', icon: Wrench },
 ];
 
@@ -126,15 +147,19 @@ export function QuoteSettingsTab({
 }: QuoteSettingsTabProps) {
   const [settingsPayload, setSettingsPayload] = useState<QuoteSettingsPayload | null>(null);
   const [managerPayload, setManagerPayload] = useState<QuoteManagerSettingsPayload | null>(null);
+  const [templatesPayload, setTemplatesPayload] = useState<QuoteEmailTemplatesPayload | null>(null);
   const [selectedNotifications, setSelectedNotifications] = useState<Record<QuoteNotificationType, string[]>>(EMPTY_SELECTED_NOTIFICATIONS);
   const [moduleSettings, setModuleSettings] = useState<QuoteModuleSettings>({
     default_start_alert_days: null,
     default_estimated_duration_days: null,
   });
   const [managerRows, setManagerRows] = useState<ReturnType<typeof normalizeManagerRows>>([]);
+  const [templateRows, setTemplateRows] = useState<QuoteEmailTemplate[]>([]);
+  const [selectedTemplateKey, setSelectedTemplateKey] = useState('');
   const [newManagerProfileId, setNewManagerProfileId] = useState('');
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [loadingManagers, setLoadingManagers] = useState(true);
+  const [loadingTemplates, setLoadingTemplates] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [deleteQuoteId, setDeleteQuoteId] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -151,10 +176,12 @@ export function QuoteSettingsTab({
   const additionalUsers = quoteUsers.filter(user => user.team_id !== 'accounts');
   const managerProfileIds = new Set(managerRows.map(row => row.profile_id));
   const availableManagerUsers = (managerPayload?.quote_users || []).filter(user => !managerProfileIds.has(user.id));
+  const selectedTemplate = templateRows.find(template => template.template_key === selectedTemplateKey) || templateRows[0] || null;
 
   useEffect(() => {
     void loadQuoteSettings();
     void loadManagerSettings();
+    void loadEmailTemplates();
   }, []);
 
   async function loadQuoteSettings() {
@@ -188,6 +215,22 @@ export function QuoteSettingsTab({
       toast.error(error instanceof Error ? error.message : 'Unable to load quote manager settings.');
     } finally {
       setLoadingManagers(false);
+    }
+  }
+
+  async function loadEmailTemplates() {
+    setLoadingTemplates(true);
+    try {
+      const res = await fetch('/api/quotes/settings/email-templates', { cache: 'no-store' });
+      if (!res.ok) throw await buildResponseError(res, 'Unable to load quote email templates.');
+      const payload = await res.json() as QuoteEmailTemplatesPayload;
+      setTemplatesPayload(payload);
+      setTemplateRows(payload.templates || []);
+      setSelectedTemplateKey(current => current || payload.templates?.[0]?.template_key || '');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to load quote email templates.');
+    } finally {
+      setLoadingTemplates(false);
     }
   }
 
@@ -336,6 +379,63 @@ export function QuoteSettingsTab({
     } finally {
       setSaving(null);
     }
+  }
+
+  function updateTemplateRow(templateKey: string, patch: Partial<QuoteEmailTemplate>) {
+    setTemplateRows(current => current.map(template => (
+      template.template_key === templateKey ? { ...template, ...patch } : template
+    )));
+  }
+
+  async function saveTemplateRow(template: QuoteEmailTemplate) {
+    setSaving(`template-${template.template_key}`);
+    try {
+      const res = await fetch('/api/quotes/settings/email-templates', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          template_key: template.template_key,
+          subject_template: template.subject_template,
+          body_template: template.body_template,
+        }),
+      });
+      if (!res.ok) throw await buildResponseError(res, 'Unable to save quote email template.');
+      const payload = await res.json() as QuoteEmailTemplatesPayload;
+      setTemplatesPayload(payload);
+      setTemplateRows(payload.templates || []);
+      toast.success('Quote email template saved');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to save quote email template.');
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function resetTemplateRow(template: QuoteEmailTemplate) {
+    setSaving(`template-reset-${template.template_key}`);
+    try {
+      const res = await fetch('/api/quotes/settings/email-templates', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          template_key: template.template_key,
+          reset_to_default: true,
+        }),
+      });
+      if (!res.ok) throw await buildResponseError(res, 'Unable to reset quote email template.');
+      const payload = await res.json() as QuoteEmailTemplatesPayload;
+      setTemplatesPayload(payload);
+      setTemplateRows(payload.templates || []);
+      toast.success('Quote email template reset');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to reset quote email template.');
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  function renderTemplatePreview(value: string, context: Record<string, string>) {
+    return value.replace(/\{([a-zA-Z0-9_]+)\}/g, (_match, key: string) => context[key] || '');
   }
 
   function renderUserCheckboxGrid(notificationType: QuoteNotificationType, users: QuoteUserOption[], emptyText: string) {
@@ -695,6 +795,131 @@ export function QuoteSettingsTab({
     );
   }
 
+  function renderTemplatesPanel() {
+    if (loadingTemplates) return <LoadingPanel label="Loading email templates..." />;
+
+    return (
+      <Card className="border-slate-700 bg-slate-900/70">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-white">
+            <Mail className="h-5 w-5 text-avs-yellow" />
+            Email Templates
+          </CardTitle>
+          <CardDescription>
+            Edit quote email and notification wording. Layout, recipients, attachments, and workflow rules are controlled by the app.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {!templatesPayload?.can_manage ? (
+            <div className="rounded-md border border-slate-700 bg-slate-800/60 px-3 py-2 text-sm text-muted-foreground">
+              Only admins can manage quote email templates.
+            </div>
+          ) : null}
+
+          {templateRows.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No quote email templates are configured.</p>
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+              <div className="space-y-2">
+                <Label>Template</Label>
+                <div className="space-y-2">
+                  {templateRows.map(template => (
+                    <button
+                      key={template.template_key}
+                      type="button"
+                      onClick={() => setSelectedTemplateKey(template.template_key)}
+                      className={[
+                        'w-full rounded-md border px-3 py-2 text-left text-sm transition-colors',
+                        selectedTemplate?.template_key === template.template_key
+                          ? 'border-avs-yellow bg-avs-yellow/10 text-white'
+                          : 'border-slate-700 bg-slate-800/40 text-slate-300 hover:bg-slate-800',
+                      ].join(' ')}
+                    >
+                      <span className="block font-medium">{template.label}</span>
+                      <span className="mt-1 block text-xs text-muted-foreground">{template.description}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {selectedTemplate ? (
+                <div className="space-y-4 rounded-lg border border-slate-700 bg-slate-800/40 p-4">
+                  <div>
+                    <h3 className="font-semibold text-white">{selectedTemplate.label}</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">{selectedTemplate.description}</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Subject wording</Label>
+                    <Input
+                      value={selectedTemplate.subject_template}
+                      disabled={!templatesPayload?.can_manage || Boolean(saving)}
+                      onChange={event => updateTemplateRow(selectedTemplate.template_key, { subject_template: event.target.value })}
+                      className="bg-slate-800 border-slate-600 text-white"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Body wording</Label>
+                    <Textarea
+                      value={selectedTemplate.body_template}
+                      disabled={!templatesPayload?.can_manage || Boolean(saving)}
+                      onChange={event => updateTemplateRow(selectedTemplate.template_key, { body_template: event.target.value })}
+                      rows={10}
+                      className="bg-slate-800 border-slate-600 text-white"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Available placeholders</p>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedTemplate.placeholders.map(placeholder => (
+                        <code key={placeholder} className="rounded border border-slate-700 bg-slate-950/60 px-2 py-1 text-xs text-slate-200">
+                          {`{${placeholder}}`}
+                        </code>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-md border border-slate-700 bg-slate-950/40 p-3 text-sm">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Sample preview</p>
+                    <p className="mt-2 font-medium text-white">
+                      {renderTemplatePreview(selectedTemplate.subject_template, selectedTemplate.sample_context)}
+                    </p>
+                    <p className="mt-3 whitespace-pre-wrap text-slate-300">
+                      {renderTemplatePreview(selectedTemplate.body_template, selectedTemplate.sample_context)}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={!templatesPayload?.can_manage || Boolean(saving)}
+                      onClick={() => void resetTemplateRow(selectedTemplate)}
+                      className="border-slate-600 text-muted-foreground"
+                    >
+                      Reset to default
+                    </Button>
+                    <Button
+                      type="button"
+                      disabled={!templatesPayload?.can_manage || Boolean(saving)}
+                      onClick={() => void saveTemplateRow(selectedTemplate)}
+                      className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90"
+                    >
+                      {saving === `template-${selectedTemplate.template_key}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      Save template
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
   function renderAdminToolsPanel() {
     return (
       <Card className="border-slate-700 bg-slate-900/70">
@@ -773,6 +998,9 @@ export function QuoteSettingsTab({
         </TabsContent>
         <TabsContent value="schedule" className="mt-0 space-y-6">
           {renderSchedulePanel()}
+        </TabsContent>
+        <TabsContent value="templates" className="mt-0 space-y-6">
+          {renderTemplatesPanel()}
         </TabsContent>
         <TabsContent value="admin-tools" className="mt-0 space-y-6">
           {renderAdminToolsPanel()}

@@ -8,20 +8,42 @@ const {
   mockCreateAdminClient,
   mockFetchQuoteBundle,
   mockAppendQuoteTimelineEvent,
+  mockGenerateQuoteReferenceForManager,
+  mockGetQuoteManagerOption,
+  mockGetInitialsFromName,
   mockSendQuoteToCustomerEmail,
+  mockSendQuotePoRequestEmail,
   mockSendQuoteRamsRequestEmail,
   mockGetQuoteNotificationRecipientEmails,
+  mockCanManageQuoteSage,
+  mockCopyQuoteCustomerContactRecipients,
+  mockNormalizeSecondaryContactIds,
+  mockReplaceQuoteCustomerContactRecipients,
+  mockValidateSecondaryContactIdsForCustomer,
   mockQuoteUpdate,
+  mockQuoteInsert,
+  mockLineItemInsert,
   mockListRemainingVersions,
 } = vi.hoisted(() => ({
   mockCreateClient: vi.fn(),
   mockCreateAdminClient: vi.fn(),
   mockFetchQuoteBundle: vi.fn(),
   mockAppendQuoteTimelineEvent: vi.fn(),
+  mockGenerateQuoteReferenceForManager: vi.fn(),
+  mockGetQuoteManagerOption: vi.fn(),
+  mockGetInitialsFromName: vi.fn(),
   mockSendQuoteToCustomerEmail: vi.fn(),
+  mockSendQuotePoRequestEmail: vi.fn(),
   mockSendQuoteRamsRequestEmail: vi.fn(),
   mockGetQuoteNotificationRecipientEmails: vi.fn(),
+  mockCanManageQuoteSage: vi.fn(),
+  mockCopyQuoteCustomerContactRecipients: vi.fn(),
+  mockNormalizeSecondaryContactIds: vi.fn(),
+  mockReplaceQuoteCustomerContactRecipients: vi.fn(),
+  mockValidateSecondaryContactIdsForCustomer: vi.fn(),
   mockQuoteUpdate: vi.fn(),
+  mockQuoteInsert: vi.fn(),
+  mockLineItemInsert: vi.fn(),
   mockListRemainingVersions: vi.fn(),
 }));
 
@@ -37,13 +59,28 @@ vi.mock('@/lib/server/sensitive-module-access', () => ({
   requireSensitiveModuleAccess: vi.fn().mockResolvedValue(null),
 }));
 
+vi.mock('@/lib/server/quote-sage-access', () => ({
+  canManageQuoteSage: mockCanManageQuoteSage,
+}));
+
+vi.mock('@/lib/server/quote-recipient-contacts', () => ({
+  copyQuoteCustomerContactRecipients: mockCopyQuoteCustomerContactRecipients,
+  normalizeSecondaryContactIds: mockNormalizeSecondaryContactIds,
+  replaceQuoteCustomerContactRecipients: mockReplaceQuoteCustomerContactRecipients,
+  validateSecondaryContactIdsForCustomer: mockValidateSecondaryContactIdsForCustomer,
+}));
+
 vi.mock('@/lib/server/quote-workflow', async () => {
   const actual = await vi.importActual<typeof import('@/lib/server/quote-workflow')>('@/lib/server/quote-workflow');
   return {
     ...actual,
     appendQuoteTimelineEvent: mockAppendQuoteTimelineEvent,
     fetchQuoteBundle: mockFetchQuoteBundle,
+    generateQuoteReferenceForManager: mockGenerateQuoteReferenceForManager,
+    getInitialsFromName: mockGetInitialsFromName,
+    getQuoteManagerOption: mockGetQuoteManagerOption,
     getQuoteNotificationRecipientEmails: mockGetQuoteNotificationRecipientEmails,
+    sendQuotePoRequestEmail: mockSendQuotePoRequestEmail,
     sendQuoteRamsRequestEmail: mockSendQuoteRamsRequestEmail,
     sendQuoteToCustomerEmail: mockSendQuoteToCustomerEmail,
   };
@@ -53,7 +90,25 @@ describe('PATCH /api/quotes/[id]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSendQuoteToCustomerEmail.mockResolvedValue({ success: true });
+    mockSendQuotePoRequestEmail.mockResolvedValue({ success: true });
     mockGetQuoteNotificationRecipientEmails.mockResolvedValue(['ops-copy@avsquires.co.uk']);
+    mockCanManageQuoteSage.mockResolvedValue(false);
+    mockGenerateQuoteReferenceForManager.mockResolvedValue({ quoteReference: '80001-CD', initials: 'CD' });
+    mockGetQuoteManagerOption.mockResolvedValue({
+      profile_id: 'manager-2',
+      initials: 'CD',
+      manager_email: 'charlotte@avsquires.co.uk',
+      signoff_name: 'Charlotte Duffill',
+      signoff_title: 'Accounts Manager',
+      profile: { full_name: 'Charlotte Duffill' },
+    });
+    mockGetInitialsFromName.mockReturnValue('CD');
+    mockCopyQuoteCustomerContactRecipients.mockResolvedValue(undefined);
+    mockNormalizeSecondaryContactIds.mockReturnValue([]);
+    mockReplaceQuoteCustomerContactRecipients.mockResolvedValue({});
+    mockValidateSecondaryContactIdsForCustomer.mockResolvedValue({});
+    mockQuoteInsert.mockResolvedValue({ error: null });
+    mockLineItemInsert.mockResolvedValue({ error: null });
     mockCreateAdminClient.mockReturnValue({
       storage: {
         from: vi.fn(() => ({
@@ -75,6 +130,17 @@ describe('PATCH /api/quotes/[id]', () => {
           };
         }
 
+        if (table === 'profiles') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                single: vi.fn().mockResolvedValue({ data: { id: 'manager-2', full_name: 'Charlotte Duffill' }, error: null }),
+                maybeSingle: vi.fn().mockResolvedValue({ data: { full_name: 'Sender User' }, error: null }),
+              })),
+            })),
+          };
+        }
+
         throw new Error(`Unexpected admin table: ${table}`);
       }),
     });
@@ -89,6 +155,10 @@ describe('PATCH /api/quotes/[id]', () => {
       from: vi.fn((table: string) => {
         if (table === 'quotes') {
           return {
+            insert: vi.fn((payload: unknown) => {
+              mockQuoteInsert(payload);
+              return Promise.resolve({ error: null });
+            }),
             update: vi.fn((payload: unknown) => {
               mockQuoteUpdate(payload);
               return {
@@ -98,6 +168,15 @@ describe('PATCH /api/quotes/[id]', () => {
             delete: vi.fn(() => ({
               eq: vi.fn().mockResolvedValue({ error: null }),
             })),
+          };
+        }
+
+        if (table === 'quote_line_items') {
+          return {
+            insert: vi.fn((payload: unknown) => {
+              mockLineItemInsert(payload);
+              return Promise.resolve({ error: null });
+            }),
           };
         }
 
@@ -208,6 +287,148 @@ describe('PATCH /api/quotes/[id]', () => {
     expect(mockAppendQuoteTimelineEvent).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       eventType: 'confirmed_and_sent',
       toStatus: 'sent',
+    }));
+  });
+
+  it('duplicates a quote with a fresh selected-manager quote number', async () => {
+    const { PATCH } = await import('@/app/api/quotes/[id]/route');
+    const sourceBundle = {
+      quote: {
+        id: 'quote-1',
+        status: 'sent',
+        is_latest_version: true,
+        quote_reference: '80000-MD',
+        base_quote_reference: '80000-MD',
+        quote_thread_id: 'thread-1',
+        revision_number: 0,
+        revision_type: 'original',
+        subject_line: 'Fence repairs',
+        requester_id: 'manager-1',
+        requester_initials: 'MD',
+        manager_name: 'Matt Duffill',
+        manager_email: 'matt@avsquires.co.uk',
+        signoff_name: 'Matt Duffill',
+        signoff_title: 'Contracts Manager',
+        po_number: null,
+        created_at: '2026-03-24T09:00:00.000Z',
+        updated_at: '2026-03-24T09:00:00.000Z',
+      },
+      lineItems: [{
+        id: 'line-1',
+        description: 'Fence repairs',
+        quantity: 1,
+        unit: 'item',
+        unit_rate: 100,
+        line_total: 100,
+        sort_order: 0,
+      }],
+      attachments: [],
+      invoices: [],
+      invoiceRequests: [],
+      versions: [],
+      timeline: [],
+      selectedSecondaryContacts: [{ id: 'contact-1' }],
+      invoiceSummary: {
+        invoicedTotal: 0,
+        remainingBalance: 100,
+        lastInvoiceAt: null,
+        status: 'not_invoiced',
+      },
+    };
+    mockFetchQuoteBundle.mockResolvedValue(sourceBundle);
+
+    const request = new NextRequest('http://localhost/api/quotes/quote-1', {
+      method: 'PATCH',
+      body: JSON.stringify({ action: 'duplicate', manager_profile_id: 'manager-2', version_notes: 'Copy for new works' }),
+    });
+
+    const response = await PATCH(request, { params: Promise.resolve({ id: 'quote-1' }) });
+
+    expect(response.status).toBe(200);
+    expect(mockGenerateQuoteReferenceForManager).toHaveBeenCalledWith({
+      managerProfileId: 'manager-2',
+      fallbackInitials: 'CD',
+    });
+    expect(mockQuoteInsert).toHaveBeenCalledWith(expect.objectContaining({
+      quote_reference: '80001-CD',
+      base_quote_reference: '80001-CD',
+      revision_number: 0,
+      revision_type: 'original',
+      version_label: 'Original',
+      requester_id: 'manager-2',
+      requester_initials: 'CD',
+      manager_name: 'Charlotte Duffill',
+      manager_email: 'charlotte@avsquires.co.uk',
+      duplicate_source_quote_id: 'quote-1',
+      status: 'draft',
+    }));
+    expect(mockCopyQuoteCustomerContactRecipients).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.any(String),
+      [{ id: 'contact-1' }],
+      'user-1'
+    );
+    expect(mockAppendQuoteTimelineEvent).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      eventType: 'quote_duplicated',
+      quoteReference: '80001-CD',
+    }));
+  });
+
+  it('sends a PO request email to selected saved customer recipients', async () => {
+    const { PATCH } = await import('@/app/api/quotes/[id]/route');
+    mockFetchQuoteBundle.mockResolvedValue({
+      quote: {
+        id: 'quote-1',
+        status: 'sent',
+        is_latest_version: true,
+        quote_reference: '80000-MD',
+        quote_thread_id: 'thread-1',
+        sent_at: '2026-03-24T09:00:00.000Z',
+        customer_sent_at: '2026-03-24T09:00:00.000Z',
+        attention_email: 'alex@example.com',
+        po_number: null,
+        customer: {
+          id: 'customer-1',
+          company_name: 'Acme Ltd',
+          contact_email: 'alex@example.com',
+          contact_name: 'Alex',
+          short_name: 'Acme',
+        },
+      },
+      lineItems: [],
+      attachments: [],
+      invoices: [],
+      invoiceRequests: [],
+      versions: [],
+      timeline: [],
+      selectedSecondaryContacts: [{ email: 'chris@example.com' }],
+      invoiceSummary: {
+        invoicedTotal: 0,
+        remainingBalance: 100,
+        lastInvoiceAt: null,
+        status: 'not_invoiced',
+      },
+    });
+
+    const request = new NextRequest('http://localhost/api/quotes/quote-1', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        action: 'request_po',
+        po_request_recipient_emails: ['alex@example.com', 'chris@example.com'],
+      }),
+    });
+
+    const response = await PATCH(request, { params: Promise.resolve({ id: 'quote-1' }) });
+
+    expect(response.status).toBe(200);
+    expect(mockSendQuotePoRequestEmail).toHaveBeenCalledWith(expect.objectContaining({
+      recipientEmails: ['alex@example.com', 'chris@example.com'],
+      senderEmail: 'sender@avsquires.co.uk',
+      senderName: 'Sender User',
+    }));
+    expect(mockAppendQuoteTimelineEvent).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      eventType: 'po_request_sent',
+      description: 'PO request emailed to alex@example.com, chris@example.com.',
     }));
   });
 
