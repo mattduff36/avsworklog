@@ -8,6 +8,7 @@ interface ProfileNotificationsTabProps {
   preferences: NotificationPreference[];
   isLoadingPreferences: boolean;
   savingPreferenceModules: NotificationModuleKey[];
+  canDisableNotifications: boolean;
   onTogglePreference: (
     moduleKey: NotificationModuleKey,
     field: 'notify_in_app' | 'notify_email',
@@ -20,6 +21,7 @@ export function ProfileNotificationsTab({
   preferences,
   isLoadingPreferences,
   savingPreferenceModules,
+  canDisableNotifications,
   onTogglePreference,
 }: ProfileNotificationsTabProps) {
   return (
@@ -28,6 +30,7 @@ export function ProfileNotificationsTab({
       preferences={preferences}
       isLoadingPreferences={isLoadingPreferences}
       savingPreferenceModules={savingPreferenceModules}
+      canDisableNotifications={canDisableNotifications}
       onTogglePreference={onTogglePreference}
     />
   );

@@ -35,8 +35,14 @@ interface InspectionWithDetails extends VanInspection {
   };
 }
 
-interface InspectionItemWithDay extends InspectionItem {
+interface InspectionItemWithDay extends Omit<InspectionItem, 'item_description' | 'created_at'> {
+  item_description: string | null;
+  created_at: string | null;
   day_of_week: number | null;
+}
+
+function getInspectionItemDescription(item: Pick<InspectionItemWithDay, 'item_number' | 'item_description'>): string {
+  return item.item_description || `Item ${item.item_number}`;
 }
 
 export default function ViewInspectionPage() {
@@ -327,12 +333,13 @@ export default function ViewInspectionPage() {
                 item_ids: string[];
               }>();
 
-              insertedItems.forEach((item: { id: string; item_number?: number; item_description?: string; day_of_week?: number; comments?: string }) => {
-                const key = `${item.item_number ?? 0}-${item.item_description ?? ''}`;
+              insertedItems.forEach((item) => {
+                const itemDescription = item.item_description || `Item ${item.item_number}`;
+                const key = `${item.item_number}-${itemDescription}`;
                 if (!groupedDefects.has(key)) {
                   groupedDefects.set(key, {
-                    item_number: item.item_number ?? 0,
-                    item_description: item.item_description ?? '',
+                    item_number: item.item_number,
+                    item_description: itemDescription,
                     days: [] as number[],
                     comments: [],
                     item_ids: []
@@ -512,11 +519,12 @@ export default function ViewInspectionPage() {
             }>();
 
             failedItems.forEach((item: InspectionItemWithDay) => {
-              const key = `${item.item_number}-${item.item_description}`;
+              const itemDescription = getInspectionItemDescription(item);
+              const key = `${item.item_number}-${itemDescription}`;
               if (!groupedDefects.has(key)) {
                 groupedDefects.set(key, {
                   item_number: item.item_number,
-                  item_description: item.item_description,
+                  item_description: itemDescription,
                   days: [],
                   comments: [],
                   item_ids: []
@@ -874,7 +882,7 @@ export default function ViewInspectionPage() {
                 {items.map((item) => (
                   <tr key={item.id} className="border-b hover:bg-secondary/20">
                     <td className="p-2 text-sm text-muted-foreground">{item.item_number}</td>
-                    <td className="p-2 text-sm">{item.item_description}</td>
+                    <td className="p-2 text-sm">{getInspectionItemDescription(item)}</td>
                     <td className="p-2">
                       {canEdit ? (
                         <div className="flex items-center justify-center gap-2">
@@ -946,7 +954,7 @@ export default function ViewInspectionPage() {
               <Card key={item.id}>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm">
-                    {item.item_number}. {item.item_description}
+                    {item.item_number}. {getInspectionItemDescription(item)}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -992,7 +1000,7 @@ export default function ViewInspectionPage() {
                           : undefined
                       }
                       title={`Item #${item.item_number} photos`}
-                      description={`Uploaded photos for ${item.item_description}.`}
+                      description={`Uploaded photos for ${getInspectionItemDescription(item)}.`}
                       emptyLabel="Add / View Photos"
                       emptyHint="No photos saved yet"
                       manageLabel="Add / View"
@@ -1065,7 +1073,7 @@ export default function ViewInspectionPage() {
                         {getStatusIcon(item.status)}
                         <div className="flex-1">
                           <div className="font-medium">
-                            {item.item_number}. {item.item_description}
+                            {item.item_number}. {getInspectionItemDescription(item)}
                             {dayName && ` (${dayName})`}
                             {statusBadge}
                           </div>
@@ -1079,7 +1087,7 @@ export default function ViewInspectionPage() {
                       <InspectionPhotoGallery
                         photos={getPhotosForItem(item.item_number, item.day_of_week)}
                         title={`Item #${item.item_number} photos`}
-                        description={`Uploaded photos for ${item.item_description}.`}
+                        description={`Uploaded photos for ${getInspectionItemDescription(item)}.`}
                         compact
                         className="mt-3 pl-7"
                       />

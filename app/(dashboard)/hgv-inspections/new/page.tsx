@@ -605,10 +605,10 @@ function NewHgvInspectionContent() {
       setExistingInspectionId(id);
       setSubmittedConflictInspectionId(null);
       setShowSubmittedConflictDialog(false);
-      setHgvId(draft.hgv_id);
-      setInspectionDate(draft.inspection_date);
+      setHgvId(draft.hgv_id || '');
+      setInspectionDate(draft.inspection_date || '');
       setCurrentMileage(draft.current_mileage != null ? String(draft.current_mileage) : '');
-      setSelectedEmployeeId(draft.user_id);
+      setSelectedEmployeeId(draft.user_id || '');
       setInspectorComments(draft.inspector_comments || '');
 
       const { data: items } = await supabase

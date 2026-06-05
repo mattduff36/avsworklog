@@ -926,7 +926,12 @@ export async function POST(request: NextRequest) {
     
     const response: MaintenanceUpdateResponse = {
       success: true,
-      maintenance: createdMaintenance
+      maintenance: {
+        ...createdMaintenance,
+        last_updated_at: createdMaintenance.last_updated_at ?? '',
+        created_at: createdMaintenance.created_at ?? '',
+        updated_at: createdMaintenance.updated_at ?? '',
+      }
     };
     
     return NextResponse.json(response);

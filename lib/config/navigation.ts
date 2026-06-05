@@ -31,6 +31,7 @@ import {
   Receipt,
   SlidersHorizontal,
   PackageSearch,
+  GraduationCap,
   LucideIcon
 } from 'lucide-react';
 import { ModuleName } from '@/types/roles';
@@ -164,6 +165,13 @@ export const managerNavItems: NavItem[] = [
     label: 'Toolbox Talks', 
     icon: MessageSquare,
     module: 'toolbox-talks',
+    category: 'manager'
+  },
+  {
+    href: '/training',
+    label: 'Training',
+    icon: GraduationCap,
+    module: 'training',
     category: 'manager'
   },
   { 

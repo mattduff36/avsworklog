@@ -784,6 +784,7 @@ export async function createQuoteNotification(params: {
         body: params.body,
         sender_id: params.senderId,
         created_via: params.createdVia || 'quote_invoice_workflow',
+        module_key: moduleKey,
       })
       .select()
       .single();

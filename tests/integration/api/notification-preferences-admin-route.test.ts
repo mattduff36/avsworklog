@@ -158,6 +158,59 @@ describe('notification preferences admin route', () => {
     );
   });
 
+  it('blocks Toolbox Talk notification disables through debug updates', async () => {
+    vi.mocked(getCurrentAuthenticatedProfile).mockResolvedValue({
+      profile: { id: 'charlotte-id', email: 'charlotte@avsquires.co.uk' },
+    } as never);
+    vi.mocked(getEffectiveRole).mockResolvedValue(baseEffectiveRole);
+
+    const response = await PUT(
+      new NextRequest('http://localhost/api/notification-preferences/admin', {
+        method: 'PUT',
+        body: JSON.stringify({
+          user_id: 'user-1',
+          module_key: 'toolbox_talks',
+          notify_in_app: false,
+        }),
+      })
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload.error).toBe('Toolbox Talk notifications cannot be disabled');
+    expect(createAdminClient).not.toHaveBeenCalled();
+  });
+
+  it('blocks below-supervisor debug users from disabling notification preferences', async () => {
+    vi.mocked(getCurrentAuthenticatedProfile).mockResolvedValue({
+      profile: { id: 'charlotte-id', email: 'charlotte@avsquires.co.uk' },
+    } as never);
+    vi.mocked(getEffectiveRole).mockResolvedValue({
+      ...baseEffectiveRole,
+      role_name: 'employee',
+      role_class: 'employee',
+      is_manager_admin: false,
+      is_super_admin: false,
+      is_actual_super_admin: false,
+    });
+
+    const response = await PUT(
+      new NextRequest('http://localhost/api/notification-preferences/admin', {
+        method: 'PUT',
+        body: JSON.stringify({
+          user_id: 'user-1',
+          module_key: 'reminders',
+          enabled: false,
+        }),
+      })
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(payload.error).toBe('Only supervisors and above can disable notifications');
+    expect(createAdminClient).not.toHaveBeenCalled();
+  });
+
   it('blocks debug access while viewing as another role', async () => {
     vi.mocked(getCurrentAuthenticatedProfile).mockResolvedValue({
       profile: { id: 'charlotte-id', email: 'charlotte@avsquires.co.uk' },

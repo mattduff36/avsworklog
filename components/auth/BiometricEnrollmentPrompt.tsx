@@ -48,8 +48,10 @@ export function BiometricEnrollmentPrompt({
   onCheckComplete,
 }: BiometricEnrollmentPromptProps) {
   const [open, setOpen] = useState(false);
-  const [working, setWorking] = useState(false);
+  const [setupWorking, setSetupWorking] = useState(false);
+  const [dismissWorking, setDismissWorking] = useState(false);
   const [hasChecked, setHasChecked] = useState(false);
+  const working = setupWorking || dismissWorking;
 
   const setDialogOpen = useCallback((nextOpen: boolean) => {
     setOpen(nextOpen);
@@ -126,7 +128,7 @@ export function BiometricEnrollmentPrompt({
     if (!profileId) return;
 
     const deviceId = getOrCreateWebAuthnDeviceId();
-    setWorking(true);
+    setSetupWorking(true);
     try {
       const options = await getRegistrationOptions(deviceId);
       const registrationResponse = await startBiometricRegistration(options);
@@ -153,13 +155,13 @@ export function BiometricEnrollmentPrompt({
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to enable biometric login');
     } finally {
-      setWorking(false);
+      setSetupWorking(false);
     }
   }
 
   async function handleDismiss(): Promise<void> {
     const deviceId = getOrCreateWebAuthnDeviceId();
-    setWorking(true);
+    setDismissWorking(true);
     try {
       await fetch('/api/auth/webauthn/prompt/dismiss', {
         method: 'POST',
@@ -170,7 +172,7 @@ export function BiometricEnrollmentPrompt({
       });
       setDialogOpen(false);
     } finally {
-      setWorking(false);
+      setDismissWorking(false);
     }
   }
 
@@ -214,7 +216,7 @@ export function BiometricEnrollmentPrompt({
             disabled={working}
             onClick={() => void handleEnable()}
           >
-            {working ? 'Setting up...' : 'Enable biometric login'}
+            {setupWorking ? 'Setting up...' : 'Enable biometric login'}
           </Button>
         </DialogFooter>
       </DialogContent>

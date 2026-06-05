@@ -261,7 +261,7 @@ export async function hasOpenFleetInspectionActionsWithStaleInspectionMetadata(
   const assetIdsByType = actions.reduce(
     (accumulator, action) => {
       const assetId = getActionAssetId(action);
-      if (assetId && action.asset_type) {
+      if (assetId && (action.asset_type === 'van' || action.asset_type === 'plant' || action.asset_type === 'hgv')) {
         accumulator[action.asset_type].add(assetId);
       }
       return accumulator;

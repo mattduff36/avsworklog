@@ -10,7 +10,16 @@ import type {
   AdminUpdatePreferenceRequest,
   UpdateNotificationPreferenceResponse,
 } from '@/types/notifications';
-import { NOTIFICATION_MODULE_KEYS } from '@/types/notifications';
+import { canDisableNotificationModule, NOTIFICATION_MODULE_KEYS } from '@/types/notifications';
+import { isEffectiveSupervisorOrHigherRole } from '@/lib/utils/role-access';
+
+function isDisablePreferenceRequest(input: {
+  enabled?: boolean;
+  notify_in_app?: boolean;
+  notify_email?: boolean;
+}): boolean {
+  return input.enabled === false || input.notify_in_app === false || input.notify_email === false;
+}
 
 /**
  * GET /api/notification-preferences/admin
@@ -143,6 +152,15 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ 
         error: `Invalid module_key. Must be one of: ${NOTIFICATION_MODULE_KEYS.join(', ')}`
       }, { status: 400 });
+    }
+
+    const isDisableRequest = isDisablePreferenceRequest({ enabled, notify_in_app, notify_email });
+    if (isDisableRequest && !canDisableNotificationModule(module_key)) {
+      return NextResponse.json({ error: 'Toolbox Talk notifications cannot be disabled' }, { status: 400 });
+    }
+
+    if (isDisableRequest && !isEffectiveSupervisorOrHigherRole(effectiveRole)) {
+      return NextResponse.json({ error: 'Only supervisors and above can disable notifications' }, { status: 403 });
     }
 
     // Build upsert data

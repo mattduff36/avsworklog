@@ -177,6 +177,7 @@ export const MANAGEMENT_MODULES: ModuleName[] = [
   'actions',
   'reports',
   'toolbox-talks',
+  'training',
   'suggestions',
   'faq-editor',
   'error-reports',
@@ -195,6 +196,7 @@ export const MODULE_SHORT_NAMES: Record<ModuleName, string> = {
   'absence': 'Absence',
   'maintenance': 'Maint.',
   'toolbox-talks': 'Toolbox',
+  'training': 'Training',
   'workshop-tasks': 'Workshop',
   'approvals': 'Approvals',
   'actions': 'Actions',
@@ -220,6 +222,7 @@ export const MODULE_CSS_VAR: Record<ModuleName, string> = {
   'absence': '--absence-primary',
   'maintenance': '--maintenance-primary',
   'toolbox-talks': '--avs-yellow',
+  'training': '--avs-yellow',
   'workshop-tasks': '--workshop-primary',
   'approvals': '--avs-yellow',
   'actions': '--avs-yellow',
@@ -246,6 +249,7 @@ export type ModuleName =
   | 'absence'
   | 'maintenance'
   | 'toolbox-talks'
+  | 'training'
   | 'workshop-tasks'
   | 'approvals'
   | 'actions'
@@ -272,6 +276,7 @@ export const ALL_MODULES: ModuleName[] = [
   'absence',
   'maintenance',
   'toolbox-talks',
+  'training',
   'workshop-tasks',
   'approvals',
   'actions',
@@ -297,6 +302,7 @@ export const MODULE_DISPLAY_NAMES: Record<ModuleName, string> = {
   'absence': 'Absence & Leave',
   'maintenance': 'Maintenance & Service',
   'toolbox-talks': 'Toolbox Talks',
+  'training': 'Training',
   'workshop-tasks': 'Workshop Tasks',
   'approvals': 'Approvals',
   'actions': 'Actions',
@@ -322,6 +328,7 @@ export const MODULE_DESCRIPTIONS: Record<ModuleName, string> = {
   'absence': 'Request and manage absence',
   'maintenance': 'Track and manage van maintenance schedules',
   'toolbox-talks': 'Send toolbox talks to users (admin/manager only)',
+  'training': 'Track employee training records, cards, qualifications, and expiry dates',
   'workshop-tasks': 'Track van & plant repairs and workshop work',
   'approvals': 'Approve timesheets, daily checks, and absences',
   'actions': 'Manage and track actions',

@@ -88,12 +88,27 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    type InspectionWithVehicle = { vehicle?: { van_categories?: { name: string } | null; vehicle_type?: string | null; reg_number?: string }; profile?: { full_name?: string } };
+    type InspectionWithVehicle = {
+      vehicle?: { van_categories?: { name: string } | null; vehicle_type?: string | null; reg_number?: string | null };
+      profile?: { full_name?: string | null };
+    };
     const pdfComponent = VanInspectionPDF({
-      inspection,
-      items,
-      vehicleReg: (inspection as InspectionWithVehicle).vehicle?.reg_number,
-      employeeName: (inspection as InspectionWithVehicle).profile?.full_name,
+      inspection: {
+        ...inspection,
+        van_id: inspection.van_id ?? '',
+        status: inspection.status ?? 'draft',
+        inspection_end_date: inspection.inspection_end_date ?? inspection.inspection_date,
+        created_at: inspection.created_at ?? '',
+        updated_at: inspection.updated_at ?? '',
+      },
+      items: items.map((item) => ({
+        ...item,
+        item_description: item.item_description || `Item ${item.item_number}`,
+        status: item.status as 'ok' | 'attention' | 'defect' | 'na',
+        created_at: item.created_at ?? '',
+      })),
+      vehicleReg: (inspection as InspectionWithVehicle).vehicle?.reg_number || 'Unknown',
+      employeeName: (inspection as InspectionWithVehicle).profile?.full_name || 'Unknown',
     });
     
     const stream = await renderToStream(pdfComponent);

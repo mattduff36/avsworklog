@@ -78,7 +78,7 @@ export function AbsenceEditDialog({
     setStartDate(absence.date);
     setEndDate(absence.end_date || '');
     setReasonId(absence.reason_id);
-    setIsHalfDay(absence.is_half_day);
+    setIsHalfDay(Boolean(absence.is_half_day));
     setHalfDaySession(absence.half_day_session || 'AM');
     setNotes(absence.notes || '');
     setAllowTimesheetWorkOnLeave(Boolean(absence.allow_timesheet_work_on_leave));

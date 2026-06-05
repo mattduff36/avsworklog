@@ -165,7 +165,10 @@ export function PlantTable({
           description: 'Retired plant data may be incomplete. Please refresh.',
         });
       } else {
-        setRetiredPlantAssets(retiredData || []);
+        setRetiredPlantAssets((retiredData || []).map((asset) => ({
+          ...asset,
+          status: asset.status || 'retired',
+        })));
         setRetiredPlantCount(retiredData?.length || 0);
       }
     } catch (error) {

@@ -467,7 +467,11 @@ function NewInspectionContent() {
         .order('reg_number');
 
       if (error) throw error;
-      setVehicles(data || []);
+      setVehicles((data || []).map((vehicle) => ({
+        ...vehicle,
+        reg_number: vehicle.reg_number || 'Unknown',
+        vehicle_type: vehicle.vehicle_type || 'van',
+      })));
     } catch (err) {
       if (isTransientNetworkError(err)) {
         console.warn('Unable to load vehicles (network):', err);
@@ -1866,7 +1870,7 @@ function NewInspectionContent() {
 
               // Find matching action
               const matchingItem = previousInspectionItems?.find(
-                (item: { id: string; item_number: number; item_description: string }) => item.item_number === itemNum && item.item_description === itemDesc
+                (item) => item.item_number === itemNum && (item.item_description || '') === itemDesc
               );
 
               if (matchingItem) {

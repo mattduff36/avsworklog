@@ -13,8 +13,9 @@ import { CreateToolboxTalkForm } from '@/components/messages/CreateToolboxTalkFo
 import { CreateReminderForm } from '@/components/messages/CreateReminderForm';
 import { MessagesReportView } from '@/components/messages/MessagesReportView';
 
-const DEFAULT_TAB = 'create-toolbox-talk';
-const VALID_TABS = ['create-toolbox-talk', 'create-reminder', 'reports'] as const;
+const DEFAULT_TAB = 'overview';
+const LEGACY_REPORTS_TAB = 'reports';
+const VALID_TABS = ['overview', 'create-toolbox-talk', 'create-reminder'] as const;
 const tabTriggerClassName = 'gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900';
 const tabletTabTriggerClassName = `${tabTriggerClassName} min-h-11 px-4 text-base [&_svg]:size-5`;
 
@@ -39,6 +40,11 @@ function ToolboxTalksContent() {
   }, [canViewToolboxTalks, permissionLoading, router]);
 
   useEffect(() => {
+    if (requestedTab === LEGACY_REPORTS_TAB) {
+      router.replace(`/toolbox-talks?tab=${DEFAULT_TAB}`, { scroll: false });
+      return;
+    }
+
     if (requestedTab && !isValidToolboxTalksTab(requestedTab)) {
       router.replace(`/toolbox-talks?tab=${DEFAULT_TAB}`, { scroll: false });
     }
@@ -49,7 +55,7 @@ function ToolboxTalksContent() {
   }
 
   function handleMessageSent() {
-    router.replace('/toolbox-talks?tab=reports', { scroll: false });
+    router.replace('/toolbox-talks?tab=overview', { scroll: false });
   }
 
   if (permissionLoading) {
@@ -72,6 +78,14 @@ function ToolboxTalksContent() {
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
         <TabsList className={tabletModeEnabled ? 'h-auto flex-wrap justify-start gap-2 p-1.5' : undefined}>
           <TabsTrigger
+            value="overview"
+            data-tab="overview"
+            className={tabletModeEnabled ? tabletTabTriggerClassName : tabTriggerClassName}
+          >
+            <BarChart3 className="h-4 w-4" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger
             value="create-toolbox-talk"
             data-tab="toolbox-talk"
             className={tabletModeEnabled ? tabletTabTriggerClassName : tabTriggerClassName}
@@ -85,17 +99,25 @@ function ToolboxTalksContent() {
             className={tabletModeEnabled ? tabletTabTriggerClassName : tabTriggerClassName}
           >
             <Bell className="h-4 w-4" />
-            Create Reminder
-          </TabsTrigger>
-          <TabsTrigger
-            value="reports"
-            data-tab="reports"
-            className={tabletModeEnabled ? tabletTabTriggerClassName : tabTriggerClassName}
-          >
-            <BarChart3 className="h-4 w-4" />
-            Reports
+            Create Notification / Reminder
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="overview" className="mt-0 space-y-6">
+          <Card className="border-border">
+            <CardHeader>
+              <CardTitle className="text-foreground">
+                Overview
+              </CardTitle>
+              <CardDescription className="text-muted-foreground">
+                View sent toolbox talks and notifications, recipient status, and compliance rates.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <MessagesReportView />
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="create-toolbox-talk" className="mt-0 space-y-6">
           <Card className="border-border">
@@ -104,7 +126,7 @@ function ToolboxTalksContent() {
                 Create Toolbox Talk Message
               </CardTitle>
               <CardDescription className="text-muted-foreground">
-                High-priority safety message requiring an employee signature before app access continues.
+                Safety message requiring an employee signature, with priority controls for how urgently it is shown.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -117,30 +139,14 @@ function ToolboxTalksContent() {
           <Card className="border-border">
             <CardHeader>
               <CardTitle className="text-foreground">
-                Create Reminder Message
+                Create Notification / Reminder
               </CardTitle>
               <CardDescription className="text-muted-foreground">
-                Non-blocking message that employees can dismiss after reading.
+                Send a dismissible notification or create a task in the Reminders module.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <CreateReminderForm onSuccess={handleMessageSent} />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="reports" className="mt-0 space-y-6">
-          <Card className="border-border">
-            <CardHeader>
-              <CardTitle className="text-foreground">
-                Message Reports
-              </CardTitle>
-              <CardDescription className="text-muted-foreground">
-                View all sent messages, recipient status, and compliance rates
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <MessagesReportView />
             </CardContent>
           </Card>
         </TabsContent>

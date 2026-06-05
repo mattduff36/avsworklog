@@ -4,6 +4,7 @@ import type { ReminderAssetType } from '@/types/reminders';
 
 export const FLEET_INSPECTION_OVERDUE_WORKFLOW_KEY = 'fleet_inspection_overdue';
 export const VAN_DRAFT_SUBMISSION_WORKFLOW_KEY = 'van_draft_submission';
+export const TOOLBOX_TALK_MANUAL_REMINDER_WORKFLOW_KEY = 'toolbox_talk_manual';
 
 export interface ReminderOverviewTabConfig {
   id: string;

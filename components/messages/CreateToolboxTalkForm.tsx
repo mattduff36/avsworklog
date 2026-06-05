@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { UserPlus, AlertTriangle, Upload, File, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { ToolboxTalkAssignDialog } from './ToolboxTalkAssignDialog';
+import type { MessagePriority } from '@/types/messages';
 
 interface CreateToolboxTalkFormProps {
   onSuccess?: () => void;
@@ -17,6 +18,8 @@ interface CreateToolboxTalkFormProps {
 export function CreateToolboxTalkForm({ onSuccess }: CreateToolboxTalkFormProps) {
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
+  const [priority, setPriority] = useState<MessagePriority>('HIGH');
+  const [acceptanceDelayMinutes, setAcceptanceDelayMinutes] = useState('');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -61,6 +64,14 @@ export function CreateToolboxTalkForm({ onSuccess }: CreateToolboxTalkFormProps)
       return;
     }
 
+    if (priority === 'URGENT') {
+      const delayMinutes = Number.parseInt(acceptanceDelayMinutes, 10);
+      if (!Number.isFinite(delayMinutes) || delayMinutes < 1 || delayMinutes > 1440) {
+        toast.error('Urgent Toolbox Talks require an acceptance delay between 1 and 1440 minutes');
+        return;
+      }
+    }
+
     setModalOpen(true);
   }
 
@@ -73,6 +84,11 @@ export function CreateToolboxTalkForm({ onSuccess }: CreateToolboxTalkFormProps)
       formData.append('body', body);
       formData.append('recipient_type', 'individual');
       formData.append('recipient_user_ids', JSON.stringify(employeeIds));
+      formData.append('priority', priority);
+      formData.append(
+        'acceptance_delay_minutes',
+        priority === 'URGENT' ? String(Number.parseInt(acceptanceDelayMinutes, 10)) : '0'
+      );
       
       if (pdfFile) {
         formData.append('pdf_file', pdfFile);
@@ -94,6 +110,8 @@ export function CreateToolboxTalkForm({ onSuccess }: CreateToolboxTalkFormProps)
       // Reset form
       setSubject('');
       setBody('');
+      setPriority('HIGH');
+      setAcceptanceDelayMinutes('');
       setPdfFile(null);
 
       onSuccess?.();
@@ -107,15 +125,90 @@ export function CreateToolboxTalkForm({ onSuccess }: CreateToolboxTalkFormProps)
   return (
     <>
       <form onSubmit={handleOpenModal} className="space-y-6">
-        {/* Warning Alert */}
-        <Alert variant="destructive">
+        <Alert variant={priority === 'LOW' ? 'default' : 'destructive'}>
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            <strong>Important:</strong> Toolbox Talks are high-priority, blocking messages. Recipients will not be able to use the app until they read and sign the message.
+            {priority === 'LOW' ? (
+              <>
+                <strong>Medium Priority:</strong> Recipients can dismiss this message and sign it later from Notifications.
+              </>
+            ) : priority === 'URGENT' ? (
+              <>
+                <strong>Urgent:</strong> Recipients must read this message for the configured delay before they can sign it.
+              </>
+            ) : (
+              <>
+                <strong>High Priority:</strong> Recipients will not be able to use the app until they read and sign the message.
+              </>
+            )}
           </AlertDescription>
         </Alert>
 
-        {/* Subject */}
+        <div className="space-y-3">
+          <Label className="text-foreground">Priority Level *</Label>
+          <div className="grid gap-3 md:grid-cols-3">
+            {([
+              {
+                value: 'LOW',
+                title: 'Level 1 - Medium Priority',
+                description: 'Can be dismissed and signed later from Notifications.',
+                className: 'border-blue-500/40 bg-blue-500/10',
+              },
+              {
+                value: 'HIGH',
+                title: 'Level 2 - High Priority',
+                description: 'Blocks app access until signed.',
+                className: 'border-amber-500/40 bg-amber-500/10',
+              },
+              {
+                value: 'URGENT',
+                title: 'Level 3 - Urgent Priority',
+                description: 'Blocks app access and delays signature acceptance.',
+                className: 'border-red-500/50 bg-red-500/10',
+              },
+            ] as const).map((option) => {
+              const isSelected = priority === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setPriority(option.value)}
+                  className={`rounded-lg border p-4 text-left transition-all ${
+                    isSelected
+                      ? `${option.className} ring-2 ring-avs-yellow`
+                      : 'border-border bg-white hover:bg-muted/30 dark:bg-slate-900'
+                  }`}
+                >
+                  <span className="block text-sm font-semibold text-foreground">{option.title}</span>
+                  <span className="mt-2 block text-xs leading-5 text-muted-foreground">{option.description}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {priority === 'URGENT' ? (
+          <div className="space-y-2 rounded-lg border border-red-500/40 bg-red-500/10 p-4">
+            <Label htmlFor="acceptance-delay-minutes" className="text-foreground">
+              Acceptance Delay (minutes) *
+            </Label>
+            <Input
+              id="acceptance-delay-minutes"
+              type="number"
+              min={1}
+              max={1440}
+              value={acceptanceDelayMinutes}
+              onChange={(event) => setAcceptanceDelayMinutes(event.target.value)}
+              placeholder="e.g., 5"
+              required
+              className="max-w-xs bg-white text-foreground dark:bg-slate-900"
+            />
+            <p className="text-xs leading-5 text-muted-foreground">
+              Users must keep the urgent Toolbox Talk open for this long before the signature button is enabled.
+            </p>
+          </div>
+        ) : null}
+
         <div className="space-y-2">
           <Label htmlFor="subject" className="text-foreground">
             Subject *

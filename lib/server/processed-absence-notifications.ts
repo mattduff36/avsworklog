@@ -222,6 +222,7 @@ export async function createProcessedAbsenceNotification(
       priority: 'HIGH',
       sender_id: params.actorUserId,
       created_via: params.createdVia,
+      module_key: 'processed_absence',
     })
     .select('id')
     .single();

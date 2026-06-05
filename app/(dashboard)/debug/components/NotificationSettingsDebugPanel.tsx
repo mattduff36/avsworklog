@@ -10,6 +10,7 @@ import { PanelLoader } from '@/components/ui/panel-loader';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertTriangle, Bell, CheckSquare, Loader2, Mail, Search, Send, ShieldCheck, Users } from 'lucide-react';
 import {
+  canDisableNotificationModule,
   NOTIFICATION_MODULES,
   type NotificationModuleKey,
 } from '@/types/notifications';
@@ -132,6 +133,11 @@ export function NotificationSettingsDebugPanel() {
     field: 'notify_in_app' | 'notify_email',
     value: boolean
   ) => {
+    if (!value && !canDisableNotificationModule(moduleKey)) {
+      toast.error('Toolbox Talk notifications cannot be disabled');
+      return;
+    }
+
     const saveKey = `${userId}-${moduleKey}-${field}`;
     setSaving(saveKey);
     try {
@@ -249,7 +255,13 @@ export function NotificationSettingsDebugPanel() {
       return;
     }
 
-    const modulesToUpdate = targetModule ? [targetModule] : DEBUG_NOTIFICATION_SETTINGS_MODULES.map(m => m.key);
+    const modulesToUpdate = (targetModule ? [targetModule] : DEBUG_NOTIFICATION_SETTINGS_MODULES.map(m => m.key))
+      .filter((moduleKey) => value || canDisableNotificationModule(moduleKey));
+
+    if (modulesToUpdate.length === 0) {
+      toast.error('Toolbox Talk notifications cannot be disabled');
+      return;
+    }
 
     setSaving('batch');
     try {
@@ -457,13 +469,13 @@ export function NotificationSettingsDebugPanel() {
             <Button size="sm" variant="outline" onClick={() => batchUpdatePreference('notify_in_app', true, moduleFilter !== 'all' ? moduleFilter : undefined)} disabled={saving === 'batch'}>
               Enable In-App
             </Button>
-            <Button size="sm" variant="outline" onClick={() => batchUpdatePreference('notify_in_app', false, moduleFilter !== 'all' ? moduleFilter : undefined)} disabled={saving === 'batch'}>
+            <Button size="sm" variant="outline" onClick={() => batchUpdatePreference('notify_in_app', false, moduleFilter !== 'all' ? moduleFilter : undefined)} disabled={saving === 'batch' || moduleFilter === 'toolbox_talks'}>
               Disable In-App
             </Button>
             <Button size="sm" variant="outline" onClick={() => batchUpdatePreference('notify_email', true, moduleFilter !== 'all' ? moduleFilter : undefined)} disabled={saving === 'batch'}>
               Enable Email
             </Button>
-            <Button size="sm" variant="outline" onClick={() => batchUpdatePreference('notify_email', false, moduleFilter !== 'all' ? moduleFilter : undefined)} disabled={saving === 'batch'}>
+            <Button size="sm" variant="outline" onClick={() => batchUpdatePreference('notify_email', false, moduleFilter !== 'all' ? moduleFilter : undefined)} disabled={saving === 'batch' || moduleFilter === 'toolbox_talks'}>
               Disable Email
             </Button>
             {saving === 'batch' && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -547,12 +559,14 @@ export function NotificationSettingsDebugPanel() {
                           const pref = getPref(module.key);
                           const saveKey = `${user.user_id}-${module.key}`;
                           const isSaving = saving?.startsWith(saveKey) || false;
+                          const inAppDisabled = isSaving || (!canDisableNotificationModule(module.key) && pref.notify_in_app);
+                          const emailDisabled = isSaving || (!canDisableNotificationModule(module.key) && pref.notify_email);
 
                           return (
                             <td key={module.key} className="p-3">
                               <div className="flex gap-4 justify-center items-center">
-                                <input type="checkbox" checked={pref.notify_in_app} onChange={(e) => updatePreference(user.user_id, module.key, 'notify_in_app', e.target.checked)} disabled={isSaving} className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-primary focus:ring-primary focus:ring-offset-0 bg-white dark:bg-slate-700 cursor-pointer disabled:opacity-50" />
-                                <input type="checkbox" checked={pref.notify_email} onChange={(e) => updatePreference(user.user_id, module.key, 'notify_email', e.target.checked)} disabled={isSaving} className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-primary focus:ring-primary focus:ring-offset-0 bg-white dark:bg-slate-700 cursor-pointer disabled:opacity-50" />
+                                <input type="checkbox" checked={pref.notify_in_app} onChange={(e) => updatePreference(user.user_id, module.key, 'notify_in_app', e.target.checked)} disabled={inAppDisabled} className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-primary focus:ring-primary focus:ring-offset-0 bg-white dark:bg-slate-700 cursor-pointer disabled:opacity-50" />
+                                <input type="checkbox" checked={pref.notify_email} onChange={(e) => updatePreference(user.user_id, module.key, 'notify_email', e.target.checked)} disabled={emailDisabled} className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-primary focus:ring-primary focus:ring-offset-0 bg-white dark:bg-slate-700 cursor-pointer disabled:opacity-50" />
                                 {isSaving && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
                               </div>
                             </td>
@@ -600,6 +614,8 @@ export function NotificationSettingsDebugPanel() {
                           const pref = getPref(module.key);
                           const saveKey = `${user.user_id}-${module.key}`;
                           const isSaving = saving?.startsWith(saveKey) || false;
+                          const inAppDisabled = isSaving || (!canDisableNotificationModule(module.key) && pref.notify_in_app);
+                          const emailDisabled = isSaving || (!canDisableNotificationModule(module.key) && pref.notify_email);
 
                           return (
                             <div key={module.key} className="flex items-center justify-between rounded border border-slate-700/70 bg-slate-900/55 p-2">
@@ -609,11 +625,11 @@ export function NotificationSettingsDebugPanel() {
                               <div className="flex items-center gap-3">
                                 <div className="flex items-center gap-2">
                                   <span className="text-xs font-medium text-slate-600 dark:text-slate-300">App</span>
-                                  <input type="checkbox" checked={pref.notify_in_app} onChange={(e) => updatePreference(user.user_id, module.key, 'notify_in_app', e.target.checked)} disabled={isSaving} className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-primary focus:ring-primary focus:ring-offset-0 bg-white dark:bg-slate-700 cursor-pointer disabled:opacity-50" />
+                                  <input type="checkbox" checked={pref.notify_in_app} onChange={(e) => updatePreference(user.user_id, module.key, 'notify_in_app', e.target.checked)} disabled={inAppDisabled} className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-primary focus:ring-primary focus:ring-offset-0 bg-white dark:bg-slate-700 cursor-pointer disabled:opacity-50" />
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Email</span>
-                                  <input type="checkbox" checked={pref.notify_email} onChange={(e) => updatePreference(user.user_id, module.key, 'notify_email', e.target.checked)} disabled={isSaving} className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-primary focus:ring-primary focus:ring-offset-0 bg-white dark:bg-slate-700 cursor-pointer disabled:opacity-50" />
+                                  <input type="checkbox" checked={pref.notify_email} onChange={(e) => updatePreference(user.user_id, module.key, 'notify_email', e.target.checked)} disabled={emailDisabled} className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-primary focus:ring-primary focus:ring-offset-0 bg-white dark:bg-slate-700 cursor-pointer disabled:opacity-50" />
                                 </div>
                                 {isSaving && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
                               </div>

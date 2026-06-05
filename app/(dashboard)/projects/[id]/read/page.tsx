@@ -105,7 +105,10 @@ function ReadRAMSContent() {
         return;
       }
 
-      setRamsDocument(doc);
+      setRamsDocument({
+        ...doc,
+        created_at: doc.created_at ?? '',
+      });
       setRequiredSignature((doc as { document_type?: { required_signature?: boolean } | null }).document_type?.required_signature ?? true);
 
       // Fetch assignment (for employees)
@@ -117,7 +120,10 @@ function ReadRAMSContent() {
         .single();
 
       if (assignmentData) {
-        setAssignment(assignmentData);
+        setAssignment({
+          ...assignmentData,
+          status: assignmentData.status ?? 'pending',
+        });
         // If action was already taken, enable sign button
         if (assignmentData.action_taken) {
           setActionTaken(assignmentData.action_taken as ActionType);

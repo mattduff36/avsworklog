@@ -157,6 +157,7 @@ export async function notifyAdminsOfSensitivePinEvent(
         body,
         sender_id: params.actorProfileId,
         created_via: 'sensitive_pin_security',
+        module_key: 'sensitive_pin_security',
       })
       .select('id')
       .single();

@@ -225,7 +225,10 @@ function InspectionsContent() {
           .order('reg_number');
         
         if (error) throw error;
-        setVehicles(data || []);
+        setVehicles((data || []).map((vehicle) => ({
+          ...vehicle,
+          reg_number: vehicle.reg_number || 'Unknown',
+        })));
       } catch (err) {
         if (isNetworkFetchError(err)) {
           console.warn('Unable to load vans (network):', err);

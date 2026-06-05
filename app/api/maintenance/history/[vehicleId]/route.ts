@@ -14,8 +14,8 @@ interface WorkshopTaskSubcategoryShape {
 
 interface WorkshopTaskShape {
   id: string;
-  created_at: string;
-  status: string;
+  created_at: string | null;
+  status: string | null;
   action_type: 'inspection_defect' | 'workshop_vehicle_task' | 'manager_action';
   workshop_comments: string | null;
   description: string | null;
@@ -67,7 +67,7 @@ export async function GET(
     const { vehicleId } = await params;
     
     // Try vans table first, then hgvs table
-    let vehicle: { id: string; reg_number: string } | null = null;
+  let vehicle: { id: string; reg_number: string | null } | null = null;
     let assetType: 'van' | 'hgv' = 'van';
     
     const { data: van } = await supabase
@@ -223,6 +223,8 @@ export async function GET(
 
     const normalizedWorkshopTasks = tasksWithProfiles.map((task) => ({
       ...task,
+      created_at: task.created_at ?? '',
+      status: task.status ?? 'pending',
       workshop_task_categories: Array.isArray(task.workshop_task_categories)
         ? task.workshop_task_categories[0] ?? null
         : task.workshop_task_categories ?? null,
@@ -236,11 +238,14 @@ export async function GET(
     
     const response: MaintenanceHistoryResponse = {
       success: true,
-      history: history || [],
+      history: (history || []).map((entry) => ({
+        ...entry,
+        created_at: entry.created_at ?? '',
+      })),
       workshopTasks: normalizedWorkshopTasks,
       vehicle: {
         id: vehicle.id,
-        reg_number: vehicle.reg_number
+        reg_number: vehicle.reg_number || 'Unknown'
       },
       vesData: maintenanceData || null
     };

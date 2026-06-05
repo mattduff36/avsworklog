@@ -20,6 +20,13 @@ import { formatDateTime } from '@/lib/utils/date';
 import { toast } from 'sonner';
 import type { MessageReportData } from '@/types/messages';
 import { ToolboxTalkPdfDialog } from '@/components/messages/ToolboxTalkPdfDialog';
+import { ColumnVisibilityMenu, DataViewToggle, type DataViewMode } from '@/components/ui/data-view-controls';
+import {
+  DEFAULT_MESSAGES_OVERVIEW_COLUMN_VISIBILITY,
+  MESSAGES_OVERVIEW_COLUMN_VISIBILITY_STORAGE_KEY,
+  MessagesOverviewTable,
+  type MessagesOverviewColumnVisibility,
+} from '@/components/messages/MessagesOverviewTable';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,6 +42,49 @@ function buildToolboxTalkPdfUrl(pdfFilePath: string) {
   return `/api/toolbox-talk-pdf/${pdfFilePath}`;
 }
 
+function isMessageBackedReport(message: MessageReportData) {
+  return !message.message.id.startsWith('reminder-action:');
+}
+
+function getTypeLabel(message: MessageReportData) {
+  if (message.message.type === 'TOOLBOX_TALK') return 'Toolbox Talk';
+  if (message.message.type === 'NOTIFICATION') return 'Notification';
+  return 'Reminder';
+}
+
+function getInitialViewMode(): DataViewMode {
+  if (typeof window === 'undefined') return 'table';
+  return (localStorage.getItem('toolbox-talks-overview-view-mode') as DataViewMode | null) || 'table';
+}
+
+type LegacyMessagesOverviewColumnVisibility = Partial<MessagesOverviewColumnVisibility> & {
+  completed?: boolean;
+  pending?: boolean;
+};
+
+function getInitialColumnVisibility(): MessagesOverviewColumnVisibility {
+  if (typeof window === 'undefined') return DEFAULT_MESSAGES_OVERVIEW_COLUMN_VISIBILITY;
+
+  try {
+    const storedValue = localStorage.getItem(MESSAGES_OVERVIEW_COLUMN_VISIBILITY_STORAGE_KEY);
+    if (!storedValue) return DEFAULT_MESSAGES_OVERVIEW_COLUMN_VISIBILITY;
+    const parsed = JSON.parse(storedValue) as LegacyMessagesOverviewColumnVisibility;
+    const { completed, pending, ...currentVisibility } = parsed;
+    const legacyCompletion =
+      completed !== undefined || pending !== undefined
+        ? completed !== false || pending !== false
+        : DEFAULT_MESSAGES_OVERVIEW_COLUMN_VISIBILITY.completion;
+
+    return {
+      ...DEFAULT_MESSAGES_OVERVIEW_COLUMN_VISIBILITY,
+      ...currentVisibility,
+      completion: parsed.completion ?? legacyCompletion,
+    };
+  } catch {
+    return DEFAULT_MESSAGES_OVERVIEW_COLUMN_VISIBILITY;
+  }
+}
+
 export function MessagesReportView() {
   const [messages, setMessages] = useState<MessageReportData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,6 +97,8 @@ export function MessagesReportView() {
   const [messageToDelete, setMessageToDelete] = useState<{id: string; subject: string} | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [pdfDialog, setPdfDialog] = useState<{ url: string; title: string } | null>(null);
+  const [viewMode, setViewMode] = useState<DataViewMode>(getInitialViewMode);
+  const [columnVisibility, setColumnVisibility] = useState<MessagesOverviewColumnVisibility>(getInitialColumnVisibility);
 
   const fetchReports = useCallback(async () => {
     setLoading(true);
@@ -146,6 +198,35 @@ export function MessagesReportView() {
     });
   }
 
+  function handleSelectMessage(message: MessageReportData) {
+    setSelectedMessage(message);
+    setShowDetail(true);
+  }
+
+  function handleOpenDeleteDialog(message: MessageReportData) {
+    setMessageToDelete({
+      id: message.message.id,
+      subject: message.message.subject,
+    });
+    setDeleteDialogOpen(true);
+  }
+
+  function handleViewModeChange(nextViewMode: DataViewMode) {
+    setViewMode(nextViewMode);
+    localStorage.setItem('toolbox-talks-overview-view-mode', nextViewMode);
+  }
+
+  function toggleColumn(column: keyof MessagesOverviewColumnVisibility) {
+    setColumnVisibility((current) => {
+      const nextVisibility = {
+        ...current,
+        [column]: !current[column],
+      };
+      localStorage.setItem(MESSAGES_OVERVIEW_COLUMN_VISIBILITY_STORAGE_KEY, JSON.stringify(nextVisibility));
+      return nextVisibility;
+    });
+  }
+
   const filteredMessages = messages.filter(msg =>
     msg.message.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (msg.message.sender?.full_name || '').toLowerCase().includes(searchQuery.toLowerCase())
@@ -177,6 +258,7 @@ export function MessagesReportView() {
           <SelectContent>
             <SelectItem value="all">All Types</SelectItem>
             <SelectItem value="TOOLBOX_TALK">Toolbox Talks</SelectItem>
+            <SelectItem value="NOTIFICATION">Notifications</SelectItem>
             <SelectItem value="REMINDER">Reminders</SelectItem>
           </SelectContent>
         </Select>
@@ -224,7 +306,7 @@ export function MessagesReportView() {
                       {selectedMessage.message.subject}
                     </h3>
                     <Badge variant={selectedMessage.message.type === 'TOOLBOX_TALK' ? 'destructive' : 'default'}>
-                      {selectedMessage.message.type === 'TOOLBOX_TALK' ? 'Toolbox Talk' : 'Reminder'}
+                      {getTypeLabel(selectedMessage)}
                     </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground">
@@ -232,20 +314,22 @@ export function MessagesReportView() {
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setMessageToDelete({
-                        id: selectedMessage.message.id,
-                        subject: selectedMessage.message.subject
-                      });
-                      setDeleteDialogOpen(true);
-                    }}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {isMessageBackedReport(selectedMessage) ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setMessageToDelete({
+                          id: selectedMessage.message.id,
+                          subject: selectedMessage.message.subject
+                        });
+                        setDeleteDialogOpen(true);
+                      }}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  ) : null}
                   {selectedMessage.message.type === 'TOOLBOX_TALK' && (
                     <>
                       <Button
@@ -366,15 +450,47 @@ export function MessagesReportView() {
           </Card>
         </div>
       ) : (
-        /* List View */
-        <div className="space-y-3">
+        /* Overview View */
+        <>
+          <div className="hidden items-center justify-end gap-2 md:flex">
+            {viewMode === 'table' ? (
+              <ColumnVisibilityMenu
+                options={[
+                  { id: 'type', label: 'Type', checked: columnVisibility.type },
+                  { id: 'priority', label: 'Priority', checked: columnVisibility.priority },
+                  { id: 'sender', label: 'Sender', checked: columnVisibility.sender },
+                  { id: 'sentAt', label: 'Sent', checked: columnVisibility.sentAt },
+                  { id: 'assigned', label: 'Assigned', checked: columnVisibility.assigned },
+                  { id: 'completion', label: 'Completion', checked: columnVisibility.completion },
+                  { id: 'compliance', label: 'Compliance', checked: columnVisibility.compliance },
+                ]}
+                onToggle={toggleColumn}
+              />
+            ) : null}
+            <DataViewToggle value={viewMode} onValueChange={handleViewModeChange} />
+          </div>
+
+          {viewMode === 'table' ? (
+            <div className="hidden md:block">
+              <MessagesOverviewTable
+                messages={filteredMessages}
+                columnVisibility={columnVisibility}
+                deleting={deleting}
+                onSelectMessage={handleSelectMessage}
+                onDeleteMessage={handleOpenDeleteDialog}
+                onExportPDF={handleExportPDF}
+                onViewAttachedPDF={handleViewAttachedPDF}
+              />
+            </div>
+          ) : null}
+
+        <div className={viewMode === 'table' ? 'grid gap-3 md:hidden' : 'grid gap-3'}>
           {filteredMessages.map((msg) => (
             <Card
               key={msg.message.id}
               className="cursor-pointer border-border p-4 transition-shadow hover:shadow-md"
               onClick={() => {
-                setSelectedMessage(msg);
-                setShowDetail(true);
+                handleSelectMessage(msg);
               }}
             >
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -382,7 +498,7 @@ export function MessagesReportView() {
                   <div className="flex items-center gap-2 mb-1">
                     <h4 className="font-semibold text-foreground">{msg.message.subject}</h4>
                     <Badge variant={msg.message.type === 'TOOLBOX_TALK' ? 'destructive' : 'default'}>
-                      {msg.message.type === 'TOOLBOX_TALK' ? 'Toolbox Talk' : 'Reminder'}
+                      {getTypeLabel(msg)}
                     </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground mb-2">
@@ -425,21 +541,19 @@ export function MessagesReportView() {
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setMessageToDelete({
-                        id: msg.message.id,
-                        subject: msg.message.subject
-                      });
-                      setDeleteDialogOpen(true);
-                    }}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {isMessageBackedReport(msg) ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenDeleteDialog(msg);
+                      }}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  ) : null}
                   {msg.message.type === 'TOOLBOX_TALK' && (
                     <>
                       <Button
@@ -474,6 +588,7 @@ export function MessagesReportView() {
             </Card>
           ))}
         </div>
+        </>
       )}
 
       {/* Delete Confirmation Dialog */}

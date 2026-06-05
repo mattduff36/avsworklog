@@ -176,7 +176,7 @@ export async function PATCH(
       (comment): WorkshopTaskTimelineComment => ({
         id: comment.id,
         body: comment.body,
-        created_at: comment.created_at,
+        created_at: comment.created_at ?? '',
         updated_at: comment.updated_at,
         author: pickProfile(comment.profiles),
       })
@@ -184,6 +184,7 @@ export async function PATCH(
 
     const taskForTimeline: WorkshopTaskTimelineTask = {
       ...typedTask,
+      created_at: typedTask.created_at ?? '',
       status_history: Array.isArray(typedTask.status_history)
         ? typedTask.status_history
         : null,

@@ -118,6 +118,7 @@ describe('processed absence notifications', () => {
       priority: 'HIGH',
       sender_id: 'actor-id',
       created_via: 'processed_absence_change',
+      module_key: 'processed_absence',
     });
     expect(recipientsInsert).toHaveBeenCalledWith([
       { message_id: 'message-id', user_id: 'accounts-supervisor', status: 'PENDING' },
@@ -193,6 +194,7 @@ describe('processed absence notifications', () => {
     expect(messagesInsert).toHaveBeenCalledWith(expect.objectContaining({
       subject: 'Processed absence affected by timesheet adjustment: Test Employee',
       created_via: 'processed_absence_timesheet_adjustment',
+      module_key: 'processed_absence',
     }));
     expect(messagesInsert.mock.calls[0][0].body).toContain('Annual Leave: 22 Apr 2026');
     expect(messagesInsert.mock.calls[0][0].body).not.toContain('Sickness');

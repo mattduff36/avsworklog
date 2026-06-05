@@ -6,8 +6,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useQueryState } from 'nuqs';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { usePermissionSnapshot } from '@/lib/hooks/usePermissionSnapshot';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
-import { resolveNotificationToOpen } from '@/lib/utils/notification-helpers';
+import { isUnreadNotification, resolveNotificationToOpen } from '@/lib/utils/notification-helpers';
 import {
   getNotificationPreference,
   NotificationPreferencesCard,
@@ -39,7 +40,7 @@ import { isNetworkFetchError } from '@/lib/utils/http-error';
 import { toast } from 'sonner';
 import type { NotificationItem } from '@/types/messages';
 import type { NotificationModule, NotificationPreference, NotificationModuleKey } from '@/types/notifications';
-import { NOTIFICATION_MODULES } from '@/types/notifications';
+import { canDisableNotificationModule, getAvailableNotificationModules } from '@/types/notifications';
 import { NuqsClientAdapter } from '@/components/providers/NuqsClientAdapter';
 import { ToolboxTalkPdfDialog } from '@/components/messages/ToolboxTalkPdfDialog';
 
@@ -56,18 +57,28 @@ function buildToolboxTalkPdfUrl(pdfFilePath: string) {
 }
 
 function resolveNotificationModuleKey(notification: NotificationItem): NotificationModuleKey {
+  if (notification.module_key) return notification.module_key;
+
   const createdVia = notification.created_via ?? '';
 
   if (notification.type === 'TOOLBOX_TALK') return 'toolbox_talks';
+  if (createdVia.startsWith('toolbox-talks')) return 'toolbox_talks';
   if (createdVia === 'sensitive_pin_security') return 'sensitive_pin_security';
   if (createdVia === 'maintenance_reminder') return 'maintenance';
+  if (createdVia.includes('error')) return 'errors';
   if (createdVia.includes('quote')) return 'quotes';
+  if (createdVia.startsWith('suggestion:')) return 'suggestions';
+  if (createdVia === 'absence_contact_line_manager') return 'absence';
+  if (createdVia === 'timesheet_did_not_work_exception' || createdVia === 'timesheet_adjustment' || createdVia === 'timesheet_rejection') {
+    return 'timesheets';
+  }
+  if (createdVia === 'timesheet_training_decline') return 'training';
+  if (createdVia === 'inventory_location_request') return 'inventory';
+  if (createdVia === 'processed_absence_change' || createdVia === 'processed_absence_timesheet_adjustment') return 'processed_absence';
   if (
-    createdVia === 'absence_contact_line_manager'
-    || createdVia === 'timesheet_training_decline'
-    || createdVia.startsWith('processed_absence_')
+    createdVia.startsWith('processed_absence_')
   ) {
-    return 'approvals';
+    return 'processed_absence';
   }
   if (notification.type === 'REMINDER') return 'reminders';
 
@@ -167,11 +178,12 @@ interface NotificationDetailPaneProps {
   isLoadingPreferences: boolean;
   isSavingPreference: boolean;
   isModuleInAppDisabled: boolean;
+  canShowPreferencePrompt: boolean;
   onBack: () => void;
   onDisableModuleNotifications: () => void;
   onSignToolboxTalk: (notification: NotificationItem) => void;
   onViewAttachedPDF: (url: string, title: string) => void;
-  getStatusBadge: (status: string) => React.ReactNode;
+  getStatusBadge: (notification: NotificationItem) => React.ReactNode;
 }
 
 function NotificationDetailPane({
@@ -182,6 +194,7 @@ function NotificationDetailPane({
   isLoadingPreferences,
   isSavingPreference,
   isModuleInAppDisabled,
+  canShowPreferencePrompt,
   onBack,
   onDisableModuleNotifications,
   onSignToolboxTalk,
@@ -209,7 +222,7 @@ function NotificationDetailPane({
   const isToolboxTalk = notification.type === 'TOOLBOX_TALK';
   const hasSigned = notification.status === 'SIGNED';
   const pdfUrl = notification.pdf_file_path ? buildToolboxTalkPdfUrl(notification.pdf_file_path) : null;
-  const preferencePrompt = notificationModule ? (
+  const preferencePrompt = notificationModule && canShowPreferencePrompt ? (
     <NotificationPreferencePrompt
       module={notificationModule}
       isLoading={isLoadingPreferences}
@@ -232,8 +245,8 @@ function NotificationDetailPane({
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 space-y-2">
             <div className="flex items-center gap-2">
-              <div className={notification.priority === 'HIGH' ? 'rounded bg-red-100 p-2 dark:bg-red-950' : 'rounded bg-blue-100 p-2 dark:bg-blue-950'}>
-                {notification.priority === 'HIGH' ? (
+              <div className={notification.priority === 'HIGH' || notification.priority === 'URGENT' ? 'rounded bg-red-100 p-2 dark:bg-red-950' : 'rounded bg-blue-100 p-2 dark:bg-blue-950'}>
+                {notification.priority === 'HIGH' || notification.priority === 'URGENT' ? (
                   <AlertTriangle className="h-5 w-5 text-red-600" />
                 ) : (
                   <Bell className="h-5 w-5 text-blue-600" />
@@ -248,7 +261,7 @@ function NotificationDetailPane({
             </CardDescription>
           </div>
           <div className="shrink-0">
-            {getStatusBadge(notification.status)}
+            {getStatusBadge(notification)}
           </div>
         </div>
       </CardHeader>
@@ -259,6 +272,12 @@ function NotificationDetailPane({
             <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin text-avs-yellow" />
               Marking as read...
+            </div>
+          )}
+
+          {isToolboxTalk && notification.priority === 'URGENT' && (
+            <div className="rounded-lg border border-red-600 bg-red-600 px-4 py-3 text-center font-black uppercase tracking-widest text-white">
+              Urgent Toolbox Talk
             </div>
           )}
 
@@ -368,7 +387,8 @@ function NotificationDetailPane({
 }
 
 function NotificationsContent() {
-  const { isAdmin, isManager } = useAuth();
+  const { isAdmin, isManager, isSupervisor, isSuperAdmin } = useAuth();
+  const { permissionLevels } = usePermissionSnapshot();
   
   // Deep-link query param from notification panel
   const [openNotificationId, setOpenNotificationId] = useQueryState('openNotification', {
@@ -418,13 +438,13 @@ function NotificationsContent() {
     }
   }, [tabParam, isAdmin, setTabParam]);
 
-  // Filter modules based on user permissions
-  const availableModules = NOTIFICATION_MODULES.filter(module => {
-    if (module.availableFor === 'all') return true;
-    if (module.availableFor === 'admin') return isAdmin;
-    if (module.availableFor === 'manager') return isManager || isAdmin;
-    return false;
+  // Filter modules based on role and module-level permissions.
+  const availableModules = getAvailableNotificationModules({
+    isAdmin,
+    isManager,
+    permissionLevels,
   });
+  const canDisableNotificationPreferences = isSupervisor || isManager || isAdmin || isSuperAdmin;
 
   const fetchNotifications = useCallback(async (keepCurrentListVisible = false) => {
     if (keepCurrentListVisible && hasLoadedNotifications) {
@@ -603,6 +623,15 @@ function NotificationsContent() {
     field: 'notify_in_app' | 'notify_email',
     value: boolean
   ) => {
+    if (!value && !canDisableNotificationPreferences) {
+      toast.error('Only supervisors and above can disable notifications');
+      return;
+    }
+    if (!value && !canDisableNotificationModule(moduleKey)) {
+      toast.error('Toolbox Talk notifications cannot be disabled');
+      return;
+    }
+
     setSavingPrefModule(moduleKey);
     try {
       // Get current preference to ensure we send both fields
@@ -668,8 +697,17 @@ function NotificationsContent() {
     fetchNotifications(true);
   }
 
-  function getStatusBadge(status: string) {
-    switch (status) {
+  function getStatusBadge(notification: NotificationItem) {
+    if (isUnreadNotification(notification)) {
+      return (
+        <Badge variant="destructive" className="gap-1">
+          <AlertTriangle className="h-3 w-3" />
+          Unread
+        </Badge>
+      );
+    }
+
+    switch (notification.status) {
       case 'SIGNED':
         return (
           <Badge variant="default" className="gap-1 bg-green-600">
@@ -712,10 +750,16 @@ function NotificationsContent() {
 
   function handleDisableSelectedModuleNotifications() {
     if (!selectedNotificationModule) return;
+    if (!canDisableNotificationPreferences || !canDisableNotificationModule(selectedNotificationModule.key)) return;
     void updatePreference(selectedNotificationModule.key, 'notify_in_app', false);
   }
 
   const isLoadingNotifications = loading || isRefreshingNotifications;
+  const canShowSelectedPreferencePrompt = Boolean(
+    selectedNotificationModule &&
+    canDisableNotificationPreferences &&
+    canDisableNotificationModule(selectedNotificationModule.key)
+  );
 
   return (
     <div className="space-y-6">
@@ -739,7 +783,7 @@ function NotificationsContent() {
       {/* Main Content */}
       <div>
         <Tabs value={activeTab} onValueChange={(value) => void setTabParam(value)} className="w-full">
-            <TabsList className="grid w-full max-w-2xl grid-cols-1 bg-slate-100 dark:bg-slate-800 p-0 sm:grid-cols-3">
+            <TabsList className="bg-slate-100 dark:bg-slate-800">
               <TabsTrigger value="all" className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900">
                 <Bell className="h-4 w-4" />
                 All Notifications
@@ -803,7 +847,7 @@ function NotificationsContent() {
                       <div className="divide-y divide-border">
                         {filteredNotifications.map((notification) => {
                           const isSelected = selectedNotification?.id === notification.id;
-                          const isUnread = notification.status === 'PENDING';
+                          const isUnread = isUnreadNotification(notification);
                           const rowStateClass = isSelected
                             ? 'border-l-avs-yellow bg-slate-200/80 shadow-inner hover:bg-slate-200 dark:bg-slate-800/90 dark:hover:bg-slate-800'
                             : isUnread
@@ -819,7 +863,7 @@ function NotificationsContent() {
                               className={`relative flex w-full items-start gap-3 border-l-4 p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-avs-yellow ${rowStateClass}`}
                             >
                               <div className="mt-1 shrink-0">
-                                {notification.priority === 'HIGH' ? (
+                                {notification.priority === 'HIGH' || notification.priority === 'URGENT' ? (
                                   <div className="rounded bg-red-100 p-2 dark:bg-red-950">
                                     <AlertTriangle className="h-4 w-4 text-red-600" />
                                   </div>
@@ -863,6 +907,7 @@ function NotificationsContent() {
                       selectedNotificationModule && savingPrefModule === selectedNotificationModule.key
                     )}
                     isModuleInAppDisabled={selectedNotificationPreference?.notify_in_app === false}
+                    canShowPreferencePrompt={canShowSelectedPreferencePrompt}
                     onBack={() => setMobileDetailOpen(false)}
                     onDisableModuleNotifications={handleDisableSelectedModuleNotifications}
                     onSignToolboxTalk={handleToolboxSignClick}
@@ -883,6 +928,7 @@ function NotificationsContent() {
                 preferences={preferences}
                 isLoadingPreferences={loadingPrefs}
                 savingPreferenceModules={savingPrefModule ? [savingPrefModule] : []}
+                canDisableNotifications={canDisableNotificationPreferences}
                 onTogglePreference={updatePreference}
               />
             </TabsContent>
@@ -977,7 +1023,7 @@ function NotificationsContent() {
                               <h3 className="font-semibold text-foreground">
                                 {notification.subject}
                               </h3>
-                              {getStatusBadge(notification.status)}
+                              {getStatusBadge(notification)}
                             </div>
 
                             <p className="mb-2 line-clamp-2 text-sm text-muted-foreground">
@@ -1010,11 +1056,15 @@ function NotificationsContent() {
                 recipient_id: modalNotification.id,
                 subject: modalNotification.subject,
                 body: modalNotification.body,
+                priority: modalNotification.priority,
+                acceptance_delay_minutes: modalNotification.acceptance_delay_minutes,
+                first_shown_at: modalNotification.first_shown_at,
                 sender_name: modalNotification.sender_name,
                 created_at: modalNotification.created_at,
                 pdf_file_path: modalNotification.pdf_file_path,
               }}
               onSigned={handleModalClose}
+              onDeferred={handleModalClose}
               totalPending={1}
               currentIndex={0}
             />

@@ -530,7 +530,7 @@ export function WorkshopTasksOverviewTab({
                           <div className="flex flex-col lg:flex-row items-start justify-between gap-4">
                             <div className="flex-1 w-full">
                               <div className="flex items-center gap-2 mb-2">
-                                {getStatusIcon(task.status, task)}
+                                {getStatusIcon(task.status ?? 'pending', task)}
                                 <h3 className="font-semibold text-lg text-foreground">
                                   {getVehicleReg(task)}
                                 </h3>
@@ -677,7 +677,7 @@ export function WorkshopTasksOverviewTab({
                           <div className="flex flex-col lg:flex-row items-start justify-between gap-4">
                             <div className="flex-1 w-full">
                               <div className="flex items-center gap-2 mb-2">
-                                {getStatusIcon(task.status)}
+                                {getStatusIcon(task.status ?? 'pending')}
                                 <h3 className="font-semibold text-lg text-foreground">{getVehicleReg(task)}</h3>
                                 <Badge variant="outline" className="text-xs">{getSourceLabel(task)}</Badge>
                                 {taskAttachmentCounts.get(task.id) && taskAttachmentCounts.get(task.id)! > 0 && (
@@ -798,7 +798,7 @@ export function WorkshopTasksOverviewTab({
                           <div className="flex flex-col lg:flex-row items-start justify-between gap-4">
                             <div className="flex-1 w-full">
                               <div className="flex items-center gap-2 mb-2">
-                                {getStatusIcon(task.status)}
+                                {getStatusIcon(task.status ?? 'pending')}
                                 <h3 className="font-semibold text-lg text-foreground">{getVehicleReg(task)}</h3>
                                 <Badge variant="outline" className="text-xs">{getSourceLabel(task)}</Badge>
                                 {taskAttachmentCounts.get(task.id) && taskAttachmentCounts.get(task.id)! > 0 && (

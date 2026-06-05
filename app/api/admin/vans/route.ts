@@ -191,7 +191,7 @@ export async function POST(request: NextRequest) {
     console.log(`[INFO] Van created: ${data.reg_number} (ID: ${data.id})`);
 
     // Automatically sync TAX and MOT data from APIs (non-blocking)
-    const syncResult = await syncVanData(data.id, data.reg_number, effectiveRole.user_id, supabase);
+    const syncResult = await syncVanData(data.id, data.reg_number || cleanReg, effectiveRole.user_id, supabase);
 
     return NextResponse.json({ 
       vehicle: data,

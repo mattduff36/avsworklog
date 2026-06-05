@@ -45,6 +45,9 @@ interface UserModulePermissionRow {
   access_level: number;
 }
 
+const UNIVERSAL_PERMISSION_MODULES = new Set<ModuleName>(['reminders']);
+const UNIVERSAL_PERMISSION_ACCESS_LEVEL: PermissionAccessLevel = 5;
+
 function requireTestUsers(testUsers: TestUsers | null): TestUsers {
   if (!testUsers) {
     throw new Error('Test users not provisioned. Run npm run testsuite:setup before authenticated permission tests.');
@@ -213,11 +216,13 @@ describe('@permissions API Endpoint Access Control', () => {
         const permissionModule = modulesByName.get(row.module_name);
         if (!user || !permissionModule || user.is_locked_admin) return;
 
-        const expectedLevel = getUsablePermissionAccessLevel(
-          permissionModule,
-          normalizePermissionAccessLevel(row.access_level),
-          { hasFullAccessRole: false }
-        );
+        const expectedLevel = UNIVERSAL_PERMISSION_MODULES.has(row.module_name)
+          ? UNIVERSAL_PERMISSION_ACCESS_LEVEL
+          : getUsablePermissionAccessLevel(
+              permissionModule,
+              normalizePermissionAccessLevel(row.access_level),
+              { hasFullAccessRole: false }
+            );
         const actualLevel = user.permissions[row.module_name] ?? 0;
         checkedOverrides.push(`${row.user_id}:${row.module_name}`);
 

@@ -64,6 +64,9 @@ type UserModulePermissionRow = {
   access_level: number;
 };
 
+const UNIVERSAL_PERMISSION_MODULES = new Set<ModuleName>(['reminders']);
+const UNIVERSAL_PERMISSION_ACCESS_LEVEL: PermissionAccessLevel = 5;
+
 type ProfilePermissionRow = {
   id: string;
   full_name: string | null;
@@ -113,6 +116,16 @@ export function createEmptyModuleLevelRecord(): Record<ModuleName, PermissionAcc
   }, {} as Record<ModuleName, PermissionAccessLevel>);
 }
 
+function applyUniversalModuleLevels(
+  levels: Record<ModuleName, PermissionAccessLevel>
+): Record<ModuleName, PermissionAccessLevel> {
+  UNIVERSAL_PERMISSION_MODULES.forEach((moduleName) => {
+    levels[moduleName] = UNIVERSAL_PERMISSION_ACCESS_LEVEL;
+  });
+
+  return levels;
+}
+
 export function getAccessLevelForRole(
   role: Pick<RoleRow, 'name' | 'role_class' | 'is_super_admin' | 'hierarchy_rank'> | null | undefined
 ): PermissionAccessLevel {
@@ -131,7 +144,7 @@ export function buildUserPermissionLevelRecord(
     permissionRecord[module.module_name] = normalizePermissionAccessLevel(levelMap?.get(module.module_name));
   });
 
-  return permissionRecord;
+  return applyUniversalModuleLevels(permissionRecord);
 }
 
 export function isFullAccessRole(role: Pick<RoleRow, 'name' | 'role_class' | 'is_super_admin'>): boolean {
@@ -477,7 +490,7 @@ function getInheritedLevelsForProfile(params: {
   enabledByTeam: Map<string, Map<ModuleName, boolean>>;
 }): Record<ModuleName, PermissionAccessLevel> {
   const levels = createEmptyModuleLevelRecord();
-  if (!params.role) return levels;
+  if (!params.role) return applyUniversalModuleLevels(levels);
 
   if (isFullAccessRole(params.role)) {
     return ALL_MODULES.reduce((acc, moduleName) => {
@@ -497,7 +510,7 @@ function getInheritedLevelsForProfile(params: {
     });
   });
 
-  return levels;
+  return applyUniversalModuleLevels(levels);
 }
 
 function getEffectiveLevelsForProfile(params: {
@@ -524,7 +537,7 @@ function getEffectiveLevelsForProfile(params: {
     }
   });
 
-  return levels;
+  return applyUniversalModuleLevels(levels);
 }
 
 export async function getUserPermissionMatrix(
@@ -972,7 +985,7 @@ export async function getPermissionLevelsForUser(
   const resolvedRoleId = effectiveRoleId || profile?.role_id || null;
 
   if (!resolvedRoleId) {
-    return createEmptyModuleLevelRecord();
+    return applyUniversalModuleLevels(createEmptyModuleLevelRecord());
   }
 
   const { data: roleData, error: roleError } = await supabaseAdmin
@@ -988,7 +1001,7 @@ export async function getPermissionLevelsForUser(
   const role = roleData as RoleRow | null;
 
   if (!role) {
-    return createEmptyModuleLevelRecord();
+    return applyUniversalModuleLevels(createEmptyModuleLevelRecord());
   }
 
   const teamId = effectiveTeamId || profile?.team_id || null;
@@ -1087,25 +1100,10 @@ export async function getUsersWithModuleAccess(
   const profilesQuery = supabaseAdmin.from('profiles').select('id, team_id, role_id, employee_id, full_name, is_placeholder');
   const scopedProfilesQuery = userIds?.length ? profilesQuery.in('id', userIds) : profilesQuery;
 
-  const [{ data: profiles, error: profilesError }, { data: roles, error: rolesError }, modules] =
-    await Promise.all([
-      scopedProfilesQuery,
-      supabaseAdmin
-        .from('roles')
-        .select('id, name, display_name, role_class, hierarchy_rank, is_super_admin, is_manager_admin'),
-      getPermissionModules(supabaseAdmin),
-    ]);
+  const { data: profiles, error: profilesError } = await scopedProfilesQuery;
 
   if (profilesError) {
     throw profilesError;
-  }
-  if (rolesError) {
-    throw rolesError;
-  }
-
-  const targetModule = modules.find((module) => module.module_name === moduleName);
-  if (!targetModule) {
-    return new Set<string>();
   }
 
   const typedProfiles = (profiles || []) as Array<{
@@ -1113,16 +1111,36 @@ export async function getUsersWithModuleAccess(
     team_id: string | null;
     role_id: string | null;
     employee_id?: string | null;
-    full_name?: string | null;
+    full_name: string | null;
     is_placeholder?: boolean | null;
   }>;
 
   const hiddenIds = await getHiddenSystemTestAccountIds(supabaseAdmin as Parameters<typeof getHiddenSystemTestAccountIds>[0]);
   const visibleProfiles = typedProfiles.filter(
-    (profile) => !hiddenIds.has(profile.id) && !isHiddenSystemTestAccountProfile(profile)
+    (profile) => !hiddenIds.has(profile.id) && !isHiddenSystemTestAccountProfile(profile) && !isDeletedProfile(profile)
   );
 
+  if (UNIVERSAL_PERMISSION_MODULES.has(moduleName)) {
+    return new Set<string>(visibleProfiles.map((profile) => profile.id));
+  }
+
   if (visibleProfiles.length === 0) {
+    return new Set<string>();
+  }
+
+  const [{ data: roles, error: rolesError }, modules] = await Promise.all([
+    supabaseAdmin
+      .from('roles')
+      .select('id, name, display_name, role_class, hierarchy_rank, is_super_admin, is_manager_admin'),
+    getPermissionModules(supabaseAdmin),
+  ]);
+
+  if (rolesError) {
+    throw rolesError;
+  }
+
+  const targetModule = modules.find((module) => module.module_name === moduleName);
+  if (!targetModule) {
     return new Set<string>();
   }
 

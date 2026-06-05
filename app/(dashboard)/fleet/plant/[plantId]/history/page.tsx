@@ -53,16 +53,16 @@ type Plant = {
   loler_due_date: string | null;
   loler_last_inspection_date: string | null;
   loler_certificate_number: string | null;
-  loler_inspection_interval_months: number;
+  loler_inspection_interval_months: number | null;
   current_hours: number | null;
-  status: 'active' | 'inactive' | 'maintenance' | 'retired';
+  status: 'active' | 'inactive' | 'maintenance' | 'retired' | null;
   reg_number: string | null;
   van_categories?: { name: string } | null;
 };
 
 type MaintenanceRecord = {
   id: string | null;
-  plant_id: string;
+  plant_id: string | null;
   current_hours: number | null;
   last_service_hours: number | null;
   next_service_hours: number | null;
@@ -706,8 +706,18 @@ export default function PlantHistoryPage({
         <EditPlantRecordDialog
           open={editDialogOpen}
           onOpenChange={setEditDialogOpen}
-          plant={plant}
-          maintenanceRecord={maintenanceRecord}
+          plant={{
+            ...plant,
+            loler_inspection_interval_months: plant.loler_inspection_interval_months ?? 12,
+          }}
+          maintenanceRecord={
+            maintenanceRecord
+              ? {
+                  ...maintenanceRecord,
+                  plant_id: maintenanceRecord.plant_id ?? plant.plant_id,
+                }
+              : null
+          }
           onSuccess={() => {
             setEditDialogOpen(false);
             fetchPlantData();

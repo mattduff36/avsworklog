@@ -22,15 +22,25 @@ function createNotificationsSupabaseMock(
   };
 }
 
-function createNotificationCountSupabaseMock(count: number | null, error: { message?: string | null } | null = null) {
-  const response = { count, error };
-  const query = createSupabaseQueryMock(response, ['select', 'eq', 'gte', 'is']);
+function createNotificationCountSupabaseMock(
+  count: number | null,
+  error: { message?: string | null } | null = null,
+  deferredRows: unknown[] = []
+) {
+  const pendingResponse = { count, error };
+  const pendingQuery = createSupabaseQueryMock(pendingResponse, ['select', 'eq', 'gte', 'is']);
+  const deferredQuery = createSupabaseQueryMock({ data: deferredRows, error: null }, ['select', 'eq', 'gte', 'is']);
+  const from = vi.fn()
+    .mockReturnValueOnce(pendingQuery)
+    .mockReturnValueOnce(deferredQuery);
 
   return {
     supabase: {
-      from: vi.fn(() => query),
+      from,
     },
-    query,
+    query: pendingQuery,
+    pendingQuery,
+    deferredQuery,
   };
 }
 
@@ -81,9 +91,11 @@ describe('listNotificationsForUser', () => {
           type: 'TOOLBOX_TALK',
           priority: 'HIGH',
           created_via: 'web',
+          module_key: 'toolbox_talks',
           subject: 'Harness safety',
           body: 'Read the attached document.',
           pdf_file_path: 'sender-1/1716111111111_harness.pdf',
+          acceptance_delay_minutes: 5,
           sender_id: 'sender-1',
           created_at: '2026-05-19T07:00:00.000Z',
           sender: {
@@ -98,27 +110,53 @@ describe('listNotificationsForUser', () => {
         id: 'recipient-1',
         message_id: 'message-1',
         type: 'TOOLBOX_TALK',
+        module_key: 'toolbox_talks',
         pdf_file_path: 'sender-1/1716111111111_harness.pdf',
+        acceptance_delay_minutes: 5,
         signature_data: 'data:image/png;base64,signature',
       },
     ]);
 
     expect(query.select).toHaveBeenCalledWith(expect.stringContaining('pdf_file_path'));
+    expect(query.select).toHaveBeenCalledWith(expect.stringContaining('acceptance_delay_minutes'));
+    expect(query.select).toHaveBeenCalledWith(expect.stringContaining('module_key'));
   });
 });
 
 describe('countUnreadNotificationsForUser', () => {
   it('uses an exact count so the badge matches the inbox contents', async () => {
-    const { supabase, query } = createNotificationCountSupabaseMock(0);
+    const { supabase, pendingQuery, deferredQuery } = createNotificationCountSupabaseMock(0);
 
     await expect(countUnreadNotificationsForUser(supabase as never, 'user-1')).resolves.toBe(0);
 
+    expect(supabase.from).toHaveBeenCalledTimes(2);
     expect(supabase.from).toHaveBeenCalledWith('message_recipients');
-    expect(query.select).toHaveBeenCalledWith('id, messages!inner(id)', { count: 'exact', head: true });
-    expect(query.eq).toHaveBeenNthCalledWith(1, 'user_id', 'user-1');
-    expect(query.eq).toHaveBeenNthCalledWith(2, 'status', 'PENDING');
-    expect(query.gte).toHaveBeenCalledWith('messages.created_at', expect.any(String));
-    expect(query.is).toHaveBeenNthCalledWith(1, 'cleared_from_inbox_at', null);
-    expect(query.is).toHaveBeenNthCalledWith(2, 'messages.deleted_at', null);
+    expect(pendingQuery.select).toHaveBeenCalledWith('id, messages!inner(id)', { count: 'exact', head: true });
+    expect(pendingQuery.eq).toHaveBeenNthCalledWith(1, 'user_id', 'user-1');
+    expect(pendingQuery.eq).toHaveBeenNthCalledWith(2, 'status', 'PENDING');
+    expect(pendingQuery.gte).toHaveBeenCalledWith('messages.created_at', expect.any(String));
+    expect(pendingQuery.is).toHaveBeenNthCalledWith(1, 'cleared_from_inbox_at', null);
+    expect(pendingQuery.is).toHaveBeenNthCalledWith(2, 'messages.deleted_at', null);
+    expect(deferredQuery.eq).toHaveBeenCalledWith('status', 'SHOWN');
+    expect(deferredQuery.eq).toHaveBeenCalledWith('messages.type', 'TOOLBOX_TALK');
+    expect(deferredQuery.eq).toHaveBeenCalledWith('messages.priority', 'LOW');
+  });
+
+  it('counts read-later toolbox talks as unread', async () => {
+    const { supabase } = createNotificationCountSupabaseMock(
+      2,
+      null,
+      [
+        {
+          status: 'SHOWN',
+          messages: {
+            type: 'TOOLBOX_TALK',
+            priority: 'LOW',
+          },
+        },
+      ],
+    );
+
+    await expect(countUnreadNotificationsForUser(supabase as never, 'user-1')).resolves.toBe(3);
   });
 });

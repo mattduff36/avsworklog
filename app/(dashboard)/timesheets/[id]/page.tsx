@@ -134,7 +134,12 @@ export default function ViewTimesheetPage() {
         return;
       }
 
-      setTimesheet(timesheetData);
+      setTimesheet({
+        ...timesheetData,
+        status: timesheetData.status ?? 'draft',
+        created_at: timesheetData.created_at ?? '',
+        updated_at: timesheetData.updated_at ?? '',
+      });
       setSignature(timesheetData.signature_data);
 
       // Fetch entries

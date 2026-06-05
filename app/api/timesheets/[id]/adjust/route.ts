@@ -192,15 +192,18 @@ export async function POST(
     const { data: employeeMessage } = await db
       .from('messages')
       .insert({
-        title: 'Your Timesheet Has Been Adjusted',
-        content: `Your timesheet for week ending ${new Date(typedTimesheet.week_ending).toLocaleDateString('en-GB', {
+        type: 'NOTIFICATION',
+        subject: 'Your Timesheet Has Been Adjusted',
+        body: `Your timesheet for week ending ${new Date(typedTimesheet.week_ending).toLocaleDateString('en-GB', {
           day: 'numeric',
           month: 'short',
           year: 'numeric',
         })} has been adjusted by ${typedProfile!.full_name}.\n\nAdjustment Details: ${comments.trim()}`,
-        message_type: 'timesheet_adjustment',
-        created_by: effectiveRole.user_id!,
-      })
+        priority: 'HIGH',
+        sender_id: effectiveRole.user_id!,
+        created_via: 'timesheet_adjustment',
+        module_key: 'timesheets',
+      } satisfies Database['public']['Tables']['messages']['Insert'])
       .select('id')
       .single();
 
@@ -211,9 +214,9 @@ export async function POST(
         .from('message_recipients')
         .insert({
           message_id: typedEmployeeMessage.id,
-          recipient_id: typedTimesheet.user_id,
-          read: false,
-        } as never);
+          user_id: typedTimesheet.user_id,
+          status: 'PENDING' as const,
+        });
     }
 
     // Create in-app notifications for selected managers
@@ -221,15 +224,18 @@ export async function POST(
       const { data: managerMessage } = await db
         .from('messages')
         .insert({
-          title: 'Timesheet Adjusted',
-          content: `A timesheet for ${employeeProfile.full_name} (week ending ${new Date(typedTimesheet.week_ending).toLocaleDateString('en-GB', {
+          type: 'NOTIFICATION',
+          subject: 'Timesheet Adjusted',
+          body: `A timesheet for ${employeeProfile.full_name} (week ending ${new Date(typedTimesheet.week_ending).toLocaleDateString('en-GB', {
             day: 'numeric',
             month: 'short',
             year: 'numeric',
           })}) has been adjusted by ${typedProfile!.full_name}.\n\nAdjustment Details: ${comments.trim()}`,
-          message_type: 'timesheet_adjustment',
-          created_by: effectiveRole.user_id!,
-        })
+          priority: 'HIGH',
+          sender_id: effectiveRole.user_id!,
+          created_via: 'timesheet_adjustment',
+          module_key: 'timesheets',
+        } satisfies Database['public']['Tables']['messages']['Insert'])
         .select('id')
         .single();
 
@@ -238,13 +244,13 @@ export async function POST(
       if (typedManagerMessage) {
         const recipients = notifyManagerIds.map((recipientId: string) => ({
           message_id: typedManagerMessage.id,
-          recipient_id: recipientId,
-          read: false,
+          user_id: recipientId,
+          status: 'PENDING' as const,
         }));
 
         await db
           .from('message_recipients')
-          .insert(recipients as never);
+          .insert(recipients);
       }
     }
 

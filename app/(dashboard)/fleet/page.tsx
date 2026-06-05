@@ -163,7 +163,10 @@ function FleetContent() {
         .eq('status', 'active');
       
       if (error) throw error;
-      setPlantAssets(data || []);
+      setPlantAssets((data || []).map((asset) => ({
+        ...asset,
+        status: asset.status || 'active',
+      })));
     } catch (error) {
       if (isExpectedFleetLoadError(error)) {
         setPlantAssets([]);
@@ -203,7 +206,10 @@ function FleetContent() {
         .order('reg_number', { ascending: true });
 
       if (error) throw error;
-      setHgvAssets(data || []);
+      setHgvAssets((data || []).map((asset) => ({
+        ...asset,
+        status: asset.status || 'active',
+      })));
     } catch (error) {
       if (isExpectedFleetLoadError(error)) {
         setHgvAssets([]);

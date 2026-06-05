@@ -54,6 +54,11 @@ export async function GET(
       success: true,
       role: {
         ...role,
+        is_super_admin: Boolean(role.is_super_admin),
+        is_manager_admin: Boolean(role.is_manager_admin),
+        timesheet_type: role.timesheet_type ?? undefined,
+        created_at: role.created_at ?? '',
+        updated_at: role.updated_at ?? '',
         permissions: [],
         user_count: count || 0,
       },

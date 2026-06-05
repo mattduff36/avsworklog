@@ -154,6 +154,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         priority: 'LOW',
         sender_id: current.profile.id,
         created_via: 'absence_contact_line_manager',
+        module_key: 'absence',
       })
       .select('id')
       .single();

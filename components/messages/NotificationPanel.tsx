@@ -10,14 +10,11 @@ import { useRouter } from 'next/navigation';
 import { formatDateTime } from '@/lib/utils/date';
 import { toast } from 'sonner';
 import type { NotificationItem } from '@/types/messages';
+import { isUnreadNotification } from '@/lib/utils/notification-helpers';
 
 interface NotificationPanelProps {
   open: boolean;
   onClose: () => void;
-}
-
-function getIsUnread(notification: NotificationItem): boolean {
-  return notification.status === 'PENDING';
 }
 
 export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
@@ -139,7 +136,7 @@ export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
             <ScrollArea className="flex-1 overflow-auto">
               <div className="divide-y divide-slate-700/50">
                 {notifications.map((notification) => {
-                  const isUnread = getIsUnread(notification);
+                  const isUnread = isUnreadNotification(notification);
                   return (
                     <button
                       key={notification.id}

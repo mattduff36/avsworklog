@@ -2,7 +2,12 @@
 
 import { Bell, CheckCircle2, Loader2, Mail } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import type { NotificationModule, NotificationModuleKey, NotificationPreference } from '@/types/notifications';
+import {
+  canDisableNotificationModule,
+  type NotificationModule,
+  type NotificationModuleKey,
+  type NotificationPreference,
+} from '@/types/notifications';
 
 export interface NotificationPreferencesCardProps {
   title?: string;
@@ -11,6 +16,7 @@ export interface NotificationPreferencesCardProps {
   preferences: NotificationPreference[];
   isLoadingPreferences: boolean;
   savingPreferenceModules: NotificationModuleKey[];
+  canDisableNotifications?: boolean;
   onTogglePreference: (
     moduleKey: NotificationModuleKey,
     field: 'notify_in_app' | 'notify_email',
@@ -49,6 +55,7 @@ export function NotificationPreferencesCard({
   preferences,
   isLoadingPreferences,
   savingPreferenceModules,
+  canDisableNotifications = true,
   onTogglePreference,
 }: NotificationPreferencesCardProps) {
   return (
@@ -69,6 +76,8 @@ export function NotificationPreferencesCard({
             const preference = getNotificationPreference(preferences, module.key);
             const isSaving = savingPreferenceModules.includes(module.key);
             const isDisabled = isLoadingPreferences || isSaving;
+            const isRequiredModule = !canDisableNotificationModule(module.key);
+            const canToggleModule = canDisableNotifications && !isRequiredModule;
 
             return (
               <div
@@ -80,7 +89,8 @@ export function NotificationPreferencesCard({
                   <p className="text-lg font-semibold text-foreground sm:text-sm">{module.label}</p>
                   <p className="text-sm text-muted-foreground sm:text-xs">{module.description}</p>
                 </div>
-                <div className="grid grid-cols-2 gap-3 sm:gap-2">
+                {canToggleModule ? (
+                  <div className="grid grid-cols-2 gap-3 sm:gap-2">
                   <button
                     type="button"
                     aria-pressed={preference.notify_in_app}
@@ -114,7 +124,14 @@ export function NotificationPreferencesCard({
                       {preference.notify_email ? 'ON' : 'OFF'}
                     </span>
                   </button>
-                </div>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-slate-700 bg-slate-950/40 px-3 py-2 text-sm text-muted-foreground">
+                    {isRequiredModule
+                      ? `${module.label} notifications are required and cannot be disabled.`
+                      : 'Notification preferences can only be changed by supervisors and above.'}
+                  </div>
+                )}
               </div>
             );
           })}

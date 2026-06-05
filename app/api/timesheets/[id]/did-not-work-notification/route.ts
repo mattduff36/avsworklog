@@ -278,6 +278,7 @@ export async function POST(
         priority: 'HIGH',
         sender_id: user.id,
         created_via: CREATED_VIA,
+        module_key: 'timesheets',
       } satisfies Database['public']['Tables']['messages']['Insert'])
       .select('id')
       .single();

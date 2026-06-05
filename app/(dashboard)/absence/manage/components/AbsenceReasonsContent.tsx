@@ -130,7 +130,9 @@ export function AbsenceReasonsContent() {
       if (sortField === 'is_paid') {
         return direction * Number(a.is_paid) - direction * Number(b.is_paid);
       }
-      return direction * new Date(a.updated_at).getTime() - direction * new Date(b.updated_at).getTime();
+      const aUpdatedAt = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+      const bUpdatedAt = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+      return direction * aUpdatedAt - direction * bUpdatedAt;
     });
     return list;
   }, [filteredReasons, sortDirection, sortField]);
@@ -427,7 +429,9 @@ export function AbsenceReasonsContent() {
                               </TableCell>
                             )}
                             {columnVisibility.updated && (
-                              <TableCell className="text-muted-foreground">{new Date(reason.updated_at).toLocaleDateString()}</TableCell>
+                              <TableCell className="text-muted-foreground">
+                                {reason.updated_at ? new Date(reason.updated_at).toLocaleDateString() : '-'}
+                              </TableCell>
                             )}
                             <TableCell className="text-right">
                               <div className="inline-flex items-center gap-2">
@@ -500,7 +504,9 @@ export function AbsenceReasonsContent() {
                               {reason.is_active ? 'Active' : 'Inactive'}
                             </Badge>
                           </div>
-                          <div className="text-xs text-muted-foreground">Updated {new Date(reason.updated_at).toLocaleDateString()}</div>
+                          <div className="text-xs text-muted-foreground">
+                            Updated {reason.updated_at ? new Date(reason.updated_at).toLocaleDateString() : '-'}
+                          </div>
                           <div className="flex items-center gap-2">
                             <Button
                               variant="outline"

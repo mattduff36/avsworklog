@@ -49,7 +49,7 @@ export interface AuditLogEntry {
   team_id: string | null;
   action: string;
   changes: Record<string, { old?: unknown; new?: unknown }> | null;
-  created_at: string;
+  created_at: string | null;
 }
 
 export interface ErrorLogEntry {

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildTeamPermissionRecord,
+  buildUserPermissionLevelRecord,
   getAdjacentTierRole,
   getPermissionLevelsForUser,
+  getPermissionMapForUser,
   getPermissionSetForUser,
   getUsersWithModuleAccess,
   isFullAccessRole,
@@ -179,6 +181,16 @@ describe('team permission helpers', () => {
     expect(normalizePermissionAccessLevel(3)).toBe(3);
     expect(normalizePermissionAccessLevel(999)).toBe(0);
     expect(normalizePermissionAccessLevel(null)).toBe(0);
+  });
+
+  it('builds user permission records with universal reminders access', () => {
+    const record = buildUserPermissionLevelRecord(
+      modules.filter((module) => module.module_name !== 'reminders'),
+      new Map([['timesheets', 2]])
+    );
+
+    expect(record.timesheets).toBe(2);
+    expect(record.reminders).toBe(5);
   });
 
   it('preserves full access for admin users without a team assignment', async () => {
@@ -392,6 +404,120 @@ describe('team permission helpers', () => {
 
     expect(levels.timesheets).toBe(3);
     expect(levels.approvals).toBe(0);
+    expect(levels.reminders).toBe(5);
+  });
+
+  it('reports reminders as universal even when no role or matrix row grants access', async () => {
+    const supabaseAdmin = {
+      from: (table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: () => ({
+              eq: () => ({
+                single: async () => ({
+                  data: { id: 'employee-1', team_id: null, role_id: null },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+
+        throw new Error(`Unexpected table lookup: ${table}`);
+      },
+    };
+
+    const levels = await getPermissionLevelsForUser('employee-1', null, supabaseAdmin as never);
+    const permissionMap = await getPermissionMapForUser('employee-1', null, supabaseAdmin as never);
+
+    expect(levels.reminders).toBe(5);
+    expect(levels.timesheets).toBe(0);
+    expect(permissionMap.reminders).toBe(true);
+    expect(permissionMap.timesheets).toBe(false);
+  });
+
+  it('ignores notification-only module keys when resolving permission modules', async () => {
+    const permissionModules = [
+      { module_name: 'training', minimum_role_id: 'manager', requires_sensitive_pin: false, sort_order: 50 },
+      {
+        module_name: 'processed_absence',
+        minimum_role_id: 'missing-notification-role',
+        requires_sensitive_pin: false,
+        sort_order: 51,
+      },
+    ];
+    const supabaseAdmin = {
+      from: (table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: () => ({
+              eq: () => ({
+                single: async () => ({
+                  data: { id: 'employee-1', team_id: 'team-a', role_id: 'employee' },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+
+        if (table === 'roles') {
+          return {
+            select: () => ({
+              eq: () => ({
+                single: async () => ({
+                  data: roles.find((role) => role.id === 'employee'),
+                  error: null,
+                }),
+              }),
+              not: () => ({
+                order: () => ({
+                  order: async () => ({ data: roles, error: null }),
+                }),
+              }),
+            }),
+          };
+        }
+
+        if (table === 'permission_modules') {
+          return {
+            select: () => ({
+              order: async () => ({ data: permissionModules, error: null }),
+            }),
+          };
+        }
+
+        if (table === 'team_module_permissions') {
+          return {
+            select: () => ({
+              eq: async () => ({
+                data: [
+                  { team_id: 'team-a', module_name: 'training', enabled: true },
+                  { team_id: 'team-a', module_name: 'processed_absence', enabled: true },
+                ],
+                error: null,
+              }),
+            }),
+          };
+        }
+
+        if (table === 'user_module_permissions') {
+          return {
+            select: () => ({
+              eq: async () => ({ data: [], error: null }),
+            }),
+          };
+        }
+
+        throw new Error(`Unexpected table lookup: ${table}`);
+      },
+    };
+
+    const levels = await getPermissionLevelsForUser('employee-1', null, supabaseAdmin as never);
+
+    expect(levels.training).toBe(0);
+    expect(levels.reminders).toBe(5);
+    expect(Object.hasOwn(levels, 'processed_absence')).toBe(false);
   });
 
   it('moves modules between adjacent tier roles', () => {
@@ -514,5 +640,36 @@ describe('team permission helpers', () => {
     );
 
     expect(allowedUsers).toEqual(new Set(['admin-1', 'employee-1']));
+  });
+
+  it('returns all real visible users for universal reminders access without matrix checks', async () => {
+    const profiles = [
+      { id: 'employee-1', team_id: 'team-a', role_id: null, full_name: 'Alex Able', employee_id: 'E001' },
+      { id: 'employee-2', team_id: null, role_id: null, full_name: 'Blake Baker', employee_id: 'E002' },
+      { id: 'deleted-1', team_id: null, role_id: null, full_name: 'Pat Placeholder (Deleted User)', employee_id: 'E003' },
+      { id: 'hidden-1', team_id: null, role_id: null, full_name: 'Test Employee', employee_id: 'TS-EMP' },
+    ];
+
+    const supabaseAdmin = {
+      from: (table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: () => ({
+              in: async () => ({ data: profiles, error: null }),
+            }),
+          };
+        }
+
+        throw new Error(`Universal reminders access should not query ${table}`);
+      },
+    };
+
+    const allowedUsers = await getUsersWithModuleAccess(
+      'reminders',
+      profiles.map((profile) => profile.id),
+      supabaseAdmin as never
+    );
+
+    expect(allowedUsers).toEqual(new Set(['employee-1', 'employee-2']));
   });
 });

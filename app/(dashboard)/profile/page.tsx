@@ -22,7 +22,8 @@ import { PanelLoader } from '@/components/ui/panel-loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { createStatusError, getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 import {
-  NOTIFICATION_MODULES,
+  canDisableNotificationModule,
+  getAvailableNotificationModules,
   type NotificationModuleKey,
   type NotificationPreference,
 } from '@/types/notifications';
@@ -136,7 +137,7 @@ function isProfileSettingsTab(value: string): value is ProfileSettingsTab {
 
 function ProfilePageContent() {
   const supabase = useMemo(() => createClient(), []);
-  const { user, profile, isAdmin, isManager } = useAuth();
+  const { user, profile, isAdmin, isManager, isSupervisor, isSuperAdmin } = useAuth();
   const [tabParam, setTabParam] = useQueryState('tab', {
     defaultValue: 'overview',
     clearOnDefault: true,
@@ -161,23 +162,17 @@ function ProfilePageContent() {
   const activeSettingsTab = isProfileSettingsTab(settingsTabParam) ? settingsTabParam : 'my-details';
 
   const availableNotificationModules = useMemo(() => {
-    const accessLevelByModule = new Map<string, number>(
+    const permissionLevels = Object.fromEntries(
       (overview?.permission_summary.modules || []).map((module) => [module.module_name, module.access_level])
     );
-    const hasModuleAccess = (moduleNames: string[], minimumLevel = 1) =>
-      moduleNames.some((moduleName) => (accessLevelByModule.get(moduleName) || 0) >= minimumLevel);
 
-    return NOTIFICATION_MODULES.filter((module) => {
-      if (module.availableFor === 'all') return true;
-      if (module.key === 'errors') return isAdmin || hasModuleAccess(['error-reports']);
-      if (module.key === 'sensitive_pin_security') return isAdmin || hasModuleAccess(['admin-settings'], 4);
-      if (module.key === 'approvals') return isManager || isAdmin || hasModuleAccess(['approvals'], 3);
-      if (module.key === 'rams') return isManager || isAdmin || hasModuleAccess(['rams'], 3);
-      if (module.availableFor === 'admin') return isAdmin;
-      if (module.availableFor === 'manager') return isManager || isAdmin;
-      return false;
+    return getAvailableNotificationModules({
+      isAdmin,
+      isManager,
+      permissionLevels,
     });
   }, [isAdmin, isManager, overview?.permission_summary.modules]);
+  const canDisableNotificationPreferences = isSupervisor || isManager || isAdmin || isSuperAdmin;
 
   const fetchProfileOverview = useCallback(async () => {
     setLoadingOverview(true);
@@ -436,6 +431,14 @@ function ProfilePageContent() {
     field: 'notify_in_app' | 'notify_email',
     checked: boolean
   ) {
+    if (!checked && !canDisableNotificationPreferences) {
+      toast.error('Only supervisors and above can disable notifications');
+      return;
+    }
+    if (!checked && !canDisableNotificationModule(moduleKey)) {
+      toast.error('Toolbox Talk notifications cannot be disabled');
+      return;
+    }
     if (loadingPreferences) return;
     if (savingPreferenceModulesRef.current.has(moduleKey)) return;
 
@@ -621,6 +624,7 @@ function ProfilePageContent() {
                     preferences={preferences}
                     isLoadingPreferences={loadingPreferences}
                     savingPreferenceModules={savingPreferenceModules}
+                    canDisableNotifications={canDisableNotificationPreferences}
                     onTogglePreference={handleTogglePreference}
                   />
                 </TabsContent>

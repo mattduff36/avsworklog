@@ -28,6 +28,13 @@ interface ExistingTimesheetSummary {
   status: string;
 }
 
+function normalizeExistingTimesheetSummary(row: { id: string; status: string | null }): ExistingTimesheetSummary {
+  return {
+    id: row.id,
+    status: row.status ?? 'draft',
+  };
+}
+
 function isEditableExistingStatus(status: string): boolean {
   return status === 'draft' || status === 'rejected';
 }
@@ -94,8 +101,8 @@ export function WeekSelector({
         if (cancelled) return;
 
         const nextWeekMap: Record<string, ExistingTimesheetSummary> = {};
-        for (const row of (data || []) as Array<{ id: string; week_ending: string; status: string }>) {
-          nextWeekMap[row.week_ending] = { id: row.id, status: row.status };
+        for (const row of (data || []) as Array<{ id: string; week_ending: string; status: string | null }>) {
+          nextWeekMap[row.week_ending] = normalizeExistingTimesheetSummary(row);
         }
 
         setExistingWeekMap(nextWeekMap);
@@ -201,10 +208,11 @@ export function WeekSelector({
       if (queryError) throw queryError;
 
       if (existing) {
+        const existingSummary = normalizeExistingTimesheetSummary(existing);
         // Timesheet exists for this week
-        if (existing.status === 'draft' || existing.status === 'rejected') {
+        if (isEditableExistingStatus(existingSummary.status)) {
           // Can edit this timesheet
-          setExistingTimesheet(existing);
+          setExistingTimesheet(existingSummary);
           setError('');
           setShowSuccess(true);
           
@@ -214,8 +222,8 @@ export function WeekSelector({
           }, 1000);
         } else {
           // Timesheet is submitted/approved - cannot edit
-          setExistingTimesheet(existing);
-          setError(`You already have a ${existing.status} timesheet for this week. You cannot create another timesheet for the same week.`);
+          setExistingTimesheet(existingSummary);
+          setError(`You already have a ${existingSummary.status} timesheet for this week. You cannot create another timesheet for the same week.`);
         }
       } else {
         // No existing timesheet - can create new

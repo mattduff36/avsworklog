@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { PanelLoader } from '@/components/ui/panel-loader';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertTriangle, Calendar, Wrench, ChevronDown, ChevronUp, Loader2, Clock, CheckCircle2, MessageSquare, Pause, Play, Undo2, Briefcase, Info, RefreshCw, Bell } from 'lucide-react';
-import type { VehicleMaintenanceWithStatus, MaintenanceCategory, CategoryResponsibility } from '@/types/maintenance';
+import type { VehicleMaintenanceWithStatus, MaintenanceCategory, CategoryResponsibility, MaintenancePeriodUnit } from '@/types/maintenance';
 import { formatDaysUntil, formatMilesUntil, formatHoursUntil, formatMileage, formatHours, formatMaintenanceDate } from '@/lib/utils/maintenanceCalculations';
 import type { CompletionUpdatesArray } from '@/types/workshop-completion';
 import { formatDateTime } from '@/lib/utils/date';
@@ -69,6 +69,17 @@ interface Alert {
 // Estimated average daily mileage for normalizing mileage-based alerts to days
 // This allows comparing date-based (Tax, MOT) with mileage-based (Service, Cambelt) alerts
 const ESTIMATED_DAILY_MILES = 35;
+const MAINTENANCE_PERIOD_UNITS: readonly MaintenancePeriodUnit[] = ['weeks', 'months', 'miles', 'hours'];
+
+function isMaintenancePeriodUnit(value: string): value is MaintenancePeriodUnit {
+  return MAINTENANCE_PERIOD_UNITS.includes(value as MaintenancePeriodUnit);
+}
+
+function getDefaultPeriodUnit(type: MaintenanceCategory['type']): MaintenancePeriodUnit {
+  if (type === 'mileage') return 'miles';
+  if (type === 'hours') return 'hours';
+  return 'months';
+}
 
 function isExpectedNetworkError(error: unknown): boolean {
   if (!navigator.onLine) return true;
@@ -221,7 +232,21 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
           .select('*');
         
         if (categories) {
-          setMaintenanceCategories(categories);
+          setMaintenanceCategories(categories.map((category) => ({
+            ...category,
+            period_unit: isMaintenancePeriodUnit(category.period_unit)
+              ? category.period_unit
+              : getDefaultPeriodUnit(category.type),
+            is_active: category.is_active ?? true,
+            sort_order: category.sort_order ?? 0,
+            created_at: category.created_at ?? '',
+            updated_at: category.updated_at ?? '',
+            responsibility: category.responsibility ?? 'workshop',
+            show_on_overview: category.show_on_overview ?? true,
+            reminder_in_app_enabled: category.reminder_in_app_enabled ?? false,
+            reminder_email_enabled: category.reminder_email_enabled ?? false,
+            applies_to: category.applies_to ?? [],
+          })));
         }
       } catch (error) {
         console.error('Error fetching maintenance categories:', error);

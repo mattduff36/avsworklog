@@ -131,9 +131,20 @@ export const MODULE_PAGES: ModulePage[] = [
     module: 'toolbox-talks',
     displayName: MODULE_DISPLAY_NAMES['toolbox-talks'],
     subPages: [
+      { value: 'toolbox-talks-list', label: 'Overview' },
       { value: 'toolbox-talks-new', label: 'Create Toolbox Talk' },
-      { value: 'toolbox-talks-reminder', label: 'Create Reminder' },
-      { value: 'toolbox-talks-list', label: 'Message Reports' },
+      { value: 'toolbox-talks-reminder', label: 'Create Notification / Reminder' },
+    ],
+  },
+  {
+    module: 'training',
+    displayName: MODULE_DISPLAY_NAMES.training,
+    subPages: [
+      { value: 'training-overview', label: 'Overview' },
+      { value: 'training-records', label: 'Records' },
+      { value: 'training-people', label: 'People' },
+      { value: 'training-qualifications', label: 'Qualifications' },
+      { value: 'training-notes', label: 'Workbook Notes' },
     ],
   },
   {
@@ -272,9 +283,16 @@ export function getPageUrl(value: string): string {
     'error-reports-manage': '/admin/errors/manage',
     
     // Toolbox Talks
-    'toolbox-talks-list': '/toolbox-talks?tab=reports',
+    'toolbox-talks-list': '/toolbox-talks?tab=overview',
     'toolbox-talks-new': '/toolbox-talks?tab=create-toolbox-talk',
     'toolbox-talks-reminder': '/toolbox-talks?tab=create-reminder',
+
+    // Training
+    'training-overview': '/training?tab=overview',
+    'training-records': '/training?tab=records',
+    'training-people': '/training?tab=people',
+    'training-qualifications': '/training?tab=qualifications',
+    'training-notes': '/training?tab=notes',
     
     // Admin - Users
     'admin-users-list': '/admin/users',

@@ -501,8 +501,10 @@ describe('POST /api/timesheets/[id]/adjust', () => {
 
       expect(messageInsertMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          title: expect.stringContaining('Adjusted'),
-          message_type: 'timesheet_adjustment',
+          type: 'NOTIFICATION',
+          subject: expect.stringContaining('Adjusted'),
+          created_via: 'timesheet_adjustment',
+          module_key: 'timesheets',
         })
       );
     });

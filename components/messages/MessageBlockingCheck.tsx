@@ -16,6 +16,10 @@ interface PendingToolboxTalk {
   recipient_id: string;
   subject: string;
   body: string;
+  priority?: 'LOW' | 'HIGH' | 'URGENT';
+  acceptance_delay_minutes?: number;
+  first_shown_at?: string | null;
+  pdf_file_path?: string | null;
   sender_name: string;
   created_at: string;
 }
@@ -151,7 +155,7 @@ export function MessageBlockingCheck() {
     pendingToolboxTalks.length,
   ]);
 
-  function handleToolboxTalkSigned() {
+  function handleToolboxTalkCompleted() {
     // Move to next Toolbox Talk or finish
     if (currentToolboxTalkIndex + 1 < pendingToolboxTalks.length) {
       setCurrentToolboxTalkIndex(currentToolboxTalkIndex + 1);
@@ -185,7 +189,8 @@ export function MessageBlockingCheck() {
       <BlockingMessageModal
         open={true}
         message={currentTalk}
-        onSigned={handleToolboxTalkSigned}
+        onSigned={handleToolboxTalkCompleted}
+        onDeferred={handleToolboxTalkCompleted}
         totalPending={pendingToolboxTalks.length}
         currentIndex={currentToolboxTalkIndex}
       />

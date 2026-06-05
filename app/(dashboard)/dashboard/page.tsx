@@ -19,6 +19,7 @@ import {
   Bug,
   FileText,
   Calendar,
+  LockKeyhole,
   Loader2
 } from 'lucide-react';
 import { getEnabledForms } from '@/lib/config/forms';
@@ -38,6 +39,17 @@ type PendingApprovalCount = {
   color: string;
   href: string;
 };
+
+const sensitivePinIndicatorClass = [
+  'absolute bottom-2 right-2 flex h-6 w-6 items-center justify-center rounded-full',
+  'border border-slate-500/20 bg-slate-700/10 text-slate-500/60 opacity-45 shadow-none ring-0',
+  'transition-all duration-200',
+  'group-hover:border-amber-300/40 group-hover:bg-amber-400/15 group-hover:text-amber-200 group-hover:opacity-100 group-hover:shadow-sm group-hover:ring-1 group-hover:ring-slate-950/40',
+  'group-focus-visible:border-amber-300/40 group-focus-visible:bg-amber-400/15 group-focus-visible:text-amber-200 group-focus-visible:opacity-100 group-focus-visible:shadow-sm group-focus-visible:ring-1 group-focus-visible:ring-slate-950/40',
+].join(' ');
+
+// Debug is a hidden sensitive module and is not exposed through permission metadata.
+const sensitivePinDashboardHrefOverrides: ReadonlySet<string> = new Set(['/debug']);
 
 /**
  * Safely applies alpha/opacity to an HSL color string.
@@ -100,6 +112,7 @@ export default function DashboardPage() {
   const [showCompactGreeting, setShowCompactGreeting] = useState(false);
   const {
     enabledModuleSet: userPermissions,
+    sensitivePinModuleSet,
     effectiveTeamName,
     isLoading: permissionsLoading,
     errorStatus: permissionsErrorStatus,
@@ -434,6 +447,9 @@ export default function DashboardPage() {
   };
   const hasManagementTileBadge = (href: string) => href in managementTileBadgeCountByHref;
   const getManagementTileBadgeCount = (href: string) => managementTileBadgeCountByHref[href] || 0;
+  const hasSensitivePinIndicator = (moduleName: ModuleName | undefined, href: string) => Boolean(
+    (moduleName && sensitivePinModuleSet.has(moduleName)) || sensitivePinDashboardHrefOverrides.has(href)
+  );
   const isDashboardLoading = permissionsLoading || !profile?.id;
 
   if (isDashboardLoading) {
@@ -602,9 +618,10 @@ export default function DashboardPage() {
                   const Icon = link.icon;
                   const canHaveBadge = hasManagementTileBadge(link.href);
                   const badgeCount = getManagementTileBadgeCount(link.href);
+                  const showSensitivePinIndicator = hasSensitivePinIndicator(link.module, link.href);
                   
                   return (
-                    <Link key={link.href} href={link.href}>
+                    <Link key={link.href} href={link.href} className="group">
                       <div 
                         className="relative bg-slate-800 dark:bg-slate-900 border-4 border-slate-600 hover:border-slate-500 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer animate-tile-pop"
                         style={{ height: '100px', animationDelay: `${index * 75}ms` }}
@@ -618,6 +635,16 @@ export default function DashboardPage() {
                             {badgeCount > 99 ? '99+' : badgeCount}
                           </div>
                         ) : null}
+                        {showSensitivePinIndicator && (
+                          <span
+                            role="img"
+                            aria-label={`${link.label} requires Sensitive PIN`}
+                            title="Sensitive PIN required"
+                            className={sensitivePinIndicatorClass}
+                          >
+                            <LockKeyhole className="h-3.5 w-3.5" aria-hidden="true" />
+                          </span>
+                        )}
                         <div className="flex flex-col items-start justify-between h-full">
                           <Icon className="h-6 w-6 text-muted-foreground" />
                           <span className="text-white font-semibold text-base leading-tight">
@@ -644,9 +671,10 @@ export default function DashboardPage() {
                   const animationIndex = renderedManagerTiles.length + index;
                   const canHaveBadge = hasManagementTileBadge(link.href);
                   const badgeCount = getManagementTileBadgeCount(link.href);
+                  const showSensitivePinIndicator = hasSensitivePinIndicator(link.module, link.href);
                   
                   return (
-                    <Link key={link.href} href={link.href}>
+                    <Link key={link.href} href={link.href} className="group">
                       <div 
                         className="relative bg-slate-800 dark:bg-slate-900 border-4 border-slate-600 hover:border-slate-500 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer animate-tile-pop"
                         style={{ height: '100px', animationDelay: `${animationIndex * 75}ms` }}
@@ -660,6 +688,16 @@ export default function DashboardPage() {
                             {badgeCount > 99 ? '99+' : badgeCount}
                           </div>
                         ) : null}
+                        {showSensitivePinIndicator && (
+                          <span
+                            role="img"
+                            aria-label={`${link.label} requires Sensitive PIN`}
+                            title="Sensitive PIN required"
+                            className={sensitivePinIndicatorClass}
+                          >
+                            <LockKeyhole className="h-3.5 w-3.5" aria-hidden="true" />
+                          </span>
+                        )}
                         <div className="flex flex-col items-start justify-between h-full">
                           <Icon className="h-6 w-6 text-muted-foreground" />
                           <span className="text-white font-semibold text-base leading-tight">
@@ -678,6 +716,7 @@ export default function DashboardPage() {
           {canAccessDebugTools && (() => {
             const Icon = Bug;
             const animationIndex = renderedManagementTiles.length;
+            const showSensitivePinIndicator = hasSensitivePinIndicator(undefined, '/debug');
             
             return (
               <div>
@@ -685,7 +724,7 @@ export default function DashboardPage() {
                   Developer
                 </h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                  <Link key="/debug" href="/debug">
+                  <Link key="/debug" href="/debug" className="group">
                     <div 
                       className="relative bg-slate-800 dark:bg-slate-900 border-4 border-red-600 hover:border-red-500 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer animate-tile-pop"
                       style={{ height: '100px', animationDelay: `${animationIndex * 75}ms` }}
@@ -699,6 +738,16 @@ export default function DashboardPage() {
                           {getManagementTileBadgeCount('/debug') > 99 ? '99+' : getManagementTileBadgeCount('/debug')}
                         </div>
                       ) : null}
+                      {showSensitivePinIndicator && (
+                        <span
+                          role="img"
+                          aria-label="Debug requires Sensitive PIN"
+                          title="Sensitive PIN required"
+                          className={sensitivePinIndicatorClass}
+                        >
+                          <LockKeyhole className="h-3.5 w-3.5" aria-hidden="true" />
+                        </span>
+                      )}
                       <div className="flex flex-col items-start justify-between h-full">
                         <Icon className="h-6 w-6 text-red-500" />
                         <span className="font-semibold text-base leading-tight text-red-500">

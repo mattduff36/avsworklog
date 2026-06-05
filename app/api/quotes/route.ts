@@ -236,12 +236,13 @@ export async function GET(request: NextRequest) {
     let acceptedValue = 0;
 
     (summaryRows || []).forEach((quote) => {
+      const status = quote.status ?? 'draft';
       statusCounts.all += 1;
-      if (quote.status in statusCounts) {
-        statusCounts[quote.status] = (statusCounts[quote.status] || 0) + 1;
+      if (status in statusCounts) {
+        statusCounts[status] = (statusCounts[status] || 0) + 1;
       }
 
-      if (ACCEPTED_QUOTE_STATUSES.has(quote.status)) {
+      if (ACCEPTED_QUOTE_STATUSES.has(status as QuoteStatus)) {
         acceptedQuotes += 1;
         acceptedValue += Number(quote.total || 0);
       }

@@ -117,6 +117,13 @@ function getTopEntry(values: string[]): { label: string; count: number } | null 
     .sort((a, b) => b.count - a.count)[0] || null;
 }
 
+function formatAuditTimestamp(createdAt: string | null | undefined, options?: Intl.DateTimeFormatOptions): string {
+  if (!createdAt) return 'Unknown';
+  const date = new Date(createdAt);
+  if (Number.isNaN(date.getTime())) return 'Unknown';
+  return date.toLocaleString('en-GB', options);
+}
+
 function AuditMetricCard({ metric }: { metric: AuditSummaryMetric }) {
   return (
     <div className={`rounded-xl border p-4 ${getAuditMetricClasses(metric.tone)}`}>
@@ -200,7 +207,7 @@ export function AuditLogDebugPanel({ supabase }: AuditLogDebugPanelProps) {
               user_id: string | null;
               action: string;
               changes: unknown;
-              created_at: string;
+              created_at: string | null;
               profiles?: { full_name: string; team_id: string | null } | null;
             }) => ({
               id: log.id,
@@ -254,8 +261,9 @@ export function AuditLogDebugPanel({ supabase }: AuditLogDebugPanelProps) {
     return Boolean(changes && Object.keys(changes).length > 0);
   };
 
-  const isWithinTimeWindow = (createdAt: string, timeWindow: AuditTimeFilter): boolean => {
+  const isWithinTimeWindow = (createdAt: string | null, timeWindow: AuditTimeFilter): boolean => {
     if (timeWindow === 'all') return true;
+    if (!createdAt) return false;
 
     const now = Date.now();
     const createdAtMs = new Date(createdAt).getTime();
@@ -480,7 +488,7 @@ Table: ${formatTableName(log.table_name)}
 Action: ${log.action.toUpperCase()}
 User: ${log.user_name}
 Team: ${getTeamName(log.team_id)}
-Timestamp: ${new Date(log.created_at).toLocaleString('en-GB')}
+Timestamp: ${formatAuditTimestamp(log.created_at)}
 Record ID: ${log.record_id}
 
 ${log.changes && Object.keys(log.changes).length > 0
@@ -559,7 +567,7 @@ ${log.changes && Object.keys(log.changes).length > 0
                 </div>
                 {auditSummary.latestEntry ? (
                   <Badge variant="outline" className="border-orange-500/30 bg-orange-500/10 text-orange-300">
-                    Latest: {new Date(auditSummary.latestEntry.created_at).toLocaleString('en-GB')}
+                    Latest: {formatAuditTimestamp(auditSummary.latestEntry.created_at)}
                   </Badge>
                 ) : null}
               </div>
@@ -741,7 +749,7 @@ ${log.changes && Object.keys(log.changes).length > 0
                         </div>
                         <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                           <Clock className="h-3 w-3" />
-                          {new Date(log.created_at).toLocaleString('en-GB', {
+                          {formatAuditTimestamp(log.created_at, {
                             day: '2-digit',
                             month: '2-digit',
                             year: 'numeric',

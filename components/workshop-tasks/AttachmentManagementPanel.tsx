@@ -141,7 +141,7 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
     setEditingTemplate(template);
     setTemplateName(template.name);
     setTemplateDescription(template.description || '');
-    setTemplateActive(template.is_active);
+    setTemplateActive(template.is_active ?? true);
     setTemplateAppliesToVehicle(appliesTo.includes('van'));
     setTemplateAppliesToHgv(appliesTo.includes('hgv'));
     setTemplateAppliesToPlant(appliesTo.includes('plant'));

@@ -48,11 +48,11 @@ type Task = Database['public']['Tables']['actions']['Row'] & {
     } | null;
   } | null;
   vans?: {
-    reg_number: string;
+    reg_number: string | null;
     nickname: string | null;
   } | null;
   hgvs?: {
-    reg_number: string;
+    reg_number: string | null;
     nickname: string | null;
   } | null;
   plant?: {
@@ -60,6 +60,10 @@ type Task = Database['public']['Tables']['actions']['Row'] & {
     nickname: string | null;
   } | null;
 };
+
+function getTaskStatus(task: Pick<Task, 'status'>): string {
+  return task.status || 'pending';
+}
 
 interface WorkshopTaskModalProps {
   open: boolean;
@@ -118,10 +122,14 @@ export function WorkshopTaskModal({
       : task.van_id
         ? 'van'
         : null;
-  const linkedInspectionHref = linkedInspectionType
+  const linkedInspectionHref = linkedInspectionType && task.inspection_id
     ? getInspectionHref(linkedInspectionType, task.inspection_id)
     : null;
   const linkedInspectionReference = getReferenceIdSuffix(task.inspection_id);
+  const taskForTimeline = {
+    ...task,
+    created_at: task.created_at || task.logged_at || task.actioned_at || new Date(0).toISOString(),
+  };
 
   const openAdjustTimestampDialog = (target: AdjustTimestampTarget) => {
     setTimestampTarget(target);
@@ -164,24 +172,30 @@ export function WorkshopTaskModal({
 
   const renderEditableTimestamp = (
     label: string,
-    value: string,
+    value: string | null,
     colorClass: string,
     timelineItemId: AdjustTimestampTarget['timelineItemId'],
     itemType: AdjustTimestampTarget['itemType']
-  ) => (
-    <button
-      type="button"
-      onClick={() => openAdjustTimestampDialog({
-        itemType,
-        timelineItemId,
-        label,
-        currentTimestamp: value,
-      })}
-      className={`ml-2 ${colorClass} underline underline-offset-2 transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background`}
-    >
-      {formatDate(value)}
-    </button>
-  );
+  ) => {
+    if (!value) {
+      return <span className="ml-2 text-muted-foreground">Unknown</span>;
+    }
+
+    return (
+      <button
+        type="button"
+        onClick={() => openAdjustTimestampDialog({
+          itemType,
+          timelineItemId,
+          label,
+          currentTimestamp: value,
+        })}
+        className={`ml-2 ${colorClass} underline underline-offset-2 transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background`}
+      >
+        {formatDate(value)}
+      </button>
+    );
+  };
 
   const getVehicleDisplay = () => {
     const getAssetIdLabel = (asset?: { reg_number?: string | null; plant_id?: string | null }) => {
@@ -312,7 +326,7 @@ export function WorkshopTaskModal({
                 )}
               </div>
               <div className="flex-shrink-0">
-                {getStatusBadge(task.status)}
+                {getStatusBadge(getTaskStatus(task))}
               </div>
             </div>
 
@@ -452,7 +466,7 @@ export function WorkshopTaskModal({
           <h3 className="text-lg font-semibold text-foreground mb-4">Attachments</h3>
           <TaskAttachmentsSection
             taskId={task.id}
-            taskStatus={task.status}
+            taskStatus={getTaskStatus(task)}
           />
         </div>
 
@@ -468,7 +482,7 @@ export function WorkshopTaskModal({
             </div>
           ) : (
             <WorkshopTaskTimeline
-              task={task}
+              task={taskForTimeline}
               comments={taskComments[task.id] || []}
               onAdjustTimestamp={openAdjustTimestampDialog}
             />
