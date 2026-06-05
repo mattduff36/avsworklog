@@ -46,6 +46,7 @@ import {
   ArrowRight,
   ExternalLink,
   RefreshCw,
+  Check,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -184,11 +185,13 @@ function getTimelineEventMeta(eventType: string) {
         iconClassName: 'text-fuchsia-300 bg-fuchsia-500/10 border-fuchsia-500/20',
       };
     case 'invoice_marked_on_sage':
+    case 'quote_marked_on_sage':
       return {
         icon: CheckCircle2,
         iconClassName: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
       };
     case 'invoice_removed_from_sage':
+    case 'quote_removed_from_sage':
       return {
         icon: CircleDot,
         iconClassName: 'text-slate-300 bg-slate-500/10 border-slate-500/20',
@@ -304,6 +307,16 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   const hasMultipleVersions = (quote?.versions?.length ?? 0) > 1;
   const availableToRequest = Number(quote?.invoice_summary?.availableToRequest ?? quote?.invoice_summary?.remainingBalance ?? quote?.total ?? 0);
   const suggestedInvoiceAmount = Number(quote?.invoice_summary?.remainingBalance ?? quote?.total ?? 0);
+  const isQuoteOnSage = Boolean(quote?.sage_posted_at);
+  const sagePostedDateLabel = quote?.sage_posted_at ? format(new Date(quote.sage_posted_at), 'dd MMM yyyy') : null;
+  const sageCardClassName = cn(
+    'rounded-lg border p-4 text-left transition-colors',
+    isQuoteOnSage
+      ? 'border-emerald-500/30 bg-emerald-500/10'
+      : 'border-slate-700 bg-slate-800/30',
+    canManageSage && !actionLoading ? 'cursor-pointer hover:bg-emerald-500/15' : '',
+    canManageSage && actionLoading ? 'cursor-wait opacity-70' : ''
+  );
   const pendingInvoiceRequests = useMemo(
     () => (quote?.invoice_requests || []).filter(request => request.status === 'pending'),
     [quote?.invoice_requests]
@@ -635,6 +648,35 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
     return updateQuote({ action, ...payload }, scope);
   }
 
+  async function toggleQuoteSage(onSage: boolean) {
+    if (!activeQuoteId) return;
+
+    setActionLoading(true);
+    try {
+      const res = await fetch(`/api/quotes/${activeQuoteId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'toggle_sage',
+          on_sage: onSage,
+        }),
+      });
+
+      if (!res.ok) {
+        throw await buildResponseError(res, 'Unable to update Sage status right now.');
+      }
+
+      toast.success(onSage ? 'Quote marked on Sage' : 'Quote removed from Sage');
+      await fetchQuote();
+      onRefresh();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to update Sage status right now.';
+      toast.error(message);
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   async function handleTriggerRams() {
     const ok = await callAction('trigger_rams', { rams_comments: ramsComments.trim() || null });
     if (ok) {
@@ -864,38 +906,6 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
         ? ((error as Error & { fieldErrors?: DetailFieldErrors }).fieldErrors || {})
         : {};
       setInvoiceFieldErrors(fieldErrors);
-      setInvoiceError(message);
-      toast.error(message);
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
-  async function toggleInvoiceSage(invoiceId: string, onSage: boolean) {
-    if (!activeQuoteId) return;
-
-    setActionLoading(true);
-    clearInvoiceError();
-    try {
-      const res = await fetch(`/api/quotes/${activeQuoteId}/invoices`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'toggle_sage',
-          invoice_id: invoiceId,
-          on_sage: onSage,
-        }),
-      });
-
-      if (!res.ok) {
-        throw await buildResponseError(res, 'Unable to update Sage status right now.');
-      }
-
-      toast.success(onSage ? 'Invoice marked on Sage' : 'Invoice removed from Sage');
-      await fetchQuote();
-      onRefresh();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to update Sage status right now.';
       setInvoiceError(message);
       toast.error(message);
     } finally {
@@ -1139,7 +1149,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-sm">
                     <div className="rounded-lg border border-slate-700 bg-slate-800/30 p-4">
                       <p className="text-muted-foreground">Quote Total</p>
                       <p className="mt-1 text-lg font-semibold text-white">£{Number(quote.total).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
@@ -1152,6 +1162,60 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                       <p className="text-muted-foreground">Remaining Balance</p>
                       <p className="mt-1 text-lg font-semibold text-white">£{Number(quote.invoice_summary?.remainingBalance ?? quote.total).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
                     </div>
+                    {canManageSage ? (
+                      <button
+                        type="button"
+                        className={sageCardClassName}
+                        onClick={() => void toggleQuoteSage(!isQuoteOnSage)}
+                        disabled={actionLoading}
+                        aria-pressed={isQuoteOnSage}
+                        aria-label={isQuoteOnSage ? 'Remove quote from Sage' : 'Mark quote on Sage'}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-muted-foreground">Sage</p>
+                          {sagePostedDateLabel ? (
+                            <span className="text-xs font-medium text-emerald-300">{sagePostedDateLabel}</span>
+                          ) : null}
+                        </div>
+                        <p className={cn('mt-1 flex items-center gap-2 text-lg font-semibold', isQuoteOnSage ? 'text-emerald-100' : 'text-white')}>
+                          <span
+                            aria-hidden="true"
+                            className={cn(
+                              'inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border',
+                              isQuoteOnSage
+                                ? 'border-emerald-300 bg-emerald-400 text-slate-950'
+                                : 'border-slate-500 bg-slate-900/60'
+                            )}
+                          >
+                            {isQuoteOnSage ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
+                          </span>
+                          <span>{isQuoteOnSage ? 'On Sage' : 'Not on Sage'}</span>
+                        </p>
+                      </button>
+                    ) : (
+                      <div className={sageCardClassName}>
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-muted-foreground">Sage</p>
+                          {sagePostedDateLabel ? (
+                            <span className="text-xs font-medium text-emerald-300">{sagePostedDateLabel}</span>
+                          ) : null}
+                        </div>
+                        <p className={cn('mt-1 flex items-center gap-2 text-lg font-semibold', isQuoteOnSage ? 'text-emerald-100' : 'text-white')}>
+                          <span
+                            aria-hidden="true"
+                            className={cn(
+                              'inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border',
+                              isQuoteOnSage
+                                ? 'border-emerald-300 bg-emerald-400 text-slate-950'
+                                : 'border-slate-500 bg-slate-900/60'
+                            )}
+                          >
+                            {isQuoteOnSage ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
+                          </span>
+                          <span>{isQuoteOnSage ? 'On Sage' : 'Not on Sage'}</span>
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   {(quote.signoff_name || quote.signoff_title) && (
@@ -1704,7 +1768,6 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                   <div className="space-y-2">
                     {quote.invoices?.length ? quote.invoices.map(invoice => {
                       const linkedRequest = quote.invoice_requests?.find(request => request.id === invoice.invoice_request_id) || null;
-                      const isOnSage = Boolean(invoice.sage_posted_at);
                       return (
                         <div key={invoice.id} className="rounded-lg border border-slate-700 bg-slate-800/30 p-4">
                           <div className="flex items-center justify-between gap-4">
@@ -1717,35 +1780,9 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                                 {linkedRequest ? `Marked ready: ${format(new Date(linkedRequest.requested_at), 'dd MMM yyyy')} • ` : ''}
                                 Added by Accounts: {format(new Date(invoice.created_at), 'dd MMM yyyy')}
                               </p>
-                              {invoice.sage_posted_at ? (
-                                <p className="text-xs text-emerald-300">
-                                  On Sage: {format(new Date(invoice.sage_posted_at), 'dd MMM yyyy')}
-                                </p>
-                              ) : null}
                             </div>
                             <div className="space-y-2 text-right">
                               <p className="font-semibold text-white">£{Number(invoice.amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
-                              {canManageSage ? (
-                                <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-slate-600 px-2 py-1 text-xs text-slate-300 hover:bg-slate-700/60">
-                                  <input
-                                    type="checkbox"
-                                    checked={isOnSage}
-                                    disabled={actionLoading}
-                                    onChange={event => void toggleInvoiceSage(invoice.id, event.target.checked)}
-                                  />
-                                  On Sage
-                                </label>
-                              ) : (
-                                <Badge
-                                  variant="outline"
-                                  className={isOnSage
-                                    ? 'border-emerald-500/30 text-emerald-300 bg-emerald-500/10'
-                                    : 'border-slate-500/30 text-slate-300 bg-slate-500/10'
-                                  }
-                                >
-                                  {isOnSage ? 'On Sage' : 'Not on Sage'}
-                                </Badge>
-                              )}
                             </div>
                           </div>
                           {invoice.comments && <p className="mt-2 text-sm text-slate-300 whitespace-pre-wrap">{invoice.comments}</p>}

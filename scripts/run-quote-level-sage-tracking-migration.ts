@@ -8,7 +8,7 @@ const { Client } = pg;
 config({ path: resolve(process.cwd(), '.env.local') });
 
 const connectionString = process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
-const sqlFile = 'supabase/migrations/20260603_quote_invoice_sage_tracking.sql';
+const sqlFile = 'supabase/migrations/20260605_quote_level_sage_tracking.sql';
 
 if (!connectionString) {
   console.error('Missing database connection string');
@@ -30,27 +30,40 @@ async function runMigration() {
   });
 
   try {
-    console.log('Running quote invoice Sage tracking migration...');
+    console.log('Running quote-level Sage tracking migration...');
     await client.connect();
 
     const sql = readFileSync(resolve(process.cwd(), sqlFile), 'utf-8');
     await client.query(sql);
 
-    const result = await client.query(`
+    const quoteColumns = await client.query(`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'quotes'
+        AND column_name IN ('sage_posted_at', 'sage_posted_by')
+      ORDER BY column_name
+    `);
+
+    if (quoteColumns.rowCount !== 2) {
+      throw new Error('quotes Sage tracking columns were not created');
+    }
+
+    const invoiceColumns = await client.query(`
       SELECT column_name
       FROM information_schema.columns
       WHERE table_schema = 'public'
         AND table_name = 'quote_invoices'
         AND column_name IN ('sage_posted_at', 'sage_posted_by')
-      ORDER BY column_name
     `);
 
-    if (result.rowCount !== 2) {
-      throw new Error('quote_invoices Sage tracking columns were not created');
+    if ((invoiceColumns.rowCount ?? 0) > 0) {
+      throw new Error('quote_invoices Sage tracking columns were not removed');
     }
 
     console.log('Migration complete');
-    console.log('quote_invoices Sage tracking columns: OK');
+    console.log('quotes Sage tracking columns: OK');
+    console.log('quote_invoices Sage tracking columns removed: OK');
   } catch (error) {
     console.error('Migration failed:', error instanceof Error ? error.message : String(error));
     process.exit(1);

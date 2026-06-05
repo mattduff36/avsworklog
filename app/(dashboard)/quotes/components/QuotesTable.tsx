@@ -53,9 +53,10 @@ const PO_FILTER_OPTIONS = [
 const SAGE_FILTER_OPTIONS = [
   { value: 'all', label: 'All Sage' },
   { value: 'not_on_sage', label: 'Not on Sage' },
-  { value: 'part_on_sage', label: 'Part on Sage' },
   { value: 'on_sage', label: 'On Sage' },
 ] as const;
+
+const STATUS_COLUMN_BADGE_CLASS = 'whitespace-nowrap';
 
 function formatCurrency(value: number | null | undefined) {
   const amount = Number(value ?? 0);
@@ -90,16 +91,16 @@ function getBillingStatusConfig(status: NonNullable<Quote['invoice_summary']>['s
   }
 }
 
-function getSageStatusConfig(status: QuoteSageStatus | undefined) {
+function getQuoteSageStatus(quote: Pick<Quote, 'sage_posted_at'>): QuoteSageStatus {
+  return quote.sage_posted_at ? 'on_sage' : 'not_on_sage';
+}
+
+function getSageStatusConfig(status: QuoteSageStatus) {
   switch (status) {
     case 'on_sage':
       return { label: 'On Sage', color: 'border-emerald-500/30 text-emerald-300 bg-emerald-500/10' };
-    case 'part_on_sage':
-      return { label: 'Part on Sage', color: 'border-amber-500/30 text-amber-300 bg-amber-500/10' };
-    case 'not_on_sage':
-      return { label: 'Not on Sage', color: 'border-slate-500/30 text-slate-300 bg-slate-500/10' };
     default:
-      return { label: 'No invoices', color: 'border-slate-700 text-slate-500 bg-slate-900/50' };
+      return { label: 'Not on Sage', color: 'border-slate-500/30 text-slate-300 bg-slate-500/10' };
   }
 }
 
@@ -161,7 +162,7 @@ export function QuotesTable({
   const [search, setSearch] = useState('');
   const [poFilter, setPoFilter] = useState<'all' | 'with_po' | 'without_po'>('all');
   const [invoiceFilter, setInvoiceFilter] = useState<'all' | 'not_invoiced' | 'ready_to_invoice' | 'partially_invoiced' | 'invoiced'>('all');
-  const [sageFilter, setSageFilter] = useState<'all' | 'not_on_sage' | 'part_on_sage' | 'on_sage'>('all');
+  const [sageFilter, setSageFilter] = useState<'all' | QuoteSageStatus>('all');
   const [sortField, setSortField] = useState<SortField>('quote_date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [expandedThreads, setExpandedThreads] = useState<Record<string, boolean>>({});
@@ -202,7 +203,7 @@ export function QuotesTable({
     }
 
     if (sageFilter !== 'all') {
-      list = list.filter(q => q.sage_status === sageFilter);
+      list = list.filter(q => getQuoteSageStatus(q) === sageFilter);
     }
 
     if (search.trim()) {
@@ -363,7 +364,7 @@ export function QuotesTable({
 
             <Select
               value={sageFilter}
-              onValueChange={(value: 'all' | 'not_on_sage' | 'part_on_sage' | 'on_sage') => setSageFilter(value)}
+              onValueChange={(value) => setSageFilter(value as 'all' | QuoteSageStatus)}
             >
               <SelectTrigger className="w-full bg-slate-800 border-slate-600 text-white sm:w-[150px]">
                 <SelectValue placeholder="Sage" />
@@ -429,7 +430,7 @@ export function QuotesTable({
               filtered.map(quote => {
                 const cfg = getQuoteStatusConfig(quote.status);
                 const billingCfg = getBillingStatusConfig(quote.invoice_summary?.status);
-                const sageCfg = getSageStatusConfig(quote.sage_status);
+                const sageCfg = getSageStatusConfig(getQuoteSageStatus(quote));
                 const previousVersions = quote.previous_versions || [];
                 const isExpanded = Boolean(expandedThreads[quote.quote_thread_id]);
                 const quoteDisplayName = buildQuoteDisplayName(quote);
@@ -477,12 +478,12 @@ export function QuotesTable({
                       <td className="px-4 py-3 text-xs text-slate-300">{quote.po_number || '—'}</td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1">
-                          <Badge variant="outline" className={cfg.color}>{cfg.label}</Badge>
+                          <Badge variant="outline" className={cn(STATUS_COLUMN_BADGE_CLASS, cfg.color)}>{cfg.label}</Badge>
                           {quote.commercial_status === 'closed' && (
-                            <Badge variant="outline" className="border-slate-300/30 text-slate-200 bg-slate-400/10">Archived</Badge>
+                            <Badge variant="outline" className={cn(STATUS_COLUMN_BADGE_CLASS, 'border-slate-300/30 text-slate-200 bg-slate-400/10')}>Archived</Badge>
                           )}
-                          <Badge variant="outline" className={billingCfg.color}>{billingCfg.label}</Badge>
-                          <Badge variant="outline" className={sageCfg.color}>{sageCfg.label}</Badge>
+                          <Badge variant="outline" className={cn(STATUS_COLUMN_BADGE_CLASS, billingCfg.color)}>{billingCfg.label}</Badge>
+                          <Badge variant="outline" className={cn(STATUS_COLUMN_BADGE_CLASS, sageCfg.color)}>{sageCfg.label}</Badge>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-xs text-slate-300">
@@ -492,7 +493,7 @@ export function QuotesTable({
                     {isExpanded ? previousVersions.map(version => {
                       const versionCfg = getQuoteStatusConfig(version.status);
                       const versionBillingCfg = getBillingStatusConfig(version.invoice_summary?.status);
-                      const versionSageCfg = getSageStatusConfig(version.sage_status);
+                      const versionSageCfg = getSageStatusConfig(getQuoteSageStatus(version));
                       const versionDisplayName = buildQuoteDisplayName(version);
                       const versionCustomerName = version.customer?.company_name || quote.customer?.company_name;
                       return (
@@ -523,12 +524,12 @@ export function QuotesTable({
                           <td className="px-4 py-3 text-xs">{version.po_number || '—'}</td>
                           <td className="px-4 py-3">
                             <div className="flex flex-wrap gap-1">
-                              <Badge variant="outline" className={versionCfg.color}>{versionCfg.label}</Badge>
+                              <Badge variant="outline" className={cn(STATUS_COLUMN_BADGE_CLASS, versionCfg.color)}>{versionCfg.label}</Badge>
                               {version.commercial_status === 'closed' && (
-                                <Badge variant="outline" className="border-slate-300/30 text-slate-300 bg-slate-400/10">Archived</Badge>
+                                <Badge variant="outline" className={cn(STATUS_COLUMN_BADGE_CLASS, 'border-slate-300/30 text-slate-300 bg-slate-400/10')}>Archived</Badge>
                               )}
-                              <Badge variant="outline" className={versionBillingCfg.color}>{versionBillingCfg.label}</Badge>
-                              <Badge variant="outline" className={versionSageCfg.color}>{versionSageCfg.label}</Badge>
+                              <Badge variant="outline" className={cn(STATUS_COLUMN_BADGE_CLASS, versionBillingCfg.color)}>{versionBillingCfg.label}</Badge>
+                              <Badge variant="outline" className={cn(STATUS_COLUMN_BADGE_CLASS, versionSageCfg.color)}>{versionSageCfg.label}</Badge>
                             </div>
                           </td>
                           <td className="px-4 py-3 text-xs">
@@ -555,7 +556,7 @@ export function QuotesTable({
           filtered.map(quote => {
             const cfg = getQuoteStatusConfig(quote.status);
             const billingCfg = getBillingStatusConfig(quote.invoice_summary?.status);
-            const sageCfg = getSageStatusConfig(quote.sage_status);
+            const sageCfg = getSageStatusConfig(getQuoteSageStatus(quote));
             const previousVersions = quote.previous_versions || [];
             const isExpanded = Boolean(expandedThreads[quote.quote_thread_id]);
             const quoteDisplayName = buildQuoteDisplayName(quote);
@@ -585,12 +586,12 @@ export function QuotesTable({
                     <span className="font-mono font-semibold text-avs-yellow">{quote.quote_reference}</span>
                   </div>
                   <div className="flex flex-wrap justify-end gap-1">
-                    <Badge variant="outline" className={cfg.color}>{cfg.label}</Badge>
+                    <Badge variant="outline" className={cn(STATUS_COLUMN_BADGE_CLASS, cfg.color)}>{cfg.label}</Badge>
                     {quote.commercial_status === 'closed' && (
-                      <Badge variant="outline" className="border-slate-300/30 text-slate-200 bg-slate-400/10">Archived</Badge>
+                      <Badge variant="outline" className={cn(STATUS_COLUMN_BADGE_CLASS, 'border-slate-300/30 text-slate-200 bg-slate-400/10')}>Archived</Badge>
                     )}
-                    <Badge variant="outline" className={billingCfg.color}>{billingCfg.label}</Badge>
-                    <Badge variant="outline" className={sageCfg.color}>{sageCfg.label}</Badge>
+                    <Badge variant="outline" className={cn(STATUS_COLUMN_BADGE_CLASS, billingCfg.color)}>{billingCfg.label}</Badge>
+                    <Badge variant="outline" className={cn(STATUS_COLUMN_BADGE_CLASS, sageCfg.color)}>{sageCfg.label}</Badge>
                   </div>
                 </div>
                 <div className="text-xs text-slate-400">{quote.version_label || 'Original'}</div>
@@ -630,7 +631,7 @@ export function QuotesTable({
                               <ChevronRight className="h-3.5 w-3.5 rotate-90 text-slate-500" />
                               <span className="truncate font-mono text-xs text-slate-300">{version.quote_reference}</span>
                             </div>
-                            <Badge variant="outline" className={versionCfg.color}>{versionCfg.label}</Badge>
+                            <Badge variant="outline" className={cn(STATUS_COLUMN_BADGE_CLASS, versionCfg.color)}>{versionCfg.label}</Badge>
                           </div>
                           <div className="mt-1 text-[11px] text-slate-400">
                             {version.version_label || 'Original'}

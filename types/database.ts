@@ -4384,8 +4384,6 @@ export type Database = {
           created_at: string
           updated_at: string
           invoice_request_id: string | null
-          sage_posted_at: string | null
-          sage_posted_by: string | null
         }
         Insert: {
           id?: string
@@ -4399,8 +4397,6 @@ export type Database = {
           created_at?: string
           updated_at?: string
           invoice_request_id?: string | null
-          sage_posted_at?: string | null
-          sage_posted_by?: string | null
         }
         Update: {
           id?: string
@@ -4414,8 +4410,6 @@ export type Database = {
           created_at?: string
           updated_at?: string
           invoice_request_id?: string | null
-          sage_posted_at?: string | null
-          sage_posted_by?: string | null
         }
         Relationships: [
           {
@@ -4437,13 +4431,6 @@ export type Database = {
             columns: ['quote_id']
             isOneToOne: false
             referencedRelation: 'quotes'
-            referencedColumns: ['id']
-          },
-          {
-            foreignKeyName: 'quote_invoices_sage_posted_by_fkey'
-            columns: ['sage_posted_by']
-            isOneToOne: false
-            referencedRelation: 'profiles'
             referencedColumns: ['id']
           },
         ]
@@ -4731,6 +4718,8 @@ export type Database = {
           scope: string | null
           estimated_duration_days: number | null
           pricing_mode: 'itemized' | 'attachments_only'
+          sage_posted_at: string | null
+          sage_posted_by: string | null
         }
         Insert: {
           id?: string
@@ -4796,6 +4785,8 @@ export type Database = {
           scope?: string | null
           estimated_duration_days?: number | null
           pricing_mode?: 'itemized' | 'attachments_only'
+          sage_posted_at?: string | null
+          sage_posted_by?: string | null
         }
         Update: {
           id?: string
@@ -4861,6 +4852,8 @@ export type Database = {
           scope?: string | null
           estimated_duration_days?: number | null
           pricing_mode?: 'itemized' | 'attachments_only'
+          sage_posted_at?: string | null
+          sage_posted_by?: string | null
         }
         Relationships: [
           {
@@ -4922,6 +4915,13 @@ export type Database = {
           {
             foreignKeyName: 'quotes_requester_id_fkey'
             columns: ['requester_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'quotes_sage_posted_by_fkey'
+            columns: ['sage_posted_by']
             isOneToOne: false
             referencedRelation: 'profiles'
             referencedColumns: ['id']

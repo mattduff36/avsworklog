@@ -21,19 +21,10 @@ import {
 import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
 
 type QuoteFieldErrors = Record<string, string>;
-type QuoteSageStatus = 'no_invoices' | 'not_on_sage' | 'part_on_sage' | 'on_sage';
+type QuoteSageStatus = 'not_on_sage' | 'on_sage';
 
-function getQuoteSageStatus(invoices: Array<{ sage_posted_at?: string | null }>): QuoteSageStatus {
-  if (invoices.length === 0) {
-    return 'no_invoices';
-  }
-
-  const postedCount = invoices.filter(invoice => Boolean(invoice.sage_posted_at)).length;
-  if (postedCount === 0) {
-    return 'not_on_sage';
-  }
-
-  return postedCount === invoices.length ? 'on_sage' : 'part_on_sage';
+function getQuoteSageStatus(quote: { sage_posted_at?: string | null }): QuoteSageStatus {
+  return quote.sage_posted_at ? 'on_sage' : 'not_on_sage';
 }
 
 function normalizeOptionalString(value: unknown): string | null {
@@ -174,7 +165,6 @@ export async function GET(request: NextRequest) {
     }
 
     const summaries = new Map<string, ReturnType<typeof getInvoiceSummary>>();
-    const sageStatuses = new Map<string, QuoteSageStatus>();
     const allVisibleQuotes = [...quotes, ...previousVersions];
     const summaryQuoteIds = allVisibleQuotes.map(quote => quote.id);
     if (summaryQuoteIds.length > 0) {
@@ -184,7 +174,7 @@ export async function GET(request: NextRequest) {
       ] = await Promise.all([
         supabase
           .from('quote_invoices')
-          .select('quote_id, amount, invoice_date, sage_posted_at')
+          .select('quote_id, amount, invoice_date')
           .in('quote_id', summaryQuoteIds),
         supabase
           .from('quote_invoice_requests')
@@ -199,7 +189,7 @@ export async function GET(request: NextRequest) {
         throw invoiceRequestError;
       }
 
-      const invoicesByQuoteId = new Map<string, Array<{ quote_id: string; amount: number; invoice_date: string | null; sage_posted_at?: string | null }>>();
+      const invoicesByQuoteId = new Map<string, Array<{ quote_id: string; amount: number; invoice_date: string | null }>>();
       (invoices || []).forEach((invoice) => {
         if (!invoicesByQuoteId.has(invoice.quote_id)) {
           invoicesByQuoteId.set(invoice.quote_id, []);
@@ -224,7 +214,6 @@ export async function GET(request: NextRequest) {
             invoiceRequests: invoiceRequestsByQuoteId.get(quote.id) || [],
           })
         );
-        sageStatuses.set(quote.id, getQuoteSageStatus(invoicesByQuoteId.get(quote.id) || []));
       }
     }
 
@@ -252,11 +241,11 @@ export async function GET(request: NextRequest) {
       quotes: quotes.map(quote => ({
         ...quote,
         invoice_summary: summaries.get(quote.id) || getInvoiceSummary({ total: Number(quote.total || 0), invoices: [] }),
-        sage_status: sageStatuses.get(quote.id) || 'no_invoices',
+        sage_status: getQuoteSageStatus(quote),
         previous_versions: (previousVersionsByThreadId.get(quote.quote_thread_id) || []).map(version => ({
           ...version,
           invoice_summary: summaries.get(version.id) || getInvoiceSummary({ total: Number(version.total || 0), invoices: [] }),
-          sage_status: sageStatuses.get(version.id) || 'no_invoices',
+          sage_status: getQuoteSageStatus(version),
         })),
       })),
       summary: {

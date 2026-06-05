@@ -97,6 +97,7 @@ describe('GET /api/quotes', () => {
         status: 'in_progress',
         quote_date: '2026-03-23',
         base_quote_reference: 'Q-002',
+        sage_posted_at: '2026-03-24T10:00:00.000Z',
         customer: { company_name: 'Bravo Ltd' },
       },
     ];
@@ -193,6 +194,10 @@ describe('GET /api/quotes', () => {
       has_more: true,
     });
     expect(payload.quotes[0].previous_versions).toEqual([]);
+    expect(payload.quotes.map((quote: { sage_status: string }) => quote.sage_status)).toEqual([
+      'not_on_sage',
+      'on_sage',
+    ]);
   });
 });
 

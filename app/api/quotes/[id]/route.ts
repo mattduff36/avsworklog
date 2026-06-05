@@ -179,6 +179,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       estimated_duration_days?: number | null;
       pricing_mode?: 'itemized' | 'attachments_only';
       rams_comments?: string | null;
+      on_sage?: boolean;
       secondary_contact_ids?: unknown;
       [key: string]: unknown;
     };
@@ -422,6 +423,39 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         actorUserId: user.id,
         createdAt: now,
       });
+    } else if (action === 'toggle_sage') {
+      if (!await canManageQuoteSage()) {
+        return NextResponse.json({ error: 'Only Accounts or admin users can update Sage status.' }, { status: 403 });
+      }
+
+      if (typeof quoteUpdates.on_sage !== 'boolean') {
+        return NextResponse.json({ error: 'Choose whether this quote is on Sage.' }, { status: 400 });
+      }
+
+      const now = new Date().toISOString();
+      const nextSagePostedAt = quoteUpdates.on_sage ? now : null;
+      const { error } = await supabase
+        .from('quotes')
+        .update({
+          sage_posted_at: nextSagePostedAt,
+          sage_posted_by: nextSagePostedAt ? user.id : null,
+          updated_by: user.id,
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+      await appendQuoteTimelineEvent(admin, {
+        quoteId: id,
+        quoteThreadId: current.quote.quote_thread_id,
+        quoteReference: current.quote.quote_reference,
+        eventType: nextSagePostedAt ? 'quote_marked_on_sage' : 'quote_removed_from_sage',
+        title: nextSagePostedAt ? 'Quote marked on Sage' : 'Quote removed from Sage',
+        description: buildQuoteDisplayName(current.quote),
+        fromStatus: current.quote.status,
+        toStatus: current.quote.status,
+        actorUserId: user.id,
+        createdAt: now,
+      });
     } else if (action === 'trigger_rams') {
       const now = new Date().toISOString();
 
@@ -638,6 +672,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         invoice_number: null,
         invoice_notes: null,
         last_invoice_at: null,
+        sage_posted_at: null,
+        sage_posted_by: null,
         accepted: false,
         accepted_at: null,
         invoiced_at: null,
@@ -706,6 +742,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({
         quote: {
           ...bundle.quote,
+          can_manage_sage: await canManageQuoteSage(),
           line_items: bundle.lineItems,
           attachments: bundle.attachments,
           invoices: bundle.invoices,
