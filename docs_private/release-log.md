@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.3.0
+
+**GIT COMMIT MESSAGE**
+`feat(mobile): update mobile text size controls, did not work absence handling, and 6 more areas`
+
+**WHAT CHANGED**
+Update mobile text size controls, did not work absence handling, and 6 more areas.
+
+**COMMITS IN THIS RELEASE**
+- `feat(mobile): update mobile text size controls, did not work absence handling, and 6 more areas`
+
 ## 0626.2.5
 
 **GIT COMMIT MESSAGE**
