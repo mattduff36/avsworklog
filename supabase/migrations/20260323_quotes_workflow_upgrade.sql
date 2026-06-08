@@ -278,7 +278,7 @@ SELECT
 FROM (
   VALUES
     ('GH', 40000, 'George', 'george@avsquires.co.uk'),
-    ('LC', 50000, 'Louis', 'louis@avsquires.co.uk'),
+    ('LC', 50000, 'Louis', 'lcree@avsquires.co.uk'),
     ('NF', 60000, 'Neil', 'neil@avsquires.co.uk'),
     ('AH', 70000, 'Andy', 'andy@avsquires.co.uk')
 ) AS seed(initials, number_start, first_name, email)

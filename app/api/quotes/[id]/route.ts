@@ -897,16 +897,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       }
 
       if (typeof manager_profile_id !== 'undefined' && normalizedManagerProfileId) {
-        const managerOption = await admin
-          .from('quote_manager_series')
-          .select('profile_id, initials, signoff_name, signoff_title, manager_email, approver_profile_id')
-          .eq('profile_id', normalizedManagerProfileId)
-          .maybeSingle();
-
-        if (managerOption.error) {
-          throw managerOption.error;
-        }
-
+        const managerOption = await getQuoteManagerOption(normalizedManagerProfileId);
         const { data: managerProfile, error: managerProfileError } = await admin
           .from('profiles')
           .select('id, full_name')
@@ -918,21 +909,19 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         }
 
         updates.requester_id = normalizedManagerProfileId;
-        updates.requester_initials = managerOption.data?.initials || current.quote.requester_initials;
+        updates.requester_initials = managerOption?.initials || current.quote.requester_initials;
         updates.manager_name = normalizeOptionalString(quoteUpdates.manager_name)
-          || managerOption.data?.signoff_name
+          || managerOption?.signoff_name
           || managerProfile.full_name;
-        updates.manager_email = normalizeOptionalString(quoteUpdates.manager_email)
-          || managerOption.data?.manager_email
-          || null;
+        updates.manager_email = managerOption?.manager_email || null;
         updates.approver_profile_id = normalizedApproverProfileId
-          || managerOption.data?.approver_profile_id
+          || managerOption?.approver_profile_id
           || normalizedManagerProfileId;
         updates.signoff_name = normalizeOptionalString(quoteUpdates.signoff_name)
-          || managerOption.data?.signoff_name
+          || managerOption?.signoff_name
           || managerProfile.full_name;
         updates.signoff_title = normalizeOptionalString(quoteUpdates.signoff_title)
-          || managerOption.data?.signoff_title
+          || managerOption?.signoff_title
           || null;
       } else if (typeof approver_profile_id !== 'undefined') {
         updates.approver_profile_id = normalizedApproverProfileId;

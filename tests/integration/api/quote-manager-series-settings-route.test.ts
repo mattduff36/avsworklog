@@ -69,13 +69,19 @@ describe('/api/quotes/settings/manager-series', () => {
     const quoteUpdate = vi.fn(() => ({
       eq: vi.fn(() => ({
         eq: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            is: vi.fn().mockResolvedValue({ error: null }),
-          })),
+          eq: vi.fn().mockResolvedValue({ error: null }),
         })),
       })),
     }));
     const admin = {
+      auth: {
+        admin: {
+          getUserById: vi.fn().mockResolvedValue({
+            data: { user: { email: 'manager-login@example.com' } },
+            error: null,
+          }),
+        },
+      },
       from: vi.fn((table: string) => {
         if (table === 'quote_manager_series') return { upsert };
         if (table === 'quotes') return { update: quoteUpdate };
@@ -129,6 +135,7 @@ describe('/api/quotes/settings/manager-series', () => {
       profile_id: 'manager-1',
       initials: 'MO',
       next_number: 12,
+      manager_email: 'manager-login@example.com',
     }), { onConflict: 'profile_id' });
     expect(payload.manager_options).toHaveLength(1);
   });

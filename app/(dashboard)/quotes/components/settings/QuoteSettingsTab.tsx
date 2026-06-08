@@ -459,9 +459,6 @@ export function QuoteSettingsTab({
             />
             <span>
               <span className="block font-medium text-slate-100">{user.full_name || 'Unnamed user'}</span>
-              {user.employee_id ? (
-                <span className="block text-xs text-muted-foreground">Employee ID: {user.employee_id}</span>
-              ) : null}
             </span>
           </label>
         ))}
@@ -515,7 +512,6 @@ export function QuoteSettingsTab({
                 {additionalUsers.map(user => (
                   <div key={user.id} className="rounded-md border border-slate-700 bg-slate-800/40 p-3 text-sm">
                     <div className="font-medium text-slate-100">{user.full_name || 'Unnamed user'}</div>
-                    {user.employee_id ? <div className="text-xs text-muted-foreground">Employee ID: {user.employee_id}</div> : null}
                     <div className="mt-3 flex flex-wrap gap-3">
                       {([
                         ['invoice_request', 'Ready to invoice'],
@@ -540,15 +536,22 @@ export function QuoteSettingsTab({
             )}
           </section>
 
-          <div className="flex justify-end">
-            <Button
-              onClick={() => void saveInvoiceNotifications()}
-              disabled={!settingsPayload?.can_manage || Boolean(saving) || accountsUsers.length === 0}
-              className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90"
-            >
-              {saving === 'notifications' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Save notification details
-            </Button>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground">
+              For audit records, copies of all quote emails are automatically sent to{' '}
+              <code className="font-mono text-slate-200">noreply@avsquires.co.uk</code>.
+            </p>
+
+            <div className="flex justify-end">
+              <Button
+                onClick={() => void saveInvoiceNotifications()}
+                disabled={!settingsPayload?.can_manage || Boolean(saving) || accountsUsers.length === 0}
+                className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90"
+              >
+                {saving === 'notifications' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Save notification details
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -625,8 +628,8 @@ export function QuoteSettingsTab({
                     <Field label="Next number">
                       <Input type="number" value={row.next_number} onChange={event => updateManagerRow(row.profile_id, { next_number: Number(event.target.value) })} />
                     </Field>
-                    <Field label="Manager email">
-                      <Input value={row.manager_email || ''} onChange={event => updateManagerRow(row.profile_id, { manager_email: event.target.value })} />
+                    <Field label="Manager email (from user account)">
+                      <Input value={row.manager_email || ''} readOnly className="bg-slate-900/60 text-muted-foreground" />
                     </Field>
                     <Field label="Sign-off name">
                       <Input value={row.signoff_name || ''} onChange={event => updateManagerRow(row.profile_id, { signoff_name: event.target.value })} />

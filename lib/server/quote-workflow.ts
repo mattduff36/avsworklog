@@ -25,6 +25,7 @@ import {
 
 const { Client } = pg;
 const QUOTE_NOTIFICATION_MODULE_KEY: NotificationModuleKey = 'quotes';
+const QUOTE_EMAIL_RECORD_CC = 'noreply@avsquires.co.uk';
 
 export type QuoteRow = Database['public']['Tables']['quotes']['Row'];
 export type QuoteLineItemRow = Database['public']['Tables']['quote_line_items']['Row'];
@@ -182,9 +183,11 @@ export async function listQuoteManagerOptions(): Promise<QuoteManagerOption[]> {
   }
 
   const hiddenIds = await getHiddenSystemTestAccountIds(admin);
-  return ((data || []) as QuoteManagerOption[]).filter(
+  const visibleOptions = ((data || []) as QuoteManagerOption[]).filter(
     (option) => !hiddenIds.has(option.profile_id) && (!option.approver_profile_id || !hiddenIds.has(option.approver_profile_id))
   );
+
+  return hydrateQuoteManagerAuthEmails(admin, visibleOptions);
 }
 
 export async function getQuoteManagerOption(profileId: string): Promise<QuoteManagerOption | null> {
@@ -203,7 +206,35 @@ export async function getQuoteManagerOption(profileId: string): Promise<QuoteMan
     throw error;
   }
 
-  return (data as QuoteManagerOption | null) || null;
+  const option = (data as QuoteManagerOption | null) || null;
+  if (!option) return null;
+
+  const [hydrated] = await hydrateQuoteManagerAuthEmails(admin, [option]);
+  return hydrated || option;
+}
+
+async function hydrateQuoteManagerAuthEmails(
+  admin: ReturnType<typeof createAdminClient>,
+  options: QuoteManagerOption[]
+): Promise<QuoteManagerOption[]> {
+  return Promise.all(options.map(async (option) => {
+    const { data, error } = await admin.auth.admin.getUserById(option.profile_id);
+    if (error) {
+      console.error('Failed to load quote manager auth email:', error);
+      return option;
+    }
+
+    const authEmail = normalizeEmailAddress(data.user?.email);
+    if (!authEmail) return option;
+
+    return {
+      ...option,
+      manager_email: authEmail,
+      profile: option.profile
+        ? { ...option.profile, email: authEmail }
+        : option.profile,
+    };
+  }));
 }
 
 export async function generateQuoteReferenceForManager(params: {
@@ -420,6 +451,11 @@ async function sendEmail(params: {
     return { success: false, error: 'Email service not configured' };
   }
 
+  const toEmails = uniqueEmailAddresses(params.to);
+  const toEmailKeys = new Set(toEmails.map(email => email.toLowerCase()));
+  const ccEmails = uniqueEmailAddresses([...(params.cc || []), QUOTE_EMAIL_RECORD_CC])
+    .filter(email => !toEmailKeys.has(email.toLowerCase()));
+
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -428,8 +464,8 @@ async function sendEmail(params: {
     },
     body: JSON.stringify({
       from: params.from || fromEmail,
-      to: params.to,
-      cc: params.cc,
+      to: toEmails,
+      cc: ccEmails,
       reply_to: params.replyTo || undefined,
       subject: params.subject,
       html: params.html,

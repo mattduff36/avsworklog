@@ -414,7 +414,7 @@ export async function POST(request: NextRequest) {
       scope: normalizeOptionalString(quoteData.scope),
       salutation: normalizeOptionalString(quoteData.salutation),
       manager_name: quoteData.manager_name || managerOption?.profile?.full_name || managerProfile.full_name,
-      manager_email: quoteData.manager_email || managerOption?.manager_email || null,
+      manager_email: managerOption?.manager_email || null,
       approver_profile_id: normalizedApproverProfileId || managerOption?.approver_profile_id || managerProfileId,
       signoff_name: quoteData.signoff_name || managerOption?.signoff_name || managerProfile.full_name,
       signoff_title: normalizeOptionalString(quoteData.signoff_title) || managerOption?.signoff_title || null,

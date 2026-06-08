@@ -157,7 +157,7 @@ describe('sendQuoteToCustomerEmail', () => {
     expect(body).toEqual(expect.objectContaining({
       from: 'Quotes <quotes@example.com>',
       to: ['alex@example.com'],
-      cc: ['manager-copy@avsquires.co.uk'],
+      cc: ['manager-copy@avsquires.co.uk', 'noreply@avsquires.co.uk'],
       reply_to: 'sender@avsquires.co.uk',
       subject: 'Q-001 - Acme Ltd - 1 Road Lane - Concrete repairs',
     }));
@@ -212,7 +212,7 @@ describe('sendQuoteToCustomerEmail', () => {
 
     expect(body).toEqual(expect.objectContaining({
       to: ['alex@example.com', 'chris@example.com'],
-      cc: ['manager-copy@avsquires.co.uk'],
+      cc: ['manager-copy@avsquires.co.uk', 'noreply@avsquires.co.uk'],
     }));
   });
 
@@ -234,6 +234,7 @@ describe('sendQuoteToCustomerEmail', () => {
     expect(body).toEqual(expect.objectContaining({
       from: 'Quotes <quotes@example.com>',
       to: ['alex@example.com'],
+      cc: ['noreply@avsquires.co.uk'],
       reply_to: 'sender@avsquires.co.uk',
       subject: 'Q-001 - Acme Ltd - 1 Road Lane - Concrete repairs',
     }));
@@ -290,6 +291,7 @@ describe('sendQuoteToCustomerEmail', () => {
 
     expect(body).toEqual(expect.objectContaining({
       to: ['alex@example.com'],
+      cc: ['noreply@avsquires.co.uk'],
       reply_to: 'sender@avsquires.co.uk',
       subject: 'PO needed for Q-001',
     }));
@@ -369,5 +371,12 @@ describe('createQuoteNotification', () => {
       },
     ]);
     expect(global.fetch).toHaveBeenCalledTimes(1);
+    const [, init] = vi.mocked(global.fetch).mock.calls[0];
+    const body = JSON.parse(String(init?.body));
+
+    expect(body).toEqual(expect.objectContaining({
+      to: ['recipient@example.com'],
+      cc: ['noreply@avsquires.co.uk'],
+    }));
   });
 });

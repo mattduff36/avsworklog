@@ -63,6 +63,15 @@ function normalizePayload(body: Record<string, unknown>) {
   };
 }
 
+async function getManagerAuthEmail(admin: ReturnType<typeof createAdminClient>, profileId: string | null) {
+  if (!profileId) return null;
+
+  const { data, error } = await admin.auth.admin.getUserById(profileId);
+  if (error) throw error;
+
+  return normalizeOptionalString(data.user?.email);
+}
+
 async function getManagerSeriesPayload(admin: ReturnType<typeof createAdminClient>, canManage: boolean) {
   const [managerOptions, quoteUsers, approversResult] = await Promise.all([
     listQuoteManagerOptions(),
@@ -99,8 +108,7 @@ async function applyManagerDefaultsToBlankOpenQuotes(
       .update({ manager_email: payload.manager_email, updated_by: actorUserId })
       .eq('is_latest_version', true)
       .eq('commercial_status', 'open')
-      .eq('requester_id', payload.profile_id)
-      .is('manager_email', null);
+      .eq('requester_id', payload.profile_id);
     if (error) throw error;
   }
 
@@ -185,15 +193,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Please correct the highlighted fields and try again.', field_errors: fieldErrors }, { status: 400 });
     }
 
+    const managerAuthEmail = await getManagerAuthEmail(admin, payload.profile_id);
+    if (!managerAuthEmail) {
+      return NextResponse.json({
+        error: 'The selected manager must have a valid login email before quote defaults can be saved.',
+        field_errors: {
+          manager_email: 'Manager email is taken from the selected user account.',
+        },
+      }, { status: 400 });
+    }
+    const savePayload = { ...payload, manager_email: managerAuthEmail };
+
     const { error } = await admin
       .from('quote_manager_series')
       .upsert({
-        ...payload,
-        profile_id: payload.profile_id as string,
+        ...savePayload,
+        profile_id: savePayload.profile_id as string,
       }, { onConflict: 'profile_id' });
 
     if (error) throw error;
-    await applyManagerDefaultsToBlankOpenQuotes(admin, payload, context.userId);
+    await applyManagerDefaultsToBlankOpenQuotes(admin, savePayload, context.userId);
 
     return NextResponse.json(await getManagerSeriesPayload(admin, true));
   } catch (error) {
