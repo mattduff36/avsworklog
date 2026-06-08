@@ -262,6 +262,11 @@ export async function POST(request: NextRequest) {
         if (leftTime !== rightTime) return leftTime - rightTime;
         return left.id.localeCompare(right.id);
       });
+    const extractCommentFromDescription = (description?: string | null): string => {
+      if (!description) return '';
+      const commentMatch = description.match(/(?:^|\n)Comment:\s*(.+?)(?:\n|$)/);
+      return commentMatch?.[1]?.trim() || '';
+    };
 
     let created = 0;
     let updated = 0;
@@ -293,6 +298,8 @@ export async function POST(request: NextRequest) {
       const commentText = comment ? `\nComment: ${comment}` : '';
       const title = `${vehicleReg} - ${item_description} (${dayRange})`;
       const description = `Van inspection defect found:\nItem ${item_number} - ${item_description} (${dayRange})${commentText}`;
+      const buildDescriptionWithComment = (descriptionComment: string) =>
+        `Van inspection defect found:\nItem ${item_number} - ${item_description} (${dayRange})${descriptionComment ? `\nComment: ${descriptionComment}` : ''}`;
 
       // CRITICAL CHECK: First check if there are ANY active tasks for this defect on this vehicle
       // (across ALL inspections, not just the current one)
@@ -300,11 +307,10 @@ export async function POST(request: NextRequest) {
 
       if (activeTasksForDefect && activeTasksForDefect.length > 0) {
         const keeperTask = sortTasksByCreatedAt(activeTasksForDefect)[0];
+        const originalComment = extractCommentFromDescription(keeperTask.description) || comment || '';
         const updates: ActionUpdate = {
           title,
-          description,
-          inspection_id: inspectionId,
-          inspection_item_id: primaryInspectionItemId,
+          description: buildDescriptionWithComment(originalComment),
           van_id: vehicleId,
           updated_at: new Date().toISOString(),
         };
@@ -347,11 +353,10 @@ export async function POST(request: NextRequest) {
         const activeTask = existing.find(e => e.status !== 'completed');
         
         if (activeTask) {
+          const originalComment = extractCommentFromDescription(activeTask.description) || comment || '';
           const updates: ActionUpdate = {
             title,
-            description,
-            inspection_id: inspectionId,
-            inspection_item_id: primaryInspectionItemId,
+            description: buildDescriptionWithComment(originalComment),
             van_id: vehicleId,
             updated_at: new Date().toISOString(),
           };

@@ -122,10 +122,11 @@ export function WorkshopTaskModal({
       : task.van_id
         ? 'van'
         : null;
-  const linkedInspectionHref = linkedInspectionType && task.inspection_id
-    ? getInspectionHref(linkedInspectionType, task.inspection_id)
+  const resolvedInspectionId = task.inspection_id;
+  const linkedInspectionHref = linkedInspectionType && resolvedInspectionId
+    ? getInspectionHref(linkedInspectionType, resolvedInspectionId)
     : null;
-  const linkedInspectionReference = getReferenceIdSuffix(task.inspection_id);
+  const linkedInspectionReference = getReferenceIdSuffix(resolvedInspectionId);
   const taskForTimeline = {
     ...task,
     created_at: task.created_at || task.logged_at || task.actioned_at || new Date(0).toISOString(),

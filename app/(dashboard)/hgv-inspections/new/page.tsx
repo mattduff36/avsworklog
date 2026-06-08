@@ -866,15 +866,9 @@ function NewHgvInspectionContent() {
       for (const item of lockedItems as Array<{ item_number: number; item_description?: string | null; status?: string; comment: string; actionId: string }>) {
         const itemNumber = resolveCurrentHgvChecklistItemNumber(item.item_description, item.item_number);
         const key = `${itemNumber}`;
-        const statusLabel =
-          item.status === 'pending' ? 'pending' :
-          item.status === 'on_hold' ? 'on hold' :
-          item.status === 'logged' ? 'logged' :
-          'in progress';
-        const lockComment = item.comment || `Defect ${statusLabel} with workshop`;
-        map.set(key, { comment: lockComment, actionId: item.actionId });
+        map.set(key, { comment: item.comment, actionId: item.actionId });
         initialStates[key] = 'attention';
-        initialComments[key] = lockComment;
+        initialComments[key] = item.comment || '';
       }
 
       const recentCompletedMap = new Map<string, RecentCompletedDefect>();
@@ -998,7 +992,11 @@ function NewHgvInspectionContent() {
     }
 
     const defectsWithoutComments = Object.entries(checkboxStates)
-      .filter(([itemKey, status]) => status === 'attention' && !comments[itemKey]?.trim());
+      .filter(([itemKey, status]) =>
+        status === 'attention' &&
+        !loggedDefects.has(itemKey) &&
+        !comments[itemKey]?.trim()
+      );
     if (defectsWithoutComments.length > 0) {
       return 'Please add comments for all failed items';
     }
@@ -1055,7 +1053,11 @@ function NewHgvInspectionContent() {
     }
 
     const firstMissingComment = Object.entries(checkboxStates)
-      .find(([itemKey, status]) => status === 'attention' && !comments[itemKey]?.trim());
+      .find(([itemKey, status]) =>
+        status === 'attention' &&
+        !loggedDefects.has(itemKey) &&
+        !comments[itemKey]?.trim()
+      );
     if (firstMissingComment) {
       const [itemKey] = firstMissingComment;
       scroll(document.querySelector(`[data-comment-input="${itemKey}"]`));
@@ -1664,8 +1666,8 @@ function NewHgvInspectionContent() {
                               value={comments[key] || ''}
                               onChange={(e) => handleCommentChange(itemNumber, e.target.value)}
                               placeholder={currentStatus === 'attention' ? 'Required for failed items' : 'Optional notes'}
-                              className={`bg-slate-900/50 border-slate-600 text-white ${currentStatus === 'attention' && !comments[key] ? 'border-red-500' : ''}`}
                               readOnly={isLocked}
+                              className={`bg-slate-900/50 border-slate-600 text-white ${currentStatus === 'attention' && !comments[key] && !isLocked ? 'border-red-500' : ''} ${isLocked ? 'cursor-not-allowed opacity-70' : ''}`}
                             />
                             {currentStatus === 'attention' && !isLocked && (() => {
                               const dayOfWeek = inspectionDate ? getDayOfWeek(new Date(inspectionDate + 'T00:00:00')) : 1;
@@ -1747,18 +1749,18 @@ function NewHgvInspectionContent() {
                       {(currentStatus === 'attention' || comments[key]) && (
                         <div className="space-y-2">
                           <Label className="text-foreground text-sm">
-                            {currentStatus === 'attention' ? (isLocked ? 'Manager Comment' : 'Comments (Required)') : 'Notes'}
+                            {currentStatus === 'attention' ? 'Comments (Required)' : 'Notes'}
                           </Label>
                           <Textarea
                             id={`hgv-comment-${itemNumber}`}
                             data-comment-input={key}
                             value={comments[key] || ''}
                             onChange={(e) => handleCommentChange(itemNumber, e.target.value)}
-                            placeholder={isLocked ? '' : 'Add details...'}
+                            placeholder="Add details..."
+                            readOnly={isLocked}
                             className={`min-h-[80px] bg-slate-900/50 border-slate-600 text-white placeholder:text-muted-foreground ${
                               currentStatus === 'attention' && !comments[key] && !isLocked ? 'border-red-500' : ''
                             } ${isLocked ? 'cursor-not-allowed opacity-70' : ''}`}
-                            readOnly={isLocked}
                           />
                         </div>
                       )}

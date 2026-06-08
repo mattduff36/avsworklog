@@ -1095,7 +1095,7 @@ function NewPlantInspectionContent() {
     const defectsWithoutComments: string[] = [];
     let firstDefectWithoutCommentKey: string | null = null;
     Object.entries(checkboxStates).forEach(([key, status]) => {
-      if (status === 'attention' && !comments[key]) {
+      if (status === 'attention' && !loggedDefects.has(key) && !comments[key]) {
         if (!firstDefectWithoutCommentKey) firstDefectWithoutCommentKey = key;
         const itemNumber = parseInt(key);
         const itemName = currentChecklist[itemNumber - 1] || `Item ${itemNumber}`;
