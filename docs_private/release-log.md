@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.5.2
+
+**GIT COMMIT MESSAGE**
+`fix(layout): update sidebar navigation styling, maintenance workflow, and 1 more areas`
+
+**WHAT CHANGED**
+Update sidebar navigation styling, maintenance workflow, and 1 more areas.
+
+**COMMITS IN THIS RELEASE**
+- `fix(layout): update sidebar navigation styling, maintenance workflow, and 1 more areas`
+
 ## 0626.5.1
 
 **GIT COMMIT MESSAGE**
