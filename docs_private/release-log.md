@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.4.0
+
+**GIT COMMIT MESSAGE**
+`feat(maintenance): update maintenance workflow, inspection workflows, and 1 more areas`
+
+**WHAT CHANGED**
+Update maintenance workflow, inspection workflows, and 1 more areas.
+
+**COMMITS IN THIS RELEASE**
+- `feat(maintenance): update maintenance workflow, inspection workflows, and 1 more areas`
+
 ## 0626.3.1
 
 **GIT COMMIT MESSAGE**
