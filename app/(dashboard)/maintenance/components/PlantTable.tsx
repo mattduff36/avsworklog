@@ -40,6 +40,7 @@ import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { cn } from '@/lib/utils/cn';
 import { useMaintenance } from '@/lib/hooks/useMaintenance';
 import { useLoadMorePagination } from '@/lib/hooks/useLoadMorePagination';
+import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 import type { MaintenanceItem } from '@/types/maintenance';
 
 type PlantAsset = {
@@ -160,10 +161,17 @@ export function PlantTable({
         .order('updated_at', { ascending: false });
 
       if (retiredError) {
-        console.error('Error fetching retired plant assets:', retiredError);
-        toast.error('Unable to load retired plant', {
-          description: 'Retired plant data may be incomplete. Please refresh.',
-        });
+        const status = getErrorStatus(retiredError);
+        if (isNetworkFetchError(retiredError)) {
+          console.warn('Retired plant temporarily unavailable:', retiredError);
+        } else if (!isAuthErrorStatus(status)) {
+          console.error('Error fetching retired plant assets:', retiredError);
+        }
+        if (!isAuthErrorStatus(status)) {
+          toast.error('Unable to load retired plant', {
+            description: 'Retired plant data may be incomplete. Please refresh.',
+          });
+        }
       } else {
         setRetiredPlantAssets((retiredData || []).map((asset) => ({
           ...asset,
@@ -172,7 +180,11 @@ export function PlantTable({
         setRetiredPlantCount(retiredData?.length || 0);
       }
     } catch (error) {
-      console.error('Error fetching plant assets:', error);
+      if (isNetworkFetchError(error)) {
+        console.warn('Plant assets temporarily unavailable:', error);
+      } else if (!isAuthErrorStatus(getErrorStatus(error))) {
+        console.error('Error fetching plant assets:', error);
+      }
     } finally {
       setLoading(false);
     }

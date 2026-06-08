@@ -39,7 +39,7 @@ import { getReadingDigitGrowthWarning } from '@/lib/utils/readingDigitGrowthWarn
 import { Database } from '@/types/database';
 import { Employee } from '@/types/common';
 import { toast } from 'sonner';
-import { getInspectionErrorMessage, isDuplicateInspectionError } from '@/lib/utils/inspection-error-handling';
+import { getInspectionErrorMessage, isDuplicateInspectionError, isMissingDraftError } from '@/lib/utils/inspection-error-handling';
 import { getInspectionVisibilityFlags } from '@/lib/utils/inspection-access';
 import { buildInspectionDefectSignature } from '@/lib/utils/inspectionDefectSignature';
 import { type PreviousDefectSummary } from '@/lib/utils/inspectionPreviousDefects';
@@ -419,6 +419,11 @@ function NewInspectionContent() {
 
         if (isTransientNetworkError(err)) {
           console.warn('Silent draft save skipped due transient network error');
+        } else if (isMissingDraftError(err)) {
+          console.warn('Silent draft save skipped because the draft no longer exists', {
+            errorContextId,
+            existingInspectionId: existingInspectionId || null,
+          });
         } else {
           if (!isAuthErrorStatus(getErrorStatus(err)) && !isClientSessionPausedError(err)) {
             console.error('Silent draft save failed:', err, { errorContextId });
@@ -870,7 +875,11 @@ function NewInspectionContent() {
       return true;
     } catch (err) {
       const message = getInspectionErrorMessage(err, 'Could not merge with existing draft');
-      console.error('Failed to merge into existing van draft:', err, { errorContextId });
+      if (isNetworkFetchError(err) || isMissingDraftError(err)) {
+        console.warn('Van draft merge temporarily unavailable:', err, { errorContextId });
+      } else if (!isAuthErrorStatus(getErrorStatus(err))) {
+        console.error('Failed to merge into existing van draft:', err, { errorContextId });
+      }
       if (showToast) {
         toast.error(message, { id: errorContextId });
       }
@@ -1954,7 +1963,7 @@ function NewInspectionContent() {
             draftInspectionId: inspection.id,
           });
         } catch (reminderError) {
-          console.error('Error completing reminder after van daily check submission:', reminderError);
+          console.warn('Reminder completion skipped after van daily check submission:', reminderError);
         }
       }
 

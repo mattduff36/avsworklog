@@ -43,7 +43,7 @@ import { useInspectionPhotos } from '@/lib/hooks/useInspectionPhotos';
 import { getInspectionPhotoKey } from '@/lib/inspection-photos';
 import { getRecentVehicleIds, recordRecentVehicleId, splitVehiclesByRecent } from '@/lib/utils/recentVehicles';
 import { getReadingDigitGrowthWarning } from '@/lib/utils/readingDigitGrowthWarning';
-import { getInspectionErrorMessage, isDuplicateInspectionError } from '@/lib/utils/inspection-error-handling';
+import { getInspectionErrorMessage, isDuplicateInspectionError, isMissingDraftError } from '@/lib/utils/inspection-error-handling';
 import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 import { completeInspectionReminder } from '@/lib/client/complete-inspection-reminder';
 import { WORKSHOP_TASK_COMMENT_MIN_LENGTH } from '@/lib/workshop-tasks/validation';
@@ -398,7 +398,9 @@ function NewPlantInspectionContent() {
       return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not merge with existing draft';
-      if (!isAuthErrorStatus(getErrorStatus(err))) {
+      if (isNetworkFetchError(err) || isMissingDraftError(err)) {
+        console.warn('Plant draft merge temporarily unavailable:', err, { errorContextId });
+      } else if (!isAuthErrorStatus(getErrorStatus(err))) {
         console.error('Failed to merge into existing plant draft:', err, { errorContextId });
       }
       if (showToast && !isAuthErrorStatus(getErrorStatus(err))) {
@@ -580,7 +582,16 @@ function NewPlantInspectionContent() {
         return draft.id;
       } catch (err) {
         const errorContextId = 'plant-inspections-new-silent-draft-save-error';
-        console.error('Silent draft save failed:', err, { errorContextId });
+        if (isNetworkFetchError(err)) {
+          console.warn('Silent plant draft save skipped due transient network error', { errorContextId });
+        } else if (isMissingDraftError(err)) {
+          console.warn('Silent plant draft save skipped because the draft no longer exists', {
+            errorContextId,
+            existingInspectionId: existingInspectionId || null,
+          });
+        } else if (!isAuthErrorStatus(getErrorStatus(err))) {
+          console.error('Silent draft save failed:', err, { errorContextId });
+        }
         if (!silent) {
           toast.error('Could not auto-save draft. Please try again.', { id: errorContextId });
         }
@@ -1446,7 +1457,7 @@ function NewPlantInspectionContent() {
             assignedTo: selectedEmployeeId,
           });
         } catch (reminderError) {
-          console.error('Error completing reminder after plant daily check submission:', reminderError);
+          console.warn('Reminder completion skipped after plant daily check submission:', reminderError);
         }
       }
 
@@ -1478,12 +1489,21 @@ function NewPlantInspectionContent() {
         return;
       }
 
-      console.error('Error saving inspection:', err, {
-        errorContextId,
-        plantId: selectedPlantId,
-        inspectionDate,
-        existingInspectionId: existingInspectionId || null,
-      });
+      if (isNetworkFetchError(err)) {
+        console.warn('Inspection save failed due transient network error', {
+          errorContextId,
+          plantId: selectedPlantId,
+          inspectionDate,
+          existingInspectionId: existingInspectionId || null,
+        });
+      } else {
+        console.error('Error saving inspection:', err, {
+          errorContextId,
+          plantId: selectedPlantId,
+          inspectionDate,
+          existingInspectionId: existingInspectionId || null,
+        });
+      }
 
       toast.error('Failed to save inspection', {
         id: errorContextId,

@@ -1246,7 +1246,7 @@ function NewHgvInspectionContent() {
             assignedTo: selectedEmployeeId,
           });
         } catch (reminderError) {
-          console.error('Error completing reminder after HGV daily check submission:', reminderError);
+          console.warn('Reminder completion skipped after HGV daily check submission:', reminderError);
         }
 
         toast.success('HGV inspection submitted successfully');
