@@ -66,13 +66,14 @@ describe('/api/quotes/settings/manager-series', () => {
   it('saves manager defaults and returns refreshed settings', async () => {
     const { POST } = await import('@/app/api/quotes/settings/manager-series/route');
     const upsert = vi.fn().mockResolvedValue({ error: null });
-    const quoteUpdate = vi.fn(() => ({
-      eq: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          eq: vi.fn().mockResolvedValue({ error: null }),
-        })),
-      })),
-    }));
+    const quoteUpdate = vi.fn(() => {
+      const query = {
+        eq: vi.fn(() => query),
+        is: vi.fn().mockResolvedValue({ error: null }),
+        then: vi.fn((resolve: (value: { error: null }) => void) => resolve({ error: null })),
+      };
+      return query;
+    });
     const admin = {
       auth: {
         admin: {

@@ -48,7 +48,7 @@ interface SidebarNavProps {
   onToggle: () => void;
 }
 
-const HOVER_EXPAND_DELAY_MS = 1000;
+const HOVER_EXPAND_DELAY_MS = 500;
 
 export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   const pathname = usePathname();

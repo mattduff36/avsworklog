@@ -217,6 +217,34 @@ export function WorkshopTasksOverviewTab({
     );
   };
 
+  const getSourceBadgeClass = (task: Action) => {
+    if (task.action_type !== 'inspection_defect') {
+      return 'bg-transparent text-workshop border-workshop';
+    }
+
+    if (task.hgv_id) {
+      return 'bg-transparent text-hgv-inspection border-hgv-inspection';
+    }
+
+    if (task.plant_id) {
+      return 'bg-transparent text-plant-inspection border-plant-inspection';
+    }
+
+    return 'bg-transparent text-inspection border-inspection';
+  };
+
+  const renderSourceBadge = (task: Action, label = getSourceLabel(task)) => (
+    <Badge variant="outline" className={`text-xs font-semibold shadow-sm ${getSourceBadgeClass(task)}`}>
+      {label}
+    </Badge>
+  );
+
+  const renderInspectionDescription = (task: Action) => (
+    task.action_type === 'inspection_defect' && task.description ? (
+      <p className="mb-2 whitespace-pre-line text-sm text-muted-foreground">{task.description}</p>
+    ) : null
+  );
+
   const completedRows = useMemo<CompletedTaskRow[]>(
     () =>
       completedTasks.map((task) => {
@@ -534,9 +562,7 @@ export function WorkshopTasksOverviewTab({
                                 <h3 className="font-semibold text-lg text-foreground">
                                   {getVehicleReg(task)}
                                 </h3>
-                                <Badge variant="outline" className="text-xs">
-                                  {getSourceLabel(task)}
-                                </Badge>
+                                {renderSourceBadge(task)}
                                 {taskAttachmentCounts.get(task.id) && taskAttachmentCounts.get(task.id)! > 0 && (
                                   <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30 text-xs">
                                     <Paperclip className="h-3 w-3 mr-1" />
@@ -557,9 +583,7 @@ export function WorkshopTasksOverviewTab({
                                   </Badge>
                                 )}
                               </div>
-                              {task.action_type === 'inspection_defect' && task.description && (
-                                <p className="text-sm text-muted-foreground mb-2">{task.description}</p>
-                              )}
+                              {renderInspectionDescription(task)}
                               {task.workshop_comments && (
                                 <p className="text-sm text-muted-foreground mb-2">
                                   <strong>Notes:</strong> {task.workshop_comments}
@@ -591,6 +615,18 @@ export function WorkshopTasksOverviewTab({
                               >
                                 <Clock className="h-3.5 w-3.5 mr-1.5" />
                                 In Progress
+                              </Button>
+                              <Button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onMarkOnHold(task);
+                                }}
+                                disabled={isUpdating}
+                                size="sm"
+                                className={`${taskActionButtonClass} bg-purple-600/80 hover:bg-purple-600 text-white border-0`}
+                              >
+                                <Pause className="h-3.5 w-3.5 mr-1.5" />
+                                On Hold
                               </Button>
                               <Button
                                 onClick={(e) => {
@@ -679,7 +715,7 @@ export function WorkshopTasksOverviewTab({
                               <div className="flex items-center gap-2 mb-2">
                                 {getStatusIcon(task.status ?? 'pending')}
                                 <h3 className="font-semibold text-lg text-foreground">{getVehicleReg(task)}</h3>
-                                <Badge variant="outline" className="text-xs">{getSourceLabel(task)}</Badge>
+                                {renderSourceBadge(task)}
                                 {taskAttachmentCounts.get(task.id) && taskAttachmentCounts.get(task.id)! > 0 && (
                                   <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30 text-xs">
                                     <Paperclip className="h-3 w-3 mr-1" />
@@ -700,9 +736,7 @@ export function WorkshopTasksOverviewTab({
                                   </Badge>
                                 )}
                               </div>
-                              {task.action_type === 'inspection_defect' && task.description && (
-                                <p className="text-sm text-muted-foreground mb-2">{task.description}</p>
-                              )}
+                              {renderInspectionDescription(task)}
                               {task.logged_comment && (
                                 <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-2">
                                   <p className="text-sm text-blue-300">
@@ -800,7 +834,7 @@ export function WorkshopTasksOverviewTab({
                               <div className="flex items-center gap-2 mb-2">
                                 {getStatusIcon(task.status ?? 'pending')}
                                 <h3 className="font-semibold text-lg text-foreground">{getVehicleReg(task)}</h3>
-                                <Badge variant="outline" className="text-xs">{getSourceLabel(task)}</Badge>
+                                {renderSourceBadge(task)}
                                 {taskAttachmentCounts.get(task.id) && taskAttachmentCounts.get(task.id)! > 0 && (
                                   <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30 text-xs">
                                     <Paperclip className="h-3 w-3 mr-1" />
@@ -821,9 +855,7 @@ export function WorkshopTasksOverviewTab({
                                   </Badge>
                                 )}
                               </div>
-                              {task.action_type === 'inspection_defect' && task.description && (
-                                <p className="text-sm text-muted-foreground mb-2">{task.description}</p>
-                              )}
+                              {renderInspectionDescription(task)}
                               {task.logged_comment && (
                                 <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3 mb-2">
                                   <p className="text-sm text-purple-200 font-medium">Progress Note: {task.logged_comment}</p>
@@ -1079,9 +1111,7 @@ export function WorkshopTasksOverviewTab({
                                 </div>
                               </TableCell>
                               <TableCell>
-                                <Badge variant="outline" className="text-xs">
-                                  {row.source}
-                                </Badge>
+                                {renderSourceBadge(row.task, row.source)}
                               </TableCell>
                               <TableCell className="text-sm text-muted-foreground">
                                 {row.subcategory ? (
@@ -1103,7 +1133,7 @@ export function WorkshopTasksOverviewTab({
                                 <div className="space-y-1">
                                   <p className="text-sm font-medium text-foreground">{row.task.title}</p>
                                   {row.summary && (
-                                    <p className="line-clamp-2 text-sm text-muted-foreground">{row.summary}</p>
+                                    <p className="line-clamp-2 whitespace-pre-line text-sm text-muted-foreground">{row.summary}</p>
                                   )}
                                 </div>
                               </TableCell>
@@ -1164,9 +1194,7 @@ export function WorkshopTasksOverviewTab({
                                     <div className="flex items-center gap-2 mb-2">
                                       <CheckCircle2 className="h-5 w-5 text-green-400" />
                                       <h3 className="font-semibold text-lg text-foreground">{assetLabel}</h3>
-                                      <Badge variant="outline" className="text-xs">
-                                        {sourceLabel}
-                                      </Badge>
+                                      {renderSourceBadge(task, sourceLabel)}
                                       {taskAttachmentCounts.get(task.id) && taskAttachmentCounts.get(task.id)! > 0 && (
                                         <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30 text-xs">
                                           <Paperclip className="h-3 w-3 mr-1" />
@@ -1192,9 +1220,7 @@ export function WorkshopTasksOverviewTab({
                                         </Badge>
                                       )}
                                     </div>
-                                    {task.action_type === 'inspection_defect' && task.description && (
-                                      <p className="text-sm text-muted-foreground mb-2">{task.description}</p>
-                                    )}
+                                    {renderInspectionDescription(task)}
                                     <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                                       {task.actioned_at && (
                                         <span className="text-green-400">

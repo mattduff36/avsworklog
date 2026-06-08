@@ -44,6 +44,11 @@ export function MaintenanceHistoryDialog({
   const history = historyData?.history || [];
   const workshopTasks = historyData?.workshopTasks || [];
   const vesData = historyData?.vesData || null;
+  const defectBadgeClass = assetType === 'hgv'
+    ? 'text-hgv-inspection border-hgv-inspection'
+    : assetType === 'plant'
+      ? 'text-plant-inspection border-plant-inspection'
+      : 'text-inspection border-inspection';
   
   // Combine maintenance history and workshop tasks, sorted by date
   type CombinedItem = 
@@ -186,8 +191,13 @@ export function MaintenanceHistoryDialog({
           
           <div className="space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
-              <Badge variant="outline" className="text-xs bg-[#8B4513]/20 border-[#8B4513]/40 text-[#D2691E]">
-                {task.action_type === 'inspection_defect' ? 'Inspection Defect Fix' : 'Workshop Task'}
+              <Badge
+                variant="outline"
+                className={`bg-transparent text-xs font-semibold ${
+                  task.action_type === 'inspection_defect' ? defectBadgeClass : 'text-workshop border-workshop'
+                }`}
+              >
+                {task.action_type === 'inspection_defect' ? 'Daily Check Defect Fix' : 'Workshop Task'}
               </Badge>
               {task.action_type === 'workshop_vehicle_task' && task.workshop_task_categories && (
                 <Badge variant="outline" className="text-xs">

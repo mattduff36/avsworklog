@@ -155,7 +155,7 @@ export default function WorkshopTasksPage() {
   const getAssetIdLabel = (asset?: { reg_number?: string | null; plant_id?: string | null }) => !asset ? 'Unknown' : asset.plant_id || asset.reg_number || 'Unknown';
   const getAssetDisplay = (asset?: { reg_number?: string | null; plant_id?: string | null; nickname?: string | null }) => !asset ? 'Unknown' : asset.nickname ? `${getAssetIdLabel(asset)} (${asset.nickname})` : getAssetIdLabel(asset);
   const getVehicleReg = (task: Action) => task.vans ? getAssetDisplay(task.vans) : task.hgvs ? getAssetDisplay(task.hgvs) : task.plant ? getAssetDisplay(task.plant) : 'Unknown';
-  const getSourceLabel = (task: Action) => task.action_type === 'inspection_defect' ? 'Inspection Defect Fix' : 'Workshop Task';
+  const getSourceLabel = (task: Action) => task.action_type === 'inspection_defect' ? 'Daily Check Defect Fix' : 'Workshop Task';
   const isHighPriorityHgvDefectTask = (task?: Action) => Boolean(task && task.action_type === 'inspection_defect' && task.hgv_id);
   const getStatusIcon = (status: string, task?: Action) =>
     status === 'completed'
