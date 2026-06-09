@@ -36,6 +36,7 @@ const originalResendApiKey = process.env.RESEND_API_KEY;
 const originalResendFromEmail = process.env.RESEND_FROM_EMAIL;
 const originalResendApiKey2 = process.env.RESEND_API_KEY_2;
 const originalResendFromEmail2 = process.env.RESEND_FROM_EMAIL_2;
+const VAT_NOTICE = 'All prices are subject to the current V.A.T. rates applicable at the time of invoice.';
 
 function buildQuoteBundle(overrides: Partial<QuoteBundle['quote']> = {}): QuoteBundle {
   return {
@@ -161,6 +162,7 @@ describe('sendQuoteToCustomerEmail', () => {
       reply_to: 'sender@avsquires.co.uk',
       subject: 'Q-001 - Acme Ltd - 1 Road Lane - Concrete repairs',
     }));
+    expect(String(body.html)).toContain(VAT_NOTICE);
     expect(body.attachments).toEqual([
       expect.objectContaining({
         filename: 'Q-001 - Acme Ltd - 1 Road Lane - Concrete repairs.pdf',
@@ -239,6 +241,7 @@ describe('sendQuoteToCustomerEmail', () => {
       subject: 'Q-001 - Acme Ltd - 1 Road Lane - Concrete repairs',
     }));
     expect(String(body.html)).toContain('Please can I have a purchase order for the attached quotation.');
+    expect(String(body.html)).toContain(VAT_NOTICE);
     expect(String(body.html)).toContain('Kind Regards<br>Matt Duffill');
     expect(body.attachments).toEqual([
       expect.objectContaining({

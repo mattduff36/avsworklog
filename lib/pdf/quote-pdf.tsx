@@ -7,6 +7,7 @@ import {
   parseQuoteRichText,
   type QuoteRichTextInline,
 } from '@/lib/quotes/quote-rich-text';
+import { QUOTE_VAT_RATE_NOTICE } from '@/lib/quotes/quote-vat-notice';
 
 const BRAND_YELLOW = '#f2cc0c';
 const BRAND_YELLOW_LIGHT = '#fff6cc';
@@ -813,7 +814,7 @@ export function QuotePDF({
 
         <View style={styles.notesPanel}>
           <PdfRichText
-            value={customFooterText || `Quotation valid for ${validityDays} days.`}
+            value={customFooterText || `Quotation valid for ${validityDays} days.\n${QUOTE_VAT_RATE_NOTICE}`}
             textStyle={styles.notesPrimary}
             headingStyle={styles.notesPrimary}
           />

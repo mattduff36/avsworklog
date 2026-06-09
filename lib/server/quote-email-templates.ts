@@ -1,4 +1,5 @@
 import type { createAdminClient } from '@/lib/supabase/admin';
+import { QUOTE_VAT_RATE_NOTICE } from '@/lib/quotes/quote-vat-notice';
 import type { Database } from '@/types/database';
 
 export const QUOTE_EMAIL_TEMPLATE_KEYS = [
@@ -67,6 +68,7 @@ export const QUOTE_EMAIL_TEMPLATE_DEFINITIONS: QuoteEmailTemplateDefinition[] = 
       '',
       'Please find attached our quotation for {subject_line}.',
       '{pricing_note}',
+      QUOTE_VAT_RATE_NOTICE,
       'If you have any queries, please reply to this email and we will be happy to help.',
       '',
       'Kind regards,',
@@ -91,6 +93,7 @@ export const QUOTE_EMAIL_TEMPLATE_DEFINITIONS: QuoteEmailTemplateDefinition[] = 
       'Hello {contact_name},',
       '',
       'Please can I have a purchase order for the attached quotation.',
+      QUOTE_VAT_RATE_NOTICE,
       '',
       'Kind Regards',
       '{sender_name}',
