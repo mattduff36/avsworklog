@@ -14,7 +14,6 @@ function isTransientNetworkError(err: unknown): boolean {
 interface UseWorkshopTasksFetchersParams {
   supabase: SupabaseClient;
   userId: string | null | undefined;
-  statusFilter: string;
   vehicleFilter: string;
   setLoading: (loading: boolean) => void;
   setTasks: (tasks: Action[]) => void;
@@ -34,7 +33,6 @@ interface UseWorkshopTasksFetchersParams {
 export function useWorkshopTasksFetchers({
   supabase,
   userId,
-  statusFilter,
   vehicleFilter,
   setLoading,
   setTasks,
@@ -95,10 +93,6 @@ export function useWorkshopTasksFetchers({
         `)
         .in('action_type', ['inspection_defect', 'workshop_vehicle_task'])
         .order('created_at', { ascending: false });
-
-      if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter);
-      }
 
       if (vehicleFilter !== 'all') {
         query = query.or(`van_id.eq.${vehicleFilter},plant_id.eq.${vehicleFilter},hgv_id.eq.${vehicleFilter}`);
@@ -278,7 +272,7 @@ export function useWorkshopTasksFetchers({
     } finally {
       setLoading(false);
     }
-  }, [setLoading, setTaskAttachmentCounts, setTasks, statusFilter, supabase, vehicleFilter]);
+  }, [setLoading, setTaskAttachmentCounts, setTasks, supabase, vehicleFilter]);
 
   const fetchCategories = useCallback(async () => {
     if (!supabase) return;
@@ -506,7 +500,6 @@ export function useWorkshopTasksFetchers({
     setRecentVehicleIds(getRecentVehicleIds(userId));
   }, [
     userId,
-    statusFilter,
     vehicleFilter,
     fetchTasks,
     fetchCategories,

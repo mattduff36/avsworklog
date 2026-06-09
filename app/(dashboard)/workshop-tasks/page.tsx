@@ -22,7 +22,7 @@ import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { useWorkshopTasksFetchers } from './hooks/useWorkshopTasksFetchers';
 import { useWorkshopTaskLifecycleActions } from './hooks/useWorkshopTaskLifecycleActions';
 import { useWorkshopTaskCrudActions } from './hooks/useWorkshopTaskCrudActions';
-import type { Action, Category, Subcategory, Vehicle } from './types';
+import type { Action, Category, Subcategory, Vehicle, WorkshopTaskTileFilter } from './types';
 import { useTaskInspectionPhotos } from '@/lib/hooks/useTaskInspectionPhotos';
 import { useWorkshopActiveWakeLock } from '@/lib/hooks/useWorkshopActiveWakeLock';
 
@@ -88,12 +88,12 @@ export default function WorkshopTasksPage() {
   const [hgvSubcategories, setHgvSubcategories] = useState<Subcategory[]>([]);
   const [categoryTaxonomyMode, setCategoryTaxonomyMode] = useState<'van' | 'plant' | 'hgv'>('van');
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState<WorkshopTaskTileFilter>('all');
   const [vehicleFilter, setVehicleFilter] = useState('all');
   const [taskAttachmentCounts, setTaskAttachmentCounts] = useState<Map<string, number>>(new Map());
   const lastAssetTabRef = useRef<'all' | 'van' | 'plant' | 'hgv'>('all');
-  const [showPending, setShowPending] = useState(true);
-  const [showInProgress, setShowInProgress] = useState(true);
+  const [showPending, setShowPending] = useState(false);
+  const [showInProgress, setShowInProgress] = useState(false);
   const [showOnHold, setShowOnHold] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
 
@@ -194,7 +194,7 @@ export default function WorkshopTasksPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, showSettings]);
 
-  const fetcher = useWorkshopTasksFetchers({ supabase, userId: user?.id, statusFilter, vehicleFilter, setLoading, setTasks, setVehicles, setRecentVehicleIds, setTaskAttachmentCounts, setCategories, setPlantCategories, setHgvCategories, setSubcategories, setPlantSubcategories, setHgvSubcategories, setCurrentMeterReading, setMeterReadingType });
+  const fetcher = useWorkshopTasksFetchers({ supabase, userId: user?.id, vehicleFilter, setLoading, setTasks, setVehicles, setRecentVehicleIds, setTaskAttachmentCounts, setCategories, setPlantCategories, setHgvCategories, setSubcategories, setPlantSubcategories, setHgvSubcategories, setCurrentMeterReading, setMeterReadingType });
   const filteredSubcategories = selectedCategoryId ? (assetTab === 'plant' ? plantSubcategories : assetTab === 'hgv' ? hgvSubcategories : subcategories).filter(sub => sub.category_id === selectedCategoryId) : [];
   const activeCategories = assetTab === 'plant' ? plantCategories : assetTab === 'hgv' ? hgvCategories : categories;
   const categoryHasSubcategories = filteredSubcategories.length > 0;
@@ -204,6 +204,14 @@ export default function WorkshopTasksPage() {
   const inProgressTasks = tabFilteredTasks.filter(t => t.status === 'logged');
   const onHoldTasks = tabFilteredTasks.filter(t => t.status === 'on_hold');
   const completedTasks = tabFilteredTasks.filter(t => t.status === 'completed').sort((a, b) => (b.actioned_at ? new Date(b.actioned_at).getTime() : 0) - (a.actioned_at ? new Date(a.actioned_at).getTime() : 0));
+  const visiblePendingTasks = statusFilter === 'all' || statusFilter === 'pending'
+    ? pendingTasks
+    : statusFilter === 'high_priority'
+      ? highPriorityPendingTasks
+      : [];
+  const visibleInProgressTasks = statusFilter === 'all' || statusFilter === 'logged' ? inProgressTasks : [];
+  const visibleOnHoldTasks = statusFilter === 'all' || statusFilter === 'on_hold' ? onHoldTasks : [];
+  const visibleCompletedTasks = statusFilter === 'all' || statusFilter === 'completed' ? completedTasks : [];
   const { photosByTask: taskInspectionPhotos } = useTaskInspectionPhotos(
     tasks.map((task) => task.id),
     { enabled: tasks.length > 0 }
@@ -220,12 +228,20 @@ export default function WorkshopTasksPage() {
     }
   }
 
+  function handleStatusFilterChange(nextFilter: WorkshopTaskTileFilter) {
+    setStatusFilter(nextFilter);
+    setShowPending(nextFilter === 'pending' || nextFilter === 'high_priority');
+    setShowInProgress(nextFilter === 'logged');
+    setShowOnHold(nextFilter === 'on_hold');
+    setShowCompleted(nextFilter === 'completed');
+  }
+
   function handleAssetTabChange(nextTab: 'all' | 'van' | 'plant' | 'hgv') {
     const prev = assetTab;
     router.replace(`/workshop-tasks?tab=${nextTab}`, { scroll: false });
     if (prev !== nextTab) {
       setVehicleFilter('all');
-      setStatusFilter('all');
+      handleStatusFilterChange('all');
     }
   }
 
@@ -340,17 +356,22 @@ export default function WorkshopTasksPage() {
           assetTab={assetTab}
           onAssetTabChange={(newTab) => handleAssetTabChange(newTab as 'all' | 'van' | 'plant' | 'hgv')}
           statusFilter={statusFilter}
-          onStatusFilterChange={setStatusFilter}
+          onStatusFilterChange={handleStatusFilterChange}
           vehicleFilter={vehicleFilter}
           onVehicleFilterChange={setVehicleFilter}
           vehicles={vehicles}
           loading={loading}
           tabFilteredTasks={tabFilteredTasks}
-          pendingTasks={pendingTasks}
+          taskCount={tabFilteredTasks.length}
+          pendingTaskCount={pendingTasks.length}
           highPriorityPendingCount={highPriorityPendingTasks.length}
-          inProgressTasks={inProgressTasks}
-          onHoldTasks={onHoldTasks}
-          completedTasks={completedTasks}
+          inProgressTaskCount={inProgressTasks.length}
+          onHoldTaskCount={onHoldTasks.length}
+          completedTaskCount={completedTasks.length}
+          pendingTasks={visiblePendingTasks}
+          inProgressTasks={visibleInProgressTasks}
+          onHoldTasks={visibleOnHoldTasks}
+          completedTasks={visibleCompletedTasks}
           showPending={showPending}
           onShowPendingChange={setShowPending}
           showInProgress={showInProgress}
