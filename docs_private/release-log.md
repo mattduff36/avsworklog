@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.5.3
+
+**GIT COMMIT MESSAGE**
+`chore(db): update database migrations and automation scripts`
+
+**WHAT CHANGED**
+Update database migrations and automation scripts.
+
+**COMMITS IN THIS RELEASE**
+- `chore(db): update database migrations and automation scripts`
+
 ## 0626.5.2
 
 **GIT COMMIT MESSAGE**
