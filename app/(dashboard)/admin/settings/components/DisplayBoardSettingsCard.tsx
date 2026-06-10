@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, Monitor, RefreshCw, Search, ShieldCheck, Trash2 } from 'lucide-react';
+import { AlertTriangle, ExternalLink, Monitor, RefreshCw, Search, ShieldCheck, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -247,6 +247,21 @@ export function DisplayBoardSettingsCard() {
               </p>
             </div>
             <div className="flex w-full flex-wrap gap-2 md:w-auto md:justify-end">
+              <Button
+                asChild
+                variant="outline"
+                className="w-full border-workshop/45 bg-workshop/10 text-workshop-light hover:bg-workshop/20 hover:text-white md:w-auto"
+              >
+                <a
+                  href="/displayboard-workshop"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Launch the Workshop Display Board in a new tab"
+                >
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  Launch Workshop Display Board
+                </a>
+              </Button>
               {activePairing ? (
                 <Button
                   type="button"
