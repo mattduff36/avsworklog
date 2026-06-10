@@ -15,6 +15,7 @@ import {
   writeAppWidescreenPreference,
 } from '@/lib/config/layout-preferences';
 import { TimesheetTypeExceptionsCard } from './components/TimesheetTypeExceptionsCard';
+import { DisplayBoardSettingsCard } from './components/DisplayBoardSettingsCard';
 
 export default function AdminSettingsPage() {
   const router = useRouter();
@@ -105,6 +106,7 @@ export default function AdminSettingsPage() {
               </div>
             </CardContent>
           </Card>
+          <DisplayBoardSettingsCard />
         </TabsContent>
 
         <TabsContent value="timesheets" className="space-y-6">

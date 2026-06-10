@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef } from 'react';
-import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
+import { createClient as createSupabaseClient, RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 
 type RealtimeCallback<T extends Record<string, unknown> = Record<string, unknown>> = (payload: RealtimePostgresChangesPayload<T>) => void;
@@ -75,5 +75,55 @@ export function usePlantInspectionRealtime(callback: RealtimeCallback) {
 
 export function useAbsenceRealtime(callback: RealtimeCallback, enabled = true) {
   useRealtimeSubscription('absences', '*', callback, undefined, enabled);
+}
+
+export function useWorkshopTaskRealtime(callback: RealtimeCallback, enabled = true) {
+  useRealtimeSubscription('actions', '*', callback, undefined, enabled);
+}
+
+export function usePublicRealtimeSubscription(
+  table: string,
+  callback: RealtimeCallback,
+  enabled = true
+) {
+  const callbackRef = useRef(callback);
+
+  useEffect(() => {
+    callbackRef.current = callback;
+  }, [callback]);
+
+  useEffect(() => {
+    if (!enabled || typeof window === 'undefined') return;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseAnonKey) return;
+
+    const client = createSupabaseClient(supabaseUrl, supabaseAnonKey);
+    const channel = client
+      .channel(`public_${table}_changes`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table,
+        },
+        (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
+          callbackRef.current(payload);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void client.removeChannel(channel);
+    };
+  }, [enabled, table]);
+}
+
+export function useWorkshopDisplayBoardRealtime(callback: RealtimeCallback, enabled = true) {
+  usePublicRealtimeSubscription('actions', callback, enabled);
+  usePublicRealtimeSubscription('vehicle_maintenance', callback, enabled);
+  usePublicRealtimeSubscription('asset_maintenance_category_values', callback, enabled);
+  usePublicRealtimeSubscription('display_board_devices', callback, enabled);
 }
 

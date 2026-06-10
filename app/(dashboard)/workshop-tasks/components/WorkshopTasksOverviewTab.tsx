@@ -521,7 +521,7 @@ export function WorkshopTasksOverviewTab({
           label: 'All Tasks',
           count: taskCount,
           countClassName: 'text-workshop',
-          activeClassName: 'border-workshop bg-workshop/15 ring-1 ring-workshop/40',
+          activeClassName: 'border-workshop bg-[hsl(var(--workshop-primary)/0.28)] hover:bg-[hsl(var(--workshop-primary)/0.34)] ring-1 ring-[hsl(var(--workshop-primary)/0.45)]',
           ariaLabel: 'Show all workshop tasks',
         })}
         {hasHighPriorityPending && (

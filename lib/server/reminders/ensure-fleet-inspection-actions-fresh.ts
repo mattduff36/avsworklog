@@ -16,11 +16,28 @@ export interface FleetInspectionFreshnessResult {
   summary: FleetInspectionGenerationSummary | null;
 }
 
+let fleetInspectionRefreshInFlight: Promise<FleetInspectionFreshnessResult> | null = null;
+
 function isValidDate(value: Date): boolean {
   return Number.isFinite(value.getTime());
 }
 
 export async function ensureFleetInspectionReminderActionsFresh(params: {
+  staleAfterMs: number;
+  now?: Date;
+}): Promise<FleetInspectionFreshnessResult> {
+  if (fleetInspectionRefreshInFlight) {
+    return fleetInspectionRefreshInFlight;
+  }
+
+  fleetInspectionRefreshInFlight = ensureFleetInspectionReminderActionsFreshInternal(params).finally(() => {
+    fleetInspectionRefreshInFlight = null;
+  });
+
+  return fleetInspectionRefreshInFlight;
+}
+
+async function ensureFleetInspectionReminderActionsFreshInternal(params: {
   staleAfterMs: number;
   now?: Date;
 }): Promise<FleetInspectionFreshnessResult> {
