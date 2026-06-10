@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.6.0
+
+**GIT COMMIT MESSAGE**
+`feat(inspections): update inspection workflows, fleet workflow, and 3 more areas`
+
+**WHAT CHANGED**
+Update inspection workflows, fleet workflow, and 3 more areas.
+
+**COMMITS IN THIS RELEASE**
+- `feat(inspections): update inspection workflows, fleet workflow, and 3 more areas`
+
 ## 0626.5.4
 
 **GIT COMMIT MESSAGE**
