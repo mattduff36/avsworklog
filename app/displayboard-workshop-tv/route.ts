@@ -88,18 +88,19 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
       top: 150px;
       left: 24px;
       right: 24px;
-      height: 140px;
-      overflow: hidden;
+      display: table;
+      table-layout: fixed;
+      border-spacing: 12px 0;
+      width: calc(100% - 48px);
     }
     .tile {
-      float: left;
-      width: 13.42%;
-      height: 128px;
-      margin-right: 1%;
+      display: table-cell;
+      width: 14.285%;
       padding: 18px;
       border: 1px solid rgba(255,255,255,0.14);
       border-radius: 20px;
       background: rgba(255,255,255,0.07);
+      vertical-align: top;
     }
     .tile-last { margin-right: 0; }
     .tile-label { color: rgba(255,255,255,0.68); font-size: 15px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; }
@@ -120,11 +121,29 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
       left: 24px;
       top: 312px;
       bottom: 24px;
-      width: 48%;
+      width: calc(33.333% - 23px);
     }
-    .panel-pending { left: 51%; right: 24px; top: 312px; height: 30%; border-color: rgba(245,158,11,0.22); }
-    .panel-progress { left: 51%; right: 24px; top: 54%; height: 20.5%; border-color: rgba(59,130,246,0.22); }
-    .panel-hold { left: 51%; right: 24px; top: 76.5%; bottom: 24px; border-color: rgba(168,85,247,0.22); }
+    .panel-pending {
+      left: calc(33.333% + 21px);
+      top: 312px;
+      right: 24px;
+      height: calc(33.333% - 120px);
+      border-color: rgba(245,158,11,0.22);
+    }
+    .panel-progress {
+      left: calc(33.333% + 21px);
+      top: calc(33.333% + 204px);
+      right: 24px;
+      height: calc(33.333% - 120px);
+      border-color: rgba(59,130,246,0.22);
+    }
+    .panel-hold {
+      left: calc(33.333% + 21px);
+      top: calc(66.666% + 96px);
+      bottom: 24px;
+      right: 24px;
+      border-color: rgba(168,85,247,0.22);
+    }
     .panel-title-small { color: rgba(255,255,255,0.65); font-size: 15px; font-weight: 800; letter-spacing: 4px; text-transform: uppercase; }
     .panel-title { margin: 5px 0 14px; font-size: 32px; line-height: 1; font-weight: 900; }
     .scroll-panel {
@@ -135,6 +154,13 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
       left: 18px;
       overflow: hidden;
     }
+    .scroll-panel.task-grid .row {
+      display: inline-block;
+      width: calc(50% - 6px);
+      margin-right: 12px;
+      vertical-align: top;
+    }
+    .scroll-panel.task-grid .row:nth-child(even) { margin-right: 0; }
     .row {
       min-height: 76px;
       margin-bottom: 12px;
@@ -169,14 +195,14 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
       color: rgba(255,255,255,0.55);
       text-align: center;
     }
-    .text-step-1 .row-title { font-size: 20px; }
-    .text-step-1 .row-sub { font-size: 14px; }
-    .text-step-2 .row-title { font-size: 22px; }
-    .text-step-2 .row-sub { font-size: 16px; }
-    .text-step-4 .row-title { font-size: 28px; }
-    .text-step-4 .row-sub { font-size: 20px; }
-    .text-step-5 .row-title { font-size: 31px; }
-    .text-step-5 .row-sub { font-size: 22px; }
+    .text-step-1 .row-title { font-size: 13px; }
+    .text-step-1 .row-sub { font-size: 9px; }
+    .text-step-2 .row-title { font-size: 19px; }
+    .text-step-2 .row-sub { font-size: 14px; }
+    .text-step-4 .row-title { font-size: 38px; }
+    .text-step-4 .row-sub { font-size: 27px; }
+    .text-step-5 .row-title { font-size: 50px; }
+    .text-step-5 .row-sub { font-size: 36px; }
   </style>
 </head>
 <body>
@@ -367,9 +393,9 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
             tile('On Hold', workshopCounts.on_hold || 0, 'purple', true) +
           '</div>' +
           '<div class="panel panel-maintenance"><div class="panel-title-small">Maintenance</div><div class="panel-title">Urgent All Assets</div><div class="scroll-panel">' + getMaintenanceRows(payload) + '</div></div>' +
-          '<div class="panel panel-pending"><div class="panel-title-small">Workshop</div><div class="panel-title">Pending</div><div class="scroll-panel">' + getItems(payload.workshop.pending, 'No pending workshop tasks.', 'row-due', true) + '</div></div>' +
-          '<div class="panel panel-progress"><div class="panel-title-small">Workshop</div><div class="panel-title">In Progress</div><div class="scroll-panel">' + getItems(payload.workshop.in_progress, 'No tasks in progress.', 'row-progress', true) + '</div></div>' +
-          '<div class="panel panel-hold"><div class="panel-title-small">Workshop</div><div class="panel-title">On Hold</div><div class="scroll-panel">' + getItems(payload.workshop.on_hold, 'No tasks on hold.', 'row-hold', true) + '</div></div>';
+          '<div class="panel panel-pending"><div class="panel-title-small">Workshop</div><div class="panel-title">Pending</div><div class="scroll-panel task-grid">' + getItems(payload.workshop.pending, 'No pending workshop tasks.', 'row-due', true) + '</div></div>' +
+          '<div class="panel panel-progress"><div class="panel-title-small">Workshop</div><div class="panel-title">In Progress</div><div class="scroll-panel task-grid">' + getItems(payload.workshop.in_progress, 'No tasks in progress.', 'row-progress', true) + '</div></div>' +
+          '<div class="panel panel-hold"><div class="panel-title-small">Workshop</div><div class="panel-title">On Hold</div><div class="scroll-panel task-grid">' + getItems(payload.workshop.on_hold, 'No tasks on hold.', 'row-hold', true) + '</div></div>';
         startAutoScroll();
         scheduleBoardRefresh(Math.max(15, pollSeconds) * 1000);
       }

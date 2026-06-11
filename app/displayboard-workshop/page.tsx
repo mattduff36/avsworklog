@@ -13,11 +13,19 @@ import {
   Wrench,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { useWorkshopDisplayBoardRealtime } from '@/lib/hooks/useRealtime';
+import { useWorkshopDisplayBoardRealtime, useDisplayBoardDeviceBroadcast } from '@/lib/hooks/useRealtime';
 import {
   DISPLAY_BOARD_LEGACY_TV_PATH,
   isLegacyDisplayBoardBrowser,
 } from '@/lib/display-board/compatibility';
+import {
+  MOBILE_TEXT_SIZE_STEPS,
+  type MobileTextSizeStep,
+} from '@/lib/config/mobile-text-size-preference';
+import {
+  WORKSHOP_DISPLAY_BOARD_KEY,
+  type DisplayBoardDeviceCommandPayload,
+} from '@/lib/display-board/device-notify';
 import type {
   DisplayBoardMaintenanceItem,
   DisplayBoardPayload,
@@ -28,6 +36,14 @@ const DEVICE_TOKEN_STORAGE_KEY = 'displayboard-workshop-device-token';
 const PAIRING_TOKEN_STORAGE_KEY = 'displayboard-workshop-pairing-token';
 const RIGHT_PANEL_SCROLL_SPEED_MULTIPLIER = 1.6;
 const DISPLAY_BOARD_TEXT_SIZE_DEFAULT_STEP = 3;
+
+function parseDisplayBoardTextSizeStep(value: unknown): MobileTextSizeStep | null {
+  const numericValue = typeof value === 'number' ? value : Number(value);
+  if (MOBILE_TEXT_SIZE_STEPS.includes(numericValue as MobileTextSizeStep)) {
+    return numericValue as MobileTextSizeStep;
+  }
+  return null;
+}
 
 type BoardState = 'loading' | 'unauthorised' | 'pairing' | 'ready' | 'error';
 type AutoScrollScrollerKey = 'maintenance' | 'pending' | 'inProgress' | 'onHold';
@@ -138,6 +154,23 @@ function EmptyPanel({ label }: { label: string }) {
       {label}
     </div>
   );
+}
+
+interface TaskGridProps {
+  tasks: DisplayBoardWorkshopTask[];
+  emptyLabel: string;
+}
+
+function TaskGrid({ tasks, emptyLabel }: TaskGridProps) {
+  if (tasks.length === 0) {
+    return (
+      <div className="col-span-2 min-h-full">
+        <EmptyPanel label={emptyLabel} />
+      </div>
+    );
+  }
+
+  return tasks.map(task => <TaskRow key={task.id} task={task} />);
 }
 
 export default function WorkshopDisplayBoardPage() {
@@ -282,6 +315,39 @@ export default function WorkshopDisplayBoardPage() {
       }
     }, realtimeDebounceMs);
   }, [fetchBoard, realtimeDebounceMs]);
+
+  const handleDeviceCommand = useCallback((command: DisplayBoardDeviceCommandPayload) => {
+    if (command.kind === 'text_size') {
+      const step = parseDisplayBoardTextSizeStep(command.text_size_step);
+      if (step) {
+        setPayload(current =>
+          current
+            ? {
+                ...current,
+                display: { text_size_step: step },
+              }
+            : current
+        );
+      }
+      return;
+    }
+
+    void fetchBoard().catch(error => {
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(DEVICE_TOKEN_STORAGE_KEY);
+      }
+      setPayload(null);
+      setState('unauthorised');
+      setMessage(error instanceof Error ? error.message : 'This display board is not authorised.');
+    });
+  }, [fetchBoard]);
+
+  useDisplayBoardDeviceBroadcast(
+    WORKSHOP_DISPLAY_BOARD_KEY,
+    payload?.device.id,
+    handleDeviceCommand,
+    state === 'ready'
+  );
 
   useWorkshopDisplayBoardRealtime((realtimePayload) => {
     if (state === 'ready') {
@@ -514,7 +580,7 @@ export default function WorkshopDisplayBoardPage() {
 
   return (
     <main className="h-dvh w-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(180,99,68,0.28),transparent_38%),linear-gradient(135deg,#020617,#0f172a_48%,#111827)] p-6 text-white">
-      <div className="grid h-full grid-rows-[88px_150px_minmax(0,1fr)] gap-5">
+      <div className="grid h-full grid-rows-[88px_auto_minmax(0,1fr)] gap-5">
         <header className="flex items-center justify-between rounded-3xl border border-white/10 bg-white/[0.06] px-7 shadow-2xl shadow-black/20">
           <div className="flex items-center gap-4">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-workshop text-white">
@@ -559,7 +625,7 @@ export default function WorkshopDisplayBoardPage() {
           <StatTile label="On Hold" value={workshopCounts?.on_hold || 0} tone="purple" />
         </section>
 
-        <section className="grid min-h-0 grid-cols-[1.05fr_1fr] gap-5">
+        <section className="grid min-h-0 grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-5">
           <div className="flex min-h-0 flex-col rounded-3xl border border-white/10 bg-white/[0.055] p-5 shadow-2xl shadow-black/20">
             <div className="mb-4 flex items-center justify-between">
               <div>
@@ -578,31 +644,33 @@ export default function WorkshopDisplayBoardPage() {
           </div>
 
           <div className="grid min-h-0 grid-rows-3 gap-4">
-            <div className="min-h-0 rounded-3xl border border-amber-500/20 bg-amber-500/[0.07] p-4">
+            <div className="flex min-h-0 flex-col rounded-3xl border border-amber-500/20 bg-amber-500/[0.07] p-4">
               <div className="mb-3 flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5 text-amber-300" />
                 <h2 className="text-2xl font-black">Pending</h2>
               </div>
-              <div ref={pendingScrollRef} className="scrollbar-hidden h-[calc(100%-2.75rem)] space-y-2 overflow-y-auto pr-2">
-                {payload.workshop.pending.length > 0 ? payload.workshop.pending.map(task => <TaskRow key={task.id} task={task} />) : <EmptyPanel label="No pending workshop tasks." />}
+              <div ref={pendingScrollRef} className="scrollbar-hidden grid min-h-0 flex-1 auto-rows-max grid-cols-[repeat(2,minmax(0,1fr))] content-start gap-2 overflow-y-auto pr-2">
+                <TaskGrid tasks={payload.workshop.pending} emptyLabel="No pending workshop tasks." />
               </div>
             </div>
-            <div className="min-h-0 rounded-3xl border border-blue-500/20 bg-blue-500/[0.07] p-4">
+
+            <div className="flex min-h-0 flex-col rounded-3xl border border-blue-500/20 bg-blue-500/[0.07] p-4">
               <div className="mb-3 flex items-center gap-2">
                 <Clock className="h-5 w-5 text-blue-300" />
                 <h2 className="text-2xl font-black">In Progress</h2>
               </div>
-              <div ref={inProgressScrollRef} className="scrollbar-hidden h-[calc(100%-2.75rem)] space-y-2 overflow-y-auto pr-2">
-                {payload.workshop.in_progress.length > 0 ? payload.workshop.in_progress.map(task => <TaskRow key={task.id} task={task} />) : <EmptyPanel label="No tasks in progress." />}
+              <div ref={inProgressScrollRef} className="scrollbar-hidden grid min-h-0 flex-1 auto-rows-max grid-cols-[repeat(2,minmax(0,1fr))] content-start gap-2 overflow-y-auto pr-2">
+                <TaskGrid tasks={payload.workshop.in_progress} emptyLabel="No tasks in progress." />
               </div>
             </div>
-            <div className="min-h-0 rounded-3xl border border-purple-500/20 bg-purple-500/[0.07] p-4">
+
+            <div className="flex min-h-0 flex-col rounded-3xl border border-purple-500/20 bg-purple-500/[0.07] p-4">
               <div className="mb-3 flex items-center gap-2">
                 <Pause className="h-5 w-5 text-purple-300" />
                 <h2 className="text-2xl font-black">On Hold</h2>
               </div>
-              <div ref={onHoldScrollRef} className="scrollbar-hidden h-[calc(100%-2.75rem)] space-y-2 overflow-y-auto pr-2">
-                {payload.workshop.on_hold.length > 0 ? payload.workshop.on_hold.map(task => <TaskRow key={task.id} task={task} />) : <EmptyPanel label="No tasks on hold." />}
+              <div ref={onHoldScrollRef} className="scrollbar-hidden grid min-h-0 flex-1 auto-rows-max grid-cols-[repeat(2,minmax(0,1fr))] content-start gap-2 overflow-y-auto pr-2">
+                <TaskGrid tasks={payload.workshop.on_hold} emptyLabel="No tasks on hold." />
               </div>
             </div>
           </div>

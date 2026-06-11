@@ -26,6 +26,7 @@ import type {
   MaintenanceListResponse,
   VehicleMaintenanceWithStatus,
 } from '@/types/maintenance';
+import { notifyDisplayBoardDevice } from '@/lib/server/display-board-notify';
 
 export const WORKSHOP_DISPLAY_BOARD_KEY = 'workshop';
 export const DISPLAY_BOARD_PAIRING_WINDOW_MS = 5 * 60 * 1000;
@@ -108,6 +109,9 @@ export interface DisplayBoardWorkshopTask {
 
 export interface DisplayBoardPayload {
   config: DisplayBoardConfig;
+  device: {
+    id: string;
+  };
   display: {
     text_size_step: MobileTextSizeStep;
   };
@@ -689,6 +693,12 @@ export async function updateDisplayBoardDeviceTextSize(
     .is('revoked_at', null);
 
   if (error) throw error;
+
+  const normalizedTextSizeStep = normalizeDisplayBoardTextSizeStep(textSizeStep);
+  await notifyDisplayBoardDevice(boardKey, deviceId, {
+    kind: 'text_size',
+    text_size_step: normalizedTextSizeStep,
+  });
 }
 
 export async function revokeDisplayBoardDevice(deviceId: string, userId: string, boardKey = WORKSHOP_DISPLAY_BOARD_KEY) {
@@ -703,6 +713,8 @@ export async function revokeDisplayBoardDevice(deviceId: string, userId: string,
     .eq('board_key', boardKey)
     .is('revoked_at', null);
   if (error) throw error;
+
+  await notifyDisplayBoardDevice(boardKey, deviceId, { kind: 'revoke' });
 }
 
 export async function validateDisplayBoardDeviceToken(deviceToken: string | null, boardKey = WORKSHOP_DISPLAY_BOARD_KEY) {
@@ -1126,6 +1138,9 @@ export async function buildDisplayBoardPayload(deviceToken: string | null, board
 
   return {
     config,
+    device: {
+      id: device.id,
+    },
     display: {
       text_size_step: normalizeDisplayBoardTextSizeStep(device.display_text_size_step),
     },

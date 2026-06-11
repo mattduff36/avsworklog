@@ -342,11 +342,11 @@
 
 /* Display board text size preference. Step 3 is the HD display-board default. */
 html[data-display-board-text-size="1"] {
-  font-size: 87.5%;
+  font-size: 50%;
 }
 
 html[data-display-board-text-size="2"] {
-  font-size: 93.75%;
+  font-size: 75%;
 }
 
 html[data-display-board-text-size="3"] {
@@ -354,11 +354,11 @@ html[data-display-board-text-size="3"] {
 }
 
 html[data-display-board-text-size="4"] {
-  font-size: 106.25%;
+  font-size: 150%;
 }
 
 html[data-display-board-text-size="5"] {
-  font-size: 112.5%;
+  font-size: 200%;
 }
 
 .mobile-text-size-slider {

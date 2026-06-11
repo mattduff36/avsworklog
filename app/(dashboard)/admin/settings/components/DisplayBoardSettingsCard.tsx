@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, ExternalLink, Monitor, RefreshCw, Search, ShieldCheck, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +24,9 @@ interface DisplayBoardSettingsResponse extends DisplayBoardAdminState {
   success: boolean;
   error?: string;
 }
+
+const SETTINGS_HELPER_TEXT_CLASS = 'text-sm leading-relaxed text-slate-400';
+const SETTINGS_COMPACT_HELPER_TEXT_CLASS = 'text-xs leading-relaxed text-slate-400';
 
 function formatDateTime(value: string | null | undefined) {
   if (!value) return 'Never';
@@ -47,7 +49,6 @@ export function DisplayBoardSettingsCard() {
   const [fallbackSeconds, setFallbackSeconds] = useState('60');
   const [debounceMs, setDebounceMs] = useState('750');
   const [enabled, setEnabled] = useState(true);
-  const [confirmationCode, setConfirmationCode] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingTextSizeDeviceId, setSavingTextSizeDeviceId] = useState<string | null>(null);
@@ -60,11 +61,6 @@ export function DisplayBoardSettingsCard() {
     setFallbackSeconds(String(payload.config.fallback_poll_interval_seconds));
     setDebounceMs(String(payload.config.realtime_debounce_ms));
     setEnabled(payload.config.is_enabled);
-    if (payload.active_pairing?.confirmation_code) {
-      setConfirmationCode(payload.active_pairing.confirmation_code);
-    } else if (!payload.active_pairing) {
-      setConfirmationCode('');
-    }
   }, []);
 
   const loadSettings = useCallback(async (quiet = false) => {
@@ -137,10 +133,10 @@ export function DisplayBoardSettingsCard() {
   };
 
   const confirmPairing = async () => {
-    if (!activePairing) return;
+    if (!activePairing?.confirmation_code) return;
     await runAction('confirm_pairing', {
       session_id: activePairing.id,
-      confirmation_code: confirmationCode,
+      confirmation_code: activePairing.confirmation_code,
     });
   };
 
@@ -176,6 +172,8 @@ export function DisplayBoardSettingsCard() {
     }
   };
 
+  const canConfirmPairing = activePairing?.confirmation_code?.length === 6;
+
   return (
     <Card className="border-border bg-slate-900/60">
       <CardHeader>
@@ -183,9 +181,9 @@ export function DisplayBoardSettingsCard() {
           <div>
             <CardTitle className="flex items-center gap-2 text-white">
               <Monitor className="h-5 w-5 text-workshop" />
-              Display Board Polling intervals
+              Workshop Display Board
             </CardTitle>
-            <CardDescription className="text-muted-foreground">
+            <CardDescription className={SETTINGS_HELPER_TEXT_CLASS}>
               Configure shared workshop display-board refresh settings and pair workshop TV browsers.
             </CardDescription>
           </div>
@@ -236,7 +234,7 @@ export function DisplayBoardSettingsCard() {
               style={{ accentColor: 'hsl(var(--workshop-primary))' }}
               className="h-2 w-full cursor-pointer accent-workshop disabled:cursor-not-allowed disabled:opacity-50"
             />
-            <p className="text-xs text-muted-foreground">Visible-tab safety net. Range: 15 to 300 seconds.</p>
+            <p className={SETTINGS_COMPACT_HELPER_TEXT_CLASS}>Visible-tab safety net. Range: 15 to 300 seconds.</p>
           </div>
           <div className="min-w-0 space-y-3">
             <div className="flex items-center justify-between gap-3">
@@ -257,7 +255,7 @@ export function DisplayBoardSettingsCard() {
               style={{ accentColor: 'hsl(var(--workshop-primary))' }}
               className="h-2 w-full cursor-pointer accent-workshop disabled:cursor-not-allowed disabled:opacity-50"
             />
-            <p className="text-xs text-muted-foreground">Coalesces bursty realtime updates. Range: 250 to 5000ms.</p>
+            <p className={SETTINGS_COMPACT_HELPER_TEXT_CLASS}>Coalesces bursty realtime updates. Range: 250 to 5000ms.</p>
           </div>
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-3 rounded-lg border border-border px-3 py-2">
@@ -280,15 +278,15 @@ export function DisplayBoardSettingsCard() {
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="font-semibold text-foreground">Workshop display board pairing</p>
-              <p className="text-sm text-muted-foreground">
-                Start a 5-minute search, open `/displayboard-workshop` on the TV, then confirm matching codes. Older Samsung TVs are sent to the TV fallback automatically.
+              <p className={SETTINGS_HELPER_TEXT_CLASS}>
+                Start a search, then confirm the code shown on the display board.
               </p>
             </div>
-            <div className="flex w-full flex-wrap gap-2 md:w-auto md:justify-end">
+            <div className="flex w-full flex-col gap-2 md:w-56 md:justify-end">
               <Button
                 asChild
                 variant="outline"
-                className="w-full border-workshop/45 bg-workshop/10 text-workshop-light hover:bg-workshop/20 hover:text-white md:w-auto"
+                className="w-full border-workshop/45 bg-workshop/10 text-workshop-light hover:bg-workshop/20 hover:text-white"
               >
                 <a
                   href="/displayboard-workshop"
@@ -297,7 +295,7 @@ export function DisplayBoardSettingsCard() {
                   aria-label="Launch the Workshop Display Board in a new tab"
                 >
                   <ExternalLink className="mr-2 h-4 w-4" />
-                  Launch Workshop Display Board
+                  Launch Display Board
                 </a>
               </Button>
               {activePairing ? (
@@ -306,7 +304,7 @@ export function DisplayBoardSettingsCard() {
                   variant="outline"
                   onClick={() => runAction('cancel_pairing')}
                   disabled={saving}
-                  className="w-full border-amber-500/45 bg-amber-500/10 text-amber-100 hover:bg-amber-500/20 hover:text-amber-50 md:w-auto"
+                  className="w-full border-amber-500/45 bg-amber-500/10 text-amber-100 hover:bg-amber-500/20 hover:text-amber-50"
                 >
                   Cancel search
                 </Button>
@@ -315,10 +313,10 @@ export function DisplayBoardSettingsCard() {
                   type="button"
                   onClick={() => runAction('start_pairing')}
                   disabled={saving || loading || !config?.is_enabled}
-                  className="w-full bg-workshop text-white hover:bg-workshop-dark md:w-auto"
+                  className="w-full bg-workshop text-white hover:bg-workshop-dark"
                 >
                   <Search className="mr-2 h-4 w-4" />
-                  Search for display board
+                  Search for Display Board
                 </Button>
               )}
             </div>
@@ -329,29 +327,21 @@ export function DisplayBoardSettingsCard() {
               <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                 <div className="space-y-1">
                   <p className="font-semibold text-workshop-light">Searching for display board</p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className={SETTINGS_HELPER_TEXT_CLASS}>
                     Expires at {formatDateTime(activePairing.expires_at)}. The confirmation code appears after the TV visits the board page.
                   </p>
                   {activePairing.confirmation_code ? (
                     <p className="mt-3 text-4xl font-black tracking-[0.2em] text-white">{activePairing.confirmation_code}</p>
                   ) : (
-                    <p className="mt-3 text-sm text-muted-foreground">Waiting for a display board browser...</p>
+                    <p className="mt-3 text-sm leading-relaxed text-muted-foreground">Waiting for a display board browser...</p>
                   )}
                 </div>
                 <div className="flex min-w-[16rem] flex-col gap-2">
-                  <Label htmlFor="display-board-confirmation">Confirmation code</Label>
-                  <Input
-                    id="display-board-confirmation"
-                    inputMode="numeric"
-                    maxLength={6}
-                    value={confirmationCode}
-                    onChange={(event) => setConfirmationCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                  />
                   <Button
                     type="button"
                     onClick={confirmPairing}
-                    disabled={saving || confirmationCode.length !== 6 || !activePairing.confirmation_code}
-                    className="bg-workshop text-white hover:bg-workshop-dark disabled:bg-workshop/45 disabled:text-white/70"
+                    disabled={saving || !canConfirmPairing}
+                    className="w-full bg-workshop text-white hover:bg-workshop-dark disabled:bg-workshop/45 disabled:text-white/70"
                   >
                     <ShieldCheck className="mr-2 h-4 w-4" />
                     Confirm display board
@@ -366,7 +356,7 @@ export function DisplayBoardSettingsCard() {
           <div className="mb-3 flex items-center justify-between">
             <div>
               <p className="font-semibold text-foreground">Paired Workshop display devices</p>
-              <p className="text-sm text-muted-foreground">Devices remain authorised until revoked here.</p>
+              <p className={SETTINGS_HELPER_TEXT_CLASS}>Devices remain authorised until revoked here.</p>
             </div>
             <Badge variant="outline">{devices.length}</Badge>
           </div>
@@ -375,7 +365,7 @@ export function DisplayBoardSettingsCard() {
               <div key={device.id} className="flex flex-col gap-3 rounded-lg border border-border bg-slate-950/40 p-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <p className="font-medium text-foreground">{device.label || 'Workshop display board'}</p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-slate-400">
                     Paired {formatDateTime(device.created_at)} · Last seen {formatDateTime(device.last_seen_at)}
                   </p>
                 </div>
@@ -420,7 +410,7 @@ export function DisplayBoardSettingsCard() {
                 </div>
               </div>
             )) : (
-              <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+              <div className="rounded-lg border border-dashed border-border p-4 text-sm leading-relaxed text-muted-foreground">
                 No Workshop display boards are paired yet.
               </div>
             )}

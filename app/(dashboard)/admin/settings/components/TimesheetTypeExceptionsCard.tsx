@@ -36,6 +36,8 @@ interface DirectoryEntry {
   } | null;
 }
 
+const SETTINGS_HELPER_TEXT_CLASS = 'text-sm leading-relaxed text-slate-400';
+
 export function TimesheetTypeExceptionsCard() {
   const [matrix, setMatrix] = useState<TimesheetTypeExceptionMatrixResponse | null>(null);
   const [directory, setDirectory] = useState<DirectoryEntry[]>([]);
@@ -152,7 +154,7 @@ export function TimesheetTypeExceptionsCard() {
     <Card className="border-border">
       <CardHeader>
         <CardTitle className="text-white">Timesheet Overrides</CardTitle>
-        <CardDescription className="text-muted-foreground">
+        <CardDescription className={SETTINGS_HELPER_TEXT_CLASS}>
           Override the default team timesheet type for individual users.
         </CardDescription>
       </CardHeader>
@@ -194,7 +196,7 @@ export function TimesheetTypeExceptionsCard() {
           {loadingMatrix ? (
             <PanelLoader message="Loading timesheet override matrix..." accent="timesheet" className="py-16" />
           ) : rows.length === 0 ? (
-            <div className="py-14 text-center text-muted-foreground">
+            <div className="py-14 text-center text-sm leading-relaxed text-muted-foreground">
               No user overrides yet. Add a user to create their override row.
             </div>
           ) : (

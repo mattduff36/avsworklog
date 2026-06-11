@@ -6,11 +6,11 @@ export const MOBILE_TEXT_SIZE_STEPS = [1, 2, 3, 4, 5] as const;
 export type MobileTextSizeStep = (typeof MOBILE_TEXT_SIZE_STEPS)[number];
 
 export const MOBILE_TEXT_SIZE_LABELS: Record<MobileTextSizeStep, string> = {
-  1: 'Small',
-  2: 'Current',
-  3: 'Large',
-  4: 'Larger',
-  5: 'Biggest',
+  1: 'Smallest',
+  2: 'Small',
+  3: 'Normal',
+  4: 'Large',
+  5: 'Largest',
 };
 
 export interface MobileTextSizeChangedDetail {

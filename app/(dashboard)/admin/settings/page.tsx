@@ -17,6 +17,8 @@ import {
 import { TimesheetTypeExceptionsCard } from './components/TimesheetTypeExceptionsCard';
 import { DisplayBoardSettingsCard } from './components/DisplayBoardSettingsCard';
 
+const SETTINGS_HELPER_TEXT_CLASS = 'text-sm leading-relaxed text-slate-400';
+
 export default function AdminSettingsPage() {
   const router = useRouter();
   const { hasPermission: canAccessSettings, loading: permissionLoading } = usePermissionCheck('admin-settings', false);
@@ -85,7 +87,7 @@ export default function AdminSettingsPage() {
           <Card className="border-border bg-slate-900/60">
             <CardHeader>
               <CardTitle className="text-white">Layout Preferences</CardTitle>
-              <CardDescription className="text-muted-foreground">
+              <CardDescription className={SETTINGS_HELPER_TEXT_CLASS}>
                 Apply a wider desktop content layout across the dashboard app.
               </CardDescription>
             </CardHeader>
@@ -93,7 +95,7 @@ export default function AdminSettingsPage() {
               <div className="flex flex-col gap-4 rounded-lg border border-border bg-background/80 p-4 md:flex-row md:items-center md:justify-between">
                 <div className="space-y-1">
                   <p className="font-medium text-foreground">Global Widescreen View</p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className={SETTINGS_HELPER_TEXT_CLASS}>
                     When enabled, dashboard pages use a wider content area on desktop screens.
                   </p>
                 </div>

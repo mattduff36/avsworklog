@@ -3,6 +3,11 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { createClient as createSupabaseClient, RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
+import {
+  DISPLAY_BOARD_DEVICE_COMMAND_EVENT,
+  type DisplayBoardDeviceCommandPayload,
+  getDisplayBoardDeviceChannelName,
+} from '@/lib/display-board/device-notify';
 
 type RealtimeCallback<T extends Record<string, unknown> = Record<string, unknown>> = (payload: RealtimePostgresChangesPayload<T>) => void;
 
@@ -125,5 +130,39 @@ export function useWorkshopDisplayBoardRealtime(callback: RealtimeCallback, enab
   usePublicRealtimeSubscription('vehicle_maintenance', callback, enabled);
   usePublicRealtimeSubscription('asset_maintenance_category_values', callback, enabled);
   usePublicRealtimeSubscription('display_board_devices', callback, enabled);
+}
+
+export function useDisplayBoardDeviceBroadcast(
+  boardKey: string,
+  deviceId: string | undefined,
+  onCommand: (command: DisplayBoardDeviceCommandPayload) => void,
+  enabled = true
+) {
+  const onCommandRef = useRef(onCommand);
+
+  useEffect(() => {
+    onCommandRef.current = onCommand;
+  }, [onCommand]);
+
+  useEffect(() => {
+    if (!enabled || !deviceId || typeof window === 'undefined') return;
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseAnonKey) return;
+
+    const client = createSupabaseClient(supabaseUrl, supabaseAnonKey);
+    const channel = client
+      .channel(getDisplayBoardDeviceChannelName(boardKey, deviceId))
+      .on('broadcast', { event: DISPLAY_BOARD_DEVICE_COMMAND_EVENT }, ({ payload }) => {
+        if (!payload || typeof payload !== 'object' || !('kind' in payload)) return;
+        onCommandRef.current(payload as DisplayBoardDeviceCommandPayload);
+      })
+      .subscribe();
+
+    return () => {
+      void client.removeChannel(channel);
+    };
+  }, [boardKey, deviceId, enabled]);
 }
 
