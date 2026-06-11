@@ -7,6 +7,7 @@ import {
   fetchQuoteBundle,
   getQuoteAccountsRecipientIds,
 } from '@/lib/server/quote-workflow';
+import { buildInvoiceRequestTimelineDescription } from '@/lib/quotes/quote-timeline-comments';
 import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
 import { buildQuoteDisplayName } from '@/lib/quotes/quote-display-name';
 import { renderConfiguredQuoteEmailTemplate } from '@/lib/server/quote-email-templates';
@@ -194,7 +195,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       quoteReference: bundle.quote.quote_reference,
       eventType: 'invoice_requested',
       title: 'Ready to invoice',
-      description: `Requested ${normalizedScope} invoice • £${normalizedAmount.toLocaleString('en-GB', { minimumFractionDigits: 2 })}`,
+      description: buildInvoiceRequestTimelineDescription({
+        requestedScope: normalizedScope,
+        requestedAmount: normalizedAmount,
+        comments: normalizedComments,
+      }),
       fromStatus: bundle.quote.status,
       toStatus: bundle.quote.status,
       actorUserId: user.id,

@@ -7,6 +7,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getUsersWithModuleAccess } from '@/lib/server/team-permissions';
 import { getHiddenSystemTestAccountIds } from '@/lib/server/system-test-accounts';
 import { buildQuoteDisplayName, buildQuotePdfFilename } from '@/lib/quotes/quote-display-name';
+import { enrichQuoteTimelineEventDescriptions } from '@/lib/quotes/quote-timeline-comments';
 import {
   plainQuoteEmailTextToHtml,
   renderConfiguredQuoteEmailTemplate,
@@ -387,6 +388,13 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
 
   const invoices = (invoicesResult.data || []) as QuoteInvoiceRow[];
   const invoiceRequests = (invoiceRequestsResult.data || []) as QuoteInvoiceRequestRow[];
+  const timeline = enrichQuoteTimelineEventDescriptions(
+    (timelineResult.data || []) as QuoteBundle['timeline'],
+    {
+      invoiceRequests,
+      invoices,
+    }
+  );
   const invoiceIds = invoices.map(invoice => invoice.id);
   const allocationsByInvoice = new Map<string, QuoteInvoiceAllocationRow[]>();
 
@@ -421,7 +429,7 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
     attachments: (attachmentsResult.data || []) as QuoteAttachmentRow[],
     ramsDocuments: (ramsDocumentsResult.data || []) as RamsDocumentRow[],
     versions: (versionsResult.data || []) as QuoteRow[],
-    timeline: (timelineResult.data || []) as QuoteBundle['timeline'],
+    timeline,
     selectedSecondaryContacts: selectedContacts,
     invoices: invoices.map(invoice => ({
       ...invoice,
