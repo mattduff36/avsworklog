@@ -15,6 +15,10 @@ import {
   getMaintenanceCategory,
   isMaintenanceCategoryVisibleOnOverview,
 } from '@/lib/utils/maintenanceCategoryRules';
+import {
+  MOBILE_TEXT_SIZE_STEPS,
+  type MobileTextSizeStep,
+} from '@/lib/config/mobile-text-size-preference';
 import type {
   MaintenanceCategory,
   MaintenanceItem,
@@ -26,6 +30,7 @@ import type {
 export const WORKSHOP_DISPLAY_BOARD_KEY = 'workshop';
 export const DISPLAY_BOARD_PAIRING_WINDOW_MS = 5 * 60 * 1000;
 export const DISPLAY_BOARD_TOKEN_HEADER = 'x-display-board-token';
+export const DISPLAY_BOARD_TEXT_SIZE_DEFAULT_STEP: MobileTextSizeStep = 3;
 
 export interface DisplayBoardConfig {
   board_key: string;
@@ -56,6 +61,7 @@ export interface DisplayBoardDevice {
   id: string;
   board_key: string;
   label: string | null;
+  display_text_size_step: MobileTextSizeStep;
   paired_by: string | null;
   pairing_session_id: string | null;
   last_seen_at: string | null;
@@ -102,6 +108,9 @@ export interface DisplayBoardWorkshopTask {
 
 export interface DisplayBoardPayload {
   config: DisplayBoardConfig;
+  display: {
+    text_size_step: MobileTextSizeStep;
+  };
   maintenance: {
     summary: MaintenanceListResponse['summary'];
     overdue_items: DisplayBoardMaintenanceItem[];
@@ -223,6 +232,14 @@ function clampNumber(value: unknown, fallback: number, min: number, max: number)
   const parsed = typeof value === 'number' ? value : Number.parseInt(String(value ?? ''), 10);
   if (!Number.isInteger(parsed)) return fallback;
   return Math.min(max, Math.max(min, parsed));
+}
+
+export function normalizeDisplayBoardTextSizeStep(value: unknown): MobileTextSizeStep {
+  const numericValue = typeof value === 'number' ? value : Number(value);
+  if (MOBILE_TEXT_SIZE_STEPS.includes(numericValue as MobileTextSizeStep)) {
+    return numericValue as MobileTextSizeStep;
+  }
+  return DISPLAY_BOARD_TEXT_SIZE_DEFAULT_STEP;
 }
 
 function getAssetLabel(asset?: { reg_number?: string | null; plant_id?: string | null; nickname?: string | null } | null) {
@@ -448,7 +465,10 @@ export async function getDisplayBoardAdminState(boardKey = WORKSHOP_DISPLAY_BOAR
   return {
     config,
     active_pairing: ((pairings || [])[0] || null) as DisplayBoardPairingSession | null,
-    devices: (devices || []) as DisplayBoardDevice[],
+    devices: ((devices || []) as DisplayBoardDevice[]).map((device) => ({
+      ...device,
+      display_text_size_step: normalizeDisplayBoardTextSizeStep(device.display_text_size_step),
+    })),
   };
 }
 
@@ -633,6 +653,7 @@ export async function confirmDisplayBoardPairing(userId: string, sessionId: stri
       board_key: boardKey,
       device_token_hash: pairing.pairing_token_hash,
       label: `Workshop display ${new Date().toLocaleDateString('en-GB')}`,
+      display_text_size_step: DISPLAY_BOARD_TEXT_SIZE_DEFAULT_STEP,
       paired_by: userId,
       pairing_session_id: pairing.id,
       last_seen_at: now,
@@ -650,6 +671,24 @@ export async function confirmDisplayBoardPairing(userId: string, sessionId: stri
     .eq('id', pairing.id);
 
   if (sessionError) throw sessionError;
+}
+
+export async function updateDisplayBoardDeviceTextSize(
+  deviceId: string,
+  textSizeStep: unknown,
+  boardKey = WORKSHOP_DISPLAY_BOARD_KEY
+) {
+  const admin = getAdmin();
+  const { error } = await admin
+    .from('display_board_devices')
+    .update({
+      display_text_size_step: normalizeDisplayBoardTextSizeStep(textSizeStep),
+    })
+    .eq('id', deviceId)
+    .eq('board_key', boardKey)
+    .is('revoked_at', null);
+
+  if (error) throw error;
 }
 
 export async function revokeDisplayBoardDevice(deviceId: string, userId: string, boardKey = WORKSHOP_DISPLAY_BOARD_KEY) {
@@ -685,7 +724,10 @@ export async function validateDisplayBoardDeviceToken(deviceToken: string | null
     .update({ last_seen_at: new Date().toISOString() })
     .eq('id', (data as DisplayBoardDevice).id);
 
-  return data as DisplayBoardDevice;
+  return {
+    ...(data as DisplayBoardDevice),
+    display_text_size_step: normalizeDisplayBoardTextSizeStep((data as DisplayBoardDevice).display_text_size_step),
+  };
 }
 
 export async function buildMaintenanceListResponse(): Promise<MaintenanceListResponse> {
@@ -1084,6 +1126,9 @@ export async function buildDisplayBoardPayload(deviceToken: string | null, board
 
   return {
     config,
+    display: {
+      text_size_step: normalizeDisplayBoardTextSizeStep(device.display_text_size_step),
+    },
     maintenance: {
       summary: maintenanceData.summary,
       overdue_items: buildMaintenanceBoardItems(maintenanceData.vehicles, 'overdue'),

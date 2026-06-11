@@ -9,6 +9,7 @@ import {
   revokeDisplayBoardDevice,
   startDisplayBoardPairing,
   updateDisplayBoardConfig,
+  updateDisplayBoardDeviceTextSize,
 } from '@/lib/server/display-board';
 
 async function requireAdminSettingsUser() {
@@ -81,10 +82,11 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json() as {
-      action?: 'start_pairing' | 'cancel_pairing' | 'confirm_pairing' | 'revoke_device';
+      action?: 'start_pairing' | 'cancel_pairing' | 'confirm_pairing' | 'revoke_device' | 'update_device_text_size';
       session_id?: string;
       confirmation_code?: string;
       device_id?: string;
+      display_text_size_step?: unknown;
     };
 
     if (body.action === 'start_pairing') {
@@ -106,6 +108,15 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'device_id is required' }, { status: 400 });
       }
       await revokeDisplayBoardDevice(body.device_id, context.userId, WORKSHOP_DISPLAY_BOARD_KEY);
+    } else if (body.action === 'update_device_text_size') {
+      if (!body.device_id) {
+        return NextResponse.json({ error: 'device_id is required' }, { status: 400 });
+      }
+      await updateDisplayBoardDeviceTextSize(
+        body.device_id,
+        body.display_text_size_step,
+        WORKSHOP_DISPLAY_BOARD_KEY
+      );
     } else {
       return NextResponse.json({ error: 'Unsupported display board action' }, { status: 400 });
     }

@@ -4,6 +4,7 @@ const PUBLIC_BROWSER_ROUTE_PREFIXES = [
   '/offline',
   '/pwa-debug',
   '/displayboard-workshop',
+  '/displayboard-workshop-tv',
 ] as const;
 
 const PUBLIC_API_ROUTE_PREFIXES = [

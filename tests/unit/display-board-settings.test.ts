@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeDisplayBoardSettings, type DisplayBoardConfig } from '@/lib/server/display-board';
+import {
+  DISPLAY_BOARD_TEXT_SIZE_DEFAULT_STEP,
+  normalizeDisplayBoardSettings,
+  normalizeDisplayBoardTextSizeStep,
+  type DisplayBoardConfig,
+} from '@/lib/server/display-board';
 
 const currentConfig: DisplayBoardConfig = {
   board_key: 'workshop',
@@ -42,5 +47,17 @@ describe('display board settings validation', () => {
       realtime_debounce_ms: 750,
       is_enabled: true,
     });
+  });
+
+  it('normalizes display board text size steps to the shared five-stage scale', () => {
+    expect(normalizeDisplayBoardTextSizeStep(1)).toBe(1);
+    expect(normalizeDisplayBoardTextSizeStep('3')).toBe(3);
+    expect(normalizeDisplayBoardTextSizeStep(5)).toBe(5);
+  });
+
+  it('defaults invalid display board text size values to the middle step', () => {
+    expect(normalizeDisplayBoardTextSizeStep('not-a-step')).toBe(DISPLAY_BOARD_TEXT_SIZE_DEFAULT_STEP);
+    expect(normalizeDisplayBoardTextSizeStep(0)).toBe(DISPLAY_BOARD_TEXT_SIZE_DEFAULT_STEP);
+    expect(normalizeDisplayBoardTextSizeStep(6)).toBe(DISPLAY_BOARD_TEXT_SIZE_DEFAULT_STEP);
   });
 });

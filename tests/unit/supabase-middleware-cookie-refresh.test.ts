@@ -176,6 +176,34 @@ describe('supabase middleware cookie refresh', () => {
     expect(productionResponse.headers.get('x-middleware-next')).toBe('1');
   });
 
+  it('redirects legacy Samsung TV display board browsers to the fallback route', async () => {
+    mockSupabaseMiddlewareAuth({
+      user: null,
+    });
+    verifyJwtHS256Mock.mockResolvedValue(null);
+
+    const response = await updateSession(new NextRequest('http://localhost/displayboard-workshop', {
+      headers: {
+        'user-agent': 'Mozilla/5.0 (SMART-TV; Linux; Tizen 2.4.0) AppleWebKit/538.1',
+      },
+    }));
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('http://localhost/displayboard-workshop-tv');
+  });
+
+  it('allows the legacy TV display board fallback without an app session', async () => {
+    mockSupabaseMiddlewareAuth({
+      user: null,
+    });
+    verifyJwtHS256Mock.mockResolvedValue(null);
+
+    const response = await updateSession(new NextRequest('http://localhost/displayboard-workshop-tv'));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('x-middleware-next')).toBe('1');
+  });
+
   it('redirects stale login display board redirects back to the public display board shell', async () => {
     mockSupabaseMiddlewareAuth({
       user: null,
@@ -193,6 +221,44 @@ describe('supabase middleware cookie refresh', () => {
     expect(response.headers.get('location')).toBe('http://localhost/displayboard-workshop');
     expect(productionResponse.status).toBe(307);
     expect(productionResponse.headers.get('location')).toBe('https://squiresapp.com/displayboard-workshop');
+  });
+
+  it('redirects stale login display board redirects to the fallback route on legacy TVs', async () => {
+    mockSupabaseMiddlewareAuth({
+      user: null,
+    });
+    verifyJwtHS256Mock.mockResolvedValue(null);
+
+    const response = await updateSession(
+      new NextRequest('http://localhost/login?redirect=%2Fdisplayboard-workshop', {
+        headers: {
+          'user-agent': 'Mozilla/5.0 (SMART-TV; Linux; Tizen 2.4.0) AppleWebKit/538.1',
+        },
+      })
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('http://localhost/displayboard-workshop-tv');
+  });
+
+  it('clears stale legacy cookies while redirecting legacy TV display board browsers', async () => {
+    mockSupabaseMiddlewareAuth({
+      user: { id: 'legacy-user' },
+    });
+    verifyJwtHS256Mock.mockResolvedValue(null);
+
+    const response = await updateSession(
+      new NextRequest('http://localhost/displayboard-workshop', {
+        headers: {
+          Cookie: 'sb-project-auth-token=legacy-token',
+          'user-agent': 'Mozilla/5.0 (SMART-TV; Linux; Tizen 2.4.0) AppleWebKit/538.1',
+        },
+      })
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('http://localhost/displayboard-workshop-tv');
+    expect(response.cookies.get('sb-project-auth-token')?.value).toBe('');
   });
 
   it('allows display board token APIs without an app session', async () => {

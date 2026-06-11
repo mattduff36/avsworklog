@@ -14,6 +14,10 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useWorkshopDisplayBoardRealtime } from '@/lib/hooks/useRealtime';
+import {
+  DISPLAY_BOARD_LEGACY_TV_PATH,
+  isLegacyDisplayBoardBrowser,
+} from '@/lib/display-board/compatibility';
 import type {
   DisplayBoardMaintenanceItem,
   DisplayBoardPayload,
@@ -23,6 +27,7 @@ import type {
 const DEVICE_TOKEN_STORAGE_KEY = 'displayboard-workshop-device-token';
 const PAIRING_TOKEN_STORAGE_KEY = 'displayboard-workshop-pairing-token';
 const RIGHT_PANEL_SCROLL_SPEED_MULTIPLIER = 1.6;
+const DISPLAY_BOARD_TEXT_SIZE_DEFAULT_STEP = 3;
 
 type BoardState = 'loading' | 'unauthorised' | 'pairing' | 'ready' | 'error';
 type AutoScrollScrollerKey = 'maintenance' | 'pending' | 'inProgress' | 'onHold';
@@ -156,6 +161,13 @@ export default function WorkshopDisplayBoardPage() {
 
   const fallbackPollMs = Math.max(15, payload?.config.fallback_poll_interval_seconds || 60) * 1000;
   const realtimeDebounceMs = Math.max(250, payload?.config.realtime_debounce_ms || 750);
+  const textSizeStep = payload?.display.text_size_step || DISPLAY_BOARD_TEXT_SIZE_DEFAULT_STEP;
+
+  useEffect(() => {
+    if (isLegacyDisplayBoardBrowser(window.navigator.userAgent)) {
+      window.location.replace(DISPLAY_BOARD_LEGACY_TV_PATH);
+    }
+  }, []);
 
   const getDeviceToken = useCallback(() => {
     if (typeof window === 'undefined') return '';
@@ -293,6 +305,14 @@ export default function WorkshopDisplayBoardPage() {
     const clock = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(clock);
   }, []);
+
+  useEffect(() => {
+    document.documentElement.dataset.displayBoardTextSize = String(textSizeStep);
+
+    return () => {
+      document.documentElement.removeAttribute('data-display-board-text-size');
+    };
+  }, [textSizeStep]);
 
   useEffect(() => {
     if (state !== 'ready') return;

@@ -9,6 +9,11 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { PanelLoader } from '@/components/ui/panel-loader';
+import {
+  MOBILE_TEXT_SIZE_LABELS,
+  MOBILE_TEXT_SIZE_STEPS,
+  type MobileTextSizeStep,
+} from '@/lib/config/mobile-text-size-preference';
 import type {
   DisplayBoardAdminState,
   DisplayBoardConfig,
@@ -45,6 +50,7 @@ export function DisplayBoardSettingsCard() {
   const [confirmationCode, setConfirmationCode] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingTextSizeDeviceId, setSavingTextSizeDeviceId] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   const syncState = useCallback((payload: DisplayBoardSettingsResponse) => {
@@ -136,6 +142,38 @@ export function DisplayBoardSettingsCard() {
       session_id: activePairing.id,
       confirmation_code: confirmationCode,
     });
+  };
+
+  const updateDeviceTextSize = async (deviceId: string, value: string) => {
+    const numericValue = Number(value);
+    if (!MOBILE_TEXT_SIZE_STEPS.includes(numericValue as MobileTextSizeStep)) return;
+    const nextStep = numericValue as MobileTextSizeStep;
+
+    setDevices(currentDevices => currentDevices.map(device => (
+      device.id === deviceId ? { ...device, display_text_size_step: nextStep } : device
+    )));
+    setSavingTextSizeDeviceId(deviceId);
+
+    try {
+      const response = await fetch('/api/admin/settings/display-board', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update_device_text_size',
+          device_id: deviceId,
+          display_text_size_step: nextStep,
+        }),
+      });
+      const payload = await response.json() as DisplayBoardSettingsResponse;
+      if (!response.ok) throw new Error(payload.error || 'Unable to update display board text size');
+      syncState(payload);
+      setError('');
+    } catch (sizeError) {
+      setError(getErrorMessage(sizeError, 'Unable to update display board text size'));
+      void loadSettings(true);
+    } finally {
+      setSavingTextSizeDeviceId(null);
+    }
   };
 
   return (
@@ -243,7 +281,7 @@ export function DisplayBoardSettingsCard() {
             <div>
               <p className="font-semibold text-foreground">Workshop display board pairing</p>
               <p className="text-sm text-muted-foreground">
-                Start a 5-minute search, open `/displayboard-workshop` on the TV, then confirm matching codes.
+                Start a 5-minute search, open `/displayboard-workshop` on the TV, then confirm matching codes. Older Samsung TVs are sent to the TV fallback automatically.
               </p>
             </div>
             <div className="flex w-full flex-wrap gap-2 md:w-auto md:justify-end">
@@ -341,16 +379,45 @@ export function DisplayBoardSettingsCard() {
                     Paired {formatDateTime(device.created_at)} · Last seen {formatDateTime(device.last_seen_at)}
                   </p>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="border-red-500/40 text-red-300 hover:bg-red-500/10"
-                  onClick={() => runAction('revoke_device', { device_id: device.id })}
-                  disabled={saving}
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Revoke
-                </Button>
+                <div className="flex w-full flex-col gap-3 md:w-[18rem]">
+                  <div className="rounded-lg border border-border bg-background/70 p-3">
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <Label htmlFor={`display-board-text-size-${device.id}`} className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                        Text size
+                      </Label>
+                      <span className="rounded-md border border-workshop/30 bg-workshop/10 px-2 py-0.5 text-xs font-semibold text-workshop-light">
+                        {MOBILE_TEXT_SIZE_LABELS[device.display_text_size_step]}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span aria-hidden className="text-sm font-bold leading-none text-slate-400">A</span>
+                      <input
+                        id={`display-board-text-size-${device.id}`}
+                        aria-label={`${device.label || 'Workshop display board'} text size`}
+                        aria-valuetext={MOBILE_TEXT_SIZE_LABELS[device.display_text_size_step]}
+                        className="mobile-text-size-slider"
+                        max={5}
+                        min={1}
+                        onChange={(event) => void updateDeviceTextSize(device.id, event.currentTarget.value)}
+                        step={1}
+                        type="range"
+                        value={device.display_text_size_step}
+                        disabled={saving || savingTextSizeDeviceId === device.id}
+                      />
+                      <span aria-hidden className="text-2xl font-bold leading-none text-slate-400">A</span>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-red-500/40 text-red-300 hover:bg-red-500/10"
+                    onClick={() => runAction('revoke_device', { device_id: device.id })}
+                    disabled={saving || savingTextSizeDeviceId === device.id}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Revoke
+                  </Button>
+                </div>
               </div>
             )) : (
               <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">

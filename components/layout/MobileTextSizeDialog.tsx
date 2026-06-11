@@ -12,19 +12,12 @@ import {
 } from '@/components/ui/dialog';
 import {
   MOBILE_TEXT_SIZE_CHANGED_EVENT,
+  MOBILE_TEXT_SIZE_LABELS,
   type MobileTextSizeStep,
   normalizeMobileTextSizeStep,
   readMobileTextSizePreference,
   writeMobileTextSizePreference,
 } from '@/lib/config/mobile-text-size-preference';
-
-const TEXT_SIZE_LABELS: Record<MobileTextSizeStep, string> = {
-  1: 'Small',
-  2: 'Current',
-  3: 'Large',
-  4: 'Larger',
-  5: 'Biggest',
-};
 
 interface MobileTextSizeDialogProps {
   open: boolean;
@@ -77,7 +70,7 @@ export function MobileTextSizeDialog({ open, onOpenChange }: MobileTextSizeDialo
             </span>
             <input
               aria-label="Mobile text size"
-              aria-valuetext={TEXT_SIZE_LABELS[selectedStep]}
+              aria-valuetext={MOBILE_TEXT_SIZE_LABELS[selectedStep]}
               className="mobile-text-size-slider"
               max={5}
               min={1}

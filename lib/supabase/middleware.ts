@@ -11,6 +11,10 @@ import {
   isPublicRequestPath,
   isSafeInternalRedirectTarget,
 } from '@/lib/routes/public-routes'
+import {
+  DISPLAY_BOARD_LEGACY_TV_PATH,
+  shouldUseLegacyDisplayBoardRoute,
+} from '@/lib/display-board/compatibility'
 import type { Database } from '@/types/database'
 
 interface MiddlewareSessionPayload extends Record<string, unknown> {
@@ -185,6 +189,10 @@ export async function updateSession(request: NextRequest) {
   const isPublicPath = isPublicRequestPath(request.nextUrl.pathname)
   const isApiRoute = request.nextUrl.pathname.startsWith('/api/')
   const isAuthRoute = request.nextUrl.pathname.startsWith('/api/auth/')
+  const shouldRedirectLegacyDisplayBoard = shouldUseLegacyDisplayBoardRoute(
+    request.nextUrl.pathname,
+    request.headers.get('user-agent')
+  )
 
   if (isAuthorizedCronRequest(request)) {
     return response
@@ -199,6 +207,12 @@ export async function updateSession(request: NextRequest) {
 
   if (!session && hasLegacyCookie) {
     clearAllAuthCookies(request, response)
+
+    if (shouldRedirectLegacyDisplayBoard) {
+      const url = request.nextUrl.clone()
+      url.pathname = DISPLAY_BOARD_LEGACY_TV_PATH
+      return redirectWithMiddlewareCookies(response, url, 307)
+    }
 
     if (isPublicPath || LEGACY_SESSION_ALLOWED_AUTH_ROUTES.has(request.nextUrl.pathname)) {
       return response
@@ -229,6 +243,12 @@ export async function updateSession(request: NextRequest) {
     return redirectWithMiddlewareCookies(response, url, 301)
   }
 
+  if (shouldRedirectLegacyDisplayBoard) {
+    const url = request.nextUrl.clone()
+    url.pathname = DISPLAY_BOARD_LEGACY_TV_PATH
+    return redirectWithMiddlewareCookies(response, url, 307)
+  }
+
   if (request.nextUrl.pathname === '/') {
     const url = request.nextUrl.clone()
     if (isAuthenticated) {
@@ -252,7 +272,9 @@ export async function updateSession(request: NextRequest) {
 
       if (targetUrl.pathname !== '/login' && isPublicBrowserPath(targetUrl.pathname)) {
         const url = request.nextUrl.clone()
-        url.pathname = targetUrl.pathname
+        url.pathname = shouldUseLegacyDisplayBoardRoute(targetUrl.pathname, request.headers.get('user-agent'))
+          ? DISPLAY_BOARD_LEGACY_TV_PATH
+          : targetUrl.pathname
         url.search = targetUrl.search
         return redirectWithMiddlewareCookies(response, url, 307)
       }
@@ -280,7 +302,9 @@ export async function updateSession(request: NextRequest) {
     const redirectTarget = request.nextUrl.searchParams.get('redirect')
     if (isSafeInternalRedirectTarget(redirectTarget)) {
       const targetUrl = new URL(redirectTarget, request.nextUrl.origin)
-      url.pathname = targetUrl.pathname
+      url.pathname = shouldUseLegacyDisplayBoardRoute(targetUrl.pathname, request.headers.get('user-agent'))
+        ? DISPLAY_BOARD_LEGACY_TV_PATH
+        : targetUrl.pathname
       url.search = targetUrl.search
     } else {
       url.pathname = '/dashboard'
