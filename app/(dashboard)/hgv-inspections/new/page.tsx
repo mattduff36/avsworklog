@@ -242,9 +242,16 @@ function NewHgvInspectionContent() {
       .maybeSingle();
 
     if (error) {
-      console.error('Failed to check for existing inspection:', error, {
-        errorContextId: 'hgv-inspections-new-check-existing-error',
-      });
+      const status = getErrorStatus(error);
+      if (!isAuthErrorStatus(status) && !isNetworkFetchError(error)) {
+        console.error('Failed to check for existing inspection:', error, {
+          errorContextId: 'hgv-inspections-new-check-existing-error',
+        });
+      } else if (isNetworkFetchError(error)) {
+        console.warn('Unable to check existing HGV inspection (network):', error, {
+          errorContextId: 'hgv-inspections-new-check-existing-error',
+        });
+      }
       return null;
     }
 

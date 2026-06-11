@@ -65,6 +65,7 @@ const SignaturePad = dynamic(() => import('@/components/forms/SignaturePad'), { 
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const INVALID_VAN_SELECTION_MESSAGE = 'Please select a valid van';
+const DUPLICATE_VEHICLE_REGISTRATION_MESSAGE = 'A vehicle with this registration already exists';
 
 // Type definitions for inspection data
 type InspectionItem = {
@@ -1531,7 +1532,11 @@ function NewInspectionContent() {
 
       if (vehicleError) {
         if (vehicleError.code === '23505') {
-          throw new Error('A vehicle with this registration already exists');
+          setError(DUPLICATE_VEHICLE_REGISTRATION_MESSAGE);
+          toast.error(DUPLICATE_VEHICLE_REGISTRATION_MESSAGE, {
+            id: 'van-inspections-new-add-vehicle-duplicate',
+          });
+          return;
         }
         throw vehicleError;
       }
@@ -1559,7 +1564,9 @@ function NewInspectionContent() {
         setNewVehicleCategoryId('');
       }, 100);
     } catch (err) {
-      console.error('Error adding vehicle:', err);
+      console.error('Error adding vehicle:', err, {
+        errorContextId: 'van-inspections-new-add-vehicle-error',
+      });
       setError(err instanceof Error ? err.message : 'Failed to add vehicle');
     } finally {
       setAddingVehicle(false);
