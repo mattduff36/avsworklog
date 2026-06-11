@@ -161,6 +161,70 @@ describe('supabase middleware cookie refresh', () => {
     expect(response.cookies.get('sb-refresh-token')?.value).toBe('');
   });
 
+  it('allows the workshop display board shell without an app session', async () => {
+    mockSupabaseMiddlewareAuth({
+      user: null,
+    });
+    verifyJwtHS256Mock.mockResolvedValue(null);
+
+    const localResponse = await updateSession(new NextRequest('http://localhost/displayboard-workshop'));
+    const productionResponse = await updateSession(new NextRequest('https://squiresapp.com/displayboard-workshop'));
+
+    expect(localResponse.status).toBe(200);
+    expect(localResponse.headers.get('x-middleware-next')).toBe('1');
+    expect(productionResponse.status).toBe(200);
+    expect(productionResponse.headers.get('x-middleware-next')).toBe('1');
+  });
+
+  it('redirects stale login display board redirects back to the public display board shell', async () => {
+    mockSupabaseMiddlewareAuth({
+      user: null,
+    });
+    verifyJwtHS256Mock.mockResolvedValue(null);
+
+    const response = await updateSession(
+      new NextRequest('http://localhost/login?redirect=%2Fdisplayboard-workshop')
+    );
+    const productionResponse = await updateSession(
+      new NextRequest('https://squiresapp.com/login?redirect=%2Fdisplayboard-workshop')
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('http://localhost/displayboard-workshop');
+    expect(productionResponse.status).toBe(307);
+    expect(productionResponse.headers.get('location')).toBe('https://squiresapp.com/displayboard-workshop');
+  });
+
+  it('allows display board token APIs without an app session', async () => {
+    mockSupabaseMiddlewareAuth({
+      user: null,
+    });
+    verifyJwtHS256Mock.mockResolvedValue(null);
+
+    const dataResponse = await updateSession(new NextRequest('http://localhost/api/display-board/workshop/data'));
+    const pairingResponse = await updateSession(new NextRequest('http://localhost/api/display-board/workshop/pairing'));
+
+    expect(dataResponse.status).toBe(200);
+    expect(dataResponse.headers.get('x-middleware-next')).toBe('1');
+    expect(pairingResponse.status).toBe(200);
+    expect(pairingResponse.headers.get('x-middleware-next')).toBe('1');
+  });
+
+  it('clears stale legacy cookies but still allows display board token APIs through', async () => {
+    mockSupabaseMiddlewareAuth({
+      user: { id: 'legacy-user' },
+    });
+    verifyJwtHS256Mock.mockResolvedValue(null);
+
+    const response = await updateSession(
+      createRequest('http://localhost/api/display-board/workshop/data', 'sb-project-auth-token=legacy-token')
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('x-middleware-next')).toBe('1');
+    expect(response.cookies.get('sb-project-auth-token')?.value).toBe('');
+  });
+
   it('preserves refreshed cookies on unauthorized API json responses', async () => {
     mockSupabaseMiddlewareAuth({
       user: null,

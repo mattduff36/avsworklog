@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/browser';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -20,7 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
-import { Fingerprint, Lock } from 'lucide-react';
+import { Fingerprint, Lock, Monitor } from 'lucide-react';
 
 interface WebAuthnOptionsResponse {
   challenge?: string;
@@ -303,6 +304,15 @@ export default function LoginPage() {
           </p>
         </div>
       </div>
+
+      <Link
+        href="/displayboard-workshop"
+        aria-label="Open Workshop Display Board"
+        title="Workshop Display Board"
+        className="fixed bottom-6 right-6 z-20 hidden h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/35 shadow-lg shadow-black/20 backdrop-blur-md transition hover:border-workshop/35 hover:bg-workshop/10 hover:text-workshop-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-workshop/60 lg:flex"
+      >
+        <Monitor className="h-5 w-5" />
+      </Link>
 
     </div>
   );

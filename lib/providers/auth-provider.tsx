@@ -33,6 +33,10 @@ import {
   createClient,
   invalidateCachedDataToken,
 } from '@/lib/supabase/client';
+import {
+  isPublicBrowserPath,
+  isSafeInternalRedirectTarget,
+} from '@/lib/routes/public-routes';
 import { getClientServiceOutage } from '@/lib/app-auth/client-service-health';
 import type { Database } from '@/types/database';
 import { isAdminRole } from '@/lib/utils/role-access';
@@ -142,7 +146,6 @@ interface AuthProviderProps {
 
 type BrowserSupabaseClient = SupabaseClient<Database>;
 
-const PUBLIC_PATHS = ['/login', '/change-password', '/offline', '/pwa-debug'];
 const AUTH_SCOPED_QUERY_KEYS = [
   'permission-snapshot',
   'absence-secondary-permissions',
@@ -193,10 +196,6 @@ function getCurrentPath(): string {
   return `${window.location.pathname}${window.location.search}`;
 }
 
-function isPublicPath(path: string): boolean {
-  return PUBLIC_PATHS.some((publicPath) => path.startsWith(publicPath));
-}
-
 function buildLoginRedirectUrl(): string {
   if (typeof window === 'undefined') {
     return '/login';
@@ -205,7 +204,7 @@ function buildLoginRedirectUrl(): string {
   const url = new URL('/login', window.location.origin);
   const currentPath = getCurrentPath();
 
-  if (!isPublicPath(currentPath)) {
+  if (!isPublicBrowserPath(currentPath)) {
     url.searchParams.set('redirect', currentPath);
   }
 
@@ -231,10 +230,7 @@ function buildAuthenticatedRedirectUrl(payload: ClientAuthSessionResponse): stri
     }
 
     const redirectTarget = currentUrl.searchParams.get('redirect');
-    if (
-      redirectTarget &&
-      redirectTarget.startsWith('/')
-    ) {
+    if (isSafeInternalRedirectTarget(redirectTarget)) {
       return redirectTarget;
     }
 
@@ -333,7 +329,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     const currentPath = getCurrentPath();
-    if (isPublicPath(currentPath) || redirectInProgressRef.current === 'login') {
+    if (isPublicBrowserPath(currentPath) || redirectInProgressRef.current === 'login') {
       return;
     }
 

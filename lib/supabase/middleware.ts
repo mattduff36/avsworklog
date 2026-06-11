@@ -6,6 +6,11 @@ import {
   getAppSessionSigningSecret,
 } from '@/lib/server/app-auth/constants'
 import { verifyJwtHS256 } from '@/lib/server/app-auth/jwt'
+import {
+  isPublicBrowserPath,
+  isPublicRequestPath,
+  isSafeInternalRedirectTarget,
+} from '@/lib/routes/public-routes'
 import type { Database } from '@/types/database'
 
 interface MiddlewareSessionPayload extends Record<string, unknown> {
@@ -177,8 +182,7 @@ export async function updateSession(request: NextRequest) {
   const session = await getMiddlewareSession(request)
   await getSupabaseUser(request, response)
   const hasLegacyCookie = hasLegacySupabaseSessionCookie(request)
-  const publicPaths = ['/login', '/change-password', '/offline', '/pwa-debug']
-  const isPublicPath = publicPaths.some((path) => request.nextUrl.pathname.startsWith(path))
+  const isPublicPath = isPublicRequestPath(request.nextUrl.pathname)
   const isApiRoute = request.nextUrl.pathname.startsWith('/api/')
   const isAuthRoute = request.nextUrl.pathname.startsWith('/api/auth/')
 
@@ -196,16 +200,16 @@ export async function updateSession(request: NextRequest) {
   if (!session && hasLegacyCookie) {
     clearAllAuthCookies(request, response)
 
+    if (isPublicPath || LEGACY_SESSION_ALLOWED_AUTH_ROUTES.has(request.nextUrl.pathname)) {
+      return response
+    }
+
     if (isApiRoute && !LEGACY_SESSION_ALLOWED_AUTH_ROUTES.has(request.nextUrl.pathname)) {
       return jsonWithMiddlewareCookies(
         response,
         { error: 'Legacy session expired', code: 'LEGACY_SESSION_EXPIRED' },
         { status: 401 }
       )
-    }
-
-    if (isPublicPath || LEGACY_SESSION_ALLOWED_AUTH_ROUTES.has(request.nextUrl.pathname)) {
-      return response
     }
 
     const url = request.nextUrl.clone()
@@ -241,6 +245,20 @@ export async function updateSession(request: NextRequest) {
     return redirectWithMiddlewareCookies(response, url, 307)
   }
 
+  if (request.nextUrl.pathname === '/login') {
+    const redirectTarget = request.nextUrl.searchParams.get('redirect')
+    if (isSafeInternalRedirectTarget(redirectTarget)) {
+      const targetUrl = new URL(redirectTarget, request.nextUrl.origin)
+
+      if (targetUrl.pathname !== '/login' && isPublicBrowserPath(targetUrl.pathname)) {
+        const url = request.nextUrl.clone()
+        url.pathname = targetUrl.pathname
+        url.search = targetUrl.search
+        return redirectWithMiddlewareCookies(response, url, 307)
+      }
+    }
+  }
+
   if (!isPublicPath && !isAuthenticated && !isAuthRoute) {
     if (isApiRoute) {
       return jsonWithMiddlewareCookies(
@@ -260,7 +278,7 @@ export async function updateSession(request: NextRequest) {
   if (request.nextUrl.pathname === '/login' && isAuthenticated) {
     const url = request.nextUrl.clone()
     const redirectTarget = request.nextUrl.searchParams.get('redirect')
-    if (redirectTarget?.startsWith('/') && !redirectTarget.startsWith('//')) {
+    if (isSafeInternalRedirectTarget(redirectTarget)) {
       const targetUrl = new URL(redirectTarget, request.nextUrl.origin)
       url.pathname = targetUrl.pathname
       url.search = targetUrl.search
