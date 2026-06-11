@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.6.3
+
+**GIT COMMIT MESSAGE**
+`fix(layout): update sidebar navigation styling, mobile text size controls, and 3 more areas`
+
+**WHAT CHANGED**
+Update sidebar navigation styling, mobile text size controls, and 3 more areas.
+
+**COMMITS IN THIS RELEASE**
+- `fix(layout): update sidebar navigation styling, mobile text size controls, and 3 more areas`
+
 ## 0626.6.2
 
 **GIT COMMIT MESSAGE**
