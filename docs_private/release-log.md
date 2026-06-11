@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.7.2
+
+**GIT COMMIT MESSAGE**
+`fix(inspections): avoid logging expected inspection errors`
+
+**WHAT CHANGED**
+Avoid logging expected inspection errors.
+
+**COMMITS IN THIS RELEASE**
+- `fix(inspections): avoid logging expected inspection errors`
+
 ## 0626.7.1
 
 **GIT COMMIT MESSAGE**
