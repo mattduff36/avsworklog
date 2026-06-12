@@ -1,6 +1,37 @@
 import { NextResponse } from 'next/server';
+import {
+  WORKSHOP_DISPLAY_BOARD_BRAND,
+  WORKSHOP_DISPLAY_BOARD_DEVICE_TOKEN_STORAGE_KEY,
+  WORKSHOP_DISPLAY_BOARD_EMPTY_MAINTENANCE_LABEL,
+  WORKSHOP_DISPLAY_BOARD_MAINTENANCE_KICKER,
+  WORKSHOP_DISPLAY_BOARD_MAINTENANCE_TITLE,
+  WORKSHOP_DISPLAY_BOARD_PAIRING_TOKEN_STORAGE_KEY,
+  WORKSHOP_DISPLAY_BOARD_RIGHT_PANEL_SCROLL_SPEED_MULTIPLIER,
+  WORKSHOP_DISPLAY_BOARD_STAT_TILES,
+  WORKSHOP_DISPLAY_BOARD_TASK_PANELS,
+  WORKSHOP_DISPLAY_BOARD_TEXT_SIZE_DEFAULT_STEP,
+  WORKSHOP_DISPLAY_BOARD_TITLE,
+  WORKSHOP_DISPLAY_BOARD_TOP_MAINTENANCE_LIMIT,
+} from '@/lib/display-board/workshop-board-config';
 
 export const dynamic = 'force-dynamic';
+
+const legacyDisplayBoardConfig = {
+  brand: WORKSHOP_DISPLAY_BOARD_BRAND,
+  title: WORKSHOP_DISPLAY_BOARD_TITLE,
+  maintenanceKicker: WORKSHOP_DISPLAY_BOARD_MAINTENANCE_KICKER,
+  maintenanceTitle: WORKSHOP_DISPLAY_BOARD_MAINTENANCE_TITLE,
+  maintenanceEmptyLabel: WORKSHOP_DISPLAY_BOARD_EMPTY_MAINTENANCE_LABEL,
+  deviceTokenStorageKey: WORKSHOP_DISPLAY_BOARD_DEVICE_TOKEN_STORAGE_KEY,
+  pairingTokenStorageKey: WORKSHOP_DISPLAY_BOARD_PAIRING_TOKEN_STORAGE_KEY,
+  rightPanelScrollSpeedMultiplier: WORKSHOP_DISPLAY_BOARD_RIGHT_PANEL_SCROLL_SPEED_MULTIPLIER,
+  textSizeDefaultStep: WORKSHOP_DISPLAY_BOARD_TEXT_SIZE_DEFAULT_STEP,
+  topMaintenanceLimit: WORKSHOP_DISPLAY_BOARD_TOP_MAINTENANCE_LIMIT,
+  statTiles: WORKSHOP_DISPLAY_BOARD_STAT_TILES,
+  taskPanels: WORKSHOP_DISPLAY_BOARD_TASK_PANELS,
+};
+
+const legacyDisplayBoardConfigJson = JSON.stringify(legacyDisplayBoardConfig);
 
 const legacyDisplayBoardHtml = String.raw`<!doctype html>
 <html lang="en">
@@ -12,11 +43,16 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
   <style>
     * { box-sizing: border-box; }
     html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    html.tv-text-step-1 { font-size: 50%; }
+    html.tv-text-step-2 { font-size: 75%; }
+    html.tv-text-step-3 { font-size: 100%; }
+    html.tv-text-step-4 { font-size: 150%; }
+    html.tv-text-step-5 { font-size: 200%; }
     body {
       background: #020617;
       color: #fff;
       font-family: Arial, Helvetica, sans-serif;
-      font-size: 20px;
+      font-size: 1.25rem;
     }
     .boot {
       position: absolute;
@@ -72,17 +108,47 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
       border-radius: 26px;
       background: rgba(255,255,255,0.06);
     }
-    .brand { color: #f0b293; font-size: 17px; font-weight: 800; letter-spacing: 5px; text-transform: uppercase; }
-    .title { margin-top: 3px; font-size: 43px; line-height: 1; font-weight: 900; }
+    .brand { color: #f0b293; font-size: 1.0625rem; font-weight: 800; letter-spacing: 5px; text-transform: uppercase; }
+    .title { margin-top: 3px; font-size: 2.6875rem; line-height: 1; font-weight: 900; }
     .status {
       position: absolute;
       top: 24px;
       right: 30px;
       text-align: right;
       color: rgba(255,255,255,0.7);
-      font-size: 17px;
+      font-size: 1.0625rem;
     }
-    .status strong { display: block; color: #fff; font-size: 28px; }
+    .status-top { white-space: nowrap; }
+    .status-block {
+      display: inline-block;
+      margin-left: 22px;
+      vertical-align: top;
+    }
+    .status-label {
+      color: rgba(255,255,255,0.5);
+      font-size: 0.875rem;
+      font-weight: 800;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+    }
+    .status strong { display: block; color: #fff; font-size: 1.75rem; }
+    .live-badge {
+      display: inline-block;
+      margin-left: 22px;
+      padding: 9px 16px;
+      border: 1px solid rgba(74,222,128,0.3);
+      border-radius: 999px;
+      background: rgba(34,197,94,0.15);
+      color: #dcfce7;
+      font-size: 0.9375rem;
+      font-weight: 800;
+      vertical-align: top;
+    }
+    .status-meta {
+      margin-top: 7px;
+      color: rgba(255,255,255,0.45);
+      font-size: 0.75rem;
+    }
     .stats {
       position: absolute;
       top: 150px;
@@ -103,8 +169,8 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
       vertical-align: top;
     }
     .tile-last { margin-right: 0; }
-    .tile-label { color: rgba(255,255,255,0.68); font-size: 15px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; }
-    .tile-value { margin-top: 10px; font-size: 54px; line-height: 1; font-weight: 900; }
+    .tile-label { color: rgba(255,255,255,0.68); font-size: 0.9375rem; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; }
+    .tile-value { margin-top: 10px; font-size: 3.375rem; line-height: 1; font-weight: 900; }
     .tone-red { border-color: rgba(239,68,68,0.46); background: rgba(239,68,68,0.15); }
     .tone-amber { border-color: rgba(245,158,11,0.46); background: rgba(245,158,11,0.15); }
     .tone-blue { border-color: rgba(59,130,246,0.46); background: rgba(59,130,246,0.15); }
@@ -144,8 +210,8 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
       right: 24px;
       border-color: rgba(168,85,247,0.22);
     }
-    .panel-title-small { color: rgba(255,255,255,0.65); font-size: 15px; font-weight: 800; letter-spacing: 4px; text-transform: uppercase; }
-    .panel-title { margin: 5px 0 14px; font-size: 32px; line-height: 1; font-weight: 900; }
+    .panel-title-small { color: rgba(255,255,255,0.65); font-size: 0.9375rem; font-weight: 800; letter-spacing: 4px; text-transform: uppercase; }
+    .panel-title { margin: 5px 0 14px; font-size: 2rem; line-height: 1; font-weight: 900; }
     .scroll-panel {
       position: absolute;
       top: 86px;
@@ -172,11 +238,23 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
     }
     .row-overdue { border-color: rgba(239,68,68,0.38); background: rgba(239,68,68,0.12); }
     .row-due { border-color: rgba(245,158,11,0.38); background: rgba(245,158,11,0.12); }
+    .row-high-priority { border-color: rgba(239,68,68,0.42); background: rgba(239,68,68,0.14); }
     .row-progress { border-color: rgba(59,130,246,0.34); background: rgba(59,130,246,0.11); }
     .row-hold { border-color: rgba(168,85,247,0.34); background: rgba(168,85,247,0.11); }
     .row-main { float: left; width: 72%; }
-    .row-title { font-size: 25px; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .row-sub { margin-top: 5px; color: rgba(255,255,255,0.72); font-size: 18px; line-height: 1.25; max-height: 46px; overflow: hidden; }
+    .row-title { font-size: 1.5625rem; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .row-sub { margin-top: 5px; color: rgba(255,255,255,0.72); font-size: 1.125rem; line-height: 1.25; max-height: 46px; overflow: hidden; }
+    .hp-badge {
+      display: inline-block;
+      margin-left: 7px;
+      padding: 2px 6px;
+      border: 1px solid rgba(248,113,113,0.5);
+      border-radius: 999px;
+      color: #fecaca;
+      font-size: 0.6875rem;
+      font-weight: 900;
+      vertical-align: middle;
+    }
     .tag {
       float: right;
       max-width: 26%;
@@ -184,7 +262,7 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
       border: 1px solid rgba(255,255,255,0.24);
       border-radius: 12px;
       color: rgba(255,255,255,0.88);
-      font-size: 16px;
+      font-size: 1rem;
       font-weight: 800;
       text-align: right;
     }
@@ -195,14 +273,6 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
       color: rgba(255,255,255,0.55);
       text-align: center;
     }
-    .text-step-1 .row-title { font-size: 13px; }
-    .text-step-1 .row-sub { font-size: 9px; }
-    .text-step-2 .row-title { font-size: 19px; }
-    .text-step-2 .row-sub { font-size: 14px; }
-    .text-step-4 .row-title { font-size: 38px; }
-    .text-step-4 .row-sub { font-size: 27px; }
-    .text-step-5 .row-title { font-size: 50px; }
-    .text-step-5 .row-sub { font-size: 36px; }
   </style>
 </head>
 <body>
@@ -213,12 +283,14 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
     </div>
   </div>
   <script>
+    var BOARD_CONFIG = ${legacyDisplayBoardConfigJson};
     (function () {
-      var DEVICE_TOKEN_STORAGE_KEY = 'displayboard-workshop-device-token';
-      var PAIRING_TOKEN_STORAGE_KEY = 'displayboard-workshop-pairing-token';
+      var DEVICE_TOKEN_STORAGE_KEY = BOARD_CONFIG.deviceTokenStorageKey;
+      var PAIRING_TOKEN_STORAGE_KEY = BOARD_CONFIG.pairingTokenStorageKey;
       var app = document.getElementById('app');
       var refreshTimer = null;
       var scrollTimers = [];
+      var clockTimer = null;
 
       function escapeHtml(value) {
         var text = value == null ? '' : String(value);
@@ -283,6 +355,14 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
         return pad(date.getDate()) + ' ' + months[date.getMonth()] + ' ' + pad(date.getHours()) + ':' + pad(date.getMinutes());
       }
 
+      function setTextSizeClass(step) {
+        var root = document.documentElement;
+        root.className = (' ' + root.className + ' ')
+          .replace(/ tv-text-step-[1-5] /g, ' ')
+          .replace(/^\s+|\s+$/g, '');
+        root.className = root.className ? root.className + ' tv-text-step-' + step : 'tv-text-step-' + step;
+      }
+
       function clearRefresh() {
         if (refreshTimer) window.clearTimeout(refreshTimer);
         refreshTimer = null;
@@ -291,7 +371,9 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
       function stopAutoScroll() {
         var index;
         for (index = 0; index < scrollTimers.length; index += 1) {
-          window.clearInterval(scrollTimers[index]);
+          scrollTimers[index].cancelled = true;
+          window.clearTimeout(scrollTimers[index].timeout);
+          window.clearTimeout(scrollTimers[index].frame);
         }
         scrollTimers = [];
       }
@@ -302,20 +384,83 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
         stopAutoScroll();
         for (index = 0; index < panels.length; index += 1) {
           (function (panel) {
-            var timer = window.setInterval(function () {
-              if (panel.scrollHeight <= panel.clientHeight + 2) return;
-              panel.scrollTop += 1;
-              if (panel.scrollTop + panel.clientHeight >= panel.scrollHeight - 1) {
-                panel.scrollTop = 0;
+            var job = { timeout: null, frame: null, cancelled: false };
+            var speedMultiplier = panel.getAttribute('data-speed') === 'fast'
+              ? BOARD_CONFIG.rightPanelScrollSpeedMultiplier
+              : 1;
+
+            function schedule(callback, delayMs) {
+              job.timeout = window.setTimeout(callback, delayMs);
+            }
+
+            function animateTo(target, done) {
+              var start = panel.scrollTop;
+              var distance = target - start;
+              var duration = Math.max(1200, Math.min(12000 * speedMultiplier, Math.abs(distance) * 35 * speedMultiplier));
+              var startTime = new Date().getTime();
+
+              function tick() {
+                var elapsed;
+                var progress;
+                if (job.cancelled) return;
+                elapsed = new Date().getTime() - startTime;
+                progress = Math.min(1, elapsed / duration);
+                panel.scrollTop = start + (distance * progress);
+                if (progress < 1) {
+                  job.frame = window.setTimeout(tick, 16);
+                  return;
+                }
+                done();
               }
-            }, 90);
-            scrollTimers.push(timer);
+
+              tick();
+            }
+
+            function loop() {
+              var maxScroll;
+              if (job.cancelled) return;
+              maxScroll = panel.scrollHeight - panel.clientHeight;
+              if (maxScroll <= 1) {
+                panel.scrollTop = 0;
+                schedule(loop, 2000);
+                return;
+              }
+              schedule(function () {
+                animateTo(maxScroll, function () {
+                  schedule(function () {
+                    animateTo(0, function () {
+                      schedule(loop, 2000);
+                    });
+                  }, 2000);
+                });
+              }, 2000);
+            }
+
+            scrollTimers.push(job);
+            loop();
           }(panels[index]));
         }
       }
 
+      function updateClock() {
+        var node = document.getElementById('board-now');
+        if (node) node.innerHTML = escapeHtml(formatTime());
+      }
+
+      function startClock() {
+        stopClock();
+        updateClock();
+        clockTimer = window.setInterval(updateClock, 1000);
+      }
+
+      function stopClock() {
+        if (clockTimer) window.clearInterval(clockTimer);
+        clockTimer = null;
+      }
+
       function showBoot(message) {
         stopAutoScroll();
+        stopClock();
         app.className = 'boot';
         app.innerHTML = '<div class="boot-card"><h1>Workshop Display Board</h1><div class="boot-message">' + escapeHtml(message) + '</div></div>';
       }
@@ -342,60 +487,107 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
         refreshTimer = window.setTimeout(loadBoard, delayMs);
       }
 
-      function getItems(items, emptyLabel, rowClass, isTask) {
+      function getTaskRowClass(item, panel) {
+        if (item && item.is_high_priority) return 'row-high-priority';
+        if (panel.tone === 'blue') return 'row-progress';
+        if (panel.tone === 'purple') return 'row-hold';
+        return 'row-due';
+      }
+
+      function getItemRow(item, rowClass, isTask) {
+        var title = escapeHtml(item.asset);
+        var html = '';
+        if (isTask && item.is_high_priority) {
+          title += '<span class="hp-badge">HP</span>';
+        }
+        html += '<div class="row ' + rowClass + '">';
+        html += '<div class="row-main">';
+        html += '<div class="row-title">' + title + '</div>';
+        html += '<div class="row-sub">' + escapeHtml(isTask ? item.summary : item.category) + '</div>';
+        html += '</div>';
+        html += '<div class="tag">' + escapeHtml(isTask ? formatDateTime(item.created_at) : item.detail) + '</div>';
+        html += '</div>';
+        return html;
+      }
+
+      function getTaskItems(items, emptyLabel, panel) {
         var html = '';
         var item;
         var index;
         if (!items || items.length === 0) return '<div class="empty">' + escapeHtml(emptyLabel) + '</div>';
         for (index = 0; index < items.length; index += 1) {
           item = items[index];
-          html += '<div class="row ' + rowClass + '">';
-          html += '<div class="row-main">';
-          html += '<div class="row-title">' + escapeHtml(item.asset) + '</div>';
-          html += '<div class="row-sub">' + escapeHtml(isTask ? item.summary : item.category) + '</div>';
-          html += '</div>';
-          html += '<div class="tag">' + escapeHtml(isTask ? formatDateTime(item.created_at) : item.detail) + '</div>';
-          html += '</div>';
+          html += getItemRow(item, getTaskRowClass(item, panel), true);
         }
         return html;
       }
 
       function getMaintenanceRows(payload) {
         var rows = [];
+        var html = '';
         var index;
         var overdue = payload.maintenance && payload.maintenance.overdue_items ? payload.maintenance.overdue_items : [];
         var dueSoon = payload.maintenance && payload.maintenance.due_soon_items ? payload.maintenance.due_soon_items : [];
         for (index = 0; index < overdue.length; index += 1) rows.push(overdue[index]);
         for (index = 0; index < dueSoon.length; index += 1) rows.push(dueSoon[index]);
-        return getItems(rows, 'No overdue or due soon maintenance.', 'row-overdue', false);
+        rows = rows.slice(0, BOARD_CONFIG.topMaintenanceLimit);
+        if (rows.length === 0) return '<div class="empty">' + escapeHtml(BOARD_CONFIG.maintenanceEmptyLabel) + '</div>';
+        for (index = 0; index < rows.length; index += 1) {
+          html += getItemRow(rows[index], rows[index].status === 'due_soon' ? 'row-due' : 'row-overdue', false);
+        }
+        return html;
       }
 
-      function tile(label, value, tone, isLast) {
-        return '<div class="tile tone-' + tone + (isLast ? ' tile-last' : '') + '"><div class="tile-label">' + escapeHtml(label) + '</div><div class="tile-value">' + escapeHtml(value) + '</div></div>';
+      function getStatValue(definition, maintenanceTotals, workshopCounts) {
+        var source = definition.source === 'maintenance' ? maintenanceTotals : workshopCounts;
+        var value = source && source[definition.valueKey] ? source[definition.valueKey] : 0;
+        return value;
+      }
+
+      function tile(definition, value, isLast) {
+        return '<div class="tile tone-' + definition.tone + (isLast ? ' tile-last' : '') + '"><div class="tile-label">' + escapeHtml(definition.label) + '</div><div class="tile-value">' + escapeHtml(value) + '</div></div>';
+      }
+
+      function getPanelClass(panel) {
+        if (panel.id === 'inProgress') return 'panel-progress';
+        if (panel.id === 'onHold') return 'panel-hold';
+        return 'panel-pending';
+      }
+
+      function getPanelHtml(panel, payload) {
+        var items = payload.workshop && payload.workshop[panel.itemsKey] ? payload.workshop[panel.itemsKey] : [];
+        return '<div class="panel ' + getPanelClass(panel) + '"><div class="panel-title-small">Workshop</div><div class="panel-title">' + escapeHtml(panel.title) + '</div><div class="scroll-panel task-grid" data-speed="fast">' + getTaskItems(items, panel.emptyLabel, panel) + '</div></div>';
       }
 
       function renderBoard(payload) {
         var maintenanceTotals = payload.maintenance && payload.maintenance.summary ? payload.maintenance.summary : {};
         var workshopCounts = payload.workshop && payload.workshop.counts ? payload.workshop.counts : {};
-        var textSize = payload.display && payload.display.text_size_step ? Number(payload.display.text_size_step) : 3;
+        var textSize = payload.display && payload.display.text_size_step ? Number(payload.display.text_size_step) : BOARD_CONFIG.textSizeDefaultStep;
         var pollSeconds = payload.config && payload.config.fallback_poll_interval_seconds ? Number(payload.config.fallback_poll_interval_seconds) : 60;
-        if (textSize < 1 || textSize > 5) textSize = 3;
+        var statsHtml = '';
+        var panelsHtml = '';
+        var index;
+        if (textSize < 1 || textSize > 5) textSize = BOARD_CONFIG.textSizeDefaultStep;
+        for (index = 0; index < BOARD_CONFIG.statTiles.length; index += 1) {
+          statsHtml += tile(
+            BOARD_CONFIG.statTiles[index],
+            getStatValue(BOARD_CONFIG.statTiles[index], maintenanceTotals, workshopCounts),
+            index === BOARD_CONFIG.statTiles.length - 1
+          );
+        }
+        for (index = 0; index < BOARD_CONFIG.taskPanels.length; index += 1) {
+          panelsHtml += getPanelHtml(BOARD_CONFIG.taskPanels[index], payload);
+        }
+        setTextSizeClass(textSize);
         app.className = 'board text-step-' + textSize;
         app.innerHTML =
-          '<div class="header"><div class="brand">Squires Workshop</div><div class="title">Live Display Board</div><div class="status">Last update<strong>' + escapeHtml(formatTime(payload.generated_at)) + '</strong><span>TV fallback mode - refresh every ' + escapeHtml(pollSeconds) + 's</span></div></div>' +
+          '<div class="header"><div class="brand">' + escapeHtml(BOARD_CONFIG.brand) + '</div><div class="title">' + escapeHtml(BOARD_CONFIG.title) + '</div><div class="status"><div class="status-top"><div class="status-block"><div class="status-label">Last update</div><strong>' + escapeHtml(formatTime(payload.generated_at)) + '</strong></div><div class="status-block"><div class="status-label">Now</div><strong id="board-now">' + escapeHtml(formatTime()) + '</strong></div><div class="live-badge">Live</div></div><div class="status-meta">Fallback refresh every ' + escapeHtml(pollSeconds) + 's · Polling mode</div></div></div>' +
           '<div class="stats">' +
-            tile('All Assets', maintenanceTotals.total || 0, 'slate', false) +
-            tile('Maintenance Overdue', maintenanceTotals.overdue || 0, 'red', false) +
-            tile('Due Soon', maintenanceTotals.due_soon || 0, 'amber', false) +
-            tile('High Priority', workshopCounts.high_priority || 0, 'red', false) +
-            tile('Pending', workshopCounts.pending || 0, 'amber', false) +
-            tile('In Progress', workshopCounts.in_progress || 0, 'blue', false) +
-            tile('On Hold', workshopCounts.on_hold || 0, 'purple', true) +
+            statsHtml +
           '</div>' +
-          '<div class="panel panel-maintenance"><div class="panel-title-small">Maintenance</div><div class="panel-title">Urgent All Assets</div><div class="scroll-panel">' + getMaintenanceRows(payload) + '</div></div>' +
-          '<div class="panel panel-pending"><div class="panel-title-small">Workshop</div><div class="panel-title">Pending</div><div class="scroll-panel task-grid">' + getItems(payload.workshop.pending, 'No pending workshop tasks.', 'row-due', true) + '</div></div>' +
-          '<div class="panel panel-progress"><div class="panel-title-small">Workshop</div><div class="panel-title">In Progress</div><div class="scroll-panel task-grid">' + getItems(payload.workshop.in_progress, 'No tasks in progress.', 'row-progress', true) + '</div></div>' +
-          '<div class="panel panel-hold"><div class="panel-title-small">Workshop</div><div class="panel-title">On Hold</div><div class="scroll-panel task-grid">' + getItems(payload.workshop.on_hold, 'No tasks on hold.', 'row-hold', true) + '</div></div>';
+          '<div class="panel panel-maintenance"><div class="panel-title-small">' + escapeHtml(BOARD_CONFIG.maintenanceKicker) + '</div><div class="panel-title">' + escapeHtml(BOARD_CONFIG.maintenanceTitle) + '</div><div class="scroll-panel">' + getMaintenanceRows(payload) + '</div></div>' +
+          panelsHtml;
+        startClock();
         startAutoScroll();
         scheduleBoardRefresh(Math.max(15, pollSeconds) * 1000);
       }
@@ -425,6 +617,12 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
           }
           renderBoard(body.payload);
         });
+      }
+
+      function refreshVisibleBoard() {
+        if (!document.visibilityState || document.visibilityState === 'visible') {
+          loadBoard();
+        }
       }
 
       function startPairing() {
@@ -477,6 +675,9 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
       }
 
       showBoot('Loading display board...');
+      if (document.addEventListener) {
+        document.addEventListener('visibilitychange', refreshVisibleBoard);
+      }
       tryJoinPairing();
     }());
   </script>

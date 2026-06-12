@@ -29,8 +29,40 @@ describe('legacy display board TV route', () => {
     expect(html).toContain("'/api/display-board/workshop/pairing?_='");
     expect(html).toContain("'/api/display-board/workshop/pairing?pairing_token='");
     expect(html).toContain("'/api/display-board/workshop/data?device_token='");
-    expect(html).toContain("DEVICE_TOKEN_STORAGE_KEY = 'displayboard-workshop-device-token'");
-    expect(html).toContain("PAIRING_TOKEN_STORAGE_KEY = 'displayboard-workshop-pairing-token'");
+    expect(html).toContain('"deviceTokenStorageKey":"displayboard-workshop-device-token"');
+    expect(html).toContain('"pairingTokenStorageKey":"displayboard-workshop-pairing-token"');
+    expect(html).toContain('var DEVICE_TOKEN_STORAGE_KEY = BOARD_CONFIG.deviceTokenStorageKey');
+    expect(html).toContain('var PAIRING_TOKEN_STORAGE_KEY = BOARD_CONFIG.pairingTokenStorageKey');
     expect(html).not.toContain('x-display-board-token');
+  });
+
+  it('applies saved device text-size steps to the fallback board shell', async () => {
+    const html = await GET().text();
+
+    expect(html).toContain('html.tv-text-step-1 { font-size: 50%; }');
+    expect(html).toContain('.title { margin-top: 3px; font-size: 2.6875rem;');
+    expect(html).toContain('function setTextSizeClass(step)');
+    expect(html).toContain('setTextSizeClass(textSize);');
+    expect(html).toContain("app.className = 'board text-step-' + textSize;");
+  });
+
+  it('uses shared display-board definitions for fallback stats and panels', async () => {
+    const html = await GET().text();
+
+    expect(html).toContain('"statTiles":[{"id":"all-assets"');
+    expect(html).toContain('"taskPanels":[{"id":"pending"');
+    expect(html).toContain('for (index = 0; index < BOARD_CONFIG.statTiles.length; index += 1)');
+    expect(html).toContain('for (index = 0; index < BOARD_CONFIG.taskPanels.length; index += 1)');
+    expect(html).toContain('rows = rows.slice(0, BOARD_CONFIG.topMaintenanceLimit);');
+  });
+
+  it('keeps fallback-only runtime behaviour close to the normal board', async () => {
+    const html = await GET().text();
+
+    expect(html).toContain('id="board-now"');
+    expect(html).toContain('function startClock()');
+    expect(html).toContain('function refreshVisibleBoard()');
+    expect(html).toContain('class="hp-badge">HP</span>');
+    expect(html).toContain("rows[index].status === 'due_soon' ? 'row-due' : 'row-overdue'");
   });
 });

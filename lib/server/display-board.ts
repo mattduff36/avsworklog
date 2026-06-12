@@ -19,6 +19,7 @@ import {
   MOBILE_TEXT_SIZE_STEPS,
   type MobileTextSizeStep,
 } from '@/lib/config/mobile-text-size-preference';
+import { WORKSHOP_DISPLAY_BOARD_TEXT_SIZE_DEFAULT_STEP } from '@/lib/display-board/workshop-board-config';
 import type {
   MaintenanceCategory,
   MaintenanceItem,
@@ -31,7 +32,7 @@ import { notifyDisplayBoardDevice } from '@/lib/server/display-board-notify';
 export const WORKSHOP_DISPLAY_BOARD_KEY = 'workshop';
 export const DISPLAY_BOARD_PAIRING_WINDOW_MS = 5 * 60 * 1000;
 export const DISPLAY_BOARD_TOKEN_HEADER = 'x-display-board-token';
-export const DISPLAY_BOARD_TEXT_SIZE_DEFAULT_STEP: MobileTextSizeStep = 3;
+export const DISPLAY_BOARD_TEXT_SIZE_DEFAULT_STEP: MobileTextSizeStep = WORKSHOP_DISPLAY_BOARD_TEXT_SIZE_DEFAULT_STEP;
 
 export interface DisplayBoardConfig {
   board_key: string;

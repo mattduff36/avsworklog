@@ -26,16 +26,27 @@ import {
   WORKSHOP_DISPLAY_BOARD_KEY,
   type DisplayBoardDeviceCommandPayload,
 } from '@/lib/display-board/device-notify';
+import {
+  WORKSHOP_DISPLAY_BOARD_BRAND,
+  WORKSHOP_DISPLAY_BOARD_DEVICE_TOKEN_STORAGE_KEY,
+  WORKSHOP_DISPLAY_BOARD_EMPTY_MAINTENANCE_LABEL,
+  WORKSHOP_DISPLAY_BOARD_MAINTENANCE_KICKER,
+  WORKSHOP_DISPLAY_BOARD_MAINTENANCE_TITLE,
+  WORKSHOP_DISPLAY_BOARD_PAIRING_TOKEN_STORAGE_KEY,
+  WORKSHOP_DISPLAY_BOARD_RIGHT_PANEL_SCROLL_SPEED_MULTIPLIER,
+  WORKSHOP_DISPLAY_BOARD_STAT_TILES,
+  WORKSHOP_DISPLAY_BOARD_TASK_PANELS,
+  WORKSHOP_DISPLAY_BOARD_TEXT_SIZE_DEFAULT_STEP,
+  WORKSHOP_DISPLAY_BOARD_TITLE,
+  WORKSHOP_DISPLAY_BOARD_TOP_MAINTENANCE_LIMIT,
+  type WorkshopDisplayBoardStatDefinition,
+  type WorkshopDisplayBoardTaskPanelDefinition,
+} from '@/lib/display-board/workshop-board-config';
 import type {
   DisplayBoardMaintenanceItem,
   DisplayBoardPayload,
   DisplayBoardWorkshopTask,
 } from '@/lib/server/display-board';
-
-const DEVICE_TOKEN_STORAGE_KEY = 'displayboard-workshop-device-token';
-const PAIRING_TOKEN_STORAGE_KEY = 'displayboard-workshop-pairing-token';
-const RIGHT_PANEL_SCROLL_SPEED_MULTIPLIER = 1.6;
-const DISPLAY_BOARD_TEXT_SIZE_DEFAULT_STEP = 3;
 
 function parseDisplayBoardTextSizeStep(value: unknown): MobileTextSizeStep | null {
   const numericValue = typeof value === 'number' ? value : Number(value);
@@ -79,13 +90,11 @@ function formatDateTime(value: string | null | undefined) {
 }
 
 function StatTile({
-  label,
+  definition,
   value,
-  tone,
 }: {
-  label: string;
+  definition: WorkshopDisplayBoardStatDefinition;
   value: number;
-  tone: 'red' | 'amber' | 'blue' | 'purple' | 'green' | 'slate';
 }) {
   const toneClass = {
     red: 'border-red-500/45 bg-red-500/15 text-red-200',
@@ -94,11 +103,11 @@ function StatTile({
     purple: 'border-purple-500/45 bg-purple-500/15 text-purple-200',
     green: 'border-green-500/45 bg-green-500/15 text-green-200',
     slate: 'border-slate-500/45 bg-slate-500/15 text-slate-100',
-  }[tone];
+  }[definition.tone];
 
   return (
     <div className={`rounded-2xl border p-4 shadow-xl shadow-black/10 ${toneClass}`}>
-      <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/70">{label}</p>
+      <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/70">{definition.label}</p>
       <p className="mt-2 text-5xl font-black leading-none text-white">{value}</p>
     </div>
   );
@@ -173,6 +182,25 @@ function TaskGrid({ tasks, emptyLabel }: TaskGridProps) {
   return tasks.map(task => <TaskRow key={task.id} task={task} />);
 }
 
+function getStatValue(definition: WorkshopDisplayBoardStatDefinition, payload: DisplayBoardPayload): number {
+  const source = definition.source === 'maintenance'
+    ? payload.maintenance.summary
+    : payload.workshop.counts;
+  const value = (source as Record<string, number | undefined>)[definition.valueKey];
+
+  return value || 0;
+}
+
+function getTaskPanelClasses(panel: WorkshopDisplayBoardTaskPanelDefinition): string {
+  const panelClasses = {
+    amber: 'border-amber-500/20 bg-amber-500/[0.07]',
+    blue: 'border-blue-500/20 bg-blue-500/[0.07]',
+    purple: 'border-purple-500/20 bg-purple-500/[0.07]',
+  };
+
+  return panelClasses[panel.tone];
+}
+
 export default function WorkshopDisplayBoardPage() {
   const [state, setState] = useState<BoardState>('loading');
   const [payload, setPayload] = useState<DisplayBoardPayload | null>(null);
@@ -194,7 +222,7 @@ export default function WorkshopDisplayBoardPage() {
 
   const fallbackPollMs = Math.max(15, payload?.config.fallback_poll_interval_seconds || 60) * 1000;
   const realtimeDebounceMs = Math.max(250, payload?.config.realtime_debounce_ms || 750);
-  const textSizeStep = payload?.display.text_size_step || DISPLAY_BOARD_TEXT_SIZE_DEFAULT_STEP;
+  const textSizeStep = payload?.display.text_size_step || WORKSHOP_DISPLAY_BOARD_TEXT_SIZE_DEFAULT_STEP;
 
   useEffect(() => {
     if (isLegacyDisplayBoardBrowser(window.navigator.userAgent)) {
@@ -204,7 +232,7 @@ export default function WorkshopDisplayBoardPage() {
 
   const getDeviceToken = useCallback(() => {
     if (typeof window === 'undefined') return '';
-    return window.localStorage.getItem(DEVICE_TOKEN_STORAGE_KEY) || '';
+    return window.localStorage.getItem(WORKSHOP_DISPLAY_BOARD_DEVICE_TOKEN_STORAGE_KEY) || '';
   }, []);
 
   const fetchBoard = useCallback(async () => {
@@ -225,7 +253,7 @@ export default function WorkshopDisplayBoardPage() {
     const body = await response.json() as { status: string; payload?: DisplayBoardPayload; error?: string };
 
     if (response.status === 401) {
-      window.localStorage.removeItem(DEVICE_TOKEN_STORAGE_KEY);
+      window.localStorage.removeItem(WORKSHOP_DISPLAY_BOARD_DEVICE_TOKEN_STORAGE_KEY);
       setPayload(null);
       setState('unauthorised');
       setMessage(body.error || 'This display board is not authorised.');
@@ -243,7 +271,7 @@ export default function WorkshopDisplayBoardPage() {
 
   const tryJoinPairing = useCallback(async () => {
     if (getDeviceToken()) return;
-    const existingPairingToken = window.localStorage.getItem(PAIRING_TOKEN_STORAGE_KEY);
+    const existingPairingToken = window.localStorage.getItem(WORKSHOP_DISPLAY_BOARD_PAIRING_TOKEN_STORAGE_KEY);
 
     if (existingPairingToken) {
       const response = await fetch(`/api/display-board/workshop/pairing?pairing_token=${encodeURIComponent(existingPairingToken)}`, {
@@ -257,8 +285,8 @@ export default function WorkshopDisplayBoardPage() {
       };
 
       if (body.status === 'paired' && body.device_token) {
-        window.localStorage.setItem(DEVICE_TOKEN_STORAGE_KEY, body.device_token);
-        window.localStorage.removeItem(PAIRING_TOKEN_STORAGE_KEY);
+        window.localStorage.setItem(WORKSHOP_DISPLAY_BOARD_DEVICE_TOKEN_STORAGE_KEY, body.device_token);
+        window.localStorage.removeItem(WORKSHOP_DISPLAY_BOARD_PAIRING_TOKEN_STORAGE_KEY);
         setPairing(null);
         await fetchBoard();
         return;
@@ -271,7 +299,7 @@ export default function WorkshopDisplayBoardPage() {
         return;
       }
 
-      window.localStorage.removeItem(PAIRING_TOKEN_STORAGE_KEY);
+      window.localStorage.removeItem(WORKSHOP_DISPLAY_BOARD_PAIRING_TOKEN_STORAGE_KEY);
     }
 
     const response = await fetch('/api/display-board/workshop/pairing', {
@@ -288,7 +316,7 @@ export default function WorkshopDisplayBoardPage() {
 
     if (body.status === 'pairing' && body.confirmation_code && body.expires_at) {
       if (body.pairing_token) {
-        window.localStorage.setItem(PAIRING_TOKEN_STORAGE_KEY, body.pairing_token);
+        window.localStorage.setItem(WORKSHOP_DISPLAY_BOARD_PAIRING_TOKEN_STORAGE_KEY, body.pairing_token);
       }
       setPairing({ confirmationCode: body.confirmation_code, expiresAt: body.expires_at });
       setState('pairing');
@@ -334,7 +362,7 @@ export default function WorkshopDisplayBoardPage() {
 
     void fetchBoard().catch(error => {
       if (typeof window !== 'undefined') {
-        window.localStorage.removeItem(DEVICE_TOKEN_STORAGE_KEY);
+        window.localStorage.removeItem(WORKSHOP_DISPLAY_BOARD_DEVICE_TOKEN_STORAGE_KEY);
       }
       setPayload(null);
       setState('unauthorised');
@@ -354,7 +382,7 @@ export default function WorkshopDisplayBoardPage() {
       if (realtimePayload.table === 'display_board_devices') {
         void fetchBoard().catch(error => {
           if (typeof window !== 'undefined') {
-            window.localStorage.removeItem(DEVICE_TOKEN_STORAGE_KEY);
+            window.localStorage.removeItem(WORKSHOP_DISPLAY_BOARD_DEVICE_TOKEN_STORAGE_KEY);
           }
           setPayload(null);
           setState('unauthorised');
@@ -385,9 +413,9 @@ export default function WorkshopDisplayBoardPage() {
 
     const scrollers = [
       { key: 'maintenance' as const, element: maintenanceScrollRef.current, speedMultiplier: 1 },
-      { key: 'pending' as const, element: pendingScrollRef.current, speedMultiplier: RIGHT_PANEL_SCROLL_SPEED_MULTIPLIER },
-      { key: 'inProgress' as const, element: inProgressScrollRef.current, speedMultiplier: RIGHT_PANEL_SCROLL_SPEED_MULTIPLIER },
-      { key: 'onHold' as const, element: onHoldScrollRef.current, speedMultiplier: RIGHT_PANEL_SCROLL_SPEED_MULTIPLIER },
+      { key: 'pending' as const, element: pendingScrollRef.current, speedMultiplier: WORKSHOP_DISPLAY_BOARD_RIGHT_PANEL_SCROLL_SPEED_MULTIPLIER },
+      { key: 'inProgress' as const, element: inProgressScrollRef.current, speedMultiplier: WORKSHOP_DISPLAY_BOARD_RIGHT_PANEL_SCROLL_SPEED_MULTIPLIER },
+      { key: 'onHold' as const, element: onHoldScrollRef.current, speedMultiplier: WORKSHOP_DISPLAY_BOARD_RIGHT_PANEL_SCROLL_SPEED_MULTIPLIER },
     ].filter((item): item is AutoScrollScroller => Boolean(item.element));
 
     if (scrollers.length === 0) return;
@@ -539,13 +567,11 @@ export default function WorkshopDisplayBoardPage() {
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, [fetchBoard, state]);
 
-  const maintenanceTotals = payload?.maintenance.summary;
-  const workshopCounts = payload?.workshop.counts;
   const topMaintenance = useMemo(
     () => [
       ...(payload?.maintenance.overdue_items || []),
       ...(payload?.maintenance.due_soon_items || []),
-    ].slice(0, 12),
+    ].slice(0, WORKSHOP_DISPLAY_BOARD_TOP_MAINTENANCE_LIMIT),
     [payload]
   );
 
@@ -587,8 +613,8 @@ export default function WorkshopDisplayBoardPage() {
               <Wrench className="h-7 w-7" />
             </div>
             <div>
-              <p className="text-sm font-bold uppercase tracking-[0.3em] text-workshop-light">Squires Workshop</p>
-              <h1 className="text-4xl font-black tracking-tight">Live Display Board</h1>
+              <p className="text-sm font-bold uppercase tracking-[0.3em] text-workshop-light">{WORKSHOP_DISPLAY_BOARD_BRAND}</p>
+              <h1 className="text-4xl font-black tracking-tight">{WORKSHOP_DISPLAY_BOARD_TITLE}</h1>
             </div>
           </div>
           <div className="flex flex-col items-end gap-2 text-right">
@@ -616,21 +642,17 @@ export default function WorkshopDisplayBoardPage() {
         </header>
 
         <section className="grid grid-cols-7 gap-4">
-          <StatTile label="All Assets" value={maintenanceTotals?.total || 0} tone="slate" />
-          <StatTile label="Maintenance Overdue" value={maintenanceTotals?.overdue || 0} tone="red" />
-          <StatTile label="Due Soon" value={maintenanceTotals?.due_soon || 0} tone="amber" />
-          <StatTile label="High Priority" value={workshopCounts?.high_priority || 0} tone="red" />
-          <StatTile label="Pending" value={workshopCounts?.pending || 0} tone="amber" />
-          <StatTile label="In Progress" value={workshopCounts?.in_progress || 0} tone="blue" />
-          <StatTile label="On Hold" value={workshopCounts?.on_hold || 0} tone="purple" />
+          {WORKSHOP_DISPLAY_BOARD_STAT_TILES.map(definition => (
+            <StatTile key={definition.id} definition={definition} value={getStatValue(definition, payload)} />
+          ))}
         </section>
 
         <section className="grid min-h-0 grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-5">
           <div className="flex min-h-0 flex-col rounded-3xl border border-white/10 bg-white/[0.055] p-5 shadow-2xl shadow-black/20">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <p className="text-sm font-bold uppercase tracking-[0.26em] text-red-200">Maintenance</p>
-                <h2 className="text-3xl font-black">Urgent All Assets</h2>
+                <p className="text-sm font-bold uppercase tracking-[0.26em] text-red-200">{WORKSHOP_DISPLAY_BOARD_MAINTENANCE_KICKER}</p>
+                <h2 className="text-3xl font-black">{WORKSHOP_DISPLAY_BOARD_MAINTENANCE_TITLE}</h2>
               </div>
               <AlertTriangle className="h-9 w-9 text-red-300" />
             </div>
@@ -638,41 +660,25 @@ export default function WorkshopDisplayBoardPage() {
               {topMaintenance.length > 0 ? topMaintenance.map(item => (
                 <MaintenanceRow key={item.id} item={item} />
               )) : (
-                <EmptyPanel label="No overdue or due soon maintenance." />
+                <EmptyPanel label={WORKSHOP_DISPLAY_BOARD_EMPTY_MAINTENANCE_LABEL} />
               )}
             </div>
           </div>
 
           <div className="grid min-h-0 grid-rows-3 gap-4">
-            <div className="flex min-h-0 flex-col rounded-3xl border border-amber-500/20 bg-amber-500/[0.07] p-4">
-              <div className="mb-3 flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-amber-300" />
-                <h2 className="text-2xl font-black">Pending</h2>
+            {WORKSHOP_DISPLAY_BOARD_TASK_PANELS.map(panel => (
+              <div key={panel.id} className={`flex min-h-0 flex-col rounded-3xl border p-4 ${getTaskPanelClasses(panel)}`}>
+                <div className="mb-3 flex items-center gap-2">
+                  {panel.id === 'pending' ? <AlertTriangle className="h-5 w-5 text-amber-300" /> : null}
+                  {panel.id === 'inProgress' ? <Clock className="h-5 w-5 text-blue-300" /> : null}
+                  {panel.id === 'onHold' ? <Pause className="h-5 w-5 text-purple-300" /> : null}
+                  <h2 className="text-2xl font-black">{panel.title}</h2>
+                </div>
+                <div ref={panel.id === 'pending' ? pendingScrollRef : panel.id === 'inProgress' ? inProgressScrollRef : onHoldScrollRef} className="scrollbar-hidden grid min-h-0 flex-1 auto-rows-max grid-cols-[repeat(2,minmax(0,1fr))] content-start gap-2 overflow-y-auto pr-2">
+                  <TaskGrid tasks={payload.workshop[panel.itemsKey]} emptyLabel={panel.emptyLabel} />
+                </div>
               </div>
-              <div ref={pendingScrollRef} className="scrollbar-hidden grid min-h-0 flex-1 auto-rows-max grid-cols-[repeat(2,minmax(0,1fr))] content-start gap-2 overflow-y-auto pr-2">
-                <TaskGrid tasks={payload.workshop.pending} emptyLabel="No pending workshop tasks." />
-              </div>
-            </div>
-
-            <div className="flex min-h-0 flex-col rounded-3xl border border-blue-500/20 bg-blue-500/[0.07] p-4">
-              <div className="mb-3 flex items-center gap-2">
-                <Clock className="h-5 w-5 text-blue-300" />
-                <h2 className="text-2xl font-black">In Progress</h2>
-              </div>
-              <div ref={inProgressScrollRef} className="scrollbar-hidden grid min-h-0 flex-1 auto-rows-max grid-cols-[repeat(2,minmax(0,1fr))] content-start gap-2 overflow-y-auto pr-2">
-                <TaskGrid tasks={payload.workshop.in_progress} emptyLabel="No tasks in progress." />
-              </div>
-            </div>
-
-            <div className="flex min-h-0 flex-col rounded-3xl border border-purple-500/20 bg-purple-500/[0.07] p-4">
-              <div className="mb-3 flex items-center gap-2">
-                <Pause className="h-5 w-5 text-purple-300" />
-                <h2 className="text-2xl font-black">On Hold</h2>
-              </div>
-              <div ref={onHoldScrollRef} className="scrollbar-hidden grid min-h-0 flex-1 auto-rows-max grid-cols-[repeat(2,minmax(0,1fr))] content-start gap-2 overflow-y-auto pr-2">
-                <TaskGrid tasks={payload.workshop.on_hold} emptyLabel="No tasks on hold." />
-              </div>
-            </div>
+            ))}
           </div>
         </section>
 
