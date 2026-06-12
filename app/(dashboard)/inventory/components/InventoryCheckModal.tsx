@@ -20,6 +20,7 @@ import {
 
 export interface InventoryChecklistSubmitPayload {
   checked_at: string;
+  note: string | null;
   checklist_version: string;
   checklist_items: InventoryChecklistItemResult[];
 }
@@ -88,6 +89,7 @@ export function InventoryCheckModal({
   const [checkedAt, setCheckedAt] = useState(initialCheckedAt);
   const [statuses, setStatuses] = useState<Record<number, InventoryChecklistStatus>>({});
   const [comments, setComments] = useState<Record<number, string>>({});
+  const [generalComments, setGeneralComments] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const completedCount = Object.keys(statuses).length;
@@ -137,6 +139,7 @@ export function InventoryCheckModal({
 
     await onSubmit({
       checked_at: checkedAt,
+      note: generalComments.trim() || null,
       checklist_version: INVENTORY_SERVICE_CHECKLIST_VERSION,
       checklist_items: checklistItems,
     });
@@ -249,13 +252,29 @@ export function InventoryCheckModal({
             </div>
           </ScrollArea>
 
-          <DialogFooter className="border-t border-border px-6 py-4 md:px-8 md:py-5">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-              Cancel
-            </Button>
-            <Button type="submit" className="bg-inventory text-white hover:bg-inventory-dark" disabled={saving}>
-              {saving ? 'Recording...' : 'Record Check'}
-            </Button>
+          <DialogFooter className="flex-col gap-4 border-t border-border px-6 py-4 sm:flex-col sm:items-stretch sm:justify-start md:px-8 md:py-5">
+            <div className="grid gap-2">
+              <Label htmlFor="inventory_check_general_comments">Comments</Label>
+              <Textarea
+                id="inventory_check_general_comments"
+                value={generalComments}
+                onChange={(event) => {
+                  setGeneralComments(event.target.value);
+                  setError(null);
+                }}
+                placeholder="Add any necessary details for this check..."
+                className="min-h-24 border-slate-600 bg-slate-950 text-white"
+                disabled={saving}
+              />
+            </div>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-inventory text-white hover:bg-inventory-dark" disabled={saving}>
+                {saving ? 'Submitting...' : 'Submit Check'}
+              </Button>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>

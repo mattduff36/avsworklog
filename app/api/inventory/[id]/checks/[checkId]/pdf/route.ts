@@ -21,6 +21,7 @@ interface InventoryCheckRow {
   item_id: string;
   checked_at: string;
   interval_days: number;
+  note: string | null;
   checklist_items: unknown;
   overall_status: InventoryCheckOverallStatus | null;
   checked_by_profile: { full_name: string | null } | null;
@@ -106,6 +107,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
           item_id,
           checked_at,
           interval_days,
+          note,
           checklist_items,
           overall_status,
           checked_by_profile:profiles!inventory_check_history_checked_by_fkey(id, full_name)
@@ -165,6 +167,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
         checkedAt: rawCheck.checked_at,
         checkedByName: checkedByProfile?.full_name || null,
         intervalDays: rawCheck.interval_days,
+        note: rawCheck.note,
         overallStatus,
         checklistItems,
       },

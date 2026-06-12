@@ -197,6 +197,13 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     fontStyle: 'italic',
   },
+  noteBox: {
+    border: '1pt solid #e2e8f0',
+    padding: 8,
+    fontSize: 9,
+    color: '#334155',
+    lineHeight: 1.35,
+  },
   footer: {
     position: 'absolute',
     bottom: 24,
@@ -224,6 +231,7 @@ export interface InventoryChecklistPdfCheck {
   checkedAt: string;
   checkedByName: string | null;
   intervalDays: number;
+  note: string | null;
   overallStatus: InventoryCheckOverallStatus;
   checklistItems: InventoryChecklistItemResult[];
 }
@@ -365,6 +373,13 @@ export function InventoryChecklistPDF({ item, check, logoSrc }: InventoryCheckli
             </View>
           ))}
         </View>
+
+        {check.note ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>General Comments</Text>
+            <Text style={styles.noteBox}>{check.note}</Text>
+          </View>
+        ) : null}
 
         <View style={styles.footer} fixed>
           <Text>Generated {generatedAt}</Text>
