@@ -2,11 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlertTriangle,
   CheckCircle2,
-  Clock,
   Monitor,
-  Pause,
   Radio,
   ShieldAlert,
   TimerReset,
@@ -30,7 +27,6 @@ import {
   WORKSHOP_DISPLAY_BOARD_BRAND,
   WORKSHOP_DISPLAY_BOARD_DEVICE_TOKEN_STORAGE_KEY,
   WORKSHOP_DISPLAY_BOARD_EMPTY_MAINTENANCE_LABEL,
-  WORKSHOP_DISPLAY_BOARD_MAINTENANCE_KICKER,
   WORKSHOP_DISPLAY_BOARD_MAINTENANCE_TITLE,
   WORKSHOP_DISPLAY_BOARD_PAIRING_TOKEN_STORAGE_KEY,
   WORKSHOP_DISPLAY_BOARD_RIGHT_PANEL_SCROLL_SPEED_MULTIPLIER,
@@ -58,6 +54,7 @@ function parseDisplayBoardTextSizeStep(value: unknown): MobileTextSizeStep | nul
 
 type BoardState = 'loading' | 'unauthorised' | 'pairing' | 'ready' | 'error';
 type AutoScrollScrollerKey = 'maintenance' | 'pending' | 'inProgress' | 'onHold';
+const SECTION_TITLE_BASE_CLASS = 'text-sm font-bold uppercase tracking-[0.3em]';
 
 interface AutoScrollScroller {
   key: AutoScrollScrollerKey;
@@ -199,6 +196,17 @@ function getTaskPanelClasses(panel: WorkshopDisplayBoardTaskPanelDefinition): st
   };
 
   return panelClasses[panel.tone];
+}
+
+function getSectionTitleClass(tone: 'red' | WorkshopDisplayBoardTaskPanelDefinition['tone']): string {
+  const titleClasses = {
+    red: 'text-red-200',
+    amber: 'text-amber-200',
+    blue: 'text-blue-200',
+    purple: 'text-purple-200',
+  };
+
+  return `${SECTION_TITLE_BASE_CLASS} ${titleClasses[tone]}`;
 }
 
 export default function WorkshopDisplayBoardPage() {
@@ -649,12 +657,8 @@ export default function WorkshopDisplayBoardPage() {
 
         <section className="grid min-h-0 grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-5">
           <div className="flex min-h-0 flex-col rounded-3xl border border-white/10 bg-white/[0.055] p-5 shadow-2xl shadow-black/20">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-bold uppercase tracking-[0.26em] text-red-200">{WORKSHOP_DISPLAY_BOARD_MAINTENANCE_KICKER}</p>
-                <h2 className="text-3xl font-black">{WORKSHOP_DISPLAY_BOARD_MAINTENANCE_TITLE}</h2>
-              </div>
-              <AlertTriangle className="h-9 w-9 text-red-300" />
+            <div className="mb-3">
+              <h2 className={getSectionTitleClass('red')}>{WORKSHOP_DISPLAY_BOARD_MAINTENANCE_TITLE}</h2>
             </div>
             <div ref={maintenanceScrollRef} className="scrollbar-hidden min-h-0 flex-1 space-y-3 overflow-y-auto pr-2">
               {topMaintenance.length > 0 ? topMaintenance.map(item => (
@@ -668,11 +672,8 @@ export default function WorkshopDisplayBoardPage() {
           <div className="grid min-h-0 grid-rows-3 gap-4">
             {WORKSHOP_DISPLAY_BOARD_TASK_PANELS.map(panel => (
               <div key={panel.id} className={`flex min-h-0 flex-col rounded-3xl border p-4 ${getTaskPanelClasses(panel)}`}>
-                <div className="mb-3 flex items-center gap-2">
-                  {panel.id === 'pending' ? <AlertTriangle className="h-5 w-5 text-amber-300" /> : null}
-                  {panel.id === 'inProgress' ? <Clock className="h-5 w-5 text-blue-300" /> : null}
-                  {panel.id === 'onHold' ? <Pause className="h-5 w-5 text-purple-300" /> : null}
-                  <h2 className="text-2xl font-black">{panel.title}</h2>
+                <div className="mb-3">
+                  <h2 className={getSectionTitleClass(panel.tone)}>{panel.title}</h2>
                 </div>
                 <div ref={panel.id === 'pending' ? pendingScrollRef : panel.id === 'inProgress' ? inProgressScrollRef : onHoldScrollRef} className="scrollbar-hidden grid min-h-0 flex-1 auto-rows-max grid-cols-[repeat(2,minmax(0,1fr))] content-start gap-2 overflow-y-auto pr-2">
                   <TaskGrid tasks={payload.workshop[panel.itemsKey]} emptyLabel={panel.emptyLabel} />

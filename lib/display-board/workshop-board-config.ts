@@ -7,8 +7,7 @@ export const WORKSHOP_DISPLAY_BOARD_RIGHT_PANEL_SCROLL_SPEED_MULTIPLIER = 1.6;
 export const WORKSHOP_DISPLAY_BOARD_TOP_MAINTENANCE_LIMIT = 12;
 export const WORKSHOP_DISPLAY_BOARD_BRAND = 'Squires Workshop';
 export const WORKSHOP_DISPLAY_BOARD_TITLE = 'Live Display Board';
-export const WORKSHOP_DISPLAY_BOARD_MAINTENANCE_KICKER = 'Maintenance';
-export const WORKSHOP_DISPLAY_BOARD_MAINTENANCE_TITLE = 'Urgent All Assets';
+export const WORKSHOP_DISPLAY_BOARD_MAINTENANCE_TITLE = 'Maintenance';
 export const WORKSHOP_DISPLAY_BOARD_EMPTY_MAINTENANCE_LABEL = 'No overdue or due soon maintenance.';
 
 export interface WorkshopDisplayBoardStatDefinition {
@@ -41,7 +40,7 @@ export const WORKSHOP_DISPLAY_BOARD_STAT_TILES: WorkshopDisplayBoardStatDefiniti
 export const WORKSHOP_DISPLAY_BOARD_TASK_PANELS: WorkshopDisplayBoardTaskPanelDefinition[] = [
   {
     id: 'pending',
-    title: 'Pending',
+    title: 'Pending Workshop Tasks',
     tone: 'amber',
     emptyLabel: 'No pending workshop tasks.',
     itemsKey: 'pending',
@@ -49,7 +48,7 @@ export const WORKSHOP_DISPLAY_BOARD_TASK_PANELS: WorkshopDisplayBoardTaskPanelDe
   },
   {
     id: 'inProgress',
-    title: 'In Progress',
+    title: 'In Progress Workshop Tasks',
     tone: 'blue',
     emptyLabel: 'No tasks in progress.',
     itemsKey: 'in_progress',
@@ -57,7 +56,7 @@ export const WORKSHOP_DISPLAY_BOARD_TASK_PANELS: WorkshopDisplayBoardTaskPanelDe
   },
   {
     id: 'onHold',
-    title: 'On Hold',
+    title: 'On Hold Workshop Tasks',
     tone: 'purple',
     emptyLabel: 'No tasks on hold.',
     itemsKey: 'on_hold',

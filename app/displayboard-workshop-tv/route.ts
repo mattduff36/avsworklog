@@ -3,7 +3,6 @@ import {
   WORKSHOP_DISPLAY_BOARD_BRAND,
   WORKSHOP_DISPLAY_BOARD_DEVICE_TOKEN_STORAGE_KEY,
   WORKSHOP_DISPLAY_BOARD_EMPTY_MAINTENANCE_LABEL,
-  WORKSHOP_DISPLAY_BOARD_MAINTENANCE_KICKER,
   WORKSHOP_DISPLAY_BOARD_MAINTENANCE_TITLE,
   WORKSHOP_DISPLAY_BOARD_PAIRING_TOKEN_STORAGE_KEY,
   WORKSHOP_DISPLAY_BOARD_RIGHT_PANEL_SCROLL_SPEED_MULTIPLIER,
@@ -19,7 +18,6 @@ export const dynamic = 'force-dynamic';
 const legacyDisplayBoardConfig = {
   brand: WORKSHOP_DISPLAY_BOARD_BRAND,
   title: WORKSHOP_DISPLAY_BOARD_TITLE,
-  maintenanceKicker: WORKSHOP_DISPLAY_BOARD_MAINTENANCE_KICKER,
   maintenanceTitle: WORKSHOP_DISPLAY_BOARD_MAINTENANCE_TITLE,
   maintenanceEmptyLabel: WORKSHOP_DISPLAY_BOARD_EMPTY_MAINTENANCE_LABEL,
   deviceTokenStorageKey: WORKSHOP_DISPLAY_BOARD_DEVICE_TOKEN_STORAGE_KEY,
@@ -218,11 +216,21 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
       right: 24px;
       border-color: rgba(168,85,247,0.22);
     }
-    .panel-title-small { color: rgba(255,255,255,0.65); font-size: 0.9375rem; font-weight: 800; letter-spacing: 4px; text-transform: uppercase; }
-    .panel-title { margin: 5px 0 14px; font-size: 2rem; line-height: 1; font-weight: 900; }
+    .panel-title {
+      margin: 0 0 10px;
+      font-size: 1.0625rem;
+      font-weight: 800;
+      letter-spacing: 5px;
+      line-height: 1.1;
+      text-transform: uppercase;
+    }
+    .panel-title-maintenance { color: #fecaca; }
+    .panel-title-amber { color: #fde68a; }
+    .panel-title-blue { color: #bfdbfe; }
+    .panel-title-purple { color: #ddd6fe; }
     .scroll-panel {
       position: absolute;
-      top: 86px;
+      top: 52px;
       right: 18px;
       bottom: 18px;
       left: 18px;
@@ -280,6 +288,116 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
       border-radius: 16px;
       color: rgba(255,255,255,0.55);
       text-align: center;
+    }
+    .text-step-1 .header {
+      height: 70px;
+      padding: 14px 22px;
+    }
+    .text-step-1 .status { top: 14px; }
+    .text-step-1 .status-block { margin-left: 16px; }
+    .text-step-1 .live-badge {
+      margin-left: 16px;
+      padding: 6px 12px;
+    }
+    .text-step-1 .status-meta { margin-top: 4px; }
+    .text-step-1 .stats {
+      top: 94px;
+      border-spacing: 10px 0;
+    }
+    .text-step-1 .tile { padding: 12px; }
+    .text-step-1 .tile-value { margin-top: 6px; }
+    .text-step-1 .panel {
+      padding: 14px;
+      border-radius: 22px;
+    }
+    .text-step-1 .panel-maintenance { top: 178px; }
+    .text-step-1 .panel-pending {
+      top: 178px;
+      height: 276px;
+    }
+    .text-step-1 .panel-progress {
+      top: 470px;
+      height: 276px;
+    }
+    .text-step-1 .panel-hold {
+      top: 762px;
+      bottom: 24px;
+    }
+    .text-step-1 .panel-title { margin: 0 0 6px; }
+    .text-step-1 .scroll-panel {
+      top: 32px;
+      right: 14px;
+      bottom: 14px;
+      left: 14px;
+    }
+    .text-step-1 .row {
+      min-height: 50px;
+      margin-bottom: 8px;
+      padding: 8px 12px;
+      border-radius: 12px;
+    }
+    .text-step-1 .row-sub {
+      margin-top: 3px;
+      max-height: 28px;
+    }
+    .text-step-1 .tag {
+      padding: 5px 8px;
+      border-radius: 9px;
+    }
+    .text-step-2 .header {
+      height: 88px;
+      padding: 18px 24px;
+    }
+    .text-step-2 .status { top: 18px; }
+    .text-step-2 .status-block { margin-left: 18px; }
+    .text-step-2 .live-badge {
+      margin-left: 18px;
+      padding: 7px 13px;
+    }
+    .text-step-2 .status-meta { margin-top: 5px; }
+    .text-step-2 .stats {
+      top: 122px;
+      border-spacing: 11px 0;
+    }
+    .text-step-2 .tile { padding: 14px; }
+    .text-step-2 .tile-value { margin-top: 7px; }
+    .text-step-2 .panel {
+      padding: 16px;
+      border-radius: 24px;
+    }
+    .text-step-2 .panel-maintenance { top: 226px; }
+    .text-step-2 .panel-pending {
+      top: 226px;
+      height: 264px;
+    }
+    .text-step-2 .panel-progress {
+      top: 506px;
+      height: 264px;
+    }
+    .text-step-2 .panel-hold {
+      top: 786px;
+      bottom: 24px;
+    }
+    .text-step-2 .panel-title { margin: 0 0 8px; }
+    .text-step-2 .scroll-panel {
+      top: 40px;
+      right: 16px;
+      bottom: 16px;
+      left: 16px;
+    }
+    .text-step-2 .row {
+      min-height: 62px;
+      margin-bottom: 10px;
+      padding: 11px 14px;
+      border-radius: 14px;
+    }
+    .text-step-2 .row-sub {
+      margin-top: 4px;
+      max-height: 36px;
+    }
+    .text-step-2 .tag {
+      padding: 6px 9px;
+      border-radius: 10px;
     }
   </style>
 </head>
@@ -589,9 +707,15 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
         return 'panel-pending';
       }
 
+      function getPanelTitleClass(panel) {
+        if (panel.tone === 'blue') return 'panel-title-blue';
+        if (panel.tone === 'purple') return 'panel-title-purple';
+        return 'panel-title-amber';
+      }
+
       function getPanelHtml(panel, payload) {
         var items = payload.workshop && payload.workshop[panel.itemsKey] ? payload.workshop[panel.itemsKey] : [];
-        return '<div class="panel ' + getPanelClass(panel) + '"><div class="panel-title-small">Workshop</div><div class="panel-title">' + escapeHtml(panel.title) + '</div><div class="scroll-panel task-grid" data-speed="fast">' + getTaskItems(items, panel.emptyLabel, panel) + '</div></div>';
+        return '<div class="panel ' + getPanelClass(panel) + '"><div class="panel-title ' + getPanelTitleClass(panel) + '">' + escapeHtml(panel.title) + '</div><div class="scroll-panel task-grid" data-speed="fast">' + getTaskItems(items, panel.emptyLabel, panel) + '</div></div>';
       }
 
       function renderBoard(payload) {
@@ -621,7 +745,7 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
           '<div class="stats">' +
             statsHtml +
           '</div>' +
-          '<div class="panel panel-maintenance"><div class="panel-title-small">' + escapeHtml(BOARD_CONFIG.maintenanceKicker) + '</div><div class="panel-title">' + escapeHtml(BOARD_CONFIG.maintenanceTitle) + '</div><div class="scroll-panel">' + getMaintenanceRows(payload) + '</div></div>' +
+          '<div class="panel panel-maintenance"><div class="panel-title panel-title-maintenance">' + escapeHtml(BOARD_CONFIG.maintenanceTitle) + '</div><div class="scroll-panel">' + getMaintenanceRows(payload) + '</div></div>' +
           panelsHtml;
         startClock();
         startAutoScroll();
