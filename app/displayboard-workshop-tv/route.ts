@@ -59,12 +59,15 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
     .boot {
       position: absolute;
       top: 0;
-      right: 0;
-      bottom: 0;
       left: 0;
+      width: 1920px;
+      height: 1080px;
       padding: 80px;
       background: #020617;
       text-align: center;
+      -webkit-transform-origin: 0 0;
+      -ms-transform-origin: 0 0;
+      transform-origin: 0 0;
     }
     .boot-card {
       width: 760px;
@@ -382,7 +385,7 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
         var top = Math.max(0, (viewport.height - (BOARD_CONFIG.designHeight * scale)) / 2);
         var transform = 'scale(' + scale + ')';
 
-        if (!app || app.className.indexOf('board') === -1) return;
+        if (!app || (app.className.indexOf('board') === -1 && app.className.indexOf('boot') === -1)) return;
         app.style.width = BOARD_CONFIG.designWidth + 'px';
         app.style.height = BOARD_CONFIG.designHeight + 'px';
         app.style.left = left + 'px';
@@ -491,13 +494,7 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
         stopAutoScroll();
         stopClock();
         app.className = 'boot';
-        app.style.width = '';
-        app.style.height = '';
-        app.style.left = '';
-        app.style.top = '';
-        app.style.webkitTransform = '';
-        app.style.msTransform = '';
-        app.style.transform = '';
+        scaleBoardToViewport();
         app.innerHTML = '<div class="boot-card"><h1>Workshop Display Board</h1><div class="boot-message">' + escapeHtml(message) + '</div></div>';
       }
 
@@ -508,7 +505,9 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
 
       function showPairing(code, expiresAt) {
         stopAutoScroll();
+        stopClock();
         app.className = 'boot';
+        scaleBoardToViewport();
         app.innerHTML = '<div class="boot-card"><h1>Workshop Display Board</h1><div class="boot-message">Confirm this code in Admin Settings</div><div class="pair-code">' + escapeHtml(code) + '</div><p class="muted">Pairing expires at ' + escapeHtml(formatTime(expiresAt)) + '</p></div>';
         schedulePairing(3000);
       }

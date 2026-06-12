@@ -78,4 +78,16 @@ describe('legacy display board TV route', () => {
     expect(html).toContain("var transform = 'scale(' + scale + ')';");
     expect(html).toContain("window.addEventListener('resize', scaleBoardToViewport);");
   });
+
+  it('uses the same viewport scaling on loading, unauthorised, and pairing screens', async () => {
+    const html = await GET().text();
+
+    expect(html).toContain('.boot {');
+    expect(html).toContain('width: 1920px;');
+    expect(html).toContain('height: 1080px;');
+    expect(html).toContain("app.className.indexOf('board') === -1 && app.className.indexOf('boot') === -1");
+    expect(html).toContain("app.className = 'boot';\n        scaleBoardToViewport();");
+    expect(html).toContain('Confirm this code in Admin Settings');
+    expect(html).toContain('<div class="pair-code">');
+  });
 });
