@@ -30,6 +30,7 @@ import {
   type InventoryLocation,
 } from '../types';
 import { CHECK_INTERVAL_MONTHS, formatInventoryLocationOptionLabel, getInventoryCheckIntervalMonths } from '../utils';
+import { toast } from 'sonner';
 
 interface InventoryItemDialogProps {
   open: boolean;
@@ -50,9 +51,11 @@ export function InventoryItemDialog({
 }: InventoryItemDialogProps) {
   const [form, setForm] = useState<InventoryItemFormData>(EMPTY_INVENTORY_ITEM_FORM);
   const [saving, setSaving] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const isEditing = !!item;
 
   useEffect(() => {
+    setSubmitError('');
     if (item) {
       setForm({
         item_number: item.item_number,
@@ -82,15 +85,21 @@ export function InventoryItemDialog({
     : (Object.entries(INVENTORY_CATEGORY_LABELS) as Array<[InventoryCategory, string]>);
 
   function updateField<K extends keyof InventoryItemFormData>(key: K, value: InventoryItemFormData[K]) {
+    setSubmitError('');
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
+    setSubmitError('');
     setSaving(true);
     try {
       await onSubmit(form);
       onClose();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to save inventory item';
+      setSubmitError(message);
+      toast.error(message, { id: 'inventory-item-save-error' });
     } finally {
       setSaving(false);
     }
@@ -199,6 +208,12 @@ export function InventoryItemDialog({
                 />
               </div>
             </div>
+
+            {submitError ? (
+              <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-100">
+                {submitError}
+              </div>
+            ) : null}
 
             {isEditing ? (
               <div className="rounded-md border border-slate-700 bg-slate-800/50 p-3 text-xs text-slate-300">
