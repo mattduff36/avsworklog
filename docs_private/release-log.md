@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.7.3
+
+**GIT COMMIT MESSAGE**
+`fix(inventory): handle duplicate item save errors`
+
+**WHAT CHANGED**
+Handle duplicate item save errors.
+
+**COMMITS IN THIS RELEASE**
+- `fix(inventory): handle duplicate item save errors`
+
 ## 0626.7.2
 
 **GIT COMMIT MESSAGE**
