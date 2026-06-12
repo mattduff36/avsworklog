@@ -65,4 +65,17 @@ describe('legacy display board TV route', () => {
     expect(html).toContain('class="hp-badge">HP</span>');
     expect(html).toContain("rows[index].status === 'due_soon' ? 'row-due' : 'row-overdue'");
   });
+
+  it('scales the 1920x1080 fallback canvas to low-resolution TV viewports', async () => {
+    const html = await GET().text();
+
+    expect(html).toContain('"designWidth":1920');
+    expect(html).toContain('"designHeight":1080');
+    expect(html).toContain('width: 1920px;');
+    expect(html).toContain('height: 1080px;');
+    expect(html).toContain('function scaleBoardToViewport()');
+    expect(html).toContain('Math.min(viewport.width / BOARD_CONFIG.designWidth, viewport.height / BOARD_CONFIG.designHeight)');
+    expect(html).toContain("var transform = 'scale(' + scale + ')';");
+    expect(html).toContain("window.addEventListener('resize', scaleBoardToViewport);");
+  });
 });

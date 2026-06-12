@@ -27,6 +27,8 @@ const legacyDisplayBoardConfig = {
   rightPanelScrollSpeedMultiplier: WORKSHOP_DISPLAY_BOARD_RIGHT_PANEL_SCROLL_SPEED_MULTIPLIER,
   textSizeDefaultStep: WORKSHOP_DISPLAY_BOARD_TEXT_SIZE_DEFAULT_STEP,
   topMaintenanceLimit: WORKSHOP_DISPLAY_BOARD_TOP_MAINTENANCE_LIMIT,
+  designWidth: 1920,
+  designHeight: 1080,
   statTiles: WORKSHOP_DISPLAY_BOARD_STAT_TILES,
   taskPanels: WORKSHOP_DISPLAY_BOARD_TASK_PANELS,
 };
@@ -89,13 +91,16 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
     .board {
       position: absolute;
       top: 0;
-      right: 0;
-      bottom: 0;
       left: 0;
+      width: 1920px;
+      height: 1080px;
       padding: 24px;
       background: #020617;
       background: -webkit-linear-gradient(315deg, #020617, #0f172a 48%, #111827);
       background: linear-gradient(135deg, #020617, #0f172a 48%, #111827);
+      -webkit-transform-origin: 0 0;
+      -ms-transform-origin: 0 0;
+      transform-origin: 0 0;
     }
     .header {
       position: absolute;
@@ -363,6 +368,30 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
         root.className = root.className ? root.className + ' tv-text-step-' + step : 'tv-text-step-' + step;
       }
 
+      function getViewportSize() {
+        return {
+          width: window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth || BOARD_CONFIG.designWidth,
+          height: window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight || BOARD_CONFIG.designHeight
+        };
+      }
+
+      function scaleBoardToViewport() {
+        var viewport = getViewportSize();
+        var scale = Math.min(viewport.width / BOARD_CONFIG.designWidth, viewport.height / BOARD_CONFIG.designHeight);
+        var left = Math.max(0, (viewport.width - (BOARD_CONFIG.designWidth * scale)) / 2);
+        var top = Math.max(0, (viewport.height - (BOARD_CONFIG.designHeight * scale)) / 2);
+        var transform = 'scale(' + scale + ')';
+
+        if (!app || app.className.indexOf('board') === -1) return;
+        app.style.width = BOARD_CONFIG.designWidth + 'px';
+        app.style.height = BOARD_CONFIG.designHeight + 'px';
+        app.style.left = left + 'px';
+        app.style.top = top + 'px';
+        app.style.webkitTransform = transform;
+        app.style.msTransform = transform;
+        app.style.transform = transform;
+      }
+
       function clearRefresh() {
         if (refreshTimer) window.clearTimeout(refreshTimer);
         refreshTimer = null;
@@ -462,6 +491,13 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
         stopAutoScroll();
         stopClock();
         app.className = 'boot';
+        app.style.width = '';
+        app.style.height = '';
+        app.style.left = '';
+        app.style.top = '';
+        app.style.webkitTransform = '';
+        app.style.msTransform = '';
+        app.style.transform = '';
         app.innerHTML = '<div class="boot-card"><h1>Workshop Display Board</h1><div class="boot-message">' + escapeHtml(message) + '</div></div>';
       }
 
@@ -580,6 +616,7 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
         }
         setTextSizeClass(textSize);
         app.className = 'board text-step-' + textSize;
+        scaleBoardToViewport();
         app.innerHTML =
           '<div class="header"><div class="brand">' + escapeHtml(BOARD_CONFIG.brand) + '</div><div class="title">' + escapeHtml(BOARD_CONFIG.title) + '</div><div class="status"><div class="status-top"><div class="status-block"><div class="status-label">Last update</div><strong>' + escapeHtml(formatTime(payload.generated_at)) + '</strong></div><div class="status-block"><div class="status-label">Now</div><strong id="board-now">' + escapeHtml(formatTime()) + '</strong></div><div class="live-badge">Live</div></div><div class="status-meta">Fallback refresh every ' + escapeHtml(pollSeconds) + 's · Polling mode</div></div></div>' +
           '<div class="stats">' +
@@ -677,6 +714,11 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
       showBoot('Loading display board...');
       if (document.addEventListener) {
         document.addEventListener('visibilitychange', refreshVisibleBoard);
+      }
+      if (window.addEventListener) {
+        window.addEventListener('resize', scaleBoardToViewport);
+      } else {
+        window.onresize = scaleBoardToViewport;
       }
       tryJoinPairing();
     }());
