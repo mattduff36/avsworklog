@@ -366,7 +366,7 @@ export default function InventoryItemDetailPage() {
                   disabled={savingCheck || !checkedAt || isRetired}
                 >
                   <CalendarCheck className="mr-2 h-4 w-4" />
-                  Record Check
+                  Start Check
                 </Button>
               </div>
             </CardContent>
