@@ -288,11 +288,11 @@ export function ProjectNumbersTab({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-lg border border-border bg-white p-4 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+    <div className="min-w-0 max-w-full space-y-4 overflow-hidden">
+      <div className="flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-white p-4 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <h2 className="text-lg font-semibold text-foreground">Project Numbers</h2>
-          <p className="text-sm text-slate-400">
+          <p className="max-w-full text-sm text-slate-400">
             Reserve real quote/job numbers before a customer quote exists, then review costs and timesheet hours here.
           </p>
         </div>
@@ -307,27 +307,27 @@ export function ProjectNumbersTab({
           No project numbers have been created yet.
         </div>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid min-w-0 gap-4">
           {projectNumbers.map((project) => {
             const openCosts = getOpenCosts(project);
             const selectedIds = selectedCosts[project.id] || new Set<string>();
             const actionQuoteId = project.converted_quote_id || project.linked_quote_id;
 
             return (
-              <article key={project.id} className="rounded-lg border border-border bg-white p-4 shadow-sm dark:bg-slate-900">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <article key={project.id} className="min-w-0 overflow-hidden rounded-lg border border-border bg-white p-3 shadow-sm dark:bg-slate-900 sm:p-4">
+                <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-xl font-semibold text-amber-600 dark:text-amber-300">
+                      <span className="min-w-0 break-all font-mono text-xl font-semibold text-amber-600 dark:text-amber-300">
                         {project.project_reference}
                       </span>
                       <Badge variant={project.status === 'open' ? 'default' : 'secondary'}>{project.status}</Badge>
                     </div>
-                    <h3 className="mt-1 text-lg font-semibold text-foreground">{project.title}</h3>
+                    <h3 className="mt-1 break-words text-lg font-semibold text-foreground">{project.title}</h3>
                     {project.description ? (
-                      <p className="mt-1 text-sm text-slate-400">{project.description}</p>
+                      <p className="mt-1 break-words text-sm text-slate-400">{project.description}</p>
                     ) : null}
-                    <p className="mt-2 text-xs text-slate-400">
+                    <p className="mt-2 break-words text-xs text-slate-400">
                       Manager: {project.manager?.full_name || project.requester_initials} · Created {formatDate(project.created_at)}
                     </p>
                     {actionQuoteId ? (
@@ -337,26 +337,26 @@ export function ProjectNumbersTab({
                     ) : null}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4 lg:min-w-[520px]">
-                    <div className="rounded-md border border-border p-3">
+                  <div className="grid min-w-0 grid-cols-2 gap-2 text-sm sm:grid-cols-4 lg:min-w-[520px]">
+                    <div className="min-w-0 rounded-md border border-border p-3">
                       <CircleDollarSign className="mb-1 h-4 w-4 text-slate-400" />
                       <p className="text-xs text-slate-400">Manual costs</p>
-                      <p className="font-semibold">{formatCurrency(project.manual_cost_total)}</p>
+                      <p className="truncate font-semibold">{formatCurrency(project.manual_cost_total)}</p>
                     </div>
-                    <div className="rounded-md border border-border p-3">
+                    <div className="min-w-0 rounded-md border border-border p-3">
                       <CheckCircle2 className="mb-1 h-4 w-4 text-slate-400" />
                       <p className="text-xs text-slate-400">Unlinked</p>
-                      <p className="font-semibold">{formatCurrency(project.unlinked_manual_cost_total)}</p>
+                      <p className="truncate font-semibold">{formatCurrency(project.unlinked_manual_cost_total)}</p>
                     </div>
-                    <div className="rounded-md border border-border p-3">
+                    <div className="min-w-0 rounded-md border border-border p-3">
                       <Clock3 className="mb-1 h-4 w-4 text-slate-400" />
                       <p className="text-xs text-slate-400">Labour hours</p>
-                      <p className="font-semibold">{formatHours(project.labour_summary?.total_hours)}</p>
+                      <p className="truncate font-semibold">{formatHours(project.labour_summary?.total_hours)}</p>
                     </div>
-                    <div className="rounded-md border border-border p-3">
+                    <div className="min-w-0 rounded-md border border-border p-3">
                       <ReceiptText className="mb-1 h-4 w-4 text-slate-400" />
                       <p className="text-xs text-slate-400">Timesheets</p>
-                      <p className="font-semibold">{project.labour_summary?.timesheet_count || 0}</p>
+                      <p className="truncate font-semibold">{project.labour_summary?.timesheet_count || 0}</p>
                     </div>
                   </div>
                 </div>
@@ -368,7 +368,7 @@ export function ProjectNumbersTab({
                       size="sm"
                       onClick={() => openCostModal(project.id)}
                       disabled={project.status !== 'open'}
-                      className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90"
+                      className="w-full bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90 sm:w-auto"
                     >
                       <Plus className="mr-2 h-4 w-4" />
                       Add Cost
@@ -380,7 +380,42 @@ export function ProjectNumbersTab({
                       No manual costs added yet. Timesheet labour still appears in the hours summary when employees use this job code.
                     </p>
                   ) : (
-                    <div className="overflow-x-auto">
+                    <>
+                    <div className="space-y-2 sm:hidden">
+                      {(project.costs || []).map((cost) => (
+                        <div key={cost.id} className="min-w-0 rounded-md border border-border p-3">
+                          <div className="flex min-w-0 items-start gap-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(cost.id)}
+                              disabled={Boolean(cost.linked_quote_id) || project.status !== 'open'}
+                              onChange={() => toggleCost(project.id, cost.id)}
+                              aria-label={`Select ${cost.description}`}
+                              className="mt-1 shrink-0"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex min-w-0 items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className="break-words text-sm font-medium text-foreground">{cost.description}</p>
+                                  <p className="mt-1 text-xs capitalize text-slate-400">
+                                    {formatDate(cost.cost_date)} · {cost.category}
+                                  </p>
+                                </div>
+                                <p className="shrink-0 text-sm font-semibold">{formatCurrency(cost.amount)}</p>
+                              </div>
+                              {cost.supplier || cost.linked_quote_id ? (
+                                <p className="mt-2 break-words text-xs text-slate-400">
+                                  {cost.supplier || 'No supplier'}
+                                  {cost.linked_quote_id ? ' · linked' : ''}
+                                </p>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="hidden overflow-x-auto sm:block">
                       <table className="w-full min-w-[720px] text-sm">
                         <thead className="text-left text-xs uppercase text-slate-400">
                           <tr className="border-b border-border">
@@ -419,13 +454,15 @@ export function ProjectNumbersTab({
                         </tbody>
                       </table>
                     </div>
+                    </>
                   )}
 
-                  <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                  <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:justify-end">
                     <Button
                       variant="outline"
                       onClick={() => openProjectAction(project, 'link')}
                       disabled={project.status !== 'open' || openCosts.length === 0}
+                      className="w-full whitespace-normal sm:w-auto sm:whitespace-nowrap"
                     >
                       <Link2 className="mr-2 h-4 w-4" />
                       Add to Existing Quote
@@ -433,7 +470,7 @@ export function ProjectNumbersTab({
                     <Button
                       onClick={() => openProjectAction(project, 'convert')}
                       disabled={project.status !== 'open' || openCosts.length === 0 || !canViewCustomers}
-                      className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90"
+                      className="w-full whitespace-normal bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90 sm:w-auto sm:whitespace-nowrap"
                     >
                       <ReceiptText className="mr-2 h-4 w-4" />
                       Create Quote from Costs
