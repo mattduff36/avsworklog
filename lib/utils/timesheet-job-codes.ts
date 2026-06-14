@@ -30,6 +30,25 @@ export function isValidJobNumber(value: string | null | undefined): boolean {
   return JOB_NUMBER_REGEX.test(normalizeJobNumberInput(value || ''));
 }
 
+export function isCataloguedJobNumber(
+  value: string | null | undefined,
+  cataloguedJobNumbers: ReadonlySet<string>
+): boolean {
+  const normalizedValue = normalizeJobNumberInput(value || '');
+  return isValidJobNumber(normalizedValue) && cataloguedJobNumbers.has(normalizedValue);
+}
+
+export function areCataloguedJobNumbers(
+  values: Array<string | null | undefined> | null | undefined,
+  cataloguedJobNumbers: ReadonlySet<string>
+): boolean {
+  const jobNumbers = getNormalizedJobNumbers(values);
+  if (jobNumbers.length === 0) return false;
+  if (hasDuplicateJobNumbers(values)) return false;
+
+  return jobNumbers.every((jobNumber) => isCataloguedJobNumber(jobNumber, cataloguedJobNumbers));
+}
+
 export function getNormalizedJobNumbers(values: Array<string | null | undefined> | null | undefined): string[] {
   if (!values || values.length === 0) return [];
 

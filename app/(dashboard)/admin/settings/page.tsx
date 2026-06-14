@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { SlidersHorizontal } from 'lucide-react';
 import { AppPageShell } from '@/components/layout/AppPageShell';
 import { PageLoader } from '@/components/ui/page-loader';
@@ -19,10 +19,19 @@ import { DisplayBoardSettingsCard } from './components/DisplayBoardSettingsCard'
 
 const SETTINGS_HELPER_TEXT_CLASS = 'text-sm leading-relaxed text-slate-400';
 
-export default function AdminSettingsPage() {
+type AdminSettingsTab = 'general' | 'timesheets';
+
+function isAdminSettingsTab(value: string | null): value is AdminSettingsTab {
+  return value === 'general' || value === 'timesheets';
+}
+
+function AdminSettingsContent() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { hasPermission: canAccessSettings, loading: permissionLoading } = usePermissionCheck('admin-settings', false);
-  const [settingsTab, setSettingsTab] = useState<'general' | 'timesheets'>('general');
+  const tabParam = searchParams.get('tab');
+  const settingsTab: AdminSettingsTab = isAdminSettingsTab(tabParam) ? tabParam : 'general';
   const [appWidescreenEnabled, setAppWidescreenEnabled] = useState(false);
 
   useEffect(() => {
@@ -53,6 +62,18 @@ export default function AdminSettingsPage() {
     writeAppWidescreenPreference(checked);
   }
 
+  function handleSettingsTabChange(nextTab: AdminSettingsTab) {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    if (nextTab === 'general') {
+      nextParams.delete('tab');
+    } else {
+      nextParams.set('tab', nextTab);
+    }
+
+    const nextQuery = nextParams.toString();
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
+  }
+
   if (permissionLoading) {
     return <PageLoader message="Loading admin settings..." />;
   }
@@ -77,7 +98,12 @@ export default function AdminSettingsPage() {
         </div>
       </div>
 
-      <Tabs value={settingsTab} onValueChange={(value) => setSettingsTab(value as 'general' | 'timesheets')}>
+      <Tabs
+        value={settingsTab}
+        onValueChange={(value) => {
+          if (isAdminSettingsTab(value)) handleSettingsTabChange(value);
+        }}
+      >
         <TabsList className="grid w-full max-w-md grid-cols-2">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="timesheets">Timesheets</TabsTrigger>
@@ -116,5 +142,13 @@ export default function AdminSettingsPage() {
         </TabsContent>
       </Tabs>
     </AppPageShell>
+  );
+}
+
+export default function AdminSettingsPage() {
+  return (
+    <Suspense fallback={<PageLoader message="Loading admin settings..." />}>
+      <AdminSettingsContent />
+    </Suspense>
   );
 }

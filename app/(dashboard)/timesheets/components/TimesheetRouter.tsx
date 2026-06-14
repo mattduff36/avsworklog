@@ -7,7 +7,7 @@ import { AlertTriangle, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { PanelLoader } from '@/components/ui/panel-loader';
 import { useTimesheetType } from '../hooks/useTimesheetType';
-import { TimesheetRegistry, isTimesheetTypeImplemented, getTimesheetTypeLabel } from '../types/registry';
+import { TimesheetRegistry, isTimesheetTypeImplemented, getTimesheetTypeLabel, type TimesheetType } from '../types/registry';
 import { PlantTimesheetV2 } from '../types/plant/PlantTimesheetV2Aligned';
 import { PlantTimesheet } from '../types/plant/PlantTimesheet';
 import { resolveTimesheetRenderVariant } from './timesheet-routing';
@@ -27,6 +27,7 @@ interface TimesheetRouterProps {
   onSelectedEmployeeChange?: (employeeId: string) => void;
   existingTimesheetType?: string | null;
   existingTemplateVersion?: number | null;
+  selectedTimesheetType?: TimesheetType | null;
 }
 
 export function TimesheetRouter({
@@ -36,8 +37,10 @@ export function TimesheetRouter({
   onSelectedEmployeeChange,
   existingTimesheetType = null,
   existingTemplateVersion = null,
+  selectedTimesheetType = null,
 }: TimesheetRouterProps) {
-  const { timesheetType, loading, error } = useTimesheetType(userId);
+  const { timesheetType, mode, loading, error } = useTimesheetType(userId);
+  const resolvedType = !existingId && selectedTimesheetType ? selectedTimesheetType : timesheetType;
 
   // Loading state
   if (loading) {
@@ -50,9 +53,13 @@ export function TimesheetRouter({
     // Still show default timesheet despite error
   }
 
+  if (!existingId && mode === 'choice' && !selectedTimesheetType) {
+    return <PanelLoader message="Waiting for timesheet type selection..." accent="timesheet" className="min-h-[240px]" />;
+  }
+
   // New plant timesheets must always use v2.
   // Existing records are handled by template-version routing below.
-  if (!existingId && timesheetType === 'plant') {
+  if (!existingId && resolvedType === 'plant') {
     return (
       <PlantTimesheetV2
         weekEnding={weekEnding}
@@ -67,7 +74,7 @@ export function TimesheetRouter({
     existingId,
     existingTimesheetType,
     existingTemplateVersion,
-    resolvedType: timesheetType,
+    resolvedType,
   });
 
   if (routing.variant === 'plant-v2') {

@@ -35,12 +35,11 @@ import {
 import { buildLeaveAwareTotals, formatLeaveAwareWeeklyDisplayMultiline } from '@/lib/utils/timesheet-leave-totals';
 import { isPlantTimesheetV2, normalizeTimesheetEntriesForDisplay } from '@/lib/utils/plant-timesheet-v2-normalization';
 import {
+  areCataloguedJobNumbers,
   formatEntryJobNumbers,
   getEntryJobNumbers,
   getNormalizedJobNumbers,
   getPrimaryJobNumber,
-  hasDuplicateJobNumbers,
-  isValidJobNumber,
   normalizeJobNumberInput,
 } from '@/lib/utils/timesheet-job-codes';
 import {
@@ -59,6 +58,10 @@ export default function ViewTimesheetPage() {
   const params = useParams();
   const { user, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
   const { options: jobCodeOptions, isLoading: jobCodeOptionsLoading } = useTimesheetJobCodeOptions();
+  const cataloguedJobNumbers = useMemo(
+    () => new Set(jobCodeOptions.map((option) => option.value)),
+    [jobCodeOptions]
+  );
   const supabase = createClient();
   
   const [timesheet, setTimesheet] = useState<Timesheet | null>(null);
@@ -398,16 +401,24 @@ export default function ViewTimesheetPage() {
 
     try {
       const entriesToPersist = normalizeTimesheetEntriesForDisplay(timesheet, entries, offDayStates);
+      if (jobCodeOptionsLoading) {
+        const errorMessage = 'Job codes are still loading. Please wait a moment, then try again.';
+        setError(errorMessage);
+        return {
+          success: false,
+          errorMessage,
+        };
+      }
+
       const invalidJobEntry = entriesToPersist.find((entry) => {
         const hasHours = Boolean(entry.time_started && entry.time_finished);
         if (!hasHours || entry.did_not_work || entry.working_in_yard) return false;
 
-        const jobNumbers = getNormalizedJobNumbers(entry.job_numbers);
-        return jobNumbers.length === 0 || hasDuplicateJobNumbers(entry.job_numbers) || !jobNumbers.every((jobNumber) => isValidJobNumber(jobNumber));
+        return !areCataloguedJobNumbers(entry.job_numbers, cataloguedJobNumbers);
       });
 
       if (invalidJobEntry) {
-        const errorMessage = `${DAY_NAMES[invalidJobEntry.day_of_week - 1]}: add at least one valid Job Number in format 1234-AB or 40001-GH and do not repeat the same code on a single day.`;
+        const errorMessage = `${DAY_NAMES[invalidJobEntry.day_of_week - 1]}: select at least one valid Job Number from the job-code list and do not repeat the same code on a single day.`;
         setError(errorMessage);
         return {
           success: false,

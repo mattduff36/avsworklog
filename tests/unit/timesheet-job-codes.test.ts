@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  areCataloguedJobNumbers,
   collectUniqueJobNumbers,
   formatEntryJobNumbers,
   getEntryJobNumbers,
@@ -21,6 +22,15 @@ describe('timesheet job code helpers', () => {
     expect(isValidJobNumber('40001-GH')).toBe(true);
     expect(isValidJobNumber('40001')).toBe(false);
     expect(isValidJobNumber('123456-GH')).toBe(false);
+  });
+
+  it('requires job numbers to be present in the loaded catalog', () => {
+    const cataloguedJobNumbers = new Set(['1234-AB', '40001-GH']);
+
+    expect(areCataloguedJobNumbers(['1234ab'], cataloguedJobNumbers)).toBe(true);
+    expect(areCataloguedJobNumbers(['40001-GH'], cataloguedJobNumbers)).toBe(true);
+    expect(areCataloguedJobNumbers(['9999-ZZ'], cataloguedJobNumbers)).toBe(false);
+    expect(areCataloguedJobNumbers(['1234-AB', '1234ab'], cataloguedJobNumbers)).toBe(false);
   });
 
   it('prefers ordered child job-code rows over the legacy scalar field', () => {

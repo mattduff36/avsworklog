@@ -1,16 +1,9 @@
 'use client';
 
-import { Fragment, useState, useMemo } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { format } from 'date-fns';
 import {
   Search,
@@ -28,16 +21,15 @@ interface QuotesTableProps {
   quotes: Quote[];
   statusCounts?: QuoteListSummary['status_counts'];
   onRowClick: (quote: Quote) => void;
-  statusFilter: QuoteStatus | 'all';
-  onStatusFilterChange: (s: QuoteStatus | 'all') => void;
   managerFilter?: string;
 }
 
 type SortField = 'quote_reference' | 'customer' | 'quote_date' | 'total' | 'status';
 type SortDir = 'asc' | 'desc';
+type PoFilter = 'with_po' | 'without_po';
+type BillingFilter = 'not_invoiced' | 'ready_to_invoice' | 'partially_invoiced' | 'invoiced';
 
 const BILLING_FILTER_OPTIONS = [
-  { value: 'all', label: 'All billing' },
   { value: 'not_invoiced', label: 'Not billed' },
   { value: 'ready_to_invoice', label: 'Ready to invoice' },
   { value: 'partially_invoiced', label: 'Part billed' },
@@ -45,13 +37,11 @@ const BILLING_FILTER_OPTIONS = [
 ] as const;
 
 const PO_FILTER_OPTIONS = [
-  { value: 'all', label: 'All PO' },
   { value: 'with_po', label: 'With PO' },
   { value: 'without_po', label: 'No PO' },
 ] as const;
 
 const SAGE_FILTER_OPTIONS = [
-  { value: 'all', label: 'All Sage' },
   { value: 'not_on_sage', label: 'Not on Sage' },
   { value: 'on_sage', label: 'On Sage' },
 ] as const;
@@ -151,18 +141,253 @@ function InvoiceProgressBadge({ quote }: { quote: Quote }) {
   );
 }
 
+interface MultiSelectFilterOption<TValue extends string> {
+  value: TValue;
+  label: string;
+  count?: number;
+}
+
+interface MultiSelectFilterProps<TValue extends string> {
+  label: string;
+  allLabel: string;
+  selectedValues: TValue[];
+  options: readonly MultiSelectFilterOption<TValue>[];
+  onSelectedValuesChange: (values: TValue[]) => void;
+  triggerClassName?: string;
+}
+
+interface DateRangeFilterProps {
+  fromDate: string;
+  toDate: string;
+  onFromDateChange: (value: string) => void;
+  onToDateChange: (value: string) => void;
+}
+
+function getMultiSelectTriggerLabel<TValue extends string>({
+  allLabel,
+  selectedValues,
+  options,
+}: {
+  allLabel: string;
+  selectedValues: TValue[];
+  options: readonly MultiSelectFilterOption<TValue>[];
+}) {
+  if (selectedValues.length === 0) return allLabel;
+  if (selectedValues.length === 1) {
+    return options.find((option) => option.value === selectedValues[0])?.label || allLabel;
+  }
+  return `${selectedValues.length} selected`;
+}
+
+function MultiSelectFilter<TValue extends string>({
+  label,
+  allLabel,
+  selectedValues,
+  options,
+  onSelectedValuesChange,
+  triggerClassName,
+}: MultiSelectFilterProps<TValue>) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const panelId = `${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-filter-menu`;
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (!containerRef.current?.contains(target)) setOpen(false);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setOpen(false);
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
+
+  function toggleValue(value: TValue) {
+    if (selectedValues.includes(value)) {
+      onSelectedValuesChange(selectedValues.filter((selectedValue) => selectedValue !== value));
+      return;
+    }
+
+    onSelectedValuesChange([...selectedValues, value]);
+  }
+
+  return (
+    <div ref={containerRef} className={cn('relative w-full sm:w-[150px]', triggerClassName)}>
+      <Button
+        type="button"
+        variant="outline"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((current) => !current)}
+        className="w-full justify-between border-slate-600 bg-slate-800 text-white hover:bg-slate-700"
+      >
+        <span className="truncate">
+          {getMultiSelectTriggerLabel({ allLabel, selectedValues, options })}
+        </span>
+        <ChevronDown className={cn('ml-2 h-4 w-4 shrink-0 opacity-70 transition-transform', open && 'rotate-180')} />
+      </Button>
+
+      {open ? (
+        <div
+          id={panelId}
+          className="absolute left-0 top-full z-40 mt-1 max-h-72 w-full overflow-y-auto rounded-md border border-slate-700 bg-slate-950 p-1 text-sm text-slate-200 shadow-xl"
+        >
+          <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+          <label className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-3 py-2 text-left hover:bg-slate-800">
+            <input
+              type="checkbox"
+              checked={selectedValues.length === 0}
+              onChange={() => onSelectedValuesChange([])}
+              className="h-4 w-4 accent-avs-yellow"
+            />
+            <span>{allLabel}</span>
+          </label>
+          {options.map((option) => (
+            <label
+              key={option.value}
+              className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-3 py-2 text-left hover:bg-slate-800"
+            >
+              <input
+                type="checkbox"
+                checked={selectedValues.includes(option.value)}
+                onChange={() => toggleValue(option.value)}
+                className="h-4 w-4 accent-avs-yellow"
+              />
+              <span className="min-w-0 flex-1 truncate">{option.label}</span>
+              {typeof option.count === 'number' && option.count > 0 ? (
+                <span className="text-xs text-slate-400">({option.count})</span>
+              ) : null}
+            </label>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function getDateRangeTriggerLabel(fromDate: string, toDate: string) {
+  if (fromDate && toDate) return `${fromDate} to ${toDate}`;
+  if (fromDate) return `From ${fromDate}`;
+  if (toDate) return `To ${toDate}`;
+  return 'All dates';
+}
+
+function DateRangeFilter({
+  fromDate,
+  toDate,
+  onFromDateChange,
+  onToDateChange,
+}: DateRangeFilterProps) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const panelId = 'quote-date-range-filter-menu';
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (!containerRef.current?.contains(target)) setOpen(false);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setOpen(false);
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div ref={containerRef} className="relative w-full sm:w-[210px]">
+      <Button
+        type="button"
+        variant="outline"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((current) => !current)}
+        className="w-full justify-between border-slate-600 bg-slate-800 text-white hover:bg-slate-700"
+      >
+        <span className="truncate">{getDateRangeTriggerLabel(fromDate, toDate)}</span>
+        <ChevronDown className={cn('ml-2 h-4 w-4 shrink-0 opacity-70 transition-transform', open && 'rotate-180')} />
+      </Button>
+
+      {open ? (
+        <div
+          id={panelId}
+          className="absolute left-0 top-full z-40 mt-1 w-full rounded-md border border-slate-700 bg-slate-950 p-3 text-sm text-slate-200 shadow-xl"
+        >
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Date Range</p>
+          <div className="space-y-3">
+            <label className="block space-y-1">
+              <span className="text-xs text-slate-400">From</span>
+              <Input
+                type="date"
+                value={fromDate}
+                onChange={(event) => onFromDateChange(event.target.value)}
+                className="border-slate-700 bg-slate-900 text-white"
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-xs text-slate-400">To</span>
+              <Input
+                type="date"
+                value={toDate}
+                onChange={(event) => onToDateChange(event.target.value)}
+                className="border-slate-700 bg-slate-900 text-white"
+              />
+            </label>
+            {(fromDate || toDate) ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  onFromDateChange('');
+                  onToDateChange('');
+                }}
+                className="w-full text-slate-300 hover:bg-slate-800 hover:text-white"
+              >
+                Clear dates
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function QuotesTable({
   quotes,
   statusCounts: providedStatusCounts,
   onRowClick,
-  statusFilter,
-  onStatusFilterChange,
   managerFilter = 'all',
 }: QuotesTableProps) {
   const [search, setSearch] = useState('');
-  const [poFilter, setPoFilter] = useState<'all' | 'with_po' | 'without_po'>('all');
-  const [invoiceFilter, setInvoiceFilter] = useState<'all' | 'not_invoiced' | 'ready_to_invoice' | 'partially_invoiced' | 'invoiced'>('all');
-  const [sageFilter, setSageFilter] = useState<'all' | QuoteSageStatus>('all');
+  const [statusFilters, setStatusFilters] = useState<QuoteStatus[]>([]);
+  const [poFilters, setPoFilters] = useState<PoFilter[]>([]);
+  const [invoiceFilters, setInvoiceFilters] = useState<BillingFilter[]>([]);
+  const [sageFilters, setSageFilters] = useState<QuoteSageStatus[]>([]);
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
   const [sortField, setSortField] = useState<SortField>('quote_date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [expandedThreads, setExpandedThreads] = useState<Record<string, boolean>>({});
@@ -184,26 +409,36 @@ export function QuotesTable({
   const filtered = useMemo(() => {
     let list = quotes;
 
-    if (statusFilter !== 'all') {
-      list = list.filter(q => quoteMatchesStatus(q, statusFilter));
+    if (statusFilters.length > 0) {
+      list = list.filter(q => statusFilters.some((status) => quoteMatchesStatus(q, status)));
     }
 
     if (managerFilter !== 'all') {
       list = list.filter(q => q.requester_id === managerFilter);
     }
 
-    if (poFilter === 'with_po') {
-      list = list.filter(q => Boolean(q.po_number));
-    } else if (poFilter === 'without_po') {
-      list = list.filter(q => !q.po_number);
+    if (poFilters.length > 0) {
+      list = list.filter(q =>
+        poFilters.some((poFilter) => (
+          poFilter === 'with_po' ? Boolean(q.po_number) : !q.po_number
+        ))
+      );
     }
 
-    if (invoiceFilter !== 'all') {
-      list = list.filter(q => q.invoice_summary?.status === invoiceFilter);
+    if (invoiceFilters.length > 0) {
+      list = list.filter(q => invoiceFilters.includes(q.invoice_summary?.status as BillingFilter));
     }
 
-    if (sageFilter !== 'all') {
-      list = list.filter(q => getQuoteSageStatus(q) === sageFilter);
+    if (sageFilters.length > 0) {
+      list = list.filter(q => sageFilters.includes(getQuoteSageStatus(q)));
+    }
+
+    if (fromDate) {
+      list = list.filter(q => q.quote_date >= fromDate);
+    }
+
+    if (toDate) {
+      list = list.filter(q => q.quote_date <= toDate);
     }
 
     if (search.trim()) {
@@ -237,7 +472,7 @@ export function QuotesTable({
     });
 
     return list;
-  }, [quotes, search, statusFilter, managerFilter, poFilter, invoiceFilter, sageFilter, sortField, sortDir]);
+  }, [quotes, search, statusFilters, managerFilter, poFilters, invoiceFilters, sageFilters, fromDate, toDate, sortField, sortDir]);
 
   function toggleSort(field: SortField) {
     if (sortField === field) {
@@ -278,8 +513,14 @@ export function QuotesTable({
     return localCounts;
   }, [providedStatusCounts, quotes]);
 
-  const statusFilterOptions = useMemo(
-    () => (['all', ...ACTIVE_QUOTE_STATUS_ORDER] as const).filter(s => s === 'all' || (statusCounts[s] || 0) > 0),
+  const statusFilterOptions = useMemo<MultiSelectFilterOption<QuoteStatus>[]>(
+    () => ACTIVE_QUOTE_STATUS_ORDER
+      .filter((status) => (statusCounts[status] || 0) > 0)
+      .map((status) => ({
+        value: status,
+        label: getQuoteStatusConfig(status).label,
+        count: statusCounts[status] || 0,
+      })),
     [statusCounts]
   );
 
@@ -290,7 +531,7 @@ export function QuotesTable({
     }));
   }
 
-  const hasSecondaryFilters = poFilter !== 'all' || invoiceFilter !== 'all' || sageFilter !== 'all';
+  const hasAnyFilters = statusFilters.length > 0 || poFilters.length > 0 || invoiceFilters.length > 0 || sageFilters.length > 0 || Boolean(fromDate || toDate);
 
   return (
     <div className="space-y-6">
@@ -307,90 +548,70 @@ export function QuotesTable({
         </div>
       </div>
 
-      {/* Status and secondary filters */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div className="space-y-2">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Workflow Status</p>
-          <div className="flex flex-wrap gap-2">
-            {statusFilterOptions.map(s => {
-              const cfg = s === 'all' ? { label: 'All', color: '' } : getQuoteStatusConfig(s);
-              const count = statusCounts[s] || 0;
-              const isActive = statusFilter === s;
-              return (
-                <Button
-                  key={s}
-                  variant={isActive ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => onStatusFilterChange(s)}
-                  className={isActive
-                    ? 'bg-slate-600 text-white hover:bg-slate-500'
-                    : 'border-slate-600 text-muted-foreground hover:bg-slate-700/50'
-                  }
-                >
-                  {cfg.label} {count > 0 && <span className="ml-1 opacity-70">({count})</span>}
-                </Button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="w-full space-y-2 lg:w-auto">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Select PO / Billing</p>
-          <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-            <Select value={poFilter} onValueChange={(value: 'all' | 'with_po' | 'without_po') => setPoFilter(value)}>
-              <SelectTrigger className="w-full bg-slate-800 border-slate-600 text-white sm:w-[140px]">
-                <SelectValue placeholder="PO" />
-              </SelectTrigger>
-              <SelectContent>
-                {PO_FILTER_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={invoiceFilter}
-              onValueChange={(value: 'all' | 'not_invoiced' | 'ready_to_invoice' | 'partially_invoiced' | 'invoiced') => setInvoiceFilter(value)}
+      {/* Filters */}
+      <div className="flex flex-col gap-2 lg:items-end">
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Filters</p>
+        <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:justify-end">
+          {hasAnyFilters ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setStatusFilters([]);
+                setPoFilters([]);
+                setInvoiceFilters([]);
+                setSageFilters([]);
+                setFromDate('');
+                setToDate('');
+              }}
+              className="border-slate-600 text-muted-foreground hover:bg-slate-700/50"
             >
-              <SelectTrigger className="w-full bg-slate-800 border-slate-600 text-white sm:w-[150px]">
-                <SelectValue placeholder="Billing" />
-              </SelectTrigger>
-              <SelectContent>
-                {BILLING_FILTER_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              Reset Filters
+            </Button>
+          ) : null}
 
-            <Select
-              value={sageFilter}
-              onValueChange={(value) => setSageFilter(value as 'all' | QuoteSageStatus)}
-            >
-              <SelectTrigger className="w-full bg-slate-800 border-slate-600 text-white sm:w-[150px]">
-                <SelectValue placeholder="Sage" />
-              </SelectTrigger>
-              <SelectContent>
-                {SAGE_FILTER_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <DateRangeFilter
+            fromDate={fromDate}
+            toDate={toDate}
+            onFromDateChange={setFromDate}
+            onToDateChange={setToDate}
+          />
 
-            {hasSecondaryFilters ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setPoFilter('all');
-                  setInvoiceFilter('all');
-                  setSageFilter('all');
-                }}
-                className="border-slate-600 text-muted-foreground hover:bg-slate-700/50"
-              >
-                Reset Filters
-              </Button>
-            ) : null}
-          </div>
+          <MultiSelectFilter
+            label="Workflow Status"
+            allLabel="All workflow"
+            selectedValues={statusFilters}
+            options={statusFilterOptions}
+            onSelectedValuesChange={setStatusFilters}
+            triggerClassName="sm:w-[170px]"
+          />
+
+          <MultiSelectFilter
+            label="PO"
+            allLabel="All PO"
+            selectedValues={poFilters}
+            options={PO_FILTER_OPTIONS}
+            onSelectedValuesChange={setPoFilters}
+            triggerClassName="sm:w-[140px]"
+          />
+
+          <MultiSelectFilter
+            label="Billing"
+            allLabel="All billing"
+            selectedValues={invoiceFilters}
+            options={BILLING_FILTER_OPTIONS}
+            onSelectedValuesChange={setInvoiceFilters}
+            triggerClassName="sm:w-[150px]"
+          />
+
+          <MultiSelectFilter
+            label="Sage"
+            allLabel="All Sage"
+            selectedValues={sageFilters}
+            options={SAGE_FILTER_OPTIONS}
+            onSelectedValuesChange={setSageFilters}
+            triggerClassName="sm:w-[150px]"
+          />
         </div>
       </div>
 

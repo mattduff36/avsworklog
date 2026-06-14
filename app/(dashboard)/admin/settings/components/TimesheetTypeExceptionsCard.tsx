@@ -20,7 +20,10 @@ import {
 } from '@/app/(dashboard)/timesheets/types/registry';
 import { Loader2, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { TimesheetTypeExceptionMatrixResponse } from '@/types/timesheet-type-exceptions';
+import type {
+  TimesheetExceptionOverrideType,
+  TimesheetTypeExceptionMatrixResponse,
+} from '@/types/timesheet-type-exceptions';
 
 interface DirectoryEntry {
   id: string;
@@ -37,6 +40,11 @@ interface DirectoryEntry {
 }
 
 const SETTINGS_HELPER_TEXT_CLASS = 'text-sm leading-relaxed text-slate-400';
+
+function getTimesheetOverrideLabel(value: TimesheetExceptionOverrideType): string {
+  if (value === 'user_choice') return "User's Choice";
+  return getTimesheetTypeLabel(value);
+}
 
 export function TimesheetTypeExceptionsCard() {
   const [matrix, setMatrix] = useState<TimesheetTypeExceptionMatrixResponse | null>(null);
@@ -111,7 +119,7 @@ export function TimesheetTypeExceptionsCard() {
     }
   }
 
-  async function handleUpdateOverride(profileId: string, timesheetType: 'civils' | 'plant' | null) {
+  async function handleUpdateOverride(profileId: string, timesheetType: TimesheetExceptionOverrideType | null) {
     setSavingRowId(profileId);
     try {
       const response = await fetch(`/api/admin/settings/timesheet-exceptions/${profileId}`, {
@@ -215,6 +223,7 @@ export function TimesheetTypeExceptionsCard() {
                   const isSaving = savingRowId === row.profile_id;
                   const isRemoving = removingRowId === row.profile_id;
                   const overrideValue = row.override_timesheet_type || 'default';
+                  const isUserChoice = row.effective_timesheet_type === 'user_choice';
                   return (
                     <tr key={row.profile_id} className="border-b border-slate-800/70">
                       <td className="px-3 py-2 align-top">
@@ -245,7 +254,7 @@ export function TimesheetTypeExceptionsCard() {
                           value={overrideValue}
                           disabled={isSaving || isRemoving}
                           onValueChange={(value) => {
-                            const nextValue = value === 'default' ? null : (value as 'civils' | 'plant');
+                            const nextValue = value === 'default' ? null : (value as TimesheetExceptionOverrideType);
                             void handleUpdateOverride(row.profile_id, nextValue);
                           }}
                         >
@@ -254,6 +263,7 @@ export function TimesheetTypeExceptionsCard() {
                           </SelectTrigger>
                           <SelectContent className="bg-slate-950 border-border text-foreground">
                             <SelectItem value="default">Use team default</SelectItem>
+                            <SelectItem value="user_choice">User&apos;s Choice</SelectItem>
                             {TimesheetTypeOptions.map((option) => (
                               <SelectItem key={option.value} value={option.value}>
                                 {option.label}
@@ -264,8 +274,10 @@ export function TimesheetTypeExceptionsCard() {
                       </td>
                       <td className="px-3 py-2 text-white">
                         <div className="flex items-center gap-2">
-                          <span>{getTimesheetTypeLabel(row.effective_timesheet_type)}</span>
-                          {row.override_timesheet_type ? (
+                          <span>{getTimesheetOverrideLabel(row.effective_timesheet_type)}</span>
+                          {isUserChoice ? (
+                            <Badge className="bg-amber-600/30 text-amber-100 border border-amber-500/40">Choice</Badge>
+                          ) : row.override_timesheet_type ? (
                             <Badge className="bg-sky-600/30 text-sky-200 border border-sky-500/40">Override</Badge>
                           ) : (
                             <Badge variant="outline" className="border-slate-600 text-muted-foreground">Default</Badge>

@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import {
+  JOB_NUMBER_REGEX,
   QUOTE_JOB_NUMBER_REGEX,
   normalizeJobNumberInput,
 } from '@/lib/utils/timesheet-job-codes';
@@ -20,32 +21,113 @@ const SENT_ONWARDS_QUOTE_STATUSES = [
   'invoiced',
 ] as const;
 
+interface QuoteJobCodeCustomer {
+  status: string | null;
+  company_name: string | null;
+}
+
 interface QuoteJobCodeRow {
   base_quote_reference: string | null;
   quote_reference: string | null;
+  subject_line: string | null;
+  project_description: string | null;
+  site_address: string | null;
+  customer: QuoteJobCodeCustomer | QuoteJobCodeCustomer[] | null;
+}
+
+interface LegacyQuoteJobCodeRow {
+  quote_reference: string | null;
+  customer_name: string | null;
+  title: string | null;
 }
 
 interface TimesheetJobCodeOption {
   value: string;
   label: string;
+  customerName: string | null;
+  quoteTitle: string | null;
+  source: 'live_quote' | 'legacy_quote';
 }
 
-function mapQuoteRowsToJobCodeOptions(
+function normalizeSearchQuery(query: string): string {
+  return query.trim().toLowerCase();
+}
+
+function optionMatchesQuery(option: TimesheetJobCodeOption, query: string): boolean {
+  if (!query) return true;
+
+  const normalizedJobCodeQuery = normalizeJobNumberInput(query).toLowerCase();
+  const haystack = [
+    option.value,
+    option.customerName,
+    option.quoteTitle,
+  ].filter(Boolean).join(' ').toLowerCase();
+
+  return haystack.includes(query) || Boolean(normalizedJobCodeQuery && option.value.toLowerCase().includes(normalizedJobCodeQuery));
+}
+
+function getQuoteCustomer(row: QuoteJobCodeRow): QuoteJobCodeCustomer | null {
+  if (Array.isArray(row.customer)) return row.customer[0] || null;
+  return row.customer;
+}
+
+function addOption(
+  options: TimesheetJobCodeOption[],
+  seen: Set<string>,
+  option: TimesheetJobCodeOption,
+  query: string
+) {
+  if (!optionMatchesQuery(option, query)) return;
+  if (seen.has(option.value)) return;
+
+  seen.add(option.value);
+  options.push(option);
+}
+
+function mapJobCodeRowsToOptions(
   rows: QuoteJobCodeRow[],
+  legacyRows: LegacyQuoteJobCodeRow[],
   query: string
 ): TimesheetJobCodeOption[] {
-  const normalizedQuery = normalizeJobNumberInput(query).toLowerCase();
+  const normalizedQuery = normalizeSearchQuery(query);
   const seen = new Set<string>();
   const options: TimesheetJobCodeOption[] = [];
 
   for (const row of rows) {
     const reference = normalizeJobNumberInput(row.base_quote_reference || row.quote_reference || '');
     if (!QUOTE_JOB_NUMBER_REGEX.test(reference)) continue;
-    if (normalizedQuery && !reference.toLowerCase().includes(normalizedQuery)) continue;
-    if (seen.has(reference)) continue;
+    const customer = getQuoteCustomer(row);
 
-    seen.add(reference);
-    options.push({ value: reference, label: reference });
+    addOption(
+      options,
+      seen,
+      {
+        value: reference,
+        label: reference,
+        customerName: customer?.company_name || null,
+        quoteTitle: row.subject_line || row.project_description || row.site_address || null,
+        source: 'live_quote',
+      },
+      normalizedQuery
+    );
+  }
+
+  for (const row of legacyRows) {
+    const reference = normalizeJobNumberInput(row.quote_reference || '');
+    if (!JOB_NUMBER_REGEX.test(reference)) continue;
+
+    addOption(
+      options,
+      seen,
+      {
+        value: reference,
+        label: reference,
+        customerName: row.customer_name || null,
+        quoteTitle: row.title || null,
+        source: 'legacy_quote',
+      },
+      normalizedQuery
+    );
   }
 
   return options;
@@ -70,27 +152,43 @@ export async function GET(request: NextRequest) {
 
     const admin = createAdminClient();
     const searchParams = request.nextUrl.searchParams;
-    const limit = Math.min(Math.max(Number.parseInt(searchParams.get('limit') || '500', 10) || 500, 1), 500);
+    const limit = Math.min(Math.max(Number.parseInt(searchParams.get('limit') || '2000', 10) || 2000, 1), 2500);
     const query = searchParams.get('q') || '';
 
-    const { data, error } = await admin
-      .from('quotes')
-      .select(`
-        base_quote_reference,
-        quote_reference,
-        customer:customers!inner(status)
-      `)
-      .eq('is_latest_version', true)
-      .eq('commercial_status', 'open')
-      .in('status', SENT_ONWARDS_QUOTE_STATUSES)
-      .eq('customer.status', 'active')
-      .order('base_quote_reference', { ascending: true })
-      .limit(limit);
+    const [quoteResult, legacyQuoteResult] = await Promise.all([
+      admin
+        .from('quotes')
+        .select(`
+          base_quote_reference,
+          quote_reference,
+          subject_line,
+          project_description,
+          site_address,
+          customer:customers!inner(status, company_name)
+        `)
+        .eq('is_latest_version', true)
+        .eq('commercial_status', 'open')
+        .in('status', SENT_ONWARDS_QUOTE_STATUSES)
+        .eq('customer.status', 'active')
+        .order('base_quote_reference', { ascending: true })
+        .limit(limit),
+      admin
+        .from('legacy_quotes')
+        .select('quote_reference, customer_name, title')
+        .not('quote_reference', 'is', null)
+        .order('quote_reference', { ascending: true })
+        .limit(limit),
+    ]);
 
-    if (error) throw error;
+    if (quoteResult.error) throw quoteResult.error;
+    if (legacyQuoteResult.error) throw legacyQuoteResult.error;
 
     return NextResponse.json({
-      job_codes: mapQuoteRowsToJobCodeOptions((data || []) as QuoteJobCodeRow[], query),
+      job_codes: mapJobCodeRowsToOptions(
+        (quoteResult.data || []) as QuoteJobCodeRow[],
+        (legacyQuoteResult.data || []) as LegacyQuoteJobCodeRow[],
+        query
+      ),
     });
   } catch (error) {
     console.error('Error fetching timesheet job codes:', error);

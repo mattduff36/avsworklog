@@ -108,6 +108,23 @@ export interface QuoteManagerOption {
   } | null;
 }
 
+export interface LegacyQuote {
+  id: string;
+  source_row: number;
+  quote_reference: string | null;
+  customer_name: string;
+  title: string;
+  quote_date: string | null;
+  quote_date_raw: string | null;
+  quote_manager_name: string;
+  quote_manager_initials: string | null;
+  quote_value_text: string | null;
+  quote_value_amount: number | null;
+  comments: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface QuoteTimelineEvent {
   id: string;
   quote_id: string;

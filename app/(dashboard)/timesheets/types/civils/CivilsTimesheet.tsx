@@ -54,11 +54,10 @@ import {
   parseDidNotWorkReasonRemark,
 } from '@/lib/utils/timesheet-did-not-work-exceptions';
 import {
+  areCataloguedJobNumbers,
   getEntryJobNumbers,
   getNormalizedJobNumbers,
   getPrimaryJobNumber,
-  hasDuplicateJobNumbers,
-  isValidJobNumber,
   normalizeJobNumberInput,
 } from '@/lib/utils/timesheet-job-codes';
 
@@ -116,6 +115,10 @@ export function CivilsTimesheet({
   const router = useRouter();
   const { user, profile, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
   const { options: jobCodeOptions, isLoading: jobCodeOptionsLoading } = useTimesheetJobCodeOptions();
+  const cataloguedJobNumbers = useMemo(
+    () => new Set(jobCodeOptions.map((option) => option.value)),
+    [jobCodeOptions]
+  );
   
   const supabase = useMemo(() => createClient(), []);
   
@@ -1093,6 +1096,12 @@ export function CivilsTimesheet({
       return;
     }
 
+    if (jobCodeOptionsLoading) {
+      setError('Job codes are still loading. Please wait a moment, then try again.');
+      setShowErrorDialog(true);
+      return;
+    }
+
     // Validate job numbers for all working days (unless working in yard)
     const allJobNumbersValid = entriesForValidation.every(entry => {
       const offDay = offDayByDay.get(entry.day_of_week);
@@ -1103,14 +1112,11 @@ export function CivilsTimesheet({
       if (entry.working_in_yard) return true; // Skip validation for yard work
       if (!hasHours) return true;
 
-      const jobNumbers = getNormalizedJobNumbers(entry.job_numbers);
-      if (jobNumbers.length === 0) return false;
-      if (hasDuplicateJobNumbers(entry.job_numbers)) return false;
-      return jobNumbers.every((jobNumber) => isValidJobNumber(jobNumber));
+      return areCataloguedJobNumbers(entry.job_numbers, cataloguedJobNumbers);
     });
     
     if (!allJobNumbersValid) {
-      setError('Please enter at least one valid Job Number (format: 1234-AB or 40001-GH) for all working days, and do not repeat the same code on a single day.');
+      setError('Please select at least one valid Job Number from the job-code list for all working days, and do not repeat the same code on a single day.');
       setShowErrorDialog(true);
       return;
     }

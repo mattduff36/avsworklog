@@ -65,11 +65,10 @@ import {
   parseDidNotWorkReasonRemark,
 } from '@/lib/utils/timesheet-did-not-work-exceptions';
 import {
+  areCataloguedJobNumbers,
   getEntryJobNumbers,
   getNormalizedJobNumbers,
   getPrimaryJobNumber,
-  hasDuplicateJobNumbers,
-  isValidJobNumber,
   normalizeJobNumberInput,
 } from '@/lib/utils/timesheet-job-codes';
 import type { WorkShiftPattern } from '@/types/work-shifts';
@@ -184,7 +183,8 @@ function buildWorkWindowValidationErrors(
 
 function buildJobNumberValidationErrors(
   entries: PlantEntryDraft[],
-  offDayMap: Map<number, TimesheetOffDayState>
+  offDayMap: Map<number, TimesheetOffDayState>,
+  cataloguedJobNumbers: ReadonlySet<string>
 ): Record<number, string> {
   const errors: Record<number, string> = {};
 
@@ -196,9 +196,8 @@ function buildJobNumberValidationErrors(
     if (offDay?.hasTrainingBooking) return;
     if (entry.did_not_work || entry.working_in_yard || !hasHours) return;
 
-    const jobNumbers = getNormalizedJobNumbers(entry.job_numbers);
-    if (jobNumbers.length === 0 || hasDuplicateJobNumbers(entry.job_numbers) || !jobNumbers.every((jobNumber) => isValidJobNumber(jobNumber))) {
-      errors[index] = `${DAY_NAMES[index]}: Add at least one valid Job Number in format 1234-AB or 40001-GH and do not repeat the same code on a single day.`;
+    if (!areCataloguedJobNumbers(entry.job_numbers, cataloguedJobNumbers)) {
+      errors[index] = `${DAY_NAMES[index]}: Select at least one valid Job Number from the job-code list and do not repeat the same code on a single day.`;
     }
   });
 
@@ -269,6 +268,10 @@ export function PlantTimesheetV2({
   const router = useRouter();
   const { user, profile, loading: authLoading, isManager, isAdmin, isSuperAdmin } = useAuth();
   const { options: jobCodeOptions, isLoading: jobCodeOptionsLoading } = useTimesheetJobCodeOptions();
+  const cataloguedJobNumbers = useMemo(
+    () => new Set(jobCodeOptions.map((option) => option.value)),
+    [jobCodeOptions]
+  );
   const supabase = useMemo(() => createClient(), []);
   const hasElevatedPermissions = isSuperAdmin || isManager || isAdmin;
 
@@ -970,9 +973,14 @@ export function PlantTimesheetV2({
       return false;
     }
 
+    if (jobCodeOptionsLoading) {
+      setError('Job codes are still loading. Please wait a moment, then try again.');
+      return false;
+    }
+
     const requiredFieldErrors = buildValidationErrors(entries);
     const workWindowErrors = buildWorkWindowValidationErrors(entries, offDayMap);
-    const jobNumberErrors = buildJobNumberValidationErrors(entries, offDayMap);
+    const jobNumberErrors = buildJobNumberValidationErrors(entries, offDayMap, cataloguedJobNumbers);
     const inlineTimeErrors = Object.entries(timeErrors).reduce<Record<number, string>>((acc, [key, message]) => {
       const index = Number(key);
       if (!Number.isFinite(index)) return acc;

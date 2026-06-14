@@ -1331,6 +1331,181 @@ export type Database = {
           },
         ]
       }
+      display_board_configs: {
+        Row: {
+          board_key: string
+          name: string
+          fallback_poll_interval_seconds: number
+          realtime_debounce_ms: number
+          is_enabled: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          board_key: string
+          name: string
+          fallback_poll_interval_seconds?: number
+          realtime_debounce_ms?: number
+          is_enabled?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          board_key?: string
+          name?: string
+          fallback_poll_interval_seconds?: number
+          realtime_debounce_ms?: number
+          is_enabled?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+        ]
+      }
+      display_board_devices: {
+        Row: {
+          id: string
+          board_key: string
+          device_token_hash: string
+          label: string | null
+          paired_by: string | null
+          pairing_session_id: string | null
+          last_seen_at: string | null
+          revoked_at: string | null
+          revoked_by: string | null
+          created_at: string
+          updated_at: string
+          display_text_size_step: number
+        }
+        Insert: {
+          id?: string
+          board_key: string
+          device_token_hash: string
+          label?: string | null
+          paired_by?: string | null
+          pairing_session_id?: string | null
+          last_seen_at?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          created_at?: string
+          updated_at?: string
+          display_text_size_step?: number
+        }
+        Update: {
+          id?: string
+          board_key?: string
+          device_token_hash?: string
+          label?: string | null
+          paired_by?: string | null
+          pairing_session_id?: string | null
+          last_seen_at?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          created_at?: string
+          updated_at?: string
+          display_text_size_step?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'display_board_devices_board_key_fkey'
+            columns: ['board_key']
+            isOneToOne: false
+            referencedRelation: 'display_board_configs'
+            referencedColumns: ['board_key']
+          },
+          {
+            foreignKeyName: 'display_board_devices_paired_by_fkey'
+            columns: ['paired_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'display_board_devices_pairing_session_id_fkey'
+            columns: ['pairing_session_id']
+            isOneToOne: false
+            referencedRelation: 'display_board_pairing_sessions'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'display_board_devices_revoked_by_fkey'
+            columns: ['revoked_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      display_board_pairing_sessions: {
+        Row: {
+          id: string
+          board_key: string
+          confirmation_code: string | null
+          confirmation_code_hash: string | null
+          pairing_token_hash: string | null
+          status: 'active' | 'confirmed' | 'cancelled' | 'expired'
+          started_by: string | null
+          confirmed_by: string | null
+          candidate_seen_at: string | null
+          confirmed_at: string | null
+          expires_at: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          board_key: string
+          confirmation_code?: string | null
+          confirmation_code_hash?: string | null
+          pairing_token_hash?: string | null
+          status?: 'active' | 'confirmed' | 'cancelled' | 'expired'
+          started_by?: string | null
+          confirmed_by?: string | null
+          candidate_seen_at?: string | null
+          confirmed_at?: string | null
+          expires_at: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          board_key?: string
+          confirmation_code?: string | null
+          confirmation_code_hash?: string | null
+          pairing_token_hash?: string | null
+          status?: 'active' | 'confirmed' | 'cancelled' | 'expired'
+          started_by?: string | null
+          confirmed_by?: string | null
+          candidate_seen_at?: string | null
+          confirmed_at?: string | null
+          expires_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'display_board_pairing_sessions_board_key_fkey'
+            columns: ['board_key']
+            isOneToOne: false
+            referencedRelation: 'display_board_configs'
+            referencedColumns: ['board_key']
+          },
+          {
+            foreignKeyName: 'display_board_pairing_sessions_confirmed_by_fkey'
+            columns: ['confirmed_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'display_board_pairing_sessions_started_by_fkey'
+            columns: ['started_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       dvla_sync_log: {
         Row: {
           id: string
@@ -2861,6 +3036,117 @@ export type Database = {
             columns: ['user_id']
             isOneToOne: false
             referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      legacy_quote_import_batches: {
+        Row: {
+          id: string
+          source_file: string
+          source_hash: string
+          imported_at: string
+          record_count: number
+          invalid_reference_count: number
+          metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          source_file: string
+          source_hash: string
+          imported_at?: string
+          record_count?: number
+          invalid_reference_count?: number
+          metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          source_file?: string
+          source_hash?: string
+          imported_at?: string
+          record_count?: number
+          invalid_reference_count?: number
+          metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+        ]
+      }
+      legacy_quotes: {
+        Row: {
+          id: string
+          import_batch_id: string | null
+          source_row: number
+          source_hash: string
+          quote_reference: string | null
+          quote_number: number | null
+          quote_suffix: string | null
+          customer_name: string
+          title: string
+          quote_date: string | null
+          quote_date_raw: string | null
+          quote_manager_name: string
+          quote_manager_initials: string | null
+          quote_value_text: string | null
+          quote_value_amount: number | null
+          comments: string | null
+          raw_data: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          import_batch_id?: string | null
+          source_row: number
+          source_hash: string
+          quote_reference?: string | null
+          quote_number?: number | null
+          quote_suffix?: string | null
+          customer_name?: string
+          title?: string
+          quote_date?: string | null
+          quote_date_raw?: string | null
+          quote_manager_name?: string
+          quote_manager_initials?: string | null
+          quote_value_text?: string | null
+          quote_value_amount?: number | null
+          comments?: string | null
+          raw_data?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          import_batch_id?: string | null
+          source_row?: number
+          source_hash?: string
+          quote_reference?: string | null
+          quote_number?: number | null
+          quote_suffix?: string | null
+          customer_name?: string
+          title?: string
+          quote_date?: string | null
+          quote_date_raw?: string | null
+          quote_manager_name?: string
+          quote_manager_initials?: string | null
+          quote_value_text?: string | null
+          quote_value_amount?: number | null
+          comments?: string | null
+          raw_data?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'legacy_quotes_import_batch_id_fkey'
+            columns: ['import_batch_id']
+            isOneToOne: false
+            referencedRelation: 'legacy_quote_import_batches'
             referencedColumns: ['id']
           },
         ]
@@ -5940,7 +6226,7 @@ export type Database = {
       timesheet_type_exceptions: {
         Row: {
           profile_id: string
-          timesheet_type: 'civils' | 'plant' | null
+          timesheet_type: string | null
           created_at: string
           updated_at: string
           created_by: string | null
@@ -5948,7 +6234,7 @@ export type Database = {
         }
         Insert: {
           profile_id: string
-          timesheet_type?: 'civils' | 'plant' | null
+          timesheet_type?: string | null
           created_at?: string
           updated_at?: string
           created_by?: string | null
@@ -5956,7 +6242,7 @@ export type Database = {
         }
         Update: {
           profile_id?: string
-          timesheet_type?: 'civils' | 'plant' | null
+          timesheet_type?: string | null
           created_at?: string
           updated_at?: string
           created_by?: string | null
@@ -8247,6 +8533,7 @@ export type Database = {
       check__actions__status: 'pending' | 'in_progress' | 'logged' | 'on_hold' | 'completed'
       check__app_auth_sessions__session_source: 'password_login' | 'session_bootstrap' | 'biometric_login'
       check__customers__status: 'active' | 'inactive'
+      check__display_board_pairing_sessions__status: 'active' | 'confirmed' | 'cancelled' | 'expired'
       check__dvla_sync_log__sync_status: 'success' | 'error'
       check__dvla_sync_log__trigger_type: 'manual' | 'bulk' | 'automatic' | 'auto_on_create'
       check__error_reports__status: 'new' | 'investigating' | 'resolved'
@@ -8290,7 +8577,6 @@ export type Database = {
       check__sensitive_pin_verification_tokens__purpose: 'setup' | 'change' | 'reset'
       check__service_health_events__status: 'active' | 'recovered'
       check__suggestions__status: 'new' | 'under_review' | 'planned' | 'completed' | 'declined'
-      check__timesheet_type_exceptions__timesheet_type: 'civils' | 'plant'
       check__timesheets__status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'processed' | 'adjusted'
       check__timesheets__template_version: 1 | 2
       check__timesheets__timesheet_type: 'civils' | 'plant'

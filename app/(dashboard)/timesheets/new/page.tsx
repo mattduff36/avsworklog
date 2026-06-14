@@ -3,13 +3,17 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { useTimesheetType } from '../hooks/useTimesheetType';
 import { TimesheetRouter } from '../components/TimesheetRouter';
 import { WeekSelector } from '../components/WeekSelector';
 import { createClient } from '@/lib/supabase/client';
 import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 import { PageLoader } from '@/components/ui/page-loader';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { Employee } from '@/types/common';
+import { TimesheetTypeOptions, type TimesheetType } from '../types/registry';
 
 /**
  * New Timesheet Page
@@ -38,9 +42,14 @@ function NewTimesheetContent() {
   const [loadedWeek, setLoadedWeek] = useState<string>('');
   const [existingTimesheetType, setExistingTimesheetType] = useState<string | null>(null);
   const [existingTemplateVersion, setExistingTemplateVersion] = useState<number | null>(null);
+  const [selectedTimesheetType, setSelectedTimesheetType] = useState<TimesheetType | null>(null);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
   const [employeeOptions, setEmployeeOptions] = useState<Employee[]>([]);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
+  const {
+    mode: selectedEmployeeTimesheetMode,
+    loading: selectedEmployeeTimesheetTypeLoading,
+  } = useTimesheetType(selectedEmployeeId || undefined);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -86,6 +95,7 @@ function NewTimesheetContent() {
       setTimesheetId(null);
       setExistingTimesheetType(null);
       setExistingTemplateVersion(null);
+      setSelectedTimesheetType(null);
     }
   };
 
@@ -104,6 +114,7 @@ function NewTimesheetContent() {
           if (!data) {
             setExistingTimesheetType(null);
             setExistingTemplateVersion(null);
+          setSelectedTimesheetType(null);
             setShowForm(false);
             return;
           }
@@ -111,6 +122,7 @@ function NewTimesheetContent() {
           setLoadedWeek(data.week_ending);
           setExistingTimesheetType(data.timesheet_type || null);
           setExistingTemplateVersion(data.template_version ?? null);
+          setSelectedTimesheetType(null);
           setSelectedEmployeeId(data.user_id || user.id);
           setShowForm(true);
           setTimesheetId(existingId);
@@ -121,6 +133,7 @@ function NewTimesheetContent() {
           // Fall back to showing week selector
           setExistingTimesheetType(null);
           setExistingTemplateVersion(null);
+          setSelectedTimesheetType(null);
           setShowForm(false);
         }
       }
@@ -138,6 +151,7 @@ function NewTimesheetContent() {
     if (!existingTimesheetId) {
       setExistingTimesheetType(null);
       setExistingTemplateVersion(null);
+      setSelectedTimesheetType(null);
       setShowForm(true);
       return;
     }
@@ -145,6 +159,7 @@ function NewTimesheetContent() {
     if (!supabase) {
       setExistingTimesheetType(null);
       setExistingTemplateVersion(null);
+      setSelectedTimesheetType(null);
       setShowForm(true);
       return;
     }
@@ -165,6 +180,7 @@ function NewTimesheetContent() {
 
       setExistingTimesheetType(data.timesheet_type || null);
       setExistingTemplateVersion(data.template_version ?? null);
+      setSelectedTimesheetType(null);
       setLoadedWeek(data.week_ending || weekEnding);
       setSelectedEmployeeId(data.user_id || user?.id || '');
     } catch (err) {
@@ -174,6 +190,7 @@ function NewTimesheetContent() {
       // Fallback keeps current behavior but avoids stale metadata.
       setExistingTimesheetType(null);
       setExistingTemplateVersion(null);
+      setSelectedTimesheetType(null);
     } finally {
       setShowForm(true);
     }
@@ -210,16 +227,65 @@ function NewTimesheetContent() {
     if (!selectedEmployeeId) {
       return <PageLoader message="Loading selected employee..." />;
     }
+
+    if (!existingId && !timesheetId && selectedEmployeeTimesheetTypeLoading) {
+      return <PageLoader message="Loading timesheet options..." />;
+    }
+
+    if (!existingId && !timesheetId && selectedEmployeeTimesheetMode === 'choice' && !selectedTimesheetType) {
+      return (
+        <div className="mx-auto w-full max-w-2xl space-y-4">
+          <Card className="border-border bg-slate-900/80">
+            <CardHeader>
+              <CardTitle className="text-white">Choose Timesheet Type</CardTitle>
+              <CardDescription>
+                Select which timesheet to create for this week. This choice only applies to the new timesheet you are creating.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {TimesheetTypeOptions.map((option) => (
+                <Button
+                  key={option.value}
+                  type="button"
+                  variant="outline"
+                  onClick={() => setSelectedTimesheetType(option.value)}
+                  className="h-auto w-full justify-start border-border bg-slate-950 p-4 text-left hover:bg-slate-900"
+                >
+                  <span>
+                    <span className="block font-semibold text-foreground">{option.label}</span>
+                    <span className="mt-1 block text-sm font-normal text-muted-foreground">{option.description}</span>
+                  </span>
+                </Button>
+              ))}
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setShowForm(false);
+                  setSelectedWeek(null);
+                  setLoadedWeek('');
+                  setSelectedTimesheetType(null);
+                }}
+                className="w-full text-muted-foreground hover:text-foreground"
+              >
+                Back to week selection
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
     
     return (
       <TimesheetRouter
-        key={`${timesheetId || 'new'}:${selectedEmployeeId}:${weekToUse}`}
+        key={`${timesheetId || 'new'}:${selectedEmployeeId}:${weekToUse}:${selectedTimesheetType || 'resolved'}`}
         weekEnding={weekToUse}
         existingId={timesheetId}
         userId={selectedEmployeeId}
         onSelectedEmployeeChange={handleSelectedEmployeeChange}
         existingTimesheetType={existingTimesheetType}
         existingTemplateVersion={existingTemplateVersion}
+        selectedTimesheetType={selectedTimesheetType}
       />
     );
   }

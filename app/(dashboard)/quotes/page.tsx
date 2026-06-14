@@ -5,7 +5,7 @@ import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { AppPageShell } from '@/components/layout/AppPageShell';
-import { CalendarClock, Plus, Receipt, Settings } from 'lucide-react';
+import { Archive, CalendarClock, Plus, Receipt, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
 import { PageLoader } from '@/components/ui/page-loader';
@@ -13,11 +13,16 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SensitiveModuleGate, SensitiveModuleSessionManager, useSensitiveModuleAccess } from '@/components/security/SensitiveModuleGate';
 import { QuotesTable } from './components/QuotesTable';
+import {
+  getLegacyQuoteManagerFilterValue,
+  LegacyQuotesTable,
+  normalizeLegacyQuoteManagerName,
+} from './components/LegacyQuotesTable';
 import { QuoteDetailsModal } from './components/QuoteDetailsModal';
 import { QuoteFormDialog } from './components/QuoteFormDialog';
 import { QuoteSettingsTab, type QuoteSettingsSubTab } from './components/settings/QuoteSettingsTab';
 import { uploadQuoteAttachment } from './quote-attachment-client';
-import type { Quote, QuoteFormData, QuoteListSummary, QuoteManagerOption, QuoteStatus } from './types';
+import type { LegacyQuote, Quote, QuoteFormData, QuoteListSummary, QuoteManagerOption } from './types';
 
 interface CustomerOption {
   id: string;
@@ -47,10 +52,15 @@ interface ApproverOption {
   email: string | null;
 }
 
-type QuotePageTab = 'overview' | 'settings';
+interface QuoteManagerFilterOption {
+  value: string;
+  label: string;
+}
+
+type QuotePageTab = 'overview' | 'legacy' | 'settings';
 
 function isQuotePageTab(value: string): value is QuotePageTab {
-  return value === 'overview' || value === 'settings';
+  return value === 'overview' || value === 'legacy' || value === 'settings';
 }
 
 function isQuoteSettingsSubTab(value: string): value is QuoteSettingsSubTab {
@@ -90,13 +100,13 @@ function getCompactManagerLabel(label: string) {
 
 interface ManagerFilterTabsProps {
   managerFilter: string;
-  activeManagerOptions: QuoteManagerOption[];
+  managerOptions: QuoteManagerFilterOption[];
   onManagerFilterChange: (nextManagerId: string) => void;
 }
 
 function ManagerFilterTabs({
   managerFilter,
-  activeManagerOptions,
+  managerOptions,
   onManagerFilterChange,
 }: ManagerFilterTabsProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -139,7 +149,7 @@ function ManagerFilterTabs({
       window.cancelAnimationFrame(animationFrame);
       resizeObserver.disconnect();
     };
-  }, [activeManagerOptions, updateCompactMode]);
+  }, [managerOptions, updateCompactMode]);
 
   return (
     <div ref={containerRef} className="relative mt-3 flex w-full justify-end overflow-hidden">
@@ -151,18 +161,14 @@ function ManagerFilterTabs({
         <span className="inline-flex min-h-8 items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-center text-sm font-medium leading-tight">
           All Quotes
         </span>
-        {activeManagerOptions.map(option => {
-          const managerLabel = option.profile?.full_name || option.signoff_name || option.initials;
-
-          return (
-            <span
-              key={option.profile_id}
-              className="inline-flex min-h-8 items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-center text-sm font-medium leading-tight"
-            >
-              {managerLabel}
-            </span>
-          );
-        })}
+        {managerOptions.map(option => (
+          <span
+            key={option.value}
+            className="inline-flex min-h-8 items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-center text-sm font-medium leading-tight"
+          >
+            {option.label}
+          </span>
+        ))}
       </div>
 
       <Tabs value={managerFilter} onValueChange={onManagerFilterChange} className="max-w-full">
@@ -170,14 +176,14 @@ function ManagerFilterTabs({
           <TabsTrigger value="all" className="gap-2 whitespace-nowrap">
             {useCompactLabels ? 'All' : 'All Quotes'}
           </TabsTrigger>
-          {activeManagerOptions.map(option => {
-            const managerLabel = option.profile?.full_name || option.signoff_name || option.initials;
+          {managerOptions.map(option => {
+            const managerLabel = option.label;
             const compactManagerLabel = getCompactManagerLabel(managerLabel);
 
             return (
               <TabsTrigger
-                key={option.profile_id}
-                value={option.profile_id}
+                key={option.value}
+                value={option.value}
                 className="gap-2 whitespace-nowrap"
                 title={managerLabel}
               >
@@ -212,12 +218,12 @@ export default function QuotesPage() {
 
 
   const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [legacyQuotes, setLegacyQuotes] = useState<LegacyQuote[]>([]);
   const [quoteSummary, setQuoteSummary] = useState<QuoteListSummary | null>(null);
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [managerOptions, setManagerOptions] = useState<QuoteManagerOption[]>([]);
   const [approvers, setApprovers] = useState<ApproverOption[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<QuoteStatus | 'all'>('all');
 
   // Modals
   const [detailQuoteId, setDetailQuoteId] = useState<string | null>(null);
@@ -235,24 +241,54 @@ export default function QuotesPage() {
     () => managerOptions.filter(option => option.is_active),
     [managerOptions]
   );
-  const activeManagerIds = useMemo(
-    () => new Set(activeManagerOptions.map(option => option.profile_id)),
+  const overviewManagerOptions = useMemo<QuoteManagerFilterOption[]>(
+    () => activeManagerOptions.map((option) => ({
+      value: option.profile_id,
+      label: option.profile?.full_name || option.signoff_name || option.initials,
+    })),
     [activeManagerOptions]
   );
-  const managerFilter = managerParam === 'all' || activeManagerIds.has(managerParam) ? managerParam : 'all';
+  const overviewManagerIds = useMemo(
+    () => new Set(overviewManagerOptions.map(option => option.value)),
+    [overviewManagerOptions]
+  );
+  const legacyManagerOptions = useMemo<QuoteManagerFilterOption[]>(() => {
+    const managers = new Map<string, string>();
+
+    legacyQuotes.forEach((quote) => {
+      const label = normalizeLegacyQuoteManagerName(quote.quote_manager_name);
+      if (!label) return;
+      managers.set(getLegacyQuoteManagerFilterValue(label), label);
+    });
+
+    return [...managers.entries()]
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [legacyQuotes]);
+  const legacyManagerIds = useMemo(
+    () => new Set(legacyManagerOptions.map(option => option.value)),
+    [legacyManagerOptions]
+  );
+  const overviewManagerFilter = managerParam === 'all' || overviewManagerIds.has(managerParam) ? managerParam : 'all';
+  const legacyManagerFilter = managerParam === 'all' || legacyManagerIds.has(managerParam) ? managerParam : 'all';
 
   const fetchData = useCallback(async () => {
     try {
       const url = customerId ? `/api/quotes?customer_id=${customerId}` : '/api/quotes';
-      const [quotesResult, metadataRes] = await Promise.all([
+      const [quotesResult, legacyQuotesResult, metadataRes] = await Promise.all([
         fetchAllPaginatedItems<Quote>(url, 'quotes', {
           limit: 250,
           errorMessage: 'Failed to load quotes',
+        }),
+        fetchAllPaginatedItems<LegacyQuote>('/api/quotes/legacy', 'legacy_quotes', {
+          limit: 250,
+          errorMessage: 'Failed to load legacy quotes',
         }),
         fetch('/api/quotes/metadata'),
       ]);
 
       setQuotes(quotesResult.items);
+      setLegacyQuotes(legacyQuotesResult.items);
       setQuoteSummary((quotesResult.firstPagePayload?.summary as QuoteListSummary | undefined) || null);
       if (metadataRes.ok) {
         const data = await metadataRes.json();
@@ -368,9 +404,9 @@ export default function QuotesPage() {
     router.replace(`${pathname}?${nextParams.toString()}`, { scroll: false });
   }
 
-  function handleManagerFilterChange(nextManagerId: string) {
+  function handleManagerFilterChange(nextManagerId: string, nextTab: Extract<QuotePageTab, 'overview' | 'legacy'>) {
     const nextParams = new URLSearchParams(searchParams.toString());
-    nextParams.set('tab', 'overview');
+    nextParams.set('tab', nextTab);
     nextParams.delete('settings');
     if (nextManagerId === 'all') {
       nextParams.delete('manager');
@@ -479,6 +515,10 @@ export default function QuotesPage() {
             <Receipt className="h-4 w-4" />
             Overview
           </TabsTrigger>
+          <TabsTrigger value="legacy" className="gap-2">
+            <Archive className="h-4 w-4" />
+            Legacy Quotes
+          </TabsTrigger>
           <TabsTrigger value="settings" className="gap-2">
             <Settings className="h-4 w-4" />
             Settings
@@ -487,9 +527,17 @@ export default function QuotesPage() {
 
         {pageTab === 'overview' ? (
           <ManagerFilterTabs
-            managerFilter={managerFilter}
-            activeManagerOptions={activeManagerOptions}
-            onManagerFilterChange={handleManagerFilterChange}
+            managerFilter={overviewManagerFilter}
+            managerOptions={overviewManagerOptions}
+            onManagerFilterChange={(nextManagerId) => handleManagerFilterChange(nextManagerId, 'overview')}
+          />
+        ) : null}
+
+        {pageTab === 'legacy' ? (
+          <ManagerFilterTabs
+            managerFilter={legacyManagerFilter}
+            managerOptions={legacyManagerOptions}
+            onManagerFilterChange={(nextManagerId) => handleManagerFilterChange(nextManagerId, 'legacy')}
           />
         ) : null}
 
@@ -498,10 +546,12 @@ export default function QuotesPage() {
             quotes={quotes}
             statusCounts={quoteSummary?.status_counts}
             onRowClick={handleRowClick}
-            statusFilter={statusFilter}
-            onStatusFilterChange={setStatusFilter}
-            managerFilter={managerFilter}
+            managerFilter={overviewManagerFilter}
           />
+        </TabsContent>
+
+        <TabsContent value="legacy" className="space-y-6 mt-0">
+          <LegacyQuotesTable legacyQuotes={legacyQuotes} managerFilter={legacyManagerFilter} />
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-6 mt-0">

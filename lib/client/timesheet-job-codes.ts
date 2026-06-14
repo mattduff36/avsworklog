@@ -5,6 +5,9 @@ import { useEffect, useState } from 'react';
 export interface TimesheetJobCodeOption {
   value: string;
   label: string;
+  customerName: string | null;
+  quoteTitle: string | null;
+  source: 'live_quote' | 'legacy_quote';
 }
 
 interface TimesheetJobCodeResponse {
