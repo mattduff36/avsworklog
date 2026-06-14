@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.11.0
+
+**GIT COMMIT MESSAGE**
+`feat(absence): update absence workflow, maintenance workflow, and 1 more areas`
+
+**WHAT CHANGED**
+Update absence workflow, maintenance workflow, and 1 more areas.
+
+**COMMITS IN THIS RELEASE**
+- `feat(absence): update absence workflow, maintenance workflow, and 1 more areas`
+
 ## 0626.10.1
 
 **GIT COMMIT MESSAGE**
