@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.10.1
+
+**GIT COMMIT MESSAGE**
+`test(tests): update test coverage`
+
+**WHAT CHANGED**
+Update test coverage.
+
+**COMMITS IN THIS RELEASE**
+- `test(tests): update test coverage`
+
 ## 0626.10.0
 
 **GIT COMMIT MESSAGE**
