@@ -108,6 +108,21 @@ export interface QuoteManagerOption {
   } | null;
 }
 
+const QUOTE_MANAGER_NAME_FILTER_PREFIX = 'manager-name:';
+
+export function normalizeQuoteManagerName(value: string | null | undefined) {
+  return value?.replace(/\s+/g, ' ').trim() || '';
+}
+
+export function getQuoteManagerNameFilterValue(value: string | null | undefined) {
+  const normalizedName = normalizeQuoteManagerName(value).toLowerCase();
+  return normalizedName ? `${QUOTE_MANAGER_NAME_FILTER_PREFIX}${normalizedName}` : '';
+}
+
+export function isQuoteManagerNameFilterValue(value: string) {
+  return value.startsWith(QUOTE_MANAGER_NAME_FILTER_PREFIX);
+}
+
 export interface LegacyQuote {
   id: string;
   source_row: number;
@@ -123,6 +138,82 @@ export interface LegacyQuote {
   comments: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export type QuoteProjectNumberStatus = 'open' | 'linked' | 'converted' | 'cancelled';
+export type QuoteProjectCostCategory = 'materials' | 'subcontractor' | 'plant' | 'labour' | 'other';
+
+export interface QuoteProjectCost {
+  id: string;
+  project_number_id: string;
+  cost_date: string;
+  category: QuoteProjectCostCategory;
+  supplier: string | null;
+  description: string;
+  amount: number;
+  notes: string | null;
+  linked_quote_id: string | null;
+  linked_quote_line_item_id: string | null;
+  linked_at: string | null;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QuoteProjectLabourSummary {
+  total_hours: number;
+  entry_count: number;
+  timesheet_count: number;
+  employee_count: number;
+  first_week_ending: string | null;
+  last_week_ending: string | null;
+}
+
+export interface QuoteProjectNumber {
+  id: string;
+  project_reference: string;
+  manager_profile_id: string;
+  requester_initials: string;
+  title: string;
+  description: string | null;
+  status: QuoteProjectNumberStatus;
+  linked_quote_id: string | null;
+  linked_at: string | null;
+  converted_quote_id: string | null;
+  converted_at: string | null;
+  cancelled_at: string | null;
+  notes: string | null;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+  manager?: {
+    id: string;
+    full_name: string | null;
+  } | null;
+  linked_quote?: {
+    id: string;
+    quote_reference: string;
+    base_quote_reference: string;
+    subject_line: string | null;
+    customer?: {
+      company_name: string;
+    } | null;
+  } | null;
+  converted_quote?: {
+    id: string;
+    quote_reference: string;
+    base_quote_reference: string;
+    subject_line: string | null;
+    customer?: {
+      company_name: string;
+    } | null;
+  } | null;
+  costs?: QuoteProjectCost[];
+  manual_cost_total?: number;
+  unlinked_manual_cost_total?: number;
+  labour_summary?: QuoteProjectLabourSummary;
 }
 
 export interface QuoteTimelineEvent {

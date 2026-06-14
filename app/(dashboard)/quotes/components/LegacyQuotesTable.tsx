@@ -5,6 +5,8 @@ import { format } from 'date-fns';
 import { ChevronDown, ChevronUp, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { LoadMorePagination } from '@/components/ui/load-more-pagination';
+import { useLoadMorePagination } from '@/lib/hooks/useLoadMorePagination';
 import { cn } from '@/lib/utils';
 import type { LegacyQuote } from '../types';
 
@@ -16,8 +18,6 @@ interface LegacyQuotesTableProps {
 type LegacyQuoteSortField = 'quote_reference' | 'customer' | 'details' | 'quote_date' | 'manager' | 'total';
 type SortDir = 'asc' | 'desc';
 
-const LEGACY_QUOTES_PAGE_SIZE = 25;
-
 interface DateRangeFilterProps {
   fromDate: string;
   toDate: string;
@@ -27,6 +27,30 @@ interface DateRangeFilterProps {
 
 function cleanLegacyQuoteManagerName(value: string | null | undefined): string {
   return (value || '').replace(/\s+/g, ' ').trim();
+}
+
+function getLegacyQuoteDetailsTitle(quote: LegacyQuote): string {
+  const title = cleanLegacyQuoteManagerName(quote.title);
+  if (!title) return 'Untitled quote';
+
+  const duplicateSegments = new Set([
+    cleanLegacyQuoteManagerName(quote.quote_reference).toLowerCase(),
+    cleanLegacyQuoteManagerName(quote.customer_name).toLowerCase(),
+  ].filter(Boolean));
+  const titleSegments = title
+    .split(/\s+(?:[-–—|])\s+/)
+    .map(cleanLegacyQuoteManagerName)
+    .filter(Boolean);
+
+  if (titleSegments.length <= 1) {
+    return duplicateSegments.has(title.toLowerCase()) ? '—' : title;
+  }
+
+  const details = titleSegments
+    .filter((segment) => !duplicateSegments.has(segment.toLowerCase()))
+    .join(' - ');
+
+  return details || '—';
 }
 
 export function normalizeLegacyQuoteManagerName(value: string | null | undefined): string {
@@ -187,7 +211,6 @@ export function LegacyQuotesTable({ legacyQuotes, managerFilter = 'all' }: Legac
   const [toDate, setToDate] = useState('');
   const [sortField, setSortField] = useState<LegacyQuoteSortField>('quote_date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
-  const [currentPage, setCurrentPage] = useState(1);
 
   const filteredQuotes = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -232,12 +255,16 @@ export function LegacyQuotesTable({ legacyQuotes, managerFilter = 'all' }: Legac
     });
   }, [legacyQuotes, managerFilter, search, fromDate, toDate, sortDir, sortField]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredQuotes.length / LEGACY_QUOTES_PAGE_SIZE));
-  const visiblePage = Math.min(currentPage, totalPages);
-  const paginatedQuotes = useMemo(
-    () => filteredQuotes.slice((visiblePage - 1) * LEGACY_QUOTES_PAGE_SIZE, visiblePage * LEGACY_QUOTES_PAGE_SIZE),
-    [filteredQuotes, visiblePage]
-  );
+  const paginationResetKey = [
+    managerFilter,
+    search.trim(),
+    fromDate,
+    toDate,
+    sortField,
+    sortDir,
+    filteredQuotes.length,
+  ].join(':');
+  const { visibleItems: visibleQuotes, showMore } = useLoadMorePagination(filteredQuotes, { resetKey: paginationResetKey });
 
   function toggleSort(field: LegacyQuoteSortField) {
     if (sortField === field) {
@@ -246,7 +273,6 @@ export function LegacyQuotesTable({ legacyQuotes, managerFilter = 'all' }: Legac
       setSortField(field);
       setSortDir('asc');
     }
-    setCurrentPage(1);
   }
 
   function renderSortIcon(field: LegacyQuoteSortField) {
@@ -271,8 +297,6 @@ export function LegacyQuotesTable({ legacyQuotes, managerFilter = 'all' }: Legac
     );
   }
 
-  const firstVisibleItem = filteredQuotes.length === 0 ? 0 : ((visiblePage - 1) * LEGACY_QUOTES_PAGE_SIZE) + 1;
-  const lastVisibleItem = Math.min(visiblePage * LEGACY_QUOTES_PAGE_SIZE, filteredQuotes.length);
   const hasDateFilter = Boolean(fromDate || toDate);
 
   return (
@@ -282,10 +306,7 @@ export function LegacyQuotesTable({ legacyQuotes, managerFilter = 'all' }: Legac
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
-            onChange={(event) => {
-              setSearch(event.target.value);
-              setCurrentPage(1);
-            }}
+            onChange={(event) => setSearch(event.target.value)}
             placeholder="Search quotes..."
             className="pl-9 bg-slate-800 border-slate-600 text-white placeholder:text-muted-foreground"
           />
@@ -312,14 +333,8 @@ export function LegacyQuotesTable({ legacyQuotes, managerFilter = 'all' }: Legac
           <DateRangeFilter
             fromDate={fromDate}
             toDate={toDate}
-            onFromDateChange={(value) => {
-              setFromDate(value);
-              setCurrentPage(1);
-            }}
-            onToDateChange={(value) => {
-              setToDate(value);
-              setCurrentPage(1);
-            }}
+            onFromDateChange={setFromDate}
+            onToDateChange={setToDate}
           />
         </div>
       </div>
@@ -331,9 +346,10 @@ export function LegacyQuotesTable({ legacyQuotes, managerFilter = 'all' }: Legac
       ) : (
         <>
           <div className="space-y-3 md:hidden">
-            {paginatedQuotes.map((quote) => {
+            {visibleQuotes.map((quote) => {
               const managerName = normalizeLegacyQuoteManagerName(quote.quote_manager_name);
               const totalLabel = formatLegacyQuoteValue(quote);
+              const detailsTitle = getLegacyQuoteDetailsTitle(quote);
 
               return (
                 <div
@@ -354,7 +370,7 @@ export function LegacyQuotesTable({ legacyQuotes, managerFilter = 'all' }: Legac
                   <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
                     <div className="col-span-2">
                       <p className="text-xs text-muted-foreground">Details</p>
-                      <p className="line-clamp-2 text-white">{quote.title || 'Untitled quote'}</p>
+                      <p className="line-clamp-2 text-white">{detailsTitle}</p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Date</p>
@@ -383,9 +399,10 @@ export function LegacyQuotesTable({ legacyQuotes, managerFilter = 'all' }: Legac
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/50">
-                {paginatedQuotes.map((quote) => {
+                {visibleQuotes.map((quote) => {
                   const managerName = normalizeLegacyQuoteManagerName(quote.quote_manager_name);
                   const totalLabel = formatLegacyQuoteValue(quote);
+                  const detailsTitle = getLegacyQuoteDetailsTitle(quote);
 
                   return (
                     <tr key={quote.id} className="align-top transition-colors hover:bg-slate-800/30">
@@ -396,7 +413,7 @@ export function LegacyQuotesTable({ legacyQuotes, managerFilter = 'all' }: Legac
                         {quote.customer_name || '-'}
                       </td>
                       <td className="max-w-[280px] px-4 py-3 text-xs text-slate-300">
-                        <span className="line-clamp-2 leading-snug text-white">{quote.title || 'Untitled quote'}</span>
+                        <span className="line-clamp-2 leading-snug text-white">{detailsTitle}</span>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-300">{formatLegacyQuoteDate(quote)}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-300">{managerName || '-'}</td>
@@ -410,38 +427,12 @@ export function LegacyQuotesTable({ legacyQuotes, managerFilter = 'all' }: Legac
             </table>
           </div>
 
-          {filteredQuotes.length > LEGACY_QUOTES_PAGE_SIZE ? (
-            <div className="flex flex-col gap-3 border-t border-border pt-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-              <p>
-                Showing {firstVisibleItem}-{lastVisibleItem} of {filteredQuotes.length} legacy quotes
-              </p>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-                  disabled={visiblePage === 1}
-                  className="border-slate-600 text-muted-foreground hover:bg-slate-700/50"
-                >
-                  Previous
-                </Button>
-                <span className="min-w-20 text-center text-xs">
-                  Page {visiblePage} of {totalPages}
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-                  disabled={visiblePage === totalPages}
-                  className="border-slate-600 text-muted-foreground hover:bg-slate-700/50"
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          ) : null}
+          <LoadMorePagination
+            visibleCount={visibleQuotes.length}
+            totalCount={filteredQuotes.length}
+            itemLabel="legacy quotes"
+            onShowMore={showMore}
+          />
         </>
       )}
     </div>

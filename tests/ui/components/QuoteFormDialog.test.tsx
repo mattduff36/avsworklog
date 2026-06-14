@@ -115,13 +115,38 @@ describe('QuoteFormDialog', () => {
 
     render(<QuoteFormDialog {...baseProps} />);
 
-    expect(screen.getByText('Title')).toBeInTheDocument();
-    expect(screen.getByText('Summary')).toBeInTheDocument();
-    expect(screen.getByText('Scope')).toBeInTheDocument();
+    expect(screen.getByText('Quote Details')).toBeInTheDocument();
+    expect(screen.getByText('Quote Content')).toBeInTheDocument();
+    expect(screen.getByText('Title *')).toBeInTheDocument();
+    expect(screen.getByText('Summary *')).toBeInTheDocument();
+    expect(screen.getByText('Scope *')).toBeInTheDocument();
     expect(screen.getByText('Estimated Duration (days)')).toBeInTheDocument();
     expect(screen.queryByText('Requester Initials')).not.toBeInTheDocument();
     expect(screen.queryByText('Approver')).not.toBeInTheDocument();
     expect(screen.queryByText('Manager Email')).not.toBeInTheDocument();
+  });
+
+  it('disables quote detail fields until a customer is selected', () => {
+    mockUseAuth.mockReturnValue({
+      profile: {
+        id: 'manager-1',
+        full_name: 'Manager Example',
+      },
+    });
+
+    render(<QuoteFormDialog {...baseProps} />);
+
+    const validityInput = screen.getByRole('spinbutton', { name: /validity days/i }) as HTMLInputElement;
+    const attentionInput = screen.getByRole('textbox', { name: /for the attention of/i }) as HTMLInputElement;
+
+    expect(validityInput).toBeDisabled();
+    expect(attentionInput).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: /select customer/i }));
+    fireEvent.click(screen.getByText('Acme Ltd'));
+
+    expect(validityInput).not.toBeDisabled();
+    expect(attentionInput).not.toBeDisabled();
   });
 
   it('generates and applies a beta AI quote draft', async () => {
@@ -209,13 +234,98 @@ describe('QuoteFormDialog', () => {
       />
     );
 
-    (Element.prototype as unknown as { hasPointerCapture?: (pointerId: number) => boolean }).hasPointerCapture ??= () => false;
-
-    fireEvent.pointerDown(screen.getAllByRole('combobox')[0]);
+    fireEvent.click(screen.getByRole('button', { name: /select customer/i }));
 
     expect(screen.getByText('Exolum [Matthew Fitzgerald]')).toBeInTheDocument();
     expect(screen.getByText('Exolum [Julian Posner]')).toBeInTheDocument();
     expect(screen.getByText('Johnsons Aggregates And Recycling Ltd')).toBeInTheDocument();
+  });
+
+  it('filters customer options while typing in the customer selector', () => {
+    mockUseAuth.mockReturnValue({
+      profile: {
+        id: 'manager-1',
+        full_name: 'Manager Example',
+      },
+    });
+
+    render(
+      <QuoteFormDialog
+        {...baseProps}
+        customers={[
+          {
+            ...baseProps.customers[0],
+            id: 'customer-1',
+            company_name: 'Acme Ltd',
+          },
+          {
+            ...baseProps.customers[0],
+            id: 'customer-2',
+            company_name: 'Beta Utilities',
+            contact_name: 'Beth Example',
+          },
+        ]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /select customer/i }));
+    fireEvent.change(screen.getByPlaceholderText('Search customers...'), {
+      target: { value: 'beta' },
+    });
+
+    expect(screen.queryByText('Acme Ltd')).not.toBeInTheDocument();
+    expect(screen.getByText('Beta Utilities')).toBeInTheDocument();
+  });
+
+  it('opens add customer action from the customer selector', () => {
+    mockUseAuth.mockReturnValue({
+      profile: {
+        id: 'manager-1',
+        full_name: 'Manager Example',
+      },
+    });
+    const onAddCustomer = vi.fn();
+
+    render(<QuoteFormDialog {...baseProps} onAddCustomer={onAddCustomer} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /select customer/i }));
+    fireEvent.click(screen.getByRole('button', { name: /add new customer/i }));
+
+    expect(onAddCustomer).toHaveBeenCalledTimes(1);
+  });
+
+  it('requires a site address before submitting a new quote', async () => {
+    mockUseAuth.mockReturnValue({
+      profile: {
+        id: 'manager-1',
+        full_name: 'Manager Example',
+      },
+    });
+    const onSubmit = vi.fn(async () => undefined);
+
+    render(
+      <QuoteFormDialog
+        {...baseProps}
+        onSubmit={onSubmit}
+        customers={[
+          {
+            ...baseProps.customers[0],
+            address_line_1: null,
+            address_line_2: null,
+            city: null,
+            county: null,
+            postcode: null,
+          },
+        ]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /select customer/i }));
+    fireEvent.click(screen.getByText('Acme Ltd'));
+    fireEvent.click(screen.getByRole('button', { name: /create quote/i }));
+
+    expect(await screen.findByText('Enter the site address for this quote.')).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it('submits selected secondary customer contacts as additional To recipients', async () => {
@@ -233,6 +343,15 @@ describe('QuoteFormDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: /alice@example.com/i }));
     fireEvent.click(await screen.findByRole('checkbox', { name: /chris cc/i }));
     expect(screen.getByRole('button', { name: /alice@example.com, plus 1 more/i })).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText('e.g. Supply of Fence Panels & Accessories'), {
+      target: { value: 'Fence repairs' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('Brief customer-facing summary'), {
+      target: { value: 'Repair damaged fence panels.' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('Describe the included scope of works'), {
+      target: { value: 'Replace broken bays and clear waste.' },
+    });
 
     fireEvent.click(screen.getByRole('button', { name: /create quote/i }));
 

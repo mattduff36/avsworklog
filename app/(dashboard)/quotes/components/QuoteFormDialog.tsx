@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { AlertTriangle, ChevronDown, ExternalLink, Loader2, Plus, RefreshCw, Sparkles, Trash2, GripVertical, Upload, X } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ExternalLink, Loader2, Plus, RefreshCw, Search, Sparkles, Trash2, GripVertical, Upload, X } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { cn } from '@/lib/utils/cn';
 import { getQuoteRichPasteText } from '@/lib/quotes/quote-rich-text';
@@ -79,6 +79,9 @@ interface QuoteFormDialogProps {
   managerOptions: QuoteManagerOption[];
   approvers: ApproverOption[];
   initialCustomerId?: string | null;
+  createdCustomerId?: string | null;
+  onCreatedCustomerApplied?: () => void;
+  onAddCustomer?: () => void;
 }
 
 const EMPTY_LINE_ITEM: QuoteLineItem = {
@@ -161,11 +164,15 @@ export function QuoteFormDialog({
   customers,
   managerOptions,
   initialCustomerId,
+  createdCustomerId,
+  onCreatedCustomerApplied,
+  onAddCustomer,
 }: QuoteFormDialogProps) {
   const { profile } = useAuth();
   const isEditing = !!quote;
   const wasOpenRef = useRef(false);
   const lastDialogKeyRef = useRef<string | null>(null);
+  const customerSelectRef = useRef<HTMLDivElement>(null);
 
   const defaultManager = managerOptions.find(option => option.profile_id === profile?.id) || managerOptions[0];
   const dialogKey = quote ? `edit:${quote.id}` : `new:${initialCustomerId || ''}`;
@@ -214,11 +221,50 @@ export function QuoteFormDialog({
   const [quoteAssistDraft, setQuoteAssistDraft] = useState<QuoteAssistDraft | null>(null);
   const [quoteAssistError, setQuoteAssistError] = useState<string | null>(null);
   const [quoteAssistLoading, setQuoteAssistLoading] = useState(false);
+  const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState('');
 
   const selectedCustomer = useMemo(
     () => customers.find(customer => customer.id === form.customer_id),
     [customers, form.customer_id]
   );
+  const selectedCustomerLabel = selectedCustomer
+    ? getCustomerSelectLabel(selectedCustomer, duplicateCustomerCompanyNames)
+    : '';
+  const filteredCustomers = useMemo(() => {
+    const query = customerSearch.trim().toLowerCase();
+    if (!query) return customers;
+
+    return customers.filter(customer => [
+      getCustomerSelectLabel(customer, duplicateCustomerCompanyNames),
+      customer.company_name,
+      customer.short_name,
+      customer.contact_name,
+      customer.contact_email,
+    ].filter(Boolean).join(' ').toLowerCase().includes(query));
+  }, [customerSearch, customers, duplicateCustomerCompanyNames]);
+
+  useEffect(() => {
+    if (!customerDropdownOpen) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (!customerSelectRef.current?.contains(target)) setCustomerDropdownOpen(false);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setCustomerDropdownOpen(false);
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [customerDropdownOpen]);
 
   function clearFieldError(field: string) {
     setFieldErrors(prev => {
@@ -270,8 +316,40 @@ export function QuoteFormDialog({
       nextErrors.customer_id = 'Select a customer.';
     }
 
+    if (!currentForm.site_address.trim()) {
+      nextErrors.site_address = 'Enter the site address for this quote.';
+    }
+
     if (!currentForm.manager_profile_id) {
       nextErrors.manager_profile_id = 'Select a manager.';
+    }
+
+    if (!currentForm.quote_date) {
+      nextErrors.quote_date = 'Select a quote date.';
+    }
+
+    if (!Number.isFinite(Number(currentForm.validity_days)) || Number(currentForm.validity_days) < 1) {
+      nextErrors.validity_days = 'Enter quote validity in days.';
+    }
+
+    if (!currentForm.attention_name.trim()) {
+      nextErrors.attention_name = 'Enter who this quote is for the attention of.';
+    }
+
+    if (!currentForm.attention_email.trim()) {
+      nextErrors.attention_email = 'Enter the contact email.';
+    }
+
+    if (!currentForm.subject_line.trim()) {
+      nextErrors.subject_line = 'Enter a quote title.';
+    }
+
+    if (!currentForm.project_description.trim()) {
+      nextErrors.project_description = 'Enter a quote summary.';
+    }
+
+    if (!currentForm.scope.trim()) {
+      nextErrors.scope = 'Enter the quote scope.';
     }
 
     if (currentForm.pricing_mode === 'itemized') {
@@ -450,8 +528,11 @@ export function QuoteFormDialog({
 
   function handleCustomerChange(customerId: string) {
     clearFieldError('customer_id');
+    clearFieldError('site_address');
     setSubmitError(null);
     const customer = customers.find(c => c.id === customerId);
+    setCustomerDropdownOpen(false);
+    setCustomerSearch('');
     setForm(prev => ({
       ...prev,
       customer_id: customerId,
@@ -463,6 +544,32 @@ export function QuoteFormDialog({
       secondary_contact_ids: [],
     }));
   }
+
+  useEffect(() => {
+    if (!open || isEditing || !createdCustomerId) return;
+    const customer = customers.find(item => item.id === createdCustomerId);
+    if (!customer) return;
+    setFieldErrors(prev => {
+      const next = { ...prev };
+      delete next.customer_id;
+      delete next.site_address;
+      return next;
+    });
+    setSubmitError(null);
+    setCustomerDropdownOpen(false);
+    setCustomerSearch('');
+    setForm(prev => ({
+      ...prev,
+      customer_id: createdCustomerId,
+      attention_name: customer.contact_name || '',
+      attention_email: customer.contact_email || '',
+      site_address: buildAddress(customer),
+      validity_days: customer.default_validity_days || prev.validity_days,
+      salutation: customer.contact_name ? `Dear ${customer.contact_name.split(' ')[0]},` : '',
+      secondary_contact_ids: [],
+    }));
+    onCreatedCustomerApplied?.();
+  }, [createdCustomerId, customers, isEditing, open, onCreatedCustomerApplied]);
 
   function toggleSecondaryContact(contactId: string, checked: boolean) {
     clearFieldError('secondary_contact_ids');
@@ -666,6 +773,8 @@ export function QuoteFormDialog({
   const contactEmailDisplay = selectedSecondaryContacts.length > 0
     ? `${form.attention_email || selectedCustomer?.contact_email || 'Primary email'}, plus ${selectedSecondaryContacts.length} more...`
     : form.attention_email || selectedCustomer?.contact_email || 'Select primary contact email';
+  const areCustomerDependentFieldsDisabled = !form.customer_id;
+  const customerDependentContactEmailDisplay = areCustomerDependentFieldsDisabled ? '' : contactEmailDisplay;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -699,12 +808,12 @@ export function QuoteFormDialog({
   return (
     <Dialog open={open} onOpenChange={isOpen => { if (!isOpen && !saving) onClose(); }}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-slate-900 border-slate-700 text-white">
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
           <DialogHeader>
             <DialogTitle className="text-white">
               {isEditing ? 'Edit Quote' : 'New Quote'}
             </DialogTitle>
-            <DialogDescription className="text-muted-foreground">
+            <DialogDescription className="text-slate-400">
               {isEditing ? 'Modify quote details and line items.' : 'Create a new customer quotation.'}
             </DialogDescription>
           </DialogHeader>
@@ -717,9 +826,9 @@ export function QuoteFormDialog({
 
           {!isEditing ? (
             <div className="mt-4 rounded-xl border border-amber-400/40 bg-amber-400/10 p-4 text-sm text-amber-50">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex gap-3">
-                  <div className="mt-0.5 rounded-full bg-amber-300/20 p-2 text-amber-200">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-full bg-amber-300/20 p-2 text-amber-200">
                     <Sparkles className="h-4 w-4" />
                   </div>
                   <div className="space-y-1">
@@ -729,9 +838,6 @@ export function QuoteFormDialog({
                         Beta feature
                       </span>
                     </div>
-                    <p className="text-xs text-amber-100/90">
-                      This is still being developed. It can help with the title, summary and scope, but the result must be checked before sending.
-                    </p>
                   </div>
                 </div>
                 <Button
@@ -830,208 +936,308 @@ export function QuoteFormDialog({
             </div>
           ) : null}
 
-          <p className="mt-4 text-xs text-muted-foreground">
+          <p className="mt-4 text-xs text-slate-400">
             Only fields marked with `*` are required to create the initial draft.
           </p>
 
           <div className="grid gap-4 py-4">
-            {/* Customer & Manager */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Customer *</Label>
-                <Select value={form.customer_id} onValueChange={handleCustomerChange}>
-                  <SelectTrigger className={getSelectClassName('customer_id')} aria-invalid={!!fieldErrors.customer_id}>
-                    <SelectValue placeholder="Select customer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {customers.map(c => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {getCustomerSelectLabel(c, duplicateCustomerCompanyNames)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {renderFieldError('customer_id')}
+            <div className="rounded-lg border border-slate-700 bg-slate-900/40 p-4 space-y-4">
+              <div>
+                <h4 className="text-sm font-semibold text-white">Quote Details</h4>
+                <p className="text-xs text-slate-400">Select a customer first to unlock the quote details.</p>
               </div>
-              <div className="space-y-2">
-                <Label>Manager *</Label>
-                <Select value={form.manager_profile_id} onValueChange={handleManagerChange}>
-                  <SelectTrigger className={getSelectClassName('manager_profile_id')} aria-invalid={!!fieldErrors.manager_profile_id}>
-                    <SelectValue placeholder="Select manager" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {managerOptions.map(option => (
-                      <SelectItem key={option.profile_id} value={option.profile_id}>
-                        {(option.profile?.full_name || option.signoff_name || option.initials)} ({option.initials})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {renderFieldError('manager_profile_id')}
-              </div>
-            </div>
 
-            {/* Quote header */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Date</Label>
-                <Input
-                  type="date"
-                  value={form.quote_date}
-                  onChange={e => updateField('quote_date', e.target.value)}
-                  className={getFieldClassName('quote_date')}
-                />
-                {renderFieldError('quote_date')}
-              </div>
-              <div className="space-y-2">
-                <Label>Validity (days)</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={form.validity_days}
-                  onChange={e => updateField('validity_days', parseInt(e.target.value) || 30)}
-                  className={getFieldClassName('validity_days')}
-                />
-                {renderFieldError('validity_days')}
-              </div>
-            </div>
-
-            {/* Attention */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>For the attention of</Label>
-                <Input
-                  value={form.attention_name}
-                  onChange={e => updateField('attention_name', e.target.value)}
-                  className={getFieldClassName('attention_name')}
-                />
-                {renderFieldError('attention_name')}
-              </div>
-              <div className="space-y-2">
-                <Label>Contact Email</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <button
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Customer *</Label>
+                  <div ref={customerSelectRef} className="relative">
+                    <Button
                       type="button"
+                      variant="outline"
+                      aria-expanded={customerDropdownOpen}
+                      aria-invalid={!!fieldErrors.customer_id}
+                      onClick={() => setCustomerDropdownOpen(current => !current)}
                       className={cn(
-                        'flex min-h-10 w-full items-center justify-between gap-3 rounded-md border px-3 py-2 text-left text-sm',
-                        getFieldClassName('attention_email')
+                        'w-full justify-between text-left font-normal',
+                        getSelectClassName('customer_id')
                       )}
                     >
-                      <span className={form.attention_email || selectedSecondaryContacts.length > 0 ? 'text-white' : 'text-muted-foreground'}>
-                        {contactEmailDisplay}
+                      <span className={cn('truncate', !selectedCustomerLabel && 'text-muted-foreground')}>
+                        {selectedCustomerLabel || 'Select customer'}
                       </span>
-                      <ChevronDown className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent align="start" className="w-[min(32rem,calc(100vw-2rem))] border-slate-700 bg-slate-900 text-white">
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="quote-primary-contact-email">Primary recipient</Label>
-                        <Input
-                          id="quote-primary-contact-email"
-                          type="email"
-                          value={form.attention_email}
-                          onChange={e => updateField('attention_email', e.target.value)}
-                          className={getFieldClassName('attention_email')}
-                        />
-                        <p className="text-xs text-muted-foreground">The primary contact is sent in the quote To field.</p>
-                      </div>
+                      <ChevronDown className={cn('ml-2 h-4 w-4 shrink-0 opacity-70 transition-transform', customerDropdownOpen && 'rotate-180')} />
+                    </Button>
 
-                      <div className="space-y-2">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Additional customer To recipients</p>
-                        {selectedCustomer?.secondary_contacts?.length ? (
-                          <div className="space-y-2">
-                            {selectedCustomer.secondary_contacts.map(contact => {
-                              const hasEmail = Boolean(contact.email?.trim());
-                              return (
-                                <label key={contact.id} className={cn(
-                                  'flex items-start gap-3 rounded-md border border-slate-700 bg-slate-950/30 p-2 text-sm',
-                                  !hasEmail && 'opacity-60'
-                                )}>
-                                  <Checkbox
-                                    checked={form.secondary_contact_ids.includes(contact.id)}
-                                    disabled={!hasEmail}
-                                    onCheckedChange={checked => toggleSecondaryContact(contact.id, checked === true)}
-                                    className="mt-0.5"
-                                  />
-                                  <span>
-                                    <span className="block text-white">{getContactLabel(contact)}</span>
-                                    <span className="block text-xs text-muted-foreground">
-                                      {contact.email || 'No email on file'}
-                                    </span>
-                                  </span>
-                                </label>
-                              );
-                            })}
+                    {customerDropdownOpen ? (
+                      <div className="absolute left-0 top-full z-50 mt-1 w-full overflow-hidden rounded-md border border-slate-700 bg-slate-950 text-sm text-slate-100 shadow-xl">
+                        <div className="border-b border-slate-800 p-2">
+                          <div className="relative">
+                            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <Input
+                              value={customerSearch}
+                              onChange={(event) => setCustomerSearch(event.target.value)}
+                              placeholder="Search customers..."
+                              autoFocus
+                              className="border-slate-700 bg-slate-900 pl-9 text-white"
+                            />
                           </div>
-                        ) : (
-                          <p className="text-sm text-muted-foreground">No saved secondary contacts for this customer.</p>
-                        )}
+                        </div>
+                        <div className="max-h-64 overflow-y-auto p-1">
+                          {filteredCustomers.length > 0 ? (
+                            filteredCustomers.map(customer => (
+                              <button
+                                key={customer.id}
+                                type="button"
+                                onClick={() => handleCustomerChange(customer.id)}
+                                className={cn(
+                                  'block w-full rounded-sm px-3 py-2 text-left hover:bg-slate-800',
+                                  form.customer_id === customer.id && 'bg-slate-800 text-avs-yellow'
+                                )}
+                              >
+                                <span className="block truncate font-medium">
+                                  {getCustomerSelectLabel(customer, duplicateCustomerCompanyNames)}
+                                </span>
+                                {customer.contact_email ? (
+                                  <span className="mt-0.5 block truncate text-xs text-slate-400">
+                                    {customer.contact_email}
+                                  </span>
+                                ) : null}
+                              </button>
+                            ))
+                          ) : (
+                            <p className="px-3 py-4 text-center text-sm text-slate-400">
+                              No customers match your search.
+                            </p>
+                          )}
+                        </div>
+                        {onAddCustomer ? (
+                          <div className="border-t border-slate-800 p-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCustomerDropdownOpen(false);
+                                setCustomerSearch('');
+                                onAddCustomer();
+                              }}
+                              className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left font-medium text-avs-yellow hover:bg-slate-800"
+                            >
+                              <Plus className="h-4 w-4" />
+                              Add New Customer
+                            </button>
+                          </div>
+                        ) : null}
                       </div>
-                    </div>
-                  </PopoverContent>
-                </Popover>
-                {renderFieldError('attention_email')}
-                {renderFieldError('secondary_contact_ids')}
+                    ) : null}
+                  </div>
+                  {renderFieldError('customer_id')}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Manager *</Label>
+                  <Select
+                    value={areCustomerDependentFieldsDisabled ? '' : form.manager_profile_id}
+                    onValueChange={handleManagerChange}
+                    disabled={areCustomerDependentFieldsDisabled}
+                  >
+                    <SelectTrigger className={getSelectClassName('manager_profile_id')} aria-invalid={!!fieldErrors.manager_profile_id}>
+                      <SelectValue placeholder={areCustomerDependentFieldsDisabled ? '' : 'Select manager'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {managerOptions.map(option => (
+                        <SelectItem key={option.profile_id} value={option.profile_id}>
+                          {(option.profile?.full_name || option.signoff_name || option.initials)} ({option.initials})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {renderFieldError('manager_profile_id')}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Date *</Label>
+                  <Input
+                    type="date"
+                    value={areCustomerDependentFieldsDisabled ? '' : form.quote_date}
+                    disabled={areCustomerDependentFieldsDisabled}
+                    aria-label="Quote date"
+                    aria-invalid={!!fieldErrors.quote_date}
+                    onChange={e => updateField('quote_date', e.target.value)}
+                    className={getFieldClassName('quote_date')}
+                  />
+                  {renderFieldError('quote_date')}
+                </div>
+                <div className="space-y-2">
+                  <Label>Validity (days) *</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={areCustomerDependentFieldsDisabled ? '' : form.validity_days}
+                    disabled={areCustomerDependentFieldsDisabled}
+                    aria-label="Validity days"
+                    aria-invalid={!!fieldErrors.validity_days}
+                    onChange={e => updateField('validity_days', parseInt(e.target.value) || 30)}
+                    className={getFieldClassName('validity_days')}
+                  />
+                  {renderFieldError('validity_days')}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>For the attention of *</Label>
+                  <Input
+                    value={form.attention_name}
+                    disabled={areCustomerDependentFieldsDisabled}
+                    aria-label="For the attention of"
+                    aria-invalid={!!fieldErrors.attention_name}
+                    onChange={e => updateField('attention_name', e.target.value)}
+                    className={getFieldClassName('attention_name')}
+                  />
+                  {renderFieldError('attention_name')}
+                </div>
+                <div className="space-y-2">
+                  <Label>Contact Email *</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        disabled={areCustomerDependentFieldsDisabled}
+                        className={cn(
+                          'flex min-h-10 w-full items-center justify-between gap-3 rounded-md border px-3 py-2 text-left text-sm disabled:cursor-not-allowed disabled:opacity-50',
+                          getFieldClassName('attention_email')
+                        )}
+                      >
+                        <span className={customerDependentContactEmailDisplay ? 'text-white' : 'text-muted-foreground'}>
+                          {customerDependentContactEmailDisplay}
+                        </span>
+                        <ChevronDown className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="w-[min(32rem,calc(100vw-2rem))] border-slate-700 bg-slate-900 text-white">
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="quote-primary-contact-email">Primary recipient</Label>
+                          <Input
+                            id="quote-primary-contact-email"
+                            type="email"
+                            value={form.attention_email}
+                            disabled={areCustomerDependentFieldsDisabled}
+                            onChange={e => updateField('attention_email', e.target.value)}
+                            className={getFieldClassName('attention_email')}
+                          />
+                          <p className="text-xs text-slate-400">The primary contact is sent in the quote To field.</p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Additional customer To recipients</p>
+                          {selectedCustomer?.secondary_contacts?.length ? (
+                            <div className="space-y-2">
+                              {selectedCustomer.secondary_contacts.map(contact => {
+                                const hasEmail = Boolean(contact.email?.trim());
+                                return (
+                                  <label key={contact.id} className={cn(
+                                    'flex items-start gap-3 rounded-md border border-slate-700 bg-slate-950/30 p-2 text-sm',
+                                    (!hasEmail || areCustomerDependentFieldsDisabled) && 'opacity-60'
+                                  )}>
+                                    <Checkbox
+                                      checked={form.secondary_contact_ids.includes(contact.id)}
+                                      disabled={!hasEmail || areCustomerDependentFieldsDisabled}
+                                      onCheckedChange={checked => toggleSecondaryContact(contact.id, checked === true)}
+                                      className="mt-0.5"
+                                    />
+                                    <span>
+                                      <span className="block text-white">{getContactLabel(contact)}</span>
+                                      <span className="block text-xs text-muted-foreground">
+                                        {contact.email || 'No email on file'}
+                                      </span>
+                                    </span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-slate-400">No saved secondary contacts for this customer.</p>
+                          )}
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  {renderFieldError('attention_email')}
+                  {renderFieldError('secondary_contact_ids')}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Site Address *</Label>
+                <Textarea
+                  value={form.site_address}
+                  onChange={e => updateField('site_address', e.target.value)}
+                  rows={3}
+                  required
+                  disabled={areCustomerDependentFieldsDisabled}
+                  aria-label="Site address"
+                  aria-invalid={!!fieldErrors.site_address}
+                  className={getFieldClassName('site_address')}
+                />
+                {renderFieldError('site_address')}
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Site Address</Label>
-              <Textarea
-                value={form.site_address}
-                onChange={e => updateField('site_address', e.target.value)}
-                rows={3}
-                className={getFieldClassName('site_address')}
-              />
-              {renderFieldError('site_address')}
-            </div>
+            <div className="rounded-lg border border-slate-700 bg-slate-900/40 p-4 space-y-4">
+              <div>
+                <h4 className="text-sm font-semibold text-white">Quote Content</h4>
+                <p className="text-xs text-slate-400">Customer-facing title, summary and scope shown on the quote.</p>
+              </div>
 
-            {/* Quote content */}
-            <div className="grid grid-cols-1 gap-4">
-              <div className="space-y-2">
-                <Label>Title</Label>
-                <Input
-                  value={form.subject_line}
-                  onChange={e => updateField('subject_line', e.target.value)}
-                  placeholder="e.g. Supply of Fence Panels & Accessories"
-                  className={getFieldClassName('subject_line')}
-                />
-                {renderFieldError('subject_line')}
-              </div>
-              <div className="space-y-2">
-                <Label>Summary</Label>
-                <Textarea
-                  value={form.project_description}
-                  onChange={e => updateField('project_description', e.target.value)}
-                  onPaste={e => handleFormattedFieldPaste('project_description', e)}
-                  placeholder="Brief customer-facing summary"
-                  rows={4}
-                  className={getFieldClassName('project_description')}
-                />
-                <p className="text-xs text-muted-foreground">Supports pasted ChatGPT-style headings, bold text, bullets and numbered lists.</p>
-                {renderFieldError('project_description')}
-              </div>
-              <div className="space-y-2">
-                <Label>Scope</Label>
-                <Textarea
-                  value={form.scope}
-                  onChange={e => updateField('scope', e.target.value)}
-                  onPaste={e => handleFormattedFieldPaste('scope', e)}
-                  placeholder="Describe the included scope of works"
-                  rows={5}
-                  className={getFieldClassName('scope')}
-                />
-                <p className="text-xs text-muted-foreground">Use simple formatting such as headings, bullets, numbered lists, bold and italic text.</p>
-                {renderFieldError('scope')}
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-2">
+                  <Label>Title *</Label>
+                  <Input
+                    value={form.subject_line}
+                    onChange={e => updateField('subject_line', e.target.value)}
+                    placeholder="e.g. Supply of Fence Panels & Accessories"
+                    aria-invalid={!!fieldErrors.subject_line}
+                    className={getFieldClassName('subject_line')}
+                  />
+                  {renderFieldError('subject_line')}
+                </div>
+                <div className="space-y-2">
+                  <Label>Summary *</Label>
+                  <Textarea
+                    value={form.project_description}
+                    onChange={e => updateField('project_description', e.target.value)}
+                    onPaste={e => handleFormattedFieldPaste('project_description', e)}
+                    placeholder="Brief customer-facing summary"
+                    rows={4}
+                    aria-invalid={!!fieldErrors.project_description}
+                    className={getFieldClassName('project_description')}
+                  />
+                  <p className="text-xs text-slate-400">Supports pasted ChatGPT-style headings, bold text, bullets and numbered lists.</p>
+                  {renderFieldError('project_description')}
+                </div>
+                <div className="space-y-2">
+                  <Label>Scope *</Label>
+                  <Textarea
+                    value={form.scope}
+                    onChange={e => updateField('scope', e.target.value)}
+                    onPaste={e => handleFormattedFieldPaste('scope', e)}
+                    placeholder="Describe the included scope of works"
+                    rows={5}
+                    aria-invalid={!!fieldErrors.scope}
+                    className={getFieldClassName('scope')}
+                  />
+                  <p className="text-xs text-slate-400">Use simple formatting such as headings, bullets, numbered lists, bold and italic text.</p>
+                  {renderFieldError('scope')}
+                </div>
               </div>
             </div>
 
             <div className="rounded-lg border border-slate-700 bg-slate-900/40 p-4 space-y-4">
               <div>
                 <h4 className="text-sm font-semibold text-white">Internal Comms</h4>
-                <p className="text-xs text-muted-foreground">Planning notes and schedule details are internal only and are not shown on the client quote.</p>
+                <p className="text-xs text-slate-400">Planning notes and schedule details are internal only and are not shown on the client quote.</p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
@@ -1088,7 +1294,7 @@ export function QuoteFormDialog({
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
                 <div>
                   <h4 className="text-sm font-semibold text-muted-foreground">Pricing / Line Items</h4>
-                  <p className="text-xs text-muted-foreground">Use itemised pricing or refer the client to attached pricing documents.</p>
+                  <p className="text-xs text-slate-400">Use itemised pricing or refer the client to attached pricing documents.</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Select value={form.pricing_mode} onValueChange={(value: 'itemized' | 'attachments_only') => updateField('pricing_mode', value)}>
@@ -1194,7 +1400,7 @@ export function QuoteFormDialog({
             <div className="border-t border-slate-700 pt-4 space-y-3">
               <div>
                 <h4 className="text-sm font-semibold text-muted-foreground">Client Attachments</h4>
-                <p className="text-xs text-muted-foreground">Attach pricing sheets, drawings, or supporting documents that can be sent with the client quote.</p>
+                <p className="text-xs text-slate-400">Attach pricing sheets, drawings, or supporting documents that can be sent with the client quote.</p>
               </div>
               <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-slate-600 px-3 py-2 text-sm text-muted-foreground hover:bg-slate-800">
                 <Upload className="h-4 w-4" />
@@ -1266,7 +1472,7 @@ export function QuoteFormDialog({
                     </div>
                   ))}
                   {!canManageSavedAttachments ? (
-                    <p className="text-xs text-muted-foreground">Only the latest quote version can have attachments changed.</p>
+                    <p className="text-xs text-slate-400">Only the latest quote version can have attachments changed.</p>
                   ) : null}
                 </div>
               )}

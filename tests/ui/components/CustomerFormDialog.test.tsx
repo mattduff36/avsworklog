@@ -5,6 +5,20 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { CustomerFormDialog } from '@/app/(dashboard)/customers/components/CustomerFormDialog';
 
 describe('CustomerFormDialog', () => {
+  it('shows address guidance for single-site customers', () => {
+    render(
+      <CustomerFormDialog
+        open
+        onClose={vi.fn()}
+        onSubmit={vi.fn(async () => undefined)}
+      />
+    );
+
+    expect(
+      screen.getByText('Only add an address here if customer only has a single address / site.')
+    ).toBeInTheDocument();
+  });
+
   it('submits secondary contact rows with the customer payload', async () => {
     const onSubmit = vi.fn(async () => undefined);
     const onClose = vi.fn();

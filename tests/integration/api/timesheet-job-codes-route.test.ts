@@ -47,6 +47,12 @@ interface LegacyQuoteJobCodeTestRow {
   title: string | null;
 }
 
+interface ProjectNumberJobCodeTestRow {
+  project_reference: string | null;
+  title: string | null;
+  description: string | null;
+}
+
 function createQuoteQuery(rows: QuoteJobCodeTestRow[]) {
   const result = { data: rows, error: null };
   const limit = vi.fn().mockResolvedValue(result);
@@ -66,6 +72,18 @@ function createLegacyQuoteQuery(rows: LegacyQuoteJobCodeTestRow[]) {
   const order = vi.fn().mockReturnValue({ limit });
   const query = {
     not: vi.fn().mockReturnThis(),
+    order,
+  };
+
+  return { query, order, limit };
+}
+
+function createProjectNumberQuery(rows: ProjectNumberJobCodeTestRow[]) {
+  const result = { data: rows, error: null };
+  const limit = vi.fn().mockResolvedValue(result);
+  const order = vi.fn().mockReturnValue({ limit });
+  const query = {
+    eq: vi.fn().mockReturnThis(),
     order,
   };
 
@@ -125,10 +143,14 @@ describe('GET /api/timesheets/job-codes', () => {
       { quote_reference: '4323-GH', customer_name: 'Omexom', title: 'ATV hire' },
       { quote_reference: '40001-GH', customer_name: 'Duplicate Legacy', title: 'Ignored duplicate' },
     ]);
+    const projectNumberQuery = createProjectNumberQuery([
+      { project_reference: '60001-MD', title: 'Emergency enabling works', description: null },
+    ]);
     const from = vi.fn((table: string) => ({
       select: vi.fn(() => {
         if (table === 'quotes') return quoteQuery.query;
         if (table === 'legacy_quotes') return legacyQuoteQuery.query;
+        if (table === 'quote_project_numbers') return projectNumberQuery.query;
         throw new Error(`Unexpected table ${table}`);
       }),
     }));
@@ -164,6 +186,13 @@ describe('GET /api/timesheets/job-codes', () => {
         quoteTitle: 'ATV hire',
         source: 'legacy_quote',
       },
+      {
+        value: '60001-MD',
+        label: '60001-MD',
+        customerName: 'Project number',
+        quoteTitle: 'Emergency enabling works',
+        source: 'project_number',
+      },
     ]);
     expect(quoteQuery.query.eq).toHaveBeenCalledWith('is_latest_version', true);
     expect(quoteQuery.query.eq).toHaveBeenCalledWith('commercial_status', 'open');
@@ -180,6 +209,7 @@ describe('GET /api/timesheets/job-codes', () => {
       'invoiced',
     ]);
     expect(legacyQuoteQuery.query.not).toHaveBeenCalledWith('quote_reference', 'is', null);
+    expect(projectNumberQuery.query.eq).toHaveBeenCalledWith('status', 'open');
   });
 
   it('requires timesheets access', async () => {

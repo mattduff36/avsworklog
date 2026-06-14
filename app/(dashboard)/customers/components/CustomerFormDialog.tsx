@@ -114,7 +114,7 @@ export function CustomerFormDialog({ open, onClose, onSubmit, customer }: Custom
 
   return (
     <Dialog open={open} onOpenChange={isOpen => { if (!isOpen && !saving) onClose(); }}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-slate-900 border-slate-700 text-white">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-slate-900 border-slate-700 text-white">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle className="text-white">
@@ -274,7 +274,12 @@ export function CustomerFormDialog({ open, onClose, onSubmit, customer }: Custom
 
             {/* Address */}
             <div className="border-t border-slate-700 pt-4">
-              <h4 className="text-sm font-semibold text-muted-foreground mb-3">Address</h4>
+              <div className="mb-3 space-y-1">
+                <h4 className="text-sm font-semibold text-muted-foreground">Address</h4>
+                <p className="text-xs text-slate-400">
+                  Only add an address here if customer only has a single address / site.
+                </p>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="address_line_1">Address Line 1</Label>

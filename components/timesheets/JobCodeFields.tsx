@@ -49,6 +49,7 @@ function getOptionDescription(option: TimesheetJobCodeOption): string {
     .join(' - ');
 
   if (description) return description;
+  if (option.source === 'project_number') return 'Project number';
   return option.source === 'legacy_quote' ? 'Legacy quote' : 'Live quote';
 }
 

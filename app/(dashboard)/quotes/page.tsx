@@ -5,7 +5,7 @@ import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { AppPageShell } from '@/components/layout/AppPageShell';
-import { Archive, CalendarClock, Plus, Receipt, Settings } from 'lucide-react';
+import { Archive, BriefcaseBusiness, CalendarClock, Plus, Receipt, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
 import { PageLoader } from '@/components/ui/page-loader';
@@ -20,9 +20,13 @@ import {
 } from './components/LegacyQuotesTable';
 import { QuoteDetailsModal } from './components/QuoteDetailsModal';
 import { QuoteFormDialog } from './components/QuoteFormDialog';
+import { ProjectNumbersTab } from './components/ProjectNumbersTab';
 import { QuoteSettingsTab, type QuoteSettingsSubTab } from './components/settings/QuoteSettingsTab';
+import { CustomerFormDialog } from '../customers/components/CustomerFormDialog';
 import { uploadQuoteAttachment } from './quote-attachment-client';
-import type { LegacyQuote, Quote, QuoteFormData, QuoteListSummary, QuoteManagerOption } from './types';
+import { getQuoteManagerNameFilterValue, normalizeQuoteManagerName } from './types';
+import type { LegacyQuote, Quote, QuoteFormData, QuoteManagerOption, QuoteProjectNumber } from './types';
+import type { CustomerFormData } from '../customers/types';
 
 interface CustomerOption {
   id: string;
@@ -57,10 +61,15 @@ interface QuoteManagerFilterOption {
   label: string;
 }
 
-type QuotePageTab = 'overview' | 'legacy' | 'settings';
+type QuotePageTab = 'current' | 'projects' | 'archived' | 'legacy' | 'settings';
 
 function isQuotePageTab(value: string): value is QuotePageTab {
-  return value === 'overview' || value === 'legacy' || value === 'settings';
+  return value === 'current' || value === 'projects' || value === 'archived' || value === 'legacy' || value === 'settings';
+}
+
+function getQuotePageTab(value: string | null): QuotePageTab {
+  if (value === 'overview') return 'current';
+  return value && isQuotePageTab(value) ? value : 'current';
 }
 
 function isQuoteSettingsSubTab(value: string): value is QuoteSettingsSubTab {
@@ -96,6 +105,46 @@ async function uploadClientQuoteAttachments(quoteId: string, files?: File[]) {
 
 function getCompactManagerLabel(label: string) {
   return label.trim().split(/\s+/)[0] || label;
+}
+
+function getQuoteManagerLabel(option: QuoteManagerOption | undefined, quote: Quote) {
+  return normalizeQuoteManagerName(
+    option?.profile?.full_name ||
+    quote.manager_name ||
+    option?.signoff_name ||
+    quote.requester_initials ||
+    option?.initials
+  );
+}
+
+function isArchivedQuote(quote: Pick<Quote, 'commercial_status' | 'status'>) {
+  return quote.commercial_status === 'closed' || quote.status === 'closed';
+}
+
+function buildQuoteManagerFilterOptions(quotes: Quote[], managerOptions: QuoteManagerOption[]) {
+  const managerOptionById = new Map(managerOptions.map((option) => [option.profile_id, option]));
+  const quoteManagers = new Map<string, QuoteManagerFilterOption>();
+
+  quotes.forEach((quote) => {
+    if (quote.requester_id) {
+      const label = getQuoteManagerLabel(managerOptionById.get(quote.requester_id), quote);
+      if (!label) return;
+
+      quoteManagers.set(quote.requester_id, {
+        value: quote.requester_id,
+        label,
+      });
+      return;
+    }
+
+    const label = normalizeQuoteManagerName(quote.manager_name);
+    const value = getQuoteManagerNameFilterValue(label);
+    if (!label || !value) return;
+
+    quoteManagers.set(value, { value, label });
+  });
+
+  return [...quoteManagers.values()].sort((a, b) => a.label.localeCompare(b.label));
 }
 
 interface ManagerFilterTabsProps {
@@ -219,7 +268,7 @@ export default function QuotesPage() {
 
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [legacyQuotes, setLegacyQuotes] = useState<LegacyQuote[]>([]);
-  const [quoteSummary, setQuoteSummary] = useState<QuoteListSummary | null>(null);
+  const [projectNumbers, setProjectNumbers] = useState<QuoteProjectNumber[]>([]);
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [managerOptions, setManagerOptions] = useState<QuoteManagerOption[]>([]);
   const [approvers, setApprovers] = useState<ApproverOption[]>([]);
@@ -229,28 +278,32 @@ export default function QuotesPage() {
   const [detailQuoteId, setDetailQuoteId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editingQuote, setEditingQuote] = useState<Quote | null>(null);
+  const [customerFormOpen, setCustomerFormOpen] = useState(false);
+  const [createdQuoteCustomerId, setCreatedQuoteCustomerId] = useState<string | null>(null);
 
   const customerId = searchParams.get('customer_id');
   const quoteIdFromQuery = searchParams.get('quote_id');
-  const tabParam = searchParams.get('tab') || 'overview';
-  const pageTab: QuotePageTab = isQuotePageTab(tabParam) ? tabParam : 'overview';
+  const pageTab = getQuotePageTab(searchParams.get('tab'));
   const settingsParam = searchParams.get('settings') || 'notifications';
   const settingsTab: QuoteSettingsSubTab = isQuoteSettingsSubTab(settingsParam) ? settingsParam : 'notifications';
   const managerParam = searchParams.get('manager') || 'all';
-  const activeManagerOptions = useMemo(
-    () => managerOptions.filter(option => option.is_active),
-    [managerOptions]
+  const currentQuotes = useMemo(() => quotes.filter((quote) => !isArchivedQuote(quote)), [quotes]);
+  const archivedQuotes = useMemo(() => quotes.filter(isArchivedQuote), [quotes]);
+  const currentManagerOptions = useMemo(
+    () => buildQuoteManagerFilterOptions(currentQuotes, managerOptions),
+    [currentQuotes, managerOptions]
   );
-  const overviewManagerOptions = useMemo<QuoteManagerFilterOption[]>(
-    () => activeManagerOptions.map((option) => ({
-      value: option.profile_id,
-      label: option.profile?.full_name || option.signoff_name || option.initials,
-    })),
-    [activeManagerOptions]
+  const currentManagerIds = useMemo(
+    () => new Set(currentManagerOptions.map(option => option.value)),
+    [currentManagerOptions]
   );
-  const overviewManagerIds = useMemo(
-    () => new Set(overviewManagerOptions.map(option => option.value)),
-    [overviewManagerOptions]
+  const archivedManagerOptions = useMemo(
+    () => buildQuoteManagerFilterOptions(archivedQuotes, managerOptions),
+    [archivedQuotes, managerOptions]
+  );
+  const archivedManagerIds = useMemo(
+    () => new Set(archivedManagerOptions.map(option => option.value)),
+    [archivedManagerOptions]
   );
   const legacyManagerOptions = useMemo<QuoteManagerFilterOption[]>(() => {
     const managers = new Map<string, string>();
@@ -269,13 +322,14 @@ export default function QuotesPage() {
     () => new Set(legacyManagerOptions.map(option => option.value)),
     [legacyManagerOptions]
   );
-  const overviewManagerFilter = managerParam === 'all' || overviewManagerIds.has(managerParam) ? managerParam : 'all';
+  const currentManagerFilter = managerParam === 'all' || currentManagerIds.has(managerParam) ? managerParam : 'all';
+  const archivedManagerFilter = managerParam === 'all' || archivedManagerIds.has(managerParam) ? managerParam : 'all';
   const legacyManagerFilter = managerParam === 'all' || legacyManagerIds.has(managerParam) ? managerParam : 'all';
 
   const fetchData = useCallback(async () => {
     try {
       const url = customerId ? `/api/quotes?customer_id=${customerId}` : '/api/quotes';
-      const [quotesResult, legacyQuotesResult, metadataRes] = await Promise.all([
+      const [quotesResult, legacyQuotesResult, projectNumbersRes, metadataRes] = await Promise.all([
         fetchAllPaginatedItems<Quote>(url, 'quotes', {
           limit: 250,
           errorMessage: 'Failed to load quotes',
@@ -284,12 +338,18 @@ export default function QuotesPage() {
           limit: 250,
           errorMessage: 'Failed to load legacy quotes',
         }),
+        fetch('/api/quotes/project-numbers'),
         fetch('/api/quotes/metadata'),
       ]);
 
       setQuotes(quotesResult.items);
       setLegacyQuotes(legacyQuotesResult.items);
-      setQuoteSummary((quotesResult.firstPagePayload?.summary as QuoteListSummary | undefined) || null);
+      if (projectNumbersRes.ok) {
+        const projectNumbersPayload = await projectNumbersRes.json() as { project_numbers?: QuoteProjectNumber[] };
+        setProjectNumbers(projectNumbersPayload.project_numbers || []);
+      } else {
+        setProjectNumbers([]);
+      }
       if (metadataRes.ok) {
         const data = await metadataRes.json();
         setCustomers(canViewCustomers ? data.customers || [] : []);
@@ -353,6 +413,24 @@ export default function QuotesPage() {
     await fetchData();
   }
 
+  async function handleCreateCustomerFromQuote(data: CustomerFormData) {
+    const res = await fetch('/api/customers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => null) as { error?: string } | null;
+      throw new Error(err?.error || 'Failed to create customer');
+    }
+
+    const payload = await res.json() as { customer?: { id?: string } };
+    toast.success('Customer added');
+    if (payload.customer?.id) setCreatedQuoteCustomerId(payload.customer.id);
+    await fetchData();
+  }
+
   async function handleEditingQuoteAttachmentsChange(quoteId: string) {
     const res = await fetch(`/api/quotes/${quoteId}`);
     if (!res.ok) {
@@ -404,7 +482,7 @@ export default function QuotesPage() {
     router.replace(`${pathname}?${nextParams.toString()}`, { scroll: false });
   }
 
-  function handleManagerFilterChange(nextManagerId: string, nextTab: Extract<QuotePageTab, 'overview' | 'legacy'>) {
+  function handleManagerFilterChange(nextManagerId: string, nextTab: Extract<QuotePageTab, 'current' | 'archived' | 'legacy'>) {
     const nextParams = new URLSearchParams(searchParams.toString());
     nextParams.set('tab', nextTab);
     nextParams.delete('settings');
@@ -511,13 +589,21 @@ export default function QuotesPage() {
         }}
       >
         <TabsList>
-          <TabsTrigger value="overview" className="gap-2">
+          <TabsTrigger value="current" className="gap-2">
             <Receipt className="h-4 w-4" />
-            Overview
+            Current
+          </TabsTrigger>
+          <TabsTrigger value="projects" className="gap-2">
+            <BriefcaseBusiness className="h-4 w-4" />
+            Projects
+          </TabsTrigger>
+          <TabsTrigger value="archived" className="gap-2">
+            <Archive className="h-4 w-4" />
+            Archived
           </TabsTrigger>
           <TabsTrigger value="legacy" className="gap-2">
-            <Archive className="h-4 w-4" />
-            Legacy Quotes
+            <Receipt className="h-4 w-4" />
+            Legacy
           </TabsTrigger>
           <TabsTrigger value="settings" className="gap-2">
             <Settings className="h-4 w-4" />
@@ -525,11 +611,19 @@ export default function QuotesPage() {
           </TabsTrigger>
         </TabsList>
 
-        {pageTab === 'overview' ? (
+        {pageTab === 'current' ? (
           <ManagerFilterTabs
-            managerFilter={overviewManagerFilter}
-            managerOptions={overviewManagerOptions}
-            onManagerFilterChange={(nextManagerId) => handleManagerFilterChange(nextManagerId, 'overview')}
+            managerFilter={currentManagerFilter}
+            managerOptions={currentManagerOptions}
+            onManagerFilterChange={(nextManagerId) => handleManagerFilterChange(nextManagerId, 'current')}
+          />
+        ) : null}
+
+        {pageTab === 'archived' ? (
+          <ManagerFilterTabs
+            managerFilter={archivedManagerFilter}
+            managerOptions={archivedManagerOptions}
+            onManagerFilterChange={(nextManagerId) => handleManagerFilterChange(nextManagerId, 'archived')}
           />
         ) : null}
 
@@ -541,17 +635,38 @@ export default function QuotesPage() {
           />
         ) : null}
 
-        <TabsContent value="overview" className="space-y-6 mt-0">
+        <TabsContent value="current" className="space-y-6 mt-0">
           <QuotesTable
-            quotes={quotes}
-            statusCounts={quoteSummary?.status_counts}
+            quotes={currentQuotes}
             onRowClick={handleRowClick}
-            managerFilter={overviewManagerFilter}
+            managerFilter={currentManagerFilter}
+            emptyMessage="No current quotes yet. Create your first quote to get started."
+          />
+        </TabsContent>
+
+        <TabsContent value="archived" className="space-y-6 mt-0">
+          <QuotesTable
+            quotes={archivedQuotes}
+            onRowClick={handleRowClick}
+            managerFilter={archivedManagerFilter}
+            emptyMessage="No archived quotes yet."
           />
         </TabsContent>
 
         <TabsContent value="legacy" className="space-y-6 mt-0">
           <LegacyQuotesTable legacyQuotes={legacyQuotes} managerFilter={legacyManagerFilter} />
+        </TabsContent>
+
+        <TabsContent value="projects" className="space-y-6 mt-0">
+          <ProjectNumbersTab
+            projectNumbers={projectNumbers}
+            managerOptions={managerOptions}
+            quotes={quotes}
+            customers={customers}
+            canViewCustomers={canViewCustomers}
+            onRefresh={fetchData}
+            onOpenQuote={handleOpenQuoteDetails}
+          />
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-6 mt-0">
@@ -585,6 +700,15 @@ export default function QuotesPage() {
         managerOptions={managerOptions}
         approvers={approvers}
         initialCustomerId={customerId}
+        createdCustomerId={createdQuoteCustomerId}
+        onCreatedCustomerApplied={() => setCreatedQuoteCustomerId(null)}
+        onAddCustomer={() => setCustomerFormOpen(true)}
+      />
+
+      <CustomerFormDialog
+        open={customerFormOpen}
+        onClose={() => setCustomerFormOpen(false)}
+        onSubmit={handleCreateCustomerFromQuote}
       />
     </AppPageShell>
   );

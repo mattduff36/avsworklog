@@ -27,6 +27,22 @@ function buildLegacyQuote(overrides: Partial<LegacyQuote>): LegacyQuote {
   };
 }
 
+function buildLegacyPaginationQuotes(firstQuoteOverrides: Partial<LegacyQuote> = {}): LegacyQuote[] {
+  return Array.from({ length: 51 }, (_, index) => {
+    const quoteDate = new Date(Date.UTC(2026, 0, index + 1)).toISOString().slice(0, 10);
+
+    return buildLegacyQuote({
+      id: `legacy-page-${index}`,
+      source_row: index + 2,
+      quote_reference: `${(4000 + index).toString()}-GH`,
+      quote_date: quoteDate,
+      customer_name: `Legacy Customer ${String(index).padStart(3, '0')}`,
+      title: `Legacy details ${String(index).padStart(3, '0')}`,
+      ...(index === 0 ? firstQuoteOverrides : {}),
+    });
+  });
+}
+
 describe('LegacyQuotesTable', () => {
   it('merges George Healey manager typo variants under the same filter', () => {
     render(
@@ -46,23 +62,20 @@ describe('LegacyQuotesTable', () => {
     expect(screen.queryByText('Geroge Healey')).not.toBeInTheDocument();
   });
 
-  it('paginates legacy quotes', () => {
-    const legacyQuotes = Array.from({ length: 26 }, (_, index) => buildLegacyQuote({
-      id: `legacy-${index + 1}`,
-      source_row: index + 2,
-      quote_reference: `${(4000 + index).toString()}-GH`,
-      quote_date: `2026-01-${(index + 1).toString().padStart(2, '0')}`,
-    }));
+  it('reveals legacy quotes with Show More', () => {
+    const legacyQuotes = buildLegacyPaginationQuotes();
 
     const { container } = render(<LegacyQuotesTable legacyQuotes={legacyQuotes} />);
     const tableBody = container.querySelector('tbody');
-    expect(tableBody?.querySelectorAll('tr')).toHaveLength(25);
-    expect(screen.getByText('Showing 1-25 of 26 legacy quotes')).toBeInTheDocument();
+    expect(tableBody?.querySelectorAll('tr')).toHaveLength(50);
+    expect(screen.getByText('Showing 50 of 51 legacy quotes')).toBeInTheDocument();
+    expect(within(tableBody as HTMLElement).queryByText('4000-GH')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show More' }));
 
-    expect(tableBody?.querySelectorAll('tr')).toHaveLength(1);
-    expect(screen.getByText('Showing 26-26 of 26 legacy quotes')).toBeInTheDocument();
+    expect(tableBody?.querySelectorAll('tr')).toHaveLength(51);
+    expect(within(tableBody as HTMLElement).getByText('4000-GH')).toBeInTheDocument();
+    expect(screen.getByText('Showing all 51 legacy quotes')).toBeInTheDocument();
   });
 
   it('sorts by clickable column headers and uses overview-style details and total columns', () => {
@@ -86,6 +99,81 @@ describe('LegacyQuotesTable', () => {
     const firstRow = container.querySelector('tbody tr');
     expect(firstRow).not.toBeNull();
     expect(within(firstRow as HTMLElement).getByText('Alpha Customer')).toBeInTheDocument();
+  });
+
+  it('keeps quote number and customer out of legacy Details cells', () => {
+    const { container } = render(
+      <LegacyQuotesTable
+        legacyQuotes={[
+          buildLegacyQuote({
+            id: 'details-cleanup',
+            quote_reference: '4001-GH',
+            customer_name: 'Alpha Customer',
+            title: '4001-GH - Alpha Customer - Pump overhaul',
+          }),
+        ]}
+      />
+    );
+
+    const firstRowCells = container.querySelectorAll('tbody tr:first-child td');
+    expect(firstRowCells[2]).toHaveTextContent('Pump overhaul');
+    expect(firstRowCells[2]).not.toHaveTextContent('4001-GH');
+    expect(firstRowCells[2]).not.toHaveTextContent('Alpha Customer');
+  });
+
+  it('searches the full legacy result set before slicing visible rows', () => {
+    const legacyQuotes = buildLegacyPaginationQuotes({
+      id: 'hidden-search',
+      quote_reference: '3999-GH',
+      title: 'Hidden pump station works',
+    });
+    const { container } = render(<LegacyQuotesTable legacyQuotes={legacyQuotes} />);
+    const tableBody = container.querySelector('tbody');
+    expect(tableBody).not.toBeNull();
+    expect(within(tableBody as HTMLElement).queryByText('3999-GH')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText('Search quotes...'), { target: { value: 'Hidden pump station' } });
+
+    expect(within(tableBody as HTMLElement).getByText('3999-GH')).toBeInTheDocument();
+    expect(screen.queryByText('Showing 50 of 51 legacy quotes')).not.toBeInTheDocument();
+  });
+
+  it('filters the full legacy result set before slicing visible rows', () => {
+    const legacyQuotes = buildLegacyPaginationQuotes({
+      id: 'hidden-date',
+      quote_reference: '3998-GH',
+      quote_date: '2025-12-31',
+    });
+    const { container } = render(<LegacyQuotesTable legacyQuotes={legacyQuotes} />);
+    const tableBody = container.querySelector('tbody');
+    expect(tableBody).not.toBeNull();
+    expect(within(tableBody as HTMLElement).queryByText('3998-GH')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /All dates/ }));
+    fireEvent.change(screen.getByLabelText('From'), { target: { value: '2025-12-31' } });
+    fireEvent.change(screen.getByLabelText('To'), { target: { value: '2025-12-31' } });
+
+    expect(within(tableBody as HTMLElement).getByText('3998-GH')).toBeInTheDocument();
+    expect(screen.queryByText('Showing 50 of 51 legacy quotes')).not.toBeInTheDocument();
+  });
+
+  it('sorts the full legacy result set before slicing visible rows', () => {
+    const legacyQuotes = buildLegacyPaginationQuotes({
+      id: 'hidden-sort',
+      quote_reference: '3997-GH',
+      customer_name: 'Aardvark Legacy Customer',
+    });
+    const { container } = render(<LegacyQuotesTable legacyQuotes={legacyQuotes} />);
+    const tableBody = container.querySelector('tbody');
+    expect(tableBody).not.toBeNull();
+    expect(within(tableBody as HTMLElement).queryByText('3997-GH')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Customer/ }));
+
+    const firstRow = tableBody?.querySelector('tr');
+    expect(firstRow).not.toBeNull();
+    expect(within(firstRow as HTMLElement).getByText('3997-GH')).toBeInTheDocument();
+    expect(screen.getByText('Showing 50 of 51 legacy quotes')).toBeInTheDocument();
   });
 
   it('leaves the total cell blank when the original CSV total value is blank', () => {

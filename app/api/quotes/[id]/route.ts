@@ -772,12 +772,47 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         fieldErrors.manager_profile_id = 'Select a manager.';
       }
 
+      if ('quote_date' in quoteUpdates && !normalizeOptionalString(quoteUpdates.quote_date)) {
+        fieldErrors.quote_date = 'Select a quote date.';
+      }
+
+      if ('validity_days' in quoteUpdates) {
+        const normalizedValidityDays = Number(quoteUpdates.validity_days);
+        if (!Number.isFinite(normalizedValidityDays) || normalizedValidityDays < 1) {
+          fieldErrors.validity_days = 'Enter quote validity in days.';
+        }
+      }
+
+      if ('attention_name' in quoteUpdates && !normalizeOptionalString(quoteUpdates.attention_name)) {
+        fieldErrors.attention_name = 'Enter who this quote is for the attention of.';
+      }
+
+      if ('attention_email' in quoteUpdates && !normalizeOptionalString(quoteUpdates.attention_email)) {
+        fieldErrors.attention_email = 'Enter the contact email.';
+      }
+
       if (Number.isNaN(normalizedStartAlertDays)) {
         fieldErrors.start_alert_days = 'Alert days before start must be a whole number.';
       }
 
       if (Number.isNaN(normalizedEstimatedDurationDays)) {
         fieldErrors.estimated_duration_days = 'Estimated duration must be a whole number.';
+      }
+
+      if ('site_address' in quoteUpdates && !normalizeOptionalString(quoteUpdates.site_address)) {
+        fieldErrors.site_address = 'Enter the site address for this quote.';
+      }
+
+      if ('subject_line' in quoteUpdates && !normalizeOptionalString(quoteUpdates.subject_line)) {
+        fieldErrors.subject_line = 'Enter a quote title.';
+      }
+
+      if ('project_description' in quoteUpdates && !normalizeOptionalString(quoteUpdates.project_description)) {
+        fieldErrors.project_description = 'Enter a quote summary.';
+      }
+
+      if ('scope' in quoteUpdates && !normalizeOptionalString(quoteUpdates.scope)) {
+        fieldErrors.scope = 'Enter the quote scope.';
       }
 
       const normalizedItems = Array.isArray(line_items)

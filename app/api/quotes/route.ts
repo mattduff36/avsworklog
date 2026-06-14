@@ -310,6 +310,7 @@ export async function POST(request: NextRequest) {
       : null;
     const normalizedStartAlertDays = normalizeOptionalInteger(quoteData.start_alert_days);
     const normalizedEstimatedDurationDays = normalizeOptionalInteger(quoteData.estimated_duration_days);
+    const normalizedValidityDays = Number(quoteData.validity_days);
     const pricingMode = quoteData.pricing_mode === 'attachments_only' ? 'attachments_only' : 'itemized';
     const normalizedSecondaryContactIds = normalizeSecondaryContactIds(secondary_contact_ids);
 
@@ -317,8 +318,40 @@ export async function POST(request: NextRequest) {
       fieldErrors.customer_id = 'Select a customer.';
     }
 
+    if (!normalizeOptionalString(quoteData.quote_date)) {
+      fieldErrors.quote_date = 'Select a quote date.';
+    }
+
+    if (!Number.isFinite(normalizedValidityDays) || normalizedValidityDays < 1) {
+      fieldErrors.validity_days = 'Enter quote validity in days.';
+    }
+
+    if (!normalizeOptionalString(quoteData.attention_name)) {
+      fieldErrors.attention_name = 'Enter who this quote is for the attention of.';
+    }
+
+    if (!normalizeOptionalString(quoteData.attention_email)) {
+      fieldErrors.attention_email = 'Enter the contact email.';
+    }
+
+    if (!normalizeOptionalString(quoteData.site_address)) {
+      fieldErrors.site_address = 'Enter the site address for this quote.';
+    }
+
     if (!managerProfileId) {
       fieldErrors.manager_profile_id = 'Select a manager.';
+    }
+
+    if (!normalizeOptionalString(quoteData.subject_line)) {
+      fieldErrors.subject_line = 'Enter a quote title.';
+    }
+
+    if (!normalizeOptionalString(quoteData.project_description)) {
+      fieldErrors.project_description = 'Enter a quote summary.';
+    }
+
+    if (!normalizeOptionalString(quoteData.scope)) {
+      fieldErrors.scope = 'Enter the quote scope.';
     }
 
     if (Number.isNaN(normalizedStartAlertDays)) {
@@ -413,6 +446,7 @@ export async function POST(request: NextRequest) {
       project_description: normalizeOptionalString(quoteData.project_description),
       scope: normalizeOptionalString(quoteData.scope),
       salutation: normalizeOptionalString(quoteData.salutation),
+      validity_days: normalizedValidityDays,
       manager_name: quoteData.manager_name || managerOption?.profile?.full_name || managerProfile.full_name,
       manager_email: managerOption?.manager_email || null,
       approver_profile_id: normalizedApproverProfileId || managerOption?.approver_profile_id || managerProfileId,

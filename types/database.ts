@@ -4721,6 +4721,192 @@ export type Database = {
           },
         ]
       }
+      quote_project_costs: {
+        Row: {
+          id: string
+          project_number_id: string
+          cost_date: string
+          category: 'materials' | 'subcontractor' | 'plant' | 'labour' | 'other'
+          supplier: string | null
+          description: string
+          amount: number
+          notes: string | null
+          linked_quote_id: string | null
+          linked_quote_line_item_id: string | null
+          linked_at: string | null
+          created_by: string | null
+          updated_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          project_number_id: string
+          cost_date?: string
+          category?: 'materials' | 'subcontractor' | 'plant' | 'labour' | 'other'
+          supplier?: string | null
+          description: string
+          amount?: number
+          notes?: string | null
+          linked_quote_id?: string | null
+          linked_quote_line_item_id?: string | null
+          linked_at?: string | null
+          created_by?: string | null
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          project_number_id?: string
+          cost_date?: string
+          category?: 'materials' | 'subcontractor' | 'plant' | 'labour' | 'other'
+          supplier?: string | null
+          description?: string
+          amount?: number
+          notes?: string | null
+          linked_quote_id?: string | null
+          linked_quote_line_item_id?: string | null
+          linked_at?: string | null
+          created_by?: string | null
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'quote_project_costs_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'quote_project_costs_linked_quote_id_fkey'
+            columns: ['linked_quote_id']
+            isOneToOne: false
+            referencedRelation: 'quotes'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'quote_project_costs_linked_quote_line_item_id_fkey'
+            columns: ['linked_quote_line_item_id']
+            isOneToOne: false
+            referencedRelation: 'quote_line_items'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'quote_project_costs_project_number_id_fkey'
+            columns: ['project_number_id']
+            isOneToOne: false
+            referencedRelation: 'quote_project_numbers'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'quote_project_costs_updated_by_fkey'
+            columns: ['updated_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      quote_project_numbers: {
+        Row: {
+          id: string
+          project_reference: string
+          manager_profile_id: string
+          requester_initials: string
+          title: string
+          description: string | null
+          status: 'open' | 'linked' | 'converted' | 'cancelled'
+          linked_quote_id: string | null
+          linked_at: string | null
+          converted_quote_id: string | null
+          converted_at: string | null
+          cancelled_at: string | null
+          notes: string | null
+          created_by: string | null
+          updated_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          project_reference: string
+          manager_profile_id: string
+          requester_initials: string
+          title: string
+          description?: string | null
+          status?: 'open' | 'linked' | 'converted' | 'cancelled'
+          linked_quote_id?: string | null
+          linked_at?: string | null
+          converted_quote_id?: string | null
+          converted_at?: string | null
+          cancelled_at?: string | null
+          notes?: string | null
+          created_by?: string | null
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          project_reference?: string
+          manager_profile_id?: string
+          requester_initials?: string
+          title?: string
+          description?: string | null
+          status?: 'open' | 'linked' | 'converted' | 'cancelled'
+          linked_quote_id?: string | null
+          linked_at?: string | null
+          converted_quote_id?: string | null
+          converted_at?: string | null
+          cancelled_at?: string | null
+          notes?: string | null
+          created_by?: string | null
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'quote_project_numbers_converted_quote_id_fkey'
+            columns: ['converted_quote_id']
+            isOneToOne: false
+            referencedRelation: 'quotes'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'quote_project_numbers_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'quote_project_numbers_linked_quote_id_fkey'
+            columns: ['linked_quote_id']
+            isOneToOne: false
+            referencedRelation: 'quotes'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'quote_project_numbers_manager_profile_id_fkey'
+            columns: ['manager_profile_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'quote_project_numbers_updated_by_fkey'
+            columns: ['updated_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       quote_line_items: {
         Row: {
           id: string
@@ -8561,6 +8747,8 @@ export type Database = {
       check__quote_invoice_requests__requested_invoice_scope: 'full' | 'partial'
       check__quote_invoice_requests__status: 'pending' | 'fulfilled' | 'cancelled'
       check__quote_invoices__invoice_scope: 'full' | 'partial'
+      check__quote_project_costs__category: 'materials' | 'subcontractor' | 'plant' | 'labour' | 'other'
+      check__quote_project_numbers__status: 'open' | 'linked' | 'converted' | 'cancelled'
       check__quotes__commercial_status: 'open' | 'closed'
       check__quotes__completion_status: 'not_completed' | 'approved_in_full' | 'approved_in_part'
       check__quotes__pricing_mode: 'itemized' | 'attachments_only'

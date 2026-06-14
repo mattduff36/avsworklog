@@ -41,12 +41,18 @@ interface LegacyQuoteJobCodeRow {
   title: string | null;
 }
 
+interface ProjectNumberJobCodeRow {
+  project_reference: string | null;
+  title: string | null;
+  description: string | null;
+}
+
 interface TimesheetJobCodeOption {
   value: string;
   label: string;
   customerName: string | null;
   quoteTitle: string | null;
-  source: 'live_quote' | 'legacy_quote';
+  source: 'live_quote' | 'legacy_quote' | 'project_number';
 }
 
 function normalizeSearchQuery(query: string): string {
@@ -87,6 +93,7 @@ function addOption(
 function mapJobCodeRowsToOptions(
   rows: QuoteJobCodeRow[],
   legacyRows: LegacyQuoteJobCodeRow[],
+  projectRows: ProjectNumberJobCodeRow[],
   query: string
 ): TimesheetJobCodeOption[] {
   const normalizedQuery = normalizeSearchQuery(query);
@@ -130,6 +137,24 @@ function mapJobCodeRowsToOptions(
     );
   }
 
+  for (const row of projectRows) {
+    const reference = normalizeJobNumberInput(row.project_reference || '');
+    if (!QUOTE_JOB_NUMBER_REGEX.test(reference)) continue;
+
+    addOption(
+      options,
+      seen,
+      {
+        value: reference,
+        label: reference,
+        customerName: 'Project number',
+        quoteTitle: row.title || row.description || null,
+        source: 'project_number',
+      },
+      normalizedQuery
+    );
+  }
+
   return options;
 }
 
@@ -155,7 +180,7 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(Math.max(Number.parseInt(searchParams.get('limit') || '2000', 10) || 2000, 1), 2500);
     const query = searchParams.get('q') || '';
 
-    const [quoteResult, legacyQuoteResult] = await Promise.all([
+    const [quoteResult, legacyQuoteResult, projectNumberResult] = await Promise.all([
       admin
         .from('quotes')
         .select(`
@@ -178,15 +203,23 @@ export async function GET(request: NextRequest) {
         .not('quote_reference', 'is', null)
         .order('quote_reference', { ascending: true })
         .limit(limit),
+      admin
+        .from('quote_project_numbers')
+        .select('project_reference, title, description')
+        .eq('status', 'open')
+        .order('project_reference', { ascending: true })
+        .limit(limit),
     ]);
 
     if (quoteResult.error) throw quoteResult.error;
     if (legacyQuoteResult.error) throw legacyQuoteResult.error;
+    if (projectNumberResult.error) throw projectNumberResult.error;
 
     return NextResponse.json({
       job_codes: mapJobCodeRowsToOptions(
         (quoteResult.data || []) as QuoteJobCodeRow[],
         (legacyQuoteResult.data || []) as LegacyQuoteJobCodeRow[],
+        (projectNumberResult.data || []) as ProjectNumberJobCodeRow[],
         query
       ),
     });
