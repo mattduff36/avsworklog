@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -18,6 +18,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useDirtyDialogGuard } from '@/lib/hooks/useDirtyDialogGuard';
 import { Loader2, Save, Plus, Briefcase, Wrench, Bell, Mail, Eye, Truck, HardHat } from 'lucide-react';
 import type { MaintenanceCategory, CreateCategoryRequest, UpdateCategoryRequest } from '@/types/maintenance';
 import { useCreateCategory, useUpdateCategory } from '@/lib/hooks/useMaintenance';
@@ -103,11 +104,56 @@ const editCategorySchema = createCategorySchema.partial().extend({
 
 type CategoryFormData = z.infer<typeof createCategorySchema>;
 
+function buildCategoryDialogSnapshot(value: Partial<CategoryFormData> | undefined) {
+  return JSON.stringify(value || {});
+}
+
 function normalizeAppliesTo(values?: string[] | null): Array<'van' | 'plant' | 'hgv'> {
   const normalized = (values || []).filter(
     (value): value is 'van' | 'plant' | 'hgv' => value === 'van' || value === 'plant' || value === 'hgv',
   );
   return normalized.length > 0 ? normalized : ['van'];
+}
+
+function buildInitialCategoryFormValues(
+  mode: 'create' | 'edit',
+  category?: MaintenanceCategory | null
+): CategoryFormData {
+  if (mode === 'edit' && category) {
+    return {
+      name: category.name,
+      description: category.description || '',
+      type: category.type,
+      period_unit: normalizePeriodUnit(category.type, category.period_unit),
+      period_value: category.period_value,
+      alert_threshold_days: category.alert_threshold_days || undefined,
+      alert_threshold_miles: category.alert_threshold_miles || undefined,
+      alert_threshold_hours: category.alert_threshold_hours || undefined,
+      applies_to: normalizeAppliesTo(category.applies_to),
+      is_active: category.is_active,
+      responsibility: category.responsibility || 'workshop',
+      show_on_overview: category.show_on_overview !== false,
+      reminder_in_app_enabled: category.reminder_in_app_enabled || false,
+      reminder_email_enabled: category.reminder_email_enabled || false,
+    };
+  }
+
+  return {
+    name: '',
+    description: '',
+    type: 'date',
+    period_unit: 'months',
+    period_value: 12,
+    alert_threshold_days: 30,
+    alert_threshold_miles: undefined,
+    alert_threshold_hours: undefined,
+    applies_to: ['van'],
+    is_active: true,
+    responsibility: 'workshop',
+    show_on_overview: true,
+    reminder_in_app_enabled: false,
+    reminder_email_enabled: false,
+  };
 }
 
 // ============================================================================
@@ -158,44 +204,32 @@ export function CategoryDialog({
   const reminderEmail = useWatch({ control, name: 'reminder_email_enabled' });
   const appliesTo = useWatch({ control, name: 'applies_to' });
   const selectedPeriodUnit = useWatch({ control, name: 'period_unit' });
+  const formValues = useWatch({ control });
   const distanceTypeLabel = getDistanceTypeLabel(appliesTo);
+  const initialDirtySnapshot = useMemo(
+    () => buildCategoryDialogSnapshot(buildInitialCategoryFormValues(mode, category)),
+    [category, mode]
+  );
+  const currentDirtySnapshot = buildCategoryDialogSnapshot(formValues);
+  const isFormDirty = open && Boolean(initialDirtySnapshot) && currentDirtySnapshot !== initialDirtySnapshot;
+  const {
+    contentRef,
+    handleOpenChange,
+    handleInteractOutside,
+    handleEscapeKeyDown,
+    discard,
+  } = useDirtyDialogGuard({
+    isDirty: isFormDirty,
+    disabled: isSubmitting || createMutation.isPending || updateMutation.isPending,
+    onOpenChange,
+  });
 
   // Reset form when dialog opens/closes or category changes
   useEffect(() => {
     if (open && mode === 'edit' && category) {
-      reset({
-        name: category.name,
-        description: category.description || '',
-        type: category.type,
-        period_unit: normalizePeriodUnit(category.type, category.period_unit),
-        period_value: category.period_value,
-        alert_threshold_days: category.alert_threshold_days || undefined,
-        alert_threshold_miles: category.alert_threshold_miles || undefined,
-        alert_threshold_hours: category.alert_threshold_hours || undefined,
-        applies_to: normalizeAppliesTo(category.applies_to),
-        is_active: category.is_active,
-        responsibility: category.responsibility || 'workshop',
-        show_on_overview: category.show_on_overview !== false,
-        reminder_in_app_enabled: category.reminder_in_app_enabled || false,
-        reminder_email_enabled: category.reminder_email_enabled || false,
-      });
+      reset(buildInitialCategoryFormValues(mode, category));
     } else if (open && mode === 'create') {
-      reset({
-        name: '',
-        description: '',
-        type: 'date',
-        period_unit: 'months',
-        period_value: 12,
-        alert_threshold_days: 30,
-        alert_threshold_miles: undefined,
-        alert_threshold_hours: undefined,
-        applies_to: ['van'],
-        is_active: true,
-        responsibility: 'workshop',
-        show_on_overview: true,
-        reminder_in_app_enabled: false,
-        reminder_email_enabled: false,
-      });
+      reset(buildInitialCategoryFormValues(mode, category));
     }
   }, [open, mode, category, reset]);
 
@@ -277,8 +311,13 @@ export function CategoryDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-border text-white max-w-5xl max-h-[90vh] overflow-hidden flex flex-col p-0">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent
+        ref={contentRef}
+        className="border-border text-white max-w-5xl max-h-[90vh] overflow-hidden flex flex-col p-0"
+        onInteractOutside={handleInteractOutside}
+        onEscapeKeyDown={handleEscapeKeyDown}
+      >
         <DialogHeader className="px-6 pt-6 pb-4 border-b border-border">
           <DialogTitle className="text-2xl">
             {mode === 'create' ? 'Add New Category' : 'Edit Category'}
@@ -835,11 +874,11 @@ export function CategoryDialog({
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={discard}
               className="border-slate-600 text-white hover:bg-slate-800"
               disabled={isSubmitting}
             >
-              Cancel
+              {isFormDirty ? 'Discard Changes' : 'Cancel'}
             </Button>
             <Button
               type="submit"

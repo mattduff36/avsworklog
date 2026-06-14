@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
+import { useDirtyDialogGuard } from '@/lib/hooks/useDirtyDialogGuard';
 import type { Customer, CustomerContactFormData, CustomerFormData } from '../types';
 import { EMPTY_CUSTOMER_FORM } from '../types';
 
@@ -31,14 +32,34 @@ interface CustomerFormDialogProps {
   customer?: Customer | null;
 }
 
+function buildCustomerFormDirtySnapshot(form: CustomerFormData) {
+  return JSON.stringify(form);
+}
+
 export function CustomerFormDialog({ open, onClose, onSubmit, customer }: CustomerFormDialogProps) {
   const [form, setForm] = useState<CustomerFormData>({ ...EMPTY_CUSTOMER_FORM, secondary_contacts: [] });
   const [saving, setSaving] = useState(false);
+  const [initialDirtySnapshot, setInitialDirtySnapshot] = useState('');
   const isEditing = !!customer;
+  const currentDirtySnapshot = buildCustomerFormDirtySnapshot(form);
+  const isFormDirty = open && Boolean(initialDirtySnapshot) && currentDirtySnapshot !== initialDirtySnapshot;
+  const {
+    contentRef,
+    handleOpenChange,
+    handleInteractOutside,
+    handleEscapeKeyDown,
+    discard,
+  } = useDirtyDialogGuard({
+    isDirty: isFormDirty,
+    disabled: saving,
+    onOpenChange: (isOpen) => {
+      if (!isOpen && !saving) onClose();
+    },
+  });
 
   useEffect(() => {
     if (customer) {
-      setForm({
+      const nextForm: CustomerFormData = {
         company_name: customer.company_name,
         short_name: customer.short_name || '',
         contact_name: customer.contact_name || '',
@@ -61,9 +82,13 @@ export function CustomerFormDialog({ open, onClose, onSubmit, customer }: Custom
           email: contact.email || '',
           phone: contact.phone || '',
         })),
-      });
+      };
+      setForm(nextForm);
+      setInitialDirtySnapshot(buildCustomerFormDirtySnapshot(nextForm));
     } else {
-      setForm({ ...EMPTY_CUSTOMER_FORM, secondary_contacts: [] });
+      const nextForm = { ...EMPTY_CUSTOMER_FORM, secondary_contacts: [] };
+      setForm(nextForm);
+      setInitialDirtySnapshot(buildCustomerFormDirtySnapshot(nextForm));
     }
   }, [customer, open]);
 
@@ -113,8 +138,13 @@ export function CustomerFormDialog({ open, onClose, onSubmit, customer }: Custom
   }
 
   return (
-    <Dialog open={open} onOpenChange={isOpen => { if (!isOpen && !saving) onClose(); }}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-slate-900 border-slate-700 text-white">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent
+        ref={contentRef}
+        className="max-w-4xl max-h-[90vh] overflow-y-auto bg-slate-900 border-slate-700 text-white"
+        onInteractOutside={handleInteractOutside}
+        onEscapeKeyDown={handleEscapeKeyDown}
+      >
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle className="text-white">
@@ -384,8 +414,8 @@ export function CustomerFormDialog({ open, onClose, onSubmit, customer }: Custom
           </div>
 
           <DialogFooter className="gap-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={saving} className="border-slate-600 text-muted-foreground">
-              Cancel
+            <Button type="button" variant="outline" onClick={discard} disabled={saving} className="border-slate-600 text-muted-foreground">
+              {isFormDirty ? 'Discard Changes' : 'Cancel'}
             </Button>
             <Button type="submit" disabled={saving || !form.company_name.trim()} className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90 font-semibold">
               {saving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : isEditing ? 'Update Customer' : 'Add Customer'}

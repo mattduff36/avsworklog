@@ -64,6 +64,7 @@ import {
   canUseScopedAbsencePermission,
   useAbsenceSecondaryPermissions,
 } from '@/lib/hooks/useAbsenceSecondaryPermissions';
+import { useDirtyDialogGuard } from '@/lib/hooks/useDirtyDialogGuard';
 import { canOpenAbsenceManageArea } from '@/types/absence-permissions';
 import type { AbsenceWithRelations } from '@/types/absence';
 import type { WorkShiftPattern } from '@/types/work-shifts';
@@ -76,6 +77,34 @@ const ANNUAL_LEAVE_REASON_NAME = 'annual leave';
 
 function normalizeReasonName(value: string | null | undefined): string {
   return (value || '').trim().toLowerCase();
+}
+
+function buildCreateAbsenceDirtySnapshot({
+  selectedProfileId,
+  selectedReasonId,
+  startDate,
+  endDate,
+  isHalfDay,
+  halfDaySession,
+  notes,
+}: {
+  selectedProfileId: string;
+  selectedReasonId: string;
+  startDate: string;
+  endDate: string;
+  isHalfDay: boolean;
+  halfDaySession: 'AM' | 'PM';
+  notes: string;
+}) {
+  return JSON.stringify({
+    selectedProfileId,
+    selectedReasonId,
+    startDate,
+    endDate,
+    isHalfDay,
+    halfDaySession,
+    notes,
+  });
 }
 
 function isDirectoryAccessError(error: unknown): boolean {
@@ -301,8 +330,53 @@ export default function AdminAbsencePage() {
   const [halfDaySession, setHalfDaySession] = useState<'AM' | 'PM'>('AM');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [createDialogBaselineSnapshot, setCreateDialogBaselineSnapshot] = useState('');
   const { data: selectedProfileSummary, isLoading: loadingSelectedProfileSummary } =
     useAbsenceSummaryForEmployee(selectedProfileId);
+  const currentCreateDialogSnapshot = buildCreateAbsenceDirtySnapshot({
+    selectedProfileId,
+    selectedReasonId,
+    startDate,
+    endDate,
+    isHalfDay,
+    halfDaySession,
+    notes,
+  });
+  const isCreateDialogDirty = showCreateDialog
+    && Boolean(createDialogBaselineSnapshot)
+    && currentCreateDialogSnapshot !== createDialogBaselineSnapshot;
+  const {
+    contentRef: createDialogContentRef,
+    handleOpenChange: handleCreateDialogOpenChange,
+    handleInteractOutside: handleCreateDialogInteractOutside,
+    handleEscapeKeyDown: handleCreateDialogEscapeKeyDown,
+    discard: discardCreateDialog,
+  } = useDirtyDialogGuard({
+    isDirty: isCreateDialogDirty,
+    disabled: submitting,
+    onOpenChange: (open) => {
+      setShowCreateDialog(open);
+    },
+  });
+
+  function resetCreateAbsenceForm() {
+    setSelectedProfileId('');
+    setSelectedReasonId('');
+    setStartDate('');
+    setEndDate('');
+    setIsHalfDay(false);
+    setHalfDaySession('AM');
+    setNotes('');
+    setCreateDialogBaselineSnapshot(buildCreateAbsenceDirtySnapshot({
+      selectedProfileId: '',
+      selectedReasonId: '',
+      startDate: '',
+      endDate: '',
+      isHalfDay: false,
+      halfDaySession: 'AM',
+      notes: '',
+    }));
+  }
   
   const isProtectedTab = useCallback((tab: ManageTab): tab is ProtectedManageTab => {
     return tab === 'overview' || tab === 'allowances' || tab === 'reasons';
@@ -803,13 +877,7 @@ export default function AdminAbsencePage() {
       toast.success('Absence created and approved');
       setAllowancesRefreshKey((k) => k + 1);
       
-      // Reset form
-      setSelectedProfileId('');
-      setSelectedReasonId('');
-      setStartDate('');
-      setEndDate('');
-      setIsHalfDay(false);
-      setNotes('');
+      resetCreateAbsenceForm();
       setShowCreateDialog(false);
     } catch (error) {
       const message = getErrorMessage(error, 'Failed to create absence');
@@ -872,7 +940,10 @@ export default function AdminAbsencePage() {
         actionsClassName="flex-col sm:w-auto sm:flex-row"
         actions={canAddEditBookings ? (
           <Button
-            onClick={() => setShowCreateDialog(true)}
+            onClick={() => {
+              resetCreateAbsenceForm();
+              setShowCreateDialog(true);
+            }}
             className="w-full sm:w-auto bg-absence hover:bg-absence-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg"
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -1435,8 +1506,13 @@ export default function AdminAbsencePage() {
       <AbsenceAboutHelper variant="manage" />
 
       {/* Create Dialog */}
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-3xl overflow-y-auto border-border">
+      <Dialog open={showCreateDialog} onOpenChange={handleCreateDialogOpenChange}>
+        <DialogContent
+          ref={createDialogContentRef}
+          className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-3xl overflow-y-auto border-border"
+          onInteractOutside={handleCreateDialogInteractOutside}
+          onEscapeKeyDown={handleCreateDialogEscapeKeyDown}
+        >
           <DialogHeader>
             <DialogTitle className="text-foreground">Create Absence Entry</DialogTitle>
             <DialogDescription className="text-slate-400/90">
@@ -1579,10 +1655,10 @@ export default function AdminAbsencePage() {
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setShowCreateDialog(false)}
+              onClick={discardCreateDialog}
               className="border-border text-muted-foreground"
             >
-              Cancel
+              {isCreateDialogDirty ? 'Discard Changes' : 'Cancel'}
             </Button>
             <Button
               onClick={handleCreate}

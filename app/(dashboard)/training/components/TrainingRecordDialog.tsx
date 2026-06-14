@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useDirtyDialogGuard } from '@/lib/hooks/useDirtyDialogGuard';
 import {
   TRAINING_RECORD_STATUS_OPTIONS,
   TRAINING_VALIDATION_STATUS_OPTIONS,
@@ -55,6 +56,10 @@ const EMPTY_FORM: TrainingRecordFormData = {
   next_review_at: '',
 };
 
+function buildTrainingFormDirtySnapshot(form: TrainingRecordFormData) {
+  return JSON.stringify(form);
+}
+
 export function TrainingRecordDialog({
   open,
   record,
@@ -63,11 +68,27 @@ export function TrainingRecordDialog({
 }: TrainingRecordDialogProps) {
   const [form, setForm] = useState<TrainingRecordFormData>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [initialDirtySnapshot, setInitialDirtySnapshot] = useState('');
   const isEditing = Boolean(record);
+  const currentDirtySnapshot = buildTrainingFormDirtySnapshot(form);
+  const isFormDirty = open && Boolean(initialDirtySnapshot) && currentDirtySnapshot !== initialDirtySnapshot;
+  const {
+    contentRef,
+    handleOpenChange,
+    handleInteractOutside,
+    handleEscapeKeyDown,
+    discard,
+  } = useDirtyDialogGuard({
+    isDirty: isFormDirty,
+    disabled: saving,
+    onOpenChange: (isOpen) => {
+      if (!isOpen && !saving) onClose();
+    },
+  });
 
   useEffect(() => {
     if (record) {
-      setForm({
+      const nextForm: TrainingRecordFormData = {
         employee_name_raw: record.employee_name_raw || '',
         qualification_raw: record.qualification_raw,
         qualification_canonical_proposed: record.qualification_canonical_proposed,
@@ -86,11 +107,14 @@ export function TrainingRecordDialog({
         comments: record.comments || '',
         record_status: record.record_status,
         next_review_at: record.next_review_at || '',
-      });
+      };
+      setForm(nextForm);
+      setInitialDirtySnapshot(buildTrainingFormDirtySnapshot(nextForm));
       return;
     }
 
     setForm(EMPTY_FORM);
+    setInitialDirtySnapshot(buildTrainingFormDirtySnapshot(EMPTY_FORM));
   }, [record, open]);
 
   function updateField<K extends keyof TrainingRecordFormData>(key: K, value: TrainingRecordFormData[K]) {
@@ -109,8 +133,13 @@ export function TrainingRecordDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen && !saving) onClose(); }}>
-      <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-4xl overflow-y-auto bg-slate-900 text-white border-slate-700">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent
+        ref={contentRef}
+        className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-4xl overflow-y-auto bg-slate-900 text-white border-slate-700"
+        onInteractOutside={handleInteractOutside}
+        onEscapeKeyDown={handleEscapeKeyDown}
+      >
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>{isEditing ? 'Edit Training Record' : 'Add Training Record'}</DialogTitle>
@@ -290,8 +319,8 @@ export function TrainingRecordDialog({
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
-              Cancel
+            <Button type="button" variant="outline" onClick={discard} disabled={saving}>
+              {isFormDirty ? 'Discard Changes' : 'Cancel'}
             </Button>
             <Button type="submit" className="bg-avs-yellow text-slate-950 hover:bg-avs-yellow/90" disabled={saving}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

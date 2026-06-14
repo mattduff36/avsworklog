@@ -24,6 +24,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { AlertTriangle, ChevronDown, ExternalLink, Loader2, Plus, RefreshCw, Search, Sparkles, Trash2, GripVertical, Upload, X } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { useDirtyDialogGuard } from '@/lib/hooks/useDirtyDialogGuard';
 import { cn } from '@/lib/utils/cn';
 import { getQuoteRichPasteText } from '@/lib/quotes/quote-rich-text';
 import { toast } from 'sonner';
@@ -94,6 +95,28 @@ const EMPTY_LINE_ITEM: QuoteLineItem = {
 };
 
 type QuoteFieldErrors = Record<string, string>;
+
+function getAttachmentFileSignature(file: File) {
+  return {
+    name: file.name,
+    size: file.size,
+    lastModified: file.lastModified,
+  };
+}
+
+function buildQuoteFormDirtySnapshot(
+  form: QuoteFormData,
+  attachmentFiles: File[],
+  quoteAssistEmail: string,
+  quoteAssistDraft: QuoteAssistDraft | null
+) {
+  return JSON.stringify({
+    form,
+    attachmentFiles: attachmentFiles.map(getAttachmentFileSignature),
+    quoteAssistEmail,
+    quoteAssistDraft,
+  });
+}
 
 function buildAddress(customer?: Customer): string {
   if (!customer) return '';
@@ -223,6 +246,22 @@ export function QuoteFormDialog({
   const [quoteAssistLoading, setQuoteAssistLoading] = useState(false);
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
   const [customerSearch, setCustomerSearch] = useState('');
+  const [initialDirtySnapshot, setInitialDirtySnapshot] = useState('');
+  const currentDirtySnapshot = buildQuoteFormDirtySnapshot(form, attachmentFiles, quoteAssistEmail, quoteAssistDraft);
+  const isFormDirty = open && Boolean(initialDirtySnapshot) && currentDirtySnapshot !== initialDirtySnapshot;
+  const {
+    contentRef,
+    handleOpenChange,
+    handleInteractOutside,
+    handleEscapeKeyDown,
+    discard,
+  } = useDirtyDialogGuard({
+    isDirty: isFormDirty,
+    disabled: saving,
+    onOpenChange: (isOpen) => {
+      if (!isOpen && !saving) onClose();
+    },
+  });
 
   const selectedCustomer = useMemo(
     () => customers.find(customer => customer.id === form.customer_id),
@@ -407,7 +446,7 @@ export function QuoteFormDialog({
     setAttachmentFiles([]);
     setExistingAttachments(quote?.attachments || []);
     if (quote) {
-      setForm({
+      const nextForm: QuoteFormData = {
         customer_id: quote.customer_id,
         manager_profile_id: quote.requester_id || '',
         requester_initials: quote.requester_initials || '',
@@ -435,7 +474,9 @@ export function QuoteFormDialog({
         line_items: quote.line_items && quote.line_items.length > 0
           ? quote.line_items.map((li, i) => ({ ...li, sort_order: i }))
           : [{ ...EMPTY_LINE_ITEM }],
-      });
+      };
+      setForm(nextForm);
+      setInitialDirtySnapshot(buildQuoteFormDirtySnapshot(nextForm, [], '', null));
     } else {
       const next = applyManager(defaultManager?.profile_id || '', {
         customer_id: '',
@@ -477,6 +518,7 @@ export function QuoteFormDialog({
       }
 
       setForm(next);
+      setInitialDirtySnapshot(buildQuoteFormDirtySnapshot(next, [], '', null));
     }
     wasOpenRef.current = true;
     lastDialogKeyRef.current = dialogKey;
@@ -806,8 +848,13 @@ export function QuoteFormDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={isOpen => { if (!isOpen && !saving) onClose(); }}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-slate-900 border-slate-700 text-white">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent
+        ref={contentRef}
+        className="max-w-4xl max-h-[90vh] overflow-y-auto bg-slate-900 border-slate-700 text-white"
+        onInteractOutside={handleInteractOutside}
+        onEscapeKeyDown={handleEscapeKeyDown}
+      >
         <form onSubmit={handleSubmit} noValidate>
           <DialogHeader>
             <DialogTitle className="text-white">
@@ -1492,8 +1539,8 @@ export function QuoteFormDialog({
           </div>
 
           <DialogFooter className="gap-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={saving} className="border-slate-600 text-muted-foreground">
-              Cancel
+            <Button type="button" variant="outline" onClick={discard} disabled={saving} className="border-slate-600 text-muted-foreground">
+              {isFormDirty ? 'Discard Changes' : 'Cancel'}
             </Button>
             <Button
               type="submit"

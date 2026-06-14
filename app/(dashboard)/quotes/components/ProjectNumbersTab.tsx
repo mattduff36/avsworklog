@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { useDirtyDialogGuard } from '@/lib/hooks/useDirtyDialogGuard';
 import type {
   Quote,
   QuoteManagerOption,
@@ -89,6 +90,10 @@ function getToday() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function buildDialogSnapshot(value: unknown) {
+  return JSON.stringify(value);
+}
+
 function buildEmptyCostForm(projectNumberId = ''): CostFormState {
   return {
     project_number_id: projectNumberId,
@@ -155,6 +160,9 @@ export function ProjectNumbersTab({
   const [actionMode, setActionMode] = useState<'link' | 'convert' | null>(null);
   const [convertForm, setConvertForm] = useState<ConvertFormState>(emptyConvertForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [projectFormBaseline, setProjectFormBaseline] = useState(buildDialogSnapshot(emptyProjectForm));
+  const [costFormBaseline, setCostFormBaseline] = useState(buildDialogSnapshot(buildEmptyCostForm()));
+  const [convertFormBaseline, setConvertFormBaseline] = useState(buildDialogSnapshot(emptyConvertForm));
 
   const activeProjects = useMemo(
     () => projectNumbers.filter(project => project.status === 'open'),
@@ -165,6 +173,61 @@ export function ProjectNumbersTab({
     () => quotes.filter(quote => quote.is_latest_version && quote.commercial_status === 'open'),
     [quotes]
   );
+  const isProjectFormDirty = projectFormOpen && buildDialogSnapshot(projectForm) !== projectFormBaseline;
+  const isCostFormDirty = costFormOpen && buildDialogSnapshot(costForm) !== costFormBaseline;
+  const isActionFormDirty = Boolean(actionProjectId && actionMode) && buildDialogSnapshot(convertForm) !== convertFormBaseline;
+  const {
+    contentRef: projectDialogContentRef,
+    handleOpenChange: handleProjectDialogOpenChange,
+    handleInteractOutside: handleProjectDialogInteractOutside,
+    handleEscapeKeyDown: handleProjectDialogEscapeKeyDown,
+    discard: discardProjectDialog,
+  } = useDirtyDialogGuard({
+    isDirty: isProjectFormDirty,
+    disabled: isSubmitting,
+    onOpenChange: (open) => {
+      setProjectFormOpen(open);
+      if (!open) {
+        setProjectForm(emptyProjectForm);
+        setProjectFormBaseline(buildDialogSnapshot(emptyProjectForm));
+      }
+    },
+  });
+  const {
+    contentRef: costDialogContentRef,
+    handleOpenChange: handleCostDialogOpenChange,
+    handleInteractOutside: handleCostDialogInteractOutside,
+    handleEscapeKeyDown: handleCostDialogEscapeKeyDown,
+    discard: discardCostDialog,
+  } = useDirtyDialogGuard({
+    isDirty: isCostFormDirty,
+    disabled: isSubmitting,
+    onOpenChange: (open) => {
+      setCostFormOpen(open);
+      if (!open) {
+        const nextForm = buildEmptyCostForm();
+        setCostForm(nextForm);
+        setCostFormBaseline(buildDialogSnapshot(nextForm));
+      }
+    },
+  });
+  const {
+    contentRef: actionDialogContentRef,
+    handleOpenChange: handleActionDialogOpenChange,
+    handleInteractOutside: handleActionDialogInteractOutside,
+    handleEscapeKeyDown: handleActionDialogEscapeKeyDown,
+    discard: discardActionDialog,
+  } = useDirtyDialogGuard({
+    isDirty: isActionFormDirty,
+    disabled: isSubmitting,
+    onOpenChange: (open) => {
+      if (open) return;
+      setActionProjectId(null);
+      setActionMode(null);
+      setConvertForm(emptyConvertForm);
+      setConvertFormBaseline(buildDialogSnapshot(emptyConvertForm));
+    },
+  });
 
   async function submitProjectForm() {
     setIsSubmitting(true);
@@ -260,7 +323,9 @@ export function ProjectNumbersTab({
   }
 
   function openCostModal(projectId: string) {
-    setCostForm(buildEmptyCostForm(projectId));
+    const nextForm = buildEmptyCostForm(projectId);
+    setCostForm(nextForm);
+    setCostFormBaseline(buildDialogSnapshot(nextForm));
     setCostFormOpen(true);
   }
 
@@ -268,14 +333,16 @@ export function ProjectNumbersTab({
     const firstCustomer = customers[0];
     setActionProjectId(project.id);
     setActionMode(mode);
-    setConvertForm({
+    const nextForm = {
       ...emptyConvertForm,
       subject_line: project.title,
       project_description: project.description || '',
       scope: getOpenCosts(project).map(cost => `- ${cost.description}`).join('\n'),
       customer_id: firstCustomer?.id || '',
       site_address: firstCustomer ? getCustomerAddress(firstCustomer) : '',
-    });
+    };
+    setConvertForm(nextForm);
+    setConvertFormBaseline(buildDialogSnapshot(nextForm));
   }
 
   function handleCustomerChange(customerId: string) {
@@ -296,7 +363,14 @@ export function ProjectNumbersTab({
             Reserve real quote/job numbers before a customer quote exists, then review costs and timesheet hours here.
           </p>
         </div>
-        <Button onClick={() => setProjectFormOpen(true)} className="w-full bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90 sm:w-auto">
+        <Button
+          onClick={() => {
+            setProjectForm(emptyProjectForm);
+            setProjectFormBaseline(buildDialogSnapshot(emptyProjectForm));
+            setProjectFormOpen(true);
+          }}
+          className="w-full bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90 sm:w-auto"
+        >
           <Plus className="mr-2 h-4 w-4" />
           New Project Number
         </Button>
@@ -483,8 +557,13 @@ export function ProjectNumbersTab({
         </div>
       )}
 
-      <Dialog open={projectFormOpen} onOpenChange={setProjectFormOpen}>
-        <DialogContent className="max-w-2xl">
+      <Dialog open={projectFormOpen} onOpenChange={handleProjectDialogOpenChange}>
+        <DialogContent
+          ref={projectDialogContentRef}
+          className="max-w-2xl"
+          onInteractOutside={handleProjectDialogInteractOutside}
+          onEscapeKeyDown={handleProjectDialogEscapeKeyDown}
+        >
           <DialogHeader>
             <DialogTitle>Create Project Number</DialogTitle>
           </DialogHeader>
@@ -539,7 +618,9 @@ export function ProjectNumbersTab({
               />
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setProjectFormOpen(false)}>Cancel</Button>
+              <Button variant="outline" onClick={discardProjectDialog}>
+                {isProjectFormDirty ? 'Discard Changes' : 'Cancel'}
+              </Button>
               <Button
                 onClick={submitProjectForm}
                 disabled={isSubmitting}
@@ -552,8 +633,13 @@ export function ProjectNumbersTab({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={costFormOpen} onOpenChange={setCostFormOpen}>
-        <DialogContent className="max-w-2xl">
+      <Dialog open={costFormOpen} onOpenChange={handleCostDialogOpenChange}>
+        <DialogContent
+          ref={costDialogContentRef}
+          className="max-w-2xl"
+          onInteractOutside={handleCostDialogInteractOutside}
+          onEscapeKeyDown={handleCostDialogEscapeKeyDown}
+        >
           <DialogHeader>
             <DialogTitle>Add Manual Cost</DialogTitle>
           </DialogHeader>
@@ -648,7 +734,9 @@ export function ProjectNumbersTab({
               />
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setCostFormOpen(false)}>Cancel</Button>
+              <Button variant="outline" onClick={discardCostDialog}>
+                {isCostFormDirty ? 'Discard Changes' : 'Cancel'}
+              </Button>
               <Button
                 onClick={submitCostForm}
                 disabled={isSubmitting}
@@ -661,13 +749,13 @@ export function ProjectNumbersTab({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={Boolean(actionProjectId && actionMode)} onOpenChange={(open) => {
-        if (!open) {
-          setActionProjectId(null);
-          setActionMode(null);
-        }
-      }}>
-        <DialogContent className="max-w-2xl">
+      <Dialog open={Boolean(actionProjectId && actionMode)} onOpenChange={handleActionDialogOpenChange}>
+        <DialogContent
+          ref={actionDialogContentRef}
+          className="max-w-2xl"
+          onInteractOutside={handleActionDialogInteractOutside}
+          onEscapeKeyDown={handleActionDialogEscapeKeyDown}
+        >
           <DialogHeader>
             <DialogTitle>
               {actionMode === 'link' ? 'Add Costs to Existing Quote' : 'Create Quote from Project Number'}
@@ -775,11 +863,8 @@ export function ProjectNumbersTab({
                 If no boxes were ticked, all currently unlinked manual costs on this project number will be used.
               </p>
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => {
-                  setActionProjectId(null);
-                  setActionMode(null);
-                }}>
-                  Cancel
+                <Button variant="outline" onClick={discardActionDialog}>
+                  {isActionFormDirty ? 'Discard Changes' : 'Cancel'}
                 </Button>
                 <Button
                   onClick={submitProjectAction}

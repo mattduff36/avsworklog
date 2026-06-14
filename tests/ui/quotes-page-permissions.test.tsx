@@ -204,12 +204,12 @@ describe('Quotes page customer access states', () => {
       .getAllByRole('tab')
       .map((tab) => tab.textContent?.replace(/\s+/g, ' ').trim());
 
-    expect(tabNames.slice(0, 5)).toEqual(['Current', 'Projects', 'Archived', 'Legacy', 'Settings']);
-    expect(screen.queryByRole('tab', { name: 'Overview' })).not.toBeInTheDocument();
+    expect(tabNames.slice(0, 6)).toEqual(['Overview', 'Current', 'Projects', 'Archived', 'Legacy', 'Settings']);
     expect(screen.queryByRole('tab', { name: 'Legacy Quotes' })).not.toBeInTheDocument();
   });
 
   it('passes only current quotes into the current table', async () => {
+    searchParamsMock = new URLSearchParams('tab=current');
     mockFetchAllPaginatedItems.mockImplementation(async (endpoint: string) => ({
       items: endpoint === '/api/quotes'
         ? [
@@ -301,6 +301,7 @@ describe('Quotes page customer access states', () => {
   });
 
   it('renders current manager tabs from quotes instead of all manager metadata', async () => {
+    searchParamsMock = new URLSearchParams('tab=current');
     mockFetchAllPaginatedItems.mockImplementation(async (endpoint: string) => ({
       items: endpoint === '/api/quotes'
         ? [

@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
+import { useDirtyDialogGuard } from '@/lib/hooks/useDirtyDialogGuard';
 import { cn } from '@/lib/utils/cn';
 import {
   INVENTORY_CHECKLIST_STATUS_LABELS,
@@ -40,6 +41,20 @@ const STATUS_OPTIONS: Array<{ status: InventoryChecklistStatus; tone: 'success' 
   { status: 'attention', tone: 'danger' },
   { status: 'na', tone: 'neutral' },
 ];
+
+function buildInventoryCheckDirtySnapshot({
+  checkedAt,
+  statuses,
+  comments,
+  generalComments,
+}: {
+  checkedAt: string;
+  statuses: Record<number, InventoryChecklistStatus>;
+  comments: Record<number, string>;
+  generalComments: string;
+}) {
+  return JSON.stringify({ checkedAt, statuses, comments, generalComments });
+}
 
 function getChoiceButtonClasses(tone: 'success' | 'danger' | 'neutral', selected: boolean): string {
   const base = 'min-h-11 rounded-lg border px-3 py-2 text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inventory/60';
@@ -98,6 +113,42 @@ export function InventoryCheckModal({
     [statuses],
   );
   const progressPercent = Math.round((completedCount / INVENTORY_SERVICE_CHECKLIST_ITEMS.length) * 100);
+  const currentDirtySnapshot = buildInventoryCheckDirtySnapshot({
+    checkedAt,
+    statuses,
+    comments,
+    generalComments,
+  });
+  const cleanDirtySnapshot = buildInventoryCheckDirtySnapshot({
+    checkedAt: initialCheckedAt,
+    statuses: {},
+    comments: {},
+    generalComments: '',
+  });
+  const isFormDirty = open && currentDirtySnapshot !== cleanDirtySnapshot;
+
+  function resetInventoryCheckForm() {
+    setCheckedAt(initialCheckedAt);
+    setStatuses({});
+    setComments({});
+    setGeneralComments('');
+    setError(null);
+  }
+
+  const {
+    contentRef,
+    handleOpenChange,
+    handleInteractOutside,
+    handleEscapeKeyDown,
+    discard,
+  } = useDirtyDialogGuard({
+    isDirty: isFormDirty,
+    disabled: saving,
+    onOpenChange: (nextOpen) => {
+      if (!nextOpen) resetInventoryCheckForm();
+      onOpenChange(nextOpen);
+    },
+  });
 
   function handleStatusChange(itemNumberValue: number, status: InventoryChecklistStatus) {
     setStatuses((current) => ({ ...current, [itemNumberValue]: status }));
@@ -146,8 +197,13 @@ export function InventoryCheckModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={dialogContentViewportClassName({ size: '6xl', scroll: 'content', className: 'border border-border bg-slate-950 p-0 text-white' })}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent
+        ref={contentRef}
+        className={dialogContentViewportClassName({ size: '6xl', scroll: 'content', className: 'border border-border bg-slate-950 p-0 text-white' })}
+        onInteractOutside={handleInteractOutside}
+        onEscapeKeyDown={handleEscapeKeyDown}
+      >
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
           <DialogHeader className="border-b border-border px-6 py-5 md:px-8 md:py-6">
             <DialogTitle className="text-xl text-white">Record Inventory Check</DialogTitle>
@@ -268,8 +324,8 @@ export function InventoryCheckModal({
               />
             </div>
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-                Cancel
+              <Button type="button" variant="outline" onClick={discard} disabled={saving}>
+                {isFormDirty ? 'Discard Changes' : 'Cancel'}
               </Button>
               <Button type="submit" className="bg-inventory text-white hover:bg-inventory-dark" disabled={saving}>
                 {saving ? 'Submitting...' : 'Submit Check'}

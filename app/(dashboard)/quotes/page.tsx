@@ -5,7 +5,7 @@ import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { AppPageShell } from '@/components/layout/AppPageShell';
-import { Archive, BriefcaseBusiness, CalendarClock, Plus, Receipt, Settings } from 'lucide-react';
+import { Archive, BriefcaseBusiness, CalendarClock, LayoutDashboard, Plus, Receipt, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
 import { PageLoader } from '@/components/ui/page-loader';
@@ -21,6 +21,7 @@ import {
 import { QuoteDetailsModal } from './components/QuoteDetailsModal';
 import { QuoteFormDialog } from './components/QuoteFormDialog';
 import { ProjectNumbersTab } from './components/ProjectNumbersTab';
+import { QuotesOverviewTab } from './components/QuotesOverviewTab';
 import { QuoteSettingsTab, type QuoteSettingsSubTab } from './components/settings/QuoteSettingsTab';
 import { CustomerFormDialog } from '../customers/components/CustomerFormDialog';
 import { uploadQuoteAttachment } from './quote-attachment-client';
@@ -61,15 +62,19 @@ interface QuoteManagerFilterOption {
   label: string;
 }
 
-type QuotePageTab = 'current' | 'projects' | 'archived' | 'legacy' | 'settings';
+type QuotePageTab = 'overview' | 'current' | 'projects' | 'archived' | 'legacy' | 'settings';
 
 function isQuotePageTab(value: string): value is QuotePageTab {
-  return value === 'current' || value === 'projects' || value === 'archived' || value === 'legacy' || value === 'settings';
+  return value === 'overview'
+    || value === 'current'
+    || value === 'projects'
+    || value === 'archived'
+    || value === 'legacy'
+    || value === 'settings';
 }
 
 function getQuotePageTab(value: string | null): QuotePageTab {
-  if (value === 'overview') return 'current';
-  return value && isQuotePageTab(value) ? value : 'current';
+  return value && isQuotePageTab(value) ? value : 'overview';
 }
 
 function isQuoteSettingsSubTab(value: string): value is QuoteSettingsSubTab {
@@ -589,6 +594,10 @@ export default function QuotesPage() {
         }}
       >
         <TabsList>
+          <TabsTrigger value="overview" className="gap-2">
+            <LayoutDashboard className="h-4 w-4" />
+            Overview
+          </TabsTrigger>
           <TabsTrigger value="current" className="gap-2">
             <Receipt className="h-4 w-4" />
             Current
@@ -642,6 +651,10 @@ export default function QuotesPage() {
             managerFilter={currentManagerFilter}
             emptyMessage="No current quotes yet. Create your first quote to get started."
           />
+        </TabsContent>
+
+        <TabsContent value="overview" className="space-y-6 mt-0">
+          <QuotesOverviewTab />
         </TabsContent>
 
         <TabsContent value="archived" className="space-y-6 mt-0">

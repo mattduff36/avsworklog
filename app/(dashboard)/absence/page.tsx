@@ -20,6 +20,7 @@ import {
   canUseScopedAbsencePermission,
   useAbsenceSecondaryPermissions,
 } from '@/lib/hooks/useAbsenceSecondaryPermissions';
+import { useDirtyDialogGuard } from '@/lib/hooks/useDirtyDialogGuard';
 import { clearClientServiceOutage } from '@/lib/app-auth/client-service-health';
 import { fetchAbsenceMessage } from '@/lib/client/absence-message';
 import { fetchCurrentWorkShift, fetchWorkShiftMatrix } from '@/lib/client/work-shifts';
@@ -109,6 +110,31 @@ function isAnnualLeaveReason(name: string): boolean {
 
 function isUnpaidLeaveReason(name: string): boolean {
   return name.trim().toLowerCase() === 'unpaid leave';
+}
+
+function buildRequestLeaveDirtySnapshot({
+  selectedReasonId,
+  startDate,
+  endDate,
+  isHalfDay,
+  halfDaySession,
+  notes,
+}: {
+  selectedReasonId: string;
+  startDate: string;
+  endDate: string;
+  isHalfDay: boolean;
+  halfDaySession: 'AM' | 'PM';
+  notes: string;
+}) {
+  return JSON.stringify({
+    selectedReasonId,
+    startDate,
+    endDate,
+    isHalfDay,
+    halfDaySession,
+    notes,
+  });
 }
 
 function getOldestOpenFinancialYearStartYear(
@@ -475,6 +501,62 @@ export default function AbsencePage() {
   const [selectedReasonId, setSelectedReasonId] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [requestDialogBaselineSnapshot, setRequestDialogBaselineSnapshot] = useState('');
+  const currentRequestDialogSnapshot = buildRequestLeaveDirtySnapshot({
+    selectedReasonId,
+    startDate,
+    endDate,
+    isHalfDay,
+    halfDaySession,
+    notes,
+  });
+  const isRequestDialogDirty = showRequestDialog
+    && Boolean(requestDialogBaselineSnapshot)
+    && currentRequestDialogSnapshot !== requestDialogBaselineSnapshot;
+  const {
+    contentRef: requestDialogContentRef,
+    handleOpenChange: handleRequestDialogOpenChange,
+    handleInteractOutside: handleRequestDialogInteractOutside,
+    handleEscapeKeyDown: handleRequestDialogEscapeKeyDown,
+    discard: discardRequestDialog,
+  } = useDirtyDialogGuard({
+    isDirty: isRequestDialogDirty,
+    disabled: submitting,
+    onOpenChange: setShowRequestDialog,
+  });
+
+  function openRequestDialog(nextStartDate = '') {
+    setStartDate(nextStartDate);
+    setEndDate('');
+    setIsHalfDay(false);
+    setHalfDaySession('AM');
+    setNotes('');
+    setRequestDialogBaselineSnapshot(buildRequestLeaveDirtySnapshot({
+      selectedReasonId,
+      startDate: nextStartDate,
+      endDate: '',
+      isHalfDay: false,
+      halfDaySession: 'AM',
+      notes: '',
+    }));
+    setShowRequestDialog(true);
+  }
+
+  function resetRequestForm() {
+    setStartDate('');
+    setEndDate('');
+    setIsHalfDay(false);
+    setHalfDaySession('AM');
+    setNotes('');
+    setRequestDialogBaselineSnapshot(buildRequestLeaveDirtySnapshot({
+      selectedReasonId,
+      startDate: '',
+      endDate: '',
+      isHalfDay: false,
+      halfDaySession: 'AM',
+      notes: '',
+    }));
+  }
 
   const handleUnavailableError = useCallback((
     source: PageServiceRequestKey,
@@ -787,12 +869,7 @@ export default function AbsencePage() {
       
       toast.success(`${selectedReason.name} request submitted`);
       
-      // Reset form
-      setStartDate('');
-      setEndDate('');
-      setIsHalfDay(false);
-      setHalfDaySession('AM');
-      setNotes('');
+      resetRequestForm();
       setShowRequestDialog(false);
       setShowDayModal(false);
     } catch (error) {
@@ -840,11 +917,8 @@ export default function AbsencePage() {
         });
         return;
       }
-      setStartDate(formatDateISO(selectedDate));
-      setEndDate('');
-      setIsHalfDay(false);
       setShowDayModal(false);
-      setShowRequestDialog(true);
+      openRequestDialog(formatDateISO(selectedDate));
     }
   }
   
@@ -1125,7 +1199,7 @@ export default function AbsencePage() {
             )}
             <Button
               className="w-full justify-center bg-absence hover:bg-absence-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg sm:w-auto"
-              onClick={() => setShowRequestDialog(true)}
+              onClick={() => openRequestDialog()}
               disabled={isSelectedFinancialYearClosed || !canRequestLeave}
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -1173,8 +1247,13 @@ export default function AbsencePage() {
         </CardContent>
       </Card>
       
-      <Dialog open={showRequestDialog} onOpenChange={setShowRequestDialog}>
-        <DialogContent className="flex max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-3xl flex-col gap-0 overflow-hidden border-border p-0 sm:max-h-[90vh] sm:w-full sm:gap-6 sm:p-6">
+      <Dialog open={showRequestDialog} onOpenChange={handleRequestDialogOpenChange}>
+        <DialogContent
+          ref={requestDialogContentRef}
+          className="flex max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-3xl flex-col gap-0 overflow-hidden border-border p-0 sm:max-h-[90vh] sm:w-full sm:gap-6 sm:p-6"
+          onInteractOutside={handleRequestDialogInteractOutside}
+          onEscapeKeyDown={handleRequestDialogEscapeKeyDown}
+        >
           <DialogHeader className="px-4 pt-4 text-left sm:px-0 sm:pt-0">
             <DialogTitle className="text-foreground">Request Leave</DialogTitle>
             <DialogDescription className="text-slate-400/90">
@@ -1341,8 +1420,8 @@ export default function AbsencePage() {
             </div>
 
             <DialogFooter className="border-t border-border bg-card px-4 py-3 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0">
-              <Button type="button" variant="outline" onClick={() => setShowRequestDialog(false)} className="border-border text-muted-foreground">
-                Cancel
+              <Button type="button" variant="outline" onClick={discardRequestDialog} className="border-border text-muted-foreground">
+                {isRequestDialogDirty ? 'Discard Changes' : 'Cancel'}
               </Button>
               <Button
                 type="button"

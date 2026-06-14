@@ -53,6 +53,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
 import { buildQuoteDisplayName, buildQuotePdfFilename } from '@/lib/quotes/quote-display-name';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { useDirtyDialogGuard } from '@/lib/hooks/useDirtyDialogGuard';
 import {
   deleteQuoteAttachment,
   getQuoteAttachmentUrl,
@@ -87,6 +88,36 @@ type DetailFieldErrors = Record<string, string>;
 interface QuoteRecipientOption {
   email: string;
   label: string;
+}
+
+interface QuoteDetailsDirtySnapshot {
+  poNumber: string;
+  poValue: string;
+  startDate: string;
+  startAlertDays: string;
+  completionStatus: QuoteCompletionStatus;
+  completionComments: string;
+  invoiceNumber: string;
+  invoiceAmount: string;
+  invoiceDate: string;
+  invoiceScope: 'full' | 'partial';
+  invoiceComments: string;
+  invoiceRequestAmount: string;
+  invoiceRequestDate: string;
+  invoiceRequestScope: 'full' | 'partial';
+  invoiceRequestComments: string;
+  selectedInvoiceRequestId: string;
+  invoiceMatchesRequest: boolean;
+  revisionType: QuoteRevisionType;
+  revisionNotes: string;
+}
+
+function buildDirtySnapshot(value: QuoteDetailsDirtySnapshot) {
+  return JSON.stringify(value);
+}
+
+function buildEmailSelectionSnapshot(emails: string[]) {
+  return JSON.stringify(emails.map(email => email.trim().toLowerCase()).sort());
 }
 
 function buildQuoteRecipientOptions(quote: Quote | null): QuoteRecipientOption[] {
@@ -288,6 +319,10 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [removingAttachmentId, setRemovingAttachmentId] = useState<string | null>(null);
   const [replacingAttachmentId, setReplacingAttachmentId] = useState<string | null>(null);
+  const [detailsBaselineSnapshot, setDetailsBaselineSnapshot] = useState('');
+  const [poRequestBaselineSnapshot, setPoRequestBaselineSnapshot] = useState('');
+  const [duplicateBaselineSnapshot, setDuplicateBaselineSnapshot] = useState('');
+  const [ramsBaselineSnapshot, setRamsBaselineSnapshot] = useState('');
   const activeQuoteId = currentQuoteId || quoteId || quote?.id || null;
   const recipientEmail = quote?.attention_email || quote?.customer?.contact_email || '';
   const customerToContacts = quote?.selected_secondary_contacts || [];
@@ -334,6 +369,103 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   const poRequestSenderName = profile?.full_name || 'user';
   const managerRequestCtaLabel = pendingInvoiceRequests.length > 0 ? 'Request Another Invoice' : 'Mark Ready To Invoice';
   const managerRequestControlsDisabled = !canManageInvoices || availableToRequest <= 0 || Boolean(pendingFullInvoiceRequest);
+  const currentDetailsSnapshot = buildDirtySnapshot({
+    poNumber,
+    poValue,
+    startDate,
+    startAlertDays,
+    completionStatus,
+    completionComments,
+    invoiceNumber,
+    invoiceAmount,
+    invoiceDate,
+    invoiceScope,
+    invoiceComments,
+    invoiceRequestAmount,
+    invoiceRequestDate,
+    invoiceRequestScope,
+    invoiceRequestComments,
+    selectedInvoiceRequestId,
+    invoiceMatchesRequest,
+    revisionType,
+    revisionNotes,
+  });
+  const isDetailsDirty = Boolean(
+    open
+    && quote
+    && detailsBaselineSnapshot
+    && currentDetailsSnapshot !== detailsBaselineSnapshot
+  );
+  const isPoRequestDirty = poRequestDialogOpen
+    && buildEmailSelectionSnapshot(poRequestRecipientEmails) !== poRequestBaselineSnapshot;
+  const isDuplicateDialogDirty = duplicateDialogOpen
+    && duplicateManagerProfileId !== duplicateBaselineSnapshot;
+  const isRamsDialogDirty = ramsDialogOpen
+    && ramsComments !== ramsBaselineSnapshot;
+  const {
+    contentRef: detailsDialogContentRef,
+    handleOpenChange: handleDetailsDialogOpenChange,
+    handleInteractOutside: handleDetailsDialogInteractOutside,
+    handleEscapeKeyDown: handleDetailsDialogEscapeKeyDown,
+    discard: discardDetailsDialog,
+  } = useDirtyDialogGuard({
+    isDirty: isDetailsDirty,
+    disabled: loading || actionLoading || uploadingAttachment,
+    onOpenChange: (isOpen) => {
+      if (!isOpen) onClose();
+    },
+  });
+  const {
+    contentRef: poRequestDialogContentRef,
+    handleOpenChange: handlePoRequestDialogOpenChange,
+    handleInteractOutside: handlePoRequestDialogInteractOutside,
+    handleEscapeKeyDown: handlePoRequestDialogEscapeKeyDown,
+    discard: discardPoRequestDialog,
+  } = useDirtyDialogGuard({
+    isDirty: isPoRequestDirty,
+    disabled: actionLoading,
+    onOpenChange: (isOpen) => {
+      setPoRequestDialogOpen(isOpen);
+      if (!isOpen) {
+        setPoRequestRecipientEmails([]);
+        setPoRequestBaselineSnapshot('');
+      }
+    },
+  });
+  const {
+    contentRef: duplicateDialogContentRef,
+    handleOpenChange: handleDuplicateDialogOpenChange,
+    handleInteractOutside: handleDuplicateDialogInteractOutside,
+    handleEscapeKeyDown: handleDuplicateDialogEscapeKeyDown,
+    discard: discardDuplicateDialog,
+  } = useDirtyDialogGuard({
+    isDirty: isDuplicateDialogDirty,
+    disabled: actionLoading,
+    onOpenChange: (isOpen) => {
+      setDuplicateDialogOpen(isOpen);
+      if (!isOpen) {
+        setDuplicateManagerProfileId('');
+        setDuplicateBaselineSnapshot('');
+      }
+    },
+  });
+  const {
+    contentRef: ramsDialogContentRef,
+    handleOpenChange: handleRamsDialogOpenChange,
+    handleInteractOutside: handleRamsDialogInteractOutside,
+    handleEscapeKeyDown: handleRamsDialogEscapeKeyDown,
+    discard: discardRamsDialog,
+  } = useDirtyDialogGuard({
+    isDirty: isRamsDialogDirty,
+    disabled: actionLoading,
+    onOpenChange: (isOpen) => {
+      setRamsDialogOpen(isOpen);
+      if (!isOpen) {
+        setRamsComments('');
+        setRamsBaselineSnapshot('');
+      }
+    },
+  });
 
   const groupedTimeline = useMemo(() => {
     const timeline = quote?.timeline ?? [];
@@ -494,6 +626,12 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   }
 
   const applyQuoteState = useCallback((nextQuote: Quote) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const nextInvoiceAmount = nextQuote.invoice_summary?.remainingBalance ? String(nextQuote.invoice_summary.remainingBalance) : '';
+    const nextInvoiceRequestAmount = nextQuote.invoice_summary?.availableToRequest ? String(nextQuote.invoice_summary.availableToRequest) : '';
+    const nextInvoiceRequestScope = nextQuote.invoice_summary?.availableToRequest === nextQuote.invoice_summary?.remainingBalance ? 'full' : 'partial';
+    const nextSelectedInvoiceRequestId = (nextQuote.invoice_requests || []).find(request => request.status === 'pending')?.id || '';
+
     setQuote(nextQuote);
     setPoNumber(nextQuote.po_number || '');
     setPoValue(nextQuote.po_value ? String(nextQuote.po_value) : '');
@@ -502,16 +640,18 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
     setCompletionStatus(nextQuote.completion_status === 'approved_in_part' ? 'approved_in_part' : 'approved_in_full');
     setCompletionComments(nextQuote.completion_comments || '');
     setInvoiceNumber('');
-    setInvoiceAmount(nextQuote.invoice_summary?.remainingBalance ? String(nextQuote.invoice_summary.remainingBalance) : '');
-    setInvoiceDate(new Date().toISOString().slice(0, 10));
+    setInvoiceAmount(nextInvoiceAmount);
+    setInvoiceDate(today);
     setInvoiceScope(nextQuote.invoice_summary?.remainingBalance === 0 ? 'partial' : 'full');
     setInvoiceComments('');
-    setInvoiceRequestAmount(nextQuote.invoice_summary?.availableToRequest ? String(nextQuote.invoice_summary.availableToRequest) : '');
-    setInvoiceRequestDate(new Date().toISOString().slice(0, 10));
-    setInvoiceRequestScope(nextQuote.invoice_summary?.availableToRequest === nextQuote.invoice_summary?.remainingBalance ? 'full' : 'partial');
+    setInvoiceRequestAmount(nextInvoiceRequestAmount);
+    setInvoiceRequestDate(today);
+    setInvoiceRequestScope(nextInvoiceRequestScope);
     setInvoiceRequestComments('');
-    setSelectedInvoiceRequestId((nextQuote.invoice_requests || []).find(request => request.status === 'pending')?.id || '');
+    setSelectedInvoiceRequestId(nextSelectedInvoiceRequestId);
     setInvoiceMatchesRequest(false);
+    setRevisionType('revision');
+    setRevisionNotes('');
     setDuplicateManagerProfileId(nextQuote.requester_id || '');
     setPoRequestRecipientEmails(buildQuoteRecipientOptions(nextQuote).map(option => option.email));
     setWorkflowError(null);
@@ -524,6 +664,27 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
     setDeleteError(null);
     setRemovingAttachmentId(null);
     setReplacingAttachmentId(null);
+    setDetailsBaselineSnapshot(buildDirtySnapshot({
+      poNumber: nextQuote.po_number || '',
+      poValue: nextQuote.po_value ? String(nextQuote.po_value) : '',
+      startDate: nextQuote.start_date || '',
+      startAlertDays: nextQuote.start_alert_days ? String(nextQuote.start_alert_days) : '',
+      completionStatus: nextQuote.completion_status === 'approved_in_part' ? 'approved_in_part' : 'approved_in_full',
+      completionComments: nextQuote.completion_comments || '',
+      invoiceNumber: '',
+      invoiceAmount: nextInvoiceAmount,
+      invoiceDate: today,
+      invoiceScope: nextQuote.invoice_summary?.remainingBalance === 0 ? 'partial' : 'full',
+      invoiceComments: '',
+      invoiceRequestAmount: nextInvoiceRequestAmount,
+      invoiceRequestDate: today,
+      invoiceRequestScope: nextInvoiceRequestScope,
+      invoiceRequestComments: '',
+      selectedInvoiceRequestId: nextSelectedInvoiceRequestId,
+      invoiceMatchesRequest: false,
+      revisionType: 'revision',
+      revisionNotes: '',
+    }));
   }, []);
 
   const selectQuoteVersion = useCallback((nextQuoteId: string) => {
@@ -595,6 +756,10 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
       setDuplicateManagerProfileId('');
       setPoRequestDialogOpen(false);
       setPoRequestRecipientEmails([]);
+      setDetailsBaselineSnapshot('');
+      setPoRequestBaselineSnapshot('');
+      setDuplicateBaselineSnapshot('');
+      setRamsBaselineSnapshot('');
     }
   }, [open]);
 
@@ -952,8 +1117,13 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
 
   return (
     <>
-    <Dialog open={open} onOpenChange={isOpen => { if (!isOpen) onClose(); }}>
-      <DialogContent className="w-[calc(100vw-2rem)] max-w-3xl xl:max-w-[60rem] max-h-[90vh] overflow-y-auto bg-slate-900 border-slate-700 text-white">
+    <Dialog open={open} onOpenChange={handleDetailsDialogOpenChange}>
+      <DialogContent
+        ref={detailsDialogContentRef}
+        className="w-[calc(100vw-2rem)] max-w-3xl xl:max-w-[60rem] max-h-[90vh] overflow-y-auto bg-slate-900 border-slate-700 text-white"
+        onInteractOutside={handleDetailsDialogInteractOutside}
+        onEscapeKeyDown={handleDetailsDialogEscapeKeyDown}
+      >
         <DialogHeader className="sr-only">
           <DialogTitle>Quote Details</DialogTitle>
         </DialogHeader>
@@ -963,7 +1133,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
           <div className="space-y-4 py-8 text-center">
             <p className="text-sm text-red-200">{loadError || 'Unable to load quote details right now.'}</p>
             <div className="flex justify-center gap-2">
-              <Button variant="outline" onClick={onClose} className="border-slate-600 text-muted-foreground">
+              <Button variant="outline" onClick={discardDetailsDialog} className="border-slate-600 text-muted-foreground">
                 Close
               </Button>
               {quoteId ? (
@@ -1353,7 +1523,9 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                       <Button
                         variant="outline"
                         onClick={() => {
-                          setPoRequestRecipientEmails(poRequestRecipientOptions.map(option => option.email));
+                          const nextRecipients = poRequestRecipientOptions.map(option => option.email);
+                          setPoRequestRecipientEmails(nextRecipients);
+                          setPoRequestBaselineSnapshot(buildEmailSelectionSnapshot(nextRecipients));
                           setPoRequestDialogOpen(true);
                         }}
                         disabled={actionLoading || poRequestRecipientOptions.length === 0}
@@ -1364,7 +1536,11 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                     )}
                     {canTriggerRams && (
                       <Button
-                        onClick={() => setRamsDialogOpen(true)}
+                        onClick={() => {
+                          setRamsComments('');
+                          setRamsBaselineSnapshot('');
+                          setRamsDialogOpen(true);
+                        }}
                         disabled={actionLoading}
                         className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90"
                       >
@@ -1935,7 +2111,9 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                     <Button
                       variant="outline"
                       onClick={() => {
-                        setDuplicateManagerProfileId(quote.requester_id || '');
+                          const nextManagerId = quote.requester_id || '';
+                          setDuplicateManagerProfileId(nextManagerId);
+                          setDuplicateBaselineSnapshot(nextManagerId);
                         setDuplicateDialogOpen(true);
                       }}
                       disabled={actionLoading || !canCreateVersions}
@@ -2106,8 +2284,13 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
         )}
       </DialogContent>
     </Dialog>
-    <Dialog open={poRequestDialogOpen} onOpenChange={setPoRequestDialogOpen}>
-      <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto bg-slate-900 border-slate-700 text-white sm:max-w-2xl">
+    <Dialog open={poRequestDialogOpen} onOpenChange={handlePoRequestDialogOpenChange}>
+      <DialogContent
+        ref={poRequestDialogContentRef}
+        className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto bg-slate-900 border-slate-700 text-white sm:max-w-2xl"
+        onInteractOutside={handlePoRequestDialogInteractOutside}
+        onEscapeKeyDown={handlePoRequestDialogEscapeKeyDown}
+      >
         <DialogHeader>
           <DialogTitle>Request purchase order</DialogTitle>
           <DialogDescription className="text-muted-foreground">
@@ -2159,8 +2342,8 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setPoRequestDialogOpen(false)} className="border-slate-600 text-muted-foreground">
-            Cancel
+          <Button variant="outline" onClick={discardPoRequestDialog} className="border-slate-600 text-muted-foreground">
+            {isPoRequestDirty ? 'Discard Changes' : 'Cancel'}
           </Button>
           <Button
             onClick={() => void handlePoRequestEmail()}
@@ -2172,8 +2355,13 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
         </DialogFooter>
       </DialogContent>
     </Dialog>
-    <Dialog open={duplicateDialogOpen} onOpenChange={setDuplicateDialogOpen}>
-      <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto bg-slate-900 border-slate-700 text-white sm:max-w-lg">
+    <Dialog open={duplicateDialogOpen} onOpenChange={handleDuplicateDialogOpenChange}>
+      <DialogContent
+        ref={duplicateDialogContentRef}
+        className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto bg-slate-900 border-slate-700 text-white sm:max-w-lg"
+        onInteractOutside={handleDuplicateDialogInteractOutside}
+        onEscapeKeyDown={handleDuplicateDialogEscapeKeyDown}
+      >
         <DialogHeader>
           <DialogTitle>Duplicate quote</DialogTitle>
           <DialogDescription className="text-muted-foreground">
@@ -2205,8 +2393,8 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setDuplicateDialogOpen(false)} className="border-slate-600 text-muted-foreground">
-            Cancel
+          <Button variant="outline" onClick={discardDuplicateDialog} className="border-slate-600 text-muted-foreground">
+            {isDuplicateDialogDirty ? 'Discard Changes' : 'Cancel'}
           </Button>
           <Button onClick={() => void handleDuplicateQuote()} disabled={actionLoading} className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90">
             {actionLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Duplicating...</> : 'Duplicate quote'}
@@ -2214,8 +2402,13 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
         </DialogFooter>
       </DialogContent>
     </Dialog>
-    <Dialog open={ramsDialogOpen} onOpenChange={setRamsDialogOpen}>
-      <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto bg-slate-900 border-slate-700 text-white">
+    <Dialog open={ramsDialogOpen} onOpenChange={handleRamsDialogOpenChange}>
+      <DialogContent
+        ref={ramsDialogContentRef}
+        className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto bg-slate-900 border-slate-700 text-white"
+        onInteractOutside={handleRamsDialogInteractOutside}
+        onEscapeKeyDown={handleRamsDialogEscapeKeyDown}
+      >
         <DialogHeader>
           <DialogTitle>Trigger RAMS</DialogTitle>
           <DialogDescription className="text-muted-foreground">
@@ -2230,8 +2423,8 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
           className="bg-slate-800 border-slate-600"
         />
         <DialogFooter>
-          <Button variant="outline" onClick={() => setRamsDialogOpen(false)} className="border-slate-600 text-muted-foreground">
-            Cancel
+          <Button variant="outline" onClick={discardRamsDialog} className="border-slate-600 text-muted-foreground">
+            {isRamsDialogDirty ? 'Discard Changes' : 'Cancel'}
           </Button>
           <Button onClick={() => void handleTriggerRams()} disabled={actionLoading} className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90">
             {actionLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...</> : 'Send RAMS Request'}
