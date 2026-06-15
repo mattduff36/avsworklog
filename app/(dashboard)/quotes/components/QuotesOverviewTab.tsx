@@ -7,20 +7,45 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { SearchInput } from '@/components/ui/search-input';
 import { cn } from '@/lib/utils/cn';
 import { ArrowRight, CalendarDays, Clock, Coins, FileSearch, Receipt, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import type { QuoteOverviewItem, QuoteOverviewPayload, QuoteOverviewSummary } from '../overview-types';
 
-function getDefaultDateFrom(): string {
-  const date = new Date();
-  date.setDate(date.getDate() - 30);
-  return date.toISOString().slice(0, 10);
+function formatDateInput(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
-function getToday(): string {
-  return new Date().toISOString().slice(0, 10);
+function getPreviousWeekBounds(): { monday: string; sunday: string } {
+  const today = new Date();
+  const daysSinceMonday = (today.getDay() + 6) % 7;
+  const currentWeekMonday = new Date(today);
+  currentWeekMonday.setHours(0, 0, 0, 0);
+  currentWeekMonday.setDate(today.getDate() - daysSinceMonday);
+
+  const previousWeekMonday = new Date(currentWeekMonday);
+  previousWeekMonday.setDate(currentWeekMonday.getDate() - 7);
+
+  const previousWeekSunday = new Date(previousWeekMonday);
+  previousWeekSunday.setDate(previousWeekMonday.getDate() + 6);
+
+  return {
+    monday: formatDateInput(previousWeekMonday),
+    sunday: formatDateInput(previousWeekSunday),
+  };
+}
+
+function getDefaultDateFrom(): string {
+  return getPreviousWeekBounds().monday;
+}
+
+function getDefaultDateTo(): string {
+  return getPreviousWeekBounds().sunday;
 }
 
 function formatCurrency(value: number): string {
@@ -107,7 +132,7 @@ function RecentItemCard({ item, estimatedRate }: RecentItemCardProps) {
   return (
     <Link
       href={item.href}
-      className="group block rounded-lg border border-slate-700 bg-slate-950/60 p-3 transition hover:border-avs-yellow/50 hover:bg-slate-900"
+      className="group flex h-full min-h-[134px] flex-col rounded-lg border border-slate-700 bg-slate-950/60 p-3 transition hover:border-avs-yellow/50 hover:bg-slate-900"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -117,7 +142,7 @@ function RecentItemCard({ item, estimatedRate }: RecentItemCardProps) {
         </div>
         <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-slate-500 transition group-hover:translate-x-0.5 group-hover:text-avs-yellow" />
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+      <div className="mt-auto grid grid-cols-2 gap-2 pt-3 text-sm">
         <div>
           <p className="text-xs text-slate-500">Invoices</p>
           <p className="font-semibold text-emerald-200">{formatCurrency(item.invoice_total)}</p>
@@ -256,7 +281,7 @@ export function QuotesOverviewTab() {
   const [search, setSearch] = useState('');
   const [searchDropdownOpen, setSearchDropdownOpen] = useState(false);
   const [dateFrom, setDateFrom] = useState(getDefaultDateFrom);
-  const [dateTo, setDateTo] = useState(getToday);
+  const [dateTo, setDateTo] = useState(getDefaultDateTo);
   const [estimatedRateInput, setEstimatedRateInput] = useState('');
   const estimatedRate = useMemo(() => Number(estimatedRateInput || 0), [estimatedRateInput]);
   const hasSearchQuery = search.trim().length > 0;
@@ -317,6 +342,7 @@ export function QuotesOverviewTab() {
   const dateRangeSummary = payload?.date_range_summary;
   const recentItems = payload?.recent_items || [];
   const items = payload?.items || [];
+  const isInitialOverviewLoading = loading && !payload;
 
   return (
     <div className="space-y-6">
@@ -396,7 +422,9 @@ export function QuotesOverviewTab() {
             </div>
           </div>
 
-          {dateRangeSummary ? (
+          {isInitialOverviewLoading ? (
+            <PanelLoader message="Loading quotes overview..." className="py-10" />
+          ) : dateRangeSummary ? (
             <DateRangeSummary summary={dateRangeSummary} estimatedRate={estimatedRate} />
           ) : (
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -408,24 +436,26 @@ export function QuotesOverviewTab() {
         </CardContent>
       </Card>
 
-      <Card className="border-slate-700 bg-slate-950">
-        <CardHeader className="p-4 pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg text-white">
-            <CalendarDays className="h-5 w-5 text-avs-yellow" />
-            Most Recent
-          </CardTitle>
-          <p className="text-sm text-slate-400">Latest quote and job-number activity.</p>
-        </CardHeader>
-        <CardContent className="grid gap-2 p-4 pt-0 md:grid-cols-2 lg:grid-cols-4">
-          {recentItems.length > 0 ? recentItems.map(item => (
-            <RecentItemCard key={`${item.kind}-${item.reference}`} item={item} estimatedRate={estimatedRate} />
-          )) : (
-            <p className="rounded-lg border border-dashed border-slate-700 p-4 text-sm text-slate-400">
-              No recent quote or job activity found.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      {!isInitialOverviewLoading ? (
+        <Card className="border-slate-700 bg-slate-950">
+          <CardHeader className="p-4 pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg text-white">
+              <CalendarDays className="h-5 w-5 text-avs-yellow" />
+              Most Recent
+            </CardTitle>
+            <p className="text-sm text-slate-400">Latest quote and job-number activity.</p>
+          </CardHeader>
+          <CardContent className="grid gap-2 p-4 pt-0 md:grid-cols-2 lg:grid-cols-4">
+            {recentItems.length > 0 ? recentItems.map(item => (
+              <RecentItemCard key={`${item.kind}-${item.reference}`} item={item} estimatedRate={estimatedRate} />
+            )) : (
+              <p className="rounded-lg border border-dashed border-slate-700 p-4 text-sm text-slate-400">
+                No recent quote or job activity found.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }
