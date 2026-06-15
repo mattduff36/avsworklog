@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.14.1
+
+**GIT COMMIT MESSAGE**
+`fix(analytics): handle usage session insert races`
+
+**WHAT CHANGED**
+Handle usage session insert races.
+
+**COMMITS IN THIS RELEASE**
+- `fix(analytics): handle usage session insert races`
+
 ## 0626.14.0
 
 **GIT COMMIT MESSAGE**
