@@ -141,6 +141,8 @@ describe('GET /api/timesheets/job-codes', () => {
     ]);
     const legacyQuoteQuery = createLegacyQuoteQuery([
       { quote_reference: '4323-GH', customer_name: 'Omexom', title: 'ATV hire' },
+      { quote_reference: 'P500', customer_name: 'Arena Racing', title: 'Arena Racing' },
+      { quote_reference: 'WORKSHOP', customer_name: 'Internal Use Only', title: 'Workshop sales' },
       { quote_reference: '40001-GH', customer_name: 'Duplicate Legacy', title: 'Ignored duplicate' },
     ]);
     const projectNumberQuery = createProjectNumberQuery([
@@ -184,6 +186,20 @@ describe('GET /api/timesheets/job-codes', () => {
         label: '4323-GH',
         customerName: 'Omexom',
         quoteTitle: 'ATV hire',
+        source: 'legacy_quote',
+      },
+      {
+        value: 'P500',
+        label: 'P500',
+        customerName: 'Arena Racing',
+        quoteTitle: 'Arena Racing',
+        source: 'legacy_quote',
+      },
+      {
+        value: 'WORKSHOP',
+        label: 'WORKSHOP',
+        customerName: 'Internal Use Only',
+        quoteTitle: 'Workshop sales',
         source: 'legacy_quote',
       },
       {

@@ -4,8 +4,8 @@ import { createClient } from '@/lib/supabase/server';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import {
-  JOB_NUMBER_REGEX,
   QUOTE_JOB_NUMBER_REGEX,
+  normalizeCatalogJobCode,
   normalizeJobNumberInput,
 } from '@/lib/utils/timesheet-job-codes';
 
@@ -120,8 +120,8 @@ function mapJobCodeRowsToOptions(
   }
 
   for (const row of legacyRows) {
-    const reference = normalizeJobNumberInput(row.quote_reference || '');
-    if (!JOB_NUMBER_REGEX.test(reference)) continue;
+    const reference = normalizeCatalogJobCode(row.quote_reference || '');
+    if (!reference) continue;
 
     addOption(
       options,
@@ -177,7 +177,7 @@ export async function GET(request: NextRequest) {
 
     const admin = createAdminClient();
     const searchParams = request.nextUrl.searchParams;
-    const limit = Math.min(Math.max(Number.parseInt(searchParams.get('limit') || '2000', 10) || 2000, 1), 2500);
+    const limit = Math.min(Math.max(Number.parseInt(searchParams.get('limit') || '10000', 10) || 10000, 1), 10000);
     const query = searchParams.get('q') || '';
 
     const [quoteResult, legacyQuoteResult, projectNumberResult] = await Promise.all([
