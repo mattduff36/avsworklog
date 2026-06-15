@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.14.2
+
+**GIT COMMIT MESSAGE**
+`fix(timesheets): page job-code catalog results`
+
+**WHAT CHANGED**
+Page job-code catalog results.
+
+**COMMITS IN THIS RELEASE**
+- `fix(timesheets): page job-code catalog results`
+
 ## 0626.14.1
 
 **GIT COMMIT MESSAGE**
