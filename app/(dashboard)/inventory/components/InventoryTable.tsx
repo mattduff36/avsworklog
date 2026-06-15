@@ -6,19 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { LoadMorePagination } from '@/components/ui/load-more-pagination';
+import { MultiSelectFilter, type MultiSelectFilterOption } from '@/components/ui/multi-select-filter';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   ChevronDown,
   ChevronUp,
@@ -37,13 +31,20 @@ import {
   getInventoryCheckStatus,
   getInventoryDueDate,
 } from '../utils';
-import { formatInventoryCategoryLabel, type InventoryCheckStatus, type InventoryItem, type InventoryLocation, type InventoryRetireReason } from '../types';
+import {
+  INVENTORY_RETIRE_REASONS,
+  formatInventoryCategoryLabel,
+  type InventoryCheckStatus,
+  type InventoryItem,
+  type InventoryLocation,
+  type InventoryRetireReason,
+} from '../types';
 import { useLoadMorePagination } from '@/lib/hooks/useLoadMorePagination';
 
-type InventoryFilter = 'all' | InventoryCheckStatus | 'yard' | 'noloc';
 type SortField = 'item_number' | 'serial_number' | 'name' | 'location' | 'last_checked_at';
 type SortDir = 'asc' | 'desc';
-const ALL_LOCATIONS_FILTER = 'all';
+const NO_LOCATION_FILTER = '__no_location__';
+const INVENTORY_STATUS_FILTER_ORDER: InventoryCheckStatus[] = ['overdue', 'due_soon', 'needs_check', 'ok'];
 
 interface InventoryTableProps {
   items: InventoryItem[];
@@ -62,15 +63,6 @@ interface InventoryTableProps {
   showMinorPlantDetails?: boolean;
   retiredMode?: boolean;
 }
-
-const filters: Array<{ value: InventoryFilter; label: string }> = [
-  { value: 'all', label: 'All' },
-  { value: 'due_soon', label: 'Due Soon' },
-  { value: 'overdue', label: 'Overdue' },
-  { value: 'needs_check', label: 'Needs Check' },
-  { value: 'yard', label: 'Yard' },
-  { value: 'noloc', label: 'No Location' },
-];
 
 function getStatusBadgeClass(status: InventoryCheckStatus): string {
   if (status === 'overdue') return 'border-red-500/30 bg-red-500/10 text-red-300';
@@ -151,13 +143,24 @@ export function InventoryTable({
   retiredMode = false,
 }: InventoryTableProps) {
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<InventoryFilter>('all');
-  const [locationFilterId, setLocationFilterId] = useState(ALL_LOCATIONS_FILTER);
+  const [statusFilters, setStatusFilters] = useState<InventoryCheckStatus[]>([]);
+  const [categoryFilters, setCategoryFilters] = useState<string[]>([]);
+  const [locationFilters, setLocationFilters] = useState<string[]>([]);
+  const [retireReasonFilters, setRetireReasonFilters] = useState<InventoryRetireReason[]>([]);
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const showLocationFilter = Boolean(locationFilterLocations?.length);
   const showSerialNumberColumn = showMinorPlantDetails && items.some((item) => Boolean(item.minor_plant_detail?.serial_number));
-  const paginationKey = `${filter}:${locationFilterId}:${search.trim()}:${sortField}:${sortDir}:${items.length}`;
+  const paginationKey = [
+    statusFilters.join(','),
+    categoryFilters.join(','),
+    locationFilters.join(','),
+    retireReasonFilters.join(','),
+    search.trim(),
+    sortField,
+    sortDir,
+    items.length,
+  ].join(':');
 
   const filteredItems = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -168,11 +171,19 @@ export function InventoryTable({
       const checkStatus = getInventoryCheckStatus(item);
       const retireReason = item.retire_reason || '';
 
-      if (locationFilterId !== ALL_LOCATIONS_FILTER && item.location_id !== locationFilterId) return false;
+      if (categoryFilters.length > 0 && !categoryFilters.includes(item.category)) return false;
+
+      if (locationFilters.length > 0) {
+        const locationMatches = item.location_id
+          ? locationFilters.includes(item.location_id)
+          : locationFilters.includes(NO_LOCATION_FILTER);
+        if (!locationMatches) return false;
+      }
+
       if (!retiredMode) {
-        if (filter === 'yard' && locationName.toLowerCase() !== 'yard') return false;
-        if (filter === 'noloc' && item.location_id) return false;
-        if (filter !== 'all' && filter !== 'yard' && filter !== 'noloc' && checkStatus !== filter) return false;
+        if (statusFilters.length > 0 && !statusFilters.includes(checkStatus)) return false;
+      } else if (retireReasonFilters.length > 0) {
+        if (!item.retire_reason || !retireReasonFilters.includes(item.retire_reason)) return false;
       }
 
       if (!query) return true;
@@ -204,7 +215,7 @@ export function InventoryTable({
       const compare = String(aValue).localeCompare(String(bValue), undefined, { sensitivity: 'base' });
       return sortDir === 'asc' ? compare : -compare;
     });
-  }, [filter, items, locationFilterId, retiredMode, search, sortDir, sortField]);
+  }, [categoryFilters, items, locationFilters, retireReasonFilters, retiredMode, search, sortDir, sortField, statusFilters]);
 
   const {
     visibleItems,
@@ -215,6 +226,99 @@ export function InventoryTable({
     () => retiredMode ? [] : visibleItems.filter((item) => selectedItemIds.has(item.id)),
     [retiredMode, visibleItems, selectedItemIds]
   );
+  const statusFilterOptions = useMemo<MultiSelectFilterOption<InventoryCheckStatus>[]>(
+    () => {
+      const counts = items.reduce<Record<InventoryCheckStatus, number>>(
+        (acc, item) => {
+          const status = getInventoryCheckStatus(item);
+          acc[status] += 1;
+          return acc;
+        },
+        { ok: 0, due_soon: 0, overdue: 0, needs_check: 0 }
+      );
+
+      return INVENTORY_STATUS_FILTER_ORDER
+        .filter((status) => counts[status] > 0)
+        .map((status) => ({
+          value: status,
+          label: getCheckStatusLabel(status),
+          count: counts[status],
+        }));
+    },
+    [items]
+  );
+  const categoryFilterOptions = useMemo<MultiSelectFilterOption<string>[]>(
+    () => {
+      const counts = items.reduce<Record<string, number>>((acc, item) => {
+        acc[item.category] = (acc[item.category] || 0) + 1;
+        return acc;
+      }, {});
+
+      return Object.entries(counts)
+        .map(([category, count]) => ({
+          value: category,
+          label: formatInventoryCategoryLabel(category, categoryLabels),
+          count,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+    },
+    [categoryLabels, items]
+  );
+  const locationFilterOptions = useMemo<MultiSelectFilterOption<string>[]>(
+    () => {
+      const counts = items.reduce<Record<string, number>>((acc, item) => {
+        const key = item.location_id || NO_LOCATION_FILTER;
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      }, {});
+      const options = (locationFilterLocations || [])
+        .filter((location) => (counts[location.id] || 0) > 0)
+        .map((location) => ({
+          value: location.id,
+          label: formatInventoryLocationOptionLabel(location),
+          count: counts[location.id] || 0,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+
+      if ((counts[NO_LOCATION_FILTER] || 0) > 0) {
+        options.push({
+          value: NO_LOCATION_FILTER,
+          label: 'No Location',
+          count: counts[NO_LOCATION_FILTER],
+        });
+      }
+
+      return options;
+    },
+    [items, locationFilterLocations]
+  );
+  const retireReasonFilterOptions = useMemo<MultiSelectFilterOption<InventoryRetireReason>[]>(
+    () => {
+      const counts = items.reduce<Record<InventoryRetireReason, number>>(
+        (acc, item) => {
+          if (item.retire_reason) acc[item.retire_reason] += 1;
+          return acc;
+        },
+        { Sold: 0, Scrapped: 0, Lost: 0, Damaged: 0, Returned: 0, Other: 0 }
+      );
+
+      return INVENTORY_RETIRE_REASONS
+        .filter((reason) => counts[reason] > 0)
+        .map((reason) => ({
+          value: reason,
+          label: reason,
+          count: counts[reason],
+        }));
+    },
+    [items]
+  );
+  const showCategoryFilter = categoryFilterOptions.length > 1;
+  const hasAnyFilters =
+    statusFilters.length > 0 ||
+    categoryFilters.length > 0 ||
+    locationFilters.length > 0 ||
+    retireReasonFilters.length > 0;
+  const hasSearchOrFilters = Boolean(search.trim()) || hasAnyFilters;
 
   useEffect(() => {
     if (retiredMode) return;
@@ -261,6 +365,13 @@ export function InventoryTable({
     onSelectedItemIdsChange(next);
   }
 
+  function clearFilters() {
+    setStatusFilters([]);
+    setCategoryFilters([]);
+    setLocationFilters([]);
+    setRetireReasonFilters([]);
+  }
+
   const allVisibleSelected = !retiredMode && visibleItems.length > 0 && visibleItems.every((item) => selectedItemIds.has(item.id));
   const emptyColSpan = (showSerialNumberColumn ? 8 : 7) - (retiredMode ? 1 : 0);
 
@@ -290,52 +401,64 @@ export function InventoryTable({
         ) : null}
       </div>
 
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        {!retiredMode ? (
-          <div className="space-y-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Inventory Filters</p>
-            <div className="flex flex-wrap gap-2">
-              {filters.map((filterOption) => (
-                <Button
-                  key={filterOption.value}
-                  variant={filter === filterOption.value ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setFilter(filterOption.value)}
-                  className={filter === filterOption.value
-                    ? 'bg-inventory text-white hover:bg-inventory-dark'
-                    : 'border-slate-600 text-muted-foreground hover:bg-slate-700/50'
-                  }
-                >
-                  {filterOption.label}
-                </Button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Retired Items</p>
-            <p className="text-sm text-muted-foreground">Search retired inventory by ID, name, location, or retirement reason.</p>
-          </div>
-        )}
+      <div className="flex flex-col gap-2 lg:items-end">
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Filters</p>
+        <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:justify-end">
+          {hasAnyFilters ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={clearFilters}
+              className="border-slate-600 text-muted-foreground hover:bg-slate-700/50"
+            >
+              Reset Filters
+            </Button>
+          ) : null}
 
-        {showLocationFilter ? (
-          <div className="w-full space-y-2 lg:w-72">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Select Location Bin</p>
-            <Select value={locationFilterId} onValueChange={setLocationFilterId}>
-              <SelectTrigger className="border-slate-600 bg-slate-800 text-white">
-                <SelectValue placeholder="All" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL_LOCATIONS_FILTER}>All</SelectItem>
-                {(locationFilterLocations || []).map((location) => (
-                  <SelectItem key={location.id} value={location.id}>
-                    {formatInventoryLocationOptionLabel(location)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ) : null}
+          {!retiredMode && statusFilterOptions.length > 0 ? (
+            <MultiSelectFilter
+              label="Check Status"
+              allLabel="All status"
+              selectedValues={statusFilters}
+              options={statusFilterOptions}
+              onSelectedValuesChange={setStatusFilters}
+              triggerClassName="sm:w-[170px]"
+            />
+          ) : null}
+
+          {showCategoryFilter ? (
+            <MultiSelectFilter
+              label="Category"
+              allLabel="All categories"
+              selectedValues={categoryFilters}
+              options={categoryFilterOptions}
+              onSelectedValuesChange={setCategoryFilters}
+              triggerClassName="sm:w-[170px]"
+            />
+          ) : null}
+
+          {retiredMode && retireReasonFilterOptions.length > 0 ? (
+            <MultiSelectFilter
+              label="Retire Reason"
+              allLabel="All reasons"
+              selectedValues={retireReasonFilters}
+              options={retireReasonFilterOptions}
+              onSelectedValuesChange={setRetireReasonFilters}
+              triggerClassName="sm:w-[170px]"
+            />
+          ) : null}
+
+          {showLocationFilter && locationFilterOptions.length > 0 ? (
+            <MultiSelectFilter
+              label="Location"
+              allLabel="All locations"
+              selectedValues={locationFilters}
+              options={locationFilterOptions}
+              onSelectedValuesChange={setLocationFilters}
+              triggerClassName="sm:w-[240px]"
+            />
+          ) : null}
+        </div>
       </div>
 
       <div className="hidden overflow-hidden rounded-lg border border-slate-700 md:block">
@@ -376,7 +499,7 @@ export function InventoryTable({
             {filteredItems.length === 0 ? (
               <tr>
                 <td colSpan={emptyColSpan} className="py-12 text-center text-muted-foreground">
-                  {search ? `No ${tableLabel} items match your search.` : `No ${tableLabel} items found.`}
+                  {hasSearchOrFilters ? `No ${tableLabel} items match your search or filters.` : `No ${tableLabel} items found.`}
                 </td>
               </tr>
             ) : (
@@ -472,7 +595,7 @@ export function InventoryTable({
       <div className="space-y-3 md:hidden">
         {filteredItems.length === 0 ? (
           <div className="py-12 text-center text-muted-foreground">
-            {search ? `No ${tableLabel} items match your search.` : `No ${tableLabel} items found.`}
+            {hasSearchOrFilters ? `No ${tableLabel} items match your search or filters.` : `No ${tableLabel} items found.`}
           </div>
         ) : (
           visibleItems.map((item) => {
