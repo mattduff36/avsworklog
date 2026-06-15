@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.12.0
+
+**GIT COMMIT MESSAGE**
+`feat(timesheets): update timesheet workflow`
+
+**WHAT CHANGED**
+Update timesheet workflow.
+
+**COMMITS IN THIS RELEASE**
+- `feat(timesheets): update timesheet workflow`
+
 ## 0626.11.0
 
 **GIT COMMIT MESSAGE**
