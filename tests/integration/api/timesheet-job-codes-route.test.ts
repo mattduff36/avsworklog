@@ -53,41 +53,52 @@ interface ProjectNumberJobCodeTestRow {
   description: string | null;
 }
 
-function createQuoteQuery(rows: QuoteJobCodeTestRow[]) {
-  const result = { data: rows, error: null };
-  const limit = vi.fn().mockResolvedValue(result);
-  const order = vi.fn().mockReturnValue({ limit });
+function normalizePages<T>(rowsOrPages: T[] | T[][]): T[][] {
+  if (Array.isArray(rowsOrPages[0])) return rowsOrPages as T[][];
+  return [rowsOrPages as T[]];
+}
+
+function createRangeMock<T>(rowsOrPages: T[] | T[][]) {
+  const range = vi.fn();
+  for (const rows of normalizePages(rowsOrPages)) {
+    range.mockResolvedValueOnce({ data: rows, error: null });
+  }
+  range.mockResolvedValue({ data: [], error: null });
+  return range;
+}
+
+function createQuoteQuery(rowsOrPages: QuoteJobCodeTestRow[] | QuoteJobCodeTestRow[][]) {
+  const range = createRangeMock(rowsOrPages);
+  const order = vi.fn().mockReturnValue({ range });
   const query = {
     eq: vi.fn().mockReturnThis(),
     in: vi.fn().mockReturnThis(),
     order,
   };
 
-  return { query, order, limit };
+  return { query, order, range };
 }
 
-function createLegacyQuoteQuery(rows: LegacyQuoteJobCodeTestRow[]) {
-  const result = { data: rows, error: null };
-  const limit = vi.fn().mockResolvedValue(result);
-  const order = vi.fn().mockReturnValue({ limit });
+function createLegacyQuoteQuery(rowsOrPages: LegacyQuoteJobCodeTestRow[] | LegacyQuoteJobCodeTestRow[][]) {
+  const range = createRangeMock(rowsOrPages);
+  const order = vi.fn().mockReturnValue({ range });
   const query = {
     not: vi.fn().mockReturnThis(),
     order,
   };
 
-  return { query, order, limit };
+  return { query, order, range };
 }
 
-function createProjectNumberQuery(rows: ProjectNumberJobCodeTestRow[]) {
-  const result = { data: rows, error: null };
-  const limit = vi.fn().mockResolvedValue(result);
-  const order = vi.fn().mockReturnValue({ limit });
+function createProjectNumberQuery(rowsOrPages: ProjectNumberJobCodeTestRow[] | ProjectNumberJobCodeTestRow[][]) {
+  const range = createRangeMock(rowsOrPages);
+  const order = vi.fn().mockReturnValue({ range });
   const query = {
     eq: vi.fn().mockReturnThis(),
     order,
   };
 
-  return { query, order, limit };
+  return { query, order, range };
 }
 
 describe('GET /api/timesheets/job-codes', () => {
@@ -226,6 +237,54 @@ describe('GET /api/timesheets/job-codes', () => {
     ]);
     expect(legacyQuoteQuery.query.not).toHaveBeenCalledWith('quote_reference', 'is', null);
     expect(projectNumberQuery.query.eq).toHaveBeenCalledWith('status', 'open');
+  });
+
+  it('paginates legacy job codes so codes beyond the first Supabase page are searchable', async () => {
+    const quoteQuery = createQuoteQuery([]);
+    const legacyQuoteQuery = createLegacyQuoteQuery([
+      Array.from({ length: 1_000 }, (_, index) => ({
+        quote_reference: `1000-AA-${index}`,
+        customer_name: 'Earlier legacy row',
+        title: 'Earlier page',
+      })),
+      [
+        {
+          quote_reference: '5388-LC',
+          customer_name: 'Saint Gobain East Leake',
+          title: 'day works',
+        },
+      ],
+    ]);
+    const projectNumberQuery = createProjectNumberQuery([]);
+    const from = vi.fn((table: string) => ({
+      select: vi.fn(() => {
+        if (table === 'quotes') return quoteQuery.query;
+        if (table === 'legacy_quotes') return legacyQuoteQuery.query;
+        if (table === 'quote_project_numbers') return projectNumberQuery.query;
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    }));
+
+    mockCreateAdminClient.mockReturnValue({
+      from,
+    });
+
+    const { GET } = await import('@/app/api/timesheets/job-codes/route');
+    const response = await GET(new NextRequest('http://localhost/api/timesheets/job-codes?q=5388'));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.job_codes).toEqual([
+      {
+        value: '5388-LC',
+        label: '5388-LC',
+        customerName: 'Saint Gobain East Leake',
+        quoteTitle: 'day works',
+        source: 'legacy_quote',
+      },
+    ]);
+    expect(legacyQuoteQuery.range).toHaveBeenNthCalledWith(1, 0, 999);
+    expect(legacyQuoteQuery.range).toHaveBeenNthCalledWith(2, 1000, 1999);
   });
 
   it('requires timesheets access', async () => {

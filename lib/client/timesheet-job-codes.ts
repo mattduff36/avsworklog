@@ -32,8 +32,7 @@ async function fetchTimesheetJobCodeOptions(): Promise<TimesheetJobCodeOption[]>
 }
 
 function loadTimesheetJobCodeOptions(): Promise<TimesheetJobCodeOption[]> {
-  if (cachedJobCodeOptions) return Promise.resolve(cachedJobCodeOptions);
-
+  // Always refresh once per mounted consumer so data repairs in Supabase are picked up without a hard browser restart.
   pendingJobCodeOptions ||= fetchTimesheetJobCodeOptions()
     .then((options) => {
       cachedJobCodeOptions = options;
@@ -48,7 +47,7 @@ function loadTimesheetJobCodeOptions(): Promise<TimesheetJobCodeOption[]> {
 
 export function useTimesheetJobCodeOptions() {
   const [options, setOptions] = useState<TimesheetJobCodeOption[]>(cachedJobCodeOptions || []);
-  const [isLoading, setIsLoading] = useState(!cachedJobCodeOptions);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {

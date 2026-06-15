@@ -21,6 +21,8 @@ const SENT_ONWARDS_QUOTE_STATUSES = [
   'invoiced',
 ] as const;
 
+const JOB_CODE_FETCH_PAGE_SIZE = 1_000;
+
 interface QuoteJobCodeCustomer {
   status: string | null;
   company_name: string | null;
@@ -158,6 +160,94 @@ function mapJobCodeRowsToOptions(
   return options;
 }
 
+async function fetchQuoteJobCodeRows(admin: ReturnType<typeof createAdminClient>, limit: number): Promise<QuoteJobCodeRow[]> {
+  const rows: QuoteJobCodeRow[] = [];
+
+  while (rows.length < limit) {
+    const pageLimit = Math.min(JOB_CODE_FETCH_PAGE_SIZE, limit - rows.length);
+    const from = rows.length;
+    const to = from + pageLimit - 1;
+    const result = await admin
+      .from('quotes')
+      .select(`
+        base_quote_reference,
+        quote_reference,
+        subject_line,
+        project_description,
+        site_address,
+        customer:customers!inner(status, company_name)
+      `)
+      .eq('is_latest_version', true)
+      .eq('commercial_status', 'open')
+      .in('status', SENT_ONWARDS_QUOTE_STATUSES)
+      .eq('customer.status', 'active')
+      .order('base_quote_reference', { ascending: true })
+      .range(from, to);
+
+    if (result.error) throw result.error;
+
+    const pageRows = (result.data || []) as QuoteJobCodeRow[];
+    rows.push(...pageRows);
+    if (pageRows.length < pageLimit) break;
+  }
+
+  return rows;
+}
+
+async function fetchLegacyQuoteJobCodeRows(
+  admin: ReturnType<typeof createAdminClient>,
+  limit: number
+): Promise<LegacyQuoteJobCodeRow[]> {
+  const rows: LegacyQuoteJobCodeRow[] = [];
+
+  while (rows.length < limit) {
+    const pageLimit = Math.min(JOB_CODE_FETCH_PAGE_SIZE, limit - rows.length);
+    const from = rows.length;
+    const to = from + pageLimit - 1;
+    const result = await admin
+      .from('legacy_quotes')
+      .select('quote_reference, customer_name, title')
+      .not('quote_reference', 'is', null)
+      .order('quote_reference', { ascending: true })
+      .range(from, to);
+
+    if (result.error) throw result.error;
+
+    const pageRows = (result.data || []) as LegacyQuoteJobCodeRow[];
+    rows.push(...pageRows);
+    if (pageRows.length < pageLimit) break;
+  }
+
+  return rows;
+}
+
+async function fetchProjectNumberJobCodeRows(
+  admin: ReturnType<typeof createAdminClient>,
+  limit: number
+): Promise<ProjectNumberJobCodeRow[]> {
+  const rows: ProjectNumberJobCodeRow[] = [];
+
+  while (rows.length < limit) {
+    const pageLimit = Math.min(JOB_CODE_FETCH_PAGE_SIZE, limit - rows.length);
+    const from = rows.length;
+    const to = from + pageLimit - 1;
+    const result = await admin
+      .from('quote_project_numbers')
+      .select('project_reference, title, description')
+      .eq('status', 'open')
+      .order('project_reference', { ascending: true })
+      .range(from, to);
+
+    if (result.error) throw result.error;
+
+    const pageRows = (result.data || []) as ProjectNumberJobCodeRow[];
+    rows.push(...pageRows);
+    if (pageRows.length < pageLimit) break;
+  }
+
+  return rows;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -180,46 +270,17 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(Math.max(Number.parseInt(searchParams.get('limit') || '10000', 10) || 10000, 1), 10000);
     const query = searchParams.get('q') || '';
 
-    const [quoteResult, legacyQuoteResult, projectNumberResult] = await Promise.all([
-      admin
-        .from('quotes')
-        .select(`
-          base_quote_reference,
-          quote_reference,
-          subject_line,
-          project_description,
-          site_address,
-          customer:customers!inner(status, company_name)
-        `)
-        .eq('is_latest_version', true)
-        .eq('commercial_status', 'open')
-        .in('status', SENT_ONWARDS_QUOTE_STATUSES)
-        .eq('customer.status', 'active')
-        .order('base_quote_reference', { ascending: true })
-        .limit(limit),
-      admin
-        .from('legacy_quotes')
-        .select('quote_reference, customer_name, title')
-        .not('quote_reference', 'is', null)
-        .order('quote_reference', { ascending: true })
-        .limit(limit),
-      admin
-        .from('quote_project_numbers')
-        .select('project_reference, title, description')
-        .eq('status', 'open')
-        .order('project_reference', { ascending: true })
-        .limit(limit),
+    const [quoteRows, legacyQuoteRows, projectNumberRows] = await Promise.all([
+      fetchQuoteJobCodeRows(admin, limit),
+      fetchLegacyQuoteJobCodeRows(admin, limit),
+      fetchProjectNumberJobCodeRows(admin, limit),
     ]);
-
-    if (quoteResult.error) throw quoteResult.error;
-    if (legacyQuoteResult.error) throw legacyQuoteResult.error;
-    if (projectNumberResult.error) throw projectNumberResult.error;
 
     return NextResponse.json({
       job_codes: mapJobCodeRowsToOptions(
-        (quoteResult.data || []) as QuoteJobCodeRow[],
-        (legacyQuoteResult.data || []) as LegacyQuoteJobCodeRow[],
-        (projectNumberResult.data || []) as ProjectNumberJobCodeRow[],
+        quoteRows,
+        legacyQuoteRows,
+        projectNumberRows,
         query
       ),
     });
