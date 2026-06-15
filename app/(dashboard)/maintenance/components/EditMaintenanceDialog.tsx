@@ -348,7 +348,7 @@ export function EditMaintenanceDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent 
         ref={dialogContentRef}
-        className="border-border text-white w-full max-w-full md:max-w-2xl h-full md:h-auto max-h-screen md:max-h-[90vh] overflow-y-auto p-4 md:p-6"
+        className="border-border text-white w-full max-w-full md:max-w-2xl h-full md:h-auto max-h-dvh md:max-h-[90dvh] overflow-y-auto p-4 md:p-6"
         onInteractOutside={(e) => {
           // Prevent closing when clicking outside if form has changes
           if (isDirty) {

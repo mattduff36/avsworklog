@@ -551,15 +551,23 @@ export default function HelpPage() {
     }
   };
 
-  // Render markdown content (simple version)
+  function escapeHtml(value: string) {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  // Render a small, controlled markdown subset after escaping raw HTML.
   const renderMarkdown = (content: string) => {
-    // Simple markdown to HTML conversion
-    return content
+    return escapeHtml(content)
       .replace(/^### (.*$)/gim, '<h3 class="text-lg font-semibold mt-4 mb-2 text-foreground">$1</h3>')
       .replace(/^## (.*$)/gim, '<h2 class="text-xl font-semibold mt-6 mb-3 text-foreground">$1</h2>')
       .replace(/^# (.*$)/gim, '<h1 class="text-2xl font-bold mt-6 mb-4 text-foreground">$1</h1>')
-      .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
-      .replace(/\*(.*)\*/gim, '<em>$1</em>')
+      .replace(/\*\*([^*\n]+)\*\*/gim, '<strong>$1</strong>')
+      .replace(/\*([^*\n]+)\*/gim, '<em>$1</em>')
       .replace(/^- (.*$)/gim, '<li class="ml-4">$1</li>')
       .replace(/^(\d+)\. (.*$)/gim, '<li class="ml-4">$2</li>')
       .replace(/\n\n/g, '</p><p class="mb-3 text-foreground">')

@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { TOOLBOX_TALK_MANUAL_REMINDER_WORKFLOW_KEY } from '@/lib/config/reminder-workflows';
-import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { parseReportDateRange } from '@/lib/server/report-date-range';
+import { getReportScopeContext, getScopedProfileIdsForModule } from '@/lib/server/report-scope';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import type { GetReportsResponse, MessageDisplayPriority, MessageRecipientStatus, MessageReportData } from '@/types/messages';
 import type { MessageType } from '@/types/messages';
 import type { NotificationModuleKey } from '@/types/notifications';
@@ -73,9 +75,13 @@ function isWithinDateRange(value: string | null | undefined, dateFrom: string | 
   if (!value) return false;
   const timestamp = new Date(value).getTime();
   if (Number.isNaN(timestamp)) return false;
-  if (dateFrom && timestamp < new Date(dateFrom).getTime()) return false;
-  if (dateTo && timestamp > new Date(dateTo).getTime()) return false;
+  if (dateFrom && timestamp < new Date(`${dateFrom}T00:00:00.000Z`).getTime()) return false;
+  if (dateTo && timestamp > new Date(`${dateTo}T23:59:59.999Z`).getTime()) return false;
   return true;
+}
+
+function isAllowedType(value: string | null): value is MessageType {
+  return value === 'TOOLBOX_TALK' || value === 'REMINDER' || value === 'NOTIFICATION';
 }
 
 export function isToolboxTalksOverviewMessage(message: {
@@ -115,20 +121,41 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user is manager/admin
-    const profile = await getProfileWithRole(user.id);
+    const [canAccessReports, canAccessToolboxTalks] = await Promise.all([
+      canEffectiveRoleAccessModule('reports'),
+      canEffectiveRoleAccessModule('toolbox-talks'),
+    ]);
 
-    if (!profile || !profile.role?.is_manager_admin) {
-      return NextResponse.json({ error: 'Forbidden: Manager/Admin access required' }, { status: 403 });
+    if (!canAccessReports || !canAccessToolboxTalks) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // Parse query parameters for filtering
     const { searchParams } = new URL(request.url);
-    const dateFrom = searchParams.get('dateFrom');
-    const dateTo = searchParams.get('dateTo');
+    const { range, error: dateRangeError } = parseReportDateRange(searchParams);
+    if (dateRangeError || !range) {
+      return NextResponse.json({ error: dateRangeError || 'Invalid date range.' }, { status: 400 });
+    }
+
+    const { dateFrom, dateTo } = range;
     const senderId = searchParams.get('sender_id');
     const type = searchParams.get('type'); // 'TOOLBOX_TALK', 'REMINDER', or 'NOTIFICATION'
     const status = searchParams.get('status'); // 'all', 'signed', 'pending'
+
+    if (type && !isAllowedType(type)) {
+      return NextResponse.json({ error: 'Invalid message type.' }, { status: 400 });
+    }
+    const messageType = type && isAllowedType(type) ? type : null;
+
+    if (status && !['all', 'signed', 'pending'].includes(status)) {
+      return NextResponse.json({ error: 'Invalid status filter.' }, { status: 400 });
+    }
+
+    const scopeContext = await getReportScopeContext();
+    const scopedProfileIds = await getScopedProfileIdsForModule('toolbox-talks', scopeContext);
+    if (scopedProfileIds && scopedProfileIds.size === 0) {
+      return NextResponse.json({ success: true, messages: [] } satisfies GetReportsResponse);
+    }
 
     // Build query for messages
     let messagesQuery = supabase
@@ -158,10 +185,10 @@ export async function GET(request: NextRequest) {
 
     // Apply filters
     if (dateFrom) {
-      messagesQuery = messagesQuery.gte('created_at', dateFrom);
+      messagesQuery = messagesQuery.gte('created_at', `${dateFrom}T00:00:00.000Z`);
     }
     if (dateTo) {
-      messagesQuery = messagesQuery.lte('created_at', dateTo);
+      messagesQuery = messagesQuery.lte('created_at', `${dateTo}T23:59:59.999Z`);
     }
     if (senderId) {
       messagesQuery = messagesQuery.eq('sender_id', senderId);
@@ -169,8 +196,8 @@ export async function GET(request: NextRequest) {
     
     // Type filter keeps the query bounded; module-origin filtering below removes
     // notifications/reminders created by other modules.
-    if (type && ['TOOLBOX_TALK', 'REMINDER', 'NOTIFICATION'].includes(type)) {
-      messagesQuery = messagesQuery.eq('type', type as MessageType);
+    if (messageType) {
+      messagesQuery = messagesQuery.eq('type', messageType);
     } else {
       messagesQuery = messagesQuery.in('type', TOOLBOX_OVERVIEW_TYPES);
     }
@@ -188,7 +215,7 @@ export async function GET(request: NextRequest) {
 
     for (const message of overviewMessages) {
       // Fetch all recipients for this message
-      const recipientsQuery = supabase
+      let recipientsQuery = supabase
         .from('message_recipients')
         .select(`
           id,
@@ -204,6 +231,10 @@ export async function GET(request: NextRequest) {
         `)
         .eq('message_id', message.id)
         .order('created_at', { ascending: true });
+
+      if (scopedProfileIds) {
+        recipientsQuery = recipientsQuery.in('user_id', Array.from(scopedProfileIds));
+      }
 
       const { data: recipients, error: recipientsError } = await recipientsQuery;
 
@@ -285,7 +316,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (!type || type === 'REMINDER') {
-      const { data: manualReminderRows, error: manualReminderError } = await admin
+      let manualReminderQuery = admin
         .from('reminders')
         .select(`
           id,
@@ -319,6 +350,11 @@ export async function GET(request: NextRequest) {
         .eq('action.workflow_key', TOOLBOX_TALK_MANUAL_REMINDER_WORKFLOW_KEY)
         .order('created_at', { ascending: true });
 
+      if (scopedProfileIds) {
+        manualReminderQuery = manualReminderQuery.in('assigned_to', Array.from(scopedProfileIds));
+      }
+
+      const { data: manualReminderRows, error: manualReminderError } = await manualReminderQuery;
       if (manualReminderError) {
         console.error('Error fetching manual reminders:', manualReminderError);
         throw manualReminderError;
@@ -432,9 +468,7 @@ export async function GET(request: NextRequest) {
         endpoint: '/api/messages/reports',
       },
     });
-    return NextResponse.json({ 
-      error: error instanceof Error ? error.message : 'Internal server error' 
-    }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 

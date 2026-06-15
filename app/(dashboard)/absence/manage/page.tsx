@@ -167,14 +167,30 @@ export default function AdminAbsencePage() {
   const [activeTab, setActiveTab] = useState<ManageTab>('overview');
   
   // Data
-  const { data: absences, isLoading } = useAllAbsences({ 
-    profileId, 
-    dateFrom, 
-    dateTo, 
-    reasonId, 
+  const shouldLoadManageAbsences = Boolean(
+    canOpenManagePage &&
+      !authLoading &&
+      !absencePermissionLoading &&
+      !isAbsenceSecondaryContextLoading &&
+      (activeTab === 'calendar' || activeTab === 'overview')
+  );
+  const absenceFilters = useMemo(() => shouldLoadManageAbsences ? {
+    profileId,
+    dateFrom,
+    dateTo,
+    reasonId,
     status,
     includeArchived,
-  });
+  } : undefined, [
+    shouldLoadManageAbsences,
+    profileId,
+    dateFrom,
+    dateTo,
+    reasonId,
+    status,
+    includeArchived,
+  ]);
+  const { data: absences, isLoading } = useAllAbsences(absenceFilters);
   const actorProfileId = profile?.id || '';
   const scopedAbsences = useMemo(() => {
     return (absences || []).filter((absence) => {

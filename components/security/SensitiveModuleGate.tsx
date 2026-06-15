@@ -837,7 +837,7 @@ export function SensitiveModuleGate({
   return (
     <>
     <div
-      className={`flex min-h-[calc(100dvh_-_var(--top-nav-h,68px)_-_1rem)] items-start justify-center overflow-y-auto px-4 pt-4 transition-[padding] sm:min-h-[calc(100vh-11rem)] ${
+      className={`flex min-h-[calc(100dvh_-_var(--top-nav-h,68px)_-_1rem)] items-start justify-center overflow-y-auto px-4 pt-4 transition-[padding] sm:min-h-[calc(100dvh-11rem)] ${
         customKeypadVisible
           ? 'pb-[calc(21rem+env(safe-area-inset-bottom,0px))] sm:items-start sm:pb-[calc(22rem+env(safe-area-inset-bottom,0px))] sm:pt-8'
           : 'pb-8 sm:items-center sm:py-8'

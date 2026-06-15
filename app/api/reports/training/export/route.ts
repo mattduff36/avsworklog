@@ -5,6 +5,33 @@ import { logServerError } from '@/lib/utils/server-error-logger';
 import { generateExcelFile } from '@/lib/utils/excel';
 import type { TrainingRecordWithRelations } from '@/types/training';
 
+const TRAINING_EXPORT_PAGE_SIZE = 1000;
+const TRAINING_EXPORT_MAX_ROWS = 5000;
+const TRAINING_EXPORT_SELECT = `
+  employee_name_raw,
+  qualification_raw,
+  qualification_canonical_proposed,
+  qualification_validation_status,
+  qualification_group,
+  relationship,
+  card_number,
+  card_type_or_status,
+  approved,
+  issue_date,
+  issue_raw,
+  expiry_date,
+  expiry_raw,
+  cpcs_statuses,
+  cpcs_status_meanings,
+  comments,
+  record_status,
+  source_sheet,
+  source_row,
+  source_record_id,
+  person:training_people(id, employee_key, employee_name_raw, profile_id, profile_match_status),
+  qualification:training_qualifications(id, qualification_key, canonical_name, validation_status)
+`;
+
 function formatDate(value: string | null): string {
   if (!value) return '';
   const date = new Date(`${value}T00:00:00`);
@@ -25,24 +52,39 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const statusParam = searchParams.get('status');
-    let query = createAdminClient()
-      .from('training_records')
-      .select(`
-        *,
-        person:training_people(id, employee_key, employee_name_raw, profile_id, profile_match_status),
-        qualification:training_qualifications(id, qualification_key, canonical_name, validation_status)
-      `)
-      .order('employee_name_raw', { ascending: true })
-      .order('expiry_date', { ascending: true, nullsFirst: false });
+    const admin = createAdminClient();
+    const records: TrainingRecordWithRelations[] = [];
+    let offset = 0;
 
-    if (statusParam === 'active' || statusParam === 'archived') {
-      query = query.eq('record_status', statusParam);
+    while (records.length <= TRAINING_EXPORT_MAX_ROWS) {
+      let query = admin
+        .from('training_records')
+        .select(TRAINING_EXPORT_SELECT)
+        .order('employee_name_raw', { ascending: true })
+        .order('expiry_date', { ascending: true, nullsFirst: false })
+        .range(offset, offset + TRAINING_EXPORT_PAGE_SIZE - 1);
+
+      if (statusParam === 'active' || statusParam === 'archived') {
+        query = query.eq('record_status', statusParam);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const pageRecords = (data || []) as unknown as TrainingRecordWithRelations[];
+      records.push(...pageRecords);
+      if (pageRecords.length < TRAINING_EXPORT_PAGE_SIZE) break;
+
+      offset += TRAINING_EXPORT_PAGE_SIZE;
     }
 
-    const { data, error } = await query;
-    if (error) throw error;
+    if (records.length > TRAINING_EXPORT_MAX_ROWS) {
+      return NextResponse.json(
+        { error: `Training export is limited to ${TRAINING_EXPORT_MAX_ROWS.toLocaleString('en-GB')} rows. Use a status filter or archive older records before exporting.` },
+        { status: 413 }
+      );
+    }
 
-    const records = (data || []) as unknown as TrainingRecordWithRelations[];
     const excelRows = records.map((record) => ({
       'Employee': record.employee_name_raw || record.person?.employee_name_raw || '',
       'Profile Match': record.person?.profile_match_status || '',

@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { getRecentVehicleIds } from '@/lib/utils/recentVehicles';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -48,8 +48,14 @@ export function useWorkshopTasksFetchers({
   setCurrentMeterReading,
   setMeterReadingType,
 }: UseWorkshopTasksFetchersParams) {
+  const fetchTasksRequestIdRef = useRef(0);
+
   const fetchTasks = useCallback(async () => {
     if (!supabase) return;
+
+    const requestId = fetchTasksRequestIdRef.current + 1;
+    fetchTasksRequestIdRef.current = requestId;
+    const isCurrentRequest = () => fetchTasksRequestIdRef.current === requestId;
 
     try {
       setLoading(true);
@@ -101,6 +107,7 @@ export function useWorkshopTasksFetchers({
       const { data, error } = await query;
 
       if (error) throw error;
+      if (!isCurrentRequest()) return;
 
       let normalizedTasks = (data || []) as Action[];
       const inspectionIdsNeedingAsset = Array.from(
@@ -157,6 +164,8 @@ export function useWorkshopTasksFetchers({
             `)
             .in('id', inspectionIdsNeedingAsset),
         ]);
+
+        if (!isCurrentRequest()) return;
 
         if (vanInspectionError) {
           console.warn('Unable to load van inspection fallback assets:', vanInspectionError.message);
@@ -235,6 +244,7 @@ export function useWorkshopTasksFetchers({
           .from('profiles')
           .select('id, full_name')
           .in('id', createdByIds);
+        if (!isCurrentRequest()) return;
         profileMap = new Map(
           (profiles || []).map((profile: { id: string; full_name: string | null }) => [profile.id, { full_name: profile.full_name }])
         );
@@ -256,6 +266,7 @@ export function useWorkshopTasksFetchers({
           .select('task_id')
           .in('task_id', taskIds);
 
+        if (!isCurrentRequest()) return;
         const counts = new Map<string, number>();
         (attachmentData || []).forEach((att: { task_id: string }) => {
           counts.set(att.task_id, (counts.get(att.task_id) || 0) + 1);
@@ -263,6 +274,7 @@ export function useWorkshopTasksFetchers({
         setTaskAttachmentCounts(counts);
       }
     } catch (err) {
+      if (!isCurrentRequest()) return;
       if (isTransientNetworkError(err)) {
         console.warn('Network error fetching tasks (transient):', (err as Error).message);
       } else {
@@ -270,7 +282,9 @@ export function useWorkshopTasksFetchers({
       }
       toast.error('Failed to load workshop tasks');
     } finally {
-      setLoading(false);
+      if (isCurrentRequest()) {
+        setLoading(false);
+      }
     }
   }, [setLoading, setTaskAttachmentCounts, setTasks, supabase, vehicleFilter]);
 

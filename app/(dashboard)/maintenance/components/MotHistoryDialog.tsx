@@ -122,7 +122,7 @@ const [motData, setMotData] = useState<MotData | null>(null);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-border text-white w-full max-w-full md:max-w-[80vw] h-full md:h-auto max-h-screen md:max-h-[90vh] overflow-y-auto p-4 md:p-6">
+      <DialogContent className="border-border text-white w-full max-w-full md:max-w-[80vw] h-full md:h-auto max-h-dvh md:max-h-[90dvh] overflow-y-auto p-4 md:p-6">
         <DialogHeader>
           <div className="flex items-start justify-between gap-4 pr-6 md:pr-8">
             <div className="flex-1 min-w-0">

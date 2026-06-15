@@ -1,6 +1,5 @@
 'use client';
 
-import { Analytics } from '@vercel/analytics/react';
 import dynamic from 'next/dynamic';
 import { Toaster } from '@/components/ui/sonner';
 import { PwaShellBridge } from '@/components/layout/PwaShellBridge';
@@ -15,6 +14,11 @@ const ErrorLoggerInit = dynamic(
 
 const DeploymentVersionChecker = dynamic(
   () => import('@/components/DeploymentVersionChecker').then((mod) => mod.DeploymentVersionChecker),
+  { ssr: false }
+);
+
+const Analytics = dynamic(
+  () => import('@vercel/analytics/react').then((mod) => mod.Analytics),
   { ssr: false }
 );
 

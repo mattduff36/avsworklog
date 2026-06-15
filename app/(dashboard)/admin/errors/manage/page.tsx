@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { AppPageShell } from '@/components/layout/AppPageShell';
@@ -546,10 +547,13 @@ export default function ErrorReportsManagePage() {
                         rel="noopener noreferrer"
                         className="group overflow-hidden rounded-lg border border-slate-800 bg-slate-950 transition-colors hover:border-red-400/70"
                       >
-                        <div className="aspect-video bg-slate-900">
-                          <img
+                        <div className="relative aspect-video bg-slate-900">
+                          <Image
                             src={screenshotUrl}
                             alt={`Error report screenshot ${index + 1}`}
+                            fill
+                            sizes="(min-width: 640px) 50vw, 100vw"
+                            unoptimized
                             className="h-full w-full object-cover transition-transform group-hover:scale-[1.02]"
                           />
                         </div>

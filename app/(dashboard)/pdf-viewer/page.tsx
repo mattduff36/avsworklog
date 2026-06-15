@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
 import { PageLoader } from '@/components/ui/page-loader';
 import { PDFCanvasRenderer } from '@/components/pdf/PDFCanvasRenderer';
+import { isSafeInternalRedirectTarget } from '@/lib/routes/public-routes';
 
 function PDFViewerContent() {
   const searchParams = useSearchParams();
@@ -14,7 +15,8 @@ function PDFViewerContent() {
   const [hasReachedBottom, setHasReachedBottom] = useState(false);
   
   const url = searchParams.get('url');
-  const returnUrl = searchParams.get('return') || '/rams';
+  const requestedReturnUrl = searchParams.get('return');
+  const returnUrl = isSafeInternalRedirectTarget(requestedReturnUrl) ? requestedReturnUrl : '/rams';
   const showSign = searchParams.get('sign') === '1';
 
   useEffect(() => {

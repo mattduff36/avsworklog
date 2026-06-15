@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 /**
  * Send RAMS document via email to the logged-in user
  * POST /api/rams/[id]/email
@@ -14,9 +23,9 @@ export async function POST(
     const { id: documentId } = await params;
     const supabase = await createClient();
 
-    // Get user session
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !session) {
+    // Verify the user with Supabase Auth rather than trusting session cookies alone.
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -60,7 +69,7 @@ export async function POST(
       .from('rams_assignments')
       .select('*')
       .eq('rams_document_id', documentId)
-      .eq('employee_id', session.user.id)
+      .eq('employee_id', user.id)
       .single();
 
     // Check if user has Org V2 RAMS access
@@ -74,7 +83,7 @@ export async function POST(
     }
 
     // Get user email
-    const userEmail = session.user.email;
+    const userEmail = user.email;
     if (!userEmail) {
       return NextResponse.json(
         { error: 'User email not found' },
@@ -103,13 +112,10 @@ export async function POST(
       );
     }
 
-    const fileBlob = await fileResponse.blob();
-    const fileBuffer = await fileBlob.arrayBuffer();
-    
-    // Convert ArrayBuffer to base64
-    const bytes = new Uint8Array(fileBuffer);
-    const binary = bytes.reduce((acc, byte) => acc + String.fromCharCode(byte), '');
-    const fileBase64 = btoa(binary);
+    const fileBuffer = await fileResponse.arrayBuffer();
+    const fileBase64 = Buffer.from(fileBuffer).toString('base64');
+    const escapedTitle = escapeHtml(doc.title);
+    const escapedDescription = doc.description ? escapeHtml(doc.description) : '';
 
     // Send email via Resend
     const emailResponse = await fetch('https://api.resend.com/emails', {
@@ -142,8 +148,8 @@ export async function POST(
                 <p>You have requested to receive the following RAMS document via email:</p>
                 
                 <div style="background-color: #fff; border: 2px solid #F1D64A; border-radius: 8px; padding: 20px; margin: 20px 0;">
-                  <h3 style="margin: 0 0 10px 0; color: #252525;">${doc.title}</h3>
-                  ${doc.description ? `<p style="margin: 0; color: #666; font-size: 14px;">${doc.description}</p>` : ''}
+                  <h3 style="margin: 0 0 10px 0; color: #252525;">${escapedTitle}</h3>
+                  ${escapedDescription ? `<p style="margin: 0; color: #666; font-size: 14px;">${escapedDescription}</p>` : ''}
                 </div>
                 
                 <p>The document is attached to this email. Please review it carefully before signing in the app.</p>
@@ -174,16 +180,12 @@ export async function POST(
     });
 
     if (!emailResponse.ok) {
-      const error = await emailResponse.json();
-      console.error('Resend API error:', error);
+      console.error('Resend API error while sending RAMS document email:', emailResponse.status);
       return NextResponse.json(
-        { error: `Failed to send email: ${error.message || 'Unknown error'}` },
+        { error: 'Failed to send email' },
         { status: 500 }
       );
     }
-
-    const emailData = await emailResponse.json();
-    console.log('RAMS document email sent successfully:', emailData);
 
     return NextResponse.json({
       success: true,
@@ -193,7 +195,7 @@ export async function POST(
   } catch (error: unknown) {
     console.error('Error sending RAMS document via email:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to send email' },
+      { error: 'Failed to send email' },
       { status: 500 }
     );
   }

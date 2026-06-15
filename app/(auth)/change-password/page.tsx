@@ -150,7 +150,7 @@ export default function ChangePasswordPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
+      <div className="min-h-dvh flex items-center justify-center bg-slate-950 p-4">
         <Card className="w-full max-w-md border-border">
           <CardContent className="pt-6">
             <div className="text-center space-y-4">
@@ -169,7 +169,7 @@ export default function ChangePasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
+    <div className="min-h-dvh flex items-center justify-center bg-slate-950 p-4">
       <Card className="w-full max-w-md border-border">
         <CardHeader className="text-center space-y-2">
           <div className="flex justify-center mb-2">

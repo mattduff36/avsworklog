@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createDebugAccessErrorBody } from '@/lib/server/debug-console-access';
+import { requireErrorLogAdminAccess } from '@/lib/server/error-logs';
 import { logServerError } from '@/lib/utils/server-error-logger';
 
 /**
@@ -6,6 +8,11 @@ import { logServerError } from '@/lib/utils/server-error-logger';
  * GET /api/test-error-logging?type=throw|catch|async
  */
 export async function GET(request: NextRequest) {
+  const access = await requireErrorLogAdminAccess();
+  if (!access.ok) {
+    return NextResponse.json(createDebugAccessErrorBody(access), { status: access.status });
+  }
+
   const searchParams = request.nextUrl.searchParams;
   const type = searchParams.get('type') || 'throw';
 

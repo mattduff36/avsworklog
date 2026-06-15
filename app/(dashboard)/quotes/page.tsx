@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { AppPageShell } from '@/components/layout/AppPageShell';
 import { Archive, BriefcaseBusiness, CalendarClock, LayoutDashboard, Plus, Receipt, Settings } from 'lucide-react';
@@ -13,17 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SensitiveModuleGate, SensitiveModuleSessionManager, useSensitiveModuleAccess } from '@/components/security/SensitiveModuleGate';
 import { QuotesTable } from './components/QuotesTable';
-import {
-  getLegacyQuoteManagerFilterValue,
-  LegacyQuotesTable,
-  normalizeLegacyQuoteManagerName,
-} from './components/LegacyQuotesTable';
-import { QuoteDetailsModal } from './components/QuoteDetailsModal';
-import { QuoteFormDialog } from './components/QuoteFormDialog';
-import { ProjectNumbersTab } from './components/ProjectNumbersTab';
-import { QuotesOverviewTab } from './components/QuotesOverviewTab';
-import { QuoteSettingsTab, type QuoteSettingsSubTab } from './components/settings/QuoteSettingsTab';
-import { CustomerFormDialog } from '../customers/components/CustomerFormDialog';
+import type { QuoteSettingsSubTab } from './components/settings/QuoteSettingsTab';
 import { uploadQuoteAttachment } from './quote-attachment-client';
 import { getQuoteManagerNameFilterValue, normalizeQuoteManagerName } from './types';
 import type { LegacyQuote, Quote, QuoteFormData, QuoteManagerOption, QuoteProjectNumber } from './types';
@@ -63,6 +54,36 @@ interface QuoteManagerFilterOption {
 }
 
 type QuotePageTab = 'overview' | 'current' | 'projects' | 'archived' | 'legacy' | 'settings';
+
+function QuoteTabLoader() {
+  return <PageLoader message="Loading quotes section..." />;
+}
+
+const LegacyQuotesTable = dynamic(
+  () => import('./components/LegacyQuotesTable').then((mod) => mod.LegacyQuotesTable),
+  { loading: QuoteTabLoader }
+);
+const QuoteDetailsModal = dynamic(
+  () => import('./components/QuoteDetailsModal').then((mod) => mod.QuoteDetailsModal)
+);
+const QuoteFormDialog = dynamic(
+  () => import('./components/QuoteFormDialog').then((mod) => mod.QuoteFormDialog)
+);
+const ProjectNumbersTab = dynamic(
+  () => import('./components/ProjectNumbersTab').then((mod) => mod.ProjectNumbersTab),
+  { loading: QuoteTabLoader }
+);
+const QuotesOverviewTab = dynamic(
+  () => import('./components/QuotesOverviewTab').then((mod) => mod.QuotesOverviewTab),
+  { loading: QuoteTabLoader }
+);
+const QuoteSettingsTab = dynamic(
+  () => import('./components/settings/QuoteSettingsTab').then((mod) => mod.QuoteSettingsTab),
+  { loading: QuoteTabLoader }
+);
+const CustomerFormDialog = dynamic(
+  () => import('../customers/components/CustomerFormDialog').then((mod) => mod.CustomerFormDialog)
+);
 
 function isQuotePageTab(value: string): value is QuotePageTab {
   return value === 'overview'
@@ -110,6 +131,17 @@ async function uploadClientQuoteAttachments(quoteId: string, files?: File[]) {
 
 function getCompactManagerLabel(label: string) {
   return label.trim().split(/\s+/)[0] || label;
+}
+
+function normalizeLegacyQuoteManagerName(value: string | null | undefined): string {
+  const cleaned = (value || '').replace(/\s+/g, ' ').trim();
+  if (/^geroge\s+healey$/i.test(cleaned)) return 'George Healey';
+  return cleaned;
+}
+
+function getLegacyQuoteManagerFilterValue(value: string | null | undefined): string {
+  const normalized = normalizeLegacyQuoteManagerName(value);
+  return normalized ? `legacy-manager:${normalized.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}` : 'unknown';
 }
 
 function getQuoteManagerLabel(option: QuoteManagerOption | undefined, quote: Quote) {
@@ -278,6 +310,12 @@ export default function QuotesPage() {
   const [managerOptions, setManagerOptions] = useState<QuoteManagerOption[]>([]);
   const [approvers, setApprovers] = useState<ApproverOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [legacyLoading, setLegacyLoading] = useState(false);
+  const [projectNumbersLoading, setProjectNumbersLoading] = useState(false);
+  const [customersLoading, setCustomersLoading] = useState(false);
+  const [hasLoadedLegacyQuotes, setHasLoadedLegacyQuotes] = useState(false);
+  const [hasLoadedProjectNumbers, setHasLoadedProjectNumbers] = useState(false);
+  const [hasLoadedCustomers, setHasLoadedCustomers] = useState(false);
 
   // Modals
   const [detailQuoteId, setDetailQuoteId] = useState<string | null>(null);
@@ -334,30 +372,21 @@ export default function QuotesPage() {
   const fetchData = useCallback(async () => {
     try {
       const url = customerId ? `/api/quotes?customer_id=${customerId}` : '/api/quotes';
-      const [quotesResult, legacyQuotesResult, projectNumbersRes, metadataRes] = await Promise.all([
+      const [quotesResult, metadataRes] = await Promise.all([
         fetchAllPaginatedItems<Quote>(url, 'quotes', {
           limit: 250,
           errorMessage: 'Failed to load quotes',
         }),
-        fetchAllPaginatedItems<LegacyQuote>('/api/quotes/legacy', 'legacy_quotes', {
-          limit: 250,
-          errorMessage: 'Failed to load legacy quotes',
-        }),
-        fetch('/api/quotes/project-numbers'),
         fetch('/api/quotes/metadata'),
       ]);
 
       setQuotes(quotesResult.items);
-      setLegacyQuotes(legacyQuotesResult.items);
-      if (projectNumbersRes.ok) {
-        const projectNumbersPayload = await projectNumbersRes.json() as { project_numbers?: QuoteProjectNumber[] };
-        setProjectNumbers(projectNumbersPayload.project_numbers || []);
-      } else {
-        setProjectNumbers([]);
-      }
       if (metadataRes.ok) {
         const data = await metadataRes.json();
-        setCustomers(canViewCustomers ? data.customers || [] : []);
+        if (data.customers) {
+          setCustomers(canViewCustomers ? data.customers || [] : []);
+          setHasLoadedCustomers(canViewCustomers);
+        }
         setManagerOptions(data.managerOptions || []);
         setApprovers(data.approvers || []);
       }
@@ -370,6 +399,77 @@ export default function QuotesPage() {
     }
   }, [canViewCustomers, customerId]);
 
+  const fetchLegacyQuotes = useCallback(async () => {
+    setLegacyLoading(true);
+    try {
+      const legacyQuotesResult = await fetchAllPaginatedItems<LegacyQuote>('/api/quotes/legacy', 'legacy_quotes', {
+        limit: 250,
+        errorMessage: 'Failed to load legacy quotes',
+      });
+      setLegacyQuotes(legacyQuotesResult.items);
+      setHasLoadedLegacyQuotes(true);
+    } catch (error) {
+      const errorContextId = 'quotes-fetch-legacy-error';
+      console.error('Error fetching legacy quotes:', error, { errorContextId });
+      toast.error('Unable to load legacy quotes right now.', { id: errorContextId });
+    } finally {
+      setLegacyLoading(false);
+    }
+  }, []);
+
+  const fetchProjectNumbers = useCallback(async () => {
+    setProjectNumbersLoading(true);
+    try {
+      const projectNumbersRes = await fetch('/api/quotes/project-numbers');
+      if (!projectNumbersRes.ok) {
+        throw await buildResponseError(projectNumbersRes, 'Failed to load project numbers');
+      }
+
+      const projectNumbersPayload = await projectNumbersRes.json() as { project_numbers?: QuoteProjectNumber[] };
+      setProjectNumbers(projectNumbersPayload.project_numbers || []);
+      setHasLoadedProjectNumbers(true);
+    } catch (error) {
+      const errorContextId = 'quotes-fetch-project-numbers-error';
+      console.error('Error fetching quote project numbers:', error, { errorContextId });
+      toast.error('Unable to load quote projects right now.', { id: errorContextId });
+    } finally {
+      setProjectNumbersLoading(false);
+    }
+  }, []);
+
+  const fetchCustomers = useCallback(async () => {
+    if (!canViewCustomers) return false;
+
+    setCustomersLoading(true);
+    try {
+      const metadataRes = await fetch('/api/quotes/metadata?include_customers=true');
+      if (!metadataRes.ok) {
+        throw await buildResponseError(metadataRes, 'Failed to load customers');
+      }
+
+      const data = await metadataRes.json() as { customers?: CustomerOption[]; managerOptions?: QuoteManagerOption[]; approvers?: ApproverOption[] };
+      setCustomers(data.customers || []);
+      setManagerOptions(data.managerOptions || []);
+      setApprovers(data.approvers || []);
+      setHasLoadedCustomers(true);
+      return true;
+    } catch (error) {
+      const errorContextId = 'quotes-fetch-customers-error';
+      console.error('Error fetching quote customers:', error, { errorContextId });
+      toast.error('Unable to load customers right now.', { id: errorContextId });
+      return false;
+    } finally {
+      setCustomersLoading(false);
+    }
+  }, [canViewCustomers]);
+
+  const refreshProjectNumbersTab = useCallback(async () => {
+    await Promise.all([
+      fetchData(),
+      fetchProjectNumbers(),
+    ]);
+  }, [fetchData, fetchProjectNumbers]);
+
   useEffect(() => {
     if (permissionLoading || customerPermissionLoading || sensitiveAccess.loading) return;
     if (!canViewQuotes) {
@@ -380,6 +480,32 @@ export default function QuotesPage() {
     if (!sensitiveAccess.canAccess) return;
     fetchData();
   }, [permissionLoading, customerPermissionLoading, sensitiveAccess.loading, sensitiveAccess.canAccess, canViewQuotes, router, fetchData]);
+
+  useEffect(() => {
+    if (!sensitiveAccess.canAccess) return;
+    if (pageTab === 'legacy' && !hasLoadedLegacyQuotes && !legacyLoading) {
+      fetchLegacyQuotes();
+    }
+    if (pageTab === 'projects' && !hasLoadedProjectNumbers && !projectNumbersLoading) {
+      fetchProjectNumbers();
+    }
+    if (pageTab === 'projects' && canViewCustomers && !hasLoadedCustomers && !customersLoading) {
+      fetchCustomers();
+    }
+  }, [
+    canViewCustomers,
+    customersLoading,
+    fetchLegacyQuotes,
+    fetchCustomers,
+    fetchProjectNumbers,
+    hasLoadedCustomers,
+    hasLoadedLegacyQuotes,
+    hasLoadedProjectNumbers,
+    legacyLoading,
+    pageTab,
+    projectNumbersLoading,
+    sensitiveAccess.canAccess,
+  ]);
 
   useEffect(() => {
     setDetailQuoteId(quoteIdFromQuery);
@@ -433,6 +559,7 @@ export default function QuotesPage() {
     const payload = await res.json() as { customer?: { id?: string } };
     toast.success('Customer added');
     if (payload.customer?.id) setCreatedQuoteCustomerId(payload.customer.id);
+    await fetchCustomers();
     await fetchData();
   }
 
@@ -471,7 +598,11 @@ export default function QuotesPage() {
     handleOpenQuoteDetails(quote.id);
   }
 
-  function handleEditFromModal(quote: Quote) {
+  async function handleEditFromModal(quote: Quote) {
+    if (!hasLoadedCustomers) {
+      const loaded = await fetchCustomers();
+      if (!loaded) return;
+    }
     setEditingQuote(quote);
     setFormOpen(true);
   }
@@ -565,17 +696,21 @@ export default function QuotesPage() {
                 </Button>
               </Link>
               <Button
-                onClick={() => {
+                onClick={async () => {
                   if (!canViewCustomers) return;
+                  if (!hasLoadedCustomers) {
+                    const loaded = await fetchCustomers();
+                    if (!loaded) return;
+                  }
                   setEditingQuote(null);
                   setFormOpen(true);
                 }}
-                disabled={!canViewCustomers}
+                disabled={!canViewCustomers || customersLoading}
                 aria-describedby={!canViewCustomers ? 'quotes-customer-access-note' : undefined}
                 className="w-full bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90 font-semibold disabled:bg-slate-300 disabled:text-slate-600 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 sm:w-auto"
               >
                 <Plus className="h-4 w-4 mr-2" />
-                New Quote
+                {customersLoading ? 'Loading Customers...' : 'New Quote'}
               </Button>
             </div>
             {!canViewCustomers ? (
@@ -667,19 +802,27 @@ export default function QuotesPage() {
         </TabsContent>
 
         <TabsContent value="legacy" className="space-y-6 mt-0">
-          <LegacyQuotesTable legacyQuotes={legacyQuotes} managerFilter={legacyManagerFilter} />
+          {legacyLoading && !hasLoadedLegacyQuotes ? (
+            <QuoteTabLoader />
+          ) : (
+            <LegacyQuotesTable legacyQuotes={legacyQuotes} managerFilter={legacyManagerFilter} />
+          )}
         </TabsContent>
 
         <TabsContent value="projects" className="space-y-6 mt-0">
-          <ProjectNumbersTab
-            projectNumbers={projectNumbers}
-            managerOptions={managerOptions}
-            quotes={quotes}
-            customers={customers}
-            canViewCustomers={canViewCustomers}
-            onRefresh={fetchData}
-            onOpenQuote={handleOpenQuoteDetails}
-          />
+          {projectNumbersLoading && !hasLoadedProjectNumbers ? (
+            <QuoteTabLoader />
+          ) : (
+            <ProjectNumbersTab
+              projectNumbers={projectNumbers}
+              managerOptions={managerOptions}
+              quotes={quotes}
+              customers={customers}
+              canViewCustomers={canViewCustomers}
+              onRefresh={refreshProjectNumbersTab}
+              onOpenQuote={handleOpenQuoteDetails}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-6 mt-0">
@@ -693,36 +836,42 @@ export default function QuotesPage() {
         </TabsContent>
       </Tabs>
 
-      <QuoteDetailsModal
-        open={!!detailQuoteId}
-        onClose={handleCloseQuoteDetails}
-        quoteId={detailQuoteId}
-        onQuoteChange={handleOpenQuoteDetails}
-        onEdit={handleEditFromModal}
-        onRefresh={fetchData}
-        managerOptions={managerOptions}
-      />
+      {detailQuoteId ? (
+        <QuoteDetailsModal
+          open
+          onClose={handleCloseQuoteDetails}
+          quoteId={detailQuoteId}
+          onQuoteChange={handleOpenQuoteDetails}
+          onEdit={handleEditFromModal}
+          onRefresh={fetchData}
+          managerOptions={managerOptions}
+        />
+      ) : null}
 
-      <QuoteFormDialog
-        open={formOpen}
-        onClose={() => { setFormOpen(false); setEditingQuote(null); }}
-        onSubmit={handleSubmit}
-        onAttachmentsChange={handleEditingQuoteAttachmentsChange}
-        quote={editingQuote}
-        customers={customers}
-        managerOptions={managerOptions}
-        approvers={approvers}
-        initialCustomerId={customerId}
-        createdCustomerId={createdQuoteCustomerId}
-        onCreatedCustomerApplied={() => setCreatedQuoteCustomerId(null)}
-        onAddCustomer={() => setCustomerFormOpen(true)}
-      />
+      {formOpen ? (
+        <QuoteFormDialog
+          open
+          onClose={() => { setFormOpen(false); setEditingQuote(null); }}
+          onSubmit={handleSubmit}
+          onAttachmentsChange={handleEditingQuoteAttachmentsChange}
+          quote={editingQuote}
+          customers={customers}
+          managerOptions={managerOptions}
+          approvers={approvers}
+          initialCustomerId={customerId}
+          createdCustomerId={createdQuoteCustomerId}
+          onCreatedCustomerApplied={() => setCreatedQuoteCustomerId(null)}
+          onAddCustomer={() => setCustomerFormOpen(true)}
+        />
+      ) : null}
 
-      <CustomerFormDialog
-        open={customerFormOpen}
-        onClose={() => setCustomerFormOpen(false)}
-        onSubmit={handleCreateCustomerFromQuote}
-      />
+      {customerFormOpen ? (
+        <CustomerFormDialog
+          open
+          onClose={() => setCustomerFormOpen(false)}
+          onSubmit={handleCreateCustomerFromQuote}
+        />
+      ) : null}
     </AppPageShell>
   );
 }

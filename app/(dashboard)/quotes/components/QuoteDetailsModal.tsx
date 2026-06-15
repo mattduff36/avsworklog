@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -323,6 +323,8 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   const [poRequestBaselineSnapshot, setPoRequestBaselineSnapshot] = useState('');
   const [duplicateBaselineSnapshot, setDuplicateBaselineSnapshot] = useState('');
   const [ramsBaselineSnapshot, setRamsBaselineSnapshot] = useState('');
+  const fetchRequestIdRef = useRef(0);
+  const activeFetchAbortRef = useRef<AbortController | null>(null);
   const activeQuoteId = currentQuoteId || quoteId || quote?.id || null;
   const recipientEmail = quote?.attention_email || quote?.customer?.contact_email || '';
   const customerToContacts = quote?.selected_secondary_contacts || [];
@@ -695,21 +697,31 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   const fetchQuote = useCallback(async () => {
     const idToLoad = activeQuoteId;
     if (!idToLoad) return;
+    activeFetchAbortRef.current?.abort();
+    const abortController = new AbortController();
+    activeFetchAbortRef.current = abortController;
+    const requestId = fetchRequestIdRef.current + 1;
+    fetchRequestIdRef.current = requestId;
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await fetch(`/api/quotes/${idToLoad}`);
+      const res = await fetch(`/api/quotes/${idToLoad}`, { signal: abortController.signal });
       if (!res.ok) {
         throw await buildResponseError(res, 'Unable to load quote details right now.');
       }
       const data = await res.json();
+      if (fetchRequestIdRef.current !== requestId) return;
       applyQuoteState(data.quote);
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
       const message = error instanceof Error ? error.message : 'Unable to load quote details right now.';
       setLoadError(message);
       toast.error(message);
     } finally {
-      setLoading(false);
+      if (fetchRequestIdRef.current === requestId) {
+        activeFetchAbortRef.current = null;
+        setLoading(false);
+      }
     }
   }, [activeQuoteId, applyQuoteState]);
 
@@ -734,6 +746,8 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
 
   useEffect(() => {
     if (!open) {
+      activeFetchAbortRef.current?.abort();
+      activeFetchAbortRef.current = null;
       setCurrentQuoteId(null);
       setActiveTab('overview');
       setQuote(null);

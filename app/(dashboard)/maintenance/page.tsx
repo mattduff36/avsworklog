@@ -83,6 +83,22 @@ function MaintenanceContent() {
     router.replace(`/maintenance?tab=${value}`, { scroll: false });
   }
 
+  const filteredMaintenance = useMemo(() => {
+    const vehicles = (maintenanceData?.vehicles || []).filter((vehicle) => {
+      if (maintenanceFilter === 'both') return true;
+      return vehicle.vehicle?.asset_type === maintenanceFilter;
+    });
+
+    return {
+      vehicles,
+      summary: {
+        total: vehicles.length,
+        overdue: vehicles.filter((vehicle) => vehicle.overdue_count > 0).length,
+        due_soon: vehicles.filter((vehicle) => vehicle.due_soon_count > 0 && vehicle.overdue_count === 0).length,
+      },
+    };
+  }, [maintenanceData?.vehicles, maintenanceFilter]);
+
   const handleVehicleClick = (vehicle: VehicleMaintenanceWithStatus) => {
     const isPlant = vehicle.is_plant === true || vehicle.vehicle?.asset_type === 'plant';
     const isHgv = vehicle.vehicle?.asset_type === 'hgv' || !!(vehicle as VehicleMaintenanceWithStatus).hgv_id;
@@ -191,26 +207,11 @@ function MaintenanceContent() {
                 </Tabs>
               </div>
 
-              {(() => {
-                const filteredVehicles = (maintenanceData?.vehicles || []).filter(v => {
-                  if (maintenanceFilter === 'both') return true;
-                  return v.vehicle?.asset_type === maintenanceFilter;
-                });
-
-                const filteredSummary = {
-                  total: filteredVehicles.length,
-                  overdue: filteredVehicles.filter(v => v.overdue_count > 0).length,
-                  due_soon: filteredVehicles.filter(v => v.due_soon_count > 0 && v.overdue_count === 0).length,
-                };
-
-                return (
-                  <MaintenanceOverview
-                    vehicles={filteredVehicles}
-                    summary={filteredSummary}
-                    onVehicleClick={handleVehicleClick}
-                  />
-                );
-              })()}
+              <MaintenanceOverview
+                vehicles={filteredMaintenance.vehicles}
+                summary={filteredMaintenance.summary}
+                onVehicleClick={handleVehicleClick}
+              />
             </>
           )}
         </TabsContent>

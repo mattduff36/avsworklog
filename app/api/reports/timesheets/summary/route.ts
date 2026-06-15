@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { getDidNotWorkReasonInfo } from '@/lib/utils/timesheetDidNotWork';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { buildSafeReportFilename, parseReportDateRange, validateRequiredReportDateRange } from '@/lib/server/report-date-range';
 import { filterTimesheetRowsForReportScope } from '@/lib/server/reports-timesheet-scope';
 import { loadEmployeeWorkShiftPatternMap } from '@/lib/server/work-shifts';
 import { 
@@ -300,8 +301,12 @@ export async function GET(request: NextRequest) {
 
     // Get query parameters
     const searchParams = request.nextUrl.searchParams;
-    const dateFrom = searchParams.get('dateFrom');
-    const dateTo = searchParams.get('dateTo');
+    const { range, error: dateRangeError } = parseReportDateRange(searchParams);
+    const requiredRangeError = validateRequiredReportDateRange(range, 366);
+    if (dateRangeError || requiredRangeError || !range) {
+      return NextResponse.json({ error: dateRangeError || requiredRangeError || 'Invalid date range.' }, { status: 400 });
+    }
+    const { dateFrom, dateTo } = range;
     const employeeId = searchParams.get('employeeId');
 
     // Fetch data
@@ -386,8 +391,7 @@ export async function GET(request: NextRequest) {
     }]);
 
     // Generate filename
-    const dateRange = dateFrom && dateTo ? `${dateFrom}_to_${dateTo}` : new Date().toISOString().split('T')[0];
-    const filename = `Timesheet_Summary_${dateRange}.xlsx`;
+    const filename = buildSafeReportFilename('Timesheet_Summary', range.filenameDateRange, 'xlsx');
 
     return new NextResponse(new Uint8Array(buffer), {
       headers: {

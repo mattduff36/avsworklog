@@ -1,10 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { AlertCircle, Bug, CheckCircle2 } from 'lucide-react';
+import { PageLoader } from '@/components/ui/page-loader';
+import { useAuth } from '@/lib/hooks/useAuth';
+import { canAccessDebugConsole } from '@/lib/utils/debug-access';
 
 interface BrowserErrorLogger {
   logError: (input: {
@@ -15,7 +19,33 @@ interface BrowserErrorLogger {
 }
 
 export default function TestErrorLoggingPage() {
+  const router = useRouter();
+  const { profile, loading, isActualSuperAdmin, isViewingAs } = useAuth();
   const [results, setResults] = useState<string[]>([]);
+  const canAccessDebugTools = canAccessDebugConsole({
+    email: profile?.email,
+    isActualSuperAdmin,
+    isViewingAs,
+  });
+
+  useEffect(() => {
+    if (loading) return;
+    if (!profile) {
+      router.replace('/login');
+      return;
+    }
+    if (!canAccessDebugTools) {
+      router.replace('/dashboard');
+    }
+  }, [canAccessDebugTools, loading, profile, router]);
+
+  if (loading) {
+    return <PageLoader message="Checking debug access..." />;
+  }
+
+  if (!profile || !canAccessDebugTools) {
+    return <PageLoader message="Redirecting..." />;
+  }
 
   const addResult = (message: string) => {
     setResults(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);

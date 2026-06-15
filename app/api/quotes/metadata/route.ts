@@ -1,11 +1,11 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { filterHiddenSystemTestAccountProfiles } from '@/lib/server/system-test-accounts';
 import { listQuoteManagerOptions } from '@/lib/server/quote-workflow';
 import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
     const {
@@ -20,14 +20,10 @@ export async function GET() {
     const sensitiveAccessResponse = await requireSensitiveModuleAccess('quotes');
     if (sensitiveAccessResponse) return sensitiveAccessResponse;
 
+    const includeCustomers = request.nextUrl.searchParams.get('include_customers') === 'true';
     const admin = createAdminClient();
-    const [managerOptions, approversResult, customersResult] = await Promise.all([
-      listQuoteManagerOptions(),
-      admin
-        .from('profiles')
-        .select('id, full_name, employee_id, is_placeholder')
-        .order('full_name'),
-      admin
+    const customersPromise = includeCustomers
+      ? admin
         .from('customers')
         .select(`
           id,
@@ -43,7 +39,16 @@ export async function GET() {
           default_validity_days,
           secondary_contacts:customer_contacts(*)
         `)
-        .order('company_name', { ascending: true }),
+        .order('company_name', { ascending: true })
+      : Promise.resolve({ data: [], error: null });
+
+    const [managerOptions, approversResult, customersResult] = await Promise.all([
+      listQuoteManagerOptions(),
+      admin
+        .from('profiles')
+        .select('id, full_name, employee_id, is_placeholder')
+        .order('full_name'),
+      customersPromise,
     ]);
 
     if (approversResult.error) {

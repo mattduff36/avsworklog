@@ -440,7 +440,7 @@ function ReadRAMSContent() {
 
   return (
     <RAMSErrorBoundary>
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-dvh">
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 border-b border-border shadow-sm">
           <div className="container mx-auto px-4 py-4 max-w-6xl">

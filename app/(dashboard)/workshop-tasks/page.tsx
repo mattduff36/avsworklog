@@ -198,22 +198,62 @@ export default function WorkshopTasksPage() {
   const filteredSubcategories = selectedCategoryId ? (assetTab === 'plant' ? plantSubcategories : assetTab === 'hgv' ? hgvSubcategories : subcategories).filter(sub => sub.category_id === selectedCategoryId) : [];
   const activeCategories = assetTab === 'plant' ? plantCategories : assetTab === 'hgv' ? hgvCategories : categories;
   const categoryHasSubcategories = filteredSubcategories.length > 0;
-  const tabFilteredTasks = assetTab === 'all' ? tasks : assetTab === 'plant' ? tasks.filter(t => t.plant_id !== null) : assetTab === 'hgv' ? tasks.filter(t => t.hgv_id !== null) : tasks.filter(t => t.van_id !== null);
-  const pendingTasks = tabFilteredTasks.filter(t => t.status === 'pending');
-  const highPriorityPendingTasks = pendingTasks.filter(isHighPriorityHgvDefectTask);
-  const inProgressTasks = tabFilteredTasks.filter(t => t.status === 'logged');
-  const onHoldTasks = tabFilteredTasks.filter(t => t.status === 'on_hold');
-  const completedTasks = tabFilteredTasks.filter(t => t.status === 'completed').sort((a, b) => (b.actioned_at ? new Date(b.actioned_at).getTime() : 0) - (a.actioned_at ? new Date(a.actioned_at).getTime() : 0));
-  const visiblePendingTasks = statusFilter === 'all' || statusFilter === 'pending'
-    ? pendingTasks
-    : statusFilter === 'high_priority'
-      ? highPriorityPendingTasks
-      : [];
+  const tabFilteredTasks = useMemo(() => {
+    if (assetTab === 'all') return tasks;
+    if (assetTab === 'plant') return tasks.filter((task) => task.plant_id !== null);
+    if (assetTab === 'hgv') return tasks.filter((task) => task.hgv_id !== null);
+    return tasks.filter((task) => task.van_id !== null);
+  }, [assetTab, tasks]);
+  const {
+    pendingTasks,
+    highPriorityPendingTasks,
+    inProgressTasks,
+    onHoldTasks,
+    completedTasks,
+  } = useMemo(() => {
+    const nextPendingTasks: Action[] = [];
+    const nextHighPriorityPendingTasks: Action[] = [];
+    const nextInProgressTasks: Action[] = [];
+    const nextOnHoldTasks: Action[] = [];
+    const nextCompletedTasks: Action[] = [];
+
+    tabFilteredTasks.forEach((task) => {
+      if (task.status === 'pending') {
+        nextPendingTasks.push(task);
+        if (isHighPriorityHgvDefectTask(task)) nextHighPriorityPendingTasks.push(task);
+      } else if (task.status === 'logged') {
+        nextInProgressTasks.push(task);
+      } else if (task.status === 'on_hold') {
+        nextOnHoldTasks.push(task);
+      } else if (task.status === 'completed') {
+        nextCompletedTasks.push(task);
+      }
+    });
+
+    nextCompletedTasks.sort((a, b) => (
+      (b.actioned_at ? new Date(b.actioned_at).getTime() : 0) -
+      (a.actioned_at ? new Date(a.actioned_at).getTime() : 0)
+    ));
+
+    return {
+      pendingTasks: nextPendingTasks,
+      highPriorityPendingTasks: nextHighPriorityPendingTasks,
+      inProgressTasks: nextInProgressTasks,
+      onHoldTasks: nextOnHoldTasks,
+      completedTasks: nextCompletedTasks,
+    };
+  }, [tabFilteredTasks]);
+  const visiblePendingTasks = useMemo(() => {
+    if (statusFilter === 'all' || statusFilter === 'pending') return pendingTasks;
+    if (statusFilter === 'high_priority') return highPriorityPendingTasks;
+    return [];
+  }, [highPriorityPendingTasks, pendingTasks, statusFilter]);
   const visibleInProgressTasks = statusFilter === 'all' || statusFilter === 'logged' ? inProgressTasks : [];
   const visibleOnHoldTasks = statusFilter === 'all' || statusFilter === 'on_hold' ? onHoldTasks : [];
   const visibleCompletedTasks = statusFilter === 'all' || statusFilter === 'completed' ? completedTasks : [];
+  const taskIds = useMemo(() => tasks.map((task) => task.id), [tasks]);
   const { photosByTask: taskInspectionPhotos } = useTaskInspectionPhotos(
-    tasks.map((task) => task.id),
+    taskIds,
     { enabled: tasks.length > 0 }
   );
 

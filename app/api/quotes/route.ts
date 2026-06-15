@@ -54,6 +54,26 @@ function isMeaningfulLineItem(item: { description?: string; unit?: string; quant
   );
 }
 
+function getQuoteListCustomerSelect(includeCustomerContacts: boolean) {
+  const baseFields = `
+    id,
+    company_name,
+    short_name,
+    contact_name,
+    contact_email,
+    address_line_1,
+    address_line_2,
+    city,
+    county,
+    postcode,
+    default_validity_days
+  `;
+
+  return includeCustomerContacts
+    ? `${baseFields}, secondary_contacts:customer_contacts(*)`
+    : baseFields;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -72,26 +92,16 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const customerId = searchParams.get('customer_id');
     const includeVersions = searchParams.get('include_versions') === 'true';
+    const includeCustomerContacts = searchParams.get('include_customer_contacts') === 'true';
     const limit = Math.min(Math.max(Number.parseInt(searchParams.get('limit') || '100', 10) || 100, 1), 250);
     const offset = Math.max(Number.parseInt(searchParams.get('offset') || '0', 10) || 0, 0);
+    const customerSelect = getQuoteListCustomerSelect(includeCustomerContacts);
 
     let query = supabase
       .from('quotes')
       .select(`
         *,
-        customer:customers(
-          id,
-          company_name,
-          short_name,
-          contact_name,
-          contact_email,
-          address_line_1,
-          address_line_2,
-          city,
-          county,
-          postcode,
-          secondary_contacts:customer_contacts(*)
-        )
+        customer:customers(${customerSelect})
       `)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
@@ -133,19 +143,7 @@ export async function GET(request: NextRequest) {
         .from('quotes')
         .select(`
           *,
-          customer:customers(
-            id,
-            company_name,
-            short_name,
-            contact_name,
-            contact_email,
-            address_line_1,
-            address_line_2,
-            city,
-            county,
-            postcode,
-            secondary_contacts:customer_contacts(*)
-          )
+          customer:customers(${customerSelect})
         `)
         .in('quote_thread_id', threadIds)
         .eq('is_latest_version', false)
