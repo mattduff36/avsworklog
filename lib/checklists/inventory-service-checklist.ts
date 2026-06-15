@@ -1,4 +1,5 @@
 export const INVENTORY_SERVICE_CHECKLIST_VERSION = 'minor-plant-equipment-service-record-v1';
+export const INVENTORY_PAT_CHECKLIST_VERSION = 'portable-appliance-test-v1';
 
 export type InventoryChecklistStatus = 'ok' | 'attention' | 'na';
 
@@ -7,6 +8,16 @@ export type InventoryCheckOverallStatus = 'pass' | 'fail' | 'partial';
 export interface InventoryServiceChecklistItem {
   item_number: number;
   label: string;
+}
+
+export interface InventoryChecklistDefinition {
+  version: string;
+  label: string;
+  modalTitle: string;
+  modalDescription: string;
+  pdfTitle: string;
+  pdfSubtitle: string;
+  items: InventoryServiceChecklistItem[];
 }
 
 export interface InventoryChecklistItemResult extends InventoryServiceChecklistItem {
@@ -51,6 +62,36 @@ export const INVENTORY_SERVICE_CHECKLIST_ITEMS: InventoryServiceChecklistItem[] 
   { item_number: 28, label: 'Oil Level' },
 ];
 
+export const INVENTORY_PAT_CHECKLIST_ITEMS: InventoryServiceChecklistItem[] = [
+  { item_number: 1, label: 'Cable' },
+  { item_number: 2, label: 'Appliance' },
+  { item_number: 3, label: 'Plug (Ext/Int)' },
+  { item_number: 4, label: 'Earth' },
+  { item_number: 5, label: 'Insulation' },
+  { item_number: 6, label: 'Polarity' },
+];
+
+export const INVENTORY_CHECKLIST_DEFINITIONS: InventoryChecklistDefinition[] = [
+  {
+    version: INVENTORY_SERVICE_CHECKLIST_VERSION,
+    label: 'Regular Check',
+    modalTitle: 'Record Regular Check',
+    modalDescription: 'Complete the service checklist for this inventory item.',
+    pdfTitle: 'Inventory Regular Check',
+    pdfSubtitle: 'Minor Plant and Equipment Service Record',
+    items: INVENTORY_SERVICE_CHECKLIST_ITEMS,
+  },
+  {
+    version: INVENTORY_PAT_CHECKLIST_VERSION,
+    label: 'PAT Test',
+    modalTitle: 'Record PAT Test',
+    modalDescription: 'Complete the Portable Appliance Testing checklist for this inventory item.',
+    pdfTitle: 'Inventory PAT Test',
+    pdfSubtitle: 'Portable Appliance Testing Record',
+    items: INVENTORY_PAT_CHECKLIST_ITEMS,
+  },
+];
+
 export const INVENTORY_CHECKLIST_STATUS_LABELS: Record<InventoryChecklistStatus, string> = {
   ok: 'Pass',
   attention: 'Fail',
@@ -79,9 +120,19 @@ export function getInventoryChecklistSummary(items: InventoryChecklistItemResult
   );
 }
 
+export function getInventoryChecklistDefinition(version: string | null | undefined): InventoryChecklistDefinition | null {
+  if (!version) return null;
+  return INVENTORY_CHECKLIST_DEFINITIONS.find((definition) => definition.version === version) || null;
+}
+
+export function getInventoryChecklistLabel(version: string | null | undefined): string {
+  return getInventoryChecklistDefinition(version)?.label || 'Inventory Check';
+}
+
 export function getInventoryCheckOverallStatus(
   items: InventoryChecklistItemResult[],
+  definition: InventoryChecklistDefinition = INVENTORY_CHECKLIST_DEFINITIONS[0],
 ): InventoryCheckOverallStatus {
-  if (items.length !== INVENTORY_SERVICE_CHECKLIST_ITEMS.length) return 'partial';
+  if (items.length !== definition.items.length) return 'partial';
   return items.some((item) => item.status === 'attention') ? 'fail' : 'pass';
 }

@@ -8,6 +8,7 @@ import { BackButton } from '@/components/ui/back-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PageLoader } from '@/components/ui/page-loader';
@@ -17,8 +18,13 @@ import { toast } from 'sonner';
 import type { InventoryItem, InventoryItemGroupSummary } from '../../types';
 import { InventoryCheckModal, type InventoryChecklistSubmitPayload } from '../../components/InventoryCheckModal';
 import {
+  INVENTORY_CHECKLIST_DEFINITIONS,
   INVENTORY_CHECK_OVERALL_STATUS_LABELS,
+  INVENTORY_SERVICE_CHECKLIST_VERSION,
+  getInventoryChecklistDefinition,
+  getInventoryChecklistLabel,
   getInventoryChecklistSummary,
+  type InventoryChecklistDefinition,
   type InventoryCheckOverallStatus,
   type InventoryChecklistItemResult,
 } from '@/lib/checklists/inventory-service-checklist';
@@ -99,7 +105,9 @@ export default function InventoryItemDetailPage() {
   const [loading, setLoading] = useState(true);
   const [intervalMonths, setIntervalMonths] = useState('');
   const [checkedAt, setCheckedAt] = useState(new Date().toISOString().slice(0, 10));
+  const [showCheckTypeModal, setShowCheckTypeModal] = useState(false);
   const [showCheckModal, setShowCheckModal] = useState(false);
+  const [selectedChecklistVersion, setSelectedChecklistVersion] = useState(INVENTORY_SERVICE_CHECKLIST_VERSION);
   const [checkModalSession, setCheckModalSession] = useState(0);
   const [savingInterval, setSavingInterval] = useState(false);
   const [savingCheck, setSavingCheck] = useState(false);
@@ -174,6 +182,13 @@ export default function InventoryItemDetailPage() {
     }
   }
 
+  function handleChooseCheckType(checklistDefinition: InventoryChecklistDefinition) {
+    setSelectedChecklistVersion(checklistDefinition.version);
+    setCheckModalSession((current) => current + 1);
+    setShowCheckTypeModal(false);
+    setShowCheckModal(true);
+  }
+
   async function handleDownloadCheckPdf(checkId: string) {
     setDownloadingCheckId(checkId);
     try {
@@ -216,6 +231,8 @@ export default function InventoryItemDetailPage() {
   const checkStatus = getInventoryCheckStatus(item);
   const intervalMonthsValue = getInventoryCheckIntervalMonths(item);
   const isRetired = item.status === 'retired';
+  const selectedChecklistDefinition =
+    getInventoryChecklistDefinition(selectedChecklistVersion) || INVENTORY_CHECKLIST_DEFINITIONS[0];
 
   return (
     <AppPageShell width="wide">
@@ -348,21 +365,18 @@ export default function InventoryItemDetailPage() {
 
               <div className="space-y-3 rounded-lg border border-slate-700 bg-slate-800/40 p-4">
                 <div>
-                  <div className="font-medium text-white">Service Checklist</div>
+                  <div className="font-medium text-white">Inventory Checks</div>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {isRetired
                       ? 'Retired items must be restored before new checks can be recorded.'
-                      : 'Record Pass, Fail, or N/A against the inventory service checklist. Failed items require comments.'
+                      : 'Choose a PAT Test or Regular Check, then record Pass, Fail, or N/A. Failed items require comments.'
                     }
                   </p>
                 </div>
                 <Button
                   type="button"
                   className="bg-inventory text-white hover:bg-inventory-dark"
-                  onClick={() => {
-                    setCheckModalSession((current) => current + 1);
-                    setShowCheckModal(true);
-                  }}
+                  onClick={() => setShowCheckTypeModal(true)}
                   disabled={savingCheck || !checkedAt || isRetired}
                 >
                   <CalendarCheck className="mr-2 h-4 w-4" />
@@ -418,12 +432,38 @@ export default function InventoryItemDetailPage() {
         </Card>
       ) : null}
 
+      <Dialog open={showCheckTypeModal} onOpenChange={setShowCheckTypeModal}>
+        <DialogContent className="border border-border bg-slate-950 text-white sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Choose Check Type</DialogTitle>
+            <DialogDescription>
+              Select the checklist to complete for {item.name} ({item.item_number}).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {INVENTORY_CHECKLIST_DEFINITIONS.map((checklistDefinition) => (
+              <button
+                key={checklistDefinition.version}
+                type="button"
+                className="rounded-xl border border-slate-700 bg-slate-900/70 p-4 text-left transition-colors hover:border-inventory/70 hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inventory/60"
+                onClick={() => handleChooseCheckType(checklistDefinition)}
+                disabled={savingCheck}
+              >
+                <div className="font-semibold text-white">{checklistDefinition.label}</div>
+                <div className="mt-2 text-sm text-muted-foreground">{checklistDefinition.pdfSubtitle}</div>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <InventoryCheckModal
         key={checkModalSession}
         open={showCheckModal}
         onOpenChange={setShowCheckModal}
         itemName={item.name}
         itemNumber={item.item_number}
+        checklistDefinition={selectedChecklistDefinition}
         initialCheckedAt={checkedAt}
         saving={savingCheck}
         onSubmit={handleRecordCheck}
@@ -520,10 +560,11 @@ function InventoryCheckTimelineEntry({
   const summary = checklistItems ? getInventoryChecklistSummary(checklistItems) : null;
   const overallStatus = summary ? check.overall_status || (summary.fail > 0 ? 'fail' : 'pass') : null;
   const failedItems = checklistItems?.filter((item) => item.status === 'attention') || [];
+  const checkTypeLabel = getInventoryChecklistLabel(check.checklist_version);
 
   return (
     <TimelineEntry
-      title={`Checked ${formatInventoryDate(check.checked_at)}`}
+      title={`${checkTypeLabel} · ${formatInventoryDate(check.checked_at)}`}
       meta={`${check.checked_by_profile?.full_name || 'Unknown user'} · interval ${formatInventoryCheckIntervalMonths(getInventoryCheckIntervalMonths({ check_interval_days: check.interval_days }))}`}
       note={check.note}
       badge={null}

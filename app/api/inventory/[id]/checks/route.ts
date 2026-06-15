@@ -3,10 +3,11 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { requireInventoryManagerAccess } from '@/lib/server/inventory-auth';
 import { CHECK_INTERVAL_DAYS } from '@/app/(dashboard)/inventory/utils';
 import {
-  INVENTORY_SERVICE_CHECKLIST_ITEMS,
   INVENTORY_SERVICE_CHECKLIST_VERSION,
+  getInventoryChecklistDefinition,
   getInventoryCheckOverallStatus,
   isInventoryChecklistStatus,
+  type InventoryChecklistDefinition,
   type InventoryChecklistItemResult,
 } from '@/lib/checklists/inventory-service-checklist';
 
@@ -29,12 +30,15 @@ function getStringValue(value: unknown): string | null {
   return typeof value === 'string' ? value.trim() : null;
 }
 
-function validateChecklistItems(value: unknown): { items: InventoryChecklistItemResult[]; error: null } | { items: null; error: string } {
+function validateChecklistItems(
+  value: unknown,
+  definition: InventoryChecklistDefinition,
+): { items: InventoryChecklistItemResult[]; error: null } | { items: null; error: string } {
   if (!Array.isArray(value)) {
     return { items: null, error: 'Checklist items must be an array' };
   }
 
-  if (value.length !== INVENTORY_SERVICE_CHECKLIST_ITEMS.length) {
+  if (value.length !== definition.items.length) {
     return { items: null, error: 'Checklist is incomplete' };
   }
 
@@ -57,10 +61,14 @@ function validateChecklistItems(value: unknown): { items: InventoryChecklistItem
   }
 
   const normalizedItems: InventoryChecklistItemResult[] = [];
-  for (const checklistItem of INVENTORY_SERVICE_CHECKLIST_ITEMS) {
+  for (const checklistItem of definition.items) {
     const entry = itemsByNumber.get(checklistItem.item_number);
     if (!entry) {
       return { items: null, error: `Checklist item ${checklistItem.item_number} is missing` };
+    }
+
+    if (getStringValue(entry.label) !== checklistItem.label) {
+      return { items: null, error: `Checklist item ${checklistItem.item_number} has an invalid label` };
     }
 
     if (!isInventoryChecklistStatus(entry.status)) {
@@ -79,7 +87,7 @@ function validateChecklistItems(value: unknown): { items: InventoryChecklistItem
     });
   }
 
-  if (itemsByNumber.size !== INVENTORY_SERVICE_CHECKLIST_ITEMS.length) {
+  if (itemsByNumber.size !== definition.items.length) {
     return { items: null, error: 'Checklist contains unknown items' };
   }
 
@@ -101,19 +109,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     const hasStructuredChecklist = body.checklist_items !== undefined && body.checklist_items !== null;
-    const checklistValidation = hasStructuredChecklist
-      ? validateChecklistItems(body.checklist_items)
-      : { items: null, error: null };
-    if (checklistValidation.error) {
-      return NextResponse.json({ error: checklistValidation.error }, { status: 400 });
+    let checklistDefinition: InventoryChecklistDefinition | null = null;
+    let checklistItems: InventoryChecklistItemResult[] | null = null;
+
+    if (hasStructuredChecklist) {
+      const checklistVersion = getStringValue(body.checklist_version) || INVENTORY_SERVICE_CHECKLIST_VERSION;
+      checklistDefinition = getInventoryChecklistDefinition(checklistVersion);
+      if (!checklistDefinition) {
+        return NextResponse.json({ error: 'Unsupported checklist version' }, { status: 400 });
+      }
+
+      const checklistValidation = validateChecklistItems(body.checklist_items, checklistDefinition);
+      if (checklistValidation.error) {
+        return NextResponse.json({ error: checklistValidation.error }, { status: 400 });
+      }
+      checklistItems = checklistValidation.items;
     }
 
-    if (hasStructuredChecklist && body.checklist_version && body.checklist_version !== INVENTORY_SERVICE_CHECKLIST_VERSION) {
-      return NextResponse.json({ error: 'Unsupported checklist version' }, { status: 400 });
-    }
-
-    const checklistItems = checklistValidation.items;
-    const overallStatus = checklistItems ? getInventoryCheckOverallStatus(checklistItems) : null;
+    const overallStatus =
+      checklistItems && checklistDefinition ? getInventoryCheckOverallStatus(checklistItems, checklistDefinition) : null;
 
     const admin = createAdminClient();
     const { data: item, error: itemError } = await admin
@@ -141,7 +155,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         checked_at: checkedAt,
         interval_days: intervalDays,
         note: body.note?.trim() || null,
-        checklist_version: checklistItems ? INVENTORY_SERVICE_CHECKLIST_VERSION : null,
+        checklist_version: checklistItems && checklistDefinition ? checklistDefinition.version : null,
         checklist_items: checklistItems,
         overall_status: overallStatus,
         checked_by: access.userId,

@@ -6,6 +6,8 @@ import { loadSquiresLogoDataUrl } from '@/lib/pdf/squires-logo';
 import { InventoryChecklistPDF } from '@/lib/pdf/inventory-checklist-pdf';
 import { formatInventoryCategoryLabel } from '@/app/(dashboard)/inventory/types';
 import {
+  getInventoryChecklistDefinition,
+  getInventoryChecklistLabel,
   getInventoryCheckOverallStatus,
   isInventoryChecklistStatus,
   type InventoryCheckOverallStatus,
@@ -22,6 +24,7 @@ interface InventoryCheckRow {
   checked_at: string;
   interval_days: number;
   note: string | null;
+  checklist_version: string | null;
   checklist_items: unknown;
   overall_status: InventoryCheckOverallStatus | null;
   checked_by_profile: { full_name: string | null } | null;
@@ -108,6 +111,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
           checked_at,
           interval_days,
           note,
+          checklist_version,
           checklist_items,
           overall_status,
           checked_by_profile:profiles!inventory_check_history_checked_by_fkey(id, full_name)
@@ -152,7 +156,13 @@ export async function GET(_request: Request, { params }: RouteParams) {
     const group = Array.isArray(groupRelation) ? groupRelation[0] ?? null : groupRelation ?? null;
     const checkedByProfile = normalizeProfileRelation(rawCheck.checked_by_profile);
     const logoSrc = await loadSquiresLogoDataUrl();
-    const overallStatus = rawCheck.overall_status || getInventoryCheckOverallStatus(checklistItems);
+    const checklistDefinition = getInventoryChecklistDefinition(rawCheck.checklist_version);
+    const checklistLabel = getInventoryChecklistLabel(rawCheck.checklist_version);
+    const overallStatus =
+      rawCheck.overall_status ||
+      (checklistDefinition
+        ? getInventoryCheckOverallStatus(checklistItems, checklistDefinition)
+        : checklistItems.some((checklistItem) => checklistItem.status === 'attention') ? 'fail' : 'pass');
 
     const pdfDocument = InventoryChecklistPDF({
       item: {
@@ -164,6 +174,9 @@ export async function GET(_request: Request, { params }: RouteParams) {
         sourceReference: item.source_reference,
       },
       check: {
+        checklistLabel,
+        pdfTitle: checklistDefinition?.pdfTitle || 'Inventory Checklist',
+        pdfSubtitle: checklistDefinition?.pdfSubtitle || 'Inventory Check Record',
         checkedAt: rawCheck.checked_at,
         checkedByName: checkedByProfile?.full_name || null,
         intervalDays: rawCheck.interval_days,

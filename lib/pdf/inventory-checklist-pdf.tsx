@@ -228,6 +228,9 @@ export interface InventoryChecklistPdfItem {
 }
 
 export interface InventoryChecklistPdfCheck {
+  checklistLabel: string;
+  pdfTitle: string;
+  pdfSubtitle: string;
   checkedAt: string;
   checkedByName: string | null;
   intervalDays: number;
@@ -277,8 +280,8 @@ export function InventoryChecklistPDF({ item, check, logoSrc }: InventoryCheckli
           <View style={styles.headerRow}>
             <View style={styles.headerText}>
               <Text style={styles.companyName}>Squires Group</Text>
-              <Text style={styles.title}>Inventory Service Checklist</Text>
-              <Text style={styles.subtitle}>Minor Plant and Equipment Service Record</Text>
+              <Text style={styles.title}>{check.pdfTitle}</Text>
+              <Text style={styles.subtitle}>{check.pdfSubtitle}</Text>
             </View>
             {logoSrc ? (
               // eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf/renderer Image does not support alt.
@@ -313,6 +316,10 @@ export function InventoryChecklistPDF({ item, check, logoSrc }: InventoryCheckli
             <View style={styles.infoCell}>
               <Text style={styles.infoLabel}>Source Reference</Text>
               <Text style={styles.infoValue}>{item.sourceReference || 'Not recorded'}</Text>
+            </View>
+            <View style={styles.infoCell}>
+              <Text style={styles.infoLabel}>Check Type</Text>
+              <Text style={styles.infoValue}>{check.checklistLabel}</Text>
             </View>
             <View style={styles.infoCell}>
               <Text style={styles.infoLabel}>Checked Date</Text>

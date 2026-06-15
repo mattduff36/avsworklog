@@ -13,8 +13,7 @@ import { useDirtyDialogGuard } from '@/lib/hooks/useDirtyDialogGuard';
 import { cn } from '@/lib/utils/cn';
 import {
   INVENTORY_CHECKLIST_STATUS_LABELS,
-  INVENTORY_SERVICE_CHECKLIST_ITEMS,
-  INVENTORY_SERVICE_CHECKLIST_VERSION,
+  type InventoryChecklistDefinition,
   type InventoryChecklistItemResult,
   type InventoryChecklistStatus,
 } from '@/lib/checklists/inventory-service-checklist';
@@ -31,6 +30,7 @@ interface InventoryCheckModalProps {
   onOpenChange: (open: boolean) => void;
   itemName: string;
   itemNumber: string;
+  checklistDefinition: InventoryChecklistDefinition;
   initialCheckedAt: string;
   saving: boolean;
   onSubmit: (payload: InventoryChecklistSubmitPayload) => Promise<void>;
@@ -97,10 +97,12 @@ export function InventoryCheckModal({
   onOpenChange,
   itemName,
   itemNumber,
+  checklistDefinition,
   initialCheckedAt,
   saving,
   onSubmit,
 }: InventoryCheckModalProps) {
+  const checklistItems = checklistDefinition.items;
   const [checkedAt, setCheckedAt] = useState(initialCheckedAt);
   const [statuses, setStatuses] = useState<Record<number, InventoryChecklistStatus>>({});
   const [comments, setComments] = useState<Record<number, string>>({});
@@ -112,7 +114,7 @@ export function InventoryCheckModal({
     () => Object.values(statuses).filter((status) => status === 'attention').length,
     [statuses],
   );
-  const progressPercent = Math.round((completedCount / INVENTORY_SERVICE_CHECKLIST_ITEMS.length) * 100);
+  const progressPercent = Math.round((completedCount / checklistItems.length) * 100);
   const currentDirtySnapshot = buildInventoryCheckDirtySnapshot({
     checkedAt,
     statuses,
@@ -168,13 +170,13 @@ export function InventoryCheckModal({
       return;
     }
 
-    const missingItem = INVENTORY_SERVICE_CHECKLIST_ITEMS.find((item) => !statuses[item.item_number]);
+    const missingItem = checklistItems.find((item) => !statuses[item.item_number]);
     if (missingItem) {
       setError(`Choose Pass, Fail, or N/A for item ${missingItem.item_number}: ${missingItem.label}.`);
       return;
     }
 
-    const failedWithoutComment = INVENTORY_SERVICE_CHECKLIST_ITEMS.find(
+    const failedWithoutComment = checklistItems.find(
       (item) => statuses[item.item_number] === 'attention' && !comments[item.item_number]?.trim(),
     );
     if (failedWithoutComment) {
@@ -182,7 +184,7 @@ export function InventoryCheckModal({
       return;
     }
 
-    const checklistItems = INVENTORY_SERVICE_CHECKLIST_ITEMS.map((item) => ({
+    const submittedChecklistItems = checklistItems.map((item) => ({
       ...item,
       status: statuses[item.item_number],
       comment: comments[item.item_number]?.trim() || null,
@@ -191,8 +193,8 @@ export function InventoryCheckModal({
     await onSubmit({
       checked_at: checkedAt,
       note: generalComments.trim() || null,
-      checklist_version: INVENTORY_SERVICE_CHECKLIST_VERSION,
-      checklist_items: checklistItems,
+      checklist_version: checklistDefinition.version,
+      checklist_items: submittedChecklistItems,
     });
   }
 
@@ -206,13 +208,16 @@ export function InventoryCheckModal({
       >
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
           <DialogHeader className="border-b border-border px-6 py-5 md:px-8 md:py-6">
-            <DialogTitle className="text-xl text-white">Record Inventory Check</DialogTitle>
+            <DialogTitle className="text-xl text-white">{checklistDefinition.modalTitle}</DialogTitle>
             <DialogDescription>
-              Complete the service checklist for {itemName} ({itemNumber}).
+              {checklistDefinition.modalDescription}
+              <span className="mt-1 block">
+                Item: {itemName} ({itemNumber}).
+              </span>
             </DialogDescription>
             <div className="pt-3">
               <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>{completedCount}/{INVENTORY_SERVICE_CHECKLIST_ITEMS.length} items complete</span>
+                <span>{completedCount}/{checklistItems.length} items complete</span>
                 <span>{failedCount} failed</span>
               </div>
               <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-800">
@@ -242,7 +247,7 @@ export function InventoryCheckModal({
               </div>
 
               <div className="grid gap-3 xl:grid-cols-2 xl:gap-4">
-                {INVENTORY_SERVICE_CHECKLIST_ITEMS.map((item) => {
+                {checklistItems.map((item) => {
                   const selectedStatus = statuses[item.item_number];
                   const showComment = selectedStatus === 'attention' || Boolean(comments[item.item_number]);
 
