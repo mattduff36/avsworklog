@@ -87,6 +87,13 @@ interface NormalizedUsageEvent {
   metadata: Record<string, unknown>;
 }
 
+interface ExistingUsageSession {
+  id: string;
+  event_count: number | null;
+  page_view_count: number | null;
+  heartbeat_count: number | null;
+}
+
 export interface UsageAnalyticsSummary {
   totalEvents: number;
   uniqueUsers: number;
@@ -190,6 +197,20 @@ function normalizeNumber(value: unknown): number | null {
   return Math.round(value);
 }
 
+function getUsageSessionCount(value: number | null): number {
+  return typeof value === 'number' ? value : 0;
+}
+
+function isDuplicateUsageSessionError(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+
+  const message = (error.message || '').toLowerCase();
+  return (
+    error.code === '23505' ||
+    (message.includes('duplicate key value') && message.includes('user_usage_sessions_client_session_id_key'))
+  );
+}
+
 function normalizeDeviceContext(device: Partial<UsageDeviceContext> | null | undefined, request?: Request | null): UsageDeviceContext {
   const fallbackUserAgent = request?.headers.get('user-agent') || null;
   const userAgent = normalizeText(device?.userAgent, MAX_USER_AGENT_LENGTH) || fallbackUserAgent;
@@ -243,6 +264,73 @@ function normalizeClientUsageEvent(payload: ClientUsageEventPayload, fallbackCli
   };
 }
 
+async function findUsageSessionByClientId(
+  admin: ReturnType<typeof createAdminClient>,
+  clientSessionId: string
+): Promise<ExistingUsageSession | null> {
+  const { data: existing, error: selectError } = await admin
+    .from('user_usage_sessions')
+    .select('id, event_count, page_view_count, heartbeat_count')
+    .eq('client_session_id', clientSessionId)
+    .maybeSingle();
+
+  if (selectError) {
+    throw new Error(selectError.message);
+  }
+
+  return existing;
+}
+
+async function updateUsageSession({
+  admin,
+  existing,
+  current,
+  appSessionId,
+  device,
+  lastEvent,
+  eventsLength,
+  pageViewCount,
+  heartbeatCount,
+}: {
+  admin: ReturnType<typeof createAdminClient>;
+  existing: ExistingUsageSession;
+  current: CurrentProfileContext;
+  appSessionId: string | null;
+  device: UsageDeviceContext;
+  lastEvent: NormalizedUsageEvent | null;
+  eventsLength: number;
+  pageViewCount: number;
+  heartbeatCount: number;
+}): Promise<string> {
+  const { error: updateError } = await admin
+    .from('user_usage_sessions')
+    .update({
+      user_id: current.profile.id,
+      app_session_id: appSessionId,
+      last_seen_at: lastEvent?.occurred_at || new Date().toISOString(),
+      exit_path: lastEvent?.normalized_path || lastEvent?.path || null,
+      user_agent: device.userAgent,
+      browser_name: device.browserName,
+      browser_version: device.browserVersion,
+      os_name: device.osName,
+      device_type: device.deviceType,
+      viewport_width: device.viewportWidth,
+      viewport_height: device.viewportHeight,
+      locale: device.locale,
+      timezone: device.timezone,
+      event_count: getUsageSessionCount(existing.event_count) + eventsLength,
+      page_view_count: getUsageSessionCount(existing.page_view_count) + pageViewCount,
+      heartbeat_count: getUsageSessionCount(existing.heartbeat_count) + heartbeatCount,
+    })
+    .eq('id', existing.id);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  return existing.id;
+}
+
 async function getUsageSessionId({
   admin,
   current,
@@ -265,48 +353,20 @@ async function getUsageSessionId({
   const pageViewCount = events.filter((event) => event.event_name === 'page_view').length;
   const heartbeatCount = events.filter((event) => event.event_name === 'session_heartbeat').length;
 
-  const { data: existing, error: selectError } = await admin
-    .from('user_usage_sessions')
-    .select('id, event_count, page_view_count, heartbeat_count')
-    .eq('client_session_id', clientSessionId)
-    .maybeSingle();
-
-  if (selectError) {
-    throw new Error(selectError.message);
-  }
+  const existing = await findUsageSessionByClientId(admin, clientSessionId);
 
   if (existing?.id) {
-    const currentEventCount = typeof existing.event_count === 'number' ? existing.event_count : 0;
-    const currentPageViewCount = typeof existing.page_view_count === 'number' ? existing.page_view_count : 0;
-    const currentHeartbeatCount = typeof existing.heartbeat_count === 'number' ? existing.heartbeat_count : 0;
-
-    const { error: updateError } = await admin
-      .from('user_usage_sessions')
-      .update({
-        user_id: current.profile.id,
-        app_session_id: appSessionId,
-        last_seen_at: lastEvent?.occurred_at || new Date().toISOString(),
-        exit_path: lastEvent?.normalized_path || lastEvent?.path || null,
-        user_agent: device.userAgent,
-        browser_name: device.browserName,
-        browser_version: device.browserVersion,
-        os_name: device.osName,
-        device_type: device.deviceType,
-        viewport_width: device.viewportWidth,
-        viewport_height: device.viewportHeight,
-        locale: device.locale,
-        timezone: device.timezone,
-        event_count: currentEventCount + events.length,
-        page_view_count: currentPageViewCount + pageViewCount,
-        heartbeat_count: currentHeartbeatCount + heartbeatCount,
-      })
-      .eq('id', existing.id);
-
-    if (updateError) {
-      throw new Error(updateError.message);
-    }
-
-    return existing.id as string;
+    return updateUsageSession({
+      admin,
+      existing,
+      current,
+      appSessionId,
+      device,
+      lastEvent,
+      eventsLength: events.length,
+      pageViewCount,
+      heartbeatCount,
+    });
   }
 
   const { data: created, error: insertError } = await admin
@@ -336,8 +396,29 @@ async function getUsageSessionId({
     .select('id')
     .single();
 
-  if (insertError || !created?.id) {
-    throw new Error(insertError?.message || 'Failed to create usage session');
+  if (insertError) {
+    if (isDuplicateUsageSessionError(insertError)) {
+      const racedSession = await findUsageSessionByClientId(admin, clientSessionId);
+      if (racedSession?.id) {
+        return updateUsageSession({
+          admin,
+          existing: racedSession,
+          current,
+          appSessionId,
+          device,
+          lastEvent,
+          eventsLength: events.length,
+          pageViewCount,
+          heartbeatCount,
+        });
+      }
+    }
+
+    throw new Error(insertError.message);
+  }
+
+  if (!created?.id) {
+    throw new Error('Failed to create usage session');
   }
 
   return created.id as string;
