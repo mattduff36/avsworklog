@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.14.3
+
+**GIT COMMIT MESSAGE**
+`fix(layout): update sidebar navigation styling, absence workflow, and 5 more areas`
+
+**WHAT CHANGED**
+Update sidebar navigation styling, absence workflow, and 5 more areas.
+
+**COMMITS IN THIS RELEASE**
+- `fix(layout): update sidebar navigation styling, absence workflow, and 5 more areas`
+
 ## 0626.14.2
 
 **GIT COMMIT MESSAGE**
