@@ -1,7 +1,7 @@
 /// <reference types="@testing-library/jest-dom/vitest" />
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { JobCodeFields } from '@/components/timesheets/JobCodeFields';
 import type { TimesheetJobCodeOption } from '@/lib/client/timesheet-job-codes';
 
@@ -9,7 +9,23 @@ vi.mock('@/components/ui/dialog', () => ({
   Dialog: ({ children, open }: { children: ReactNode; open?: boolean }) => (
     open ? <div data-testid="job-code-dialog">{children}</div> : null
   ),
-  DialogContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DialogContent: ({
+    children,
+    className,
+    style,
+  }: {
+    children: ReactNode;
+    className?: string;
+    style?: CSSProperties;
+  }) => (
+    <div
+      className={className}
+      data-testid="job-code-dialog-panel"
+      data-top-style={String(style?.top || '')}
+    >
+      {children}
+    </div>
+  ),
   DialogTitle: ({ children, className }: { children: ReactNode; className?: string }) => (
     <h2 className={className}>{children}</h2>
   ),
@@ -98,6 +114,29 @@ describe('JobCodeFields', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close job code search' }));
 
     expect(screen.queryByTestId('job-code-dialog')).not.toBeInTheDocument();
+  });
+
+  it('positions the picker below the mobile safe area', () => {
+    render(
+      <JobCodeFields
+        values={[]}
+        onChange={vi.fn()}
+        onAdd={vi.fn()}
+        onRemove={vi.fn()}
+        placeholder="Select job code"
+        jobCodeOptions={jobCodeOptions}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select job code' }));
+
+    expect(screen.getByTestId('job-code-dialog-panel')).toHaveClass(
+      'top-[calc(env(safe-area-inset-top,0px)+0.5rem)]'
+    );
+    expect(screen.getByTestId('job-code-dialog-panel')).toHaveAttribute(
+      'data-top-style',
+      'max(8px, calc(env(safe-area-inset-top, 0px) + 8px))'
+    );
   });
 
   it('filters and selects a legacy job code by customer or quote name', () => {

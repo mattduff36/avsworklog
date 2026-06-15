@@ -42,6 +42,8 @@ interface JobCodeFieldRowProps {
 const JOB_CODE_FILTER_MIN_LENGTH = 3;
 const PICKER_VIEWPORT_MARGIN_PX = 8;
 const PICKER_MIN_VISIBLE_HEIGHT_PX = 280;
+const PICKER_SAFE_AREA_TOP_CSS = 'env(safe-area-inset-top, 0px)';
+const PICKER_SAFE_AREA_BOTTOM_CSS = 'env(safe-area-inset-bottom, 0px)';
 
 function getOptionDescription(option: TimesheetJobCodeOption): string {
   const description = [option.customerName, option.quoteTitle]
@@ -71,21 +73,33 @@ function optionMatchesFilter(option: TimesheetJobCodeOption, filterValue: string
     || Boolean(normalizedJobCodeQuery && option.value.toLowerCase().includes(normalizedJobCodeQuery));
 }
 
+function getPickerTopCss(viewportTop: number): string {
+  const visualViewportTop = Math.max(
+    PICKER_VIEWPORT_MARGIN_PX,
+    viewportTop + PICKER_VIEWPORT_MARGIN_PX
+  );
+
+  return `max(${visualViewportTop}px, calc(${PICKER_SAFE_AREA_TOP_CSS} + ${PICKER_VIEWPORT_MARGIN_PX}px))`;
+}
+
+function getPickerMaxHeightCss(viewportTop: number, viewportHeight: number, topCss: string): string {
+  const visualViewportBottom = viewportTop + viewportHeight;
+
+  return `max(${PICKER_MIN_VISIBLE_HEIGHT_PX}px, calc(${visualViewportBottom}px - ${topCss} - ${PICKER_VIEWPORT_MARGIN_PX}px - ${PICKER_SAFE_AREA_BOTTOM_CSS}))`;
+}
+
 function getKeyboardAwarePickerStyle(): CSSProperties {
   if (typeof window === 'undefined') return {};
 
   const visualViewport = window.visualViewport;
   const viewportTop = visualViewport?.offsetTop ?? 0;
   const viewportHeight = visualViewport?.height ?? window.innerHeight;
-  const top = Math.max(PICKER_VIEWPORT_MARGIN_PX, viewportTop + PICKER_VIEWPORT_MARGIN_PX);
-  const maxHeight = Math.max(
-    PICKER_MIN_VISIBLE_HEIGHT_PX,
-    viewportHeight - (PICKER_VIEWPORT_MARGIN_PX * 2)
-  );
+  const top = getPickerTopCss(viewportTop);
+  const maxHeight = getPickerMaxHeightCss(viewportTop, viewportHeight, top);
 
   return {
-    top: `${top}px`,
-    maxHeight: `${maxHeight}px`,
+    top,
+    maxHeight,
   };
 }
 
@@ -114,11 +128,18 @@ function JobCodeFieldRow({
   );
 
   function handlePickerOpenChange(open: boolean) {
+    if (open) setPickerViewportStyle(getKeyboardAwarePickerStyle());
+
     setIsPickerOpen(open);
     if (!open) {
       setFilterValue('');
       setPickerViewportStyle({});
     }
+  }
+
+  function openPicker() {
+    setPickerViewportStyle(getKeyboardAwarePickerStyle());
+    setIsPickerOpen(true);
   }
 
   useEffect(() => {
@@ -170,7 +191,7 @@ function JobCodeFieldRow({
         type="button"
         disabled={disabled}
         aria-label={normalizedValue ? `Selected job code ${normalizedValue}` : 'Select job code'}
-        onClick={() => setIsPickerOpen(true)}
+        onClick={openPicker}
         className={cn(
           'flex h-9 w-full items-center justify-center rounded-md border border-input bg-transparent px-3 py-2 text-center text-sm shadow-sm ring-offset-background transition-colors focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
           trailingControl ? 'pr-11' : '',
@@ -184,7 +205,7 @@ function JobCodeFieldRow({
       <Dialog open={isPickerOpen} onOpenChange={handlePickerOpenChange}>
         <DialogContent
           hideCloseButton
-          className="left-2 right-2 top-2 flex max-h-[calc(100dvh-1rem)] w-auto max-w-none translate-x-0 translate-y-0 flex-col gap-3 overflow-hidden rounded-xl border border-slate-700 bg-slate-950 p-4 text-white sm:left-1/2 sm:right-auto sm:top-4 sm:w-[calc(100vw-2rem)] sm:max-w-xl sm:-translate-x-1/2"
+          className="left-2 right-2 top-[calc(env(safe-area-inset-top,0px)+0.5rem)] flex max-h-[calc(100dvh-1rem)] w-auto max-w-none translate-x-0 translate-y-0 flex-col gap-3 overflow-hidden rounded-xl border border-slate-700 bg-slate-950 p-4 text-white sm:left-1/2 sm:right-auto sm:top-4 sm:w-[calc(100vw-2rem)] sm:max-w-xl sm:-translate-x-1/2"
           style={pickerViewportStyle}
         >
           <DialogTitle className="sr-only">Choose job code</DialogTitle>
