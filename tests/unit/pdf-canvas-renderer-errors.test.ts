@@ -53,6 +53,13 @@ describe('isExpectedPdfLoadError', () => {
     expect(getPdfLoadMessage(error)).toBe('This PDF link has expired or is unavailable. Please reopen the document and try again.');
   });
 
+  it('returns true for transient HTTP PDF load responses', () => {
+    const error = new Error('Unexpected server response (504) while retrieving PDF');
+
+    expect(isExpectedPdfLoadError(error)).toBe(true);
+    expect(getPdfLoadMessage(error)).toBe('The PDF service did not respond in time. Please try reopening the document.');
+  });
+
   it('returns true for transient browser PDF network failures', () => {
     const error = new Error('Load failed');
     error.name = 'UnknownErrorException';

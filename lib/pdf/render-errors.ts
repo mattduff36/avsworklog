@@ -18,6 +18,11 @@ export function isExpectedPdfLoadError(error: unknown): boolean {
 
   const name = error.name.toLowerCase();
   const message = error.message.toLowerCase();
+  const unexpectedServerResponseMatch = message.match(/unexpected server response \((\d{3})\)/);
+  const unexpectedServerResponseStatus = unexpectedServerResponseMatch
+    ? Number.parseInt(unexpectedServerResponseMatch[1], 10)
+    : null;
+
   return (
     isNetworkFetchError(error) ||
     name.includes('invalidpdfexception') ||
@@ -25,7 +30,10 @@ export function isExpectedPdfLoadError(error: unknown): boolean {
     message.includes('unexpected server response (400)') ||
     message.includes('unexpected server response (401)') ||
     message.includes('unexpected server response (403)') ||
-    message.includes('unexpected server response (404)')
+    message.includes('unexpected server response (404)') ||
+    unexpectedServerResponseStatus === 408 ||
+    unexpectedServerResponseStatus === 429 ||
+    (unexpectedServerResponseStatus !== null && unexpectedServerResponseStatus >= 500)
   );
 }
 
@@ -45,6 +53,18 @@ export function getPdfLoadMessage(error: unknown): string {
 
   if (/404/.test(message) && message.includes('Unexpected server response')) {
     return 'This PDF is no longer available.';
+  }
+
+  const unexpectedServerResponseMatch = message.match(/Unexpected server response \((\d{3})\)/);
+  const unexpectedServerResponseStatus = unexpectedServerResponseMatch
+    ? Number.parseInt(unexpectedServerResponseMatch[1], 10)
+    : null;
+  if (
+    unexpectedServerResponseStatus === 408 ||
+    unexpectedServerResponseStatus === 429 ||
+    (unexpectedServerResponseStatus !== null && unexpectedServerResponseStatus >= 500)
+  ) {
+    return 'The PDF service did not respond in time. Please try reopening the document.';
   }
 
   if (error.name === 'InvalidPDFException' || message.includes('Invalid PDF structure')) {
