@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.16.0
+
+**GIT COMMIT MESSAGE**
+`feat(fleet): update fleet workflow and API routes`
+
+**WHAT CHANGED**
+Update fleet workflow and API routes.
+
+**COMMITS IN THIS RELEASE**
+- `feat(fleet): update fleet workflow and API routes`
+
 ## 0626.15.1
 
 **GIT COMMIT MESSAGE**
