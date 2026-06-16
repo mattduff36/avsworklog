@@ -60,14 +60,17 @@ export async function GET(request: NextRequest) {
 
     const approvers = await filterHiddenSystemTestAccountProfiles(admin, approversResult.data || []);
 
-    return NextResponse.json({
+    const metadata = {
       managerOptions,
-      customers: customersResult.data || [],
       approvers: approvers.map(approver => ({
         ...approver,
         email: null,
       })),
-    });
+    };
+
+    return NextResponse.json(includeCustomers
+      ? { ...metadata, customers: customersResult.data || [] }
+      : metadata);
   } catch (error) {
     console.error('Error fetching quote metadata:', error);
     return NextResponse.json({ error: 'Unable to load quote settings right now.' }, { status: 500 });

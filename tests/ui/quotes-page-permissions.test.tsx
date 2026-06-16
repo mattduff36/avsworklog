@@ -12,6 +12,7 @@ const pushMock = vi.fn();
 const mockUsePermissionCheck = vi.fn();
 const mockFetchAllPaginatedItems = vi.fn();
 const quotesTableMock = vi.fn();
+const quoteFormDialogMock = vi.fn();
 let searchParamsMock = new URLSearchParams();
 
 vi.mock('next/navigation', () => ({
@@ -130,7 +131,10 @@ vi.mock('@/app/(dashboard)/quotes/components/QuoteDetailsModal', () => ({
 }));
 
 vi.mock('@/app/(dashboard)/quotes/components/QuoteFormDialog', () => ({
-  QuoteFormDialog: () => null,
+  QuoteFormDialog: (props: { open: boolean; customers: Array<{ id: string; company_name: string }> }) => {
+    quoteFormDialogMock(props);
+    return props.open ? <div data-testid="quote-form-dialog" /> : null;
+  },
 }));
 
 describe('Quotes page customer access states', () => {
@@ -191,6 +195,76 @@ describe('Quotes page customer access states', () => {
     expect(
       mockFetchAllPaginatedItems.mock.calls.some(([endpoint]) => endpoint === '/api/customers')
     ).toBe(false);
+  });
+
+  it('loads customers before opening the new quote form when initial metadata omits them', async () => {
+    mockUsePermissionCheck.mockImplementation((moduleName: string) => {
+      if (moduleName === 'quotes' || moduleName === 'customers') {
+        return { hasPermission: true, loading: false };
+      }
+
+      return { hasPermission: false, loading: false };
+    });
+
+    const customer = {
+      id: 'customer-1',
+      company_name: 'Acme Ltd',
+      short_name: null,
+      contact_name: 'Alice Example',
+      contact_email: 'alice@example.com',
+      address_line_1: '1 Example Street',
+      address_line_2: null,
+      city: 'Nottingham',
+      county: null,
+      postcode: 'NG1 1AA',
+      default_validity_days: 30,
+      secondary_contacts: [],
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+
+      if (url === '/api/quotes/metadata?include_customers=true') {
+        return {
+          ok: true,
+          json: async () => ({
+            managerOptions: [],
+            approvers: [],
+            customers: [customer],
+          }),
+        } as Response;
+      }
+
+      if (url.includes('/api/quotes/metadata')) {
+        return {
+          ok: true,
+          json: async () => ({
+            managerOptions: [],
+            approvers: [],
+          }),
+        } as Response;
+      }
+
+      return {
+        ok: true,
+        json: async () => ({}),
+      } as Response;
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    render(<QuotesPage />);
+
+    const newQuoteButton = await screen.findByRole('button', { name: 'New Quote' });
+    await waitFor(() => expect(newQuoteButton).not.toBeDisabled());
+
+    fireEvent.click(newQuoteButton);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/quotes/metadata?include_customers=true');
+      expect(screen.getByTestId('quote-form-dialog')).toBeInTheDocument();
+    });
+    expect(quoteFormDialogMock.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({
+      customers: [customer],
+    }));
   });
 
   it('renders quote page tabs in the requested order', async () => {
