@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.18.0
+
+**GIT COMMIT MESSAGE**
+`feat(timesheets): update timesheet workflow, database migrations, and 2 more areas`
+
+**WHAT CHANGED**
+Update timesheet workflow, database migrations, and 2 more areas.
+
+**COMMITS IN THIS RELEASE**
+- `feat(timesheets): update timesheet workflow, database migrations, and 2 more areas`
+
 ## 0626.17.0
 
 **GIT COMMIT MESSAGE**
