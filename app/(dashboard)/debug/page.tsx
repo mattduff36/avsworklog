@@ -11,7 +11,7 @@ import { PageLoader } from '@/components/ui/page-loader';
 import { PanelLoader } from '@/components/ui/panel-loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SensitiveModuleGate, SensitiveModuleSessionManager, useSensitiveModuleAccess } from '@/components/security/SensitiveModuleGate';
-import { BarChart3, Bug, Car, FlaskConical, History, RefreshCw, Send, type LucideIcon } from 'lucide-react';
+import { BarChart3, Bug, Car, FlaskConical, History, KeyRound, RefreshCw, Send, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { canAccessDebugConsole } from '@/lib/utils/debug-access';
 
@@ -37,6 +37,10 @@ const NotificationSettingsDebugPanel = dynamic(
   () => import('./components/NotificationSettingsDebugPanel').then((mod) => ({ default: mod.NotificationSettingsDebugPanel })),
   { loading: debugTabLoading },
 );
+const LegacyJobCodesDebugPanel = dynamic(
+  () => import('./components/LegacyJobCodesDebugPanel').then((mod) => ({ default: mod.LegacyJobCodesDebugPanel })),
+  { loading: debugTabLoading },
+);
 const TestFleetDebugPanel = dynamic(
   () => import('./components/TestFleetDebugPanel').then((mod) => ({ default: mod.TestFleetDebugPanel })),
   { loading: debugTabLoading },
@@ -52,6 +56,7 @@ type DebugTab =
   | 'usage-analytics'
   | 'dvla-sync'
   | 'test-fleet'
+  | 'legacy-job-codes'
   | 'notification-settings'
   | 'emulation-tests';
 
@@ -72,6 +77,9 @@ const DEBUG_TAB_ALIASES: Record<string, DebugTab> = {
   dvla: 'dvla-sync',
   'dvla-sync': 'dvla-sync',
   'test-fleet': 'test-fleet',
+  legacy: 'legacy-job-codes',
+  'legacy-codes': 'legacy-job-codes',
+  'legacy-job-codes': 'legacy-job-codes',
   notifications: 'notification-settings',
   'notification-settings': 'notification-settings',
   emulation: 'emulation-tests',
@@ -84,6 +92,7 @@ const DEBUG_TABS: DebugTabConfig[] = [
   { value: 'usage-analytics', label: 'Usage Analytics', icon: BarChart3 },
   { value: 'dvla-sync', label: 'DVLA Sync', icon: RefreshCw },
   { value: 'test-fleet', label: 'Test Fleet', icon: Car },
+  { value: 'legacy-job-codes', label: 'Legacy Job Codes', icon: KeyRound },
   { value: 'notification-settings', label: 'Notification Settings', icon: Send },
   { value: 'emulation-tests', label: 'Emulation Tests', icon: FlaskConical },
 ];
@@ -183,7 +192,7 @@ export default function DebugPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as DebugTab)} className="space-y-6">
-        <TabsList className="grid h-auto w-full grid-cols-7 gap-1 bg-slate-900/50 p-1 lg:flex lg:w-auto lg:flex-wrap lg:justify-start lg:gap-0 lg:p-1.5">
+        <TabsList className="grid h-auto w-full grid-cols-4 gap-1 bg-slate-900/50 p-1 sm:grid-cols-8 lg:flex lg:w-auto lg:flex-wrap lg:justify-start lg:gap-0 lg:p-1.5">
           {DEBUG_TABS.map(({ value, label, icon: Icon }) => (
             <TabsTrigger
               key={value}
@@ -216,6 +225,10 @@ export default function DebugPage() {
 
         <TabsContent value="test-fleet">
           <TestFleetDebugPanel />
+        </TabsContent>
+
+        <TabsContent value="legacy-job-codes">
+          <LegacyJobCodesDebugPanel />
         </TabsContent>
 
         <TabsContent value="notification-settings">
