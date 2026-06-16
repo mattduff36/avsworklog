@@ -22,6 +22,7 @@ import { Database } from '@/types/database';
 import { isAdminRole } from '@/lib/utils/role-access';
 import { Employee } from '@/types/common';
 import { toast } from 'sonner';
+import { isSubsistencePaymentRequired } from '@/lib/utils/timesheet-subsistence';
 import {
   buildValidationErrors,
   createBlankEntry,
@@ -195,6 +196,7 @@ export function PlantTimesheetV2({
             job_number: existingEntry.job_number || '',
             job_numbers: existingEntry.job_number ? [existingEntry.job_number] : [],
             working_in_yard: existingEntry.working_in_yard || false,
+            subsistence_payment_required: isSubsistencePaymentRequired(existingEntry),
             time_started: existingEntry.time_started || '',
             time_finished: existingEntry.time_finished || '',
             operator_travel_hours: toHoursInput(existingEntry.operator_travel_hours),
@@ -357,6 +359,7 @@ export function PlantTimesheetV2({
           daily_total: recalculated.daily_total,
           job_number: null,
           working_in_yard: (operatorYard || 0) > 0,
+          subsistence_payment_required: false,
           did_not_work: recalculated.did_not_work,
           night_shift: false,
           bank_holiday: false,

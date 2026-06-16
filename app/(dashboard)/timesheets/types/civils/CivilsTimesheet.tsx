@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PanelLoader } from '@/components/ui/panel-loader';
-import { ArrowLeft, Save, Check, AlertCircle, XCircle, Home, User } from 'lucide-react';
+import { ArrowLeft, Save, Check, AlertCircle, XCircle, Home, User, Moon } from 'lucide-react';
 import Link from 'next/link';
 // Removed: getWeekEnding, formatDateISO - no longer needed (week comes from props)
 import { calculateStandardTimesheetHours, formatHours, roundTimeToNearestQuarterHour } from '@/lib/utils/time-calculations';
@@ -60,6 +60,11 @@ import {
   getPrimaryJobNumber,
   normalizeJobNumberInput,
 } from '@/lib/utils/timesheet-job-codes';
+import {
+  hasWorkedTimesForSubsistence,
+  isSubsistencePaymentRequired,
+  syncSubsistenceRemark,
+} from '@/lib/utils/timesheet-subsistence';
 
 /**
  * Civils Timesheet Component
@@ -93,6 +98,7 @@ const createBlankEntry = (dayOfWeek: number): TimesheetEntryDraft => ({
   job_number: '',
   job_numbers: [],
   working_in_yard: false,
+  subsistence_payment_required: false,
   did_not_work: false,
   didNotWorkReason: null,
   night_shift: false,
@@ -759,6 +765,7 @@ export function CivilsTimesheet({
           job_number: getPrimaryJobNumber(existingEntry) || '',
           job_numbers: getEntryJobNumbers(existingEntry),
           working_in_yard: existingEntry.working_in_yard || false,
+          subsistence_payment_required: isSubsistencePaymentRequired(existingEntry),
           did_not_work: existingEntry.did_not_work || false,
           didNotWorkReason: inferredReason,
           night_shift: existingEntry.night_shift || false,
@@ -817,6 +824,7 @@ export function CivilsTimesheet({
           job_number: '',
           job_numbers: [],
           working_in_yard: false,
+          subsistence_payment_required: false,
           daily_total: 0,
           remarks: requiredReason ? formatDidNotWorkReasonRemark(requiredReason) : '',
         };
@@ -899,6 +907,15 @@ export function CivilsTimesheet({
         };
       }
 
+      if (field === 'subsistence_payment_required') {
+        const isRequired = Boolean(value);
+        newEntries[dayIndex] = {
+          ...newEntries[dayIndex],
+          subsistence_payment_required: isRequired,
+          remarks: syncSubsistenceRemark(newEntries[dayIndex].remarks, isRequired),
+        };
+      }
+
       // Auto-calculate daily total if both times are present
       if (field === 'time_started' || field === 'time_finished') {
         const entry = newEntries[dayIndex];
@@ -944,6 +961,14 @@ export function CivilsTimesheet({
             );
           }
         }
+
+        if (!hasWorkedTimesForSubsistence(newEntries[dayIndex])) {
+          newEntries[dayIndex] = {
+            ...newEntries[dayIndex],
+            subsistence_payment_required: false,
+            remarks: syncSubsistenceRemark(newEntries[dayIndex].remarks, false),
+          };
+        }
       }
     }
 
@@ -974,6 +999,27 @@ export function CivilsTimesheet({
     }
 
     updateEntry(dayIndex, 'did_not_work', true);
+  }
+
+  function handleSubsistenceToggle(dayIndex: number) {
+    const entry = entries[dayIndex];
+    const nextValue = !entry.subsistence_payment_required;
+
+    if (nextValue && !hasWorkedTimesForSubsistence(entry)) {
+      toast.info('Enter start and finish times before adding subsistence.', {
+        id: `timesheet-subsistence-blocked-${dayIndex}`,
+        description: 'Use this when the worker stayed away overnight and needs subsistence payment.',
+      });
+      return;
+    }
+
+    updateEntry(dayIndex, 'subsistence_payment_required', nextValue);
+    toast.success(nextValue ? 'Subsistence payment added' : 'Subsistence payment removed', {
+      id: `timesheet-subsistence-toggle-${dayIndex}`,
+      description: nextValue
+        ? 'This day will be marked as stayed away for payroll.'
+        : 'The stayed-away payroll marker has been removed for this day.',
+    });
   }
 
   function handleDidNotWorkReasonConfirm(reason: string) {
@@ -1273,6 +1319,9 @@ export function CivilsTimesheet({
             (entry.did_not_work
               ? (offDay && !offDay.isExpectedShiftDay ? 'Not on Shift' : 'Did Not Work')
               : '');
+          const requiresSubsistence =
+            Boolean(entry.subsistence_payment_required) && hasWorkedTimesForSubsistence(entry);
+          const persistedRemarks = syncSubsistenceRemark(normalizedRemarks, requiresSubsistence);
           
           return {
             timesheet_id: timesheetId,
@@ -1281,11 +1330,12 @@ export function CivilsTimesheet({
             time_finished: entry.time_finished || null,
             job_number: persistedJobNumbers[0] || null,
             working_in_yard: entry.working_in_yard,
+            subsistence_payment_required: requiresSubsistence,
             did_not_work: entry.did_not_work,
             night_shift: isNight,
             bank_holiday: isBankHol,
             daily_total: entry.daily_total,
-            remarks: normalizedRemarks || null,
+            remarks: persistedRemarks || null,
           };
         });
 
@@ -1615,7 +1665,7 @@ export function CivilsTimesheet({
 
                   <div className="space-y-4 max-w-full">
                     {/* Start and Finish Time - Side by Side on Mobile */}
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_4rem] gap-3 items-end">
                       <div className="space-y-2">
                         <Label className="text-foreground text-xl">Start Time</Label>
                         <MobileNumericTimeInput
@@ -1640,6 +1690,25 @@ export function CivilsTimesheet({
                             timeErrors[index] ? 'border-red-500' : ''
                           }`}
                         />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-foreground text-sm leading-tight">Subsistence</Label>
+                        <button
+                          type="button"
+                          aria-pressed={entry.subsistence_payment_required}
+                          aria-label={`${DAY_NAMES[index]} subsistence payment required`}
+                          title="Stayed away - subsistence payment required"
+                          onClick={() => handleSubsistenceToggle(index)}
+                          disabled={disableWorkingInputs}
+                          className={`flex h-16 w-16 items-center justify-center rounded-lg border-2 transition-all ${
+                            entry.subsistence_payment_required
+                              ? 'bg-emerald-500/20 border-emerald-500 shadow-lg shadow-emerald-500/20'
+                              : 'bg-slate-800/30 border-slate-700 hover:bg-slate-800/50'
+                          } disabled:opacity-30 disabled:cursor-not-allowed`}
+                        >
+                          <Moon className={`h-7 w-7 ${entry.subsistence_payment_required ? 'text-emerald-400' : 'text-muted-foreground'}`} />
+                        </button>
                       </div>
                     </div>
                     {timeErrors[index] && (
@@ -1899,6 +1968,21 @@ export function CivilsTimesheet({
                             title="Did Not Work"
                           >
                             <XCircle className={`h-5 w-5 ${entry.did_not_work ? 'text-amber-400' : 'text-muted-foreground'}`} />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleSubsistenceToggle(index)}
+                            disabled={disableWorkingInputs}
+                            aria-pressed={entry.subsistence_payment_required}
+                            className={`flex items-center justify-center w-10 h-10 rounded-lg border-2 transition-all ${
+                              entry.subsistence_payment_required
+                                ? 'bg-emerald-500/20 border-emerald-500 shadow-lg shadow-emerald-500/20'
+                                : 'bg-slate-800/30 border-slate-700 hover:bg-slate-800/50'
+                            } disabled:opacity-30 disabled:cursor-not-allowed`}
+                            title="Subsistence Payment"
+                          >
+                            <Moon className={`h-5 w-5 ${entry.subsistence_payment_required ? 'text-emerald-400' : 'text-muted-foreground'}`} />
                           </button>
 
                           {hasTrainingBooking && (

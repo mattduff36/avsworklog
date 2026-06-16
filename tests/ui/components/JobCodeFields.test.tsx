@@ -1,6 +1,6 @@
 /// <reference types="@testing-library/jest-dom/vitest" />
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { CSSProperties, ReactNode } from 'react';
 import { JobCodeFields } from '@/components/timesheets/JobCodeFields';
 import type { TimesheetJobCodeOption } from '@/lib/client/timesheet-job-codes';
@@ -94,6 +94,104 @@ describe('JobCodeFields', () => {
       target: { value: 'sa' },
     });
     expect(screen.queryByRole('button', { name: /4323-GH/ })).not.toBeInTheDocument();
+  });
+
+  it('shows square add and remove controls only after a primary code is selected', () => {
+    const handleAdd = vi.fn();
+    const handleRemove = vi.fn();
+    const { rerender } = render(
+      <JobCodeFields
+        values={[]}
+        onChange={vi.fn()}
+        onAdd={handleAdd}
+        onRemove={handleRemove}
+        placeholder="Select job code"
+        jobCodeOptions={jobCodeOptions}
+      />
+    );
+
+    expect(screen.queryByRole('button', { name: 'Add another job code' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove job code 1' })).not.toBeInTheDocument();
+
+    rerender(
+      <JobCodeFields
+        values={['40001-GH']}
+        onChange={vi.fn()}
+        onAdd={handleAdd}
+        onRemove={handleRemove}
+        placeholder="Select job code"
+        jobCodeOptions={jobCodeOptions}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove job code 1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add another job code' }));
+    expect(handleRemove).toHaveBeenCalledWith(0);
+    expect(handleAdd).not.toHaveBeenCalled();
+  });
+
+  it('shows delete on every populated row and add only on the last row', () => {
+    render(
+      <JobCodeFields
+        values={['40001-GH', '4323-GH']}
+        onChange={vi.fn()}
+        onAdd={vi.fn()}
+        onRemove={vi.fn()}
+        placeholder="Select job code"
+        jobCodeOptions={jobCodeOptions}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Remove job code 1' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove job code 2' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Add another job code' })).toHaveLength(1);
+  });
+
+  it('opens the picker for a newly added row and removes it when closed empty', async () => {
+    const handleChange = vi.fn();
+    const handleRemove = vi.fn();
+    render(
+      <JobCodeFields
+        values={['40001-GH']}
+        onChange={handleChange}
+        onAdd={vi.fn()}
+        onRemove={handleRemove}
+        placeholder="Select job code"
+        jobCodeOptions={jobCodeOptions}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add another job code' }));
+
+    await waitFor(() => expect(screen.getByTestId('job-code-dialog')).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: 'Select job code' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Close job code search' }));
+
+    expect(handleRemove).not.toHaveBeenCalled();
+    expect(handleChange).not.toHaveBeenCalled();
+  });
+
+  it('writes a newly selected job code into the next index', async () => {
+    const handleChange = vi.fn();
+    render(
+      <JobCodeFields
+        values={['40001-GH']}
+        onChange={handleChange}
+        onAdd={vi.fn()}
+        onRemove={vi.fn()}
+        placeholder="Select job code"
+        jobCodeOptions={jobCodeOptions}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add another job code' }));
+    await waitFor(() => expect(screen.getByTestId('job-code-dialog')).toBeInTheDocument());
+    fireEvent.change(screen.getByPlaceholderText('Search code, customer, or name'), {
+      target: { value: 'gob' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /4323-GH/ }));
+
+    expect(handleChange).toHaveBeenCalledWith(1, '4323-GH');
   });
 
   it('closes the picker from the inline close button', () => {

@@ -29,7 +29,7 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageLoader } from '@/components/ui/page-loader';
-import { AlertCircle, ArrowLeft, Check, Home, Save, User, Wrench, XCircle } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Check, Home, Moon, Save, User, Wrench, XCircle } from 'lucide-react';
 import { DAY_NAMES } from '@/types/timesheet';
 import { formatHours, roundTimeToNearestQuarterHour } from '@/lib/utils/time-calculations';
 import { SignaturePad } from '@/components/forms/SignaturePad';
@@ -71,6 +71,11 @@ import {
   getPrimaryJobNumber,
   normalizeJobNumberInput,
 } from '@/lib/utils/timesheet-job-codes';
+import {
+  hasWorkedTimesForSubsistence,
+  isSubsistencePaymentRequired,
+  syncSubsistenceRemark,
+} from '@/lib/utils/timesheet-subsistence';
 import type { WorkShiftPattern } from '@/types/work-shifts';
 import {
   buildValidationErrors,
@@ -541,6 +546,7 @@ export function PlantTimesheetV2({
             job_number: getPrimaryJobNumber(existingEntry) || '',
             job_numbers: getEntryJobNumbers(existingEntry),
             working_in_yard: existingEntry.working_in_yard || false,
+            subsistence_payment_required: isSubsistencePaymentRequired(existingEntry),
             time_started: existingEntry.time_started || '',
             time_finished: existingEntry.time_finished || '',
             operator_travel_hours: toHoursInput(existingEntry.operator_travel_hours),
@@ -769,11 +775,21 @@ export function PlantTimesheetV2({
         typeof normalizedValue === 'string' && (field === 'time_started' || field === 'time_finished')
           ? getMachineMirrorUpdates(currentEntry, field, normalizedValue)
           : {};
-      const updated = recalculateEntry({
+      let updated = recalculateEntry({
         ...currentEntry,
         [field]: normalizedValue,
         ...machineMirrorUpdates,
       } as PlantEntryDraft, getRecalculateOptionsForOffDay(offDayState));
+      if (
+        (field === 'time_started' || field === 'time_finished') &&
+        !hasWorkedTimesForSubsistence(updated)
+      ) {
+        updated = {
+          ...updated,
+          subsistence_payment_required: false,
+          remarks: syncSubsistenceRemark(updated.remarks, false),
+        };
+      }
       next[dayIndex] = updated;
       return next;
     });
@@ -783,10 +799,19 @@ export function PlantTimesheetV2({
     setEntries((current) => {
       const next = [...current];
       const offDayState = getOffDayForIndex(dayIndex);
-      next[dayIndex] = recalculateEntry({
+      let updated = recalculateEntry({
         ...next[dayIndex],
         ...updates,
       }, getRecalculateOptionsForOffDay(offDayState));
+      if ('subsistence_payment_required' in updates) {
+        const isRequired = Boolean(updates.subsistence_payment_required);
+        updated = {
+          ...updated,
+          subsistence_payment_required: isRequired,
+          remarks: syncSubsistenceRemark(updated.remarks, isRequired),
+        };
+      }
+      next[dayIndex] = updated;
       return next;
     });
   };
@@ -854,6 +879,7 @@ export function PlantTimesheetV2({
         did_not_work: true,
         didNotWorkReason: trimmedReason ? 'Other' : next[dayIndex].didNotWorkReason || 'Other',
         working_in_yard: false,
+        subsistence_payment_required: false,
         time_started: '',
         time_finished: '',
         job_number: '',
@@ -896,6 +922,29 @@ export function PlantTimesheetV2({
       didNotWorkReason: null,
       daily_total: currentEntry.time_started && currentEntry.time_finished ? currentEntry.daily_total : null,
       remarks: parseDidNotWorkReasonRemark(existingRemarks) === existingRemarks ? existingRemarks : '',
+    });
+  };
+
+  const toggleSubsistencePayment = (dayIndex: number) => {
+    const currentEntry = entries[dayIndex];
+    const nextValue = !currentEntry.subsistence_payment_required;
+
+    if (nextValue && !hasWorkedTimesForSubsistence(currentEntry)) {
+      toast.info('Enter start and finish times before adding subsistence.', {
+        id: `plant-timesheet-subsistence-blocked-${dayIndex}`,
+        description: 'Use this when the worker stayed away overnight and needs subsistence payment.',
+      });
+      return;
+    }
+
+    updateEntry(dayIndex, {
+      subsistence_payment_required: nextValue,
+    });
+    toast.success(nextValue ? 'Subsistence payment added' : 'Subsistence payment removed', {
+      id: `plant-timesheet-subsistence-toggle-${dayIndex}`,
+      description: nextValue
+        ? 'This day will be marked as stayed away for payroll.'
+        : 'The stayed-away payroll marker has been removed for this day.',
     });
   };
 
@@ -1098,6 +1147,9 @@ export function PlantTimesheetV2({
           (recalculated.did_not_work
             ? (offDayState && !offDayState.isExpectedShiftDay ? 'Not on Shift' : 'Did Not Work')
             : '');
+        const requiresSubsistence =
+          Boolean(recalculated.subsistence_payment_required) && hasWorkedTimesForSubsistence(recalculated);
+        const persistedRemarks = syncSubsistenceRemark(normalizedRemarks, requiresSubsistence);
 
         return {
           timesheet_id: timesheetId,
@@ -1117,10 +1169,11 @@ export function PlantTimesheetV2({
           daily_total: recalculated.daily_total,
           job_number: persistedJobNumbers[0] || null,
           working_in_yard: recalculated.working_in_yard,
+          subsistence_payment_required: requiresSubsistence,
           did_not_work: recalculated.did_not_work,
           night_shift: false,
           bank_holiday: false,
-          remarks: normalizedRemarks || null,
+          remarks: persistedRemarks || null,
         };
       });
 
@@ -1555,7 +1608,7 @@ export function PlantTimesheetV2({
                     ) : null}
 
                     <div className="space-y-4 max-w-full">
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_4rem] gap-3 items-end">
                         <div className="space-y-2">
                           <Label className="text-foreground text-xl">Start Time</Label>
                           <MobileNumericTimeInput
@@ -1580,6 +1633,24 @@ export function PlantTimesheetV2({
                             }`}
                           />
                         </div>
+                        <div className="space-y-2">
+                          <Label className="text-foreground text-sm leading-tight">Subsistence</Label>
+                          <button
+                            type="button"
+                            aria-pressed={entry.subsistence_payment_required}
+                            aria-label={`${DAY_NAMES[index]} subsistence payment required`}
+                            title="Stayed away - subsistence payment required"
+                            onClick={() => toggleSubsistencePayment(index)}
+                            disabled={disableInputs}
+                            className={`flex h-16 w-16 items-center justify-center rounded-lg border-2 transition-all ${
+                              entry.subsistence_payment_required
+                                ? 'bg-emerald-500/20 border-emerald-500 shadow-lg shadow-emerald-500/20'
+                                : 'bg-slate-800/30 border-slate-700 hover:bg-slate-800/50'
+                            } disabled:opacity-30 disabled:cursor-not-allowed`}
+                          >
+                            <Moon className={`h-7 w-7 ${entry.subsistence_payment_required ? 'text-emerald-400' : 'text-muted-foreground'}`} />
+                          </button>
+                        </div>
                       </div>
                       {timeErrors[index] && (
                         <p className="text-base text-red-400 flex items-center gap-1 -mt-2">
@@ -1588,8 +1659,8 @@ export function PlantTimesheetV2({
                         </p>
                       )}
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-2">
+                      <div className="grid grid-cols-[minmax(7.25rem,0.75fr)_minmax(0,1.45fr)] gap-2">
+                        <div className="min-w-0 space-y-2">
                           <Label className="text-foreground text-xl">Travel Time</Label>
                           <Input
                             type="number"
@@ -1602,7 +1673,7 @@ export function PlantTimesheetV2({
                           />
                         </div>
 
-                        <div className="space-y-2">
+                        <div className="min-w-0 space-y-2">
                           <Label className="text-foreground text-xl flex items-center gap-2">
                             Job Number
                             {!entry.working_in_yard && !hasTrainingBooking && <span className="text-red-400 text-lg">*</span>}
@@ -1960,6 +2031,21 @@ export function PlantTimesheetV2({
                                 title="Did Not Work"
                               >
                                 <XCircle className={`h-5 w-5 ${entry.did_not_work ? 'text-amber-400' : 'text-muted-foreground'}`} />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => toggleSubsistencePayment(index)}
+                                disabled={disableInputs}
+                                aria-pressed={entry.subsistence_payment_required}
+                                className={`flex items-center justify-center w-10 h-10 rounded-lg border-2 transition-all ${
+                                  entry.subsistence_payment_required
+                                    ? 'bg-emerald-500/20 border-emerald-500 shadow-lg shadow-emerald-500/20'
+                                    : 'bg-slate-800/30 border-slate-700 hover:bg-slate-800/50'
+                                } disabled:opacity-30 disabled:cursor-not-allowed`}
+                                title="Subsistence Payment"
+                              >
+                                <Moon className={`h-5 w-5 ${entry.subsistence_payment_required ? 'text-emerald-400' : 'text-muted-foreground'}`} />
                               </button>
 
                               {hasTrainingBooking && (

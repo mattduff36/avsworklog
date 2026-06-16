@@ -6226,6 +6226,7 @@ export type Database = {
           time_started: string | null
           time_finished: string | null
           working_in_yard: boolean | null
+          subsistence_payment_required: boolean
           daily_total: number | null
           remarks: string | null
           created_at: string | null
@@ -6252,6 +6253,7 @@ export type Database = {
           time_started?: string | null
           time_finished?: string | null
           working_in_yard?: boolean | null
+          subsistence_payment_required?: boolean
           daily_total?: number | null
           remarks?: string | null
           created_at?: string | null
@@ -6278,6 +6280,7 @@ export type Database = {
           time_started?: string | null
           time_finished?: string | null
           working_in_yard?: boolean | null
+          subsistence_payment_required?: boolean
           daily_total?: number | null
           remarks?: string | null
           created_at?: string | null

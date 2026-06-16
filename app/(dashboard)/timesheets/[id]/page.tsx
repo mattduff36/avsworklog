@@ -13,7 +13,7 @@ import { JobCodeFields } from '@/components/timesheets/JobCodeFields';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Save, Send, Edit2, CheckCircle2, XCircle, Download, Package, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { Save, Send, Edit2, CheckCircle2, XCircle, Download, Package, AlertTriangle, ArrowLeft, Moon } from 'lucide-react';
 import Link from 'next/link';
 import { BackButton } from '@/components/ui/back-button';
 import { formatDate } from '@/lib/utils/date';
@@ -42,6 +42,11 @@ import {
   getPrimaryJobNumber,
   normalizeJobNumberInput,
 } from '@/lib/utils/timesheet-job-codes';
+import {
+  hasWorkedTimesForSubsistence,
+  isSubsistencePaymentRequired,
+  syncSubsistenceRemark,
+} from '@/lib/utils/timesheet-subsistence';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -168,6 +173,7 @@ export default function ViewTimesheetPage() {
           time_started: null,
           time_finished: null,
           working_in_yard: false,
+          subsistence_payment_required: false,
           daily_total: null,
           remarks: null,
         };
@@ -177,6 +183,7 @@ export default function ViewTimesheetPage() {
         ...entry,
         job_numbers: getEntryJobNumbers(entry),
         job_number: getPrimaryJobNumber(entry),
+        subsistence_payment_required: isSubsistencePaymentRequired(entry),
       }));
 
       setEntries(normalizedWeek);
@@ -293,8 +300,9 @@ export default function ViewTimesheetPage() {
         job_number: nextDidNotWork ? null : currentEntry.job_number,
         job_numbers: nextDidNotWork ? [] : currentEntry.job_numbers,
         working_in_yard: nextDidNotWork ? false : currentEntry.working_in_yard,
+        subsistence_payment_required: nextDidNotWork ? false : currentEntry.subsistence_payment_required,
         daily_total: nextDidNotWork ? 0 : currentEntry.daily_total,
-        remarks: nextRemarks,
+        remarks: nextDidNotWork ? syncSubsistenceRemark(nextRemarks, false) : nextRemarks,
       };
 
       if (nextDidNotWork) {
@@ -330,6 +338,12 @@ export default function ViewTimesheetPage() {
       nextEntry.job_numbers = [];
     }
 
+    if (field === 'subsistence_payment_required') {
+      const isRequired = Boolean(value);
+      nextEntry.subsistence_payment_required = isRequired;
+      nextEntry.remarks = syncSubsistenceRemark(nextEntry.remarks, isRequired);
+    }
+
     const hasMeaningfulValue =
       field === 'job_numbers'
         ? getNormalizedJobNumbers(Array.isArray(normalizedValue) ? normalizedValue : []).length > 0
@@ -351,6 +365,10 @@ export default function ViewTimesheetPage() {
     if (field === 'time_started' || field === 'time_finished') {
       const entry = newEntries[dayIndex];
       newEntries[dayIndex].daily_total = calculateStandardTimesheetHours(entry.time_started, entry.time_finished);
+      if (!hasWorkedTimesForSubsistence(newEntries[dayIndex])) {
+        newEntries[dayIndex].subsistence_payment_required = false;
+        newEntries[dayIndex].remarks = syncSubsistenceRemark(newEntries[dayIndex].remarks, false);
+      }
       
       // Clear manual edit flag for this day when times change (recalculation)
       setManuallyEditedDays(prev => {
@@ -372,6 +390,27 @@ export default function ViewTimesheetPage() {
     if (timesheet?.status === 'approved' && originalData) {
       setDataChanged(true);
     }
+  };
+
+  const handleSubsistenceToggle = (dayIndex: number) => {
+    const entry = entries[dayIndex];
+    const nextValue = !entry.subsistence_payment_required;
+
+    if (nextValue && !hasWorkedTimesForSubsistence(entry)) {
+      toast.info('Enter start and finish times before adding subsistence.', {
+        id: `timesheet-details-subsistence-blocked-${dayIndex}`,
+        description: 'Use this when the worker stayed away overnight and needs subsistence payment.',
+      });
+      return;
+    }
+
+    updateEntry(dayIndex, 'subsistence_payment_required', nextValue);
+    toast.success(nextValue ? 'Subsistence payment added' : 'Subsistence payment removed', {
+      id: `timesheet-details-subsistence-toggle-${dayIndex}`,
+      description: nextValue
+        ? 'This day will be marked as stayed away for payroll.'
+        : 'The stayed-away payroll marker has been removed for this day.',
+    });
   };
 
   const leaveAwareTotals = useMemo(
@@ -452,6 +491,7 @@ export default function ViewTimesheetPage() {
             entry.remarks ||
             entry.did_not_work ||
             entry.working_in_yard ||
+            entry.subsistence_payment_required ||
             entry.job_number ||
             entry.operator_travel_hours ||
             entry.operator_yard_hours ||
@@ -469,6 +509,9 @@ export default function ViewTimesheetPage() {
           const normalizedRemarks =
             entry.remarks?.trim() ||
             (entry.did_not_work ? 'Did Not Work' : '');
+          const requiresSubsistence =
+            Boolean(entry.subsistence_payment_required) && hasWorkedTimesForSubsistence(entry);
+          const persistedRemarks = syncSubsistenceRemark(normalizedRemarks, requiresSubsistence);
 
           return {
           timesheet_id: timesheet.id,
@@ -488,10 +531,11 @@ export default function ViewTimesheetPage() {
           job_number: persistedJobNumbers[0] || null,
           did_not_work: entry.did_not_work,
           working_in_yard: entry.working_in_yard,
+          subsistence_payment_required: requiresSubsistence,
           daily_total: entry.daily_total,
           night_shift: entry.night_shift ?? false,
           bank_holiday: entry.bank_holiday ?? false,
-          remarks: normalizedRemarks || null,
+          remarks: persistedRemarks || null,
           };
         });
 
@@ -977,6 +1021,7 @@ export default function ViewTimesheetPage() {
                   <th className="text-left p-2 font-medium">Job Number</th>
                   <th className="text-center p-2 font-medium">Did Not Work</th>
                   <th className="text-center p-2 font-medium">In Yard</th>
+                  <th className="text-center p-2 font-medium">Subsistence</th>
                   <th className="text-right p-2 font-medium">Total Hours</th>
                   <th className="text-left p-2 font-medium">Remarks</th>
                 </tr>
@@ -1064,6 +1109,20 @@ export default function ViewTimesheetPage() {
                         entry.working_in_yard && <CheckCircle2 className="h-4 w-4 inline text-green-600" />
                       )}
                     </td>
+                    <td className="p-2 text-center">
+                      {canEdit ? (
+                        <input
+                          type="checkbox"
+                          checked={Boolean(entry.subsistence_payment_required)}
+                          onChange={() => handleSubsistenceToggle(index)}
+                          disabled={entry.did_not_work}
+                          className="w-4 h-4"
+                          aria-label={`${DAY_NAMES[index]} subsistence payment required`}
+                        />
+                      ) : (
+                        entry.subsistence_payment_required && <Moon className="h-4 w-4 inline text-emerald-600" />
+                      )}
+                    </td>
                     <td className="p-2 text-right font-semibold">
                       {canEdit && hasElevatedAccess && !leaveAwareTotals.rowByDay.get(entry.day_of_week)?.hasLeave && !isPlantV2Timesheet ? (
                         <Input
@@ -1101,7 +1160,7 @@ export default function ViewTimesheetPage() {
                   </tr>
                 )})}
                 <tr className="bg-secondary/50 font-bold">
-                  <td colSpan={isPlantV2Timesheet ? 7 : 6} className="p-2 text-right">
+                  <td colSpan={isPlantV2Timesheet ? 8 : 7} className="p-2 text-right">
                     Weekly Total:
                   </td>
                   <td className="p-2 text-right text-lg whitespace-pre-line">
@@ -1216,6 +1275,27 @@ export default function ViewTimesheetPage() {
                       </>
                     ) : (
                       entry.working_in_yard && <span className="text-sm text-green-600">✓ Working in Yard</span>
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {canEdit ? (
+                      <>
+                        <input
+                          type="checkbox"
+                          id={`subsistence-${index}`}
+                          checked={Boolean(entry.subsistence_payment_required)}
+                          onChange={() => handleSubsistenceToggle(index)}
+                          disabled={entry.did_not_work}
+                          className="w-4 h-4"
+                        />
+                        <Label htmlFor={`subsistence-${index}`} className="text-sm">
+                          Subsistence Payment
+                        </Label>
+                      </>
+                    ) : (
+                      entry.subsistence_payment_required && (
+                        <span className="text-sm text-emerald-600">Subsistence Payment</span>
+                      )
                     )}
                   </div>
                   <div className="space-y-1">
