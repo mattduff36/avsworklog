@@ -9,6 +9,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { isNetworkFetchError } from '@/lib/utils/http-error';
 import { DEFAULT_TIMESHEET_TYPE, TimesheetType } from '../types/registry';
 
 export type TimesheetTypeResolutionMode = 'fixed' | 'choice';
@@ -200,8 +201,12 @@ export function useTimesheetType(userId?: string): UseTimesheetTypeReturn {
         setMode(resolution.mode);
         setError(null);
       } catch (err) {
-        console.error('Error fetching timesheet type:', err);
-        setError(getErrorMessage(err) || 'Failed to fetch timesheet type');
+        if (!isNetworkFetchError(err)) {
+          console.error('Error fetching timesheet type:', err);
+          setError(getErrorMessage(err) || 'Failed to fetch timesheet type');
+        } else {
+          setError(null);
+        }
         
         // Fallback to default on error
         setTimesheetType(DEFAULT_TIMESHEET_TYPE);

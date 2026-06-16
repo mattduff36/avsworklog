@@ -47,10 +47,9 @@ export function TimesheetRouter({
     return <PanelLoader message="Loading timesheet..." accent="timesheet" className="min-h-[400px]" />;
   }
 
-  // Error state (should rarely happen - falls back to default)
+  // Error state (should rarely happen - hook falls back to default)
   if (error) {
-    console.error('Timesheet routing error:', error);
-    // Still show default timesheet despite error
+    console.warn('Timesheet routing warning:', error);
   }
 
   if (!existingId && mode === 'choice' && !selectedTimesheetType) {

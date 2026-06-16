@@ -98,6 +98,7 @@ export function shouldIgnoreConsoleErrorForLogging(errorMessage: string): boolea
     'error fetching rams documents:',
     'error fetching notifications:',
     'error checking for existing timesheet:',
+    'error fetching timesheet type:',
   ].some((context) => normalized.includes(context));
 }
 
