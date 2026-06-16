@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, Clock, CheckCircle2, XCircle, User, Filter, Calendar, Package } from 'lucide-react';
+import { FileText, Clock, CheckCircle2, XCircle, User, Filter, Calendar, Package, Edit2 } from 'lucide-react';
 import { ColumnVisibilityMenu, DataViewToggle } from '@/components/ui/data-view-controls';
 import Link from 'next/link';
 import { formatDate } from '@/lib/utils/date';
@@ -1189,6 +1189,19 @@ function ApprovalsContent() {
                             )}
                             {timesheet.status === 'approved' && (
                               <div className="flex gap-2" onClick={(e) => e.preventDefault()}>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    router.push(`/timesheets/${timesheet.id}`);
+                                  }}
+                                  className="border-blue-300 text-blue-500 hover:bg-blue-500 hover:text-white hover:border-blue-500 active:bg-blue-600 active:scale-95 transition-all"
+                                >
+                                  <Edit2 className="h-4 w-4 mr-1" />
+                                  Adjust
+                                </Button>
                                 <Button
                                   variant="outline"
                                   size="sm"
