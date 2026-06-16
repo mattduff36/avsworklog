@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.15.1
+
+**GIT COMMIT MESSAGE**
+`fix(pdf): handle transient PDF load failures`
+
+**WHAT CHANGED**
+Handle transient PDF load failures.
+
+**COMMITS IN THIS RELEASE**
+- `fix(pdf): handle transient PDF load failures`
+
 ## 0626.15.0
 
 **GIT COMMIT MESSAGE**
