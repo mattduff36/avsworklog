@@ -236,24 +236,26 @@ function NewTimesheetContent() {
       return (
         <div className="mx-auto w-full max-w-2xl space-y-4">
           <Card className="border-border bg-slate-900/80">
-            <CardHeader>
-              <CardTitle className="text-white">Choose Timesheet Type</CardTitle>
-              <CardDescription>
+            <CardHeader className="space-y-2 p-5 sm:p-6">
+              <CardTitle className="text-2xl font-bold text-white sm:text-3xl">Choose Timesheet Type</CardTitle>
+              <CardDescription className="text-base leading-relaxed text-muted-foreground sm:text-lg">
                 Select which timesheet to create for this week. This choice only applies to the new timesheet you are creating.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-5 p-5 pt-0 sm:p-6 sm:pt-0">
               {TimesheetTypeOptions.map((option) => (
                 <Button
                   key={option.value}
                   type="button"
                   variant="outline"
                   onClick={() => setSelectedTimesheetType(option.value)}
-                  className="h-auto w-full justify-start border-border bg-slate-950 p-4 text-left hover:bg-slate-900"
+                  className="h-auto min-h-24 w-full justify-start rounded-lg border-border bg-slate-950 p-5 text-left hover:bg-slate-900"
                 >
                   <span>
-                    <span className="block font-semibold text-foreground">{option.label}</span>
-                    <span className="mt-1 block text-sm font-normal text-muted-foreground">{option.description}</span>
+                    <span className="block text-xl font-semibold text-foreground">{option.label}</span>
+                    <span className="mt-2 block text-base font-normal leading-relaxed text-muted-foreground">
+                      {option.description}
+                    </span>
                   </span>
                 </Button>
               ))}
@@ -266,7 +268,7 @@ function NewTimesheetContent() {
                   setLoadedWeek('');
                   setSelectedTimesheetType(null);
                 }}
-                className="w-full text-muted-foreground hover:text-foreground"
+                className="h-14 w-full text-lg font-semibold text-muted-foreground hover:text-foreground"
               >
                 Back to week selection
               </Button>

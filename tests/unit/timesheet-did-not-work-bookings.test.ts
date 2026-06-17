@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { resolveTimesheetOffDayStates } from '@/lib/utils/timesheet-off-days';
 import {
   applyPendingTrainingBookingsToOffDayStates,
+  formatHalfDayTrainingRemark,
+  getHalfDayTrainingRemarkForOffDayState,
   getPendingDidNotWorkBookingsPayload,
   type PendingDidNotWorkBookingMap,
 } from '@/lib/utils/timesheet-did-not-work-bookings';
@@ -26,6 +28,11 @@ describe('timesheet Did Not Work booking helpers', () => {
     expect(tuesday?.hasTrainingBooking).toBe(true);
     expect(tuesday?.trainingLabels.map((label) => label.label)).toEqual(['Training (PM)']);
     expect(tuesday?.trainingDisplayRemarks).toBe('Training (PM)');
+    expect(getHalfDayTrainingRemarkForOffDayState(tuesday)).toBe('TRAINING - Half day training (PM)');
+  });
+
+  it('formats the payroll remark for half-day training', () => {
+    expect(formatHalfDayTrainingRemark('AM')).toBe('TRAINING - Half day training (AM)');
   });
 
   it('serializes pending bookings in day order for the commit route', () => {

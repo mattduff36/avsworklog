@@ -68,8 +68,11 @@ import {
 } from '@/lib/utils/timesheet-subsistence';
 import {
   applyPendingTrainingBookingsToOffDayStates,
+  formatHalfDayTrainingRemark,
+  getHalfDayTrainingRemarkForOffDayState,
   getPendingDidNotWorkBookingsPayload,
   getPendingDidNotWorkTrainingBooking,
+  isHalfDayTrainingSession,
   type DidNotWorkTrainingSession,
   type PendingDidNotWorkBooking,
   type PendingDidNotWorkBookingMap,
@@ -1090,6 +1093,9 @@ export function CivilsTimesheet({
 
   function applyPendingTrainingSelection(dayIndex: number, trainingSession: DidNotWorkTrainingSession) {
     const booking = buildPendingDidNotWorkBooking(dayIndex, 'training', trainingSession);
+    const halfDayRemark = isHalfDayTrainingSession(trainingSession)
+      ? formatHalfDayTrainingRemark(trainingSession)
+      : '';
     queuePendingDidNotWorkBooking(booking);
     setEntries((current) => {
       const next = [...current];
@@ -1108,12 +1114,14 @@ export function CivilsTimesheet({
         job_numbers: [],
         subsistence_payment_required: Boolean(entry.subsistence_payment_required && dailyTotal !== null),
         daily_total: dailyTotal,
-        remarks: '',
+        remarks: halfDayRemark,
       };
       return next;
     });
     toast.info(`${booking.dayName} marked for ${trainingSession === 'FULL' ? 'Training' : `Training (${trainingSession})`}.`, {
-      description: 'Enter the training-day start and finish times before saving.',
+      description: isHalfDayTrainingSession(trainingSession)
+        ? 'Enter the total day start and finish times, including training and any worked time.'
+        : 'Enter the training-day start and finish times before saving.',
     });
   }
 
@@ -1420,8 +1428,10 @@ export function CivilsTimesheet({
           // Automatically detect night shift and bank holiday
           const isNight = !entry.did_not_work && isNightShift(entry.time_started, entry.daily_total);
           const isBankHol = !entry.did_not_work && isUKBankHoliday(entryDate);
+          const halfDayTrainingRemark = getHalfDayTrainingRemarkForOffDayState(offDay);
           const normalizedRemarks =
             entry.remarks?.trim() ||
+            halfDayTrainingRemark ||
             (entry.did_not_work
               ? (offDay && !offDay.isExpectedShiftDay ? 'Not on Shift' : 'Did Not Work')
               : '');
@@ -1764,6 +1774,10 @@ export function CivilsTimesheet({
                   : entry.working_in_yard
                     ? 'N/A (Yard)'
                     : 'Select job code';
+                const halfDayTrainingRemark = getHalfDayTrainingRemarkForOffDayState(dayOffState);
+                const halfDayTrainingHelperText = halfDayTrainingRemark
+                  ? 'Half-day training: enter the total day start and finish times, including training and any worked time.'
+                  : null;
 
                 return (
                 <TabsContent key={index} value={String(index)} className="space-y-4 px-4 pb-4 overflow-hidden">
@@ -1933,6 +1947,11 @@ export function CivilsTimesheet({
                                   Working hours allowed: {dayOffState?.workWindow?.start} to {dayOffState?.workWindow?.end}
                                 </p>
                               )}
+                              {halfDayTrainingHelperText && (
+                                <p className="text-sm font-medium text-emerald-200">
+                                  {halfDayTrainingHelperText}
+                                </p>
+                              )}
                             </div>
                           ) : (
                             <p
@@ -1995,6 +2014,10 @@ export function CivilsTimesheet({
                     : entry.working_in_yard
                       ? 'N/A (Yard)'
                       : 'Select job code';
+                  const halfDayTrainingRemark = getHalfDayTrainingRemarkForOffDayState(dayOffState);
+                  const halfDayTrainingHelperText = halfDayTrainingRemark
+                    ? 'Half-day training: enter total day hours, including training and worked time.'
+                    : null;
 
                   return (
                   <tr key={entry.day_of_week} className="border-b border-border/50">
@@ -2135,6 +2158,11 @@ export function CivilsTimesheet({
                                     {label.label}
                                   </p>
                                 ))}
+                                {halfDayTrainingHelperText && (
+                                  <p className="max-w-40 text-[10px] font-medium text-emerald-200">
+                                    {halfDayTrainingHelperText}
+                                  </p>
+                                )}
                               </div>
                             ) : (
                               <p

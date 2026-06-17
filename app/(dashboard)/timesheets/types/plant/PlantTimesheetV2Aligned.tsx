@@ -80,8 +80,11 @@ import {
 } from '@/lib/utils/timesheet-subsistence';
 import {
   applyPendingTrainingBookingsToOffDayStates,
+  formatHalfDayTrainingRemark,
+  getHalfDayTrainingRemarkForOffDayState,
   getPendingDidNotWorkBookingsPayload,
   getPendingDidNotWorkTrainingBooking,
+  isHalfDayTrainingSession,
   type DidNotWorkTrainingSession,
   type PendingDidNotWorkBooking,
   type PendingDidNotWorkBookingMap,
@@ -1025,6 +1028,9 @@ export function PlantTimesheetV2({
 
   const applyPendingTrainingSelection = (dayIndex: number, trainingSession: DidNotWorkTrainingSession) => {
     const booking = buildPendingDidNotWorkBooking(dayIndex, 'training', trainingSession);
+    const halfDayRemark = isHalfDayTrainingSession(trainingSession)
+      ? formatHalfDayTrainingRemark(trainingSession)
+      : '';
     queuePendingDidNotWorkBooking(booking);
     setEntries((current) => {
       const next = [...current];
@@ -1037,12 +1043,14 @@ export function PlantTimesheetV2({
         job_number: '',
         job_numbers: [],
         operator_yard_hours: '',
-        remarks: '',
+        remarks: halfDayRemark,
       });
       return next;
     });
     toast.info(`${booking.dayName} marked for ${trainingSession === 'FULL' ? 'Training' : `Training (${trainingSession})`}.`, {
-      description: 'Enter the training-day start and finish times before saving.',
+      description: isHalfDayTrainingSession(trainingSession)
+        ? 'Enter the total day start and finish times, including training and any worked time.'
+        : 'Enter the training-day start and finish times before saving.',
     });
   };
 
@@ -1249,8 +1257,10 @@ export function PlantTimesheetV2({
         const machineStanding = parseHoursInput(recalculated.machine_standing_hours);
         const machineOperator = parseHoursInput(recalculated.machine_operator_hours);
         const maintenanceBreakdown = parseHoursInput(recalculated.maintenance_breakdown_hours);
+        const halfDayTrainingRemark = getHalfDayTrainingRemarkForOffDayState(offDayState);
         const normalizedRemarks =
           recalculated.remarks?.trim() ||
+          halfDayTrainingRemark ||
           (recalculated.did_not_work
             ? (offDayState && !offDayState.isExpectedShiftDay ? 'Not on Shift' : 'Did Not Work')
             : '');
@@ -1677,6 +1687,10 @@ export function PlantTimesheetV2({
                   : entry.working_in_yard
                     ? 'N/A (Yard)'
                     : 'Select job code';
+                const halfDayTrainingRemark = getHalfDayTrainingRemarkForOffDayState(dayOffState);
+                const halfDayTrainingHelperText = halfDayTrainingRemark
+                  ? 'Half-day training: enter the total day start and finish times, including training and any worked time.'
+                  : null;
 
                 return (
                   <TabsContent key={entry.day_of_week} value={String(index)} className="space-y-4 px-4 pb-4 overflow-hidden">
@@ -1714,6 +1728,11 @@ export function PlantTimesheetV2({
                         {dayOffState?.workWindow && (dayOffState?.leaveLabels.length ?? 0) > 0 && (
                           <p className="text-xs text-muted-foreground">
                             Working hours allowed: {dayOffState?.workWindow?.start} to {dayOffState?.workWindow?.end}
+                          </p>
+                        )}
+                        {halfDayTrainingHelperText && (
+                          <p className="text-sm font-medium text-emerald-200">
+                            {halfDayTrainingHelperText}
                           </p>
                         )}
                       </div>
@@ -1884,6 +1903,11 @@ export function PlantTimesheetV2({
                                     Working hours allowed: {dayOffState?.workWindow?.start} to {dayOffState?.workWindow?.end}
                                   </p>
                                 )}
+                                {halfDayTrainingHelperText && (
+                                  <p className="text-sm font-medium text-emerald-200">
+                                    {halfDayTrainingHelperText}
+                                  </p>
+                                )}
                               </div>
                             ) : (
                               <p
@@ -2050,6 +2074,10 @@ export function PlantTimesheetV2({
                     : entry.working_in_yard
                       ? 'N/A (Yard)'
                       : 'Select job code';
+                  const halfDayTrainingRemark = getHalfDayTrainingRemarkForOffDayState(dayOffState);
+                  const halfDayTrainingHelperText = halfDayTrainingRemark
+                    ? 'Half-day training: enter total day hours, including training and worked time.'
+                    : null;
 
                   return (
                     <Fragment key={entry.day_of_week}>
@@ -2198,6 +2226,11 @@ export function PlantTimesheetV2({
                                         {label.label}
                                       </p>
                                     ))}
+                                    {halfDayTrainingHelperText && (
+                                      <p className="max-w-40 text-[10px] font-medium text-emerald-200">
+                                        {halfDayTrainingHelperText}
+                                      </p>
+                                    )}
                                   </div>
                                 ) : (
                                   <p

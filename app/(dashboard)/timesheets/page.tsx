@@ -9,6 +9,7 @@ import { useBrowserSupabaseClient } from '@/lib/hooks/useBrowserSupabaseClient';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PageLoader } from '@/components/ui/page-loader';
@@ -61,6 +62,17 @@ interface TimesheetFilterEmployee {
   team_name: string | null;
 }
 
+interface AssociatedLeaveBookingSummary {
+  id: string;
+  date: string;
+  endDate: string | null;
+  reasonName: string;
+  status: 'pending' | 'approved' | 'processed';
+  isHalfDay: boolean;
+  halfDaySession: 'AM' | 'PM' | null;
+  durationDays: number;
+}
+
 export default function TimesheetsPage() {
   const { user, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
   const { hasPermission, loading: permissionLoading } = usePermissionCheck('timesheets');
@@ -91,6 +103,10 @@ export default function TimesheetsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [timesheetToDelete, setTimesheetToDelete] = useState<{ id: string; weekEnding: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [selectedAssociatedLeaveBookingIds, setSelectedAssociatedLeaveBookingIds] = useState<string[]>([]);
+  const [associatedLeaveBookings, setAssociatedLeaveBookings] = useState<AssociatedLeaveBookingSummary[]>([]);
+  const [associatedLeaveBookingsLoading, setAssociatedLeaveBookingsLoading] = useState(false);
+  const [associatedLeaveBookingsError, setAssociatedLeaveBookingsError] = useState<string | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [displayCount, setDisplayCount] = useState(pageSize);
   const [hasMore, setHasMore] = useState(false);
@@ -521,13 +537,87 @@ export default function TimesheetsPage() {
     }
   };
 
+  function resetDeleteDialogState() {
+    setDeleteDialogOpen(false);
+    setTimesheetToDelete(null);
+    setSelectedAssociatedLeaveBookingIds([]);
+    setAssociatedLeaveBookings([]);
+    setAssociatedLeaveBookingsLoading(false);
+    setAssociatedLeaveBookingsError(null);
+  }
+
+  function handleDeleteDialogOpenChange(open: boolean) {
+    if (deleting) return;
+    if (!open) {
+      resetDeleteDialogState();
+      return;
+    }
+    setDeleteDialogOpen(true);
+  }
+
+  function formatAssociatedLeaveBooking(booking: AssociatedLeaveBookingSummary): string {
+    const halfDaySuffix = booking.isHalfDay && booking.halfDaySession
+      ? ` (${booking.halfDaySession})`
+      : '';
+    const dateRange = booking.endDate && booking.endDate !== booking.date
+      ? `${formatDate(booking.date)} to ${formatDate(booking.endDate)}`
+      : formatDate(booking.date);
+    return `${booking.reasonName}${halfDaySuffix} on ${dateRange}`;
+  }
+
+  function toggleAssociatedLeaveBooking(bookingId: string, checked: boolean) {
+    setSelectedAssociatedLeaveBookingIds((current) => {
+      if (!checked) return current.filter((id) => id !== bookingId);
+      if (current.includes(bookingId)) return current;
+      return [...current, bookingId];
+    });
+  }
+
+  function toggleAllAssociatedLeaveBookings() {
+    setSelectedAssociatedLeaveBookingIds((current) => (
+      current.length === associatedLeaveBookings.length
+        ? []
+        : associatedLeaveBookings.map((booking) => booking.id)
+    ));
+  }
+
+  async function fetchAssociatedLeaveBookings(timesheetId: string) {
+    setAssociatedLeaveBookingsLoading(true);
+    setAssociatedLeaveBookingsError(null);
+
+    try {
+      const response = await fetch(`/api/timesheets/${timesheetId}/delete`, {
+        method: 'GET',
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(payload.error || 'Unable to check associated leave bookings.');
+      }
+
+      setAssociatedLeaveBookings(
+        Array.isArray(payload.associatedLeaveBookings) ? payload.associatedLeaveBookings : []
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to check associated leave bookings.';
+      setAssociatedLeaveBookingsError(message);
+      toast.error(message);
+    } finally {
+      setAssociatedLeaveBookingsLoading(false);
+    }
+  }
+
   const openDeleteDialog = (e: React.MouseEvent, timesheet: Timesheet) => {
     e.stopPropagation(); // Prevent card click
     setTimesheetToDelete({
       id: timesheet.id,
       weekEnding: formatDate(timesheet.week_ending),
     });
+    setSelectedAssociatedLeaveBookingIds([]);
+    setAssociatedLeaveBookings([]);
+    setAssociatedLeaveBookingsError(null);
     setDeleteDialogOpen(true);
+    void fetchAssociatedLeaveBookings(timesheet.id);
   };
 
   const handleDelete = async () => {
@@ -538,6 +628,12 @@ export default function TimesheetsPage() {
     try {
       const response = await fetch(`/api/timesheets/${timesheetToDelete.id}/delete`, {
         method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          associatedLeaveBookingIdsToDelete: selectedAssociatedLeaveBookingIds,
+        }),
       });
 
       if (!response.ok) {
@@ -545,9 +641,17 @@ export default function TimesheetsPage() {
         throw new Error(data.error || 'Failed to delete timesheet');
       }
 
-      toast.success('Timesheet deleted successfully');
-      setDeleteDialogOpen(false);
-      setTimesheetToDelete(null);
+      const data = await response.json().catch(() => ({}));
+      const deletedBookingCount = typeof data.deletedAssociatedLeaveBookingCount === 'number'
+        ? data.deletedAssociatedLeaveBookingCount
+        : 0;
+
+      toast.success('Timesheet deleted successfully', {
+        description: deletedBookingCount > 0
+          ? `${deletedBookingCount} associated leave booking${deletedBookingCount === 1 ? '' : 's'} deleted.`
+          : undefined,
+      });
+      resetDeleteDialogState();
       fetchTimesheets(); // Refresh list
     } catch (err) {
       console.error('Error deleting timesheet:', err, { errorContextId });
@@ -567,6 +671,10 @@ export default function TimesheetsPage() {
   if (!hasPermission) {
     return null;
   }
+
+  const hasAssociatedLeaveBookings = associatedLeaveBookings.length > 0;
+  const allAssociatedLeaveBookingsSelected = hasAssociatedLeaveBookings &&
+    selectedAssociatedLeaveBookingIds.length === associatedLeaveBookings.length;
 
   return (
     <AppPageShell>
@@ -847,7 +955,7 @@ export default function TimesheetsPage() {
       )}
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialog open={deleteDialogOpen} onOpenChange={handleDeleteDialogOpenChange}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Timesheet</AlertDialogTitle>
@@ -859,11 +967,81 @@ export default function TimesheetsPage() {
               This action cannot be undone. All timesheet entries will be permanently deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {associatedLeaveBookingsLoading && (
+            <div className="rounded-lg border border-slate-700 bg-slate-900/60 p-3 text-sm text-muted-foreground">
+              Checking for associated leave bookings...
+            </div>
+          )}
+          {!associatedLeaveBookingsLoading && hasAssociatedLeaveBookings && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-foreground">
+                      Select associated leave bookings to delete
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Leave all unticked to delete only the timesheet and keep every leave booking.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={toggleAllAssociatedLeaveBookings}
+                    disabled={deleting}
+                    className="shrink-0 border-amber-400/60 text-amber-200 hover:bg-amber-500/10"
+                  >
+                    {allAssociatedLeaveBookingsSelected ? 'Clear all' : 'Select all'}
+                  </Button>
+                </div>
+
+                <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
+                  {associatedLeaveBookings.map((booking) => {
+                    const checkboxId = `delete-associated-leave-booking-${booking.id}`;
+                    const isSelected = selectedAssociatedLeaveBookingIds.includes(booking.id);
+
+                    return (
+                      <label
+                        key={booking.id}
+                        htmlFor={checkboxId}
+                        className="flex cursor-pointer items-start gap-3 rounded-md border border-amber-500/20 bg-slate-950/30 p-3"
+                      >
+                        <Checkbox
+                          id={checkboxId}
+                          checked={isSelected}
+                          onCheckedChange={(checked) => toggleAssociatedLeaveBooking(booking.id, checked === true)}
+                          disabled={deleting}
+                          className="mt-0.5 border-amber-400 data-[state=checked]:bg-amber-500 data-[state=checked]:text-slate-950"
+                        />
+                        <span className="space-y-1">
+                          <span className="block text-sm font-semibold text-amber-100">
+                            {formatAssociatedLeaveBooking(booking)}
+                          </span>
+                          <span className="block text-xs text-muted-foreground">
+                            {booking.status} · {booking.durationDays} day{booking.durationDays === 1 ? '' : 's'}
+                          </span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+          {!associatedLeaveBookingsLoading && associatedLeaveBookingsError && (
+            <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
+              {associatedLeaveBookingsError}
+            </div>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDelete}
-              disabled={deleting}
+              onClick={(event) => {
+                event.preventDefault();
+                void handleDelete();
+              }}
+              disabled={deleting || associatedLeaveBookingsLoading}
               className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
             >
               {deleting ? 'Deleting...' : 'Delete'}

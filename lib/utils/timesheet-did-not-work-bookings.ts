@@ -23,6 +23,28 @@ function formatTrainingLabel(session: DidNotWorkTrainingSession | undefined): st
   return `Training (${session})`;
 }
 
+export function isHalfDayTrainingSession(
+  session: DidNotWorkTrainingSession | null | undefined
+): session is 'AM' | 'PM' {
+  return session === 'AM' || session === 'PM';
+}
+
+export function formatHalfDayTrainingRemark(session: 'AM' | 'PM'): string {
+  return `TRAINING - Half day training (${session})`;
+}
+
+export function getHalfDayTrainingRemarkForOffDayState(
+  state: TimesheetOffDayState | undefined
+): string | null {
+  const halfDayTrainingLabel = state?.trainingLabels.find((label) => (
+    label.isTraining && isHalfDayTrainingSession(label.session)
+  ));
+
+  return isHalfDayTrainingSession(halfDayTrainingLabel?.session)
+    ? formatHalfDayTrainingRemark(halfDayTrainingLabel.session)
+    : null;
+}
+
 function toPendingTrainingLabel(booking: PendingDidNotWorkBooking): TimesheetLeaveLabel {
   const session = booking.trainingSession || 'FULL';
   return {
