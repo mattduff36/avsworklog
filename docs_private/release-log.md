@@ -2,6 +2,20 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.18.2
+
+**GIT COMMIT MESSAGE**
+`chore(finalise): update finalise commit summaries, maintenance workflow, and 2 more areas`
+
+**PUSHED AT**
+2026-06-17T10:09:18.179Z
+
+**WHAT CHANGED**
+Update finalise commit summaries, maintenance workflow, and 2 more areas.
+
+**COMMITS IN THIS RELEASE**
+- `chore(finalise): update finalise commit summaries, maintenance workflow, and 2 more areas`
+
 ## 0626.18.1
 
 **GIT COMMIT MESSAGE**

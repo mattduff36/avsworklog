@@ -1,5 +1,12 @@
 [
   {
+    "version": "0626.18.2",
+    "updateKind": "minor",
+    "title": "Finalise maintenance update",
+    "description": "Update finalise commit summaries, maintenance workflow, and 2 more areas.",
+    "pushedAt": "2026-06-17T10:09:18.179Z"
+  },
+  {
     "version": "0626.18.1",
     "updateKind": "minor",
     "title": "Timesheets improvements",
