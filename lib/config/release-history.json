@@ -1,5 +1,12 @@
 [
   {
+    "version": "0626.18.3",
+    "updateKind": "minor",
+    "title": "App screens maintenance update",
+    "description": "Update general app maintenance.",
+    "pushedAt": "2026-06-17T10:36:32.785Z"
+  },
+  {
     "version": "0626.18.2",
     "updateKind": "minor",
     "title": "Finalise maintenance update",
