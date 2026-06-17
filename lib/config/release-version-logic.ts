@@ -15,12 +15,63 @@ export interface ParsedCommit {
 
 export type VersionBumpKind = 'major' | 'minor' | 'month_reset' | 'none';
 
+export type ReleaseHistoryUpdateKind = 'major' | 'minor';
+
+export interface ParsedReleaseLogEntry {
+  version: string;
+  primaryCommitMessage: string | null;
+  whatChanged: string;
+  commitMessages: string[];
+  pushedAt: string | null;
+}
+
+export interface ReleaseHistoryEntry {
+  version: string;
+  updateKind: ReleaseHistoryUpdateKind;
+  title: string;
+  description: string;
+  pushedAt: string | null;
+}
+
 const CONVENTIONAL_COMMIT_PATTERN =
   /^([a-z]+)(?:\(([^)]+)\))?(!)?:\s*(.+)$/iu;
 
 const MAJOR_TYPES = new Set(['feat']);
 const MINOR_TYPES = new Set(['fix', 'chore', 'docs', 'test', 'refactor', 'perf', 'style']);
 const SKIP_VERSION_MARKER = '[skip version]';
+const RELEASE_VERSION_HEADING_PATTERN = /^##\s+(\d{4}\.\d+\.\d+)\s*$/gmu;
+const RELEASE_LOG_LABELS = new Set([
+  '**GIT COMMIT MESSAGE**',
+  '**PUSHED AT**',
+  '**WHAT CHANGED**',
+  '**COMMITS IN THIS RELEASE**',
+]);
+const FRIENDLY_SCOPE_LABELS: Record<string, string> = {
+  actions: 'Actions',
+  admin: 'Admin settings',
+  analytics: 'Usage tracking',
+  api: 'Background services',
+  app: 'App',
+  auth: 'Sign in',
+  components: 'App screens',
+  customers: 'Customers',
+  db: 'Data storage',
+  errors: 'Error reporting',
+  faq: 'Help articles',
+  fleet: 'Fleet',
+  help: 'Help and FAQ',
+  inspections: 'Inspections',
+  inventory: 'Inventory',
+  layout: 'Navigation',
+  logging: 'Error logging',
+  maintenance: 'Maintenance',
+  mobile: 'Mobile app',
+  pdf: 'PDF documents',
+  repo: 'App maintenance',
+  tests: 'App reliability',
+  timesheets: 'Timesheets',
+  workshop: 'Workshop tasks',
+};
 
 export function getCurrentMmyy(date: Date, timeZone = 'Europe/London'): string {
   const parts = new Intl.DateTimeFormat('en-GB', {
@@ -202,14 +253,17 @@ export function formatReleaseLogEntry(options: {
   primaryCommitMessage: string;
   whatChanged: string;
   commitMessages: string[];
+  pushedAt?: string | null;
 }): string {
   const commitBullets = options.commitMessages.map((message) => `- \`${message}\``).join('\n');
+  const pushedAtLines = options.pushedAt ? ['', '**PUSHED AT**', options.pushedAt] : [];
 
   return [
     `## ${options.version}`,
     '',
     '**GIT COMMIT MESSAGE**',
     `\`${options.primaryCommitMessage}\``,
+    ...pushedAtLines,
     '',
     '**WHAT CHANGED**',
     options.whatChanged,
@@ -220,7 +274,172 @@ export function formatReleaseLogEntry(options: {
   ].join('\n');
 }
 
+function stripInlineCode(value: string): string {
+  return value.trim().replace(/^`|`$/gu, '').trim();
+}
+
+function getSectionValue(lines: string[], label: string): string {
+  const index = lines.findIndex((line) => line.trim() === label);
+  if (index === -1) {
+    return '';
+  }
+
+  const values: string[] = [];
+  for (let lineIndex = index + 1; lineIndex < lines.length; lineIndex += 1) {
+    const line = lines[lineIndex]?.trim() ?? '';
+    if (RELEASE_LOG_LABELS.has(line)) {
+      break;
+    }
+
+    if (!line && values.length > 0) {
+      break;
+    }
+
+    if (line) {
+      values.push(line);
+    }
+  }
+
+  return values.join(' ').trim();
+}
+
+function getCommitMessagesFromSection(lines: string[]): string[] {
+  const index = lines.findIndex((line) => line.trim() === '**COMMITS IN THIS RELEASE**');
+  if (index === -1) {
+    return [];
+  }
+
+  const messages: string[] = [];
+  for (let lineIndex = index + 1; lineIndex < lines.length; lineIndex += 1) {
+    const line = lines[lineIndex]?.trim() ?? '';
+    if (!line) {
+      if (messages.length > 0) break;
+      continue;
+    }
+
+    if (RELEASE_LOG_LABELS.has(line)) {
+      break;
+    }
+
+    if (line.startsWith('- ')) {
+      messages.push(stripInlineCode(line.slice(2)));
+    }
+  }
+
+  return messages;
+}
+
+function sentenceCase(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+}
+
+function ensureSentence(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  return /[.!?]$/u.test(trimmed) ? trimmed : `${trimmed}.`;
+}
+
+function getFriendlyScopeLabel(scope: string | null): string {
+  if (!scope) {
+    return 'App';
+  }
+
+  const normalized = scope.toLowerCase();
+  if (FRIENDLY_SCOPE_LABELS[normalized]) {
+    return FRIENDLY_SCOPE_LABELS[normalized];
+  }
+
+  return normalized
+    .split(/[-_\s]+/u)
+    .filter(Boolean)
+    .map((part) => sentenceCase(part))
+    .join(' ');
+}
+
+function getReleaseHistoryUpdateKind(version: string): ReleaseHistoryUpdateKind {
+  const [, major = '0', minor = '0'] = version.split('.');
+  return Number(minor) === 0 && Number(major) > 0 ? 'major' : 'minor';
+}
+
+function buildReleaseHistoryTitle(entry: ParsedReleaseLogEntry): string {
+  const primaryCommit = entry.primaryCommitMessage ? parseConventionalCommit(entry.primaryCommitMessage) : null;
+  const scopeLabel = getFriendlyScopeLabel(primaryCommit?.scope ?? null);
+
+  if (primaryCommit?.type === 'fix') {
+    return `${scopeLabel} improvements`;
+  }
+
+  if (primaryCommit?.type === 'feat') {
+    return `${scopeLabel} update`;
+  }
+
+  if (primaryCommit?.type === 'docs') {
+    return `${scopeLabel} guidance update`;
+  }
+
+  if (primaryCommit?.type === 'test') {
+    return 'App reliability update';
+  }
+
+  return `${scopeLabel} maintenance update`;
+}
+
+function buildFriendlyReleaseDescription(entry: ParsedReleaseLogEntry): string {
+  const rawDescription = entry.whatChanged || buildWhatChangedSummary(parseCommitsFromMessages(entry.commitMessages));
+  const friendlyDescription = rawDescription
+    .replace(/\bAPI routes?\b/giu, 'background services')
+    .replace(/\bAPI\b/gu, 'background services')
+    .replace(/\bdatabase migrations?\b/giu, 'data storage updates')
+    .replace(/\brepository files?\b/giu, 'general app maintenance')
+    .replace(/\bPDF\b/giu, 'PDF document')
+    .replace(/\btransient\b/giu, 'temporary')
+    .replace(/\binsert races\b/giu, 'timing issues')
+    .replace(/\blookup failures\b/giu, 'lookup problems');
+
+  return ensureSentence(sentenceCase(friendlyDescription));
+}
+
+export function parseReleaseLogEntries(content: string): ParsedReleaseLogEntry[] {
+  const headings = Array.from(content.matchAll(RELEASE_VERSION_HEADING_PATTERN));
+  return headings.map((heading, index) => {
+    const nextHeading = headings[index + 1];
+    const blockStart = (heading.index ?? 0) + heading[0].length;
+    const blockEnd = nextHeading?.index ?? content.length;
+    const lines = content.slice(blockStart, blockEnd).split(/\r?\n/u);
+
+    return {
+      version: heading[1] ?? '',
+      primaryCommitMessage: stripInlineCode(getSectionValue(lines, '**GIT COMMIT MESSAGE**')) || null,
+      whatChanged: getSectionValue(lines, '**WHAT CHANGED**'),
+      commitMessages: getCommitMessagesFromSection(lines),
+      pushedAt: getSectionValue(lines, '**PUSHED AT**') || null,
+    };
+  });
+}
+
+export function buildReleaseHistoryEntries(
+  releaseLogContent: string,
+  timestampLookup: Record<string, string | null | undefined> = {}
+): ReleaseHistoryEntry[] {
+  return parseReleaseLogEntries(releaseLogContent).map((entry) => ({
+    version: entry.version,
+    updateKind: getReleaseHistoryUpdateKind(entry.version),
+    title: buildReleaseHistoryTitle(entry),
+    description: buildFriendlyReleaseDescription(entry),
+    pushedAt: entry.pushedAt ?? timestampLookup[entry.version] ?? null,
+  }));
+}
+
 export const RELEASE_LOG_PATH = 'docs_private/release-log.md';
+export const RELEASE_HISTORY_PATH = 'lib/config/release-history.json';
 export const RELEASE_LOG_PREAMBLE =
   '# Production release log\n\nPrivate changelog for production builds. Newest entries first.\n';
 

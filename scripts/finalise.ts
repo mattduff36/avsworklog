@@ -21,7 +21,11 @@ const REPO_ROOT = process.cwd();
 const NEXT_BUILD_DIR = path.join(REPO_ROOT, '.next');
 const NEXT_BUILD_ARTIFACT_PATH = path.join(NEXT_BUILD_DIR, 'BUILD_ID');
 const RELEASE_VERSION_JSON_PATH = path.join(REPO_ROOT, 'lib/config/release-version.json');
-const RELEASE_VERSION_FILES = ['lib/config/release-version.json', 'docs_private/release-log.md'] as const;
+const RELEASE_VERSION_FILES = [
+  'lib/config/release-version.json',
+  'lib/config/release-history.json',
+  'docs_private/release-log.md',
+] as const;
 const DEV_SERVER_PORT = 4000;
 let automationRun: AutomationRun | null = null;
 

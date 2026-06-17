@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildReleaseHistoryEntries,
   buildWhatChangedSummary,
   computeNextVersionState,
   determineBumpKind,
@@ -137,14 +138,72 @@ describe('release version logic', () => {
         'feat(fleet): import plant assets',
         'fix(fleet): normalize serial numbers',
       ],
+      pushedAt: '2026-05-21T14:00:29Z',
     });
 
     expect(entry).toContain('## 0526.1.0');
     expect(entry).toContain('**GIT COMMIT MESSAGE**');
     expect(entry).toContain('`feat(fleet): improve plant table layout`');
+    expect(entry).toContain('**PUSHED AT**');
+    expect(entry).toContain('2026-05-21T14:00:29Z');
     expect(entry).toContain('**WHAT CHANGED**');
     expect(entry).toContain('**COMMITS IN THIS RELEASE**');
     expect(entry).toContain('- `fix(fleet): normalize serial numbers`');
+  });
+
+  it('builds sanitized release history from release log entries', () => {
+    const releaseLog = [
+      '# Production release log',
+      '',
+      'Private changelog for production builds. Newest entries first.',
+      '',
+      '## 0526.2.1',
+      '',
+      '**GIT COMMIT MESSAGE**',
+      '`fix(api): handle transient lookup failures`',
+      '',
+      '**WHAT CHANGED**',
+      'Handle transient API lookup failures.',
+      '',
+      '**COMMITS IN THIS RELEASE**',
+      '- `fix(api): handle transient lookup failures`',
+      '',
+      '## 0526.2.0',
+      '',
+      '**GIT COMMIT MESSAGE**',
+      '`feat(fleet): update fleet workflow`',
+      '',
+      '**PUSHED AT**',
+      '2026-05-21T14:00:29Z',
+      '',
+      '**WHAT CHANGED**',
+      'Update fleet workflow and API routes.',
+      '',
+      '**COMMITS IN THIS RELEASE**',
+      '- `feat(fleet): update fleet workflow`',
+      '',
+    ].join('\n');
+
+    const history = buildReleaseHistoryEntries(releaseLog, {
+      '0526.2.1': '2026-05-21T15:00:29Z',
+    });
+
+    expect(history).toEqual([
+      {
+        version: '0526.2.1',
+        updateKind: 'minor',
+        title: 'Background services improvements',
+        description: 'Handle temporary background services lookup problems.',
+        pushedAt: '2026-05-21T15:00:29Z',
+      },
+      {
+        version: '0526.2.0',
+        updateKind: 'major',
+        title: 'Fleet update',
+        description: 'Update fleet workflow and background services.',
+        pushedAt: '2026-05-21T14:00:29Z',
+      },
+    ]);
   });
 
   it('prepends newest log entry after preamble', () => {

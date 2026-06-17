@@ -3,10 +3,12 @@
 import { Fragment, useMemo, useState, type ComponentType, type KeyboardEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import {
+  Check,
   ClipboardCheck,
   FileText,
   History,
   Wrench,
+  X,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -47,14 +49,7 @@ interface FilterConfig {
   key: AssetHistoryRowType;
   label: string;
   icon: ComponentType<{ className?: string }>;
-  activeClassName?: string;
 }
-
-const DAILY_TASK_CLASS_NAMES: Record<AssetHistoryAssetType, string> = {
-  van: 'bg-[hsl(var(--inspection-primary)/0.20)] hover:bg-[hsl(var(--inspection-primary)/0.30)] border-inspection text-inspection',
-  plant: 'bg-[hsl(var(--plant-inspection-primary)/0.20)] hover:bg-[hsl(var(--plant-inspection-primary)/0.30)] border-plant-inspection text-plant-inspection',
-  hgv: 'bg-[hsl(var(--hgv-inspection-primary)/0.20)] hover:bg-[hsl(var(--hgv-inspection-primary)/0.30)] border-hgv-inspection text-hgv-inspection',
-};
 
 const DAILY_TASK_ROW_CLASS_NAMES: Record<AssetHistoryAssetType, string> = {
   van: 'bg-[hsl(var(--inspection-primary)/0.10)] hover:bg-[hsl(var(--inspection-primary)/0.18)]',
@@ -85,13 +80,11 @@ const FILTERS: FilterConfig[] = [
     key: 'workshop',
     label: 'Workshop',
     icon: Wrench,
-    activeClassName: 'bg-[hsl(var(--workshop-primary)/0.28)] hover:bg-[hsl(var(--workshop-primary)/0.38)] border-workshop text-orange-200',
   },
   {
     key: 'record',
     label: 'Records',
     icon: FileText,
-    activeClassName: 'bg-blue-500/20 hover:bg-blue-500/30 border-blue-500 text-blue-300',
   },
   {
     key: 'dailyTask',
@@ -399,16 +392,26 @@ export function AssetHistoryTable({
                     size="sm"
                     onClick={() => toggleFilter(filter.key)}
                     className={cn(
-                      'h-9 gap-2 px-3 transition-all',
+                      'h-9 gap-2 border px-3 transition-all',
                       isActive
-                        ? filter.activeClassName || DAILY_TASK_CLASS_NAMES[assetType]
-                        : 'bg-muted/50 hover:bg-muted border-border text-muted-foreground'
+                        ? 'border-green-500/60 bg-green-500/20 text-green-100 shadow-sm shadow-green-950/20 hover:bg-green-500/30'
+                        : 'border-slate-600 bg-slate-800/60 text-slate-400 hover:border-slate-500 hover:bg-slate-700/70 hover:text-slate-200'
                     )}
                     aria-pressed={isActive}
                   >
-                    <Icon className="h-4 w-4" />
+                    {isActive ? (
+                      <Check className="h-4 w-4 shrink-0 text-green-200" aria-hidden="true" />
+                    ) : (
+                      <X className="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+                    )}
+                    <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-green-100' : 'text-slate-400')} />
                     <span>{filter.label}</span>
-                    <span className="rounded-full bg-slate-950/40 px-1.5 py-0.5 text-[10px] leading-none">
+                    <span
+                      className={cn(
+                        'rounded-full px-1.5 py-0.5 text-[10px] leading-none',
+                        isActive ? 'bg-green-950/50 text-green-100' : 'bg-slate-950/40 text-slate-400'
+                      )}
+                    >
                       {counts[filter.key]}
                     </span>
                   </Button>

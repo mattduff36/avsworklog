@@ -655,6 +655,20 @@ export default function HgvHistoryPage({
     }
   }, [activeTab, motData, vehicle?.reg_number, resolvedParams.hgvId]);
 
+  const handleEditSuccess = useCallback(() => {
+    setEditDialogOpen(false);
+    setMotData(null);
+    setExpandedTestId(null);
+
+    void Promise.all([
+      fetchVehicleData(),
+      fetchMaintenanceRecord(),
+      fetchMaintenanceHistory(),
+    ]).then(() => {
+      router.refresh();
+    });
+  }, [fetchMaintenanceHistory, fetchMaintenanceRecord, fetchVehicleData, router]);
+
   const getDefectColor = (type: string) => {
     switch (type) {
       case 'DANGEROUS': return 'text-red-400 bg-red-500/10 border-red-500/30';
@@ -1346,11 +1360,7 @@ export default function HgvHistoryPage({
               asset_type: 'hgv' as const,
             },
           }}
-          onSuccess={() => {
-            setEditDialogOpen(false);
-            fetchMaintenanceRecord();
-            fetchMaintenanceHistory();
-          }}
+          onSuccess={handleEditSuccess}
           onRetire={() => {
             setDeleteDialogOpen(true);
           }}

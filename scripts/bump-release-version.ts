@@ -2,7 +2,9 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import path from 'path';
 import { spawnSync } from 'child_process';
 import {
+  RELEASE_HISTORY_PATH,
   RELEASE_LOG_PATH,
+  buildReleaseHistoryEntries,
   buildWhatChangedSummary,
   computeNextVersionState,
   formatReleaseLogEntry,
@@ -11,12 +13,14 @@ import {
   prependReleaseLogEntry,
   selectReleasePrimaryCommitMessage,
   shouldSkipVersionBumpCommit,
+  type ReleaseHistoryEntry,
   type ReleaseVersionState,
 } from '../lib/config/release-version-logic';
 
 const REPO_ROOT = process.cwd();
 const VERSION_JSON_PATH = path.join(REPO_ROOT, 'lib/config/release-version.json');
 const RELEASE_LOG_FILE = path.join(REPO_ROOT, RELEASE_LOG_PATH);
+const RELEASE_HISTORY_FILE = path.join(REPO_ROOT, RELEASE_HISTORY_PATH);
 
 function getExecutable(command: string): string {
   if (process.platform !== 'win32') {
@@ -113,6 +117,25 @@ function writeReleaseLog(content: string): void {
   writeFileSync(RELEASE_LOG_FILE, content, 'utf8');
 }
 
+function readReleaseHistoryTimestampLookup(): Record<string, string | null> {
+  if (!existsSync(RELEASE_HISTORY_FILE)) {
+    return {};
+  }
+
+  const raw = readFileSync(RELEASE_HISTORY_FILE, 'utf8');
+  try {
+    const entries = JSON.parse(raw) as ReleaseHistoryEntry[];
+    return Object.fromEntries(entries.map((entry) => [entry.version, entry.pushedAt]));
+  } catch {
+    return {};
+  }
+}
+
+function writeReleaseHistory(releaseLogContent: string): void {
+  const entries = buildReleaseHistoryEntries(releaseLogContent, readReleaseHistoryTimestampLookup());
+  writeFileSync(RELEASE_HISTORY_FILE, `${JSON.stringify(entries, null, 2)}\n`, 'utf8');
+}
+
 function main(): void {
   const beforeSha = process.argv[2];
   const afterSha = resolveAfterSha(process.argv[3]);
@@ -136,6 +159,7 @@ function main(): void {
 
   const versionLabel = formatReleaseVersion(nextState);
   const primaryCommitMessage = selectReleasePrimaryCommitMessage(commits, bumpKind, nextState);
+  const pushedAt = new Date().toISOString();
 
   if (!primaryCommitMessage) {
     throw new Error('Version bump required but no eligible commit message was found.');
@@ -146,10 +170,13 @@ function main(): void {
     primaryCommitMessage,
     whatChanged: buildWhatChangedSummary(commits),
     commitMessages: commits.map((commit) => commit.raw),
+    pushedAt,
   });
 
+  const releaseLogContent = prependReleaseLogEntry(readReleaseLog(), logEntry);
   writeVersionState(nextState);
-  writeReleaseLog(prependReleaseLogEntry(readReleaseLog(), logEntry));
+  writeReleaseLog(releaseLogContent);
+  writeReleaseHistory(releaseLogContent);
 
   console.log(`Release version bumped: ${formatReleaseVersion(current)} -> ${versionLabel} (${bumpKind})`);
 }

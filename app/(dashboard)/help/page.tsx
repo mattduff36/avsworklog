@@ -626,9 +626,13 @@ export default function HelpPage() {
             <p className="text-muted-foreground">
               Find answers to common questions and submit suggestions
             </p>
-            <p className="text-xs text-muted-foreground tabular-nums sm:shrink-0">
+            <Link
+              href="/help/version-history"
+              aria-label="Open version history"
+              className="text-xs text-muted-foreground underline-offset-4 tabular-nums transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-avs-yellow focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:shrink-0"
+            >
               {getPublicReleaseVersionLabel()}
-            </p>
+            </Link>
           </div>
         </div>
       </div>

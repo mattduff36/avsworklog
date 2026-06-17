@@ -39,6 +39,7 @@ import { Undo2, XCircle } from 'lucide-react';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { cn } from '@/lib/utils/cn';
 import { useMaintenance } from '@/lib/hooks/useMaintenance';
+import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue';
 import { useLoadMorePagination } from '@/lib/hooks/useLoadMorePagination';
 import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 import type { MaintenanceItem } from '@/types/maintenance';
@@ -103,6 +104,7 @@ export function PlantTable({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
   const [retiredSearchQuery, setRetiredSearchQuery] = useState('');
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
   const [selectedPlantIds, setSelectedPlantIds] = useState<Set<string>>(new Set());
   const [movingToMinorPlant, setMovingToMinorPlant] = useState(false);
   
@@ -256,21 +258,31 @@ export function PlantTable({
     });
   }, [maintenanceColumns]);
 
-  // Filter based on search
-  const filteredPlant = activePlantAssets.filter(asset => {
-    if (!searchQuery) return true;
-    
-    const searchLower = searchQuery.toLowerCase();
-    const plantId = asset.plant?.plant_id?.toLowerCase() || '';
-    const regNumber = asset.plant?.reg_number?.toLowerCase() || '';
-    const nickname = asset.plant?.nickname?.toLowerCase() || '';
-    const serialNumber = asset.plant?.serial_number?.toLowerCase() || '';
-    
-    return plantId.includes(searchLower) || 
-           regNumber.includes(searchLower) ||
-           nickname.includes(searchLower) ||
-           serialNumber.includes(searchLower);
-  });
+  // Filter based on search before pagination so matches can come from any page.
+  const filteredPlant = useMemo(() => {
+    const query = debouncedSearchQuery.trim().toLowerCase();
+    if (!query) return activePlantAssets;
+
+    return activePlantAssets.filter(asset => {
+      const searchableValues = [
+        asset.plant?.plant_id,
+        asset.plant?.reg_number,
+        asset.plant?.nickname,
+        asset.plant?.serial_number,
+        asset.plant?.van_categories?.name,
+        asset.current_hours?.toString(),
+        ...(asset.maintenance_items || []).flatMap((item) => [
+          item.category_name,
+          item.display_value,
+          item.due_date,
+          item.due_mileage?.toString(),
+          item.due_hours?.toString(),
+        ]),
+      ];
+
+      return searchableValues.some((value) => value?.toLowerCase().includes(query));
+    });
+  }, [activePlantAssets, debouncedSearchQuery]);
 
   // Sort
   const sortedPlant = [...filteredPlant].sort((a, b) => {
@@ -312,7 +324,7 @@ export function PlantTable({
     }
   });
   const paginationKey = [
-    searchQuery.trim(),
+    debouncedSearchQuery.trim(),
     sortField,
     sortDirection,
     sortedPlant.length,
@@ -588,7 +600,7 @@ export function PlantTable({
           {/* Desktop Table View */}
           {sortedPlant.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              {searchQuery ? 'No plant machinery found matching your search.' : 'No plant machinery with maintenance records yet.'}
+              {debouncedSearchQuery ? 'No plant machinery found matching your search.' : 'No plant machinery with maintenance records yet.'}
             </div>
           ) : (
             <div className={cn('border border-slate-700 rounded-lg', tabletModeEnabled ? 'hidden' : 'hidden md:block')}>

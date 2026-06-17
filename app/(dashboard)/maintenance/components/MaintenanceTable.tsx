@@ -44,6 +44,7 @@ import {
 } from '@/lib/utils/maintenanceCalculations';
 import { EditMaintenanceDialog } from './EditMaintenanceDialog';
 import { useDeletedVehicles, usePermanentlyDeleteArchivedVehicle, useRestoreArchivedVehicle } from '@/lib/hooks/useMaintenance';
+import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue';
 import { useLoadMorePagination } from '@/lib/hooks/useLoadMorePagination';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { createClient } from '@/lib/supabase/client';
@@ -108,6 +109,7 @@ export function MaintenanceTable({
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleMaintenanceWithStatus | null>(null);
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
   const [retiredSearchQuery, setRetiredSearchQuery] = useState('');
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
   
   // Track pending operations per vehicle ID (vans + HGVs share these)
   const [pendingRestore, setPendingRestore] = useState<Set<string>>(new Set());
@@ -305,8 +307,30 @@ export function MaintenanceTable({
     }
   };
   
+  const filteredVehicles = useMemo(() => {
+    const query = debouncedSearchQuery.trim().toLowerCase();
+    if (!query) return vehicles;
+
+    return vehicles.filter((vehicle) => {
+      const searchableValues = [
+        vehicle.vehicle?.reg_number,
+        vehicle.vehicle?.nickname,
+        vehicle.current_mileage?.toString(),
+        ...(vehicle.maintenance_items || []).flatMap((item) => [
+          item.category_name,
+          item.display_value,
+          item.due_date,
+          item.due_mileage?.toString(),
+          item.due_hours?.toString(),
+        ]),
+      ];
+
+      return searchableValues.some((value) => value?.toLowerCase().includes(query));
+    });
+  }, [debouncedSearchQuery, vehicles]);
+
   // Sort vehicles
-  const sortedVehicles = [...vehicles].sort((a, b) => {
+  const sortedVehicles = [...filteredVehicles].sort((a, b) => {
     const multiplier = sortDirection === 'asc' ? 1 : -1;
     
     switch (sortField) {
@@ -339,7 +363,7 @@ export function MaintenanceTable({
   });
   const paginationKey = [
     assetLabel,
-    searchQuery.trim(),
+    debouncedSearchQuery.trim(),
     sortField,
     sortDirection,
     sortedVehicles.length,
@@ -436,9 +460,9 @@ export function MaintenanceTable({
           </div>
 
           {/* Desktop Table View */}
-          {vehicles.length === 0 ? (
+          {sortedVehicles.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              {searchQuery ? `No ${assetLabelPluralLower} found matching your search.` : `No ${assetLabelPluralLower} with maintenance records yet.`}
+              {debouncedSearchQuery ? `No ${assetLabelPluralLower} found matching your search.` : `No ${assetLabelPluralLower} with maintenance records yet.`}
             </div>
           ) : (
             <div className={cn('border border-slate-700 rounded-lg', tabletModeEnabled ? 'hidden' : 'hidden md:block')}>
@@ -559,7 +583,7 @@ export function MaintenanceTable({
           )}
 
           {/* Mobile Card View */}
-          {vehicles.length > 0 && (
+          {sortedVehicles.length > 0 && (
             <div className={cn('space-y-3', tabletModeEnabled ? 'block' : 'md:hidden')}>
               {visibleVehicles.map((vehicle) => {
                 const cardVehicleId = vehicle.hgv_id ?? vehicle.van_id ?? vehicle.id;
