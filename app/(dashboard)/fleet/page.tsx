@@ -33,18 +33,17 @@ import { Button } from '@/components/ui/button';
 import { PageLoader } from '@/components/ui/page-loader';
 import type { Category, HgvAsset, HgvCategory, PlantAsset, Vehicle } from './types';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
-import { getErrorStatus, isAuthErrorStatus } from '@/lib/utils/http-error';
+import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 import { getErrorMessage } from '@/lib/utils/absence-error-handling';
 
 function isExpectedFleetLoadError(error: unknown): boolean {
   const status = getErrorStatus(error);
-  const message = getErrorMessage(error, '');
+  const message = getErrorMessage(error, '').toLowerCase();
   return (
     isAuthErrorStatus(status) ||
-    message.includes('Unauthorized') ||
-    message.includes('Not authenticated') ||
-    message.includes('Failed to fetch') ||
-    message.includes('NetworkError')
+    isNetworkFetchError(error) ||
+    message.includes('unauthorized') ||
+    message.includes('not authenticated')
   );
 }
 
@@ -146,7 +145,11 @@ function FleetContent() {
         setVehicles(data.vehicles || []);
       }
     } catch (error) {
-      logger.error('Failed to fetch vehicles', error, 'FleetPage');
+      if (isExpectedFleetLoadError(error)) {
+        setVehicles([]);
+      } else {
+        logger.error('Failed to fetch vehicles', error, 'FleetPage');
+      }
     } finally {
       setVehiclesLoading(false);
     }
@@ -188,7 +191,11 @@ function FleetContent() {
         setHgvCategories(data.categories || []);
       }
     } catch (error) {
-      logger.error('Failed to fetch HGV categories', error, 'FleetPage');
+      if (isExpectedFleetLoadError(error)) {
+        setHgvCategories([]);
+      } else {
+        logger.error('Failed to fetch HGV categories', error, 'FleetPage');
+      }
     } finally {
       setHgvCategoriesLoading(false);
     }
@@ -231,7 +238,11 @@ function FleetContent() {
         setCategories(data.categories || []);
       }
     } catch (error) {
-      logger.error('Failed to fetch categories', error, 'FleetPage');
+      if (isExpectedFleetLoadError(error)) {
+        setCategories([]);
+      } else {
+        logger.error('Failed to fetch categories', error, 'FleetPage');
+      }
     } finally {
       setCategoriesLoading(false);
     }
