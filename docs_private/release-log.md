@@ -2,6 +2,17 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.18.1
+
+**GIT COMMIT MESSAGE**
+`fix(timesheets): handle transient type lookup failures`
+
+**WHAT CHANGED**
+Handle transient type lookup failures.
+
+**COMMITS IN THIS RELEASE**
+- `fix(timesheets): handle transient type lookup failures`
+
 ## 0626.18.0
 
 **GIT COMMIT MESSAGE**
