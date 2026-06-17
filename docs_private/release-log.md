@@ -2,6 +2,20 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.19.0
+
+**GIT COMMIT MESSAGE**
+`feat(api): update API routes`
+
+**PUSHED AT**
+2026-06-17T11:28:11.249Z
+
+**WHAT CHANGED**
+Update API routes.
+
+**COMMITS IN THIS RELEASE**
+- `feat(api): update API routes`
+
 ## 0626.18.3
 
 **GIT COMMIT MESSAGE**

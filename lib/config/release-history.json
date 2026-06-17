@@ -1,5 +1,12 @@
 [
   {
+    "version": "0626.19.0",
+    "updateKind": "major",
+    "title": "Background services update",
+    "description": "Update background services.",
+    "pushedAt": "2026-06-17T11:28:11.249Z"
+  },
+  {
     "version": "0626.18.3",
     "updateKind": "minor",
     "title": "App screens maintenance update",
