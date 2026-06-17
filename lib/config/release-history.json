@@ -1,5 +1,12 @@
 [
   {
+    "version": "0626.21.0",
+    "updateKind": "major",
+    "title": "Fleet update",
+    "description": "Update fleet workflow.",
+    "pushedAt": "2026-06-17T16:32:10.324Z"
+  },
+  {
     "version": "0626.20.0",
     "updateKind": "major",
     "title": "Timesheets update",
