@@ -1,5 +1,12 @@
 [
   {
+    "version": "0626.22.0",
+    "updateKind": "major",
+    "title": "Timesheets update",
+    "description": "Update did not work absence handling and background services.",
+    "pushedAt": "2026-06-17T22:55:07.450Z"
+  },
+  {
     "version": "0626.21.0",
     "updateKind": "major",
     "title": "Fleet update",
