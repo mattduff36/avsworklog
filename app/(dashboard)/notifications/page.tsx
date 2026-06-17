@@ -112,16 +112,18 @@ function NotificationPreferencePrompt({
   return (
     <div className={isFooter ? 'relative' : 'relative overflow-hidden rounded-xl border border-avs-yellow/30 bg-gradient-to-br from-avs-yellow/15 via-slate-50 to-white p-4 shadow-sm dark:from-avs-yellow/10 dark:via-slate-900 dark:to-slate-950'}>
       {!isFooter ? <div className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-avs-yellow/20 blur-3xl" /> : null}
-      <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-avs-yellow/20 text-avs-yellow ring-1 ring-avs-yellow/30 dark:bg-avs-yellow/15">
-            <BellOff className="h-5 w-5" />
+      <div className={`relative flex flex-col sm:flex-row sm:items-center sm:justify-between ${isFooter ? 'gap-3' : 'gap-4'}`}>
+        <div className={`flex min-w-0 ${isFooter ? 'gap-2' : 'gap-3'}`}>
+          <div className={`flex shrink-0 items-center justify-center rounded-full bg-avs-yellow/20 text-avs-yellow ring-1 ring-avs-yellow/30 dark:bg-avs-yellow/15 ${isFooter ? 'h-8 w-8' : 'h-10 w-10'}`}>
+            <BellOff className={isFooter ? 'h-4 w-4' : 'h-5 w-5'} />
           </div>
           <div className="min-w-0">
-            <h4 className="text-sm font-semibold text-foreground">
-              Want to stop seeing these notifications?
-            </h4>
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+            {!isFooter ? (
+              <h4 className="text-sm font-semibold text-foreground">
+                Want to stop seeing these notifications?
+              </h4>
+            ) : null}
+            <p className={isFooter ? 'mt-0.5 text-xs leading-4 text-muted-foreground' : 'mt-1 text-sm leading-6 text-muted-foreground'}>
               {isInAppDisabled ? (
                 <>
                   {module.label} in-app notifications are already disabled. You can manage email and in-app preferences from your profile.
@@ -135,20 +137,23 @@ function NotificationPreferencePrompt({
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-col gap-2 sm:min-w-48">
+        <div className={`flex shrink-0 ${isFooter ? 'flex-row gap-2 sm:min-w-0' : 'flex-col gap-2 sm:min-w-48'}`}>
           <Button
             type="button"
+            size={isFooter ? 'sm' : 'default'}
             onClick={onDisable}
             disabled={isLoading || isSaving || isInAppDisabled}
-            className="w-full gap-2 bg-avs-yellow text-slate-950 shadow-sm hover:bg-avs-yellow-hover disabled:cursor-not-allowed disabled:opacity-60"
+            className={`w-full gap-2 bg-avs-yellow text-slate-950 shadow-sm hover:bg-avs-yellow-hover disabled:cursor-not-allowed disabled:opacity-60 ${isFooter ? 'h-7 px-2.5' : ''}`}
           >
             {isSaving ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className={`${isFooter ? 'h-3.5 w-3.5' : 'h-4 w-4'} animate-spin`} />
                 Saving...
               </>
             ) : isInAppDisabled ? (
               'Already disabled'
+            ) : isFooter ? (
+              'Disable'
             ) : (
               `Disable ${module.label}`
             )}
@@ -156,11 +161,12 @@ function NotificationPreferencePrompt({
           <Button
             type="button"
             variant="outline"
+            size={isFooter ? 'sm' : 'default'}
             asChild
-            className="w-full gap-2 border-border bg-white/70 hover:bg-white dark:bg-slate-950/60 dark:hover:bg-slate-900"
+            className={`w-full gap-2 border-border bg-white/70 hover:bg-white dark:bg-slate-950/60 dark:hover:bg-slate-900 ${isFooter ? 'h-7 px-2.5' : ''}`}
           >
             <Link href={buildProfileNotificationSettingsHref(module.key)}>
-              Profile settings
+              {isFooter ? 'Settings' : 'Profile settings'}
               <ExternalLink className="h-3.5 w-3.5" />
             </Link>
           </Button>
@@ -233,8 +239,8 @@ function NotificationDetailPane({
   ) : null;
 
   return (
-    <Card className={`relative flex min-h-[42rem] flex-col overflow-hidden border-border bg-white dark:bg-slate-900 md:h-full md:min-h-0 ${className}`}>
-      <CardHeader className="border-b border-border">
+    <Card className={`flex min-h-[42rem] flex-col overflow-hidden border-border bg-white dark:bg-slate-900 md:h-full md:min-h-0 ${className}`}>
+      <CardHeader className="shrink-0 border-b border-border">
         <div className="mb-3 md:hidden">
           <Button type="button" variant="outline" size="sm" onClick={onBack} className="gap-2">
             <ArrowLeft className="h-4 w-4" />
@@ -266,27 +272,27 @@ function NotificationDetailPane({
         </div>
       </CardHeader>
 
-      <CardContent className="flex min-h-0 flex-1 overflow-y-auto p-0 md:pb-36">
-        <div className="flex min-h-full w-full flex-col gap-6 p-6">
+      <CardContent className="flex min-h-0 flex-1 overflow-hidden p-0">
+        <div className="flex min-h-0 w-full flex-1 flex-col gap-6 p-6">
           {isMarkingRead && (
-            <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+            <div className="flex shrink-0 items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin text-avs-yellow" />
               Marking as read...
             </div>
           )}
 
           {isToolboxTalk && notification.priority === 'URGENT' && (
-            <div className="rounded-lg border border-red-600 bg-red-600 px-4 py-3 text-center font-black uppercase tracking-widest text-white">
+            <div className="shrink-0 rounded-lg border border-red-600 bg-red-600 px-4 py-3 text-center font-black uppercase tracking-widest text-white">
               Urgent Toolbox Talk
             </div>
           )}
 
-          <div className="rounded-md border border-border bg-muted/20 p-4 text-sm leading-6 text-foreground whitespace-pre-wrap">
+          <div className="min-h-0 flex-1 overflow-y-auto rounded-md border border-border bg-muted/20 p-4 pr-5 text-sm leading-6 text-foreground whitespace-pre-wrap">
             {notification.body}
           </div>
 
           {isToolboxTalk && pdfUrl && (
-            <div className="rounded-md border border-border bg-white p-4 dark:bg-slate-900">
+            <div className="shrink-0 rounded-md border border-border bg-white p-4 dark:bg-slate-900">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h4 className="font-semibold text-foreground">
@@ -310,7 +316,7 @@ function NotificationDetailPane({
           )}
 
           {isToolboxTalk && hasSigned && (
-            <div className="rounded-md border border-green-200 bg-green-50 p-4 dark:border-green-900 dark:bg-green-950/30">
+            <div className="shrink-0 rounded-md border border-green-200 bg-green-50 p-4 dark:border-green-900 dark:bg-green-950/30">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <h4 className="font-semibold text-green-700 dark:text-green-300">
@@ -340,7 +346,7 @@ function NotificationDetailPane({
           )}
 
           {isToolboxTalk && !hasSigned && (
-            <div className="rounded-md border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/30">
+            <div className="shrink-0 rounded-md border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/30">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h4 className="font-semibold text-red-700 dark:text-red-300">
@@ -363,7 +369,7 @@ function NotificationDetailPane({
           )}
 
           {preferencePrompt && (
-            <div className="pt-2 md:hidden">
+            <div className="shrink-0 pt-2 md:hidden">
               {preferencePrompt}
             </div>
           )}
@@ -371,7 +377,7 @@ function NotificationDetailPane({
       </CardContent>
 
       {preferencePrompt && (
-        <div className="hidden border-t border-border bg-slate-950/20 p-6 md:absolute md:bottom-0 md:left-0 md:right-0 md:block">
+        <div className="hidden shrink-0 border-t border-border bg-slate-950/20 px-3 py-2 md:block">
           <NotificationPreferencePrompt
             module={notificationModule!}
             isLoading={isLoadingPreferences}
@@ -804,14 +810,14 @@ function NotificationsContent() {
             <TabsContent value="all" className="space-y-4 mt-4">
               {/* Search */}
               <Card className={mobileDetailOpen && selectedNotification ? 'hidden md:block' : undefined}>
-                <CardContent className="pt-6">
+                <CardContent className="p-3">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder="Search notifications..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-11 bg-white dark:bg-slate-900 border-border dark:text-slate-100 text-slate-900"
+                      className="h-8 pl-10 text-sm bg-white dark:bg-slate-900 border-border dark:text-slate-100 text-slate-900"
                     />
                   </div>
                 </CardContent>
@@ -833,7 +839,7 @@ function NotificationsContent() {
                   </CardContent>
                 </Card>
               ) : (
-                <div className="grid items-stretch gap-4 md:h-[calc(100dvh-28rem)] md:min-h-[32rem] md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+                <div className="grid items-stretch gap-4 md:h-[calc(100dvh-28.5rem)] md:min-h-0 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
                   <Card className={`flex min-h-[42rem] flex-col overflow-hidden border-border bg-white dark:bg-slate-900 md:min-h-0 ${mobileDetailOpen && selectedNotification ? 'hidden md:flex' : ''}`}>
                     <CardHeader className="border-b border-border px-4 py-3">
                       <CardTitle className="text-base text-foreground">
@@ -913,7 +919,7 @@ function NotificationsContent() {
                     onSignToolboxTalk={handleToolboxSignClick}
                     onViewAttachedPDF={(url, title) => setPdfDialog({ url, title })}
                     getStatusBadge={getStatusBadge}
-                    className={mobileDetailOpen && selectedNotification ? 'block' : 'hidden md:flex'}
+                    className={mobileDetailOpen && selectedNotification ? 'flex' : 'hidden md:flex'}
                   />
                 </div>
               )}

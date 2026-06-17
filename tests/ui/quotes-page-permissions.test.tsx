@@ -10,6 +10,7 @@ import QuotesPage from '@/app/(dashboard)/quotes/page';
 const replaceMock = vi.fn();
 const pushMock = vi.fn();
 const mockUsePermissionCheck = vi.fn();
+const mockUseAuth = vi.fn();
 const mockFetchAllPaginatedItems = vi.fn();
 const quotesTableMock = vi.fn();
 const quoteFormDialogMock = vi.fn();
@@ -27,6 +28,10 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/lib/hooks/usePermissionCheck', () => ({
   usePermissionCheck: (moduleName: string, redirectOnFail?: boolean) =>
     mockUsePermissionCheck(moduleName, redirectOnFail),
+}));
+
+vi.mock('@/lib/hooks/useAuth', () => ({
+  useAuth: () => mockUseAuth(),
 }));
 
 vi.mock('@/lib/client/paginated-fetch', () => ({
@@ -143,6 +148,11 @@ describe('Quotes page customer access states', () => {
     searchParamsMock = new URLSearchParams();
     window.requestAnimationFrame = vi.fn(() => 0) as unknown as typeof window.requestAnimationFrame;
     window.cancelAnimationFrame = vi.fn() as unknown as typeof window.cancelAnimationFrame;
+    mockUseAuth.mockReturnValue({
+      isAdmin: false,
+      isSuperAdmin: false,
+      isActualSuperAdmin: false,
+    });
 
     mockUsePermissionCheck.mockImplementation((moduleName: string) => {
       if (moduleName === 'quotes') {

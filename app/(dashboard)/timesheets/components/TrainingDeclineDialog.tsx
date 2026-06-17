@@ -33,8 +33,8 @@ export function TrainingDeclineDialog({
         <DialogHeader>
           <DialogTitle className="text-foreground">Remove Training Booking?</DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            {dayLabel} is currently marked as {trainingLabel}. If you confirm that the employee did not attend,
-            the linked training booking will be deleted and their team manager plus Sarah Hubbard will be
+            {dayLabel} is currently marked as {trainingLabel}. If you confirm that you did not attend,
+            the linked training booking will be deleted and your team manager plus Sarah Hubbard will be
             notified.
           </DialogDescription>
         </DialogHeader>

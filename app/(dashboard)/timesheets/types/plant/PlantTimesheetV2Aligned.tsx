@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { DidNotWorkReasonDialog } from '@/components/timesheets/DidNotWorkReasonDialog';
+import { DidNotWorkReasonDialog, type DidNotWorkReasonDecision } from '@/components/timesheets/DidNotWorkReasonDialog';
 import { JobCodeFields } from '@/components/timesheets/JobCodeFields';
 import { MobileNumericTimeInput } from '@/components/timesheets/MobileNumericTimeInput';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -50,8 +50,10 @@ import { getRecentTextValues, recordRecentTextValue } from '@/lib/utils/recentTe
 import {
   type ApprovedAbsenceForTimesheet,
   isWorkWindowOvernight,
+  type TimesheetDidNotWorkReason,
   type TimesheetEntryLike,
   type TimesheetOffDayState,
+  getTimesheetEntryDateFromWeekEnding,
   getTimesheetWeekIsoBounds,
   isTimeWithinWorkWindow,
   normalizeTimesheetEntriesForOffDays,
@@ -76,6 +78,15 @@ import {
   isSubsistencePaymentRequired,
   syncSubsistenceRemark,
 } from '@/lib/utils/timesheet-subsistence';
+import {
+  applyPendingTrainingBookingsToOffDayStates,
+  getPendingDidNotWorkBookingsPayload,
+  getPendingDidNotWorkTrainingBooking,
+  type DidNotWorkTrainingSession,
+  type PendingDidNotWorkBooking,
+  type PendingDidNotWorkBookingMap,
+} from '@/lib/utils/timesheet-did-not-work-bookings';
+import { commitTimesheetDidNotWorkBookings } from '@/lib/client/timesheet-did-not-work-bookings';
 import type { WorkShiftPattern } from '@/types/work-shifts';
 import {
   buildValidationErrors,
@@ -117,6 +128,13 @@ const QUARTER_HOUR_TIME_FIELDS: ReadonlySet<keyof PlantEntryDraft> = new Set([
 
 const createBlankPlantWeekEntries = (): PlantEntryDraft[] =>
   Array.from({ length: 7 }, (_, index) => createBlankEntry(index + 1));
+
+function formatLocalIsoDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 function formatDerivedHours(value: number | null): string {
   if (value === null) return '';
@@ -323,19 +341,24 @@ export function PlantTimesheetV2({
   const [trainingDeclineDayIndex, setTrainingDeclineDayIndex] = useState<number | null>(null);
   const [decliningTraining, setDecliningTraining] = useState(false);
   const [didNotWorkReasonDayIndex, setDidNotWorkReasonDayIndex] = useState<number | null>(null);
+  const [pendingDidNotWorkBookings, setPendingDidNotWorkBookings] = useState<PendingDidNotWorkBookingMap>({});
 
   const currentOffDayKey = selectedEmployeeId && weekEnding ? `${selectedEmployeeId}:${weekEnding}` : '';
+  const effectiveOffDayStates = useMemo(
+    () => applyPendingTrainingBookingsToOffDayStates(offDayStates, pendingDidNotWorkBookings),
+    [offDayStates, pendingDidNotWorkBookings]
+  );
   const offDayMap = useMemo(
     () =>
       offDayKey === currentOffDayKey
-        ? new Map(offDayStates.map((state) => [state.day_of_week, state] as const))
+        ? new Map(effectiveOffDayStates.map((state) => [state.day_of_week, state] as const))
         : new Map<number, TimesheetOffDayState>(),
-    [currentOffDayKey, offDayKey, offDayStates]
+    [currentOffDayKey, effectiveOffDayStates, offDayKey]
   );
 
   const leaveAwareTotals = useMemo(
-    () => buildLeaveAwareTotals(entries, offDayStates),
-    [entries, offDayStates]
+    () => buildLeaveAwareTotals(entries, effectiveOffDayStates),
+    [effectiveOffDayStates, entries]
   );
   const weeklyTotalMultiline = formatLeaveAwareWeeklyDisplayMultiline(
     leaveAwareTotals.weekly.workedHours,
@@ -352,6 +375,43 @@ export function PlantTimesheetV2({
     if (selectedEmployeeId === user?.id) return profile?.full_name || '';
     return employees.find((employee) => employee.id === selectedEmployeeId)?.full_name || '';
   }, [employees, profile?.full_name, selectedEmployeeId, user?.id]);
+
+  const getDayDate = (dayIndex: number): Date =>
+    getTimesheetEntryDateFromWeekEnding(weekEnding, dayIndex + 1);
+
+  function buildPendingDidNotWorkBooking(
+    dayIndex: number,
+    kind: PendingDidNotWorkBooking['kind'],
+    trainingSession?: DidNotWorkTrainingSession
+  ): PendingDidNotWorkBooking {
+    return {
+      dayOfWeek: dayIndex + 1,
+      dayName: DAY_NAMES[dayIndex] || `Day ${dayIndex + 1}`,
+      date: formatLocalIsoDate(getDayDate(dayIndex)),
+      kind,
+      ...(trainingSession ? { trainingSession } : {}),
+    };
+  }
+
+  function queuePendingDidNotWorkBooking(booking: PendingDidNotWorkBooking) {
+    setPendingDidNotWorkBookings((current) => ({
+      ...current,
+      [booking.dayOfWeek - 1]: booking,
+    }));
+  }
+
+  function removePendingDidNotWorkBooking(dayIndex: number) {
+    setPendingDidNotWorkBookings((current) => {
+      if (!current[dayIndex]) return current;
+      const next = { ...current };
+      delete next[dayIndex];
+      return next;
+    });
+  }
+
+  function hasPendingTrainingBooking(dayIndex: number): boolean {
+    return Boolean(getPendingDidNotWorkTrainingBooking(pendingDidNotWorkBookings, dayIndex));
+  }
 
   const machineSelectValue = useMemo(() => {
     if (isHiredPlant) return HIRED_PLANT_SENTINEL;
@@ -432,6 +492,10 @@ export function PlantTimesheetV2({
       current === managerSelectedUserId ? current : managerSelectedUserId
     );
   }, [managerSelectedUserId]);
+
+  useEffect(() => {
+    setPendingDidNotWorkBookings({});
+  }, [selectedEmployeeId, weekEnding]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -675,9 +739,9 @@ export function PlantTimesheetV2({
 
   useEffect(() => {
     if (!existingTimesheetLoaded) return;
-    if (!currentOffDayKey || offDayKey !== currentOffDayKey || offDayStates.length === 0) return;
-    setEntries((previous) => applyOffDayDefaults(previous, offDayStates));
-  }, [currentOffDayKey, existingTimesheetLoaded, offDayKey, offDayStates]);
+    if (!currentOffDayKey || offDayKey !== currentOffDayKey || effectiveOffDayStates.length === 0) return;
+    setEntries((previous) => applyOffDayDefaults(previous, effectiveOffDayStates));
+  }, [currentOffDayKey, effectiveOffDayStates, existingTimesheetLoaded, offDayKey]);
 
   useEffect(() => {
     const nextErrors: Record<number, string> = {};
@@ -726,6 +790,12 @@ export function PlantTimesheetV2({
     offDayMap.get(dayIndex + 1);
 
   const handleTrainingStatusToggle = (dayIndex: number) => {
+    if (hasPendingTrainingBooking(dayIndex)) {
+      removePendingDidNotWorkBooking(dayIndex);
+      toast.success('Training booking selection removed.');
+      return;
+    }
+
     const dayOffState = getOffDayForIndex(dayIndex);
     if (!dayOffState?.hasTrainingBooking) return;
     setTrainingDeclineDayIndex(dayIndex);
@@ -870,14 +940,18 @@ export function PlantTimesheetV2({
     });
   };
 
-  const applyDidNotWorkSelection = (dayIndex: number, reason?: string) => {
+  const applyDidNotWorkSelection = (
+    dayIndex: number,
+    reason?: string,
+    didNotWorkReasonCategory: TimesheetDidNotWorkReason = 'Other'
+  ) => {
     const trimmedReason = reason?.trim();
     setEntries((current) => {
       const next = [...current];
       const clearedEntry = recalculateEntry({
         ...next[dayIndex],
         did_not_work: true,
-        didNotWorkReason: trimmedReason ? 'Other' : next[dayIndex].didNotWorkReason || 'Other',
+        didNotWorkReason: trimmedReason ? didNotWorkReasonCategory : next[dayIndex].didNotWorkReason || 'Other',
         working_in_yard: false,
         subsistence_payment_required: false,
         time_started: '',
@@ -917,6 +991,7 @@ export function PlantTimesheetV2({
     }
 
     const existingRemarks = currentEntry.remarks;
+    removePendingDidNotWorkBooking(dayIndex);
     updateEntry(dayIndex, {
       did_not_work: false,
       didNotWorkReason: null,
@@ -948,15 +1023,47 @@ export function PlantTimesheetV2({
     });
   };
 
-  const handleDidNotWorkReasonConfirm = (reason: string) => {
+  const applyPendingTrainingSelection = (dayIndex: number, trainingSession: DidNotWorkTrainingSession) => {
+    const booking = buildPendingDidNotWorkBooking(dayIndex, 'training', trainingSession);
+    queuePendingDidNotWorkBooking(booking);
+    setEntries((current) => {
+      const next = [...current];
+      next[dayIndex] = recalculateEntry({
+        ...next[dayIndex],
+        did_not_work: false,
+        didNotWorkReason: null,
+        working_in_yard: false,
+        subsistence_payment_required: false,
+        job_number: '',
+        job_numbers: [],
+        operator_yard_hours: '',
+        remarks: '',
+      });
+      return next;
+    });
+    toast.info(`${booking.dayName} marked for ${trainingSession === 'FULL' ? 'Training' : `Training (${trainingSession})`}.`, {
+      description: 'Enter the training-day start and finish times before saving.',
+    });
+  };
+
+  const handleDidNotWorkReasonConfirm = (decision: DidNotWorkReasonDecision) => {
     if (didNotWorkReasonDayIndex === null) return;
-    applyDidNotWorkSelection(didNotWorkReasonDayIndex, reason);
+    if (decision.kind === 'sickness') {
+      queuePendingDidNotWorkBooking(buildPendingDidNotWorkBooking(didNotWorkReasonDayIndex, 'sickness'));
+      applyDidNotWorkSelection(didNotWorkReasonDayIndex, 'Sickness', 'Sickness');
+    } else if (decision.kind === 'training') {
+      applyPendingTrainingSelection(didNotWorkReasonDayIndex, decision.trainingSession);
+    } else {
+      removePendingDidNotWorkBooking(didNotWorkReasonDayIndex);
+      applyDidNotWorkSelection(didNotWorkReasonDayIndex, decision.reason);
+    }
     setDidNotWorkReasonDayIndex(null);
   };
 
   const handleSelectedEmployeeChange = (nextEmployeeId: string) => {
     setSelectedEmployeeId(nextEmployeeId);
     onSelectedEmployeeChange?.(nextEmployeeId);
+    setPendingDidNotWorkBookings({});
 
     // New timesheets should reset daily rows when switching employee context
     // to avoid carrying over prior employee leave defaults/values.
@@ -1007,7 +1114,7 @@ export function PlantTimesheetV2({
 
     const missingReason = getMissingScheduledDidNotWorkReasonException(
       entries as unknown as TimesheetEntryLike[],
-      offDayStates,
+      effectiveOffDayStates,
       weekEnding
     );
     if (missingReason) {
@@ -1205,6 +1312,11 @@ export function PlantTimesheetV2({
           .insert(jobCodesToInsert);
 
         if (jobCodesError) throw jobCodesError;
+      }
+
+      const didNotWorkBookings = getPendingDidNotWorkBookingsPayload(pendingDidNotWorkBookings);
+      if (didNotWorkBookings.length > 0) {
+        await commitTimesheetDidNotWorkBookings(timesheetId, didNotWorkBookings);
       }
 
       try {

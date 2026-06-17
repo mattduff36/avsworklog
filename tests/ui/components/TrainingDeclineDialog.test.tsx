@@ -21,6 +21,8 @@ describe('TrainingDeclineDialog', () => {
 
     expect(screen.getByText('Remove Training Booking?')).toBeInTheDocument();
     expect(screen.getByText(/Tuesday is currently marked as Training \(AM\)/)).toBeInTheDocument();
+    expect(screen.getByText(/you did not attend/i)).toBeInTheDocument();
+    expect(screen.getByText(/your team manager plus Sarah Hubbard will be notified/i)).toBeInTheDocument();
     expect(screen.getByText(/team manager plus Sarah Hubbard will be notified/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Confirm Did Not Attend' }));

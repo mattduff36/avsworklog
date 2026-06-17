@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { DidNotWorkReasonDialog } from '@/components/timesheets/DidNotWorkReasonDialog';
+import { DidNotWorkReasonDialog, type DidNotWorkReasonDecision } from '@/components/timesheets/DidNotWorkReasonDialog';
 import { JobCodeFields } from '@/components/timesheets/JobCodeFields';
 import { MobileNumericTimeInput } from '@/components/timesheets/MobileNumericTimeInput';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -38,6 +38,7 @@ import type { WorkShiftPattern } from '@/types/work-shifts';
 import {
   type ApprovedAbsenceForTimesheet,
   isWorkWindowOvernight,
+  type TimesheetDidNotWorkReason,
   type TimesheetEntryLike,
   type TimesheetOffDayState,
   getTimesheetEntryDateFromWeekEnding,
@@ -65,6 +66,15 @@ import {
   isSubsistencePaymentRequired,
   syncSubsistenceRemark,
 } from '@/lib/utils/timesheet-subsistence';
+import {
+  applyPendingTrainingBookingsToOffDayStates,
+  getPendingDidNotWorkBookingsPayload,
+  getPendingDidNotWorkTrainingBooking,
+  type DidNotWorkTrainingSession,
+  type PendingDidNotWorkBooking,
+  type PendingDidNotWorkBookingMap,
+} from '@/lib/utils/timesheet-did-not-work-bookings';
+import { commitTimesheetDidNotWorkBookings } from '@/lib/client/timesheet-did-not-work-bookings';
 
 /**
  * Civils Timesheet Component
@@ -110,6 +120,13 @@ const createBlankEntry = (dayOfWeek: number): TimesheetEntryDraft => ({
 
 const createBlankWeekEntries = (): TimesheetEntryDraft[] =>
   Array.from({ length: 7 }, (_, i) => createBlankEntry(i + 1));
+
+function formatLocalIsoDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 export function CivilsTimesheet({
   weekEnding: initialWeekEnding,
@@ -182,15 +199,20 @@ export function CivilsTimesheet({
   const [offDayStates, setOffDayStates] = useState<TimesheetOffDayState[]>([]);
   const [offDayKey, setOffDayKey] = useState<string>('');
   const [loadingOffDays, setLoadingOffDays] = useState(true);
+  const [pendingDidNotWorkBookings, setPendingDidNotWorkBookings] = useState<PendingDidNotWorkBookingMap>({});
   const currentOffDayKey = useMemo(
     () => (selectedEmployeeId && weekEnding ? `${selectedEmployeeId}:${weekEnding}` : ''),
     [selectedEmployeeId, weekEnding]
   );
+  const effectiveOffDayStates = useMemo(
+    () => applyPendingTrainingBookingsToOffDayStates(offDayStates, pendingDidNotWorkBookings),
+    [offDayStates, pendingDidNotWorkBookings]
+  );
 
   const offDayMap = useMemo(() => {
     if (offDayKey !== currentOffDayKey) return new Map<number, TimesheetOffDayState>();
-    return new Map(offDayStates.map((state) => [state.day_of_week, state] as const));
-  }, [offDayKey, currentOffDayKey, offDayStates]);
+    return new Map(effectiveOffDayStates.map((state) => [state.day_of_week, state] as const));
+  }, [offDayKey, currentOffDayKey, effectiveOffDayStates]);
 
   // Fetch bank holidays from GOV.UK API on mount
   useEffect(() => {
@@ -225,6 +247,10 @@ export function CivilsTimesheet({
       current === managerSelectedUserId ? current : managerSelectedUserId
     );
   }, [managerSelectedUserId]);
+
+  useEffect(() => {
+    setPendingDidNotWorkBookings({});
+  }, [selectedEmployeeId, weekEnding]);
 
   // Load existing timesheet if ID is provided via props
   useEffect(() => {
@@ -321,15 +347,15 @@ export function CivilsTimesheet({
 
   useEffect(() => {
     if (!existingTimesheetLoaded) return;
-    if (offDayKey !== currentOffDayKey || offDayStates.length === 0) return;
+    if (offDayKey !== currentOffDayKey || effectiveOffDayStates.length === 0) return;
 
     setEntries((prev) =>
-      normalizeTimesheetEntriesForOffDays(prev, offDayStates, {
+      normalizeTimesheetEntriesForOffDays(prev, effectiveOffDayStates, {
         enforceLeaveOverwrite: true,
         applyNonShiftDefaults: true,
       }) as TimesheetEntryDraft[]
     );
-  }, [currentOffDayKey, existingTimesheetLoaded, offDayKey, offDayStates]);
+  }, [currentOffDayKey, effectiveOffDayStates, existingTimesheetLoaded, offDayKey]);
 
   // Removed: Fetch existing timesheets effect - no longer needed
   // Duplicate checking now happens in WeekSelector
@@ -339,6 +365,38 @@ export function CivilsTimesheet({
 
   const getOffDayForIndex = (dayIndex: number): TimesheetOffDayState | undefined =>
     offDayMap.get(dayIndex + 1);
+
+  const buildPendingDidNotWorkBooking = (
+    dayIndex: number,
+    kind: PendingDidNotWorkBooking['kind'],
+    trainingSession?: DidNotWorkTrainingSession
+  ): PendingDidNotWorkBooking => ({
+    dayOfWeek: dayIndex + 1,
+    dayName: DAY_NAMES[dayIndex] || `Day ${dayIndex + 1}`,
+    date: formatLocalIsoDate(getDayDate(dayIndex)),
+    kind,
+    ...(trainingSession ? { trainingSession } : {}),
+  });
+
+  function queuePendingDidNotWorkBooking(booking: PendingDidNotWorkBooking) {
+    setPendingDidNotWorkBookings((current) => ({
+      ...current,
+      [booking.dayOfWeek - 1]: booking,
+    }));
+  }
+
+  function removePendingDidNotWorkBooking(dayIndex: number) {
+    setPendingDidNotWorkBookings((current) => {
+      if (!current[dayIndex]) return current;
+      const next = { ...current };
+      delete next[dayIndex];
+      return next;
+    });
+  }
+
+  function hasPendingTrainingBooking(dayIndex: number): boolean {
+    return Boolean(getPendingDidNotWorkTrainingBooking(pendingDidNotWorkBookings, dayIndex));
+  }
 
   const isLeaveLockedDay = (dayIndex: number): boolean => Boolean(getOffDayForIndex(dayIndex)?.isLeaveLocked);
   const isLeaveDay = (dayIndex: number): boolean => Boolean(getOffDayForIndex(dayIndex)?.isOnApprovedLeave);
@@ -392,6 +450,12 @@ export function CivilsTimesheet({
     dayOffState?.pendingTrainingDisplayRemarks || dayOffState?.pendingTrainingLabels[0]?.label || 'Training pending approval';
 
   const handleTrainingStatusToggle = (dayIndex: number) => {
+    if (hasPendingTrainingBooking(dayIndex)) {
+      removePendingDidNotWorkBooking(dayIndex);
+      toast.success('Training booking selection removed.');
+      return;
+    }
+
     const dayOffState = getOffDayForIndex(dayIndex);
     if (!dayOffState?.hasTrainingBooking) return;
     setTrainingDeclineDayIndex(dayIndex);
@@ -580,6 +644,7 @@ export function CivilsTimesheet({
   const handleSelectedEmployeeChange = (nextEmployeeId: string) => {
     setSelectedEmployeeId(nextEmployeeId);
     onSelectedEmployeeChange?.(nextEmployeeId);
+    setPendingDidNotWorkBookings({});
 
     // New timesheets should always start from a clean week for the chosen employee.
     // This prevents prior employee leave defaults from leaking into the new selection.
@@ -802,7 +867,7 @@ export function CivilsTimesheet({
     dayIndex: number,
     field: string,
     value: string | boolean | string[],
-    options?: { didNotWorkReason?: string }
+    options?: { didNotWorkReason?: string; didNotWorkReasonCategory?: TimesheetDidNotWorkReason }
   ) => {
     if (isLeaveLockedDay(dayIndex)) return;
     const workWindow = getWorkWindowForDay(dayIndex);
@@ -818,7 +883,7 @@ export function CivilsTimesheet({
         newEntries[dayIndex] = {
           ...newEntries[dayIndex],
           did_not_work: true,
-          didNotWorkReason: requiredReason ? 'Other' : null,
+          didNotWorkReason: requiredReason ? (options?.didNotWorkReasonCategory || 'Other') : null,
           time_started: '',
           time_finished: '',
           job_number: '',
@@ -829,6 +894,7 @@ export function CivilsTimesheet({
           remarks: requiredReason ? formatDidNotWorkReasonRemark(requiredReason) : '',
         };
       } else {
+        removePendingDidNotWorkBooking(dayIndex);
         const currentRemarks = newEntries[dayIndex].remarks;
         // Setting did_not_work to false - reset daily_total if times are empty
         newEntries[dayIndex] = {
@@ -973,8 +1039,8 @@ export function CivilsTimesheet({
     }
 
     const normalizedEntries =
-      offDayKey === currentOffDayKey && offDayStates.length > 0
-        ? (normalizeTimesheetEntriesForOffDays(newEntries, offDayStates, {
+      offDayKey === currentOffDayKey && effectiveOffDayStates.length > 0
+        ? (normalizeTimesheetEntriesForOffDays(newEntries, effectiveOffDayStates, {
             enforceLeaveOverwrite: true,
             // Keep approved-leave guardrails, but do not re-force "Not on Shift" while the
             // user is actively editing. This allows weekend overtime overrides.
@@ -1022,14 +1088,54 @@ export function CivilsTimesheet({
     });
   }
 
-  function handleDidNotWorkReasonConfirm(reason: string) {
+  function applyPendingTrainingSelection(dayIndex: number, trainingSession: DidNotWorkTrainingSession) {
+    const booking = buildPendingDidNotWorkBooking(dayIndex, 'training', trainingSession);
+    queuePendingDidNotWorkBooking(booking);
+    setEntries((current) => {
+      const next = [...current];
+      const entry = next[dayIndex];
+      const dailyTotal =
+        entry.time_started && entry.time_finished
+          ? calculateStandardTimesheetHours(entry.time_started, entry.time_finished)
+          : null;
+
+      next[dayIndex] = {
+        ...entry,
+        did_not_work: false,
+        didNotWorkReason: null,
+        working_in_yard: false,
+        job_number: '',
+        job_numbers: [],
+        subsistence_payment_required: Boolean(entry.subsistence_payment_required && dailyTotal !== null),
+        daily_total: dailyTotal,
+        remarks: '',
+      };
+      return next;
+    });
+    toast.info(`${booking.dayName} marked for ${trainingSession === 'FULL' ? 'Training' : `Training (${trainingSession})`}.`, {
+      description: 'Enter the training-day start and finish times before saving.',
+    });
+  }
+
+  function handleDidNotWorkReasonConfirm(decision: DidNotWorkReasonDecision) {
     if (didNotWorkReasonDayIndex === null) return;
-    updateEntry(didNotWorkReasonDayIndex, 'did_not_work', true, { didNotWorkReason: reason });
+    if (decision.kind === 'sickness') {
+      queuePendingDidNotWorkBooking(buildPendingDidNotWorkBooking(didNotWorkReasonDayIndex, 'sickness'));
+      updateEntry(didNotWorkReasonDayIndex, 'did_not_work', true, {
+        didNotWorkReason: 'Sickness',
+        didNotWorkReasonCategory: 'Sickness',
+      });
+    } else if (decision.kind === 'training') {
+      applyPendingTrainingSelection(didNotWorkReasonDayIndex, decision.trainingSession);
+    } else {
+      removePendingDidNotWorkBooking(didNotWorkReasonDayIndex);
+      updateEntry(didNotWorkReasonDayIndex, 'did_not_work', true, { didNotWorkReason: decision.reason });
+    }
     setDidNotWorkReasonDayIndex(null);
   }
 
   function validateScheduledDidNotWorkReasons(entriesToValidate: TimesheetEntryDraft[]): boolean {
-    const missingReason = getMissingScheduledDidNotWorkReasonException(entriesToValidate, offDayStates, weekEnding);
+    const missingReason = getMissingScheduledDidNotWorkReasonException(entriesToValidate, effectiveOffDayStates, weekEnding);
     if (!missingReason) return true;
 
     const dayIndex = missingReason.dayOfWeek - 1;
@@ -1040,8 +1146,8 @@ export function CivilsTimesheet({
   }
 
   const leaveAwareTotals = useMemo(
-    () => buildLeaveAwareTotals(entries, offDayStates),
-    [entries, offDayStates]
+    () => buildLeaveAwareTotals(entries, effectiveOffDayStates),
+    [effectiveOffDayStates, entries]
   );
   const weeklyTotalMultiline = formatLeaveAwareWeeklyDisplayMultiline(
     leaveAwareTotals.weekly.workedHours,
@@ -1075,14 +1181,14 @@ export function CivilsTimesheet({
     }
 
     const entriesForValidation =
-      offDayKey === currentOffDayKey && offDayStates.length > 0
-        ? (normalizeTimesheetEntriesForOffDays(entries, offDayStates, {
+      offDayKey === currentOffDayKey && effectiveOffDayStates.length > 0
+        ? (normalizeTimesheetEntriesForOffDays(entries, effectiveOffDayStates, {
             enforceLeaveOverwrite: true,
             applyNonShiftDefaults: true,
           }) as TimesheetEntryDraft[])
         : entries;
     if (!validateScheduledDidNotWorkReasons(entriesForValidation)) return;
-    const offDayByDay = new Map(offDayStates.map((state) => [state.day_of_week, state] as const));
+    const offDayByDay = new Map(effectiveOffDayStates.map((state) => [state.day_of_week, state] as const));
     
     // Validate that ALL days have either hours OR "did not work" marked
     const allDaysComplete = entriesForValidation.every(entry => {
@@ -1213,14 +1319,14 @@ export function CivilsTimesheet({
 
     try {
       const entriesForPersistence =
-        offDayKey === currentOffDayKey && offDayStates.length > 0
-          ? (normalizeTimesheetEntriesForOffDays(entries, offDayStates, {
+        offDayKey === currentOffDayKey && effectiveOffDayStates.length > 0
+          ? (normalizeTimesheetEntriesForOffDays(entries, effectiveOffDayStates, {
               enforceLeaveOverwrite: true,
               applyNonShiftDefaults: true,
             }) as TimesheetEntryDraft[])
           : entries;
       if (!validateScheduledDidNotWorkReasons(entriesForPersistence)) return;
-      const offDayByDay = new Map(offDayStates.map((state) => [state.day_of_week, state] as const));
+      const offDayByDay = new Map(effectiveOffDayStates.map((state) => [state.day_of_week, state] as const));
       const invalidHalfDayWindow = entriesForPersistence.find((entry) => {
         const offDay = offDayByDay.get(entry.day_of_week);
         if (!offDay?.workWindow) return false;
@@ -1374,6 +1480,11 @@ export function CivilsTimesheet({
           console.error('Error inserting timesheet entry job codes:', jobCodesError);
           throw new Error(`Failed to insert timesheet job codes: ${jobCodesError.message}`);
         }
+      }
+
+      const didNotWorkBookings = getPendingDidNotWorkBookingsPayload(pendingDidNotWorkBookings);
+      if (didNotWorkBookings.length > 0) {
+        await commitTimesheetDidNotWorkBookings(timesheetId, didNotWorkBookings);
       }
 
       try {
@@ -2158,7 +2269,7 @@ export function CivilsTimesheet({
         onConfirm={handleConfirmSubmission}
         weekEnding={weekEnding}
         entries={entries}
-        offDayStates={offDayStates}
+        offDayStates={effectiveOffDayStates}
         regNumber={regNumber}
         submitting={false}
       />
