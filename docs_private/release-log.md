@@ -2,6 +2,20 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.20.0
+
+**GIT COMMIT MESSAGE**
+`feat(timesheets): update did not work absence handling and API routes`
+
+**PUSHED AT**
+2026-06-17T15:02:06.478Z
+
+**WHAT CHANGED**
+Update did not work absence handling and API routes.
+
+**COMMITS IN THIS RELEASE**
+- `feat(timesheets): update did not work absence handling and API routes`
+
 ## 0626.19.0
 
 **GIT COMMIT MESSAGE**
