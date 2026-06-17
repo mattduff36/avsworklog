@@ -2,10 +2,19 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
-import { ChevronDown, ChevronUp, Search } from 'lucide-react';
+import { ChevronDown, ChevronUp, Loader2, Pencil, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { LoadMorePagination } from '@/components/ui/load-more-pagination';
+import { Textarea } from '@/components/ui/textarea';
 import { useLoadMorePagination } from '@/lib/hooks/useLoadMorePagination';
 import { cn } from '@/lib/utils';
 import type { LegacyQuote } from '../types';
@@ -13,6 +22,18 @@ import type { LegacyQuote } from '../types';
 interface LegacyQuotesTableProps {
   legacyQuotes: LegacyQuote[];
   managerFilter?: string;
+  canEditLegacyQuotes?: boolean;
+  onLegacyQuoteUpdate?: (quoteId: string, updates: LegacyQuoteEditForm) => Promise<LegacyQuote | void>;
+}
+
+export interface LegacyQuoteEditForm {
+  quote_reference: string;
+  customer_name: string;
+  title: string;
+  quote_date: string;
+  quote_manager_name: string;
+  quote_value_text: string;
+  comments: string;
 }
 
 type LegacyQuoteSortField = 'quote_reference' | 'customer' | 'details' | 'quote_date' | 'manager' | 'total';
@@ -23,6 +44,16 @@ interface DateRangeFilterProps {
   toDate: string;
   onFromDateChange: (value: string) => void;
   onToDateChange: (value: string) => void;
+}
+
+interface LegacyQuoteEditDialogProps {
+  quote: LegacyQuote | null;
+  form: LegacyQuoteEditForm;
+  isSaving: boolean;
+  error: string | null;
+  onOpenChange: (open: boolean) => void;
+  onFormChange: (field: keyof LegacyQuoteEditForm, value: string) => void;
+  onSubmit: () => Promise<void>;
 }
 
 function cleanLegacyQuoteManagerName(value: string | null | undefined): string {
@@ -100,6 +131,18 @@ function getLegacyQuoteDateTime(quote: LegacyQuote): number {
   if (!quote.quote_date) return 0;
   const date = new Date(`${quote.quote_date}T00:00:00Z`);
   return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+}
+
+function buildLegacyQuoteEditForm(quote: LegacyQuote): LegacyQuoteEditForm {
+  return {
+    quote_reference: quote.quote_reference || '',
+    customer_name: quote.customer_name || '',
+    title: quote.title || '',
+    quote_date: quote.quote_date || '',
+    quote_manager_name: quote.quote_manager_name || '',
+    quote_value_text: quote.quote_value_text || '',
+    comments: quote.comments || '',
+  };
 }
 
 function compareStrings(a: string | null | undefined, b: string | null | undefined): number {
@@ -205,12 +248,151 @@ function DateRangeFilter({
   );
 }
 
-export function LegacyQuotesTable({ legacyQuotes, managerFilter = 'all' }: LegacyQuotesTableProps) {
+function LegacyQuoteEditDialog({
+  quote,
+  form,
+  isSaving,
+  error,
+  onOpenChange,
+  onFormChange,
+  onSubmit,
+}: LegacyQuoteEditDialogProps) {
+  return (
+    <Dialog open={Boolean(quote)} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl border border-slate-700 bg-slate-950 text-white">
+        <DialogHeader>
+          <DialogTitle>Edit Legacy Quote</DialogTitle>
+          <DialogDescription>
+            Admin-only changes update the legacy quote archive used by quotes and timesheets.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form
+          className="grid gap-4 sm:grid-cols-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void onSubmit();
+          }}
+        >
+          <label className="space-y-2">
+            <span className="text-sm font-medium text-slate-300">Job Number</span>
+            <Input
+              value={form.quote_reference}
+              onChange={(event) => onFormChange('quote_reference', event.target.value.toUpperCase())}
+              className="border-slate-700 bg-slate-900 text-white"
+            />
+          </label>
+
+          <label className="space-y-2">
+            <span className="text-sm font-medium text-slate-300">Date</span>
+            <Input
+              type="date"
+              value={form.quote_date}
+              onChange={(event) => onFormChange('quote_date', event.target.value)}
+              className="border-slate-700 bg-slate-900 text-white"
+            />
+          </label>
+
+          <label className="space-y-2">
+            <span className="text-sm font-medium text-slate-300">Customer</span>
+            <Input
+              value={form.customer_name}
+              onChange={(event) => onFormChange('customer_name', event.target.value)}
+              className="border-slate-700 bg-slate-900 text-white"
+            />
+          </label>
+
+          <label className="space-y-2">
+            <span className="text-sm font-medium text-slate-300">Manager</span>
+            <Input
+              value={form.quote_manager_name}
+              onChange={(event) => onFormChange('quote_manager_name', event.target.value)}
+              className="border-slate-700 bg-slate-900 text-white"
+            />
+          </label>
+
+          <label className="space-y-2 sm:col-span-2">
+            <span className="text-sm font-medium text-slate-300">Details</span>
+            <Textarea
+              value={form.title}
+              onChange={(event) => onFormChange('title', event.target.value)}
+              className="border-slate-700 bg-slate-900 text-white"
+            />
+          </label>
+
+          <label className="space-y-2 sm:col-span-2">
+            <span className="text-sm font-medium text-slate-300">Total</span>
+            <Input
+              value={form.quote_value_text}
+              onChange={(event) => onFormChange('quote_value_text', event.target.value)}
+              placeholder="£1,250.00, Rates, Various..."
+              className="border-slate-700 bg-slate-900 text-white"
+            />
+          </label>
+
+          <label className="space-y-2 sm:col-span-2">
+            <span className="text-sm font-medium text-slate-300">Comments</span>
+            <Textarea
+              value={form.comments}
+              onChange={(event) => onFormChange('comments', event.target.value)}
+              className="border-slate-700 bg-slate-900 text-white"
+            />
+          </label>
+
+          {error ? (
+            <p className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200 sm:col-span-2">
+              {error}
+            </p>
+          ) : null}
+
+          <DialogFooter className="sm:col-span-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isSaving}
+              className="border-slate-700 text-slate-200 hover:bg-slate-800"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={isSaving}
+              className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90"
+            >
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function LegacyQuotesTable({
+  legacyQuotes,
+  managerFilter = 'all',
+  canEditLegacyQuotes = false,
+  onLegacyQuoteUpdate,
+}: LegacyQuotesTableProps) {
   const [search, setSearch] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [sortField, setSortField] = useState<LegacyQuoteSortField>('quote_date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [editingQuote, setEditingQuote] = useState<LegacyQuote | null>(null);
+  const [editForm, setEditForm] = useState<LegacyQuoteEditForm>({
+    quote_reference: '',
+    customer_name: '',
+    title: '',
+    quote_date: '',
+    quote_manager_name: '',
+    quote_value_text: '',
+    comments: '',
+  });
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   const filteredQuotes = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -297,7 +479,39 @@ export function LegacyQuotesTable({ legacyQuotes, managerFilter = 'all' }: Legac
     );
   }
 
+  function openEditDialog(quote: LegacyQuote) {
+    setEditingQuote(quote);
+    setEditForm(buildLegacyQuoteEditForm(quote));
+    setEditError(null);
+  }
+
+  function closeEditDialog() {
+    if (isSavingEdit) return;
+    setEditingQuote(null);
+    setEditError(null);
+  }
+
+  function updateEditForm(field: keyof LegacyQuoteEditForm, value: string) {
+    setEditForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function submitEditForm() {
+    if (!editingQuote || !onLegacyQuoteUpdate) return;
+
+    setIsSavingEdit(true);
+    setEditError(null);
+    try {
+      await onLegacyQuoteUpdate(editingQuote.id, editForm);
+      setEditingQuote(null);
+    } catch (error) {
+      setEditError(error instanceof Error ? error.message : 'Unable to update this legacy quote.');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  }
+
   const hasDateFilter = Boolean(fromDate || toDate);
+  const canEdit = canEditLegacyQuotes && Boolean(onLegacyQuoteUpdate);
 
   return (
     <div className="space-y-6">
@@ -381,6 +595,18 @@ export function LegacyQuotesTable({ legacyQuotes, managerFilter = 'all' }: Legac
                       <p>{managerName || '-'}</p>
                     </div>
                   </div>
+                  {canEdit ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openEditDialog(quote)}
+                      className="mt-4 w-full border-slate-600 text-slate-200 hover:bg-slate-800"
+                    >
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Edit Legacy Quote
+                    </Button>
+                  ) : null}
                 </div>
               );
             })}
@@ -396,6 +622,9 @@ export function LegacyQuotesTable({ legacyQuotes, managerFilter = 'all' }: Legac
                   {renderSortableHeader('Date', 'quote_date')}
                   {renderSortableHeader('Manager', 'manager')}
                   {renderSortableHeader('Total', 'total', 'text-right')}
+                  {canEdit ? (
+                    <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Actions</th>
+                  ) : null}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/50">
@@ -420,6 +649,20 @@ export function LegacyQuotesTable({ legacyQuotes, managerFilter = 'all' }: Legac
                       <td className={cn('whitespace-nowrap px-4 py-3 text-right font-semibold', totalLabel ? 'text-white' : 'text-slate-600')}>
                         {totalLabel}
                       </td>
+                      {canEdit ? (
+                        <td className="whitespace-nowrap px-4 py-3 text-right">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openEditDialog(quote)}
+                            className="border-slate-600 text-slate-200 hover:bg-slate-800"
+                          >
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Edit
+                          </Button>
+                        </td>
+                      ) : null}
                     </tr>
                   );
                 })}
@@ -435,6 +678,18 @@ export function LegacyQuotesTable({ legacyQuotes, managerFilter = 'all' }: Legac
           />
         </>
       )}
+
+      <LegacyQuoteEditDialog
+        quote={editingQuote}
+        form={editForm}
+        isSaving={isSavingEdit}
+        error={editError}
+        onOpenChange={(open) => {
+          if (!open) closeEditDialog();
+        }}
+        onFormChange={updateEditForm}
+        onSubmit={submitEditForm}
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
@@ -18,6 +19,7 @@ import type { QuoteSettingsSubTab } from './components/settings/QuoteSettingsTab
 import { uploadQuoteAttachment } from './quote-attachment-client';
 import { getQuoteManagerNameFilterValue, normalizeQuoteManagerName } from './types';
 import type { LegacyQuote, Quote, QuoteFormData, QuoteManagerOption, QuoteProjectNumber } from './types';
+import type { LegacyQuoteEditForm } from './components/LegacyQuotesTable';
 import type { CustomerFormData } from '../customers/types';
 
 interface CustomerOption {
@@ -286,6 +288,7 @@ function ManagerFilterTabs({
 export default function QuotesPage() {
   const { hasPermission: canViewQuotes, loading: permissionLoading } = usePermissionCheck('quotes', false);
   const { hasPermission: canViewCustomers, loading: customerPermissionLoading } = usePermissionCheck('customers', false);
+  const { isAdmin, isSuperAdmin, isActualSuperAdmin } = useAuth();
   const sensitiveAccess = useSensitiveModuleAccess('quotes');
   const router = useRouter();
   const pathname = usePathname();
@@ -368,6 +371,7 @@ export default function QuotesPage() {
   const currentManagerFilter = managerParam === 'all' || currentManagerIds.has(managerParam) ? managerParam : 'all';
   const archivedManagerFilter = managerParam === 'all' || archivedManagerIds.has(managerParam) ? managerParam : 'all';
   const legacyManagerFilter = managerParam === 'all' || legacyManagerIds.has(managerParam) ? managerParam : 'all';
+  const canEditLegacyQuotes = isAdmin || isSuperAdmin || isActualSuperAdmin;
 
   const fetchData = useCallback(async () => {
     try {
@@ -542,6 +546,28 @@ export default function QuotesPage() {
     toast.success('Quote updated');
     setEditingQuote(null);
     await fetchData();
+  }
+
+  async function handleLegacyQuoteUpdate(quoteId: string, updates: LegacyQuoteEditForm) {
+    const res = await fetch('/api/quotes/legacy', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: quoteId, ...updates }),
+    });
+    const payload = await res.json().catch(() => null) as { legacy_quote?: LegacyQuote; error?: string } | null;
+
+    if (!res.ok) {
+      throw new Error(payload?.error || 'Unable to update this legacy quote.');
+    }
+    if (!payload?.legacy_quote) {
+      throw new Error('Legacy quote update returned no data.');
+    }
+
+    setLegacyQuotes((current) => current.map((quote) => (
+      quote.id === payload.legacy_quote?.id ? payload.legacy_quote : quote
+    )));
+    toast.success('Legacy quote updated');
+    return payload.legacy_quote;
   }
 
   async function handleCreateCustomerFromQuote(data: CustomerFormData) {
@@ -805,7 +831,12 @@ export default function QuotesPage() {
           {legacyLoading && !hasLoadedLegacyQuotes ? (
             <QuoteTabLoader />
           ) : (
-            <LegacyQuotesTable legacyQuotes={legacyQuotes} managerFilter={legacyManagerFilter} />
+            <LegacyQuotesTable
+              legacyQuotes={legacyQuotes}
+              managerFilter={legacyManagerFilter}
+              canEditLegacyQuotes={canEditLegacyQuotes}
+              onLegacyQuoteUpdate={handleLegacyQuoteUpdate}
+            />
           )}
         </TabsContent>
 

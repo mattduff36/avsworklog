@@ -1,7 +1,7 @@
 /** @vitest-environment happy-dom */
 
-import { describe, expect, it } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import {
   getLegacyQuoteManagerFilterValue,
   LegacyQuotesTable,
@@ -193,6 +193,42 @@ describe('LegacyQuotesTable', () => {
     const firstRowCells = container.querySelectorAll('tbody tr:first-child td');
     expect(firstRowCells).toHaveLength(6);
     expect(firstRowCells[5]).toHaveTextContent('');
+  });
+
+  it('keeps legacy quote edit actions hidden by default', () => {
+    render(<LegacyQuotesTable legacyQuotes={[buildLegacyQuote({ id: 'read-only' })]} />);
+
+    expect(screen.queryByRole('button', { name: /^Edit$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Edit Legacy Quote/ })).not.toBeInTheDocument();
+  });
+
+  it('lets admins submit legacy quote edits', async () => {
+    const onLegacyQuoteUpdate = vi.fn().mockResolvedValue(undefined);
+    render(
+      <LegacyQuotesTable
+        legacyQuotes={[buildLegacyQuote({ id: 'editable', quote_reference: '4001-GH' })]}
+        canEditLegacyQuotes
+        onLegacyQuoteUpdate={onLegacyQuoteUpdate}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /^Edit$/ }));
+    fireEvent.change(screen.getByLabelText('Customer'), { target: { value: 'Updated Customer' } });
+    fireEvent.change(screen.getByLabelText('Details'), { target: { value: 'Updated details' } });
+    fireEvent.change(screen.getByLabelText('Total'), { target: { value: '£250.00' } });
+    fireEvent.click(screen.getByRole('button', { name: /Save Changes/ }));
+
+    await waitFor(() => {
+      expect(onLegacyQuoteUpdate).toHaveBeenCalledWith('editable', {
+        quote_reference: '4001-GH',
+        customer_name: 'Updated Customer',
+        title: 'Updated details',
+        quote_date: '2026-01-01',
+        quote_manager_name: 'George Healey',
+        quote_value_text: '£250.00',
+        comments: 'Imported quote',
+      });
+    });
   });
 
   it('filters legacy quotes by date range with overview-style filter controls', () => {
