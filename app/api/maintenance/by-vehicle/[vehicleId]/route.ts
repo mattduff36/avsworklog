@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { logger } from '@/lib/utils/logger';
 import type {
   CustomMaintenanceItemUpdate,
@@ -14,6 +15,7 @@ type ChangedFieldValueType = 'date' | 'mileage' | 'boolean' | 'text';
 
 type ExtendedUpdateMaintenanceRequest = UpdateMaintenanceRequest & {
   assetType?: AssetType;
+  task_id?: string;
   completed_at?: string;
   task_title?: string | null;
   task_description?: string | null;
@@ -31,6 +33,27 @@ interface CustomCategoryValueRow {
   due_hours: number | null;
   last_hours: number | null;
   notes: string | null;
+}
+
+interface TaskMaintenanceContextRow {
+  id: string;
+  title: string | null;
+  description: string | null;
+  workshop_comments: string | null;
+  actioned_at: string | null;
+  status: string | null;
+  van_id: string | null;
+  hgv_id: string | null;
+  plant_id: string | null;
+  workshop_task_categories: { name: string | null } | Array<{ name: string | null }> | null;
+  workshop_task_subcategories: { name: string | null } | Array<{ name: string | null }> | null;
+}
+
+function getRelatedName(
+  related: { name: string | null } | Array<{ name: string | null }> | null
+): string | null {
+  if (Array.isArray(related)) return related[0]?.name ?? null;
+  return related?.name ?? null;
 }
 
 function fkColumnForAssetType(assetType: AssetType): FkColumn {
@@ -231,20 +254,75 @@ export async function POST(
     const maintenanceCategories = (categories || []) as MaintenanceCategory[];
     const categoryIdByField = buildCategoryIdByField(maintenanceCategories);
     const assetType = fkColumn === 'hgv_id' ? 'hgv' : fkColumn === 'plant_id' ? 'plant' : 'van';
+    let verifiedTaskContext: TaskMaintenanceContextRow | null = null;
+
+    if (body.task_id) {
+      const admin = createAdminClient();
+      const { data: taskContext, error: taskContextError } = await admin
+        .from('actions')
+        .select(`
+          id,
+          title,
+          description,
+          workshop_comments,
+          actioned_at,
+          status,
+          van_id,
+          hgv_id,
+          plant_id,
+          workshop_task_categories (
+            name
+          ),
+          workshop_task_subcategories (
+            name
+          )
+        `)
+        .eq('id', body.task_id)
+        .maybeSingle();
+
+      if (taskContextError) {
+        logger.error('Failed to verify workshop task for maintenance update', taskContextError);
+        throw taskContextError;
+      }
+
+      verifiedTaskContext = taskContext as TaskMaintenanceContextRow | null;
+
+      if (
+        !verifiedTaskContext ||
+        verifiedTaskContext.status !== 'completed' ||
+        verifiedTaskContext[fkColumn] !== vehicleId
+      ) {
+        return NextResponse.json(
+          { error: 'Workshop task could not be verified for this maintenance update' },
+          { status: 400 }
+        );
+      }
+    }
+
+    const automaticContext = verifiedTaskContext
+      ? {
+          title: verifiedTaskContext.title,
+          description: verifiedTaskContext.description,
+          workshopCategoryName: getRelatedName(verifiedTaskContext.workshop_task_categories),
+          workshopSubcategoryName: getRelatedName(verifiedTaskContext.workshop_task_subcategories),
+        }
+      : {
+          title: body.task_title,
+          description: body.task_description,
+          workshopCategoryName: body.task_category_name,
+          workshopSubcategoryName: body.task_subcategory_name,
+        };
+    const automaticCompletedAt =
+      verifiedTaskContext?.actioned_at || body.completed_at || new Date().toISOString();
 
     const autoPlan = buildAutomaticMaintenancePlan({
-      context: {
-        title: body.task_title,
-        description: body.task_description,
-        workshopCategoryName: body.task_category_name,
-        workshopSubcategoryName: body.task_subcategory_name,
-      },
+      context: automaticContext,
       categories: maintenanceCategories,
       state: {
         currentMileage: body.current_mileage ?? existingRecord?.current_mileage ?? null,
         currentHours: body.current_hours ?? existingRecord?.current_hours ?? null,
       },
-      completedAt: body.completed_at || new Date().toISOString(),
+      completedAt: automaticCompletedAt,
       assetType,
     });
 
@@ -627,14 +705,27 @@ export async function POST(
 
     if (requestedPlantUpdates.loler_due_date !== undefined && plantRecord) {
       if (plantRecord.loler_due_date !== requestedPlantUpdates.loler_due_date) {
-        const { error: plantUpdateError } = await supabase
+        const shouldUseVerifiedAutomaticPlantUpdate =
+          Boolean(verifiedTaskContext) &&
+          body.loler_due_date === undefined &&
+          autoPlan?.plantUpdates.loler_due_date !== undefined;
+        const plantUpdateClient = shouldUseVerifiedAutomaticPlantUpdate
+          ? createAdminClient()
+          : supabase;
+        const { data: updatedPlant, error: plantUpdateError } = await plantUpdateClient
           .from('plant')
           .update({ loler_due_date: requestedPlantUpdates.loler_due_date })
-          .eq('id', vehicleId);
+          .eq('id', vehicleId)
+          .select('id')
+          .maybeSingle();
 
         if (plantUpdateError) {
           logger.error('Failed to update plant LOLER due date', plantUpdateError);
           throw plantUpdateError;
+        }
+
+        if (!updatedPlant) {
+          throw new Error('Plant LOLER due date update was not applied');
         }
 
         assignChangedField(

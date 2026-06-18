@@ -11,6 +11,12 @@ import { normalizeSignatureDataUrl } from '@/lib/pdf/signature-image';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type { StatusHistoryEvent } from '@/lib/utils/workshopTaskStatusHistory';
 import { inferAssetMeterUnit, normalizeAssetMeterUnit } from '@/lib/workshop-tasks/asset-meter';
+import {
+  calculateLolerExpiryDate,
+  findLolerMaintenanceCategory,
+  getLolerPeriodLabel,
+  type LolerMaintenanceCategory,
+} from '@/lib/utils/lolerMaintenance';
 
 const LOLER_THOROUGH_EXAMINATION = 'LOLER THOROUGH EXAMINATION';
 const LEGACY_LOLER_TYPO_PATTERN = new RegExp(`\\b${['LOLO', 'R'].join('')}\\b`, 'gi');
@@ -80,6 +86,12 @@ interface FieldResponseRow {
 interface MaintenanceMeterRow {
   current_hours?: number | null;
   current_mileage?: number | null;
+}
+
+interface MaintenanceCategoryPeriodRow extends LolerMaintenanceCategory {
+  name: string;
+  field_key: string | null;
+  is_active: boolean | null;
 }
 
 function isStatusHistoryEvent(value: unknown): value is StatusHistoryEvent {
@@ -395,6 +407,23 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const logoSrc = await loadSquiresLogoDataUrl();
     const reportCreatedAt = task?.created_at ?? attachment.created_at;
     const reportCompletedAt = task ? task.actioned_at : attachment.completed_at;
+    let lolerIntervalLabel = '12 months';
+    if (assetType === 'plant') {
+      const { data: maintenanceCategories, error: maintenanceCategoriesError } = await supabase
+        .from('maintenance_categories')
+        .select('name, field_key, type, period_value, period_unit, is_active')
+        .eq('is_active', true);
+
+      if (maintenanceCategoriesError) {
+        console.error('Error fetching LOLER maintenance category:', maintenanceCategoriesError);
+      } else {
+        const lolerCategory = findLolerMaintenanceCategory(
+          (maintenanceCategories || []) as MaintenanceCategoryPeriodRow[]
+        );
+        lolerIntervalLabel = getLolerPeriodLabel(lolerCategory);
+        lolerExpiryDate = calculateLolerExpiryDate(reportCompletedAt, lolerCategory) || lolerExpiryDate;
+      }
+    }
     let inspectorName: string | null = null;
     if (attachment.completed_by) {
       const { data: completedByProfile } = await supabase
@@ -432,6 +461,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       assetMeterUnit,
       inspectorName,
       lolerExpiryDate,
+      lolerIntervalLabel,
       logoSrc,
     });
 

@@ -301,6 +301,7 @@ interface WorkshopAttachmentPDFProps {
   assetMeterUnit?: AssetMeterUnit | null;
   inspectorName?: string | null;
   lolerExpiryDate?: string | null;
+  lolerIntervalLabel?: string | null;
   logoSrc?: string | null;
 }
 
@@ -440,6 +441,7 @@ export function WorkshopAttachmentPDF({
   assetMeterUnit = null,
   inspectorName = null,
   lolerExpiryDate = null,
+  lolerIntervalLabel = '12 months',
   logoSrc = null,
 }: WorkshopAttachmentPDFProps) {
   const itemCount = v2Sections.reduce((count, section) => count + section.fields.length, 0);
@@ -506,7 +508,7 @@ export function WorkshopAttachmentPDF({
               </View>
               <View style={styles.infoRow}>
                 <Text style={styles.label}>Interval:</Text>
-                <Text style={styles.value}>Yearly</Text>
+                <Text style={styles.value}>{lolerIntervalLabel || '12 months'}</Text>
               </View>
               <View style={styles.infoRow}>
                 <Text style={styles.label}>Inspector Name:</Text>

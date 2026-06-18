@@ -921,6 +921,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
               body: JSON.stringify({
                 ...data.maintenanceUpdates,
                 assetType: completingTask.plant_id ? 'plant' : completingTask.hgv_id ? 'hgv' : 'van',
+                task_id: taskId,
                 completed_at: now.toISOString(),
                 task_title: completingTask.title,
                 task_description: completingTask.description,

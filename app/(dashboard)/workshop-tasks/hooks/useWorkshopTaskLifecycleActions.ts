@@ -352,6 +352,7 @@ export function useWorkshopTaskLifecycleActions({
               body: JSON.stringify({
                 ...data.maintenanceUpdates,
                 assetType,
+                task_id: taskId,
                 completed_at: now.toISOString(),
                 task_title: completingTask.title,
                 task_description: completingTask.description,

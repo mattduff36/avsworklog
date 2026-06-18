@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -24,6 +24,12 @@ import type { MaintenanceHistoryValueType } from '@/lib/utils/maintenance-histor
 import { safeMaintenanceHistoryFieldName } from '@/lib/utils/maintenance-history';
 import { toast } from 'sonner';
 import { normalizePlantSerialNumber, isValidPlantSerialNumber } from '@/lib/utils/plant-serial-number';
+import {
+  DEFAULT_LOLER_PERIOD_LABEL,
+  findLolerMaintenanceCategory,
+  getLolerPeriodLabel,
+  type LolerMaintenanceCategory,
+} from '@/lib/utils/lolerMaintenance';
 
 // ============================================================================
 // Types
@@ -94,10 +100,6 @@ const editPlantRecordSchema = z.object({
   loler_due_date: z.string().optional().nullable(),
   loler_last_inspection_date: z.string().optional().nullable(),
   loler_certificate_number: z.string().max(50, 'Certificate number must be less than 50 characters').optional().nullable(),
-  loler_inspection_interval_months: z.preprocess(
-    (val) => val === '' || val === null || val === undefined ? null : Number(val),
-    z.number().int().positive('Inspection interval must be a positive number').optional().nullable()
-  ),
   tracker_id: z.string().max(50, 'Tracker ID must be less than 50 characters').optional().nullable(),
   comment: z.string()
     .min(10, 'Comment must be at least 10 characters')
@@ -128,8 +130,9 @@ export function EditPlantRecordDialog({
   onSuccess,
   onRetire
 }: EditPlantRecordDialogProps) {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [lolerPeriodLabel, setLolerPeriodLabel] = useState(DEFAULT_LOLER_PERIOD_LABEL);
   const dialogContentRef = useRef<HTMLDivElement>(null);
   
   // Check if this is a new maintenance record
@@ -166,12 +169,43 @@ export function EditPlantRecordDialog({
         loler_due_date: formatDateForInput(plant.loler_due_date),
         loler_last_inspection_date: formatDateForInput(plant.loler_last_inspection_date),
         loler_certificate_number: plant.loler_certificate_number || '',
-        loler_inspection_interval_months: plant.loler_inspection_interval_months || undefined,
         tracker_id: maintenanceRecord?.tracker_id || '',
         comment: '',
       });
     }
   }, [plant, maintenanceRecord, reset]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    let isCancelled = false;
+
+    async function loadLolerPeriod() {
+      const { data, error } = await supabase
+        .from('maintenance_categories')
+        .select('name, field_key, type, period_value, period_unit, is_active')
+        .eq('is_active', true);
+
+      if (isCancelled) return;
+
+      if (error) {
+        console.error('Error loading LOLER period from maintenance settings:', error);
+        setLolerPeriodLabel(DEFAULT_LOLER_PERIOD_LABEL);
+        return;
+      }
+
+      const lolerCategory = findLolerMaintenanceCategory(
+        (data || []) as LolerMaintenanceCategory[]
+      );
+      setLolerPeriodLabel(getLolerPeriodLabel(lolerCategory));
+    }
+
+    loadLolerPeriod();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [open, supabase]);
 
   // Handle modal close attempts
   const handleOpenChange = (newOpen: boolean) => {
@@ -349,18 +383,6 @@ export function EditPlantRecordDialog({
           old_value: oldLolerCertNumber,
           new_value: newLolerCertNumber,
           value_type: 'text'
-        });
-      }
-
-      const newLolerInterval = data.loler_inspection_interval_months || 12;
-      const oldLolerInterval = plant.loler_inspection_interval_months || 12;
-      if (newLolerInterval !== oldLolerInterval) {
-        plantUpdates.loler_inspection_interval_months = newLolerInterval;
-        fieldChanges.push({
-          field_name: 'loler_inspection_interval_months',
-          old_value: oldLolerInterval.toString(),
-          new_value: newLolerInterval.toString(),
-          value_type: 'text' // Configuration value, not a measurement
         });
       }
 
@@ -863,17 +885,13 @@ export function EditPlantRecordDialog({
 
               {/* Inspection Interval */}
               <div className="space-y-2">
-                <Label htmlFor="loler_inspection_interval_months">Inspection Interval (months)</Label>
-                <Input
-                  id="loler_inspection_interval_months"
-                  type="number"
-                  {...register('loler_inspection_interval_months')}
-                  placeholder="e.g., 12"
-                  className="bg-input border-border text-white"
-                />
-                {errors.loler_inspection_interval_months && (
-                  <p className="text-sm text-red-400">{errors.loler_inspection_interval_months.message}</p>
-                )}
+                <Label>Inspection Interval</Label>
+                <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                  {lolerPeriodLabel}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Managed from Maintenance Settings.
+                </p>
               </div>
             </div>
           </div>
