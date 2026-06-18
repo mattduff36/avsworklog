@@ -2,6 +2,20 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.23.0
+
+**GIT COMMIT MESSAGE**
+`feat(maintenance): update maintenance workflow and API routes`
+
+**PUSHED AT**
+2026-06-18T13:52:30.807Z
+
+**WHAT CHANGED**
+Update maintenance workflow and API routes.
+
+**COMMITS IN THIS RELEASE**
+- `feat(maintenance): update maintenance workflow and API routes`
+
 ## 0626.22.0
 
 **GIT COMMIT MESSAGE**
