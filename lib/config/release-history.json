@@ -1,5 +1,24 @@
 [
   {
+    "version": "0626.25.0",
+    "updateKind": "major",
+    "title": "Inspections update",
+    "description": "Updated inspection workflows and background services.",
+    "summary": "Updated inspection workflows and background services.",
+    "details": [
+      "Covered inspection workflows, background services, and inspections.",
+      "Updated inspection workflows and background services.",
+      "Published as a larger app update because it included broader workflow changes.",
+      "The release time shown is when the version record was created."
+    ],
+    "areas": [
+      "Inspection workflows",
+      "Background services",
+      "Inspections"
+    ],
+    "pushedAt": "2026-06-19T10:20:18.087Z"
+  },
+  {
     "version": "0626.24.1",
     "updateKind": "minor",
     "title": "Finalise maintenance update",

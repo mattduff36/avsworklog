@@ -2,6 +2,20 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.25.0
+
+**GIT COMMIT MESSAGE**
+`feat(inspections): update inspection workflows and API routes`
+
+**PUSHED AT**
+2026-06-19T10:20:18.087Z
+
+**WHAT CHANGED**
+Update inspection workflows and API routes.
+
+**COMMITS IN THIS RELEASE**
+- `feat(inspections): update inspection workflows and API routes`
+
 ## 0626.24.1
 
 **GIT COMMIT MESSAGE**
