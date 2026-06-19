@@ -56,7 +56,7 @@ type DebugTab =
   | 'usage-analytics'
   | 'dvla-sync'
   | 'test-fleet'
-  | 'legacy-job-codes'
+  | 'job-code-corrections'
   | 'notification-settings'
   | 'emulation-tests';
 
@@ -77,9 +77,11 @@ const DEBUG_TAB_ALIASES: Record<string, DebugTab> = {
   dvla: 'dvla-sync',
   'dvla-sync': 'dvla-sync',
   'test-fleet': 'test-fleet',
-  legacy: 'legacy-job-codes',
-  'legacy-codes': 'legacy-job-codes',
-  'legacy-job-codes': 'legacy-job-codes',
+  legacy: 'job-code-corrections',
+  'legacy-codes': 'job-code-corrections',
+  'legacy-job-codes': 'job-code-corrections',
+  'job-codes': 'job-code-corrections',
+  'job-code-corrections': 'job-code-corrections',
   notifications: 'notification-settings',
   'notification-settings': 'notification-settings',
   emulation: 'emulation-tests',
@@ -92,7 +94,7 @@ const DEBUG_TABS: DebugTabConfig[] = [
   { value: 'usage-analytics', label: 'Usage Analytics', icon: BarChart3 },
   { value: 'dvla-sync', label: 'DVLA Sync', icon: RefreshCw },
   { value: 'test-fleet', label: 'Test Fleet', icon: Car },
-  { value: 'legacy-job-codes', label: 'Legacy Job Codes', icon: KeyRound },
+  { value: 'job-code-corrections', label: 'Job Codes', icon: KeyRound },
   { value: 'notification-settings', label: 'Notification Settings', icon: Send },
   { value: 'emulation-tests', label: 'Emulation Tests', icon: FlaskConical },
 ];
@@ -227,7 +229,7 @@ export default function DebugPage() {
           <TestFleetDebugPanel />
         </TabsContent>
 
-        <TabsContent value="legacy-job-codes">
+        <TabsContent value="job-code-corrections">
           <LegacyJobCodesDebugPanel />
         </TabsContent>
 
