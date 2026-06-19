@@ -2,6 +2,20 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.28.0
+
+**GIT COMMIT MESSAGE**
+`feat(inventory): update inventory`
+
+**PUSHED AT**
+2026-06-19T14:46:43.461Z
+
+**WHAT CHANGED**
+Update inventory.
+
+**COMMITS IN THIS RELEASE**
+- `feat(inventory): update inventory`
+
 ## 0626.27.0
 
 **GIT COMMIT MESSAGE**

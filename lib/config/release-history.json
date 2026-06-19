@@ -1,5 +1,25 @@
 [
   {
+    "version": "0626.28.0",
+    "updateKind": "major",
+    "title": "Inventory update",
+    "description": "Updated inventory.",
+    "summary": "Updated inventory.",
+    "details": [
+      "Covered inventory.",
+      "Updated inventory.",
+      "Published as a larger app update because it included broader workflow changes.",
+      "The release time shown is when the version record was created."
+    ],
+    "areas": [
+      "Inventory"
+    ],
+    "areaKeys": [
+      "inventory"
+    ],
+    "pushedAt": "2026-06-19T14:46:43.461Z"
+  },
+  {
     "version": "0626.27.0",
     "updateKind": "major",
     "title": "Inventory update",
