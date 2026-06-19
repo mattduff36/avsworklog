@@ -12,10 +12,27 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PageLoader } from '@/components/ui/page-loader';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertTriangle, CalendarCheck, Clock, Download, Loader2, MapPin, PackageSearch } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatInventoryCategoryLabel, type InventoryItem, type InventoryItemGroupSummary } from '../../types';
+import {
+  EMPTY_INVENTORY_ITEM_FORM,
+  INVENTORY_CATEGORY_LABELS,
+  formatInventoryCategoryLabel,
+  type InventoryCategory,
+  type InventoryItem,
+  type InventoryItemCategory,
+  type InventoryItemFormData,
+  type InventoryItemGroupSummary,
+  type InventoryLocation,
+} from '../../types';
 import { InventoryCheckModal, type InventoryChecklistSubmitPayload } from '../../components/InventoryCheckModal';
 import {
   INVENTORY_CHECKLIST_DEFINITIONS,
@@ -33,12 +50,14 @@ import {
   checkIntervalMonthsToDays,
   formatInventoryCheckIntervalMonths,
   formatInventoryDate,
+  formatInventoryLocationOptionLabel,
   formatInventoryUnknownLocationAge,
   getCheckStatusLabel,
   getInventoryCheckIntervalMonths,
   getInventoryCheckStatus,
   getInventoryDueDate,
   isInventoryCheckExempt,
+  isInventoryUnknownLocation,
   isInventoryYardLocation,
   shouldMuteInventoryCheckBadge,
 } from '../../utils';
@@ -104,29 +123,59 @@ function getStatusBadgeClass(item: InventoryItem): string {
   return 'border-green-500/30 bg-green-500/10 text-green-300';
 }
 
+function buildItemEditForm(item: InventoryItem): InventoryItemFormData {
+  return {
+    item_number: item.item_number,
+    name: item.name,
+    category: item.category,
+    location_id: item.location_id || '',
+    last_checked_at: item.last_checked_at || '',
+    check_interval_months: item.check_interval_days ? String(getInventoryCheckIntervalMonths(item)) : '',
+    status: item.status,
+  };
+}
+
 export default function InventoryItemDetailPage() {
   const params = useParams<{ itemId: string }>();
   const itemId = params.itemId;
   const [payload, setPayload] = useState<InventoryHistoryPayload | null>(null);
+  const [locations, setLocations] = useState<InventoryLocation[]>([]);
+  const [categories, setCategories] = useState<InventoryItemCategory[]>([]);
   const [loading, setLoading] = useState(true);
-  const [intervalMonths, setIntervalMonths] = useState('');
   const [checkedAt, setCheckedAt] = useState(new Date().toISOString().slice(0, 10));
   const [showCheckTypeModal, setShowCheckTypeModal] = useState(false);
   const [showCheckModal, setShowCheckModal] = useState(false);
   const [selectedChecklistVersion, setSelectedChecklistVersion] = useState(INVENTORY_SERVICE_CHECKLIST_VERSION);
   const [checkModalSession, setCheckModalSession] = useState(0);
-  const [savingInterval, setSavingInterval] = useState(false);
   const [savingCheck, setSavingCheck] = useState(false);
+  const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [editForm, setEditForm] = useState<InventoryItemFormData>(EMPTY_INVENTORY_ITEM_FORM);
+  const [savingDetails, setSavingDetails] = useState(false);
+  const [detailsSubmitError, setDetailsSubmitError] = useState('');
   const [downloadingCheckId, setDownloadingCheckId] = useState<string | null>(null);
 
   const fetchHistory = useCallback(async () => {
     try {
-      const response = await fetch(`/api/inventory/${itemId}/history`, { cache: 'no-store' });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to fetch inventory item history');
+      const [historyResponse, locationsResponse, categoriesResponse] = await Promise.all([
+        fetch(`/api/inventory/${itemId}/history`, { cache: 'no-store' }),
+        fetch('/api/inventory/locations', { cache: 'no-store' }),
+        fetch('/api/inventory/categories', { cache: 'no-store' }),
+      ]);
 
-      setPayload(data);
-      setIntervalMonths(data.item.check_interval_days ? String(getInventoryCheckIntervalMonths(data.item)) : '');
+      const [historyData, locationsData, categoriesData] = await Promise.all([
+        historyResponse.json(),
+        locationsResponse.json(),
+        categoriesResponse.json(),
+      ]);
+
+      if (!historyResponse.ok) throw new Error(historyData.error || 'Failed to fetch inventory item history');
+      if (!locationsResponse.ok) throw new Error(locationsData.error || 'Failed to fetch inventory locations');
+      if (!categoriesResponse.ok) throw new Error(categoriesData.error || 'Failed to fetch inventory categories');
+
+      setPayload(historyData);
+      setLocations(locationsData.locations || []);
+      setCategories(categoriesData.categories || []);
+      setEditForm(buildItemEditForm(historyData.item));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to load inventory item');
     } finally {
@@ -144,27 +193,47 @@ export default function InventoryItemDetailPage() {
     return data;
   }
 
-  async function handleSaveInterval(event: React.FormEvent) {
+  function updateEditField<K extends keyof InventoryItemFormData>(key: K, value: InventoryItemFormData[K]) {
+    setDetailsSubmitError('');
+    setEditForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function handleCancelDetailsEdit() {
+    if (payload?.item) setEditForm(buildItemEditForm(payload.item));
+    setDetailsSubmitError('');
+    setIsEditingDetails(false);
+  }
+
+  async function handleSaveItemDetails(event: React.FormEvent) {
     event.preventDefault();
-    setSavingInterval(true);
+    setSavingDetails(true);
+    setDetailsSubmitError('');
     try {
-      const parsedInterval = Number.parseInt(intervalMonths, 10);
-      const response = await fetch(`/api/inventory/${itemId}/check-interval`, {
+      const parsedInterval = Number.parseInt(editForm.check_interval_months, 10);
+      const response = await fetch(`/api/inventory/${itemId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          item_number: editForm.item_number,
+          name: editForm.name,
+          category: editForm.category,
+          location_id: editForm.location_id,
+          last_checked_at: editForm.last_checked_at || null,
           check_interval_days: checkIntervalMonthsToDays(
             Number.isFinite(parsedInterval) && parsedInterval > 0 ? parsedInterval : null
           ),
         }),
       });
-      await parseResponse(response, 'Failed to update check interval');
-      toast.success('Check interval updated');
+      await parseResponse(response, 'Failed to update inventory item');
+      toast.success('Inventory item updated');
+      setIsEditingDetails(false);
       await fetchHistory();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to update check interval');
+      const message = error instanceof Error ? error.message : 'Failed to update inventory item';
+      setDetailsSubmitError(message);
+      toast.error(message);
     } finally {
-      setSavingInterval(false);
+      setSavingDetails(false);
     }
   }
 
@@ -242,6 +311,15 @@ export default function InventoryItemDetailPage() {
   const unknownLocationAgeLabel = formatInventoryUnknownLocationAge(item);
   const selectedChecklistDefinition =
     getInventoryChecklistDefinition(selectedChecklistVersion) || INVENTORY_CHECKLIST_DEFINITIONS[0];
+  const categoryLabels = Object.fromEntries(categories.map((category) => [category.slug, category.name]));
+  const categoryOptions = categories.length > 0
+    ? [...categories]
+      .filter((category) => category.is_active || category.slug === item.category)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((category) => [category.slug, category.name] as const)
+    : (Object.entries(INVENTORY_CATEGORY_LABELS) as Array<[InventoryCategory, string]>);
+  const selectedEditLocation = locations.find((location) => location.id === editForm.location_id) || null;
+  const isUnknownLocationSelected = isInventoryUnknownLocation(selectedEditLocation);
 
   return (
     <AppPageShell width="wide">
@@ -330,36 +408,177 @@ export default function InventoryItemDetailPage() {
 
         <TabsContent value="overview" className="mt-0 grid gap-6 lg:grid-cols-2">
           <Card className="border-slate-700 bg-slate-900/70">
-            <CardHeader>
-              <CardTitle className="text-white">Item Details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <DetailRow label="Status" value={item.status} />
-              {isRetired ? (
-                <>
-                  <DetailRow label="Retired Date" value={formatInventoryDate(item.retired_at)} />
-                  <DetailRow label="Retirement Reason" value={item.retire_reason || 'Other'} />
-                </>
-              ) : null}
-              <DetailRow label="Category" value={formatInventoryCategoryLabel(item.category)} />
-              <DetailRow label="Source" value={item.source || 'Not recorded'} />
-              <DetailRow label="Source Reference" value={item.source_reference || 'Not recorded'} />
-              <DetailRow label="Group" value={group?.name || 'No group'} />
-              {item.minor_plant_detail ? (
-                <>
-                  <DetailRow label="Plant ID" value={item.minor_plant_detail.plant_identifier || 'Not recorded'} />
-                  {'serial_number' in item.minor_plant_detail ? (
-                    <DetailRow label="Serial Number" value={item.minor_plant_detail.serial_number || 'Not recorded'} />
-                  ) : null}
-                  <DetailRow label="Make" value={item.minor_plant_detail.make || 'Not recorded'} />
-                  <DetailRow label="Model" value={item.minor_plant_detail.model || 'Not recorded'} />
-                  <DetailRow label="Registration" value={item.minor_plant_detail.reg_number || 'Not recorded'} />
-                </>
-              ) : null}
-              {item.location?.linked_asset_label ? (
-                <DetailRow label="Linked Location Asset" value={`${item.location.linked_asset_label}${item.location.linked_asset_nickname ? ` · ${item.location.linked_asset_nickname}` : ''}`} />
-              ) : null}
-            </CardContent>
+            <form onSubmit={handleSaveItemDetails}>
+              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <CardTitle className="text-white">Item Details</CardTitle>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {isEditingDetails ? 'Update item identity, category, location, and check cadence.' : 'View item identity, source data, and linked location context.'}
+                  </p>
+                </div>
+                {!isRetired ? (
+                  isEditingDetails ? (
+                    <div className="flex gap-2">
+                      <Button type="button" variant="outline" onClick={handleCancelDetailsEdit} disabled={savingDetails}>
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        className="bg-inventory text-white hover:bg-inventory-dark"
+                        disabled={savingDetails || !editForm.location_id}
+                      >
+                        {savingDetails && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Save Changes
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button type="button" variant="outline" onClick={() => setIsEditingDetails(true)} className="border-slate-600">
+                      Edit Details
+                    </Button>
+                  )
+                ) : null}
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm">
+                {isEditingDetails ? (
+                  <>
+                    <div className="rounded-md border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-100">
+                      Fleet Plant guidance: anything with an engine, valued over £1000, or too large for a standard van should normally be added to Fleet Plant instead of Inventory. This is guidance only for this phase.
+                    </div>
+
+                    {isUnknownLocationSelected ? (
+                      <div className="rounded-md border border-slate-500/25 bg-slate-500/10 p-3 text-xs text-slate-200">
+                        Unknown is a system location for lost or missing items. It does not generate check due dates; the item list will show how long the item has been in Unknown.
+                      </div>
+                    ) : null}
+
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="item_number">ID Number *</Label>
+                        <Input
+                          id="item_number"
+                          required
+                          value={editForm.item_number}
+                          onChange={(event) => updateEditField('item_number', event.target.value)}
+                          className="bg-slate-800 border-slate-600"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="name">Name *</Label>
+                        <Input
+                          id="name"
+                          required
+                          value={editForm.name}
+                          onChange={(event) => updateEditField('name', event.target.value)}
+                          className="bg-slate-800 border-slate-600"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Category</Label>
+                        <Select
+                          value={editForm.category}
+                          onValueChange={(value) => updateEditField('category', value as InventoryCategory)}
+                        >
+                          <SelectTrigger className="bg-slate-800 border-slate-600">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categoryOptions.map(([value, label]) => (
+                              <SelectItem key={value} value={value}>{label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Location *</Label>
+                        <Select
+                          value={editForm.location_id || undefined}
+                          onValueChange={(value) => updateEditField('location_id', value)}
+                        >
+                          <SelectTrigger className="bg-slate-800 border-slate-600">
+                            <SelectValue placeholder="Select location" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {locations.map((location) => (
+                              <SelectItem key={location.id} value={location.id}>
+                                {formatInventoryLocationOptionLabel(location)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="last_checked_at">Last Checked</Label>
+                        <Input
+                          id="last_checked_at"
+                          type="date"
+                          value={editForm.last_checked_at}
+                          onChange={(event) => updateEditField('last_checked_at', event.target.value)}
+                          className="bg-slate-800 border-slate-600"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="check_interval_months">Check Interval Months</Label>
+                        <Input
+                          id="check_interval_months"
+                          type="number"
+                          min={1}
+                          max={120}
+                          value={editForm.check_interval_months}
+                          onChange={(event) => updateEditField('check_interval_months', event.target.value)}
+                          placeholder={`Default ${CHECK_INTERVAL_MONTHS}`}
+                          className="bg-slate-800 border-slate-600"
+                        />
+                      </div>
+                    </div>
+
+                    {detailsSubmitError ? (
+                      <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-100">
+                        {detailsSubmitError}
+                      </div>
+                    ) : null}
+
+                    <div className="rounded-md border border-slate-700 bg-slate-800/50 p-3 text-xs text-slate-300">
+                      Use the table action to retire inventory items so a retirement reason is recorded.
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-3">
+                    <DetailRow label="Status" value={item.status} />
+                    {isRetired ? (
+                      <>
+                        <DetailRow label="Retired Date" value={formatInventoryDate(item.retired_at)} />
+                        <DetailRow label="Retirement Reason" value={item.retire_reason || 'Other'} />
+                      </>
+                    ) : null}
+                    <DetailRow label="Category" value={formatInventoryCategoryLabel(item.category, categoryLabels)} />
+                    <DetailRow label="Source" value={item.source || 'Not recorded'} />
+                    <DetailRow label="Source Reference" value={item.source_reference || 'Not recorded'} />
+                    <DetailRow label="Group" value={group?.name || 'No group'} />
+                    {item.minor_plant_detail ? (
+                      <>
+                        <DetailRow label="Plant ID" value={item.minor_plant_detail.plant_identifier || 'Not recorded'} />
+                        {'serial_number' in item.minor_plant_detail ? (
+                          <DetailRow label="Serial Number" value={item.minor_plant_detail.serial_number || 'Not recorded'} />
+                        ) : null}
+                        <DetailRow label="Make" value={item.minor_plant_detail.make || 'Not recorded'} />
+                        <DetailRow label="Model" value={item.minor_plant_detail.model || 'Not recorded'} />
+                        <DetailRow label="Registration" value={item.minor_plant_detail.reg_number || 'Not recorded'} />
+                      </>
+                    ) : null}
+                    {item.location?.linked_asset_label ? (
+                      <DetailRow label="Linked Location Asset" value={`${item.location.linked_asset_label}${item.location.linked_asset_nickname ? ` · ${item.location.linked_asset_nickname}` : ''}`} />
+                    ) : null}
+                  </div>
+                )}
+              </CardContent>
+            </form>
           </Card>
 
           <Card className="border-slate-700 bg-slate-900/70">
@@ -367,26 +586,6 @@ export default function InventoryItemDetailPage() {
               <CardTitle className="text-white">Check Workflow</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              <form className="space-y-3" onSubmit={handleSaveInterval}>
-                <div className="space-y-2">
-                  <Label htmlFor="interval_months">Item Check Interval (months)</Label>
-                  <Input
-                    id="interval_months"
-                    type="number"
-                    min={1}
-                    max={120}
-                    value={intervalMonths}
-                    onChange={(event) => setIntervalMonths(event.target.value)}
-                    placeholder={`Default ${CHECK_INTERVAL_MONTHS}`}
-                    className="bg-slate-800 border-slate-600"
-                    disabled={isRetired}
-                  />
-                </div>
-                <Button type="submit" variant="outline" disabled={savingInterval || isRetired}>
-                  Save Interval
-                </Button>
-              </form>
-
               <div className="space-y-3 rounded-lg border border-slate-700 bg-slate-800/40 p-4">
                 <div>
                   <div className="font-medium text-white">Inventory Checks</div>
@@ -395,7 +594,7 @@ export default function InventoryItemDetailPage() {
                       ? 'Retired items must be restored before new checks can be recorded.'
                       : isCheckExempt
                         ? 'No due date is generated while this special status applies. You can still record a check before moving it back into a regular category.'
-                        : 'Choose a PAT Test or Regular Check, then record Pass, Fail, or N/A. Failed items require comments.'
+                        : 'Choose a PAT Test or Regular Check, then record Pass, Fail, or N/A. Failed items require comments. Edit the item details to change the check interval.'
                     }
                   </p>
                 </div>

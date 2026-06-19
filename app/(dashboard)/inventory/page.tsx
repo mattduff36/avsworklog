@@ -58,7 +58,6 @@ export default function InventoryPage() {
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
   const [changeLocationDialogOpen, setChangeLocationDialogOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [retiringItem, setRetiringItem] = useState<InventoryItem | null>(null);
   const [editingLocation, setEditingLocation] = useState<InventoryLocation | null>(null);
   const [movingItems, setMovingItems] = useState<InventoryItem[]>([]);
@@ -282,19 +281,6 @@ export default function InventoryPage() {
     });
     await parseJsonResponse(response, 'Failed to create inventory item');
     toast.success('Inventory item added');
-    await fetchInventoryData();
-  }
-
-  async function handleUpdateItem(data: InventoryItemFormData) {
-    if (!editingItem) return;
-    const response = await fetch(`/api/inventory/${editingItem.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(buildInventoryItemPayload(data)),
-    });
-    await parseJsonResponse(response, 'Failed to update inventory item');
-    toast.success('Inventory item updated');
-    setEditingItem(null);
     await fetchInventoryData();
   }
 
@@ -619,7 +605,7 @@ export default function InventoryPage() {
               {employeeLocationName ? 'Change My Location' : 'Set My Location'}
             </Button>
             <Button
-              onClick={() => { setEditingItem(null); setItemDialogOpen(true); }}
+              onClick={() => setItemDialogOpen(true)}
               className="bg-inventory text-white hover:bg-inventory-dark"
             >
               <Plus className="mr-2 h-4 w-4" />
@@ -757,7 +743,6 @@ export default function InventoryPage() {
                 items={smallToolsItems}
                 selectedItemIds={selectedItemIds}
                 onSelectedItemIdsChange={setSelectedItemIds}
-                onEdit={(item) => { setEditingItem(item); setItemDialogOpen(true); }}
                 onDelete={setRetiringItem}
                 onMove={setMovingItems}
                 onOpenDetails={(item) => router.push('/inventory/items/' + item.id + '?fromTab=overview')}
@@ -774,7 +759,6 @@ export default function InventoryPage() {
                 items={minorPlantItems}
                 selectedItemIds={selectedItemIds}
                 onSelectedItemIdsChange={setSelectedItemIds}
-                onEdit={(item) => { setEditingItem(item); setItemDialogOpen(true); }}
                 onDelete={setRetiringItem}
                 onMove={setMovingItems}
                 onBulkAction={handleRestoreMinorPlantToPlant}
@@ -849,11 +833,10 @@ export default function InventoryPage() {
 
       <InventoryItemDialog
         open={itemDialogOpen}
-        item={editingItem}
         locations={locations}
         categories={categories}
-        onClose={() => { setItemDialogOpen(false); setEditingItem(null); }}
-        onSubmit={editingItem ? handleUpdateItem : handleCreateItem}
+        onClose={() => setItemDialogOpen(false)}
+        onSubmit={handleCreateItem}
       />
 
       <InventoryLocationDialog

@@ -24,7 +24,6 @@ import {
   EMPTY_INVENTORY_ITEM_FORM,
   INVENTORY_CATEGORY_LABELS,
   type InventoryCategory,
-  type InventoryItem,
   type InventoryItemCategory,
   type InventoryItemFormData,
   type InventoryLocation,
@@ -32,7 +31,6 @@ import {
 import {
   CHECK_INTERVAL_MONTHS,
   formatInventoryLocationOptionLabel,
-  getInventoryCheckIntervalMonths,
   isInventoryCheckExempt,
   isInventoryUnknownLocation,
 } from '../utils';
@@ -40,7 +38,6 @@ import { toast } from 'sonner';
 
 interface InventoryItemDialogProps {
   open: boolean;
-  item?: InventoryItem | null;
   locations: InventoryLocation[];
   categories: InventoryItemCategory[];
   onClose: () => void;
@@ -49,7 +46,6 @@ interface InventoryItemDialogProps {
 
 export function InventoryItemDialog({
   open,
-  item,
   locations,
   categories,
   onClose,
@@ -58,7 +54,6 @@ export function InventoryItemDialog({
   const [form, setForm] = useState<InventoryItemFormData>(EMPTY_INVENTORY_ITEM_FORM);
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState('');
-  const isEditing = !!item;
   const selectedLocation = locations.find((location) => location.id === form.location_id) || null;
   const hasSpecialCheckStatus = isInventoryCheckExempt({
     category: form.category,
@@ -69,24 +64,11 @@ export function InventoryItemDialog({
 
   useEffect(() => {
     setSubmitError('');
-    if (item) {
-      setForm({
-        item_number: item.item_number,
-        name: item.name,
-        category: item.category,
-        location_id: item.location_id || '',
-        last_checked_at: item.last_checked_at || '',
-        check_interval_months: item.check_interval_days ? String(getInventoryCheckIntervalMonths(item)) : '',
-        status: item.status,
-      });
-      return;
-    }
-
     setForm({
       ...EMPTY_INVENTORY_ITEM_FORM,
       category: categories[0]?.slug || EMPTY_INVENTORY_ITEM_FORM.category,
     });
-  }, [categories, item, locations, open]);
+  }, [categories, open]);
 
   const categoryOptions = categories.length > 0
     ? [...categories]
@@ -123,7 +105,7 @@ export function InventoryItemDialog({
       <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-2xl overflow-y-auto bg-slate-900 text-white border-slate-700">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>{isEditing ? 'Edit Inventory Item' : 'Add Inventory Item'}</DialogTitle>
+            <DialogTitle>Add Inventory Item</DialogTitle>
             <DialogDescription className="text-muted-foreground">
               Track item identity, location, and the last check date.
             </DialogDescription>
@@ -235,11 +217,6 @@ export function InventoryItemDialog({
               </div>
             ) : null}
 
-            {isEditing ? (
-              <div className="rounded-md border border-slate-700 bg-slate-800/50 p-3 text-xs text-slate-300">
-                Use the table action to retire inventory items so a retirement reason is recorded.
-              </div>
-            ) : null}
           </div>
 
           <DialogFooter>
@@ -248,7 +225,7 @@ export function InventoryItemDialog({
             </Button>
             <Button type="submit" className="bg-inventory text-white hover:bg-inventory-dark" disabled={saving || !form.location_id}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isEditing ? 'Save Changes' : 'Add Item'}
+              Add Item
             </Button>
           </DialogFooter>
         </form>

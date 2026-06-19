@@ -55,7 +55,6 @@ interface InventoryTableProps {
   items: InventoryItem[];
   selectedItemIds: Set<string>;
   onSelectedItemIdsChange: (selectedItemIds: Set<string>) => void;
-  onEdit?: (item: InventoryItem) => void;
   onDelete?: (item: InventoryItem) => void;
   onRestore?: (item: InventoryItem) => void;
   onMove: (items: InventoryItem[]) => void;
@@ -158,7 +157,6 @@ export function InventoryTable({
   items,
   selectedItemIds,
   onSelectedItemIdsChange,
-  onEdit,
   onDelete,
   onRestore,
   onMove,
@@ -592,11 +590,6 @@ export function InventoryTable({
                             Move
                           </Button>
                         ) : null}
-                        {!retiredMode && onEdit ? (
-                          <Button size="sm" onClick={(event) => { event.stopPropagation(); onEdit(item); }} className="bg-inventory text-white hover:bg-inventory-dark">
-                            Edit
-                          </Button>
-                        ) : null}
                         {retiredMode && onRestore ? (
                           <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); onRestore(item); }} className="border-green-500/40 text-green-200 hover:bg-green-500/10">
                             <RotateCcw className="mr-2 h-4 w-4" />
@@ -690,11 +683,6 @@ export function InventoryTable({
                   {!retiredMode ? (
                     <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); onMove([item]); }} className="flex-1 border-slate-600">
                       Move
-                    </Button>
-                  ) : null}
-                  {!retiredMode && onEdit ? (
-                    <Button size="sm" onClick={(event) => { event.stopPropagation(); onEdit(item); }} className="flex-1 bg-inventory text-white hover:bg-inventory-dark">
-                      Edit
                     </Button>
                   ) : null}
                   {retiredMode && onRestore ? (
