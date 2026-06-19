@@ -2,6 +2,20 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.24.0
+
+**GIT COMMIT MESSAGE**
+`feat(fleet): update fleet workflow, database migrations, and 2 more areas`
+
+**PUSHED AT**
+2026-06-19T09:17:39.114Z
+
+**WHAT CHANGED**
+Update fleet workflow, database migrations, and 2 more areas.
+
+**COMMITS IN THIS RELEASE**
+- `feat(fleet): update fleet workflow, database migrations, and 2 more areas`
+
 ## 0626.23.1
 
 **GIT COMMIT MESSAGE**

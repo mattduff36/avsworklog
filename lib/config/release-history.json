@@ -1,5 +1,12 @@
 [
   {
+    "version": "0626.24.0",
+    "updateKind": "major",
+    "title": "Fleet update",
+    "description": "Update fleet workflow, data storage updates, and 2 more areas.",
+    "pushedAt": "2026-06-19T09:17:39.114Z"
+  },
+  {
     "version": "0626.23.1",
     "updateKind": "minor",
     "title": "Data storage maintenance update",
