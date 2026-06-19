@@ -13,11 +13,11 @@ describe('finalise change summaries', () => {
       'tests/unit/finalise-summary.test.ts',
     ]);
 
-    expect(summary.commitMessage).toBe('chore(finalise): improve finalise commit summaries');
-    expect(summary.areas).toEqual(['finalise commit summaries']);
+    expect(summary.commitMessage).toBe('chore(finalise): update Release automation and App reliability');
+    expect(summary.areas).toEqual(['Release automation', 'App reliability']);
   });
 
-  it('summarises mobile text size work from related files', () => {
+  it('summarises dashboard and navigation work from related files', () => {
     const summary = summarizeFinaliseChanges([
       'app/(dashboard)/dashboard/page.tsx',
       'components/layout/MobileTextSizeDialog.tsx',
@@ -25,7 +25,7 @@ describe('finalise change summaries', () => {
       'tests/unit/mobile-text-size-preference.test.ts',
     ]);
 
-    expect(summary.commitMessage).toBe('feat(mobile): add mobile text size controls');
+    expect(summary.commitMessage).toBe('feat(dashboard): update Dashboard and Navigation');
   });
 
   it('summarises sidebar layout styling instead of falling back to repository files', () => {
@@ -34,7 +34,7 @@ describe('finalise change summaries', () => {
       'components/layout/SidebarNav.tsx',
     ]);
 
-    expect(summary.commitMessage).toBe('fix(layout): improve sidebar navigation styling');
+    expect(summary.commitMessage).toBe('fix(layout): update navigation');
   });
 
   it('summarises multiple feature areas when a finalise contains more than one task', () => {
@@ -44,7 +44,33 @@ describe('finalise change summaries', () => {
       'lib/utils/numeric-time-input.ts',
     ]);
 
-    expect(summary.commitMessage).toBe('feat(mobile): update mobile text size controls and mobile time entry');
+    expect(summary.commitMessage).toBe('feat(timesheets): update Timesheets and Navigation');
+  });
+
+  it('orders summaries by changed-file and line impact instead of static descriptor priority', () => {
+    const summary = summarizeFinaliseChanges([
+      { path: 'app/(dashboard)/debug/components/LegacyJobCodesDebugPanel.tsx', additions: 400, deletions: 20 },
+      { path: 'app/(dashboard)/debug/page.tsx', additions: 20, deletions: 2 },
+      { path: 'app/api/debug/job-code-corrections/route.ts', additions: 120, deletions: 0 },
+      { path: 'app/(dashboard)/inventory/components/InventoryTable.tsx', additions: 30, deletions: 5 },
+      { path: 'app/(dashboard)/van-inspections/[id]/page.tsx', additions: 1, deletions: 1 },
+    ]);
+
+    expect(summary.commitMessage).toBe('feat(debug): update Debug tools, Inventory, and Daily Tasks');
+    expect(summary.areas).toEqual(['Debug tools', 'Inventory', 'Daily Tasks']);
+  });
+
+  it('excludes generated and release artifacts from product summaries', () => {
+    const summary = summarizeFinaliseChanges([
+      '.next/types/routes.d.ts',
+      'docs_private/automation/runs/finalise/2026-06-19.json',
+      'lib/config/release-history.json',
+      'app/(dashboard)/inventory/page.tsx',
+    ]);
+
+    expect(summary.commitMessage).toBe('feat(inventory): update inventory');
+    expect(summary.fileCount).toBe(1);
+    expect(summary.areas).toEqual(['Inventory']);
   });
 
   it('uses the primary change summary for release version commits', () => {

@@ -1,3 +1,11 @@
+import {
+  getFriendlyReleaseScopeLabel,
+  getReleaseAreasFromScopes,
+  getReleaseDescriptorByArea,
+  getReleaseDescriptorByScope,
+  uniqueReleaseValues,
+} from './release-module-descriptors';
+
 export interface ReleaseVersionState {
   mmyy: string;
   major: number;
@@ -33,6 +41,7 @@ export interface ReleaseHistoryEntry {
   summary: string;
   details: string[];
   areas: string[];
+  areaKeys?: string[];
   pushedAt: string | null;
 }
 
@@ -69,7 +78,10 @@ const FRIENDLY_SCOPE_LABELS: Record<string, string> = {
   faq: 'Help articles',
   fleet: 'Fleet',
   help: 'Help and FAQ',
-  inspections: 'Inspections',
+  inspections: 'Daily Tasks',
+  'van-inspections': 'Daily Tasks',
+  'plant-inspections': 'Daily Tasks',
+  'hgv-inspections': 'Daily Tasks',
   inventory: 'Inventory',
   layout: 'Navigation',
   logging: 'Error logging',
@@ -80,6 +92,19 @@ const FRIENDLY_SCOPE_LABELS: Record<string, string> = {
   tests: 'App reliability',
   timesheets: 'Timesheets',
   workshop: 'Workshop tasks',
+  debug: 'Debug tools',
+  rams: 'Projects',
+  projects: 'Projects',
+  absence: 'Absence & Leave',
+  'toolbox-talks': 'Toolbox Talks',
+  training: 'Training',
+  approvals: 'Approvals',
+  reports: 'Reports',
+  suggestions: 'Suggestions',
+  'admin-users': 'User Management',
+  'admin-settings': 'Admin Settings',
+  reminders: 'Reminders',
+  quotes: 'Quotes',
 };
 
 export function getCurrentMmyy(date: Date, timeZone = 'Europe/London'): string {
@@ -366,7 +391,7 @@ function lowerFirst(value: string): string {
 }
 
 function uniqueStrings(values: string[]): string[] {
-  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+  return uniqueReleaseValues(values.map((value) => value.trim()).filter(Boolean));
 }
 
 function formatFriendlyList(values: string[]): string {
@@ -473,9 +498,9 @@ function removeRedundantAreas(areas: string[]): string[] {
 }
 
 function getFriendlyScopeLabel(scope: string | null): string {
-  if (!scope) {
-    return 'App';
-  }
+  const descriptorLabel = getFriendlyReleaseScopeLabel(scope);
+  if (descriptorLabel !== 'App') return descriptorLabel;
+  if (!scope) return 'App';
 
   const normalized = scope.toLowerCase();
   if (FRIENDLY_SCOPE_LABELS[normalized]) {
@@ -496,7 +521,8 @@ function getReleaseHistoryUpdateKind(version: string): ReleaseHistoryUpdateKind 
 
 function buildReleaseHistoryTitle(entry: ParsedReleaseLogEntry): string {
   const primaryCommit = entry.primaryCommitMessage ? parseConventionalCommit(entry.primaryCommitMessage) : null;
-  const scopeLabel = getFriendlyScopeLabel(primaryCommit?.scope ?? null);
+  const descriptor = getReleaseDescriptorByScope(primaryCommit?.scope ?? null);
+  const scopeLabel = descriptor?.versionHistoryArea || getFriendlyScopeLabel(primaryCommit?.scope ?? null);
 
   if (primaryCommit?.type === 'fix') {
     return `${scopeLabel} improvements`;
@@ -518,12 +544,21 @@ function buildReleaseHistoryTitle(entry: ParsedReleaseLogEntry): string {
 }
 
 function buildReleaseHistoryAreas(entry: ParsedReleaseLogEntry, commits: ParsedCommit[]): string[] {
-  const scopedAreas = commits
-    .map((commit) => getFriendlyScopeLabel(commit.scope))
-    .filter((area) => area !== 'App');
+  const scopedAreas = getReleaseAreasFromScopes(commits.map((commit) => commit.scope));
   const describedAreas = extractAreasFromText(entry.whatChanged);
 
   return removeRedundantAreas([...describedAreas, ...scopedAreas]);
+}
+
+function buildReleaseHistoryAreaKeys(areas: string[], commits: ParsedCommit[]): string[] {
+  return uniqueStrings([
+    ...commits
+      .map((commit) => getReleaseDescriptorByScope(commit.scope)?.id || '')
+      .filter(Boolean),
+    ...areas
+      .map((area) => getReleaseDescriptorByArea(area)?.id || '')
+      .filter(Boolean),
+  ]);
 }
 
 function buildFriendlyReleaseSummary(entry: ParsedReleaseLogEntry, areas: string[]): string {
@@ -571,6 +606,7 @@ function buildReleaseHistoryEntry(
   const commits = parseCommitsFromMessages(entry.commitMessages);
   const updateKind = getReleaseHistoryUpdateKind(entry.version);
   const areas = buildReleaseHistoryAreas(entry, commits);
+  const areaKeys = buildReleaseHistoryAreaKeys(areas, commits);
   const summary = buildFriendlyReleaseSummary(entry, areas);
 
   return {
@@ -581,6 +617,7 @@ function buildReleaseHistoryEntry(
     summary,
     details: buildReleaseHistoryDetails(entry, commits, areas, updateKind),
     areas,
+    areaKeys,
     pushedAt: entry.pushedAt ?? timestampLookup[entry.version] ?? null,
   };
 }

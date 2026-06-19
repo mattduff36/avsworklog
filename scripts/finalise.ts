@@ -8,6 +8,7 @@ import { AutomationRun } from './automation/logger';
 import { checkFinaliseBlockingActivity, formatBlockingActivity } from './finalise-activity-guard';
 import { getSkippableFinaliseTasks, type RecentFinaliseTaskRun } from './finalise-recent-tasks';
 import {
+  type FinaliseChangedFile,
   formatReleaseVersionCommitMessage,
   getFinaliseTimingSummaryLines,
   summarizeFinaliseChanges,
@@ -167,15 +168,36 @@ function getTrimmedLines(output: string): string[] {
     .filter(Boolean);
 }
 
-function getChangedFiles(): string[] {
-  const tracked = runCommand('git', ['diff', '--name-only', 'HEAD', '--'], {
+function getChangedFileStats(): FinaliseChangedFile[] {
+  const tracked = runCommand('git', ['diff', '--numstat', 'HEAD', '--'], {
     captureOutput: true,
   });
   const untracked = runCommand('git', ['ls-files', '--others', '--exclude-standard'], {
     captureOutput: true,
   });
+  const statsByPath = new Map<string, FinaliseChangedFile>();
 
-  return Array.from(new Set([...getTrimmedLines(tracked.stdout), ...getTrimmedLines(untracked.stdout)]));
+  getTrimmedLines(tracked.stdout).forEach((line) => {
+    const [rawAdditions, rawDeletions, rawPath] = line.split(/\t/u);
+    const filePath = rawPath || '';
+    if (!filePath) return;
+
+    const additions = Number.parseInt(rawAdditions || '0', 10);
+    const deletions = Number.parseInt(rawDeletions || '0', 10);
+    statsByPath.set(filePath, {
+      path: filePath,
+      additions: Number.isFinite(additions) ? additions : 0,
+      deletions: Number.isFinite(deletions) ? deletions : 0,
+    });
+  });
+
+  getTrimmedLines(untracked.stdout).forEach((filePath) => {
+    if (!statsByPath.has(filePath)) {
+      statsByPath.set(filePath, { path: filePath, additions: 0, deletions: 0 });
+    }
+  });
+
+  return Array.from(statsByPath.values());
 }
 
 function getGitStatusPorcelain(): string {
@@ -859,12 +881,13 @@ async function main(): Promise<void> {
       throw new Error(`Resolve merge conflicts before finalising: ${unmergedFiles.join(', ')}`);
     }
 
-    const changedFiles = getChangedFiles();
+    const changedFileStats = getChangedFileStats();
+    const changedFiles = changedFileStats.map((entry) => entry.path);
     const pendingMigrationFiles = getPendingMigrationFiles(changedFiles);
     const shouldRunDbValidate = pendingMigrationFiles.some((relativePath) => migrationNeedsDbValidate(relativePath));
     const devServerProcesses = getRepoDevServerProcesses();
     const branch = getCurrentBranch();
-    const initialChangeSummary = summarizeFinaliseChanges(changedFiles);
+    const initialChangeSummary = summarizeFinaliseChanges(changedFileStats);
     const skippableTasks = getSkippableFinaliseTasks({
       repoRoot: REPO_ROOT,
       changedFiles,
@@ -1063,7 +1086,7 @@ async function main(): Promise<void> {
 
     console.log('\n==> Summarise workspace changes');
     printProgress('Summarising workspace changes...', 87);
-    const changeSummary = summarizeFinaliseChanges(getChangedFiles());
+    const changeSummary = summarizeFinaliseChanges(changedFileStats);
     if (changeSummary.fileCount > 0) {
       console.log(`Changed files: ${changeSummary.fileCount}`);
       console.log(`Areas: ${changeSummary.areas.join(', ')}`);

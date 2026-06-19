@@ -5,16 +5,17 @@ Private changelog for production builds. Newest entries first.
 ## 0626.25.0
 
 **GIT COMMIT MESSAGE**
-`feat(inspections): update inspection workflows and API routes`
+`feat(debug): update debug tools and inventory`
 
 **PUSHED AT**
 2026-06-19T10:20:18.087Z
 
 **WHAT CHANGED**
-Update inspection workflows and API routes.
+Updated Debug tools and Inventory.
 
 **COMMITS IN THIS RELEASE**
-- `feat(inspections): update inspection workflows and API routes`
+- `feat(debug): add job-code correction tools`
+- `feat(inventory): improve inventory screens`
 
 ## 0626.24.1
 
@@ -30,6 +31,10 @@ Update finalise commit summaries, mobile text size controls, and API routes.
 **COMMITS IN THIS RELEASE**
 - `chore(finalise): update finalise commit summaries, mobile text size controls, and API routes`
 
+
+
+
+
 ## 0626.24.0
 
 **GIT COMMIT MESSAGE**
@@ -43,6 +48,10 @@ Update fleet workflow, database migrations, and 2 more areas.
 
 **COMMITS IN THIS RELEASE**
 - `feat(fleet): update fleet workflow, database migrations, and 2 more areas`
+
+
+
+
 
 ## 0626.23.1
 
@@ -58,6 +67,10 @@ Update database migrations, API routes, and 1 more areas.
 **COMMITS IN THIS RELEASE**
 - `chore(db): update database migrations, API routes, and 1 more areas`
 
+
+
+
+
 ## 0626.23.0
 
 **GIT COMMIT MESSAGE**
@@ -71,6 +84,10 @@ Update maintenance workflow and API routes.
 
 **COMMITS IN THIS RELEASE**
 - `feat(maintenance): update maintenance workflow and API routes`
+
+
+
+
 
 ## 0626.22.0
 
@@ -86,6 +103,10 @@ Update did not work absence handling and API routes.
 **COMMITS IN THIS RELEASE**
 - `feat(timesheets): update did not work absence handling and API routes`
 
+
+
+
+
 ## 0626.21.0
 
 **GIT COMMIT MESSAGE**
@@ -99,6 +120,10 @@ Update fleet workflow.
 
 **COMMITS IN THIS RELEASE**
 - `feat(fleet): update fleet workflow`
+
+
+
+
 
 ## 0626.20.0
 
@@ -114,6 +139,10 @@ Update did not work absence handling and API routes.
 **COMMITS IN THIS RELEASE**
 - `feat(timesheets): update did not work absence handling and API routes`
 
+
+
+
+
 ## 0626.19.0
 
 **GIT COMMIT MESSAGE**
@@ -127,6 +156,10 @@ Update API routes.
 
 **COMMITS IN THIS RELEASE**
 - `feat(api): update API routes`
+
+
+
+
 
 ## 0626.18.3
 
@@ -142,6 +175,10 @@ Update repository files.
 **COMMITS IN THIS RELEASE**
 - `chore(components): update repository files`
 
+
+
+
+
 ## 0626.18.2
 
 **GIT COMMIT MESSAGE**
@@ -156,6 +193,10 @@ Update finalise commit summaries, maintenance workflow, and 2 more areas.
 **COMMITS IN THIS RELEASE**
 - `chore(finalise): update finalise commit summaries, maintenance workflow, and 2 more areas`
 
+
+
+
+
 ## 0626.18.1
 
 **GIT COMMIT MESSAGE**
@@ -166,6 +207,10 @@ Handle transient type lookup failures.
 
 **COMMITS IN THIS RELEASE**
 - `fix(timesheets): handle transient type lookup failures`
+
+
+
+
 
 ## 0626.18.0
 
@@ -178,6 +223,10 @@ Update timesheet workflow, database migrations, and 2 more areas.
 **COMMITS IN THIS RELEASE**
 - `feat(timesheets): update timesheet workflow, database migrations, and 2 more areas`
 
+
+
+
+
 ## 0626.17.0
 
 **GIT COMMIT MESSAGE**
@@ -188,6 +237,10 @@ Update timesheet workflow.
 
 **COMMITS IN THIS RELEASE**
 - `feat(timesheets): update timesheet workflow`
+
+
+
+
 
 ## 0626.16.0
 
@@ -200,6 +253,10 @@ Update fleet workflow and API routes.
 **COMMITS IN THIS RELEASE**
 - `feat(fleet): update fleet workflow and API routes`
 
+
+
+
+
 ## 0626.15.1
 
 **GIT COMMIT MESSAGE**
@@ -210,6 +267,10 @@ Handle transient PDF load failures.
 
 **COMMITS IN THIS RELEASE**
 - `fix(pdf): handle transient PDF load failures`
+
+
+
+
 
 ## 0626.15.0
 
@@ -222,6 +283,10 @@ Update API routes.
 **COMMITS IN THIS RELEASE**
 - `feat(api): update API routes`
 
+
+
+
+
 ## 0626.14.4
 
 **GIT COMMIT MESSAGE**
@@ -232,6 +297,10 @@ Update repository files.
 
 **COMMITS IN THIS RELEASE**
 - `chore(app): update repository files`
+
+
+
+
 
 ## 0626.14.3
 
@@ -244,6 +313,10 @@ Update sidebar navigation styling, absence workflow, and 5 more areas.
 **COMMITS IN THIS RELEASE**
 - `fix(layout): update sidebar navigation styling, absence workflow, and 5 more areas`
 
+
+
+
+
 ## 0626.14.2
 
 **GIT COMMIT MESSAGE**
@@ -254,6 +327,10 @@ Page job-code catalog results.
 
 **COMMITS IN THIS RELEASE**
 - `fix(timesheets): page job-code catalog results`
+
+
+
+
 
 ## 0626.14.1
 
@@ -266,6 +343,10 @@ Handle usage session insert races.
 **COMMITS IN THIS RELEASE**
 - `fix(analytics): handle usage session insert races`
 
+
+
+
+
 ## 0626.14.0
 
 **GIT COMMIT MESSAGE**
@@ -276,6 +357,10 @@ Update timesheet workflow, database migrations, and 2 more areas.
 
 **COMMITS IN THIS RELEASE**
 - `feat(timesheets): update timesheet workflow, database migrations, and 2 more areas`
+
+
+
+
 
 ## 0626.13.1
 
@@ -288,6 +373,10 @@ Update repository files.
 **COMMITS IN THIS RELEASE**
 - `chore(repo): update repository files`
 
+
+
+
+
 ## 0626.13.0
 
 **GIT COMMIT MESSAGE**
@@ -298,6 +387,10 @@ Update API routes.
 
 **COMMITS IN THIS RELEASE**
 - `feat(api): update API routes`
+
+
+
+
 
 ## 0626.12.0
 
@@ -310,6 +403,10 @@ Update timesheet workflow.
 **COMMITS IN THIS RELEASE**
 - `feat(timesheets): update timesheet workflow`
 
+
+
+
+
 ## 0626.11.0
 
 **GIT COMMIT MESSAGE**
@@ -320,6 +417,10 @@ Update absence workflow, maintenance workflow, and 1 more areas.
 
 **COMMITS IN THIS RELEASE**
 - `feat(absence): update absence workflow, maintenance workflow, and 1 more areas`
+
+
+
+
 
 ## 0626.10.1
 
@@ -332,6 +433,10 @@ Update test coverage.
 **COMMITS IN THIS RELEASE**
 - `test(tests): update test coverage`
 
+
+
+
+
 ## 0626.10.0
 
 **GIT COMMIT MESSAGE**
@@ -342,6 +447,10 @@ Update timesheet workflow, database migrations, and 2 more areas.
 
 **COMMITS IN THIS RELEASE**
 - `feat(timesheets): update timesheet workflow, database migrations, and 2 more areas`
+
+
+
+
 
 ## 0626.9.0
 
@@ -354,6 +463,10 @@ Update timesheet workflow, database migrations, and 2 more areas.
 **COMMITS IN THIS RELEASE**
 - `feat(timesheets): update timesheet workflow, database migrations, and 2 more areas`
 
+
+
+
+
 ## 0626.8.5
 
 **GIT COMMIT MESSAGE**
@@ -364,6 +477,10 @@ Update test coverage.
 
 **COMMITS IN THIS RELEASE**
 - `test(tests): update test coverage`
+
+
+
+
 
 ## 0626.8.4
 
@@ -376,6 +493,10 @@ Update test coverage.
 **COMMITS IN THIS RELEASE**
 - `test(tests): update test coverage`
 
+
+
+
+
 ## 0626.8.3
 
 **GIT COMMIT MESSAGE**
@@ -386,6 +507,10 @@ Update test coverage.
 
 **COMMITS IN THIS RELEASE**
 - `test(tests): update test coverage`
+
+
+
+
 
 ## 0626.8.2
 
@@ -398,6 +523,10 @@ Update test coverage.
 **COMMITS IN THIS RELEASE**
 - `test(tests): update test coverage`
 
+
+
+
+
 ## 0626.8.1
 
 **GIT COMMIT MESSAGE**
@@ -408,6 +537,10 @@ Update repository files.
 
 **COMMITS IN THIS RELEASE**
 - `chore(app): update repository files`
+
+
+
+
 
 ## 0626.8.0
 
@@ -420,6 +553,10 @@ Update API routes.
 **COMMITS IN THIS RELEASE**
 - `feat(api): update API routes`
 
+
+
+
+
 ## 0626.7.3
 
 **GIT COMMIT MESSAGE**
@@ -430,6 +567,10 @@ Handle duplicate item save errors.
 
 **COMMITS IN THIS RELEASE**
 - `fix(inventory): handle duplicate item save errors`
+
+
+
+
 
 ## 0626.7.2
 
@@ -442,6 +583,10 @@ Avoid logging expected inspection errors.
 **COMMITS IN THIS RELEASE**
 - `fix(inspections): avoid logging expected inspection errors`
 
+
+
+
+
 ## 0626.7.1
 
 **GIT COMMIT MESSAGE**
@@ -452,6 +597,10 @@ Update sidebar navigation styling, mobile text size controls, and 1 more areas.
 
 **COMMITS IN THIS RELEASE**
 - `fix(layout): update sidebar navigation styling, mobile text size controls, and 1 more areas`
+
+
+
+
 
 ## 0626.7.0
 
@@ -464,6 +613,10 @@ Update API routes.
 **COMMITS IN THIS RELEASE**
 - `feat(api): update API routes`
 
+
+
+
+
 ## 0626.6.3
 
 **GIT COMMIT MESSAGE**
@@ -474,6 +627,10 @@ Update sidebar navigation styling, mobile text size controls, and 3 more areas.
 
 **COMMITS IN THIS RELEASE**
 - `fix(layout): update sidebar navigation styling, mobile text size controls, and 3 more areas`
+
+
+
+
 
 ## 0626.6.2
 
@@ -486,6 +643,10 @@ Update test coverage.
 **COMMITS IN THIS RELEASE**
 - `test(tests): update test coverage`
 
+
+
+
+
 ## 0626.6.1
 
 **GIT COMMIT MESSAGE**
@@ -496,6 +657,10 @@ Update repository files.
 
 **COMMITS IN THIS RELEASE**
 - `chore(app): update repository files`
+
+
+
+
 
 ## 0626.6.0
 
@@ -508,6 +673,10 @@ Update inspection workflows, fleet workflow, and 3 more areas.
 **COMMITS IN THIS RELEASE**
 - `feat(inspections): update inspection workflows, fleet workflow, and 3 more areas`
 
+
+
+
+
 ## 0626.5.4
 
 **GIT COMMIT MESSAGE**
@@ -518,6 +687,10 @@ Update test coverage.
 
 **COMMITS IN THIS RELEASE**
 - `test(tests): update test coverage`
+
+
+
+
 
 ## 0626.5.3
 
@@ -530,6 +703,10 @@ Update database migrations and automation scripts.
 **COMMITS IN THIS RELEASE**
 - `chore(db): update database migrations and automation scripts`
 
+
+
+
+
 ## 0626.5.2
 
 **GIT COMMIT MESSAGE**
@@ -540,6 +717,10 @@ Update sidebar navigation styling, maintenance workflow, and 1 more areas.
 
 **COMMITS IN THIS RELEASE**
 - `fix(layout): update sidebar navigation styling, maintenance workflow, and 1 more areas`
+
+
+
+
 
 ## 0626.5.1
 
@@ -552,6 +733,10 @@ Update database migrations, API routes, and 1 more areas.
 **COMMITS IN THIS RELEASE**
 - `chore(db): update database migrations, API routes, and 1 more areas`
 
+
+
+
+
 ## 0626.5.0
 
 **GIT COMMIT MESSAGE**
@@ -562,6 +747,10 @@ Update inspection workflows, API routes, and 1 more areas.
 
 **COMMITS IN THIS RELEASE**
 - `feat(inspections): update inspection workflows, API routes, and 1 more areas`
+
+
+
+
 
 ## 0626.4.0
 
@@ -574,6 +763,10 @@ Update maintenance workflow, inspection workflows, and 1 more areas.
 **COMMITS IN THIS RELEASE**
 - `feat(maintenance): update maintenance workflow, inspection workflows, and 1 more areas`
 
+
+
+
+
 ## 0626.3.1
 
 **GIT COMMIT MESSAGE**
@@ -584,6 +777,10 @@ Update database migrations, API routes, and 1 more areas.
 
 **COMMITS IN THIS RELEASE**
 - `chore(db): update database migrations, API routes, and 1 more areas`
+
+
+
+
 
 ## 0626.3.0
 
@@ -596,6 +793,10 @@ Update mobile text size controls, did not work absence handling, and 6 more area
 **COMMITS IN THIS RELEASE**
 - `feat(mobile): update mobile text size controls, did not work absence handling, and 6 more areas`
 
+
+
+
+
 ## 0626.2.5
 
 **GIT COMMIT MESSAGE**
@@ -606,6 +807,10 @@ Update finalise commit summaries, maintenance workflow, and 1 more areas.
 
 **COMMITS IN THIS RELEASE**
 - `chore(finalise): update finalise commit summaries, maintenance workflow, and 1 more areas`
+
+
+
+
 
 ## 0626.2.4
 
@@ -619,6 +824,10 @@ Update test coverage. Ignore browser event promise noise.
 - `test(tests): update test coverage`
 - `fix(logging): ignore browser event promise noise`
 
+
+
+
+
 ## 0626.2.3
 
 **GIT COMMIT MESSAGE**
@@ -629,6 +838,10 @@ Update database migrations, API routes, and 1 more areas.
 
 **COMMITS IN THIS RELEASE**
 - `chore(db): update database migrations, API routes, and 1 more areas`
+
+
+
+
 
 ## 0626.2.2
 
@@ -641,6 +854,10 @@ Update database migrations and API routes.
 **COMMITS IN THIS RELEASE**
 - `chore(db): update database migrations and API routes`
 
+
+
+
+
 ## 0626.2.1
 
 **GIT COMMIT MESSAGE**
@@ -651,6 +868,10 @@ Update finalise commit summaries, inspection workflows, and 3 more areas.
 
 **COMMITS IN THIS RELEASE**
 - `chore(finalise): update finalise commit summaries, inspection workflows, and 3 more areas`
+
+
+
+
 
 ## 0626.2.0
 
@@ -663,6 +884,10 @@ Update absence workflow, maintenance workflow, and 4 more areas.
 **COMMITS IN THIS RELEASE**
 - `feat(absence): update absence workflow, maintenance workflow, and 4 more areas`
 
+
+
+
+
 ## 0626.1.0
 
 **GIT COMMIT MESSAGE**
@@ -673,6 +898,10 @@ Update maintenance workflow, inspection workflows, and 4 more areas.
 
 **COMMITS IN THIS RELEASE**
 - `feat(maintenance): update maintenance workflow, inspection workflows, and 4 more areas`
+
+
+
+
 
 ## 0626.0.3
 
@@ -685,6 +914,10 @@ Update repository files.
 **COMMITS IN THIS RELEASE**
 - `chore(app): update repository files`
 
+
+
+
+
 ## 0626.0.2
 
 **GIT COMMIT MESSAGE**
@@ -695,6 +928,10 @@ Update repository files.
 
 **COMMITS IN THIS RELEASE**
 - `chore(app): update repository files`
+
+
+
+
 
 ## 0626.0.1
 
@@ -707,6 +944,10 @@ Update repository files.
 **COMMITS IN THIS RELEASE**
 - `chore(app): update repository files`
 
+
+
+
+
 ## 0626.0.0
 
 **GIT COMMIT MESSAGE**
@@ -717,6 +958,10 @@ Update database migrations, API routes, and 1 more areas.
 
 **COMMITS IN THIS RELEASE**
 - `chore(db): update database migrations, API routes, and 1 more areas`
+
+
+
+
 
 ## 0526.29.2
 
@@ -729,6 +974,10 @@ Handle transient usage telemetry errors.
 **COMMITS IN THIS RELEASE**
 - `fix(api): handle transient usage telemetry errors`
 
+
+
+
+
 ## 0526.29.1
 
 **GIT COMMIT MESSAGE**
@@ -739,6 +988,10 @@ Update test coverage.
 
 **COMMITS IN THIS RELEASE**
 - `test(tests): update test coverage`
+
+
+
+
 
 ## 0526.29.0
 
@@ -751,6 +1004,10 @@ Update API routes.
 **COMMITS IN THIS RELEASE**
 - `feat(api): update API routes`
 
+
+
+
+
 ## 0526.28.0
 
 **GIT COMMIT MESSAGE**
@@ -761,6 +1018,10 @@ Update absence workflow, timesheet workflow, and 2 more areas.
 
 **COMMITS IN THIS RELEASE**
 - `feat(absence): update absence workflow, timesheet workflow, and 2 more areas`
+
+
+
+
 
 ## 0526.27.4
 
@@ -773,6 +1034,10 @@ Update test coverage.
 **COMMITS IN THIS RELEASE**
 - `test(tests): update test coverage`
 
+
+
+
+
 ## 0526.27.3
 
 **GIT COMMIT MESSAGE**
@@ -783,6 +1048,10 @@ Update test coverage.
 
 **COMMITS IN THIS RELEASE**
 - `test(tests): update test coverage`
+
+
+
+
 
 ## 0526.27.2
 
@@ -795,6 +1064,10 @@ Update repository files.
 **COMMITS IN THIS RELEASE**
 - `chore(repo): update repository files`
 
+
+
+
+
 ## 0526.27.1
 
 **GIT COMMIT MESSAGE**
@@ -805,6 +1078,10 @@ Update sidebar navigation styling, mobile text size controls, and 6 more areas.
 
 **COMMITS IN THIS RELEASE**
 - `fix(layout): update sidebar navigation styling, mobile text size controls, and 6 more areas`
+
+
+
+
 
 ## 0526.27.0
 
@@ -817,6 +1094,10 @@ Add mobile text size controls.
 **COMMITS IN THIS RELEASE**
 - `feat(mobile): add mobile text size controls`
 
+
+
+
+
 ## 0526.26.0
 
 **GIT COMMIT MESSAGE**
@@ -827,6 +1108,10 @@ Update maintenance workflow and automation scripts.
 
 **COMMITS IN THIS RELEASE**
 - `feat(maintenance): update maintenance workflow and automation scripts`
+
+
+
+
 
 ## 0526.25.0
 
@@ -839,6 +1124,10 @@ Update maintenance workflow and automation scripts.
 **COMMITS IN THIS RELEASE**
 - `feat(maintenance): update maintenance workflow and automation scripts`
 
+
+
+
+
 ## 0526.24.0
 
 **GIT COMMIT MESSAGE**
@@ -849,6 +1138,10 @@ Update maintenance workflow and automation scripts.
 
 **COMMITS IN THIS RELEASE**
 - `feat(maintenance): update maintenance workflow and automation scripts`
+
+
+
+
 
 ## 0526.23.0
 
@@ -861,6 +1154,10 @@ Update maintenance workflow and automation scripts.
 **COMMITS IN THIS RELEASE**
 - `feat(maintenance): update maintenance workflow and automation scripts`
 
+
+
+
+
 ## 0526.22.0
 
 **GIT COMMIT MESSAGE**
@@ -871,6 +1168,10 @@ Update maintenance workflow and automation scripts.
 
 **COMMITS IN THIS RELEASE**
 - `feat(maintenance): update maintenance workflow and automation scripts`
+
+
+
+
 
 ## 0526.21.5
 
@@ -884,6 +1185,10 @@ Update sidebar navigation styling, fleet workflow, and 3 more areas. Ignore expe
 - `fix(layout): update sidebar navigation styling, fleet workflow, and 3 more areas`
 - `fix(errors): ignore expected dvla lookup misses`
 
+
+
+
+
 ## 0526.21.4
 
 **GIT COMMIT MESSAGE**
@@ -894,6 +1199,10 @@ Update repository files.
 
 **COMMITS IN THIS RELEASE**
 - `chore(components): update repository files`
+
+
+
+
 
 ## 0526.21.3
 
@@ -906,6 +1215,10 @@ Repair profile overview and hgv error handling.
 **COMMITS IN THIS RELEASE**
 - `fix(errors): repair profile overview and hgv error handling`
 
+
+
+
+
 ## 0526.21.2
 
 **GIT COMMIT MESSAGE**
@@ -916,6 +1229,10 @@ Update repository files.
 
 **COMMITS IN THIS RELEASE**
 - `chore(components): update repository files`
+
+
+
+
 
 ## 0526.21.1
 
@@ -928,6 +1245,10 @@ Update automation scripts.
 **COMMITS IN THIS RELEASE**
 - `chore(automation): update automation scripts`
 
+
+
+
+
 ## 0526.21.0
 
 **GIT COMMIT MESSAGE**
@@ -938,6 +1259,10 @@ Update mobile text size controls, absence workflow, and 7 more areas.
 
 **COMMITS IN THIS RELEASE**
 - `feat(mobile): update mobile text size controls, absence workflow, and 7 more areas`
+
+
+
+
 
 ## 0526.20.4
 
@@ -950,6 +1275,10 @@ Update database migrations, API routes, and 1 more areas.
 **COMMITS IN THIS RELEASE**
 - `chore(db): update database migrations, API routes, and 1 more areas`
 
+
+
+
+
 ## 0526.20.3
 
 **GIT COMMIT MESSAGE**
@@ -960,6 +1289,10 @@ Update repository files.
 
 **COMMITS IN THIS RELEASE**
 - `chore(components): update repository files`
+
+
+
+
 
 ## 0526.20.2
 
@@ -972,6 +1305,10 @@ Update finalise commit summaries, inspection workflows, and 2 more areas.
 **COMMITS IN THIS RELEASE**
 - `chore(finalise): update finalise commit summaries, inspection workflows, and 2 more areas`
 
+
+
+
+
 ## 0526.20.1
 
 **GIT COMMIT MESSAGE**
@@ -982,6 +1319,10 @@ Update finalise commit summaries, inspection workflows, and 3 more areas.
 
 **COMMITS IN THIS RELEASE**
 - `chore(finalise): update finalise commit summaries, inspection workflows, and 3 more areas`
+
+
+
+
 
 ## 0526.20.0
 
@@ -994,6 +1335,10 @@ Update timesheet workflow.
 **COMMITS IN THIS RELEASE**
 - `feat(timesheets): update timesheet workflow`
 
+
+
+
+
 ## 0526.19.0
 
 **GIT COMMIT MESSAGE**
@@ -1004,6 +1349,10 @@ Update API routes.
 
 **COMMITS IN THIS RELEASE**
 - `feat(api): update API routes`
+
+
+
+
 
 ## 0526.18.0
 
@@ -1020,6 +1369,10 @@ Update API routes and automation scripts.
 
 Private changelog for production builds. Newest entries first.
 
+
+
+
+
 ## 0526.17.2
 
 **GIT COMMIT MESSAGE**
@@ -1030,6 +1383,10 @@ Update database migrations, API routes, and 1 more areas.
 
 **COMMITS IN THIS RELEASE**
 - `chore(db): update database migrations, API routes, and 1 more areas`
+
+
+
+
 
 ## 0526.17.1
 
@@ -1042,6 +1399,10 @@ Update repository files.
 **COMMITS IN THIS RELEASE**
 - `chore(components): update repository files`
 
+
+
+
+
 ## 0526.17.0
 
 **GIT COMMIT MESSAGE**
@@ -1052,6 +1413,10 @@ Update absence workflow, inspection workflows, and 4 more areas.
 
 **COMMITS IN THIS RELEASE**
 - `feat(absence): update absence workflow, inspection workflows, and 4 more areas`
+
+
+
+
 
 ## 0526.16.1
 
@@ -1065,6 +1430,10 @@ Update sidebar navigation styling, maintenance workflow, and 5 more areas. Filte
 - `fix(layout): update sidebar navigation styling, maintenance workflow, and 5 more areas`
 - `fix(errors): filter notification fetch network noise`
 
+
+
+
+
 ## 0526.16.0
 
 **GIT COMMIT MESSAGE**
@@ -1075,6 +1444,10 @@ Update mobile text size controls and API routes.
 
 **COMMITS IN THIS RELEASE**
 - `feat(mobile): update mobile text size controls and API routes`
+
+
+
+
 
 ## 0526.15.2
 
@@ -1087,6 +1460,10 @@ Update test coverage.
 **COMMITS IN THIS RELEASE**
 - `test(tests): update test coverage`
 
+
+
+
+
 ## 0526.15.1
 
 **GIT COMMIT MESSAGE**
@@ -1097,6 +1474,10 @@ Update finalise commit summaries, maintenance workflow, and 3 more areas.
 
 **COMMITS IN THIS RELEASE**
 - `chore(finalise): update finalise commit summaries, maintenance workflow, and 3 more areas`
+
+
+
+
 
 ## 0526.15.0
 
@@ -1109,6 +1490,10 @@ Update absence workflow, maintenance workflow, and 5 more areas.
 **COMMITS IN THIS RELEASE**
 - `feat(absence): update absence workflow, maintenance workflow, and 5 more areas`
 
+
+
+
+
 ## 0526.14.0
 
 **GIT COMMIT MESSAGE**
@@ -1119,6 +1504,10 @@ Update fleet workflow.
 
 **COMMITS IN THIS RELEASE**
 - `feat(fleet): update fleet workflow`
+
+
+
+
 
 ## 0526.13.0
 
@@ -1131,6 +1520,10 @@ Update API routes.
 **COMMITS IN THIS RELEASE**
 - `feat(api): update API routes`
 
+
+
+
+
 ## 0526.12.0
 
 **GIT COMMIT MESSAGE**
@@ -1141,6 +1534,10 @@ Update timesheet workflow and API routes.
 
 **COMMITS IN THIS RELEASE**
 - `feat(timesheets): update timesheet workflow and API routes`
+
+
+
+
 
 ## 0526.11.1
 
@@ -1153,6 +1550,10 @@ Update archive tabs and ignore periods.
 **COMMITS IN THIS RELEASE**
 - `fix(actions): update archive tabs and ignore periods`
 
+
+
+
+
 ## 0526.11.0
 
 **GIT COMMIT MESSAGE**
@@ -1163,6 +1564,10 @@ Update API routes.
 
 **COMMITS IN THIS RELEASE**
 - `feat(api): update API routes`
+
+
+
+
 
 ## 0526.10.0
 
@@ -1176,6 +1581,10 @@ Update fleet workflow and API routes. Sync approval summary counts.
 - `feat(fleet): update fleet workflow and API routes`
 - `fix(dashboard): sync approval summary counts`
 
+
+
+
+
 ## 0526.9.1
 
 **GIT COMMIT MESSAGE**
@@ -1186,6 +1595,10 @@ Allow cross-team reminder assignment.
 
 **COMMITS IN THIS RELEASE**
 - `fix(actions): allow cross-team reminder assignment`
+
+
+
+
 
 ## 0526.9.0
 
@@ -1198,6 +1611,10 @@ Update API routes.
 **COMMITS IN THIS RELEASE**
 - `feat(api): update API routes`
 
+
+
+
+
 ## 0526.8.1
 
 **GIT COMMIT MESSAGE**
@@ -1208,6 +1625,10 @@ Update repository files.
 
 **COMMITS IN THIS RELEASE**
 - `chore(repo): update repository files`
+
+
+
+
 
 ## 0526.8.0
 
@@ -1220,6 +1641,10 @@ Update inspection workflows, database migrations, and 2 more areas.
 **COMMITS IN THIS RELEASE**
 - `feat(inspections): update inspection workflows, database migrations, and 2 more areas`
 
+
+
+
+
 ## 0526.7.3
 
 **GIT COMMIT MESSAGE**
@@ -1230,6 +1655,10 @@ Update repository files.
 
 **COMMITS IN THIS RELEASE**
 - `chore(app): update repository files`
+
+
+
+
 
 ## 0526.7.2
 
@@ -1242,6 +1671,10 @@ Improve sidebar navigation styling.
 **COMMITS IN THIS RELEASE**
 - `fix(layout): improve sidebar navigation styling`
 
+
+
+
+
 ## 0526.7.1
 
 **GIT COMMIT MESSAGE**
@@ -1252,6 +1685,10 @@ Update finalise commit summaries and sidebar navigation styling.
 
 **COMMITS IN THIS RELEASE**
 - `chore(finalise): update finalise commit summaries and sidebar navigation styling`
+
+
+
+
 
 ## 0526.7.0
 
@@ -1264,6 +1701,10 @@ Update absence workflow, timesheet workflow, and 4 more areas.
 **COMMITS IN THIS RELEASE**
 - `feat(absence): update absence workflow, timesheet workflow, and 4 more areas`
 
+
+
+
+
 ## 0526.6.0
 
 **GIT COMMIT MESSAGE**
@@ -1274,6 +1715,10 @@ Add reminder workflow management.
 
 **COMMITS IN THIS RELEASE**
 - `feat(actions): add reminder workflow management`
+
+
+
+
 
 ## 0526.5.2
 
@@ -1286,6 +1731,10 @@ Improve finalise commit summaries.
 **COMMITS IN THIS RELEASE**
 - `chore(finalise): improve finalise commit summaries`
 
+
+
+
+
 ## 0526.5.1
 
 **GIT COMMIT MESSAGE**
@@ -1296,6 +1745,10 @@ Update repository files.
 
 **COMMITS IN THIS RELEASE**
 - `chore(repo): update repository files`
+
+
+
+
 
 ## 0526.5.0
 
@@ -1308,6 +1761,10 @@ Add mobile text size controls.
 **COMMITS IN THIS RELEASE**
 - `feat(mobile): add mobile text size controls`
 
+
+
+
+
 ## 0526.4.0
 
 **GIT COMMIT MESSAGE**
@@ -1318,6 +1775,10 @@ Update mobile text size controls, inspection workflows, and 4 more areas.
 
 **COMMITS IN THIS RELEASE**
 - `feat(mobile): update mobile text size controls, inspection workflows, and 4 more areas`
+
+
+
+
 
 ## 0526.3.0
 
@@ -1330,6 +1791,10 @@ Update fleet workflow.
 **COMMITS IN THIS RELEASE**
 - `feat(fleet): update fleet workflow`
 
+
+
+
+
 ## 0526.2.3
 
 **GIT COMMIT MESSAGE**
@@ -1340,6 +1805,10 @@ Update repository files.
 
 **COMMITS IN THIS RELEASE**
 - `chore(app): update repository files`
+
+
+
+
 
 ## 0526.2.2
 
@@ -1356,6 +1825,10 @@ Improve finalise commit summaries.
 
 Private changelog for production builds. Newest entries first.
 
+
+
+
+
 ## 0526.2.1
 
 **GIT COMMIT MESSAGE**
@@ -1366,6 +1839,10 @@ Update repository files.
 
 **COMMITS IN THIS RELEASE**
 - `chore(components): update repository files`
+
+
+
+
 
 ## 0526.2.0
 
@@ -1378,6 +1855,10 @@ Update mobile text size controls and API routes.
 **COMMITS IN THIS RELEASE**
 - `feat(mobile): update mobile text size controls and API routes`
 
+
+
+
+
 ## 0526.1.1
 
 **GIT COMMIT MESSAGE**
@@ -1388,6 +1869,10 @@ Update test coverage.
 
 **COMMITS IN THIS RELEASE**
 - `test(tests): update test coverage`
+
+
+
+
 
 ## 0526.1.0
 
@@ -1400,6 +1885,10 @@ Update maintenance workflow. Add production release version display and bump aut
 **COMMITS IN THIS RELEASE**
 - `feat(maintenance): update maintenance workflow`
 - `feat(help): add production release version display and bump automation`
+
+
+
+
 
 ## 0526.0.0
 

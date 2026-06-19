@@ -4,6 +4,10 @@ import releaseHistoryJson from '@/lib/config/release-history.json';
 import { VersionHistoryPDF } from '@/lib/pdf/version-history-pdf';
 import { createClient } from '@/lib/supabase/server';
 import type { ReleaseHistoryEntry } from '@/lib/config/release-version-logic';
+import {
+  filterReleaseHistoryEntriesForAccess,
+  getCurrentReleaseHistoryAccess,
+} from '@/lib/server/version-history-filter';
 
 export const runtime = 'nodejs';
 
@@ -24,8 +28,9 @@ export async function GET() {
   }
 
   try {
+    const access = await getCurrentReleaseHistoryAccess();
     const pdfComponent = VersionHistoryPDF({
-      entries: releaseHistoryJson as ReleaseHistoryEntry[],
+      entries: filterReleaseHistoryEntriesForAccess(releaseHistoryJson as ReleaseHistoryEntry[], access),
       generatedAt: new Date().toISOString(),
     });
     const stream = await renderToStream(pdfComponent);

@@ -65,6 +65,14 @@ interface InventoryTableProps {
   tableLabel?: string;
   showMinorPlantDetails?: boolean;
   retiredMode?: boolean;
+  quickFilter?: InventoryTableQuickFilter;
+}
+
+export interface InventoryTableQuickFilter {
+  version: number;
+  statusFilters: InventoryCheckStatus[];
+  locationFilters: string[];
+  search: string;
 }
 
 function getStatusBadgeClass(status: InventoryCheckStatus): string {
@@ -155,11 +163,14 @@ export function InventoryTable({
   tableLabel = 'inventory',
   showMinorPlantDetails = false,
   retiredMode = false,
+  quickFilter,
 }: InventoryTableProps) {
-  const [search, setSearch] = useState('');
-  const [statusFilters, setStatusFilters] = useState<InventoryCheckStatus[]>([]);
+  const [search, setSearch] = useState(() => quickFilter?.search || '');
+  const [statusFilters, setStatusFilters] = useState<InventoryCheckStatus[]>(
+    () => retiredMode ? [] : quickFilter?.statusFilters || []
+  );
   const [categoryFilters, setCategoryFilters] = useState<string[]>([]);
-  const [locationFilters, setLocationFilters] = useState<string[]>([]);
+  const [locationFilters, setLocationFilters] = useState<string[]>(() => quickFilter?.locationFilters || []);
   const [retireReasonFilters, setRetireReasonFilters] = useState<InventoryRetireReason[]>([]);
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');

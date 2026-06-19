@@ -6,11 +6,20 @@ import {
   getReleaseHistoryEntriesForMonth,
   type ReleaseHistoryEntry,
 } from '@/lib/config/release-version-logic';
+import {
+  filterReleaseHistoryEntriesForAccess,
+  getCurrentReleaseHistoryAccess,
+} from '@/lib/server/version-history-filter';
 
 const releaseHistory = releaseHistoryJson as ReleaseHistoryEntry[];
 const monthKeyPattern = /^\d{4}$/u;
 
-export function GET(request: NextRequest) {
+export async function GET(request: NextRequest) {
+  const access = await getCurrentReleaseHistoryAccess();
+  if (!access.authenticated) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const availableMonths = getRecentReleaseHistoryMonths(releaseHistory);
   const requestedMonth = request.nextUrl.searchParams.get('month')?.trim();
   const monthKey = requestedMonth || availableMonths[0]?.key || '';
@@ -26,6 +35,9 @@ export function GET(request: NextRequest) {
 
   return NextResponse.json({
     month,
-    entries: getReleaseHistoryEntriesForMonth(releaseHistory, monthKey),
+    entries: filterReleaseHistoryEntriesForAccess(
+      getReleaseHistoryEntriesForMonth(releaseHistory, monthKey),
+      access
+    ),
   });
 }

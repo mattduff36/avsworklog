@@ -203,6 +203,7 @@ describe('release version logic', () => {
           'Published as a smaller improvement release for fixes, maintenance, or supporting updates.',
         ],
         areas: ['Background services'],
+        areaKeys: ['background-services'],
         pushedAt: '2026-05-21T15:00:29Z',
       },
       {
@@ -218,9 +219,36 @@ describe('release version logic', () => {
           'The release time shown is when the version record was created.',
         ],
         areas: ['Fleet workflow', 'Background services'],
+        areaKeys: ['fleet', 'background-services'],
         pushedAt: '2026-05-21T14:00:29Z',
       },
     ]);
+  });
+
+  it('uses client-facing Daily Tasks wording for inspection scopes', () => {
+    const releaseLog = [
+      '# Production release log',
+      '',
+      'Private changelog for production builds. Newest entries first.',
+      '',
+      '## 0626.3.0',
+      '',
+      '**GIT COMMIT MESSAGE**',
+      '`feat(van-inspections): update inspection workflow`',
+      '',
+      '**WHAT CHANGED**',
+      'Fixed an issue in the daily check flow.',
+      '',
+      '**COMMITS IN THIS RELEASE**',
+      '- `feat(van-inspections): update inspection workflow`',
+      '',
+    ].join('\n');
+
+    expect(buildReleaseHistoryEntries(releaseLog)[0]).toMatchObject({
+      title: 'Daily Tasks update',
+      areas: ['Daily Tasks'],
+      areaKeys: ['daily-tasks'],
+    });
   });
 
   it('builds recent release month tabs and filters entries by month', () => {

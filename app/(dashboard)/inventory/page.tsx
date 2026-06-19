@@ -20,7 +20,7 @@ import { InventoryGroupsPanel } from './components/InventoryGroupsPanel';
 import { InventoryLocationDialog } from './components/InventoryLocationDialog';
 import { InventoryLocationsPanel } from './components/InventoryLocationsPanel';
 import { InventoryRetireItemDialog } from './components/InventoryRetireItemDialog';
-import { InventoryTable } from './components/InventoryTable';
+import { InventoryTable, type InventoryTableQuickFilter } from './components/InventoryTable';
 import { MoveInventoryDialog } from './components/MoveInventoryDialog';
 import { checkIntervalMonthsToDays, getInventoryCheckStatus, isInventoryUnknownLocation } from './utils';
 import type {
@@ -35,6 +35,7 @@ import type {
   InventoryLocationFormData,
   InventoryMovePayload,
   InventoryRetireReason,
+  InventoryCheckStatus,
 } from './types';
 
 export default function InventoryPage() {
@@ -63,6 +64,12 @@ export default function InventoryPage() {
   const [movingItems, setMovingItems] = useState<InventoryItem[]>([]);
   const [restoringMinorPlantItems, setRestoringMinorPlantItems] = useState(false);
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+  const [inventoryTableQuickFilter, setInventoryTableQuickFilter] = useState<InventoryTableQuickFilter>({
+    version: 0,
+    statusFilters: [],
+    locationFilters: [],
+    search: '',
+  });
 
   const fetchInventoryData = useCallback(async () => {
     try {
@@ -198,6 +205,11 @@ export default function InventoryPage() {
     [categories]
   );
 
+  const unknownLocation = useMemo(
+    () => locations.find((location) => isInventoryUnknownLocation(location)) || null,
+    [locations]
+  );
+
   const smallToolsItems = useMemo(
     () => items.filter((item) => item.category !== 'minor_plant'),
     [items]
@@ -207,6 +219,36 @@ export default function InventoryPage() {
     () => items.filter((item) => item.category === 'minor_plant'),
     [items]
   );
+
+  function openInventoryOverviewForSummaryFilter() {
+    const nextOverviewTab = overviewTab === 'retired' ? 'small_tools' : overviewTab;
+    setPageTab('overview');
+    setOverviewTab(nextOverviewTab);
+    router.push(nextOverviewTab === 'minor_plant' ? '/inventory?overview=minor-plant' : '/inventory', { scroll: false });
+  }
+
+  function applyInventorySummaryFilter(params: {
+    statusFilters?: InventoryCheckStatus[];
+    locationFilters?: string[];
+  }) {
+    openInventoryOverviewForSummaryFilter();
+    setSelectedItemIds(new Set());
+    setInventoryTableQuickFilter((current) => ({
+      version: current.version + 1,
+      statusFilters: params.statusFilters || [],
+      locationFilters: params.locationFilters || [],
+      search: '',
+    }));
+  }
+
+  function applyUnknownLocationFilter() {
+    if (!unknownLocation) {
+      toast.error('Unknown location is not available');
+      return;
+    }
+
+    applyInventorySummaryFilter({ locationFilters: [unknownLocation.id] });
+  }
 
   async function parseJsonResponse(response: Response, fallbackMessage: string) {
     const payload = await response.json();
@@ -587,11 +629,39 @@ export default function InventoryPage() {
       ) : null}
 
       <div className="hidden grid-cols-5 gap-2 min-[430px]:grid lg:gap-4">
-        <SummaryCard label="Active Items" value={summary.total} icon={<PackageSearch className="h-5 w-5" />} />
-        <SummaryCard label="Overdue" value={summary.overdue} icon={<AlertTriangle className="h-5 w-5" />} tone="danger" />
-        <SummaryCard label="Due Soon" value={summary.dueSoon} icon={<AlertTriangle className="h-5 w-5" />} tone="warning" />
-        <SummaryCard label="Needs Check" value={summary.needsCheck} icon={<CheckCircle2 className="h-5 w-5" />} tone="info" />
-        <SummaryCard label="Unknown" value={summary.unknownLocation} icon={<Truck className="h-5 w-5" />} />
+        <SummaryCard
+          label="Active Items"
+          value={summary.total}
+          icon={<PackageSearch className="h-5 w-5" />}
+          onClick={() => applyInventorySummaryFilter({})}
+        />
+        <SummaryCard
+          label="Overdue"
+          value={summary.overdue}
+          icon={<AlertTriangle className="h-5 w-5" />}
+          tone="danger"
+          onClick={() => applyInventorySummaryFilter({ statusFilters: ['overdue'] })}
+        />
+        <SummaryCard
+          label="Due Soon"
+          value={summary.dueSoon}
+          icon={<AlertTriangle className="h-5 w-5" />}
+          tone="warning"
+          onClick={() => applyInventorySummaryFilter({ statusFilters: ['due_soon'] })}
+        />
+        <SummaryCard
+          label="Needs Check"
+          value={summary.needsCheck}
+          icon={<CheckCircle2 className="h-5 w-5" />}
+          tone="info"
+          onClick={() => applyInventorySummaryFilter({ statusFilters: ['needs_check'] })}
+        />
+        <SummaryCard
+          label="Unknown"
+          value={summary.unknownLocation}
+          icon={<Truck className="h-5 w-5" />}
+          onClick={applyUnknownLocationFilter}
+        />
       </div>
 
       <Tabs
@@ -678,6 +748,7 @@ export default function InventoryPage() {
 
             <TabsContent value="small_tools" className="mt-4">
               <InventoryTable
+                key={`small-tools-${inventoryTableQuickFilter.version}`}
                 items={smallToolsItems}
                 selectedItemIds={selectedItemIds}
                 onSelectedItemIdsChange={setSelectedItemIds}
@@ -688,11 +759,13 @@ export default function InventoryPage() {
                 locationFilterLocations={locations}
                 categoryLabels={categoryLabels}
                 tableLabel="small tools"
+                quickFilter={inventoryTableQuickFilter}
               />
             </TabsContent>
 
             <TabsContent value="minor_plant" className="mt-4">
               <InventoryTable
+                key={`minor-plant-${inventoryTableQuickFilter.version}`}
                 items={minorPlantItems}
                 selectedItemIds={selectedItemIds}
                 onSelectedItemIdsChange={setSelectedItemIds}
@@ -706,6 +779,7 @@ export default function InventoryPage() {
                 categoryLabels={categoryLabels}
                 tableLabel="minor plant"
                 showMinorPlantDetails
+                quickFilter={inventoryTableQuickFilter}
               />
             </TabsContent>
 
@@ -863,9 +937,10 @@ interface SummaryCardProps {
   value: number;
   icon: ReactNode;
   tone?: 'default' | 'danger' | 'warning' | 'info';
+  onClick?: () => void;
 }
 
-function SummaryCard({ label, value, icon, tone = 'default' }: SummaryCardProps) {
+function SummaryCard({ label, value, icon, tone = 'default', onClick }: SummaryCardProps) {
   const toneClassName = {
     default: 'text-inventory bg-inventory-soft',
     danger: 'text-red-300 bg-red-500/10',
@@ -873,8 +948,8 @@ function SummaryCard({ label, value, icon, tone = 'default' }: SummaryCardProps)
     info: 'text-blue-300 bg-blue-500/10',
   }[tone];
 
-  return (
-    <Card className="border-slate-700 bg-slate-900/70">
+  const card = (
+    <Card className={`h-full border-slate-700 bg-slate-900/70 transition-colors ${onClick ? 'hover:border-slate-500 hover:bg-slate-800/70' : ''}`}>
       <CardContent className="flex min-h-[88px] flex-col items-start justify-center gap-2 p-2 min-[900px]:min-h-0 min-[900px]:flex-row min-[900px]:items-center min-[900px]:gap-3 min-[900px]:p-4">
         <div className={`rounded-lg p-1.5 min-[900px]:p-2 [&_svg]:h-4 [&_svg]:w-4 min-[900px]:[&_svg]:h-5 min-[900px]:[&_svg]:w-5 ${toneClassName}`}>
           {icon}
@@ -885,5 +960,18 @@ function SummaryCard({ label, value, icon, tone = 'default' }: SummaryCardProps)
         </div>
       </CardContent>
     </Card>
+  );
+
+  if (!onClick) return card;
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="h-full w-full appearance-none rounded-lg border-0 bg-transparent p-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inventory focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+      aria-label={`Filter inventory by ${label}`}
+    >
+      {card}
+    </button>
   );
 }
