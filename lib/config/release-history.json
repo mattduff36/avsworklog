@@ -1,5 +1,12 @@
 [
   {
+    "version": "0626.23.1",
+    "updateKind": "minor",
+    "title": "Data storage maintenance update",
+    "description": "Update data storage updates, background services, and 1 more areas.",
+    "pushedAt": "2026-06-19T08:59:10.774Z"
+  },
+  {
     "version": "0626.23.0",
     "updateKind": "major",
     "title": "Maintenance update",
