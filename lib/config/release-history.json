@@ -1,5 +1,27 @@
 [
   {
+    "version": "0626.30.0",
+    "updateKind": "major",
+    "title": "Debug tools update",
+    "description": "Updated Debug tools and Timesheets.",
+    "summary": "Updated Debug tools and Timesheets.",
+    "details": [
+      "Covered debug tools and timesheets.",
+      "Updated Debug tools and Timesheets.",
+      "Published as a larger app update because it included broader workflow changes.",
+      "The release time shown is when the version record was created."
+    ],
+    "areas": [
+      "Debug tools",
+      "Timesheets"
+    ],
+    "areaKeys": [
+      "debug",
+      "timesheets"
+    ],
+    "pushedAt": "2026-06-19T20:33:12.898Z"
+  },
+  {
     "version": "0626.29.0",
     "updateKind": "major",
     "title": "Timesheets update",
