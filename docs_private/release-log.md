@@ -2,6 +2,20 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.24.1
+
+**GIT COMMIT MESSAGE**
+`chore(finalise): update finalise commit summaries, mobile text size controls, and API routes`
+
+**PUSHED AT**
+2026-06-19T09:48:25.869Z
+
+**WHAT CHANGED**
+Update finalise commit summaries, mobile text size controls, and API routes.
+
+**COMMITS IN THIS RELEASE**
+- `chore(finalise): update finalise commit summaries, mobile text size controls, and API routes`
+
 ## 0626.24.0
 
 **GIT COMMIT MESSAGE**

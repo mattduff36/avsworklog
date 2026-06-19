@@ -1,5 +1,24 @@
 [
   {
+    "version": "0626.24.1",
+    "updateKind": "minor",
+    "title": "Finalise maintenance update",
+    "description": "Updated finalise commit summaries, mobile text size controls, and background services.",
+    "summary": "Updated finalise commit summaries, mobile text size controls, and background services.",
+    "details": [
+      "Covered finalise commit summaries, mobile text size controls, and and background services.",
+      "Updated finalise commit summaries, mobile text size controls, and background services.",
+      "Published as a smaller improvement release for fixes, maintenance, or supporting updates.",
+      "The release time shown is when the version record was created."
+    ],
+    "areas": [
+      "Finalise commit summaries",
+      "Mobile text size controls",
+      "And background services"
+    ],
+    "pushedAt": "2026-06-19T09:48:25.869Z"
+  },
+  {
     "version": "0626.24.0",
     "updateKind": "major",
     "title": "Fleet update",
