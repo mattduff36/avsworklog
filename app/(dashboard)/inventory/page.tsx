@@ -253,7 +253,12 @@ export default function InventoryPage() {
   async function parseJsonResponse(response: Response, fallbackMessage: string) {
     const payload = await response.json();
     if (!response.ok) {
-      throw new Error(payload.error || fallbackMessage);
+      const error = new Error(payload.error || fallbackMessage);
+      Object.assign(error, {
+        status: response.status,
+        payload,
+      });
+      throw error;
     }
     return payload;
   }

@@ -39,6 +39,8 @@ import {
   getInventoryCheckStatus,
   getInventoryDueDate,
   isInventoryCheckExempt,
+  isInventoryYardLocation,
+  shouldMuteInventoryCheckBadge,
 } from '../../utils';
 
 interface MovementProfile {
@@ -94,6 +96,7 @@ function formatTimestamp(value: string): string {
 function getStatusBadgeClass(item: InventoryItem): string {
   if (item.status === 'retired') return 'border-slate-500/30 bg-slate-500/10 text-slate-200';
   const status = getInventoryCheckStatus(item);
+  if (shouldMuteInventoryCheckBadge(item)) return 'border-slate-600/30 bg-slate-700/20 text-slate-300';
   if (status === 'overdue') return 'border-red-500/30 bg-red-500/10 text-red-300';
   if (status === 'due_soon') return 'border-amber-500/30 bg-amber-500/10 text-amber-300';
   if (status === 'needs_check') return 'border-blue-500/30 bg-blue-500/10 text-blue-300';
@@ -235,6 +238,7 @@ export default function InventoryItemDetailPage() {
   const intervalMonthsValue = getInventoryCheckIntervalMonths(item);
   const isRetired = item.status === 'retired';
   const isCheckExempt = isInventoryCheckExempt(item);
+  const isYardLocation = isInventoryYardLocation(item.location);
   const unknownLocationAgeLabel = formatInventoryUnknownLocationAge(item);
   const selectedChecklistDefinition =
     getInventoryChecklistDefinition(selectedChecklistVersion) || INVENTORY_CHECKLIST_DEFINITIONS[0];
@@ -280,6 +284,9 @@ export default function InventoryItemDetailPage() {
             <div className="mt-2 font-semibold text-white">
               {isCheckExempt ? 'No check required' : getInventoryDueDate(item.last_checked_at, intervalMonthsValue)}
             </div>
+            {isYardLocation ? (
+              <div className="text-xs text-muted-foreground">Required before moving out of Yard</div>
+            ) : null}
             {unknownLocationAgeLabel ? (
               <div className="text-xs text-muted-foreground">{unknownLocationAgeLabel}</div>
             ) : null}
@@ -293,6 +300,7 @@ export default function InventoryItemDetailPage() {
             </div>
             {!isCheckExempt && !item.check_interval_days ? <div className="text-xs text-muted-foreground">Default cadence</div> : null}
             {isCheckExempt ? <div className="text-xs text-muted-foreground">Ignored while this special status applies</div> : null}
+            {isYardLocation ? <div className="text-xs text-muted-foreground">Applies again once moved from Yard</div> : null}
           </CardContent>
         </Card>
       </div>

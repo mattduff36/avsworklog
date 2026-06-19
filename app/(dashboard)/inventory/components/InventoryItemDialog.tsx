@@ -31,11 +31,9 @@ import {
 } from '../types';
 import {
   CHECK_INTERVAL_MONTHS,
-  hasInventoryCheckLapsedForCategoryExit,
   formatInventoryLocationOptionLabel,
   getInventoryCheckIntervalMonths,
   isInventoryCheckExempt,
-  isInventoryCheckOnDemandCategory,
   isInventoryUnknownLocation,
 } from '../utils';
 import { toast } from 'sonner';
@@ -68,13 +66,6 @@ export function InventoryItemDialog({
     last_checked_at: form.last_checked_at || null,
   });
   const isUnknownLocationSelected = isInventoryUnknownLocation(selectedLocation);
-  const isCheckOnDemandSelected = isInventoryCheckOnDemandCategory(form.category);
-  const isBlockedCategoryExit = Boolean(
-    item &&
-    isInventoryCheckOnDemandCategory(item.category) &&
-    form.category !== item.category &&
-    hasInventoryCheckLapsedForCategoryExit(item)
-  );
 
   useEffect(() => {
     setSubmitError('');
@@ -170,15 +161,7 @@ export function InventoryItemDialog({
               <div className="rounded-md border border-slate-500/25 bg-slate-500/10 p-3 text-xs text-slate-200">
                 {isUnknownLocationSelected
                   ? 'Unknown is a system location for lost or missing items. It does not generate check due dates; the item list will show how long the item has been in Unknown.'
-                  : isCheckOnDemandSelected
-                    ? 'Check on Demand is for long-term storage. Check dates and intervals are kept on the item, but no due date is generated until it moves back to a regular category.'
-                    : 'This item will not generate check due dates while the special status applies.'}
-              </div>
-            ) : null}
-
-            {isBlockedCategoryExit ? (
-              <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-100">
-                Record an inventory check before moving this item out of Check on Demand.
+                  : 'This item will not generate check due dates while the special status applies.'}
               </div>
             ) : null}
 
@@ -263,7 +246,7 @@ export function InventoryItemDialog({
             <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
               Cancel
             </Button>
-            <Button type="submit" className="bg-inventory text-white hover:bg-inventory-dark" disabled={saving || isBlockedCategoryExit || !form.location_id}>
+            <Button type="submit" className="bg-inventory text-white hover:bg-inventory-dark" disabled={saving || !form.location_id}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isEditing ? 'Save Changes' : 'Add Item'}
             </Button>

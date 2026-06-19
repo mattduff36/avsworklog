@@ -7,7 +7,7 @@ export const CHECK_INTERVAL_MONTHS = 1;
 export const CHECK_INTERVAL_DAYS = CHECK_INTERVAL_MONTHS * DAYS_PER_INVENTORY_CHECK_MONTH;
 export const DUE_SOON_DAYS = 7;
 export const INVENTORY_UNKNOWN_LOCATION_NAME = 'Unknown';
-export const INVENTORY_CHECK_ON_DEMAND_CATEGORY = 'check_on_demand';
+export const INVENTORY_YARD_LOCATION_NAME = 'Yard';
 
 interface InventoryCheckScheduleItem {
   last_checked_at: string | null;
@@ -39,12 +39,12 @@ export function formatInventoryCheckIntervalMonths(intervalMonths: number): stri
   return `${intervalMonths} ${intervalMonths === 1 ? 'month' : 'months'}`;
 }
 
-export function isInventoryCheckOnDemandCategory(category: string | null | undefined): boolean {
-  return category === INVENTORY_CHECK_ON_DEMAND_CATEGORY;
-}
-
 export function isUnknownInventoryLocationName(name: string | null | undefined): boolean {
   return name?.trim().toLowerCase() === INVENTORY_UNKNOWN_LOCATION_NAME.toLowerCase();
+}
+
+export function isYardInventoryLocationName(name: string | null | undefined): boolean {
+  return name?.trim().toLowerCase() === INVENTORY_YARD_LOCATION_NAME.toLowerCase();
 }
 
 export function isInventoryUnknownLocation(
@@ -53,8 +53,14 @@ export function isInventoryUnknownLocation(
   return isUnknownInventoryLocationName(location?.name);
 }
 
+export function isInventoryYardLocation(
+  location: Pick<InventoryLocation, 'name'> | null | undefined
+): boolean {
+  return isYardInventoryLocationName(location?.name);
+}
+
 export function isInventoryCheckExempt(item: Partial<InventorySpecialStatusItem>): boolean {
-  return isInventoryCheckOnDemandCategory(item.category) || isInventoryUnknownLocation(item.location);
+  return isInventoryUnknownLocation(item.location);
 }
 
 export function getInventoryNormalCheckStatus(item: InventoryCheckScheduleItem): InventoryCheckStatus {
@@ -75,9 +81,33 @@ export function getInventoryCheckStatus(item: InventorySpecialStatusItem): Inven
   return getInventoryNormalCheckStatus(item);
 }
 
-export function hasInventoryCheckLapsedForCategoryExit(item: InventoryCheckScheduleItem): boolean {
+export function hasInventoryCheckLapsed(item: InventoryCheckScheduleItem): boolean {
   const status = getInventoryNormalCheckStatus(item);
   return status === 'needs_check' || status === 'overdue';
+}
+
+export function isInventoryYardExitBlocked(
+  item: InventoryCheckScheduleItem & { location?: Pick<InventoryLocation, 'name'> | null },
+  destinationLocation: Pick<InventoryLocation, 'name'> | null | undefined
+): boolean {
+  if (!isInventoryYardLocation(item.location)) return false;
+  if (isInventoryYardLocation(destinationLocation)) return false;
+  return hasInventoryCheckLapsed(item);
+}
+
+export function isInventoryMoveCheckBlocked(
+  item: InventorySpecialStatusItem,
+  destinationLocation: Pick<InventoryLocation, 'name'> | null | undefined
+): boolean {
+  if (isInventoryYardExitBlocked(item, destinationLocation)) return true;
+  if (isInventoryYardLocation(destinationLocation)) return false;
+  return getInventoryCheckStatus(item) === 'overdue';
+}
+
+export function shouldMuteInventoryCheckBadge(
+  item: Partial<InventorySpecialStatusItem>
+): boolean {
+  return isInventoryYardLocation(item.location) || isInventoryCheckExempt(item);
 }
 
 export function getInventoryDueDate(lastCheckedAt: string | null, intervalMonths = CHECK_INTERVAL_MONTHS): string {

@@ -32,7 +32,9 @@ import {
   getInventoryCheckStatus,
   getInventoryDueDate,
   isInventoryCheckExempt,
+  isInventoryYardLocation,
   isInventoryUnknownLocation,
+  shouldMuteInventoryCheckBadge,
 } from '../utils';
 import {
   INVENTORY_RETIRE_REASONS,
@@ -75,7 +77,8 @@ export interface InventoryTableQuickFilter {
   search: string;
 }
 
-function getStatusBadgeClass(status: InventoryCheckStatus): string {
+function getStatusBadgeClass(status: InventoryCheckStatus, item?: InventoryItem): string {
+  if (item && shouldMuteInventoryCheckBadge(item)) return 'border-slate-600/30 bg-slate-700/20 text-slate-300';
   if (status === 'overdue') return 'border-red-500/30 bg-red-500/10 text-red-300';
   if (status === 'due_soon') return 'border-amber-500/30 bg-amber-500/10 text-amber-300';
   if (status === 'needs_check') return 'border-blue-500/30 bg-blue-500/10 text-blue-300';
@@ -143,8 +146,12 @@ function renderCheckDueDetails(item: InventoryItem) {
     return formatInventoryUnknownLocationAge(item) || 'No check required';
   }
 
-  if (!item.last_checked_at) return null;
-  return `Due ${getInventoryDueDate(item.last_checked_at, getInventoryCheckIntervalMonths(item))}`;
+  if (!item.last_checked_at) {
+    return isInventoryYardLocation(item.location) ? 'Check required before leaving Yard' : null;
+  }
+
+  const dueText = `Due ${getInventoryDueDate(item.last_checked_at, getInventoryCheckIntervalMonths(item))}`;
+  return isInventoryYardLocation(item.location) ? `${dueText} - required before leaving Yard` : dueText;
 }
 
 export function InventoryTable({
@@ -573,7 +580,7 @@ export function InventoryTable({
                           {item.retire_reason || 'Other'}
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className={`whitespace-nowrap ${getStatusBadgeClass(checkStatus)}`}>
+                        <Badge variant="outline" className={`whitespace-nowrap ${getStatusBadgeClass(checkStatus, item)}`}>
                           {getCheckStatusLabel(checkStatus)}
                         </Badge>
                       )}
@@ -664,7 +671,7 @@ export function InventoryTable({
                       {item.retire_reason || 'Other'}
                     </Badge>
                   ) : (
-                    <Badge variant="outline" className={getStatusBadgeClass(checkStatus)}>
+                    <Badge variant="outline" className={getStatusBadgeClass(checkStatus, item)}>
                       {getCheckStatusLabel(checkStatus)}
                     </Badge>
                   )}

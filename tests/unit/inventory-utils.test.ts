@@ -9,7 +9,9 @@ import {
   getInventoryCheckIntervalMonths,
   getInventoryCheckStatus,
   getInventoryDueDate,
-  hasInventoryCheckLapsedForCategoryExit,
+  hasInventoryCheckLapsed,
+  isInventoryMoveCheckBlocked,
+  isInventoryYardExitBlocked,
 } from '@/app/(dashboard)/inventory/utils';
 
 describe('inventory utils', () => {
@@ -42,12 +44,16 @@ describe('inventory utils', () => {
     vi.useRealTimers();
   });
 
-  it('suppresses due dates for special inventory statuses', () => {
+  it('keeps Yard on the normal check status while Unknown remains exempt', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-19T12:00:00Z'));
+
     expect(getInventoryCheckStatus({
-      category: 'check_on_demand',
+      category: 'van_stock',
+      location: { name: 'Yard' },
       last_checked_at: '2026-01-01',
       check_interval_days: 30,
-    })).toBe('not_required');
+    })).toBe('overdue');
 
     expect(getInventoryCheckStatus({
       category: 'tools',
@@ -55,6 +61,8 @@ describe('inventory utils', () => {
       last_checked_at: null,
       check_interval_days: null,
     })).toBe('not_required');
+
+    vi.useRealTimers();
   });
 
   it('calculates unknown-location age from movement or created date fallback', () => {
@@ -76,13 +84,76 @@ describe('inventory utils', () => {
     vi.useRealTimers();
   });
 
-  it('blocks leaving check-on-demand when the normal check has lapsed', () => {
+  it('detects lapsed inventory checks', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-19T12:00:00Z'));
 
-    expect(hasInventoryCheckLapsedForCategoryExit({ last_checked_at: '2026-04-01', check_interval_days: 30 })).toBe(true);
-    expect(hasInventoryCheckLapsedForCategoryExit({ last_checked_at: null, check_interval_days: 30 })).toBe(true);
-    expect(hasInventoryCheckLapsedForCategoryExit({ last_checked_at: '2026-04-25', check_interval_days: 30 })).toBe(false);
+    expect(hasInventoryCheckLapsed({ last_checked_at: '2026-04-01', check_interval_days: 30 })).toBe(true);
+    expect(hasInventoryCheckLapsed({ last_checked_at: null, check_interval_days: 30 })).toBe(true);
+    expect(hasInventoryCheckLapsed({ last_checked_at: '2026-04-25', check_interval_days: 30 })).toBe(false);
+
+    vi.useRealTimers();
+  });
+
+  it('blocks Yard exits only when the normal check has lapsed', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-19T12:00:00Z'));
+
+    const yardLocation = { name: 'Yard' };
+    const vanLocation = { name: 'Van 1' };
+
+    expect(isInventoryYardExitBlocked({
+      location: yardLocation,
+      last_checked_at: '2026-04-01',
+      check_interval_days: 30,
+    }, vanLocation)).toBe(true);
+
+    expect(isInventoryYardExitBlocked({
+      location: yardLocation,
+      last_checked_at: null,
+      check_interval_days: 30,
+    }, vanLocation)).toBe(true);
+
+    expect(isInventoryYardExitBlocked({
+      location: yardLocation,
+      last_checked_at: '2026-04-25',
+      check_interval_days: 30,
+    }, vanLocation)).toBe(false);
+
+    expect(isInventoryYardExitBlocked({
+      location: yardLocation,
+      last_checked_at: null,
+      check_interval_days: 30,
+    }, yardLocation)).toBe(false);
+
+    vi.useRealTimers();
+  });
+
+  it('blocks overdue non-Yard moves unless the destination is Yard', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-19T12:00:00Z'));
+
+    const storesLocation = { name: 'Stores' };
+    const vanLocation = { name: 'Van 1' };
+    const yardLocation = { name: 'Yard' };
+
+    expect(isInventoryMoveCheckBlocked({
+      location: storesLocation,
+      last_checked_at: '2026-04-01',
+      check_interval_days: 30,
+    }, vanLocation)).toBe(true);
+
+    expect(isInventoryMoveCheckBlocked({
+      location: storesLocation,
+      last_checked_at: '2026-04-01',
+      check_interval_days: 30,
+    }, yardLocation)).toBe(false);
+
+    expect(isInventoryMoveCheckBlocked({
+      location: storesLocation,
+      last_checked_at: null,
+      check_interval_days: 30,
+    }, vanLocation)).toBe(false);
 
     vi.useRealTimers();
   });

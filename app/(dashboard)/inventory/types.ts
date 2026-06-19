@@ -165,7 +165,6 @@ export const INVENTORY_CATEGORY_LABELS: Record<string, string> = {
   tools: 'Tools',
   equipment: 'Equipment',
   unknown: 'Unknown',
-  check_on_demand: 'Check on Demand',
 };
 
 export const INVENTORY_RETIRE_REASONS: InventoryRetireReason[] = [
