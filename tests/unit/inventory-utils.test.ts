@@ -3,11 +3,13 @@ import {
   CHECK_INTERVAL_DAYS,
   CHECK_INTERVAL_MONTHS,
   formatInventoryCheckIntervalMonths,
+  formatInventoryUnknownLocationAge,
   formatInventoryDate,
   getInventoryCheckIntervalDays,
   getInventoryCheckIntervalMonths,
   getInventoryCheckStatus,
   getInventoryDueDate,
+  hasInventoryCheckLapsedForCategoryExit,
 } from '@/app/(dashboard)/inventory/utils';
 
 describe('inventory utils', () => {
@@ -36,6 +38,51 @@ describe('inventory utils', () => {
     expect(getInventoryCheckStatus({ last_checked_at: '2026-04-25', check_interval_days: 30 })).toBe('due_soon');
     expect(getInventoryCheckStatus({ last_checked_at: '2026-04-01', check_interval_days: 30 })).toBe('overdue');
     expect(getInventoryCheckStatus({ last_checked_at: null, check_interval_days: 30 })).toBe('needs_check');
+
+    vi.useRealTimers();
+  });
+
+  it('suppresses due dates for special inventory statuses', () => {
+    expect(getInventoryCheckStatus({
+      category: 'check_on_demand',
+      last_checked_at: '2026-01-01',
+      check_interval_days: 30,
+    })).toBe('not_required');
+
+    expect(getInventoryCheckStatus({
+      category: 'tools',
+      location: { name: 'Unknown' },
+      last_checked_at: null,
+      check_interval_days: null,
+    })).toBe('not_required');
+  });
+
+  it('calculates unknown-location age from movement or created date fallback', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-19T12:00:00Z'));
+
+    expect(formatInventoryUnknownLocationAge({
+      location: { name: 'Unknown' },
+      unknown_location_entered_at: '2026-06-17T08:00:00Z',
+      created_at: '2026-06-01T08:00:00Z',
+    })).toBe('In Unknown for 2 days');
+
+    expect(formatInventoryUnknownLocationAge({
+      location: { name: 'Unknown' },
+      unknown_location_entered_at: null,
+      created_at: '2026-06-18T08:00:00Z',
+    })).toBe('In Unknown for 1 day');
+
+    vi.useRealTimers();
+  });
+
+  it('blocks leaving check-on-demand when the normal check has lapsed', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-19T12:00:00Z'));
+
+    expect(hasInventoryCheckLapsedForCategoryExit({ last_checked_at: '2026-04-01', check_interval_days: 30 })).toBe(true);
+    expect(hasInventoryCheckLapsedForCategoryExit({ last_checked_at: null, check_interval_days: 30 })).toBe(true);
+    expect(hasInventoryCheckLapsedForCategoryExit({ last_checked_at: '2026-04-25', check_interval_days: 30 })).toBe(false);
 
     vi.useRealTimers();
   });

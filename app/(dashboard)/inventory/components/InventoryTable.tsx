@@ -26,10 +26,12 @@ import {
 import {
   formatInventoryLocationOptionLabel,
   formatInventoryDate,
+  formatInventoryUnknownLocationAge,
   getCheckStatusLabel,
   getInventoryCheckIntervalMonths,
   getInventoryCheckStatus,
   getInventoryDueDate,
+  isInventoryCheckExempt,
 } from '../utils';
 import {
   INVENTORY_RETIRE_REASONS,
@@ -44,7 +46,7 @@ import { useLoadMorePagination } from '@/lib/hooks/useLoadMorePagination';
 type SortField = 'item_number' | 'serial_number' | 'name' | 'location' | 'last_checked_at';
 type SortDir = 'asc' | 'desc';
 const NO_LOCATION_FILTER = '__no_location__';
-const INVENTORY_STATUS_FILTER_ORDER: InventoryCheckStatus[] = ['overdue', 'due_soon', 'needs_check', 'ok'];
+const INVENTORY_STATUS_FILTER_ORDER: InventoryCheckStatus[] = ['overdue', 'due_soon', 'needs_check', 'not_required', 'ok'];
 
 interface InventoryTableProps {
   items: InventoryItem[];
@@ -68,6 +70,7 @@ function getStatusBadgeClass(status: InventoryCheckStatus): string {
   if (status === 'overdue') return 'border-red-500/30 bg-red-500/10 text-red-300';
   if (status === 'due_soon') return 'border-amber-500/30 bg-amber-500/10 text-amber-300';
   if (status === 'needs_check') return 'border-blue-500/30 bg-blue-500/10 text-blue-300';
+  if (status === 'not_required') return 'border-slate-500/30 bg-slate-500/10 text-slate-300';
   return 'border-green-500/30 bg-green-500/10 text-green-300';
 }
 
@@ -123,6 +126,15 @@ function renderLocationDetails(item: InventoryItem) {
       ) : null}
     </div>
   );
+}
+
+function renderCheckDueDetails(item: InventoryItem) {
+  if (isInventoryCheckExempt(item)) {
+    return formatInventoryUnknownLocationAge(item) || 'No check required';
+  }
+
+  if (!item.last_checked_at) return null;
+  return `Due ${getInventoryDueDate(item.last_checked_at, getInventoryCheckIntervalMonths(item))}`;
 }
 
 export function InventoryTable({
@@ -234,7 +246,7 @@ export function InventoryTable({
           acc[status] += 1;
           return acc;
         },
-        { ok: 0, due_soon: 0, overdue: 0, needs_check: 0 }
+        { ok: 0, due_soon: 0, overdue: 0, needs_check: 0, not_required: 0 }
       );
 
       return INVENTORY_STATUS_FILTER_ORDER
@@ -505,6 +517,7 @@ export function InventoryTable({
             ) : (
               visibleItems.map((item) => {
                 const checkStatus = getInventoryCheckStatus(item);
+                const checkDueDetails = renderCheckDueDetails(item);
                 return (
                   <tr
                     key={item.id}
@@ -537,8 +550,8 @@ export function InventoryTable({
                     <td className="px-4 py-3 text-slate-300">{renderLocationDetails(item)}</td>
                     <td className="w-28 px-4 py-3 text-slate-300">
                       <div>{formatInventoryDate(retiredMode ? item.retired_at : item.last_checked_at)}</div>
-                      {!retiredMode && item.last_checked_at ? (
-                        <div className="whitespace-nowrap text-[11px] leading-4 text-muted-foreground">Due {getInventoryDueDate(item.last_checked_at, getInventoryCheckIntervalMonths(item))}</div>
+                      {!retiredMode && checkDueDetails ? (
+                        <div className="whitespace-nowrap text-[11px] leading-4 text-muted-foreground">{checkDueDetails}</div>
                       ) : null}
                     </td>
                     <td className="w-36 px-4 py-3">
@@ -600,6 +613,7 @@ export function InventoryTable({
         ) : (
           visibleItems.map((item) => {
             const checkStatus = getInventoryCheckStatus(item);
+            const checkDueDetails = renderCheckDueDetails(item);
             return (
               <div
                 key={item.id}
@@ -648,8 +662,8 @@ export function InventoryTable({
                     {renderLocationDetails(item)}
                   </div>
                   <span>{retiredMode ? 'Retired' : 'Last'}: {formatInventoryDate(retiredMode ? item.retired_at : item.last_checked_at)}</span>
-                  {!retiredMode && item.last_checked_at ? (
-                    <span>Due: {getInventoryDueDate(item.last_checked_at, getInventoryCheckIntervalMonths(item))}</span>
+                  {!retiredMode && checkDueDetails ? (
+                    <span>{checkDueDetails}</span>
                   ) : null}
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">

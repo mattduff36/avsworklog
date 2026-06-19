@@ -3,6 +3,7 @@ import { resolve } from 'path';
 import ExcelJS from 'exceljs';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizeInventoryItemNumber, requireInventoryAccess, requireInventoryManagerAccess } from '@/lib/server/inventory-auth';
+import { isUnknownInventoryLocationName } from '@/app/(dashboard)/inventory/utils';
 import type { InventoryCategory, InventoryStatus } from '@/app/(dashboard)/inventory/types';
 
 const completeListPath = 'data/COMPLETE LIST 2023.xlsx';
@@ -31,9 +32,20 @@ interface InventoryLocationRow {
 interface InventoryItemRow {
   id: string;
   item_number_normalized: string;
+  created_at?: string | null;
   location?: InventoryLocationRow | null;
   minor_plant_detail?: unknown;
   [key: string]: unknown;
+}
+
+interface InventoryMovementLocationRow {
+  name: string | null;
+}
+
+interface InventoryUnknownMovementRow {
+  item_id: string;
+  moved_at: string;
+  to_location?: InventoryMovementLocationRow | InventoryMovementLocationRow[] | null;
 }
 
 interface InventoryItemGroupSummary {
@@ -151,6 +163,45 @@ function normalizeMinorPlantDetailRelation(item: InventoryItemRow): InventoryIte
   };
 }
 
+function pickMovementLocation(
+  location: InventoryUnknownMovementRow['to_location']
+): InventoryMovementLocationRow | null {
+  if (!location) return null;
+  return Array.isArray(location) ? location[0] ?? null : location;
+}
+
+async function loadUnknownLocationEnteredAt(
+  admin: ReturnType<typeof createAdminClient>,
+  items: InventoryItemRow[]
+): Promise<Map<string, string>> {
+  const unknownLocationItemIds = items
+    .filter((item) => isUnknownInventoryLocationName(item.location?.name))
+    .map((item) => item.id);
+
+  if (unknownLocationItemIds.length === 0) return new Map();
+
+  const { data, error } = await admin
+    .from('inventory_item_movements')
+    .select(`
+      item_id,
+      moved_at,
+      to_location:inventory_locations!inventory_item_movements_to_location_id_fkey(name)
+    `)
+    .in('item_id', unknownLocationItemIds)
+    .order('moved_at', { ascending: false });
+
+  if (error) throw error;
+
+  const enteredAtByItemId = new Map<string, string>();
+  ((data || []) as unknown as InventoryUnknownMovementRow[]).forEach((movement) => {
+    if (enteredAtByItemId.has(movement.item_id)) return;
+    if (!isUnknownInventoryLocationName(pickMovementLocation(movement.to_location)?.name)) return;
+    enteredAtByItemId.set(movement.item_id, movement.moved_at);
+  });
+
+  return enteredAtByItemId;
+}
+
 async function loadItemGroups(
   admin: ReturnType<typeof createAdminClient>,
   itemIds: string[]
@@ -215,8 +266,11 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
     const items = (data || []) as InventoryItemRow[];
-    const vanById = await loadLinkedVans(admin, getLinkedVanIds(items));
-    const groupByItemId = await loadItemGroups(admin, items.map((item) => item.id));
+    const [vanById, groupByItemId, unknownLocationEnteredAtByItemId] = await Promise.all([
+      loadLinkedVans(admin, getLinkedVanIds(items)),
+      loadItemGroups(admin, items.map((item) => item.id)),
+      loadUnknownLocationEnteredAt(admin, items),
+    ]);
 
     let sourceLocationHints = new Map<string, SourceLocationHint>();
     try {
@@ -229,6 +283,7 @@ export async function GET(request: NextRequest) {
       const itemWithLinkedVan = {
         ...normalizeMinorPlantDetailRelation(addLinkedVanDisplay(item, vanById)),
         group: groupByItemId.get(item.id) || null,
+        unknown_location_entered_at: unknownLocationEnteredAtByItemId.get(item.id) || null,
       };
       if (itemWithLinkedVan.location) return itemWithLinkedVan;
 

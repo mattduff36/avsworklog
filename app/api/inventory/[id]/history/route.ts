@@ -1,14 +1,23 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireInventoryManagerAccess } from '@/lib/server/inventory-auth';
+import { isUnknownInventoryLocationName } from '@/app/(dashboard)/inventory/utils';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
 interface InventoryItemRow {
+  created_at?: string | null;
+  location?: { name?: string | null } | null;
   minor_plant_detail?: unknown;
+  unknown_location_entered_at?: string | null;
   [key: string]: unknown;
+}
+
+interface InventoryMovementRow {
+  moved_at: string;
+  to_location?: { name: string | null } | { name: string | null }[] | null;
 }
 
 function normalizeMinorPlantDetailRelation(item: InventoryItemRow): InventoryItemRow {
@@ -17,6 +26,25 @@ function normalizeMinorPlantDetailRelation(item: InventoryItemRow): InventoryIte
     ...item,
     minor_plant_detail: Array.isArray(relation) ? relation[0] ?? null : relation ?? null,
   };
+}
+
+function pickMovementLocation(movement: InventoryMovementRow): { name: string | null } | null {
+  const location = movement.to_location;
+  if (!location) return null;
+  return Array.isArray(location) ? location[0] ?? null : location;
+}
+
+function getUnknownLocationEnteredAt(
+  item: InventoryItemRow,
+  movements: InventoryMovementRow[]
+): string | null {
+  if (!isUnknownInventoryLocationName(item.location?.name)) return null;
+
+  const latestUnknownMovement = movements.find((movement) =>
+    isUnknownInventoryLocationName(pickMovementLocation(movement)?.name)
+  );
+
+  return latestUnknownMovement?.moved_at || item.created_at || null;
 }
 
 export async function GET(_request: Request, { params }: RouteParams) {
@@ -77,8 +105,14 @@ export async function GET(_request: Request, { params }: RouteParams) {
     if (checksResult.error) throw checksResult.error;
     if (groupResult.error) throw groupResult.error;
 
+    const movements = (movementsResult.data || []) as unknown as InventoryMovementRow[];
+    const item = normalizeMinorPlantDetailRelation(itemResult.data as InventoryItemRow);
+
     return NextResponse.json({
-      item: normalizeMinorPlantDetailRelation(itemResult.data as InventoryItemRow),
+      item: {
+        ...item,
+        unknown_location_entered_at: getUnknownLocationEnteredAt(item, movements),
+      },
       movements: movementsResult.data || [],
       checks: checksResult.data || [],
       group: groupResult.data?.group || null,

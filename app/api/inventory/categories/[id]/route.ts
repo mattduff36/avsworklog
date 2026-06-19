@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireInventoryManagerAccess } from '@/lib/server/inventory-auth';
+import { INVENTORY_CHECK_ON_DEMAND_CATEGORY } from '@/app/(dashboard)/inventory/utils';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -22,6 +23,27 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params;
     const body = (await request.json()) as UpdateInventoryCategoryBody;
+    const admin = createAdminClient();
+    const { data: currentCategory, error: currentCategoryError } = await admin
+      .from('inventory_item_categories')
+      .select('id, slug')
+      .eq('id', id)
+      .single();
+
+    if (currentCategoryError) {
+      if (currentCategoryError.code === 'PGRST116') {
+        return NextResponse.json({ error: 'Inventory category not found' }, { status: 404 });
+      }
+      throw currentCategoryError;
+    }
+
+    if (currentCategory.slug === INVENTORY_CHECK_ON_DEMAND_CATEGORY && body.is_active === false) {
+      return NextResponse.json(
+        { error: 'Check on Demand is a system category and cannot be deactivated' },
+        { status: 400 }
+      );
+    }
+
     const update: Record<string, unknown> = {
       updated_by: access.userId,
     };
@@ -37,7 +59,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (body.sort_order !== undefined) update.sort_order = Number.isFinite(body.sort_order) ? body.sort_order : 0;
     if (body.is_active !== undefined) update.is_active = body.is_active;
 
-    const { data, error } = await createAdminClient()
+    const { data, error } = await admin
       .from('inventory_item_categories')
       .update(update)
       .eq('id', id)
@@ -78,6 +100,13 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
         return NextResponse.json({ error: 'Inventory category not found' }, { status: 404 });
       }
       throw categoryError;
+    }
+
+    if (category.slug === INVENTORY_CHECK_ON_DEMAND_CATEGORY) {
+      return NextResponse.json(
+        { error: 'Check on Demand is a system category and cannot be deleted' },
+        { status: 400 }
+      );
     }
 
     const { count, error: countError } = await admin

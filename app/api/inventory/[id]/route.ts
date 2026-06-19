@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizeInventoryItemNumber, requireInventoryManagerAccess } from '@/lib/server/inventory-auth';
 import { isInventoryRetireReason, type InventoryCategory, type InventoryRetireReason, type InventoryStatus } from '@/app/(dashboard)/inventory/types';
+import {
+  INVENTORY_CHECK_ON_DEMAND_CATEGORY,
+  hasInventoryCheckLapsedForCategoryExit,
+} from '@/app/(dashboard)/inventory/utils';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -21,6 +25,13 @@ interface InventoryItemUpdateBody {
 interface InventoryItemRow {
   minor_plant_detail?: unknown;
   [key: string]: unknown;
+}
+
+interface CurrentInventoryItemRow {
+  id: string;
+  category: string;
+  last_checked_at: string | null;
+  check_interval_days: number | null;
 }
 
 function cleanOptionalDate(value: string | null | undefined): string | null {
@@ -45,6 +56,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params;
     const body = (await request.json()) as InventoryItemUpdateBody;
+    const admin = createAdminClient();
     const update: Record<string, unknown> = {
       updated_by: access.userId,
     };
@@ -64,7 +76,39 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       }
       update.name = name;
     }
-    if (body.category !== undefined) update.category = body.category;
+    if (body.category !== undefined) {
+      const category = body.category.trim();
+      if (!category) {
+        return NextResponse.json({ error: 'Category is required' }, { status: 400 });
+      }
+
+      const { data: currentItem, error: currentItemError } = await admin
+        .from('inventory_items')
+        .select('id, category, last_checked_at, check_interval_days')
+        .eq('id', id)
+        .single();
+
+      if (currentItemError) {
+        if (currentItemError.code === 'PGRST116') {
+          return NextResponse.json({ error: 'Inventory item not found' }, { status: 404 });
+        }
+        throw currentItemError;
+      }
+
+      const item = currentItem as CurrentInventoryItemRow;
+      const isLeavingCheckOnDemand =
+        item.category === INVENTORY_CHECK_ON_DEMAND_CATEGORY &&
+        category !== INVENTORY_CHECK_ON_DEMAND_CATEGORY;
+
+      if (isLeavingCheckOnDemand && hasInventoryCheckLapsedForCategoryExit(item)) {
+        return NextResponse.json(
+          { error: 'Record an inventory check before moving this item out of Check on Demand.' },
+          { status: 400 }
+        );
+      }
+
+      update.category = category;
+    }
     if (body.location_id !== undefined) update.location_id = body.location_id?.trim() || null;
     if (body.last_checked_at !== undefined) update.last_checked_at = cleanOptionalDate(body.last_checked_at);
     if (body.check_interval_days !== undefined) {
@@ -87,7 +131,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       }
     }
 
-    const { data, error } = await createAdminClient()
+    const { data, error } = await admin
       .from('inventory_items')
       .update(update)
       .eq('id', id)

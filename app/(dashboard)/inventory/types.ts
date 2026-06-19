@@ -4,7 +4,7 @@ export type InventoryStatus = 'active' | 'retired';
 
 export type InventoryRetireReason = 'Sold' | 'Scrapped' | 'Lost' | 'Damaged' | 'Returned' | 'Other';
 
-export type InventoryCheckStatus = 'ok' | 'due_soon' | 'overdue' | 'needs_check';
+export type InventoryCheckStatus = 'ok' | 'due_soon' | 'overdue' | 'needs_check' | 'not_required';
 
 export type FleetAssetLinkType = 'van' | 'hgv' | 'plant';
 
@@ -64,6 +64,7 @@ export interface InventoryItem {
   source_reference: string | null;
   source_location_hint?: string | null;
   source_location_rows?: string | null;
+  unknown_location_entered_at?: string | null;
   minor_plant_detail?: InventoryMinorPlantDetail | null;
   group?: InventoryItemGroupSummary | null;
   created_at: string;
@@ -164,6 +165,7 @@ export const INVENTORY_CATEGORY_LABELS: Record<string, string> = {
   tools: 'Tools',
   equipment: 'Equipment',
   unknown: 'Unknown',
+  check_on_demand: 'Check on Demand',
 };
 
 export const INVENTORY_RETIRE_REASONS: InventoryRetireReason[] = [

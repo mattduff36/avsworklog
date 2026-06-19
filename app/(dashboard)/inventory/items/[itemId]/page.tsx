@@ -15,7 +15,7 @@ import { PageLoader } from '@/components/ui/page-loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertTriangle, CalendarCheck, Clock, Download, Loader2, MapPin, PackageSearch } from 'lucide-react';
 import { toast } from 'sonner';
-import type { InventoryItem, InventoryItemGroupSummary } from '../../types';
+import { formatInventoryCategoryLabel, type InventoryItem, type InventoryItemGroupSummary } from '../../types';
 import { InventoryCheckModal, type InventoryChecklistSubmitPayload } from '../../components/InventoryCheckModal';
 import {
   INVENTORY_CHECKLIST_DEFINITIONS,
@@ -33,10 +33,12 @@ import {
   checkIntervalMonthsToDays,
   formatInventoryCheckIntervalMonths,
   formatInventoryDate,
+  formatInventoryUnknownLocationAge,
   getCheckStatusLabel,
   getInventoryCheckIntervalMonths,
   getInventoryCheckStatus,
   getInventoryDueDate,
+  isInventoryCheckExempt,
 } from '../../utils';
 
 interface MovementProfile {
@@ -95,6 +97,7 @@ function getStatusBadgeClass(item: InventoryItem): string {
   if (status === 'overdue') return 'border-red-500/30 bg-red-500/10 text-red-300';
   if (status === 'due_soon') return 'border-amber-500/30 bg-amber-500/10 text-amber-300';
   if (status === 'needs_check') return 'border-blue-500/30 bg-blue-500/10 text-blue-300';
+  if (status === 'not_required') return 'border-slate-500/30 bg-slate-500/10 text-slate-300';
   return 'border-green-500/30 bg-green-500/10 text-green-300';
 }
 
@@ -231,6 +234,8 @@ export default function InventoryItemDetailPage() {
   const checkStatus = getInventoryCheckStatus(item);
   const intervalMonthsValue = getInventoryCheckIntervalMonths(item);
   const isRetired = item.status === 'retired';
+  const isCheckExempt = isInventoryCheckExempt(item);
+  const unknownLocationAgeLabel = formatInventoryUnknownLocationAge(item);
   const selectedChecklistDefinition =
     getInventoryChecklistDefinition(selectedChecklistVersion) || INVENTORY_CHECKLIST_DEFINITIONS[0];
 
@@ -258,6 +263,9 @@ export default function InventoryItemDetailPage() {
               <MapPin className="h-4 w-4 text-inventory" />
               {item.location?.name || 'No location assigned'}
             </div>
+            {unknownLocationAgeLabel ? (
+              <div className="mt-1 text-xs text-muted-foreground">{unknownLocationAgeLabel}</div>
+            ) : null}
           </CardContent>
         </Card>
         <Card className="border-slate-700 bg-slate-900/70">
@@ -269,14 +277,22 @@ export default function InventoryItemDetailPage() {
         <Card className="border-slate-700 bg-slate-900/70">
           <CardContent className="p-4">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">Due Date</div>
-            <div className="mt-2 font-semibold text-white">{getInventoryDueDate(item.last_checked_at, intervalMonthsValue)}</div>
+            <div className="mt-2 font-semibold text-white">
+              {isCheckExempt ? 'No check required' : getInventoryDueDate(item.last_checked_at, intervalMonthsValue)}
+            </div>
+            {unknownLocationAgeLabel ? (
+              <div className="text-xs text-muted-foreground">{unknownLocationAgeLabel}</div>
+            ) : null}
           </CardContent>
         </Card>
         <Card className="border-slate-700 bg-slate-900/70">
           <CardContent className="p-4">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">Check Interval</div>
-            <div className="mt-2 font-semibold text-white">{formatInventoryCheckIntervalMonths(intervalMonthsValue)}</div>
-            {!item.check_interval_days ? <div className="text-xs text-muted-foreground">Default cadence</div> : null}
+            <div className="mt-2 font-semibold text-white">
+              {isCheckExempt ? 'Not required' : formatInventoryCheckIntervalMonths(intervalMonthsValue)}
+            </div>
+            {!isCheckExempt && !item.check_interval_days ? <div className="text-xs text-muted-foreground">Default cadence</div> : null}
+            {isCheckExempt ? <div className="text-xs text-muted-foreground">Ignored while this special status applies</div> : null}
           </CardContent>
         </Card>
       </div>
@@ -317,7 +333,7 @@ export default function InventoryItemDetailPage() {
                   <DetailRow label="Retirement Reason" value={item.retire_reason || 'Other'} />
                 </>
               ) : null}
-              <DetailRow label="Category" value={item.category.replace(/_/g, ' ')} />
+              <DetailRow label="Category" value={formatInventoryCategoryLabel(item.category)} />
               <DetailRow label="Source" value={item.source || 'Not recorded'} />
               <DetailRow label="Source Reference" value={item.source_reference || 'Not recorded'} />
               <DetailRow label="Group" value={group?.name || 'No group'} />
@@ -369,7 +385,9 @@ export default function InventoryItemDetailPage() {
                   <p className="mt-1 text-sm text-muted-foreground">
                     {isRetired
                       ? 'Retired items must be restored before new checks can be recorded.'
-                      : 'Choose a PAT Test or Regular Check, then record Pass, Fail, or N/A. Failed items require comments.'
+                      : isCheckExempt
+                        ? 'No due date is generated while this special status applies. You can still record a check before moving it back into a regular category.'
+                        : 'Choose a PAT Test or Regular Check, then record Pass, Fail, or N/A. Failed items require comments.'
                     }
                   </p>
                 </div>

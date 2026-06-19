@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireInventoryManagerAccess } from '@/lib/server/inventory-auth';
+import { INVENTORY_UNKNOWN_LOCATION_NAME, isUnknownInventoryLocationName } from '@/app/(dashboard)/inventory/utils';
 import type { FleetAssetLinkType } from '@/app/(dashboard)/inventory/types';
 
 interface RouteParams {
@@ -36,6 +37,31 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params;
     const body = (await request.json()) as LocationUpdateBody;
+    const admin = createAdminClient();
+    const { data: currentLocation, error: currentLocationError } = await admin
+      .from('inventory_locations')
+      .select('id, name')
+      .eq('id', id)
+      .single();
+
+    if (currentLocationError) {
+      if (currentLocationError.code === 'PGRST116') {
+        return NextResponse.json({ error: 'Location not found' }, { status: 404 });
+      }
+      throw currentLocationError;
+    }
+
+    if (
+      isUnknownInventoryLocationName(currentLocation.name) &&
+      body.name !== undefined &&
+      !isUnknownInventoryLocationName(body.name)
+    ) {
+      return NextResponse.json(
+        { error: `${INVENTORY_UNKNOWN_LOCATION_NAME} is a system location and cannot be renamed` },
+        { status: 400 }
+      );
+    }
+
     const update: Record<string, unknown> = {
       updated_by: access.userId,
       ...buildLinkedAssetColumns(body),
@@ -52,7 +78,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       update.description = body.description?.trim() || null;
     }
 
-    const { data, error } = await createAdminClient()
+    const { data, error } = await admin
       .from('inventory_locations')
       .update(update)
       .eq('id', id)
@@ -85,6 +111,26 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params;
     const admin = createAdminClient();
+    const { data: location, error: locationError } = await admin
+      .from('inventory_locations')
+      .select('id, name')
+      .eq('id', id)
+      .single();
+
+    if (locationError) {
+      if (locationError.code === 'PGRST116') {
+        return NextResponse.json({ error: 'Location not found' }, { status: 404 });
+      }
+      throw locationError;
+    }
+
+    if (isUnknownInventoryLocationName(location.name)) {
+      return NextResponse.json(
+        { error: `${INVENTORY_UNKNOWN_LOCATION_NAME} is a system location and cannot be removed` },
+        { status: 400 }
+      );
+    }
+
     const { count, error: countError } = await admin
       .from('inventory_items')
       .select('id', { count: 'exact', head: true })

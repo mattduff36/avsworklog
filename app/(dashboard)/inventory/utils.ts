@@ -6,6 +6,20 @@ const DAYS_PER_INVENTORY_CHECK_MONTH = 30;
 export const CHECK_INTERVAL_MONTHS = 1;
 export const CHECK_INTERVAL_DAYS = CHECK_INTERVAL_MONTHS * DAYS_PER_INVENTORY_CHECK_MONTH;
 export const DUE_SOON_DAYS = 7;
+export const INVENTORY_UNKNOWN_LOCATION_NAME = 'Unknown';
+export const INVENTORY_CHECK_ON_DEMAND_CATEGORY = 'check_on_demand';
+
+interface InventoryCheckScheduleItem {
+  last_checked_at: string | null;
+  check_interval_days?: number | null;
+}
+
+interface InventorySpecialStatusItem extends InventoryCheckScheduleItem {
+  category?: string | null;
+  location?: Pick<InventoryLocation, 'name'> | null;
+  unknown_location_entered_at?: string | null;
+  created_at?: string | null;
+}
 
 export function getInventoryCheckIntervalDays(item: Pick<InventoryItem, 'check_interval_days'>): number {
   return checkIntervalMonthsToDays(getInventoryCheckIntervalMonths(item)) || CHECK_INTERVAL_DAYS;
@@ -25,9 +39,25 @@ export function formatInventoryCheckIntervalMonths(intervalMonths: number): stri
   return `${intervalMonths} ${intervalMonths === 1 ? 'month' : 'months'}`;
 }
 
-export function getInventoryCheckStatus(
-  item: Pick<InventoryItem, 'last_checked_at'> & Partial<Pick<InventoryItem, 'check_interval_days'>>
-): InventoryCheckStatus {
+export function isInventoryCheckOnDemandCategory(category: string | null | undefined): boolean {
+  return category === INVENTORY_CHECK_ON_DEMAND_CATEGORY;
+}
+
+export function isUnknownInventoryLocationName(name: string | null | undefined): boolean {
+  return name?.trim().toLowerCase() === INVENTORY_UNKNOWN_LOCATION_NAME.toLowerCase();
+}
+
+export function isInventoryUnknownLocation(
+  location: Pick<InventoryLocation, 'name'> | null | undefined
+): boolean {
+  return isUnknownInventoryLocationName(location?.name);
+}
+
+export function isInventoryCheckExempt(item: Partial<InventorySpecialStatusItem>): boolean {
+  return isInventoryCheckOnDemandCategory(item.category) || isInventoryUnknownLocation(item.location);
+}
+
+export function getInventoryNormalCheckStatus(item: InventoryCheckScheduleItem): InventoryCheckStatus {
   if (!item.last_checked_at) return 'needs_check';
 
   const dueDate = addMonths(new Date(`${item.last_checked_at}T00:00:00`), getInventoryCheckIntervalMonths({
@@ -38,6 +68,16 @@ export function getInventoryCheckStatus(
   if (daysUntilDue < 0) return 'overdue';
   if (daysUntilDue <= DUE_SOON_DAYS) return 'due_soon';
   return 'ok';
+}
+
+export function getInventoryCheckStatus(item: InventorySpecialStatusItem): InventoryCheckStatus {
+  if (isInventoryCheckExempt(item)) return 'not_required';
+  return getInventoryNormalCheckStatus(item);
+}
+
+export function hasInventoryCheckLapsedForCategoryExit(item: InventoryCheckScheduleItem): boolean {
+  const status = getInventoryNormalCheckStatus(item);
+  return status === 'needs_check' || status === 'overdue';
 }
 
 export function getInventoryDueDate(lastCheckedAt: string | null, intervalMonths = CHECK_INTERVAL_MONTHS): string {
@@ -53,9 +93,38 @@ export function formatInventoryDate(value: string | null): string {
 }
 
 export function getCheckStatusLabel(status: InventoryCheckStatus): string {
+  if (status === 'not_required') return 'No Check Required';
   if (status === 'due_soon') return 'Due Soon';
   if (status === 'needs_check') return 'Needs Check';
   return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+export function getInventoryUnknownLocationEnteredAt(
+  item: Pick<InventoryItem, 'location' | 'created_at'> & Partial<Pick<InventoryItem, 'unknown_location_entered_at'>>
+): string | null {
+  if (!isInventoryUnknownLocation(item.location)) return null;
+  return item.unknown_location_entered_at || item.created_at || null;
+}
+
+export function getInventoryUnknownLocationAgeDays(
+  item: Pick<InventoryItem, 'location' | 'created_at'> & Partial<Pick<InventoryItem, 'unknown_location_entered_at'>>,
+  now = new Date()
+): number | null {
+  const enteredAt = getInventoryUnknownLocationEnteredAt(item);
+  if (!enteredAt) return null;
+  const parsedDate = new Date(enteredAt.includes('T') ? enteredAt : `${enteredAt}T00:00:00`);
+  if (Number.isNaN(parsedDate.getTime())) return null;
+  return Math.max(0, differenceInCalendarDays(now, parsedDate));
+}
+
+export function formatInventoryUnknownLocationAge(
+  item: Pick<InventoryItem, 'location' | 'created_at'> & Partial<Pick<InventoryItem, 'unknown_location_entered_at'>>,
+  now = new Date()
+): string | null {
+  const days = getInventoryUnknownLocationAgeDays(item, now);
+  if (days === null) return null;
+  if (days === 0) return 'In Unknown today';
+  return `In Unknown for ${days} ${days === 1 ? 'day' : 'days'}`;
 }
 
 export function formatInventoryLocationOptionLabel(location: InventoryLocation): string {
