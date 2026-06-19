@@ -1,5 +1,27 @@
 [
   {
+    "version": "0626.27.0",
+    "updateKind": "major",
+    "title": "Inventory update",
+    "description": "Updated Inventory and Data storage.",
+    "summary": "Updated Inventory and Data storage.",
+    "details": [
+      "Covered inventory and data storage.",
+      "Updated Inventory and Data storage.",
+      "Published as a larger app update because it included broader workflow changes.",
+      "The release time shown is when the version record was created."
+    ],
+    "areas": [
+      "Inventory",
+      "Data storage"
+    ],
+    "areaKeys": [
+      "inventory",
+      "data-storage"
+    ],
+    "pushedAt": "2026-06-19T14:09:09.818Z"
+  },
+  {
     "version": "0626.26.0",
     "updateKind": "major",
     "title": "Inventory update",
