@@ -249,12 +249,16 @@ function NewTimesheetContent() {
                   type="button"
                   variant="outline"
                   onClick={() => setSelectedTimesheetType(option.value)}
-                  className="h-auto min-h-24 w-full justify-start rounded-lg border-border bg-slate-950 p-5 text-left hover:bg-slate-900"
+                  className="h-auto min-h-24 w-full min-w-0 items-start justify-start whitespace-normal rounded-lg border-border bg-slate-950 p-5 text-left hover:bg-slate-900"
                 >
-                  <span>
-                    <span className="block text-xl font-semibold text-foreground">{option.label}</span>
-                    <span className="mt-2 block text-base font-normal leading-relaxed text-muted-foreground">
-                      {option.description}
+                  <span className="block min-w-0 max-w-full flex-1">
+                    <span className="block break-words text-xl font-semibold leading-snug text-foreground">
+                      {option.value === 'plant' ? 'Plant' : option.label}
+                    </span>
+                    <span className="mt-2 block break-words text-base font-normal leading-relaxed text-muted-foreground">
+                      {option.value === 'plant'
+                        ? 'Use the plant weekly flow.'
+                        : option.description}
                     </span>
                   </span>
                 </Button>
