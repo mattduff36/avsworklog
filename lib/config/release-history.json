@@ -1,5 +1,25 @@
 [
   {
+    "version": "0626.29.0",
+    "updateKind": "major",
+    "title": "Timesheets update",
+    "description": "Updated timesheets.",
+    "summary": "Updated timesheets.",
+    "details": [
+      "Covered timesheets.",
+      "Updated timesheets.",
+      "Published as a larger app update because it included broader workflow changes.",
+      "The release time shown is when the version record was created."
+    ],
+    "areas": [
+      "Timesheets"
+    ],
+    "areaKeys": [
+      "timesheets"
+    ],
+    "pushedAt": "2026-06-19T20:04:21.532Z"
+  },
+  {
     "version": "0626.28.0",
     "updateKind": "major",
     "title": "Inventory update",

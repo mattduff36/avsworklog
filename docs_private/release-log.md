@@ -2,6 +2,20 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.29.0
+
+**GIT COMMIT MESSAGE**
+`feat(timesheets): update timesheets`
+
+**PUSHED AT**
+2026-06-19T20:04:21.532Z
+
+**WHAT CHANGED**
+Update timesheets.
+
+**COMMITS IN THIS RELEASE**
+- `feat(timesheets): update timesheets`
+
 ## 0626.28.0
 
 **GIT COMMIT MESSAGE**
