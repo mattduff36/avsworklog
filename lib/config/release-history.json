@@ -1,5 +1,26 @@
 [
   {
+    "version": "0626.26.0",
+    "updateKind": "major",
+    "title": "Inventory update",
+    "description": "Updated Inventory and PDF document documents.",
+    "summary": "Updated Inventory and PDF document documents.",
+    "details": [
+      "Covered inventory and pDF document documents.",
+      "Updated Inventory and PDF document documents.",
+      "Published as a larger app update because it included broader workflow changes.",
+      "The release time shown is when the version record was created."
+    ],
+    "areas": [
+      "Inventory",
+      "PDF document documents"
+    ],
+    "areaKeys": [
+      "inventory"
+    ],
+    "pushedAt": "2026-06-19T11:33:38.963Z"
+  },
+  {
     "version": "0626.25.0",
     "updateKind": "major",
     "title": "Debug tools update",

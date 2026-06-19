@@ -2,6 +2,20 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.26.0
+
+**GIT COMMIT MESSAGE**
+`feat(inventory): update Inventory and PDF documents`
+
+**PUSHED AT**
+2026-06-19T11:33:38.963Z
+
+**WHAT CHANGED**
+Update Inventory and PDF documents.
+
+**COMMITS IN THIS RELEASE**
+- `feat(inventory): update Inventory and PDF documents`
+
 ## 0626.25.0
 
 **GIT COMMIT MESSAGE**
