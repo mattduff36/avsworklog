@@ -32,6 +32,7 @@ import {
   getInventoryCheckStatus,
   getInventoryDueDate,
   isInventoryCheckExempt,
+  isInventoryUnknownLocation,
 } from '../utils';
 import {
   INVENTORY_RETIRE_REASONS,
@@ -87,15 +88,16 @@ function isNoLocationItem(item: InventoryItem): boolean {
 
 function renderLocationWithHint(item: InventoryItem) {
   const isUnassigned = !item.location_id;
+  const isMutedLocation = isUnassigned || isInventoryUnknownLocation(item.location);
   const locationName = item.location?.name || 'No location assigned';
   if (!isNoLocationItem(item) || !item.source_location_hint) {
-    return isUnassigned ? <span className="italic text-slate-400">{locationName}</span> : locationName;
+    return isMutedLocation ? <span className="italic text-slate-400">{locationName}</span> : locationName;
   }
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className={`cursor-help underline decoration-slate-500 decoration-dotted underline-offset-4 ${isUnassigned ? 'italic text-slate-400' : ''}`}>
+        <span className={`cursor-help underline decoration-slate-500 decoration-dotted underline-offset-4 ${isMutedLocation ? 'italic text-slate-400' : ''}`}>
           {locationName}
         </span>
       </TooltipTrigger>

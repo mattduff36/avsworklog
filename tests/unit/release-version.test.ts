@@ -7,6 +7,8 @@ import {
   formatReleaseLogEntry,
   formatReleaseVersion,
   getCurrentMmyy,
+  getRecentReleaseHistoryMonths,
+  getReleaseHistoryEntriesForMonth,
   parseConventionalCommit,
   parseCommitsFromMessages,
   prependReleaseLogEntry,
@@ -193,17 +195,63 @@ describe('release version logic', () => {
         version: '0526.2.1',
         updateKind: 'minor',
         title: 'Background services improvements',
-        description: 'Handle temporary background services lookup problems.',
+        description: 'Handled temporary background services lookup problems.',
+        summary: 'Handled temporary background services lookup problems.',
+        details: [
+          'Covered background services.',
+          'Handled temporary lookup problems.',
+          'Published as a smaller improvement release for fixes, maintenance, or supporting updates.',
+        ],
+        areas: ['Background services'],
         pushedAt: '2026-05-21T15:00:29Z',
       },
       {
         version: '0526.2.0',
         updateKind: 'major',
         title: 'Fleet update',
-        description: 'Update fleet workflow and background services.',
+        description: 'Updated fleet workflow and background services.',
+        summary: 'Updated fleet workflow and background services.',
+        details: [
+          'Covered fleet workflow and background services.',
+          'Updated fleet workflow.',
+          'Published as a larger app update because it included broader workflow changes.',
+          'The release time shown is when the version record was created.',
+        ],
+        areas: ['Fleet workflow', 'Background services'],
         pushedAt: '2026-05-21T14:00:29Z',
       },
     ]);
+  });
+
+  it('builds recent release month tabs and filters entries by month', () => {
+    const history = [
+      {
+        version: '0626.1.0',
+        updateKind: 'major' as const,
+        title: 'June update',
+        description: 'Updated June workflow.',
+        summary: 'Updated June workflow.',
+        details: ['Updated June workflow.'],
+        areas: ['June workflow'],
+        pushedAt: '2026-06-19T09:00:00Z',
+      },
+      {
+        version: '0526.2.0',
+        updateKind: 'major' as const,
+        title: 'May update',
+        description: 'Updated May workflow.',
+        summary: 'Updated May workflow.',
+        details: ['Updated May workflow.'],
+        areas: ['May workflow'],
+        pushedAt: '2026-05-21T14:00:29Z',
+      },
+    ];
+
+    expect(getRecentReleaseHistoryMonths(history, 2)).toEqual([
+      { key: '0626', label: 'June 2026' },
+      { key: '0526', label: 'May 2026' },
+    ]);
+    expect(getReleaseHistoryEntriesForMonth(history, '0526')).toEqual([history[1]]);
   });
 
   it('prepends newest log entry after preamble', () => {

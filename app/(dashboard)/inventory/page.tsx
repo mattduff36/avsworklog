@@ -22,7 +22,7 @@ import { InventoryLocationsPanel } from './components/InventoryLocationsPanel';
 import { InventoryRetireItemDialog } from './components/InventoryRetireItemDialog';
 import { InventoryTable } from './components/InventoryTable';
 import { MoveInventoryDialog } from './components/MoveInventoryDialog';
-import { checkIntervalMonthsToDays, getInventoryCheckStatus } from './utils';
+import { checkIntervalMonthsToDays, getInventoryCheckStatus, isInventoryUnknownLocation } from './utils';
 import type {
   FleetAssetOption,
   InventoryContext,
@@ -180,7 +180,7 @@ export default function InventoryPage() {
         if (status === 'overdue') acc.overdue += 1;
         if (status === 'due_soon') acc.dueSoon += 1;
         if (status === 'needs_check') acc.needsCheck += 1;
-        if (!item.location_id) acc.noLocation += 1;
+        if (isInventoryUnknownLocation(item.location)) acc.unknownLocation += 1;
         return acc;
       },
       {
@@ -188,7 +188,7 @@ export default function InventoryPage() {
         overdue: 0,
         dueSoon: 0,
         needsCheck: 0,
-        noLocation: 0,
+        unknownLocation: 0,
       }
     );
   }, [items]);
@@ -591,7 +591,7 @@ export default function InventoryPage() {
         <SummaryCard label="Overdue" value={summary.overdue} icon={<AlertTriangle className="h-5 w-5" />} tone="danger" />
         <SummaryCard label="Due Soon" value={summary.dueSoon} icon={<AlertTriangle className="h-5 w-5" />} tone="warning" />
         <SummaryCard label="Needs Check" value={summary.needsCheck} icon={<CheckCircle2 className="h-5 w-5" />} tone="info" />
-        <SummaryCard label="No Location" value={summary.noLocation} icon={<Truck className="h-5 w-5" />} />
+        <SummaryCard label="Unknown" value={summary.unknownLocation} icon={<Truck className="h-5 w-5" />} />
       </div>
 
       <Tabs

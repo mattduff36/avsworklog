@@ -47,13 +47,13 @@ import Link from 'next/link';
 import { MODULE_PAGES, getPageLabel, getPageUrl } from '@/lib/config/module-pages';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { forceAppRefresh } from '@/lib/client/force-app-refresh';
+import { ReleaseVersionLink } from '@/components/layout/ReleaseVersionLink';
 import {
   MAX_ERROR_REPORT_SCREENSHOT_SIZE_BYTES,
   MAX_ERROR_REPORT_SCREENSHOTS,
   getErrorReportScreenshots,
   isAllowedErrorReportScreenshot,
 } from '@/lib/utils/error-report-screenshots';
-import { getPublicReleaseVersionLabel } from '@/lib/config/release-version';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -626,13 +626,7 @@ export default function HelpPage() {
             <p className="text-muted-foreground">
               Find answers to common questions and submit suggestions
             </p>
-            <Link
-              href="/help/version-history"
-              aria-label="Open version history"
-              className="text-xs text-muted-foreground underline-offset-4 tabular-nums transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-avs-yellow focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:shrink-0"
-            >
-              {getPublicReleaseVersionLabel()}
-            </Link>
+            <ReleaseVersionLink className="sm:shrink-0" />
           </div>
         </div>
       </div>

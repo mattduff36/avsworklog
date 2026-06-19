@@ -197,7 +197,7 @@ function joinAreas(areas: string[]): string {
   if (areas.length === 0) return 'repository files';
   if (areas.length === 1) return areas[0];
   if (areas.length === 2) return `${areas[0]} and ${areas[1]}`;
-  return `${areas.slice(0, 2).join(', ')}, and ${areas.length - 2} more areas`;
+  return `${areas.slice(0, -1).join(', ')}, and ${areas[areas.length - 1]}`;
 }
 
 function getFallbackScope(changedFiles: string[]): string {

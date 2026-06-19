@@ -30,7 +30,15 @@ export interface ReleaseHistoryEntry {
   updateKind: ReleaseHistoryUpdateKind;
   title: string;
   description: string;
+  summary: string;
+  details: string[];
+  areas: string[];
   pushedAt: string | null;
+}
+
+export interface ReleaseHistoryMonthOption {
+  key: string;
+  label: string;
 }
 
 const CONVENTIONAL_COMMIT_PATTERN =
@@ -40,6 +48,7 @@ const MAJOR_TYPES = new Set(['feat']);
 const MINOR_TYPES = new Set(['fix', 'chore', 'docs', 'test', 'refactor', 'perf', 'style']);
 const SKIP_VERSION_MARKER = '[skip version]';
 const RELEASE_VERSION_HEADING_PATTERN = /^##\s+(\d{4}\.\d+\.\d+)\s*$/gmu;
+const DEFAULT_RELEASE_HISTORY_MONTH_LIMIT = 6;
 const RELEASE_LOG_LABELS = new Set([
   '**GIT COMMIT MESSAGE**',
   '**PUSHED AT**',
@@ -347,6 +356,122 @@ function ensureSentence(value: string): string {
   return /[.!?]$/u.test(trimmed) ? trimmed : `${trimmed}.`;
 }
 
+function lowerFirst(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  return trimmed.charAt(0).toLowerCase() + trimmed.slice(1);
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
+function formatFriendlyList(values: string[]): string {
+  const items = uniqueStrings(values);
+  if (items.length === 0) {
+    return '';
+  }
+
+  const lowered = items.map(lowerFirst);
+  if (lowered.length === 1) {
+    return lowered[0];
+  }
+
+  if (lowered.length === 2) {
+    return `${lowered[0]} and ${lowered[1]}`;
+  }
+
+  return `${lowered.slice(0, -1).join(', ')}, and ${lowered[lowered.length - 1]}`;
+}
+
+function makeFriendlyReleaseText(value: string): string {
+  return value
+    .replace(/\bAPI routes?\b/giu, 'background services')
+    .replace(/\bAPI\b/gu, 'background services')
+    .replace(/\bdatabase migrations?\b/giu, 'data storage')
+    .replace(/\brepository files?\b/giu, 'general app maintenance')
+    .replace(/\bPDF\b/giu, 'PDF document')
+    .replace(/\btransient\b/giu, 'temporary')
+    .replace(/\binsert races\b/giu, 'timing issues')
+    .replace(/\blookup failures\b/giu, 'lookup problems')
+    .replace(/\s+/gu, ' ')
+    .trim();
+}
+
+function makePastTenseOpening(value: string): string {
+  return value.replace(/^(add|fix|handle|improve|normalize|publish|update)\b/iu, (match) => {
+    const normalized = match.toLowerCase();
+    const replacements: Record<string, string> = {
+      add: 'Added',
+      fix: 'Fixed',
+      handle: 'Handled',
+      improve: 'Improved',
+      normalize: 'Normalized',
+      publish: 'Published',
+      update: 'Updated',
+    };
+
+    return replacements[normalized] ?? sentenceCase(match);
+  });
+}
+
+function stripVagueAreaCount(value: string): string {
+  return value
+    .replace(/,\s*and\s+\d+\s+more areas?\b/giu, '')
+    .replace(/\s+and\s+\d+\s+more areas?\b/giu, '')
+    .replace(/\s+/gu, ' ')
+    .trim();
+}
+
+function normalizeAreaLabel(value: string): string {
+  const trimmed = stripVagueAreaCount(value)
+    .replace(/[.!?]$/u, '')
+    .replace(/^(add|added|fix|fixed|handle|handled|improve|improved|normalize|normalized|publish|published|update|updated)\s+/iu, '')
+    .trim();
+
+  if (!trimmed || /^\d+\s+more areas?$/iu.test(trimmed)) {
+    return '';
+  }
+
+  return sentenceCase(trimmed);
+}
+
+function extractAreasFromText(value: string): string[] {
+  const friendlyText = makeFriendlyReleaseText(value);
+  const hasAreaSeparators = /,|\s+and\s+|\bmore areas?\b/iu.test(friendlyText);
+  const startsWithAreaVerb = /^(add|added|improve|improved|update|updated)\s+/iu.test(friendlyText);
+  if (!hasAreaSeparators && !startsWithAreaVerb) {
+    return [];
+  }
+
+  const withoutPrefix = friendlyText
+    .replace(/[.!?]$/u, '')
+    .replace(/^(add|added|fix|fixed|handle|handled|improve|improved|normalize|normalized|publish|published|update|updated)\s+/iu, '')
+    .trim();
+
+  return uniqueStrings(
+    stripVagueAreaCount(withoutPrefix)
+      .split(/\s*,\s*|\s+and\s+/u)
+      .map(normalizeAreaLabel)
+      .filter((area) => area.length > 0 && area.length <= 80)
+  );
+}
+
+function removeRedundantAreas(areas: string[]): string[] {
+  const uniqueAreas = uniqueStrings(areas);
+
+  return uniqueAreas.filter((area) => {
+    const normalizedArea = area.toLowerCase();
+    return !uniqueAreas.some((otherArea) => {
+      const normalizedOther = otherArea.toLowerCase();
+      return normalizedArea !== normalizedOther && normalizedOther.includes(normalizedArea);
+    });
+  });
+}
+
 function getFriendlyScopeLabel(scope: string | null): string {
   if (!scope) {
     return 'App';
@@ -392,19 +517,72 @@ function buildReleaseHistoryTitle(entry: ParsedReleaseLogEntry): string {
   return `${scopeLabel} maintenance update`;
 }
 
-function buildFriendlyReleaseDescription(entry: ParsedReleaseLogEntry): string {
-  const rawDescription = entry.whatChanged || buildWhatChangedSummary(parseCommitsFromMessages(entry.commitMessages));
-  const friendlyDescription = rawDescription
-    .replace(/\bAPI routes?\b/giu, 'background services')
-    .replace(/\bAPI\b/gu, 'background services')
-    .replace(/\bdatabase migrations?\b/giu, 'data storage updates')
-    .replace(/\brepository files?\b/giu, 'general app maintenance')
-    .replace(/\bPDF\b/giu, 'PDF document')
-    .replace(/\btransient\b/giu, 'temporary')
-    .replace(/\binsert races\b/giu, 'timing issues')
-    .replace(/\blookup failures\b/giu, 'lookup problems');
+function buildReleaseHistoryAreas(entry: ParsedReleaseLogEntry, commits: ParsedCommit[]): string[] {
+  const scopedAreas = commits
+    .map((commit) => getFriendlyScopeLabel(commit.scope))
+    .filter((area) => area !== 'App');
+  const describedAreas = extractAreasFromText(entry.whatChanged);
 
-  return ensureSentence(sentenceCase(friendlyDescription));
+  return removeRedundantAreas([...describedAreas, ...scopedAreas]);
+}
+
+function buildFriendlyReleaseSummary(entry: ParsedReleaseLogEntry, areas: string[]): string {
+  const rawDescription = entry.whatChanged || buildWhatChangedSummary(parseCommitsFromMessages(entry.commitMessages));
+  const friendlyDescription = makeFriendlyReleaseText(rawDescription);
+  const hasVagueAreaCount = /\b\d+\s+more areas?\b/iu.test(friendlyDescription);
+
+  if (areas.length > 0 && hasVagueAreaCount) {
+    return `Updated ${formatFriendlyList(areas)}. Related app improvements were included in the same release.`;
+  }
+
+  return ensureSentence(makePastTenseOpening(sentenceCase(stripVagueAreaCount(friendlyDescription))));
+}
+
+function buildFriendlyCommitDetail(commit: ParsedCommit): string {
+  const friendlySubject = stripVagueAreaCount(makeFriendlyReleaseText(commit.subject));
+  return ensureSentence(makePastTenseOpening(sentenceCase(friendlySubject)));
+}
+
+function buildReleaseHistoryDetails(
+  entry: ParsedReleaseLogEntry,
+  commits: ParsedCommit[],
+  areas: string[],
+  updateKind: ReleaseHistoryUpdateKind
+): string[] {
+  const areaDetail = areas.length > 0 ? `Covered ${formatFriendlyList(areas)}.` : '';
+  const commitDetails = commits.map(buildFriendlyCommitDetail);
+  const releaseKindDetail =
+    updateKind === 'major'
+      ? 'Published as a larger app update because it included broader workflow changes.'
+      : 'Published as a smaller improvement release for fixes, maintenance, or supporting updates.';
+
+  return uniqueStrings([
+    areaDetail,
+    ...commitDetails,
+    releaseKindDetail,
+    entry.pushedAt ? 'The release time shown is when the version record was created.' : '',
+  ]);
+}
+
+function buildReleaseHistoryEntry(
+  entry: ParsedReleaseLogEntry,
+  timestampLookup: Record<string, string | null | undefined>
+): ReleaseHistoryEntry {
+  const commits = parseCommitsFromMessages(entry.commitMessages);
+  const updateKind = getReleaseHistoryUpdateKind(entry.version);
+  const areas = buildReleaseHistoryAreas(entry, commits);
+  const summary = buildFriendlyReleaseSummary(entry, areas);
+
+  return {
+    version: entry.version,
+    updateKind,
+    title: buildReleaseHistoryTitle(entry),
+    description: summary,
+    summary,
+    details: buildReleaseHistoryDetails(entry, commits, areas, updateKind),
+    areas,
+    pushedAt: entry.pushedAt ?? timestampLookup[entry.version] ?? null,
+  };
 }
 
 export function parseReleaseLogEntries(content: string): ParsedReleaseLogEntry[] {
@@ -429,13 +607,71 @@ export function buildReleaseHistoryEntries(
   releaseLogContent: string,
   timestampLookup: Record<string, string | null | undefined> = {}
 ): ReleaseHistoryEntry[] {
-  return parseReleaseLogEntries(releaseLogContent).map((entry) => ({
-    version: entry.version,
-    updateKind: getReleaseHistoryUpdateKind(entry.version),
-    title: buildReleaseHistoryTitle(entry),
-    description: buildFriendlyReleaseDescription(entry),
-    pushedAt: entry.pushedAt ?? timestampLookup[entry.version] ?? null,
-  }));
+  return parseReleaseLogEntries(releaseLogContent).map((entry) => buildReleaseHistoryEntry(entry, timestampLookup));
+}
+
+export function getReleaseHistoryMonthKey(version: string): string {
+  return version.split('.')[0] ?? '';
+}
+
+function parseReleaseHistoryMonthKey(key: string): { month: number; year: number } | null {
+  if (!/^\d{4}$/u.test(key)) {
+    return null;
+  }
+
+  const month = Number(key.slice(0, 2));
+  const year = 2000 + Number(key.slice(2, 4));
+  if (!Number.isInteger(month) || month < 1 || month > 12) {
+    return null;
+  }
+
+  return { month, year };
+}
+
+function formatReleaseHistoryMonthKey(date: Date): string {
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const year = String(date.getUTCFullYear()).slice(-2);
+  return `${month}${year}`;
+}
+
+export function formatReleaseHistoryMonthLabel(key: string): string {
+  const parsed = parseReleaseHistoryMonthKey(key);
+  if (!parsed) {
+    return 'Unknown month';
+  }
+
+  return new Intl.DateTimeFormat('en-GB', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(parsed.year, parsed.month - 1, 1)));
+}
+
+export function getRecentReleaseHistoryMonths(
+  entries: ReleaseHistoryEntry[],
+  limit = DEFAULT_RELEASE_HISTORY_MONTH_LIMIT
+): ReleaseHistoryMonthOption[] {
+  const latestKey = entries[0] ? getReleaseHistoryMonthKey(entries[0].version) : getCurrentMmyy(new Date());
+  const parsed = parseReleaseHistoryMonthKey(latestKey) ?? parseReleaseHistoryMonthKey(getCurrentMmyy(new Date()));
+  const startDate = parsed
+    ? new Date(Date.UTC(parsed.year, parsed.month - 1, 1))
+    : new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1));
+
+  return Array.from({ length: limit }, (_, index) => {
+    const date = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth() - index, 1));
+    const key = formatReleaseHistoryMonthKey(date);
+    return {
+      key,
+      label: formatReleaseHistoryMonthLabel(key),
+    };
+  });
+}
+
+export function getReleaseHistoryEntriesForMonth(
+  entries: ReleaseHistoryEntry[],
+  monthKey: string
+): ReleaseHistoryEntry[] {
+  return entries.filter((entry) => getReleaseHistoryMonthKey(entry.version) === monthKey);
 }
 
 export const RELEASE_LOG_PATH = 'docs_private/release-log.md';

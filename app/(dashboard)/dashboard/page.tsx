@@ -9,6 +9,7 @@ import { SectionLoader } from '@/components/ui/section-loader';
 import { PageLoader } from '@/components/ui/page-loader';
 import { AppPageShell } from '@/components/layout/AppPageShell';
 import { MobileTextSizeDialog } from '@/components/layout/MobileTextSizeDialog';
+import { ReleaseVersionLink } from '@/components/layout/ReleaseVersionLink';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -29,7 +30,6 @@ import { usePermissionSnapshot } from '@/lib/hooks/usePermissionSnapshot';
 import { useRamsAssignmentSummary } from '@/lib/hooks/useNavMetrics';
 import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError, createStatusError } from '@/lib/utils/http-error';
 import { canAccessDebugConsole } from '@/lib/utils/debug-access';
-import { getPublicReleaseVersionLabel } from '@/lib/config/release-version';
 
 type PendingApprovalCount = {
   type: 'timesheets' | 'absences';
@@ -462,7 +462,7 @@ export default function DashboardPage() {
       {!tabletModeEnabled && !isDashboardLoading && (
         <div className="bg-slate-900 rounded-lg p-4 md:p-5 border border-slate-700 relative overflow-hidden">
           {/* Actual Content */}
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-3 md:flex-row md:items-stretch md:justify-between">
             <div className="flex items-center gap-4 min-w-0">
               <Link
                 href="/profile"
@@ -498,9 +498,7 @@ export default function DashboardPage() {
                 <p className="mt-1 text-slate-400">
                   {headerSubtitle}
                 </p>
-                <p className="mt-2 text-xs text-muted-foreground tabular-nums md:hidden">
-                  {getPublicReleaseVersionLabel()}
-                </p>
+                <ReleaseVersionLink className="mt-2 inline-flex md:hidden" />
               </div>
               <Button
                 type="button"
@@ -515,10 +513,8 @@ export default function DashboardPage() {
                 </span>
               </Button>
             </div>
-            <div className="hidden md:flex items-center justify-end">
-              <p className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                {getPublicReleaseVersionLabel()}
-              </p>
+            <div className="hidden md:flex items-end justify-end">
+              <ReleaseVersionLink className="shrink-0" />
             </div>
           </div>
         </div>
