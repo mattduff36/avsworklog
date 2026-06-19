@@ -2677,7 +2677,7 @@ export type Database = {
           item_number_normalized: string
           name: string
           category: string
-          location_id: string | null
+          location_id: string
           last_checked_at: string | null
           status: 'active' | 'retired'
           source: string | null
@@ -2697,7 +2697,7 @@ export type Database = {
           item_number_normalized: string
           name: string
           category?: string
-          location_id?: string | null
+          location_id: string
           last_checked_at?: string | null
           status?: 'active' | 'retired'
           source?: string | null
@@ -2717,7 +2717,7 @@ export type Database = {
           item_number_normalized?: string
           name?: string
           category?: string
-          location_id?: string | null
+          location_id?: string
           last_checked_at?: string | null
           status?: 'active' | 'retired'
           source?: string | null

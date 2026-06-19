@@ -321,7 +321,7 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as InventoryItemRequestBody;
     const itemNumber = body.item_number?.trim();
     const name = body.name?.trim();
-    const locationId = body.location_id?.trim() || null;
+    const locationId = body.location_id?.trim();
 
     if (!itemNumber) {
       return NextResponse.json({ error: 'Item number is required' }, { status: 400 });
@@ -329,7 +329,22 @@ export async function POST(request: NextRequest) {
     if (!name) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
     }
-    const { data, error } = await createAdminClient()
+    if (!locationId) {
+      return NextResponse.json({ error: 'Location is required' }, { status: 400 });
+    }
+
+    const admin = createAdminClient();
+    const { data: location, error: locationError } = await admin
+      .from('inventory_locations')
+      .select('id, is_active')
+      .eq('id', locationId)
+      .single();
+
+    if (locationError || !location?.is_active) {
+      return NextResponse.json({ error: 'Location not found' }, { status: 404 });
+    }
+
+    const { data, error } = await admin
       .from('inventory_items')
       .insert({
         item_number: itemNumber,

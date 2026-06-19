@@ -52,7 +52,7 @@ export interface InventoryItem {
   item_number_normalized: string;
   name: string;
   category: InventoryCategory;
-  location_id: string | null;
+  location_id: string;
   location?: InventoryLocation | null;
   last_checked_at: string | null;
   check_interval_days: number | null;

@@ -201,16 +201,15 @@ export function InventoryItemDialog({
               </div>
 
               <div className="space-y-2">
-                <Label>Location</Label>
+                <Label>Location *</Label>
                 <Select
-                  value={form.location_id || 'unassigned'}
-                  onValueChange={(value) => updateField('location_id', value === 'unassigned' ? '' : value)}
+                  value={form.location_id || undefined}
+                  onValueChange={(value) => updateField('location_id', value)}
                 >
                   <SelectTrigger className="bg-slate-800 border-slate-600">
                     <SelectValue placeholder="Select location" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="unassigned" className="text-muted-foreground">No location assigned</SelectItem>
                     {locations.map((location) => (
                       <SelectItem key={location.id} value={location.id}>
                         {formatInventoryLocationOptionLabel(location)}
@@ -264,7 +263,7 @@ export function InventoryItemDialog({
             <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
               Cancel
             </Button>
-            <Button type="submit" className="bg-inventory text-white hover:bg-inventory-dark" disabled={saving || isBlockedCategoryExit}>
+            <Button type="submit" className="bg-inventory text-white hover:bg-inventory-dark" disabled={saving || isBlockedCategoryExit || !form.location_id}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isEditing ? 'Save Changes' : 'Add Item'}
             </Button>

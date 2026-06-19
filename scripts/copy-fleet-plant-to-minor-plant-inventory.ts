@@ -289,6 +289,18 @@ async function main() {
           .filter((row) => row.source === 'fleet_plant' && row.source_reference)
           .map((row) => row.source_reference)
       );
+      const { rows: unknownLocationRows } = await client.query<{ id: string }>(`
+        SELECT id
+        FROM public.inventory_locations
+        WHERE LOWER(BTRIM(name)) = 'unknown'
+          AND is_active = TRUE
+        ORDER BY created_at
+        LIMIT 1
+      `);
+      const unknownLocationId = unknownLocationRows[0]?.id;
+      if (!unknownLocationId) {
+        throw new Error('Unknown inventory location is required before copying Fleet Plant into inventory');
+      }
 
       for (const plant of eligible) {
         const displayName = buildDisplayName(plant);
@@ -323,9 +335,9 @@ async function main() {
             source,
             source_reference
           )
-          VALUES ($1, $2, $3, 'minor_plant', NULL, NULL, NULL, 'active', 'fleet_plant', $4)
+          VALUES ($1, $2, $3, 'minor_plant', $5, NULL, NULL, 'active', 'fleet_plant', $4)
           RETURNING id
-        `, [plant.plant_id, normalizedItemNumber, displayName, plant.id]);
+        `, [plant.plant_id, normalizedItemNumber, displayName, plant.id, unknownLocationId]);
 
         const inventoryItemId = insertedItem.rows[0]?.id;
         if (!inventoryItemId) {

@@ -109,7 +109,24 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
       update.category = category;
     }
-    if (body.location_id !== undefined) update.location_id = body.location_id?.trim() || null;
+    if (body.location_id !== undefined) {
+      const locationId = body.location_id?.trim() || '';
+      if (!locationId) {
+        return NextResponse.json({ error: 'Location is required' }, { status: 400 });
+      }
+
+      const { data: location, error: locationError } = await admin
+        .from('inventory_locations')
+        .select('id, is_active')
+        .eq('id', locationId)
+        .single();
+
+      if (locationError || !location?.is_active) {
+        return NextResponse.json({ error: 'Location not found' }, { status: 404 });
+      }
+
+      update.location_id = locationId;
+    }
     if (body.last_checked_at !== undefined) update.last_checked_at = cleanOptionalDate(body.last_checked_at);
     if (body.check_interval_days !== undefined) {
       update.check_interval_days = body.check_interval_days || null;

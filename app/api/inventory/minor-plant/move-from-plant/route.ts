@@ -88,6 +88,19 @@ export async function POST(request: NextRequest) {
       .filter((plantId) => !foundIds.has(plantId))
       .map((plantId) => ({ id: plantId, reason: 'Plant asset was not found or is not active' }));
 
+    const { rows: unknownLocationRows } = await client.query<{ id: string }>(`
+      SELECT id
+      FROM public.inventory_locations
+      WHERE LOWER(BTRIM(name)) = 'unknown'
+        AND is_active = TRUE
+      ORDER BY created_at
+      LIMIT 1
+    `);
+    const unknownLocationId = unknownLocationRows[0]?.id;
+    if (!unknownLocationId) {
+      throw new Error('Unknown inventory location is required before moving Plant assets to inventory');
+    }
+
     const moved: Array<{ id: string; plant_id: string; inventory_item_id: string }> = [];
 
     for (const plant of plants) {
@@ -108,10 +121,11 @@ export async function POST(request: NextRequest) {
           SET category = 'minor_plant',
               status = 'active',
               name = $2,
+              location_id = COALESCE(location_id, $4),
               updated_by = $3,
               updated_at = NOW()
           WHERE id = $1
-        `, [inventoryItemId, buildDisplayName(plant), access.userId]);
+        `, [inventoryItemId, buildDisplayName(plant), access.userId, unknownLocationId]);
       } else {
         const conflict = await client.query<{ id: string }>(`
           SELECT id
@@ -144,9 +158,9 @@ export async function POST(request: NextRequest) {
             created_by,
             updated_by
           )
-          VALUES ($1, $2, $3, 'minor_plant', NULL, NULL, NULL, 'active', 'fleet_plant', $4, $5, $5)
+          VALUES ($1, $2, $3, 'minor_plant', $6, NULL, NULL, 'active', 'fleet_plant', $4, $5, $5)
           RETURNING id
-        `, [plant.plant_id, normalizedItemNumber, buildDisplayName(plant), plant.id, access.userId]);
+        `, [plant.plant_id, normalizedItemNumber, buildDisplayName(plant), plant.id, access.userId, unknownLocationId]);
         inventoryItemId = insertedItem.rows[0]?.id;
       }
 
