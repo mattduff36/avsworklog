@@ -29,6 +29,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { JobCodePicker } from '@/components/timesheets/JobCodeFields';
 import {
   Table,
   TableBody,
@@ -37,6 +38,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { useTimesheetJobCodeOptions, type TimesheetJobCodeOption } from '@/lib/client/timesheet-job-codes';
 
 interface LegacyJobCodeResponse {
   success?: boolean;
@@ -106,6 +108,12 @@ interface TimesheetSearchResponse {
   success?: boolean;
   error?: string;
   timesheets?: JobCodeCorrectionTimesheet[];
+}
+
+interface StoredJobCodesResponse {
+  success?: boolean;
+  error?: string;
+  job_codes?: TimesheetJobCodeOption[];
 }
 
 type CorrectionScope = 'batch' | 'individual';
@@ -240,9 +248,14 @@ function CorrectionPreviewSummary({ title, preview, result }: CorrectionPreviewS
 }
 
 export function LegacyJobCodesDebugPanel() {
+  const {
+    options: replacementJobCodeOptions,
+    isLoading: replacementJobCodeOptionsLoading,
+    error: replacementJobCodeOptionsError,
+  } = useTimesheetJobCodeOptions();
   const [batchFromCode, setBatchFromCode] = useState('');
   const [batchToCode, setBatchToCode] = useState('');
-  const [deleteOldLegacyQuote, setDeleteOldLegacyQuote] = useState(true);
+  const [deleteOldLegacyQuote, setDeleteOldLegacyQuote] = useState(false);
   const [batchPreview, setBatchPreview] = useState<JobCodeCorrectionPreview | null>(null);
   const [batchResult, setBatchResult] = useState<JobCodeCorrectionApplyResult | null>(null);
   const [batchLoading, setBatchLoading] = useState(false);
@@ -256,6 +269,9 @@ export function LegacyJobCodesDebugPanel() {
   const [individualPreview, setIndividualPreview] = useState<JobCodeCorrectionPreview | null>(null);
   const [individualResult, setIndividualResult] = useState<JobCodeCorrectionApplyResult | null>(null);
   const [individualLoading, setIndividualLoading] = useState(false);
+  const [storedJobCodeSearch, setStoredJobCodeSearch] = useState('');
+  const [storedJobCodeOptions, setStoredJobCodeOptions] = useState<TimesheetJobCodeOption[]>([]);
+  const [storedJobCodeOptionsLoading, setStoredJobCodeOptionsLoading] = useState(false);
 
   const [confirmScope, setConfirmScope] = useState<CorrectionScope | null>(null);
 
@@ -281,6 +297,54 @@ export function LegacyJobCodesDebugPanel() {
     setIndividualPreview(null);
     setIndividualResult(null);
   }, [individualFromCode, individualToCode, selectedTimesheetIds]);
+
+  useEffect(() => {
+    if (replacementJobCodeOptionsError) {
+      toast.error(replacementJobCodeOptionsError);
+    }
+  }, [replacementJobCodeOptionsError]);
+
+  useEffect(() => {
+    const search = storedJobCodeSearch.trim();
+    if (search.length < 3) {
+      setStoredJobCodeOptions([]);
+      setStoredJobCodeOptionsLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      setStoredJobCodeOptionsLoading(true);
+
+      try {
+        const params = new URLSearchParams({
+          mode: 'stored-codes',
+          q: search,
+          limit: '100',
+        });
+        const response = await fetch(`/api/debug/job-code-corrections?${params.toString()}`, {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        const payload = await response.json().catch(() => null) as StoredJobCodesResponse | null;
+        if (!response.ok || !payload?.success) {
+          throw new Error(payload?.error || 'Unable to search stored job codes.');
+        }
+
+        setStoredJobCodeOptions(payload.job_codes || []);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        toast.error(error instanceof Error ? error.message : 'Unable to search stored job codes.');
+      } finally {
+        setStoredJobCodeOptionsLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [storedJobCodeSearch]);
 
   useEffect(() => {
     const search = timesheetSearch.trim();
@@ -473,17 +537,6 @@ export function LegacyJobCodesDebugPanel() {
             Preview and apply destructive database changes for incorrect job codes across timesheets and the legacy quotes archive.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="flex gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-100">
-            <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0" />
-            <div>
-              <p className="font-semibold">Destructive DB change feature</p>
-              <p className="mt-1 text-red-100/85">
-                Always generate a preview first. Applying a correction updates stored timesheet job codes and can rename or delete legacy quote archive rows.
-              </p>
-            </div>
-          </div>
-        </CardContent>
       </Card>
 
       <Card className="border-border">
@@ -499,33 +552,60 @@ export function LegacyJobCodesDebugPanel() {
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-[220px_220px_1fr]">
             <div className="space-y-2">
-              <Label htmlFor="batch-from-code">Change all job codes from</Label>
-              <Input
-                id="batch-from-code"
+              <Label>Change all job codes from</Label>
+              <JobCodePicker
                 value={batchFromCode}
-                onChange={(event) => setBatchFromCode(normalizeDisplayCode(event.target.value))}
-                placeholder="5388-LC"
-                className="uppercase"
+                onChange={setBatchFromCode}
+                placeholder="Select stored code"
+                inputClassName="h-10 justify-start border-slate-700 bg-slate-900/70 font-mono uppercase hover:bg-slate-900"
+                jobCodeOptions={storedJobCodeOptions}
+                jobCodeOptionsLoading={storedJobCodeOptionsLoading}
+                onSearchChange={setStoredJobCodeSearch}
+                serverSideFiltering
+                ariaLabel={batchFromCode ? `Selected source job code ${batchFromCode}` : 'Select source job code for batch change'}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="batch-to-code">To</Label>
-              <Input
-                id="batch-to-code"
+              <Label>To</Label>
+              <JobCodePicker
                 value={batchToCode}
-                onChange={(event) => setBatchToCode(normalizeDisplayCode(event.target.value))}
-                placeholder="60001-MD"
-                className="uppercase"
+                onChange={setBatchToCode}
+                placeholder="Select valid code"
+                inputClassName="h-10 justify-start border-emerald-500/30 bg-emerald-500/10 font-mono uppercase text-emerald-50 hover:bg-emerald-500/15"
+                jobCodeOptions={replacementJobCodeOptions}
+                jobCodeOptionsLoading={replacementJobCodeOptionsLoading}
+                ariaLabel={batchToCode ? `Selected replacement job code ${batchToCode}` : 'Select replacement job code for batch change'}
               />
             </div>
             <div className="flex items-end">
-              <label className="flex min-h-10 items-center gap-3 rounded-lg border border-slate-700/70 bg-slate-900/60 px-3 py-2 text-sm text-slate-200">
-                <Checkbox
-                  checked={deleteOldLegacyQuote}
-                  onCheckedChange={(checked) => setDeleteOldLegacyQuote(checked === true)}
-                />
-                Delete old legacy quote row if the replacement already exists
-              </label>
+              <button
+                type="button"
+                aria-pressed={deleteOldLegacyQuote}
+                onClick={() => setDeleteOldLegacyQuote((current) => !current)}
+                className={[
+                  'flex min-h-16 w-full items-start gap-3 rounded-xl border px-4 py-3 text-left text-sm transition-all',
+                  deleteOldLegacyQuote
+                    ? 'border-red-500/70 bg-red-500/15 text-red-50 shadow-[0_0_0_1px_rgba(239,68,68,0.25)] hover:bg-red-500/20'
+                    : 'border-slate-700/70 bg-slate-900/60 text-slate-300 hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-100',
+                ].join(' ')}
+              >
+                <span className={[
+                  'mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border',
+                  deleteOldLegacyQuote ? 'border-red-300 bg-red-500 text-white' : 'border-slate-500 bg-slate-950',
+                ].join(' ')}>
+                  {deleteOldLegacyQuote ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}
+                </span>
+                <span>
+                  <span className="block font-semibold">
+                    Delete old legacy quote row if the replacement already exists
+                  </span>
+                  <span className={deleteOldLegacyQuote ? 'mt-1 block text-xs text-red-100/80' : 'mt-1 block text-xs text-slate-400'}>
+                    {deleteOldLegacyQuote
+                      ? 'Enabled: old archive rows can be deleted during apply.'
+                      : 'Off by default. Click to enable this destructive archive cleanup.'}
+                  </span>
+                </span>
+              </button>
             </div>
           </div>
 
@@ -535,6 +615,7 @@ export function LegacyJobCodesDebugPanel() {
               variant="outline"
               onClick={() => void requestCorrectionPreview('batch')}
               disabled={batchLoading}
+              className="border-blue-500/40 bg-blue-500/10 text-blue-100 hover:bg-blue-500/20 hover:text-blue-50"
             >
               {batchLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
               Preview Batch Change
@@ -544,6 +625,7 @@ export function LegacyJobCodesDebugPanel() {
               variant="destructive"
               onClick={() => setConfirmScope('batch')}
               disabled={batchLoading || getTotalChangeCount(batchPreview) === 0}
+              className="bg-red-600 text-white shadow-lg shadow-red-950/20 hover:bg-red-700 disabled:shadow-none"
             >
               <AlertTriangle className="mr-2 h-4 w-4" />
               Apply Batch Change
@@ -567,23 +649,29 @@ export function LegacyJobCodesDebugPanel() {
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-[220px_220px_1fr]">
             <div className="space-y-2">
-              <Label htmlFor="individual-from-code">Change from</Label>
-              <Input
-                id="individual-from-code"
+              <Label>Change from</Label>
+              <JobCodePicker
                 value={individualFromCode}
-                onChange={(event) => setIndividualFromCode(normalizeDisplayCode(event.target.value))}
-                placeholder="5388-LC"
-                className="uppercase"
+                onChange={setIndividualFromCode}
+                placeholder="Select stored code"
+                inputClassName="h-10 justify-start border-slate-700 bg-slate-900/70 font-mono uppercase hover:bg-slate-900"
+                jobCodeOptions={storedJobCodeOptions}
+                jobCodeOptionsLoading={storedJobCodeOptionsLoading}
+                onSearchChange={setStoredJobCodeSearch}
+                serverSideFiltering
+                ariaLabel={individualFromCode ? `Selected source job code ${individualFromCode}` : 'Select source job code for individual change'}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="individual-to-code">To</Label>
-              <Input
-                id="individual-to-code"
+              <Label>To</Label>
+              <JobCodePicker
                 value={individualToCode}
-                onChange={(event) => setIndividualToCode(normalizeDisplayCode(event.target.value))}
-                placeholder="60001-MD"
-                className="uppercase"
+                onChange={setIndividualToCode}
+                placeholder="Select valid code"
+                inputClassName="h-10 justify-start border-emerald-500/30 bg-emerald-500/10 font-mono uppercase text-emerald-50 hover:bg-emerald-500/15"
+                jobCodeOptions={replacementJobCodeOptions}
+                jobCodeOptionsLoading={replacementJobCodeOptionsLoading}
+                ariaLabel={individualToCode ? `Selected replacement job code ${individualToCode}` : 'Select replacement job code for individual change'}
               />
             </div>
             <div className="space-y-2">
@@ -713,6 +801,7 @@ export function LegacyJobCodesDebugPanel() {
               variant="outline"
               onClick={() => void requestCorrectionPreview('individual')}
               disabled={individualLoading || selectedTimesheetIds.length === 0}
+              className="border-blue-500/40 bg-blue-500/10 text-blue-100 hover:bg-blue-500/20 hover:text-blue-50"
             >
               {individualLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
               Preview Individual Change
@@ -722,6 +811,7 @@ export function LegacyJobCodesDebugPanel() {
               variant="destructive"
               onClick={() => setConfirmScope('individual')}
               disabled={individualLoading || getTotalChangeCount(individualPreview) === 0}
+              className="bg-red-600 text-white shadow-lg shadow-red-950/20 hover:bg-red-700 disabled:shadow-none"
             >
               <AlertTriangle className="mr-2 h-4 w-4" />
               Apply Individual Change

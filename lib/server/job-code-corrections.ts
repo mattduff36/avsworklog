@@ -70,6 +70,14 @@ export interface JobCodeTimesheetSearchResult extends JobCodeCorrectionTimesheet
   }>;
 }
 
+export interface JobCodeCorrectionStoredCodeOption {
+  value: string;
+  label: string;
+  customerName: string | null;
+  quoteTitle: string | null;
+  source: 'timesheet' | 'legacy_quote';
+}
+
 interface ProfileRelation {
   full_name?: string | null;
   employee_id?: string | null;
@@ -82,6 +90,12 @@ interface TimesheetRow {
   week_ending: string;
   status: string | null;
   profile?: ProfileRelation | ProfileRelation[] | null;
+}
+
+interface StoredJobCodeCount {
+  code: string;
+  timesheetRows: number;
+  legacyQuoteRows: number;
 }
 
 export interface TimesheetEntryRow {
@@ -129,6 +143,14 @@ function throwIfSupabaseError(error: unknown): asserts error is null | undefined
 
 function uniqueValues(values: Array<string | null | undefined>): string[] {
   return Array.from(new Set(values.filter((value): value is string => Boolean(value))));
+}
+
+function uniqueSearchTerms(query: string): string[] {
+  return uniqueValues([
+    query.trim(),
+    normalizeCatalogJobCode(query),
+    query.replace(/\s+/g, '').toUpperCase(),
+  ]).filter((term) => term.length >= 3);
 }
 
 function chunkValues<T>(values: T[], size = MUTATION_CHUNK_SIZE): T[][] {
@@ -395,6 +417,119 @@ async function fetchCorrectionRows(
     targetLegacyRows,
     affectedTimesheets,
   };
+}
+
+function addStoredCodeCount(
+  counts: Map<string, StoredJobCodeCount>,
+  value: string | null | undefined,
+  source: 'timesheet' | 'legacy_quote'
+) {
+  const code = normalizeCatalogJobCode(value || '');
+  if (!code) return;
+
+  const current = counts.get(code) || {
+    code,
+    timesheetRows: 0,
+    legacyQuoteRows: 0,
+  };
+
+  if (source === 'timesheet') current.timesheetRows += 1;
+  if (source === 'legacy_quote') current.legacyQuoteRows += 1;
+  counts.set(code, current);
+}
+
+function formatStoredCodeSource(count: StoredJobCodeCount): string {
+  const sources: string[] = [];
+  if (count.timesheetRows > 0) sources.push(`${count.timesheetRows} timesheet row(s)`);
+  if (count.legacyQuoteRows > 0) sources.push(`${count.legacyQuoteRows} legacy quote row(s)`);
+  return sources.join(', ');
+}
+
+function mapStoredCodeCountToOption(count: StoredJobCodeCount): JobCodeCorrectionStoredCodeOption {
+  const hasTimesheetRows = count.timesheetRows > 0;
+  const hasLegacyRows = count.legacyQuoteRows > 0;
+
+  return {
+    value: count.code,
+    label: count.code,
+    customerName: hasTimesheetRows && hasLegacyRows
+      ? 'Stored in timesheets and legacy quotes'
+      : hasTimesheetRows
+        ? 'Stored in timesheets'
+        : 'Stored in legacy quotes',
+    quoteTitle: formatStoredCodeSource(count),
+    source: hasTimesheetRows ? 'timesheet' : 'legacy_quote',
+  };
+}
+
+export async function searchStoredJobCodeOptions(input: {
+  query: string;
+  limit?: number;
+}, admin: AdminClient = createAdminClient()): Promise<JobCodeCorrectionStoredCodeOption[]> {
+  const query = input.query.replace(/\s+/g, ' ').trim();
+  if (query.length < 3) return [];
+
+  const counts = new Map<string, StoredJobCodeCount>();
+  const searchTerms = uniqueSearchTerms(query);
+  const limit = Math.min(Math.max(input.limit || 50, 1), 100);
+
+  for (const term of searchTerms) {
+    const [childRows, scalarRows, legacyRows] = await Promise.all([
+      fetchAllRows<Pick<TimesheetEntryJobCodeRow, 'job_number'>>((from, to) =>
+        admin
+          .from('timesheet_entry_job_codes')
+          .select('job_number')
+          .ilike('job_number', `%${term}%`)
+          .range(from, to)
+      ),
+      fetchAllRows<Pick<TimesheetEntryRow, 'job_number'>>((from, to) =>
+        admin
+          .from('timesheet_entries')
+          .select('job_number')
+          .ilike('job_number', `%${term}%`)
+          .range(from, to)
+      ),
+      fetchAllRows<Pick<LegacyQuoteRow, 'quote_reference'>>((from, to) =>
+        admin
+          .from('legacy_quotes')
+          .select('quote_reference')
+          .ilike('quote_reference', `%${term}%`)
+          .range(from, to)
+      ),
+    ]);
+
+    childRows.forEach((row) => addStoredCodeCount(counts, row.job_number, 'timesheet'));
+    scalarRows.forEach((row) => addStoredCodeCount(counts, row.job_number, 'timesheet'));
+    legacyRows.forEach((row) => addStoredCodeCount(counts, row.quote_reference, 'legacy_quote'));
+  }
+
+  return buildStoredJobCodeOptionsFromCounts(counts, limit);
+}
+
+function buildStoredJobCodeOptionsFromCounts(
+  counts: Map<string, StoredJobCodeCount>,
+  limit: number
+): JobCodeCorrectionStoredCodeOption[] {
+  return Array.from(counts.values())
+    .sort((left, right) => {
+      const totalLeft = left.timesheetRows + left.legacyQuoteRows;
+      const totalRight = right.timesheetRows + right.legacyQuoteRows;
+      if (totalRight !== totalLeft) return totalRight - totalLeft;
+      return left.code.localeCompare(right.code);
+    })
+    .slice(0, limit)
+    .map(mapStoredCodeCountToOption);
+}
+
+export function buildStoredJobCodeOptionsFromValues(input: {
+  timesheetCodes?: Array<string | null | undefined>;
+  legacyQuoteCodes?: Array<string | null | undefined>;
+  limit?: number;
+}): JobCodeCorrectionStoredCodeOption[] {
+  const counts = new Map<string, StoredJobCodeCount>();
+  input.timesheetCodes?.forEach((code) => addStoredCodeCount(counts, code, 'timesheet'));
+  input.legacyQuoteCodes?.forEach((code) => addStoredCodeCount(counts, code, 'legacy_quote'));
+  return buildStoredJobCodeOptionsFromCounts(counts, Math.min(Math.max(input.limit || 50, 1), 100));
 }
 
 export function getChildJobCodeMutationPlan(

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildJobCodeCorrectionPreviewFromRows,
+  buildStoredJobCodeOptionsFromValues,
   getChildJobCodeMutationPlan,
   getLegacyQuoteMutationPlan,
   normalizeJobCodeCorrectionInput,
@@ -171,6 +172,35 @@ describe('job code corrections helper', () => {
     expect(preview.warnings).toEqual([
       '1 duplicate timesheet job-code row(s) will be deleted because the replacement code already exists on the same day.',
       '1 old legacy quote row(s) for 5388-LC will be deleted because 60001-MD already exists.',
+    ]);
+  });
+
+  it('builds stored source-code options from timesheet and legacy values', () => {
+    expect(buildStoredJobCodeOptionsFromValues({
+      timesheetCodes: ['5388 lc', '5388-LC', 'BADCODE'],
+      legacyQuoteCodes: ['5388-LC', '60001-MD'],
+    })).toEqual([
+      {
+        value: '5388-LC',
+        label: '5388-LC',
+        customerName: 'Stored in timesheets and legacy quotes',
+        quoteTitle: '2 timesheet row(s), 1 legacy quote row(s)',
+        source: 'timesheet',
+      },
+      {
+        value: '60001-MD',
+        label: '60001-MD',
+        customerName: 'Stored in legacy quotes',
+        quoteTitle: '1 legacy quote row(s)',
+        source: 'legacy_quote',
+      },
+      {
+        value: 'BADCODE',
+        label: 'BADCODE',
+        customerName: 'Stored in timesheets',
+        quoteTitle: '1 timesheet row(s)',
+        source: 'timesheet',
+      },
     ]);
   });
 });

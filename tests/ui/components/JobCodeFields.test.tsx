@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { CSSProperties, ReactNode } from 'react';
-import { JobCodeFields } from '@/components/timesheets/JobCodeFields';
+import { JobCodeFields, JobCodePicker } from '@/components/timesheets/JobCodeFields';
 import type { TimesheetJobCodeOption } from '@/lib/client/timesheet-job-codes';
 
 vi.mock('@/components/ui/dialog', () => ({
@@ -261,5 +261,31 @@ describe('JobCodeFields', () => {
 
     expect(handleChange).toHaveBeenCalledWith(0, '4323-GH');
     expect(screen.queryByTestId('job-code-dialog')).not.toBeInTheDocument();
+  });
+
+  it('supports server-side search options in the single job-code picker', () => {
+    const handleChange = vi.fn();
+    const handleSearchChange = vi.fn();
+
+    render(
+      <JobCodePicker
+        value=""
+        onChange={handleChange}
+        placeholder="Select stored code"
+        jobCodeOptions={[jobCodeOptions[1]]}
+        onSearchChange={handleSearchChange}
+        serverSideFiltering
+        ariaLabel="Select stored source job code"
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select stored source job code' }));
+    fireEvent.change(screen.getByPlaceholderText('Search code, customer, or name'), {
+      target: { value: 'incorrect code' },
+    });
+
+    expect(handleSearchChange).toHaveBeenLastCalledWith('incorrect code');
+    fireEvent.click(screen.getByRole('button', { name: /4323-GH/ }));
+    expect(handleChange).toHaveBeenCalledWith('4323-GH');
   });
 });

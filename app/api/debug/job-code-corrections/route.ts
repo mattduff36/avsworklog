@@ -3,6 +3,7 @@ import { createDebugAccessErrorBody, requireDebugConsoleAccess } from '@/lib/ser
 import {
   applyJobCodeCorrection,
   buildJobCodeCorrectionPreview,
+  searchStoredJobCodeOptions,
   searchJobCodeTimesheets,
   type JobCodeCorrectionScope,
 } from '@/lib/server/job-code-corrections';
@@ -44,8 +45,20 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('q') || '';
-    const fromJobCode = searchParams.get('from_job_code') || '';
     const limit = Number.parseInt(searchParams.get('limit') || '25', 10);
+    if (searchParams.get('mode') === 'stored-codes') {
+      const jobCodes = await searchStoredJobCodeOptions({
+        query,
+        limit: Number.isFinite(limit) ? limit : 25,
+      });
+
+      return NextResponse.json({
+        success: true,
+        job_codes: jobCodes,
+      });
+    }
+
+    const fromJobCode = searchParams.get('from_job_code') || '';
     const timesheets = await searchJobCodeTimesheets({
       query,
       fromJobCode,

@@ -27,6 +27,19 @@ interface JobCodeFieldsProps {
   jobCodeOptionsLoading?: boolean;
 }
 
+interface JobCodePickerProps {
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+  placeholder?: string;
+  inputClassName?: string;
+  jobCodeOptions?: TimesheetJobCodeOption[];
+  jobCodeOptionsLoading?: boolean;
+  ariaLabel?: string;
+  onSearchChange?: (query: string) => void;
+  serverSideFiltering?: boolean;
+}
+
 interface JobCodeFieldRowProps {
   index: number;
   value: string;
@@ -41,6 +54,9 @@ interface JobCodeFieldRowProps {
   onAutoOpenComplete?: () => void;
   onEmptyPickerClose?: (index: number) => void;
   hideTrigger?: boolean;
+  ariaLabel?: string;
+  onSearchChange?: (query: string) => void;
+  serverSideFiltering?: boolean;
 }
 
 const JOB_CODE_FILTER_MIN_LENGTH = 3;
@@ -55,6 +71,7 @@ function getOptionDescription(option: TimesheetJobCodeOption): string {
     .join(' - ');
 
   if (description) return description;
+  if (option.source === 'timesheet') return 'Stored timesheet code';
   if (option.source === 'project_number') return 'Project number';
   return option.source === 'legacy_quote' ? 'Legacy quote' : 'Live quote';
 }
@@ -121,6 +138,9 @@ function JobCodeFieldRow({
   onAutoOpenComplete,
   onEmptyPickerClose,
   hideTrigger,
+  ariaLabel,
+  onSearchChange,
+  serverSideFiltering,
 }: JobCodeFieldRowProps) {
   const shouldAutoOpen = Boolean(autoOpen && !disabled);
   const [isPickerOpen, setIsPickerOpen] = useState(shouldAutoOpen);
@@ -134,9 +154,11 @@ function JobCodeFieldRow({
   const isFilterReady = getFilterLength(filterValue) >= JOB_CODE_FILTER_MIN_LENGTH;
   const filteredOptions = useMemo(
     () => isFilterReady
-      ? jobCodeOptions.filter((option) => optionMatchesFilter(option, filterValue))
+      ? serverSideFiltering
+        ? jobCodeOptions
+        : jobCodeOptions.filter((option) => optionMatchesFilter(option, filterValue))
       : [],
-    [filterValue, isFilterReady, jobCodeOptions]
+    [filterValue, isFilterReady, jobCodeOptions, serverSideFiltering]
   );
 
   function handlePickerOpenChange(open: boolean) {
@@ -192,6 +214,10 @@ function JobCodeFieldRow({
     if (!autoOpen || disabled) return;
     onAutoOpenComplete?.();
   }, [autoOpen, disabled, onAutoOpenComplete]);
+
+  useEffect(() => {
+    onSearchChange?.(filterValue);
+  }, [filterValue, onSearchChange]);
 
   const pickerDialog = (
     <Dialog open={isPickerOpen} onOpenChange={handlePickerOpenChange}>
@@ -288,7 +314,7 @@ function JobCodeFieldRow({
       <button
         type="button"
         disabled={disabled}
-        aria-label={normalizedValue ? `Selected job code ${normalizedValue}` : 'Select job code'}
+        aria-label={ariaLabel || (normalizedValue ? `Selected job code ${normalizedValue}` : 'Select job code')}
         onClick={openPicker}
         className={cn(
           'flex h-9 w-full items-center justify-center rounded-md border border-input bg-transparent px-3 py-2 text-center text-sm shadow-sm ring-offset-background transition-colors focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
@@ -303,6 +329,35 @@ function JobCodeFieldRow({
       {pickerDialog}
       {trailingControl}
     </div>
+  );
+}
+
+export function JobCodePicker({
+  value,
+  onChange,
+  disabled = false,
+  placeholder,
+  inputClassName,
+  jobCodeOptions = [],
+  jobCodeOptionsLoading = false,
+  ariaLabel,
+  onSearchChange,
+  serverSideFiltering = false,
+}: JobCodePickerProps) {
+  return (
+    <JobCodeFieldRow
+      index={0}
+      value={value}
+      onChange={(_, nextValue) => onChange(nextValue)}
+      placeholder={placeholder}
+      disabled={disabled}
+      inputClassName={inputClassName}
+      jobCodeOptions={jobCodeOptions}
+      jobCodeOptionsLoading={jobCodeOptionsLoading}
+      ariaLabel={ariaLabel}
+      onSearchChange={onSearchChange}
+      serverSideFiltering={serverSideFiltering}
+    />
   );
 }
 
