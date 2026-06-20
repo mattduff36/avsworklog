@@ -2,6 +2,20 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.30.1
+
+**GIT COMMIT MESSAGE**
+`fix(fleet): suppress transient plant history fetch errors`
+
+**PUSHED AT**
+2026-06-20T15:47:45.784Z
+
+**WHAT CHANGED**
+Suppress transient plant history fetch errors.
+
+**COMMITS IN THIS RELEASE**
+- `fix(fleet): suppress transient plant history fetch errors`
+
 ## 0626.30.0
 
 **GIT COMMIT MESSAGE**
