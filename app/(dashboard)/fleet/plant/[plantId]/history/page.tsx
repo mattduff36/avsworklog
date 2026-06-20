@@ -31,6 +31,7 @@ import { fetchDailyChecks, type DailyCheckHistoryItem } from '@/components/fleet
 import { AssetHistoryTable } from '@/components/fleet/AssetHistoryTable';
 import { buildAssetHistoryRows } from '@/lib/fleet/asset-history-events';
 import { getAssetHistoryFieldLabel } from '@/lib/fleet/asset-history-field-labels';
+import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 
 // Dynamic imports for dialog components
 const EditPlantRecordDialog = dynamic(() => import('@/app/(dashboard)/maintenance/components/EditPlantRecordDialog').then(m => ({ default: m.EditPlantRecordDialog })), { ssr: false });
@@ -132,6 +133,10 @@ type TaskAttachment = {
   } | null;
 };
 
+function shouldLogPlantHistoryFetchError(error: unknown) {
+  return !isAuthErrorStatus(getErrorStatus(error)) && !isNetworkFetchError(error);
+}
+
 function DocumentsTabContent({ plantId, workshopTasks }: { plantId: string; workshopTasks: WorkshopTask[] }) {
   const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -171,7 +176,9 @@ function DocumentsTabContent({ plantId, workshopTasks }: { plantId: string; work
         if (error) throw error;
         setAttachments(data || []);
       } catch (error) {
-        console.error('Error fetching attachments:', error);
+        if (shouldLogPlantHistoryFetchError(error)) {
+          console.error('Error fetching attachments:', error);
+        }
       } finally {
         setLoading(false);
       }
@@ -379,7 +386,9 @@ export default function PlantHistoryPage({
       if (error) throw error;
       setPlant(data);
     } catch (err) {
-      console.error('Error fetching plant:', err);
+      if (shouldLogPlantHistoryFetchError(err)) {
+        console.error('Error fetching plant:', err);
+      }
     } finally {
       setLoading(false);
     }
@@ -399,7 +408,9 @@ export default function PlantHistoryPage({
 
       setMaintenanceRecord(data);
     } catch (err) {
-      console.error('Error fetching maintenance record:', err);
+      if (shouldLogPlantHistoryFetchError(err)) {
+        console.error('Error fetching maintenance record:', err);
+      }
     }
   }, [supabase, unwrappedParams.plantId]);
 
@@ -415,7 +426,9 @@ export default function PlantHistoryPage({
       const rows = await fetchDailyChecks('plant', unwrappedParams.plantId);
       setDailyChecks(rows);
     } catch (error) {
-      console.error('Error fetching plant daily checks:', error);
+      if (shouldLogPlantHistoryFetchError(error)) {
+        console.error('Error fetching plant daily checks:', error);
+      }
       setDailyChecks([]);
     } finally {
       setDailyChecksLoading(false);
