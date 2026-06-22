@@ -1,5 +1,27 @@
 [
   {
+    "version": "0626.31.0",
+    "updateKind": "major",
+    "title": "Workshop Tasks update",
+    "description": "Updated Workshop Tasks and Daily Tasks.",
+    "summary": "Updated Workshop Tasks and Daily Tasks.",
+    "details": [
+      "Covered workshop Tasks and daily Tasks.",
+      "Updated Workshop Tasks and Daily Tasks.",
+      "Published as a larger app update because it included broader workflow changes.",
+      "The release time shown is when the version record was created."
+    ],
+    "areas": [
+      "Workshop Tasks",
+      "Daily Tasks"
+    ],
+    "areaKeys": [
+      "workshop-tasks",
+      "daily-tasks"
+    ],
+    "pushedAt": "2026-06-22T23:21:00.439Z"
+  },
+  {
     "version": "0626.30.1",
     "updateKind": "minor",
     "title": "Fleet improvements",

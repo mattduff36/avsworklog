@@ -2,6 +2,20 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.31.0
+
+**GIT COMMIT MESSAGE**
+`feat(workshop-tasks): update Workshop Tasks and Daily Tasks`
+
+**PUSHED AT**
+2026-06-22T23:21:00.439Z
+
+**WHAT CHANGED**
+Update Workshop Tasks and Daily Tasks.
+
+**COMMITS IN THIS RELEASE**
+- `feat(workshop-tasks): update Workshop Tasks and Daily Tasks`
+
 ## 0626.30.1
 
 **GIT COMMIT MESSAGE**
