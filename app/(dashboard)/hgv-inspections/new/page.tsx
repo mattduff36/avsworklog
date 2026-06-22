@@ -656,8 +656,17 @@ function NewHgvInspectionContent() {
       loadedDraftIdRef.current = id;
     } catch (err) {
       const errorContextId = 'hgv-inspections-new-load-draft-error';
-      console.error('Error loading HGV draft:', err, { errorContextId });
-      toast.error('Failed to load draft inspection', { id: errorContextId });
+      if (isNetworkFetchError(err)) {
+        console.warn('Unable to load HGV draft inspection (network):', err, { errorContextId });
+        setError('Could not load draft inspection because the network request failed. Please refresh and try again.');
+        toast.error('Could not load draft inspection. Please refresh and try again.', { id: errorContextId });
+      } else {
+        if (!isAuthErrorStatus(getErrorStatus(err))) {
+          console.error('Error loading HGV draft:', err, { errorContextId });
+        }
+        setError(err instanceof Error ? err.message : 'Failed to load draft inspection');
+        toast.error('Failed to load draft inspection', { id: errorContextId });
+      }
     } finally {
       if (activeDraftLoadIdRef.current === id) {
         activeDraftLoadIdRef.current = null;

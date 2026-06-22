@@ -753,8 +753,17 @@ function NewPlantInspectionContent() {
       loadedDraftIdRef.current = id;
       toast.success('Draft inspection loaded');
     } catch (err) {
-      console.error('Error loading draft inspection:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load draft inspection');
+      const errorContextId = 'plant-inspections-new-load-draft-error';
+      if (isNetworkFetchError(err)) {
+        console.warn('Unable to load plant draft inspection (network):', err, { errorContextId });
+        setError('Could not load draft inspection because the network request failed. Please refresh and try again.');
+        toast.error('Could not load draft inspection. Please refresh and try again.', { id: errorContextId });
+      } else {
+        if (!isAuthErrorStatus(getErrorStatus(err))) {
+          console.error('Error loading draft inspection:', err, { errorContextId });
+        }
+        setError(getInspectionErrorMessage(err, 'Failed to load draft inspection'));
+      }
     } finally {
       if (activeDraftLoadIdRef.current === id) {
         activeDraftLoadIdRef.current = null;

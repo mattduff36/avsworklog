@@ -102,6 +102,7 @@ export function WorkshopTaskModal({
   });
   const [timestampTarget, setTimestampTarget] = useState<AdjustTimestampTarget | null>(null);
   const [adjustTimestampOpen, setAdjustTimestampOpen] = useState(false);
+  const [attachmentsRefreshKey, setAttachmentsRefreshKey] = useState(0);
 
   if (!task) return null;
 
@@ -167,6 +168,7 @@ export function WorkshopTaskModal({
       refetch(),
     ]);
 
+    setAttachmentsRefreshKey((currentKey) => currentKey + 1);
     toast.success(`${timestampTarget.label} timestamp updated`);
     setTimestampTarget(null);
   };
@@ -466,6 +468,7 @@ export function WorkshopTaskModal({
         <div className="mt-6">
           <h3 className="text-lg font-semibold text-foreground mb-4">Attachments</h3>
           <TaskAttachmentsSection
+            key={`${task.id}-${attachmentsRefreshKey}`}
             taskId={task.id}
             taskStatus={getTaskStatus(task)}
           />
