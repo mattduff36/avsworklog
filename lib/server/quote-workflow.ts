@@ -473,7 +473,7 @@ async function sendEmail(params: {
   from?: string;
   to: string[];
   cc?: string[];
-  replyTo?: string | null;
+  replyTo?: string | string[] | null;
   subject: string;
   html: string;
   attachments?: EmailAttachment[];
@@ -485,8 +485,13 @@ async function sendEmail(params: {
 
   const toEmails = uniqueEmailAddresses(params.to);
   const toEmailKeys = new Set(toEmails.map(email => email.toLowerCase()));
-  const ccEmails = uniqueEmailAddresses([...(params.cc || []), QUOTE_EMAIL_RECORD_CC])
+  const directCcEmails = uniqueEmailAddresses(params.cc || [])
     .filter(email => !toEmailKeys.has(email.toLowerCase()));
+  const ccEmails = uniqueEmailAddresses([...directCcEmails, QUOTE_EMAIL_RECORD_CC]);
+  const replyToEmails = uniqueEmailAddresses([
+    ...(Array.isArray(params.replyTo) ? params.replyTo : [params.replyTo]),
+    ...directCcEmails,
+  ]);
 
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -498,7 +503,7 @@ async function sendEmail(params: {
       from: params.from || fromEmail,
       to: toEmails,
       cc: ccEmails,
-      reply_to: params.replyTo || undefined,
+      reply_to: replyToEmails.length > 1 ? replyToEmails : replyToEmails[0] || undefined,
       subject: params.subject,
       html: params.html,
       attachments: params.attachments,

@@ -173,7 +173,7 @@ describe('sendQuoteToCustomerEmail', () => {
       from: 'Quotes <quotes@example.com>',
       to: ['alex@example.com'],
       cc: ['manager-copy@avsquires.co.uk', 'noreply@avsquires.co.uk'],
-      reply_to: 'sender@avsquires.co.uk',
+      reply_to: ['sender@avsquires.co.uk', 'manager-copy@avsquires.co.uk'],
       subject: 'Q-001 - Acme Ltd - 1 Road Lane - Concrete repairs',
     }));
     expect(String(body.html)).toContain(VAT_NOTICE);
@@ -252,7 +252,7 @@ describe('sendQuoteToCustomerEmail', () => {
       from: 'Quotes <quotes@example.com>',
       to: ['alex@example.com'],
       cc: ['charlotte@avsquires.co.uk', 'noreply@avsquires.co.uk'],
-      reply_to: 'sender@avsquires.co.uk',
+      reply_to: ['sender@avsquires.co.uk', 'charlotte@avsquires.co.uk'],
       subject: 'Q-001 - Acme Ltd - 1 Road Lane - Concrete repairs',
     }));
     expect(String(body.html)).toContain('Please can I have a purchase order for the attached quotation.');
