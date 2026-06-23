@@ -14,6 +14,7 @@ const {
   mockSendQuoteToCustomerEmail,
   mockSendQuotePoRequestEmail,
   mockSendQuoteRamsRequestEmail,
+  mockGetQuoteEmailCcEmails,
   mockGetQuoteNotificationRecipientEmails,
   mockCanManageQuoteSage,
   mockCopyQuoteCustomerContactRecipients,
@@ -21,6 +22,8 @@ const {
   mockReplaceQuoteCustomerContactRecipients,
   mockValidateSecondaryContactIdsForCustomer,
   mockQuoteUpdate,
+  mockQuoteUpdateEq,
+  mockQuoteUpdateNeq,
   mockQuoteInsert,
   mockLineItemInsert,
   mockListRemainingVersions,
@@ -35,6 +38,7 @@ const {
   mockSendQuoteToCustomerEmail: vi.fn(),
   mockSendQuotePoRequestEmail: vi.fn(),
   mockSendQuoteRamsRequestEmail: vi.fn(),
+  mockGetQuoteEmailCcEmails: vi.fn(),
   mockGetQuoteNotificationRecipientEmails: vi.fn(),
   mockCanManageQuoteSage: vi.fn(),
   mockCopyQuoteCustomerContactRecipients: vi.fn(),
@@ -42,6 +46,8 @@ const {
   mockReplaceQuoteCustomerContactRecipients: vi.fn(),
   mockValidateSecondaryContactIdsForCustomer: vi.fn(),
   mockQuoteUpdate: vi.fn(),
+  mockQuoteUpdateEq: vi.fn(),
+  mockQuoteUpdateNeq: vi.fn(),
   mockQuoteInsert: vi.fn(),
   mockLineItemInsert: vi.fn(),
   mockListRemainingVersions: vi.fn(),
@@ -78,6 +84,7 @@ vi.mock('@/lib/server/quote-workflow', async () => {
     fetchQuoteBundle: mockFetchQuoteBundle,
     generateQuoteReferenceForManager: mockGenerateQuoteReferenceForManager,
     getInitialsFromName: mockGetInitialsFromName,
+    getQuoteEmailCcEmails: mockGetQuoteEmailCcEmails,
     getQuoteManagerOption: mockGetQuoteManagerOption,
     getQuoteNotificationRecipientEmails: mockGetQuoteNotificationRecipientEmails,
     sendQuotePoRequestEmail: mockSendQuotePoRequestEmail,
@@ -91,6 +98,7 @@ describe('PATCH /api/quotes/[id]', () => {
     vi.clearAllMocks();
     mockSendQuoteToCustomerEmail.mockResolvedValue({ success: true });
     mockSendQuotePoRequestEmail.mockResolvedValue({ success: true });
+    mockGetQuoteEmailCcEmails.mockResolvedValue(['ops-copy@avsquires.co.uk']);
     mockGetQuoteNotificationRecipientEmails.mockResolvedValue(['ops-copy@avsquires.co.uk']);
     mockCanManageQuoteSage.mockResolvedValue(false);
     mockGenerateQuoteReferenceForManager.mockResolvedValue({ quoteReference: '80001-CD', initials: 'CD' });
@@ -162,7 +170,16 @@ describe('PATCH /api/quotes/[id]', () => {
             update: vi.fn((payload: unknown) => {
               mockQuoteUpdate(payload);
               return {
-                eq: vi.fn().mockResolvedValue({ error: null }),
+                eq: vi.fn((...args: unknown[]) => {
+                  mockQuoteUpdateEq(...args);
+                  return {
+                    error: null,
+                    neq: vi.fn((...neqArgs: unknown[]) => {
+                      mockQuoteUpdateNeq(...neqArgs);
+                      return Promise.resolve({ error: null });
+                    }),
+                  };
+                }),
               };
             }),
             delete: vi.fn(() => ({
@@ -310,6 +327,8 @@ describe('PATCH /api/quotes/[id]', () => {
         signoff_name: 'Matt Duffill',
         signoff_title: 'Contracts Manager',
         po_number: null,
+        sage_posted_at: '2026-06-05T12:00:00.000Z',
+        sage_posted_by: 'accounts-user',
         created_at: '2026-03-24T09:00:00.000Z',
         updated_at: '2026-03-24T09:00:00.000Z',
       },
@@ -361,6 +380,8 @@ describe('PATCH /api/quotes/[id]', () => {
       manager_email: 'charlotte@avsquires.co.uk',
       duplicate_source_quote_id: 'quote-1',
       status: 'draft',
+      sage_posted_at: null,
+      sage_posted_by: null,
     }));
     expect(mockCopyQuoteCustomerContactRecipients).toHaveBeenCalledWith(
       expect.anything(),
@@ -372,6 +393,61 @@ describe('PATCH /api/quotes/[id]', () => {
       eventType: 'quote_duplicated',
       quoteReference: '80001-CD',
     }));
+  });
+
+  it('creates revisions that inherit the source quote Sage status', async () => {
+    const { PATCH } = await import('@/app/api/quotes/[id]/route');
+    mockFetchQuoteBundle.mockResolvedValue({
+      quote: {
+        id: 'quote-1',
+        status: 'sent',
+        is_latest_version: true,
+        quote_reference: '80000-MD',
+        base_quote_reference: '80000-MD',
+        quote_thread_id: 'thread-1',
+        revision_number: 0,
+        revision_type: 'original',
+        requester_id: 'manager-1',
+        requester_initials: 'MD',
+        sage_posted_at: '2026-06-05T12:00:00.000Z',
+        sage_posted_by: 'accounts-user',
+        created_at: '2026-03-24T09:00:00.000Z',
+        updated_at: '2026-03-24T09:00:00.000Z',
+      },
+      lineItems: [],
+      attachments: [],
+      invoices: [],
+      invoiceRequests: [],
+      versions: [],
+      timeline: [],
+      selectedSecondaryContacts: [],
+      invoiceSummary: {
+        invoicedTotal: 0,
+        remainingBalance: 100,
+        lastInvoiceAt: null,
+        status: 'not_invoiced',
+      },
+    });
+
+    const request = new NextRequest('http://localhost/api/quotes/quote-1', {
+      method: 'PATCH',
+      body: JSON.stringify({ action: 'create_revision', revision_type: 'revision', version_notes: 'Client changes' }),
+    });
+
+    const response = await PATCH(request, { params: Promise.resolve({ id: 'quote-1' }) });
+
+    expect(response.status).toBe(200);
+    expect(mockQuoteInsert).toHaveBeenCalledWith(expect.objectContaining({
+      quote_reference: '80000-MD-REV1',
+      base_quote_reference: '80000-MD',
+      quote_thread_id: 'thread-1',
+      revision_number: 1,
+      revision_type: 'revision',
+      sage_posted_at: '2026-06-05T12:00:00.000Z',
+      sage_posted_by: 'accounts-user',
+    }));
+    expect(mockQuoteUpdateEq).toHaveBeenCalledWith('quote_thread_id', 'thread-1');
+    expect(mockQuoteUpdateNeq).toHaveBeenCalledWith('id', expect.any(String));
   });
 
   it('sends a PO request email to selected saved customer recipients', async () => {
@@ -423,6 +499,7 @@ describe('PATCH /api/quotes/[id]', () => {
     expect(response.status).toBe(200);
     expect(mockSendQuotePoRequestEmail).toHaveBeenCalledWith(expect.objectContaining({
       recipientEmails: ['alex@example.com', 'chris@example.com'],
+      cc: ['ops-copy@avsquires.co.uk'],
       senderEmail: 'sender@avsquires.co.uk',
       senderName: 'Sender User',
     }));
@@ -531,6 +608,7 @@ describe('PATCH /api/quotes/[id]', () => {
       sage_posted_by: 'user-1',
       updated_by: 'user-1',
     });
+    expect(mockQuoteUpdateEq).toHaveBeenCalledWith('quote_thread_id', 'thread-1');
     expect(mockAppendQuoteTimelineEvent).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       eventType: 'quote_marked_on_sage',
       title: 'Quote marked on Sage',
@@ -626,6 +704,7 @@ describe('PATCH /api/quotes/[id]', () => {
     );
     expect(mockSendQuoteRamsRequestEmail).toHaveBeenCalledWith(
       expect.objectContaining({
+        cc: ['ops-copy@avsquires.co.uk'],
         poNumber: 'Not supplied',
         quoteReference: 'Q-001',
         ramsComments: 'Mind the gate access.',

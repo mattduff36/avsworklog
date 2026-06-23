@@ -38,7 +38,18 @@ vi.mock('@/lib/utils/rbac', () => ({
 }));
 
 vi.mock('@/lib/server/quote-workflow', () => ({
-  QUOTE_INVOICE_NOTIFICATION_TYPES: ['invoice_request', 'invoice_added', 'quote_sent_copy', 'start_alert_copy'],
+  QUOTE_INVOICE_NOTIFICATION_TYPES: [
+    'invoice_request',
+    'invoice_added',
+    'quote_sent_copy',
+    'start_alert_copy',
+    'quote_customer_email_copy',
+    'quote_po_request_copy',
+    'quote_rams_request_copy',
+    'quote_start_alert_copy',
+    'quote_invoice_request_copy',
+    'quote_invoice_added_copy',
+  ],
   getSelectedQuoteInvoiceNotificationRecipientIds: mockGetSelectedQuoteInvoiceNotificationRecipientIds,
   listQuoteUserNotificationRecipientOptions: mockListQuoteUserNotificationRecipientOptions,
   loadQuoteModuleSettings: mockLoadQuoteModuleSettings,
@@ -81,6 +92,12 @@ describe('/api/quotes/settings', () => {
       invoice_added: [],
       quote_sent_copy: ['user-1'],
       start_alert_copy: [],
+      quote_customer_email_copy: ['user-1'],
+      quote_po_request_copy: [],
+      quote_rams_request_copy: [],
+      quote_start_alert_copy: [],
+      quote_invoice_request_copy: [],
+      quote_invoice_added_copy: [],
     });
     mockReplaceQuoteNotificationRecipients.mockResolvedValue(undefined);
     mockUpsertQuoteModuleSettings.mockResolvedValue({
@@ -100,7 +117,7 @@ describe('/api/quotes/settings', () => {
       default_start_alert_days: 7,
       default_estimated_duration_days: 3,
     });
-    expect(payload.selected_notifications.quote_sent_copy).toEqual(['user-1']);
+    expect(payload.selected_notifications.quote_customer_email_copy).toEqual(['user-1']);
   });
 
   it('saves defaults and configured copy recipients', async () => {
@@ -124,7 +141,8 @@ describe('/api/quotes/settings', () => {
           default_estimated_duration_days: 4,
         },
         selected_notifications: {
-          quote_sent_copy: ['user-1'],
+          quote_customer_email_copy: ['user-1'],
+          quote_po_request_copy: ['user-1'],
         },
         apply_empty_defaults: true,
       }),
@@ -133,7 +151,8 @@ describe('/api/quotes/settings', () => {
 
     expect(response.status).toBe(200);
     expect(mockReplaceQuoteNotificationRecipients).toHaveBeenCalledWith(admin, {
-      quote_sent_copy: ['user-1'],
+      quote_customer_email_copy: ['user-1'],
+      quote_po_request_copy: ['user-1'],
     }, 'admin-1');
     expect(mockUpsertQuoteModuleSettings).toHaveBeenCalledWith(admin, {
       default_start_alert_days: 10,

@@ -89,7 +89,7 @@ export async function PUT(request: NextRequest) {
     const legacyRecipientIds = Array.isArray(body.recipient_ids)
       ? Array.from(new Set(body.recipient_ids.filter((id): id is string => typeof id === 'string' && id.trim().length > 0).map(id => id.trim())))
       : [];
-    const selectedNotifications = INVOICE_NOTIFICATION_TYPES.reduce<Record<QuoteInvoiceNotificationType, string[]>>((acc, type) => {
+    const selectedNotifications = INVOICE_NOTIFICATION_TYPES.reduce<Partial<Record<QuoteInvoiceNotificationType, string[]>>>((acc, type) => {
       const rawIds = body.selected_notifications?.[type];
       if (Array.isArray(rawIds)) {
         acc[type] = Array.from(new Set(rawIds.filter((id): id is string => typeof id === 'string' && id.trim().length > 0).map(id => id.trim())));
@@ -98,8 +98,6 @@ export async function PUT(request: NextRequest) {
     }, {
       invoice_request: legacyRecipientIds,
       invoice_added: [],
-      quote_sent_copy: [],
-      start_alert_copy: [],
     });
 
     const admin = createAdminClient();
@@ -110,14 +108,14 @@ export async function PUT(request: NextRequest) {
     const accountsIds = new Set(accountsRecipients.map(recipient => recipient.id));
     const additionalIds = new Set(additionalRecipients.map(recipient => recipient.id));
 
-    const selectedAccountsRecipientIds = selectedNotifications.invoice_request.filter(id => accountsIds.has(id));
+    const selectedAccountsRecipientIds = (selectedNotifications.invoice_request || []).filter(id => accountsIds.has(id));
     if (selectedAccountsRecipientIds.length === 0) {
       return NextResponse.json({ error: 'Select at least one Accounts recipient.' }, { status: 400 });
     }
 
     const invoiceRequestEligibleIds = new Set([...accountsIds, ...additionalIds]);
-    const invalidInvoiceRequestIds = selectedNotifications.invoice_request.filter(id => !invoiceRequestEligibleIds.has(id));
-    const invalidInvoiceAddedIds = selectedNotifications.invoice_added.filter(id => !additionalIds.has(id));
+    const invalidInvoiceRequestIds = (selectedNotifications.invoice_request || []).filter(id => !invoiceRequestEligibleIds.has(id));
+    const invalidInvoiceAddedIds = (selectedNotifications.invoice_added || []).filter(id => !additionalIds.has(id));
 
     if (invalidInvoiceRequestIds.length > 0 || invalidInvoiceAddedIds.length > 0) {
       return NextResponse.json(
@@ -127,8 +125,8 @@ export async function PUT(request: NextRequest) {
     }
 
     await replaceQuoteNotificationRecipients(admin, {
-      invoice_request: selectedNotifications.invoice_request,
-      invoice_added: selectedNotifications.invoice_added,
+      invoice_request: selectedNotifications.invoice_request || [],
+      invoice_added: selectedNotifications.invoice_added || [],
     }, context.userId);
 
     return NextResponse.json({

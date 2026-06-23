@@ -139,8 +139,6 @@ describe('/api/quotes/notification-settings', () => {
     expect(payload.selected_notifications).toEqual({
       invoice_request: ['accounts-1', 'manager-1'],
       invoice_added: ['manager-1'],
-      quote_sent_copy: [],
-      start_alert_copy: [],
     });
   });
 });

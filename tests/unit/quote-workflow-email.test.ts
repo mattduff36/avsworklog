@@ -8,11 +8,15 @@ const {
   mockLoadSquiresLogoDataUrl,
   mockQuotePDF,
   mockRenderToStream,
+  mockGetUsersWithModuleAccess,
+  mockGetHiddenSystemTestAccountIds,
 } = vi.hoisted(() => ({
   mockCreateAdminClient: vi.fn(),
   mockLoadSquiresLogoDataUrl: vi.fn(),
   mockQuotePDF: vi.fn(),
   mockRenderToStream: vi.fn(),
+  mockGetUsersWithModuleAccess: vi.fn(),
+  mockGetHiddenSystemTestAccountIds: vi.fn(),
 }));
 
 vi.mock('@/lib/supabase/admin', () => ({
@@ -25,6 +29,14 @@ vi.mock('@/lib/pdf/squires-logo', () => ({
 
 vi.mock('@/lib/pdf/quote-pdf', () => ({
   QuotePDF: mockQuotePDF,
+}));
+
+vi.mock('@/lib/server/team-permissions', () => ({
+  getUsersWithModuleAccess: mockGetUsersWithModuleAccess,
+}));
+
+vi.mock('@/lib/server/system-test-accounts', () => ({
+  getHiddenSystemTestAccountIds: mockGetHiddenSystemTestAccountIds,
 }));
 
 vi.mock('@react-pdf/renderer', () => ({
@@ -95,6 +107,8 @@ beforeEach(() => {
   process.env.RESEND_FROM_EMAIL = 'Quotes <quotes@example.com>';
   delete process.env.RESEND_API_KEY_2;
   delete process.env.RESEND_FROM_EMAIL_2;
+  mockGetUsersWithModuleAccess.mockResolvedValue(new Set(['copy-1']));
+  mockGetHiddenSystemTestAccountIds.mockResolvedValue(new Set());
 
   global.fetch = vi.fn().mockResolvedValue({ ok: true }) as typeof fetch;
   mockCreateAdminClient.mockReturnValue({
@@ -224,6 +238,7 @@ describe('sendQuoteToCustomerEmail', () => {
     const result = await sendQuotePoRequestEmail({
       bundle: buildQuoteBundle(),
       recipientEmails: ['alex@example.com', ' alex@example.com '],
+      cc: ['charlotte@avsquires.co.uk', 'alex@example.com'],
       senderEmail: 'sender@avsquires.co.uk',
       senderName: 'Matt Duffill',
     });
@@ -236,7 +251,7 @@ describe('sendQuoteToCustomerEmail', () => {
     expect(body).toEqual(expect.objectContaining({
       from: 'Quotes <quotes@example.com>',
       to: ['alex@example.com'],
-      cc: ['noreply@avsquires.co.uk'],
+      cc: ['charlotte@avsquires.co.uk', 'noreply@avsquires.co.uk'],
       reply_to: 'sender@avsquires.co.uk',
       subject: 'Q-001 - Acme Ltd - 1 Road Lane - Concrete repairs',
     }));
@@ -307,6 +322,55 @@ describe('sendQuoteToCustomerEmail', () => {
   });
 });
 
+describe('quote workflow direct emails', () => {
+  it('sends RAMS request emails with configured CC recipients', async () => {
+    const { sendQuoteRamsRequestEmail } = await import('@/lib/server/quote-workflow');
+
+    const result = await sendQuoteRamsRequestEmail({
+      quoteReference: 'Q-001',
+      customerName: 'Acme Ltd',
+      subjectLine: 'Concrete repairs',
+      cc: ['charlotte@avsquires.co.uk'],
+      poNumber: 'PO-123',
+      managerName: 'Matt Duffill',
+    });
+
+    expect(result).toEqual({ success: true });
+
+    const [, init] = vi.mocked(global.fetch).mock.calls[0];
+    const body = JSON.parse(String(init?.body));
+
+    expect(body).toEqual(expect.objectContaining({
+      to: ['conway@avsquires.co.uk'],
+      cc: ['charlotte@avsquires.co.uk', 'noreply@avsquires.co.uk'],
+    }));
+  });
+
+  it('sends start alert emails with configured CC recipients', async () => {
+    const { sendQuoteStartAlertEmail } = await import('@/lib/server/quote-workflow');
+
+    const result = await sendQuoteStartAlertEmail({
+      to: 'manager@avsquires.co.uk',
+      cc: ['charlotte@avsquires.co.uk'],
+      managerName: 'Matt Duffill',
+      quoteReference: 'Q-001',
+      customerName: 'Acme Ltd',
+      subjectLine: 'Concrete repairs',
+      startDate: '2026-06-30',
+    });
+
+    expect(result).toEqual({ success: true });
+
+    const [, init] = vi.mocked(global.fetch).mock.calls[0];
+    const body = JSON.parse(String(init?.body));
+
+    expect(body).toEqual(expect.objectContaining({
+      to: ['manager@avsquires.co.uk'],
+      cc: ['charlotte@avsquires.co.uk', 'noreply@avsquires.co.uk'],
+    }));
+  });
+});
+
 describe('createQuoteNotification', () => {
   it('uses visible channel toggles even when the legacy enabled flag is false', async () => {
     const { createQuoteNotification } = await import('@/lib/server/quote-workflow');
@@ -320,13 +384,39 @@ describe('createQuoteNotification', () => {
     mockCreateAdminClient.mockReturnValue({
       auth: {
         admin: {
-          getUserById: vi.fn().mockResolvedValue({
-            data: { user: { email: 'recipient@example.com' } },
+          getUserById: vi.fn(async (userId: string) => ({
+            data: {
+              user: {
+                email: userId === 'copy-1' ? 'copy@example.com' : 'recipient@example.com',
+              },
+            },
             error: null,
-          }),
+          })),
         },
       },
       from: vi.fn((table: string) => {
+        if (table === 'quote_invoice_notification_recipients') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn().mockResolvedValue({
+                data: [{ profile_id: 'copy-1', notification_type: 'quote_invoice_request_copy' }],
+                error: null,
+              }),
+            })),
+          };
+        }
+        if (table === 'profiles') {
+          return {
+            select: vi.fn(() => ({
+              in: vi.fn(() => ({
+                order: vi.fn().mockResolvedValue({
+                  data: [{ id: 'copy-1', full_name: 'Copy User', employee_id: null, team_id: 'accounts' }],
+                  error: null,
+                }),
+              })),
+            })),
+          };
+        }
         if (table === 'notification_preferences') {
           return {
             select: vi.fn(() => ({
@@ -363,6 +453,7 @@ describe('createQuoteNotification', () => {
       subject: 'Quote update',
       body: 'A quote needs attention.',
       sendEmail: true,
+      emailCcType: 'quote_invoice_request_copy',
     });
 
     expect(messageInsert).toHaveBeenCalled();
@@ -379,7 +470,7 @@ describe('createQuoteNotification', () => {
 
     expect(body).toEqual(expect.objectContaining({
       to: ['recipient@example.com'],
-      cc: ['noreply@avsquires.co.uk'],
+      cc: ['copy@example.com', 'noreply@avsquires.co.uk'],
     }));
   });
 });

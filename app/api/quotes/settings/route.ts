@@ -61,6 +61,13 @@ function normalizeNotificationSelections(value: unknown) {
   }, {});
 }
 
+function buildEmptyQuoteNotificationSelections(): Record<QuoteInvoiceNotificationType, string[]> {
+  return QUOTE_INVOICE_NOTIFICATION_TYPES.reduce<Record<QuoteInvoiceNotificationType, string[]>>((acc, type) => {
+    acc[type] = [];
+    return acc;
+  }, {} as Record<QuoteInvoiceNotificationType, string[]>);
+}
+
 async function applyDefaultsToEmptyOpenQuotes(
   admin: ReturnType<typeof createAdminClient>,
   settings: {
@@ -109,12 +116,7 @@ export async function GET() {
       listQuoteUserNotificationRecipientOptions(admin),
       context.canManage
         ? getSelectedQuoteInvoiceNotificationRecipientIds(admin)
-        : {
-          invoice_request: [],
-          invoice_added: [],
-          quote_sent_copy: [],
-          start_alert_copy: [],
-        },
+        : buildEmptyQuoteNotificationSelections(),
     ]);
     const quoteUserIds = new Set(quoteUsers.map(user => user.id));
     const selectedByType = selectedNotifications as Record<QuoteInvoiceNotificationType, string[]>;
@@ -126,12 +128,7 @@ export async function GET() {
       selected_notifications: QUOTE_INVOICE_NOTIFICATION_TYPES.reduce<Record<QuoteInvoiceNotificationType, string[]>>((acc, type) => {
         acc[type] = (selectedByType[type] || []).filter(id => quoteUserIds.has(id));
         return acc;
-      }, {
-        invoice_request: [],
-        invoice_added: [],
-        quote_sent_copy: [],
-        start_alert_copy: [],
-      }),
+      }, buildEmptyQuoteNotificationSelections()),
     });
   } catch (error) {
     console.error('Error fetching quote module settings:', error);
@@ -210,12 +207,7 @@ export async function PATCH(request: NextRequest) {
       selected_notifications: QUOTE_INVOICE_NOTIFICATION_TYPES.reduce<Record<QuoteInvoiceNotificationType, string[]>>((acc, type) => {
         acc[type] = (selected[type] || []).filter(id => quoteUserIds.has(id));
         return acc;
-      }, {
-        invoice_request: [],
-        invoice_added: [],
-        quote_sent_copy: [],
-        start_alert_copy: [],
-      }),
+      }, buildEmptyQuoteNotificationSelections()),
     });
   } catch (error) {
     console.error('Error saving quote module settings:', error);

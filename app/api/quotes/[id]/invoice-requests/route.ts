@@ -168,6 +168,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         subject: notificationTemplate.subject,
         body: notificationTemplate.bodyText,
         sendEmail: true,
+        emailCcType: 'quote_invoice_request_copy',
       });
     } catch (error) {
       await admin

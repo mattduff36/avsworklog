@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Bell, CalendarClock, Loader2, Mail, Plus, Save, Send, Trash2, UserCog, Wrench } from 'lucide-react';
 import { toast } from 'sonner';
@@ -33,13 +33,24 @@ import type { Quote, QuoteManagerOption } from '../../types';
 
 export type QuoteSettingsSubTab = 'notifications' | 'managers' | 'sending' | 'schedule' | 'templates' | 'admin-tools';
 
-type QuoteNotificationType = 'invoice_request' | 'invoice_added' | 'quote_sent_copy' | 'start_alert_copy';
+type QuoteNotificationType =
+  | 'invoice_request'
+  | 'invoice_added'
+  | 'quote_sent_copy'
+  | 'start_alert_copy'
+  | 'quote_customer_email_copy'
+  | 'quote_po_request_copy'
+  | 'quote_rams_request_copy'
+  | 'quote_start_alert_copy'
+  | 'quote_invoice_request_copy'
+  | 'quote_invoice_added_copy';
 
 interface QuoteUserOption {
   id: string;
   full_name: string | null;
   employee_id: string | null;
   team_id: string | null;
+  team_name: string | null;
 }
 
 interface ApproverOption {
@@ -97,7 +108,7 @@ interface QuoteSettingsTabProps {
 const SETTINGS_TABS: Array<{ value: QuoteSettingsSubTab; label: string; icon: typeof Bell }> = [
   { value: 'notifications', label: 'Notifications', icon: Bell },
   { value: 'managers', label: 'Managers', icon: UserCog },
-  { value: 'sending', label: 'Sending', icon: Send },
+  { value: 'sending', label: 'Emails', icon: Send },
   { value: 'schedule', label: 'Schedule', icon: CalendarClock },
   { value: 'templates', label: 'Templates', icon: Mail },
   { value: 'admin-tools', label: 'Admin Tools', icon: Wrench },
@@ -108,7 +119,46 @@ const EMPTY_SELECTED_NOTIFICATIONS: Record<QuoteNotificationType, string[]> = {
   invoice_added: [],
   quote_sent_copy: [],
   start_alert_copy: [],
+  quote_customer_email_copy: [],
+  quote_po_request_copy: [],
+  quote_rams_request_copy: [],
+  quote_start_alert_copy: [],
+  quote_invoice_request_copy: [],
+  quote_invoice_added_copy: [],
 };
+
+const EMAIL_CC_COLUMNS: Array<{ value: QuoteNotificationType; label: string; description: string }> = [
+  {
+    value: 'quote_customer_email_copy',
+    label: 'Customer Quote',
+    description: 'Quote emails sent to customers.',
+  },
+  {
+    value: 'quote_po_request_copy',
+    label: 'PO Request',
+    description: 'Purchase order request emails.',
+  },
+  {
+    value: 'quote_rams_request_copy',
+    label: 'RAMS Request',
+    description: 'RAMS request emails.',
+  },
+  {
+    value: 'quote_start_alert_copy',
+    label: 'Start Alert',
+    description: 'Job start reminder emails.',
+  },
+  {
+    value: 'quote_invoice_request_copy',
+    label: 'Invoice Request',
+    description: 'Ready-to-invoice request emails.',
+  },
+  {
+    value: 'quote_invoice_added_copy',
+    label: 'Invoice Added',
+    description: 'Invoice details added emails.',
+  },
+];
 
 async function buildResponseError(response: Response, fallback: string) {
   const payload = await response.json().catch(() => null) as { error?: string } | null;
@@ -122,6 +172,20 @@ function getInitialsFromLabel(label: string) {
     .slice(0, 3)
     .map(part => part[0]?.toUpperCase() || '')
     .join('');
+}
+
+function formatUserMetaValue(value: string | null | undefined) {
+  const normalized = value?.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!normalized) return null;
+
+  return normalized
+    .split(' ')
+    .map(word => word ? `${word[0].toUpperCase()}${word.slice(1)}` : '')
+    .join(' ');
+}
+
+function getUserTeamLabel(user: QuoteUserOption) {
+  return user.team_name || formatUserMetaValue(user.team_id) || 'Unassigned';
 }
 
 function normalizeManagerRows(rows: QuoteManagerOption[]) {
@@ -171,12 +235,23 @@ export function QuoteSettingsTab({
     [quotes]
   );
   const selectedDeleteQuote = deletableQuotes.find(quote => quote.id === deleteQuoteId) || null;
-  const quoteUsers = settingsPayload?.quote_users || [];
+  const quoteUsers = useMemo(() => settingsPayload?.quote_users || [], [settingsPayload]);
   const accountsUsers = quoteUsers.filter(user => user.team_id === 'accounts');
   const additionalUsers = quoteUsers.filter(user => user.team_id !== 'accounts');
   const managerProfileIds = new Set(managerRows.map(row => row.profile_id));
   const availableManagerUsers = (managerPayload?.quote_users || []).filter(user => !managerProfileIds.has(user.id));
   const selectedTemplate = templateRows.find(template => template.template_key === selectedTemplateKey) || templateRows[0] || null;
+  const emailMatrixUsers = useMemo(
+    () => [...quoteUsers].sort((a, b) => {
+      const teamA = a.team_id ? getUserTeamLabel(a) : 'ZZZ Unassigned';
+      const teamB = b.team_id ? getUserTeamLabel(b) : 'ZZZ Unassigned';
+      const byTeam = teamA.localeCompare(teamB);
+      if (byTeam !== 0) return byTeam;
+
+      return (a.full_name || '').localeCompare(b.full_name || '');
+    }),
+    [quoteUsers]
+  );
 
   useEffect(() => {
     void loadQuoteSettings();
@@ -689,33 +764,101 @@ export function QuoteSettingsTab({
   }
 
   function renderSendingPanel() {
-    if (loadingSettings) return <LoadingPanel label="Loading sending settings..." />;
+    if (loadingSettings) return <LoadingPanel label="Loading email settings..." />;
+    const emailCcSelections = EMAIL_CC_COLUMNS.reduce<Partial<Record<QuoteNotificationType, string[]>>>((acc, column) => {
+      acc[column.value] = selectedNotifications[column.value] || [];
+      return acc;
+    }, {});
 
     return (
       <Card className="border-slate-700 bg-slate-900/70">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-white">
             <Send className="h-5 w-5 text-avs-yellow" />
-            Quote Sending
+            Email CC Recipients
           </CardTitle>
           <CardDescription>
-            Select app users with Quotes access who receive a copy when a customer quote email is sent.
+            Choose exactly which quote-module emails each user is CC&apos;d into.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {renderUserCheckboxGrid('quote_sent_copy', quoteUsers, 'No users with Quotes access are available.')}
+        <CardContent className="space-y-5">
+          {quoteUsers.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No users with Quotes access are available.</p>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-slate-700">
+              <table className="min-w-[900px] w-full border-collapse text-sm">
+                <thead className="bg-slate-950/70">
+                  <tr>
+                    <th className="sticky left-0 z-10 min-w-56 border-b border-slate-700 bg-slate-950/95 px-4 py-3 text-left font-semibold text-white">
+                      User
+                    </th>
+                    {EMAIL_CC_COLUMNS.map(column => (
+                      <th key={column.value} className="min-w-32 border-b border-slate-700 px-3 py-3 text-center align-top">
+                        <span className="block font-semibold text-white">{column.label}</span>
+                        <span className="mt-1 block text-xs font-normal leading-snug text-muted-foreground">
+                          {column.description}
+                        </span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {emailMatrixUsers.map((user, index) => {
+                    const currentTeamKey = user.team_id || 'unassigned';
+                    const previousTeamKey = index > 0 ? (emailMatrixUsers[index - 1]?.team_id || 'unassigned') : null;
+                    const startsNewTeam = index === 0 || currentTeamKey !== previousTeamKey;
+                    const teamLabel = getUserTeamLabel(user);
+
+                    return (
+                      <Fragment key={user.id}>
+                        {startsNewTeam ? (
+                          <tr className="border-t border-slate-600 bg-slate-950/40">
+                            <td colSpan={EMAIL_CC_COLUMNS.length + 1} className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                              {teamLabel}
+                            </td>
+                          </tr>
+                        ) : null}
+                        <tr className="border-t border-slate-800 odd:bg-slate-900/30 even:bg-slate-900/10">
+                          <th className="sticky left-0 z-10 border-r border-slate-800 bg-slate-900/95 px-4 py-3 text-left font-medium text-white">
+                            {user.full_name || 'Unnamed user'}
+                          </th>
+                          {EMAIL_CC_COLUMNS.map(column => {
+                            const isChecked = (selectedNotifications[column.value] || []).includes(user.id);
+                            const label = `${user.full_name || 'Unnamed user'}: ${column.label}`;
+
+                            return (
+                              <td key={`${user.id}-${column.value}`} className="px-3 py-3 text-center">
+                                <input
+                                  type="checkbox"
+                                  aria-label={label}
+                                  checked={isChecked}
+                                  disabled={!settingsPayload?.can_manage || Boolean(saving)}
+                                  onChange={event => toggleNotification(column.value, user.id, event.target.checked)}
+                                  className="h-4 w-4 rounded border-slate-500 bg-slate-950 text-avs-yellow accent-avs-yellow"
+                                />
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      </Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
           <div className="flex justify-end">
             <Button
               disabled={!settingsPayload?.can_manage || Boolean(saving)}
               onClick={() => void saveModuleSettings({
-                selected_notifications: { quote_sent_copy: selectedNotifications.quote_sent_copy },
-                successMessage: 'Quote sending settings saved',
+                selected_notifications: emailCcSelections,
+                successMessage: 'Quote email settings saved',
                 savingKey: 'sending',
               })}
               className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90"
             >
               {saving === 'sending' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Save sending settings
+              Save email settings
             </Button>
           </div>
         </CardContent>

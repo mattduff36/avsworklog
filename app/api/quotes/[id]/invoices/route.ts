@@ -328,6 +328,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           subject: invoiceAddedTemplate.subject,
           body: invoiceAddedTemplate.bodyText,
           sendEmail: true,
+          emailCcType: 'quote_invoice_added_copy',
         });
       } catch (notificationError) {
         console.error('Failed to notify quote manager about invoice details:', notificationError);
@@ -342,6 +343,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           subject: invoiceAddedTemplate.subject,
           body: invoiceAddedTemplate.bodyText,
           sendEmail: true,
+          emailCcType: 'quote_invoice_added_copy',
         });
       } catch (notificationError) {
         console.error('Failed to notify quote invoice notification recipients:', notificationError);

@@ -44,19 +44,43 @@ export interface QuoteNotificationRecipientOption {
   full_name: string | null;
   employee_id: string | null;
   team_id: string | null;
+  team_name: string | null;
 }
+
+interface QuoteNotificationRecipientRow extends Omit<QuoteNotificationRecipientOption, 'team_name'> {
+  team?: { name: string | null } | Array<{ name: string | null }> | null;
+}
+
+export type QuoteEmailCcNotificationType =
+  | 'quote_customer_email_copy'
+  | 'quote_po_request_copy'
+  | 'quote_rams_request_copy'
+  | 'quote_start_alert_copy'
+  | 'quote_invoice_request_copy'
+  | 'quote_invoice_added_copy';
 
 export type QuoteInvoiceNotificationType =
   | 'invoice_request'
   | 'invoice_added'
   | 'quote_sent_copy'
-  | 'start_alert_copy';
+  | 'start_alert_copy'
+  | QuoteEmailCcNotificationType;
+
+export const QUOTE_EMAIL_CC_NOTIFICATION_TYPES: QuoteEmailCcNotificationType[] = [
+  'quote_customer_email_copy',
+  'quote_po_request_copy',
+  'quote_rams_request_copy',
+  'quote_start_alert_copy',
+  'quote_invoice_request_copy',
+  'quote_invoice_added_copy',
+];
 
 export const QUOTE_INVOICE_NOTIFICATION_TYPES: QuoteInvoiceNotificationType[] = [
   'invoice_request',
   'invoice_added',
   'quote_sent_copy',
   'start_alert_copy',
+  ...QUOTE_EMAIL_CC_NOTIFICATION_TYPES,
 ];
 
 export interface QuoteModuleSettings {
@@ -657,6 +681,7 @@ export async function sendQuoteToCustomerEmail(
 export async function sendQuotePoRequestEmail(params: {
   bundle: QuoteBundle;
   recipientEmails: string[];
+  cc?: string[];
   senderEmail?: string | null;
   senderName?: string | null;
 }) {
@@ -680,6 +705,7 @@ export async function sendQuotePoRequestEmail(params: {
   return sendEmail({
     from: getDefaultFromEmail(),
     to: toEmails,
+    cc: params.cc,
     subject: template.subject,
     html: renderQuoteWorkflowEmailHtml(template.bodyHtml),
     replyTo: replyToEmail,
@@ -713,6 +739,7 @@ export async function sendQuoteRamsRequestEmail(params: {
   quoteReference: string;
   customerName: string;
   subjectLine: string;
+  cc?: string[];
   scope?: string | null;
   poNumber: string;
   managerName: string;
@@ -752,6 +779,7 @@ export async function sendQuoteRamsRequestEmail(params: {
 
   return sendEmail({
     to: ['conway@avsquires.co.uk'],
+    cc: params.cc,
     subject: template.subject,
     html: renderQuoteWorkflowEmailHtml(template.bodyHtml, 'RAMS requested'),
   });
@@ -759,6 +787,7 @@ export async function sendQuoteRamsRequestEmail(params: {
 
 export async function sendQuoteStartAlertEmail(params: {
   to: string;
+  cc?: string[];
   managerName: string;
   quoteReference: string;
   customerName: string;
@@ -776,6 +805,7 @@ export async function sendQuoteStartAlertEmail(params: {
 
   return sendEmail({
     to: [params.to],
+    cc: params.cc,
     subject: template.subject,
     html: renderQuoteWorkflowEmailHtml(template.bodyHtml, 'Job start reminder'),
   });
@@ -789,6 +819,7 @@ export async function createQuoteNotification(params: {
   createdVia?: string;
   moduleKey?: NotificationModuleKey;
   sendEmail?: boolean;
+  emailCcType?: QuoteEmailCcNotificationType;
 }) {
   const recipientIds = Array.from(new Set(params.recipientIds.filter(Boolean)));
   if (recipientIds.length === 0) {
@@ -871,6 +902,9 @@ export async function createQuoteNotification(params: {
 
   const emailResult = await sendEmail({
     to: emailTo,
+    cc: params.emailCcType
+      ? await getQuoteEmailCcEmails(admin, params.emailCcType, [params.senderId, ...emailRecipientIds])
+      : undefined,
     subject: params.subject,
     html: renderQuoteWorkflowEmailHtml(plainQuoteEmailTextToHtml(params.body), params.subject),
   });
@@ -892,7 +926,7 @@ export async function listQuoteNotificationRecipientOptions(
   const hiddenIds = await getHiddenSystemTestAccountIds(supabase);
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, full_name, employee_id, team_id')
+    .select('id, full_name, employee_id, team_id, team:org_teams!profiles_team_id_fkey(name)')
     .in('id', quoteUserIds)
     .order('full_name', { ascending: true });
 
@@ -900,11 +934,21 @@ export async function listQuoteNotificationRecipientOptions(
     throw error;
   }
 
-  return ((data || []) as QuoteNotificationRecipientOption[])
+  return ((data || []) as QuoteNotificationRecipientRow[])
     .filter(profile => !hiddenIds.has(profile.id))
     .filter(profile => {
       if (teamFilter === 'all') return true;
       return teamFilter === 'accounts' ? profile.team_id === 'accounts' : profile.team_id !== 'accounts';
+    })
+    .map(profile => {
+      const team = Array.isArray(profile.team) ? profile.team[0] || null : profile.team || null;
+      return {
+        id: profile.id,
+        full_name: profile.full_name,
+        employee_id: profile.employee_id,
+        team_id: profile.team_id,
+        team_name: team?.name || null,
+      };
     });
 }
 
@@ -987,6 +1031,12 @@ export async function getSelectedQuoteInvoiceNotificationRecipientIds(
     invoice_added: [],
     quote_sent_copy: [],
     start_alert_copy: [],
+    quote_customer_email_copy: [],
+    quote_po_request_copy: [],
+    quote_rams_request_copy: [],
+    quote_start_alert_copy: [],
+    quote_invoice_request_copy: [],
+    quote_invoice_added_copy: [],
   };
 
   for (const row of data || []) {
@@ -1030,6 +1080,14 @@ export async function getQuoteNotificationRecipientEmails(
   }));
 
   return Array.from(new Set(emails.filter((email): email is string => Boolean(email))));
+}
+
+export async function getQuoteEmailCcEmails(
+  supabase: ReturnType<typeof createAdminClient>,
+  notificationType: QuoteEmailCcNotificationType,
+  excludeUserIds: Array<string | null | undefined> = []
+): Promise<string[]> {
+  return getQuoteNotificationRecipientEmails(supabase, notificationType, excludeUserIds);
 }
 
 export async function getQuoteAccountsRecipientIds(

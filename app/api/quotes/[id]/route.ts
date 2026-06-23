@@ -12,8 +12,8 @@ import {
   fetchQuoteBundle,
   generateQuoteReferenceForManager,
   getInitialsFromName,
+  getQuoteEmailCcEmails,
   getQuoteManagerOption,
-  getQuoteNotificationRecipientEmails,
   sendQuotePoRequestEmail,
   sendQuoteRamsRequestEmail,
   sendQuoteToCustomerEmail,
@@ -218,7 +218,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         );
       }
 
-      const quoteCopyEmails = await getQuoteNotificationRecipientEmails(admin, 'quote_sent_copy', [user.id, current.quote.requester_id]);
+      const quoteCopyEmails = await getQuoteEmailCcEmails(admin, 'quote_customer_email_copy', [user.id, current.quote.requester_id]);
       const emailResult = await sendQuoteToCustomerEmail(current, [
         current.quote.manager_email || '',
         ...quoteCopyEmails,
@@ -305,7 +305,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         );
       }
 
-      const quoteCopyEmails = await getQuoteNotificationRecipientEmails(admin, 'quote_sent_copy', [user.id, current.quote.requester_id]);
+      const quoteCopyEmails = await getQuoteEmailCcEmails(admin, 'quote_customer_email_copy', [user.id, current.quote.requester_id]);
       const emailResult = await sendQuoteToCustomerEmail(current, [
         current.quote.manager_email || '',
         ...quoteCopyEmails,
@@ -376,6 +376,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       const emailResult = await sendQuotePoRequestEmail({
         bundle: current,
         recipientEmails: selectedRecipientEmails,
+        cc: await getQuoteEmailCcEmails(admin, 'quote_po_request_copy', [user.id]),
         senderEmail: user.email,
         senderName: senderProfile?.full_name || null,
       });
@@ -407,7 +408,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           po_received_at: hasPoDetails ? (current.quote.po_received_at || now) : current.quote.po_received_at,
           updated_by: user.id,
         })
-        .eq('id', id);
+        .eq('quote_thread_id', current.quote.quote_thread_id);
 
       if (error) throw error;
       await appendQuoteTimelineEvent(admin, {
@@ -441,7 +442,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           sage_posted_by: nextSagePostedAt ? user.id : null,
           updated_by: user.id,
         })
-        .eq('id', id);
+        .eq('quote_thread_id', current.quote.quote_thread_id);
 
       if (error) throw error;
       await appendQuoteTimelineEvent(admin, {
@@ -474,6 +475,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         quoteReference: current.quote.quote_reference,
         customerName: current.quote.customer?.company_name || 'Unknown customer',
         subjectLine: current.quote.subject_line || 'No subject provided',
+        cc: await getQuoteEmailCcEmails(admin, 'quote_rams_request_copy', [user.id]),
         scope: current.quote.scope || null,
         poNumber: String(normalizedPoNumber || current.quote.po_number || 'Not supplied'),
         managerName: current.quote.manager_name || 'Unknown manager',
@@ -672,8 +674,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         invoice_number: null,
         invoice_notes: null,
         last_invoice_at: null,
-        sage_posted_at: null,
-        sage_posted_by: null,
+        sage_posted_at: isDuplicate ? null : current.quote.sage_posted_at,
+        sage_posted_by: isDuplicate ? null : current.quote.sage_posted_by,
         accepted: false,
         accepted_at: null,
         invoiced_at: null,

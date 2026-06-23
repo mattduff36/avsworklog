@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import {
   createQuoteNotification,
+  getQuoteEmailCcEmails,
   getQuoteInvoiceNotificationRecipientIds,
   sendQuoteStartAlertEmail,
 } from '@/lib/server/quote-workflow';
@@ -90,6 +91,7 @@ async function handleQuoteStartAlerts(request: NextRequest, method: 'GET' | 'POS
 
       const emailResult = await sendQuoteStartAlertEmail({
         to: managerEmail,
+        cc: await getQuoteEmailCcEmails(admin, 'quote_start_alert_copy', [quote.requester_id]),
         managerName: manager?.full_name || 'Manager',
         quoteReference: quote.quote_reference,
         customerName: customer?.company_name || 'Unknown customer',
@@ -125,6 +127,7 @@ async function handleQuoteStartAlerts(request: NextRequest, method: 'GET' | 'POS
             subject: notificationTemplate.subject,
             body: notificationTemplate.bodyText,
             sendEmail: true,
+            emailCcType: 'quote_start_alert_copy',
           });
         }
 
