@@ -1,5 +1,28 @@
 [
   {
+    "version": "0626.34.0",
+    "updateKind": "major",
+    "title": "Workshop Tasks update",
+    "description": "Updated Workshop Tasks, Maintenance, and Actions.",
+    "summary": "Updated Workshop Tasks, Maintenance, and Actions.",
+    "details": [
+      "Covered workshop Tasks, maintenance, and and Actions.",
+      "Updated Workshop Tasks, Maintenance, and Actions.",
+      "Published as a larger app update because it included broader workflow changes.",
+      "The release time shown is when the version record was created."
+    ],
+    "areas": [
+      "Workshop Tasks",
+      "Maintenance",
+      "And Actions"
+    ],
+    "areaKeys": [
+      "workshop-tasks",
+      "maintenance"
+    ],
+    "pushedAt": "2026-06-23T15:21:32.598Z"
+  },
+  {
     "version": "0626.33.0",
     "updateKind": "major",
     "title": "Quotes update",
