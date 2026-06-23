@@ -1,5 +1,28 @@
 [
   {
+    "version": "0626.32.0",
+    "updateKind": "major",
+    "title": "Quotes update",
+    "description": "Updated Quotes, Data storage, and Notifications.",
+    "summary": "Updated Quotes, Data storage, and Notifications.",
+    "details": [
+      "Covered quotes, data storage, and and Notifications.",
+      "Updated Quotes, Data storage, and Notifications.",
+      "Published as a larger app update because it included broader workflow changes.",
+      "The release time shown is when the version record was created."
+    ],
+    "areas": [
+      "Quotes",
+      "Data storage",
+      "And Notifications"
+    ],
+    "areaKeys": [
+      "quotes",
+      "data-storage"
+    ],
+    "pushedAt": "2026-06-23T09:23:14.540Z"
+  },
+  {
     "version": "0626.31.0",
     "updateKind": "major",
     "title": "Workshop Tasks update",
