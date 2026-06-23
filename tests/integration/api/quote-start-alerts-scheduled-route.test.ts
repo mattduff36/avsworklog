@@ -4,12 +4,14 @@ import { NextRequest } from 'next/server';
 const {
   mockCreateAdminClient,
   mockCreateQuoteNotification,
+  mockGetQuoteEmailCcEmails,
   mockGetQuoteInvoiceNotificationRecipientIds,
   mockSendQuoteStartAlertEmail,
   mockRenderConfiguredQuoteEmailTemplate,
 } = vi.hoisted(() => ({
   mockCreateAdminClient: vi.fn(),
   mockCreateQuoteNotification: vi.fn(),
+  mockGetQuoteEmailCcEmails: vi.fn(),
   mockGetQuoteInvoiceNotificationRecipientIds: vi.fn(),
   mockSendQuoteStartAlertEmail: vi.fn(),
   mockRenderConfiguredQuoteEmailTemplate: vi.fn(),
@@ -21,6 +23,7 @@ vi.mock('@/lib/supabase/admin', () => ({
 
 vi.mock('@/lib/server/quote-workflow', () => ({
   createQuoteNotification: mockCreateQuoteNotification,
+  getQuoteEmailCcEmails: mockGetQuoteEmailCcEmails,
   getQuoteInvoiceNotificationRecipientIds: mockGetQuoteInvoiceNotificationRecipientIds,
   sendQuoteStartAlertEmail: mockSendQuoteStartAlertEmail,
 }));
@@ -34,6 +37,7 @@ describe('/api/quotes/start-alerts-scheduled', () => {
     vi.clearAllMocks();
     process.env.CRON_SECRET = 'secret';
     mockSendQuoteStartAlertEmail.mockResolvedValue({ success: true });
+    mockGetQuoteEmailCcEmails.mockResolvedValue([]);
     mockGetQuoteInvoiceNotificationRecipientIds.mockResolvedValue(['copy-1']);
     mockCreateQuoteNotification.mockResolvedValue(undefined);
     mockRenderConfiguredQuoteEmailTemplate.mockResolvedValue({

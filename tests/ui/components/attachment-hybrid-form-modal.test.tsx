@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { TabletModeProvider } from '@/components/layout/tablet-mode-context';
 import { AttachmentHybridFormModal } from '@/components/workshop-tasks/AttachmentHybridFormModal';
-import type { AttachmentSchemaSnapshot } from '@/types/workshop-attachments-v2';
+import type { AttachmentSchemaResponse, AttachmentSchemaSnapshot } from '@/types/workshop-attachments-v2';
 
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
@@ -150,6 +150,39 @@ const noteSnapshot: AttachmentSchemaSnapshot = {
   },
 };
 
+const existingInspectionResponses: AttachmentSchemaResponse[] = [
+  {
+    section_key: 'inside_cab',
+    field_key: 'engine_mil',
+    field_id: 'field-a1',
+    response_value: 'serviceable',
+    response_json: null,
+  },
+  {
+    section_key: 'declaration',
+    field_key: 'inspector_name',
+    field_id: 'field-b1',
+    response_value: 'A. Inspector',
+    response_json: null,
+  },
+];
+
+function renderInspectionModal(existingResponses: AttachmentSchemaResponse[]) {
+  return (
+    <TabletModeProvider>
+      <AttachmentHybridFormModal
+        open
+        onOpenChange={vi.fn()}
+        templateName="6 Week Inspection - HGV"
+        snapshot={snapshot}
+        existingResponses={existingResponses}
+        attachmentId="attachment-refresh"
+        onSave={vi.fn(async () => undefined)}
+      />
+    </TabletModeProvider>
+  );
+}
+
 describe('AttachmentHybridFormModal', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -270,6 +303,51 @@ describe('AttachmentHybridFormModal', () => {
 
     expect(noteResponse).toBeDefined();
     expect(noteResponse?.response_json).toMatchObject({ note: 'all four tyres' });
+  });
+
+  it('keeps the active section when existing responses refresh while open', async () => {
+    const { rerender } = render(renderInspectionModal(existingInspectionResponses));
+
+    fireEvent.click(screen.getByRole('button', { name: /declaration/i }));
+    expect(screen.getByRole('textbox', { name: /inspector name/i })).toBeInTheDocument();
+
+    rerender(renderInspectionModal([
+      ...existingInspectionResponses,
+      {
+        section_key: 'inside_cab',
+        field_key: 'engine_mil',
+        field_id: 'field-a1',
+        response_value: 'serviceable',
+        response_json: { refreshed_at: '2026-04-01T12:01:00.000Z' },
+      },
+    ]));
+
+    await waitFor(() => {
+      expect(screen.getByRole('textbox', { name: /inspector name/i })).toBeInTheDocument();
+    });
+  });
+
+  it('does not clobber unsaved input when existing responses refresh while open', async () => {
+    const { rerender } = render(renderInspectionModal(existingInspectionResponses));
+
+    fireEvent.click(screen.getByRole('button', { name: /declaration/i }));
+    const inspectorInput = screen.getByRole('textbox', { name: /inspector name/i }) as HTMLInputElement;
+    fireEvent.change(inspectorInput, { target: { value: 'Unsaved Inspector' } });
+
+    rerender(renderInspectionModal([
+      existingInspectionResponses[0],
+      {
+        section_key: 'declaration',
+        field_key: 'inspector_name',
+        field_id: 'field-b1',
+        response_value: 'Server Inspector',
+        response_json: null,
+      },
+    ]));
+
+    await waitFor(() => {
+      expect(screen.getByRole('textbox', { name: /inspector name/i })).toHaveValue('Unsaved Inspector');
+    });
   });
 
   it('restores a locally saved attachment draft on reopen', async () => {

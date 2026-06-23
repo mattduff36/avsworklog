@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
@@ -44,6 +44,12 @@ interface LocalResponseValue {
   response_value: string | null;
   response_json: Record<string, unknown> | null;
   field_id: string | null;
+}
+
+interface InitialResponseState {
+  responses: Record<string, LocalResponseValue>;
+  signatureNames: Record<string, string>;
+  fingerprint: string;
 }
 
 const MARKING_CODE_OPTIONS = [
@@ -97,6 +103,31 @@ function getChoiceButtonClasses(
 
 function toResponseKey(sectionKey: string, fieldKey: string): string {
   return `${sectionKey}::${fieldKey}`;
+}
+
+function getInitialResponseState(existingResponses: AttachmentSchemaResponse[]): InitialResponseState {
+  const responses: Record<string, LocalResponseValue> = {};
+  const signatureNames: Record<string, string> = {};
+
+  existingResponses.forEach((response) => {
+    const key = toResponseKey(response.section_key, response.field_key);
+    responses[key] = {
+      response_value: response.response_value ?? null,
+      response_json: response.response_json ?? null,
+      field_id: response.field_id ?? null,
+    };
+
+    const signedByName = normalizeValue(response.response_json?.signed_by_name);
+    if (signedByName.length > 0) {
+      signatureNames[key] = signedByName;
+    }
+  });
+
+  return {
+    responses,
+    signatureNames,
+    fingerprint: getResponsesFingerprint(responses),
+  };
 }
 
 function normalizeValue(value: unknown): string {
@@ -255,30 +286,25 @@ export function AttachmentHybridFormModal({
   const [signatureNames, setSignatureNames] = useState<Record<string, string>>({});
   const [initialResponsesFingerprint, setInitialResponsesFingerprint] = useState<string | null>(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const initializedSessionKeyRef = useRef<string | null>(null);
+  const formSessionKey = `${attachmentId || 'new-attachment'}:${snapshot.id}:${snapshot.template_version_id}`;
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      initializedSessionKeyRef.current = null;
+      return;
+    }
+    if (initializedSessionKeyRef.current === formSessionKey) return;
+    initializedSessionKeyRef.current = formSessionKey;
+
     setActiveSectionKey(sections[0]?.section_key || '');
     setActiveSignatureKey(null);
 
-    const nextResponses: Record<string, LocalResponseValue> = {};
-    const nextSignatureNames: Record<string, string> = {};
-    existingResponses.forEach((response) => {
-      const key = toResponseKey(response.section_key, response.field_key);
-      nextResponses[key] = {
-        response_value: response.response_value ?? null,
-        response_json: response.response_json ?? null,
-        field_id: response.field_id ?? null,
-      };
-      const signedByName = normalizeValue(response.response_json?.signed_by_name);
-      if (signedByName.length > 0) {
-        nextSignatureNames[key] = signedByName;
-      }
-    });
-    setResponses(nextResponses);
-    setSignatureNames(nextSignatureNames);
-    setInitialResponsesFingerprint(getResponsesFingerprint(nextResponses));
-  }, [open, existingResponses, sections]);
+    const initialResponseState = getInitialResponseState(existingResponses);
+    setResponses(initialResponseState.responses);
+    setSignatureNames(initialResponseState.signatureNames);
+    setInitialResponsesFingerprint(initialResponseState.fingerprint);
+  }, [existingResponses, formSessionKey, open, sections]);
 
   const activeSection = sections.find((section) => section.section_key === activeSectionKey) || sections[0];
   const totalFields = sections.reduce((sum, section) => sum + section.fields.length, 0);
