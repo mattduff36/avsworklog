@@ -156,4 +156,100 @@ describe('workshop task completion date confirmation', () => {
 
     vi.unstubAllGlobals();
   });
+
+  it('uses confirmed created and in-progress dates when completion is backdated before them', async () => {
+    const loggedEvent = {
+      id: 'event-logged',
+      type: 'status',
+      status: 'logged',
+      created_at: '2026-05-10T10:00:00.000Z',
+      author_id: 'manager-1',
+      author_name: 'Manager One',
+      body: 'Started',
+    };
+    const updatePayloads: Array<Record<string, unknown>> = [];
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table !== 'actions') throw new Error(`Unexpected table: ${table}`);
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              single: vi.fn().mockResolvedValue({
+                data: { status_history: [loggedEvent] },
+                error: null,
+              }),
+            })),
+          })),
+          update: vi.fn((payload: Record<string, unknown>) => {
+            updatePayloads.push(payload);
+            return {
+              eq: vi.fn().mockResolvedValue({ error: null }),
+            };
+          }),
+        };
+      }),
+    };
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({}),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const task = buildTask({
+      created_at: '2026-05-10T09:00:00.000Z',
+      logged_at: '2026-05-10T10:00:00.000Z',
+    });
+    const lifecycle = useWorkshopTaskLifecycleActions({
+      supabase: supabase as never,
+      userId: 'manager-1',
+      profileName: 'Manager One',
+      tasks: [task],
+      fetchTasks: vi.fn().mockResolvedValue(undefined),
+      selectedTask: null,
+      loggedComment: '',
+      onHoldingTask: null,
+      onHoldComment: '',
+      resumingTask: null,
+      resumeComment: '',
+      completingTask: task,
+      setUpdatingStatus: vi.fn((updater: (previous: Set<string>) => Set<string>) => updater(new Set())),
+      setShowStatusModal: vi.fn(),
+      setSelectedTask: vi.fn(),
+      setLoggedComment: vi.fn(),
+      setShowOnHoldModal: vi.fn(),
+      setShowResumeModal: vi.fn(),
+      setShowCompleteModal: vi.fn(),
+      setCompletingTask: vi.fn(),
+    });
+
+    const completedAt = '2026-05-09T14:26:00.000Z';
+    const createdAt = '2026-05-09T14:24:00.000Z';
+    const intermediateAt = '2026-05-09T14:25:00.000Z';
+    const result = await lifecycle.confirmMarkComplete({
+      intermediateComment: '',
+      completedComment: 'Backdated completion',
+      completedAt,
+      createdAt,
+      intermediateAt,
+    } satisfies CompletionData);
+
+    expect(result).toBe(true);
+    expect(updatePayloads[0]).toMatchObject({
+      created_at: createdAt,
+      logged_at: intermediateAt,
+      actioned_at: completedAt,
+    });
+    expect(updatePayloads[0].status_history).toEqual([
+      expect.objectContaining({
+        id: 'event-logged',
+        created_at: intermediateAt,
+      }),
+      expect.objectContaining({
+        status: 'completed',
+        created_at: completedAt,
+      }),
+    ]);
+
+    vi.unstubAllGlobals();
+  });
 });

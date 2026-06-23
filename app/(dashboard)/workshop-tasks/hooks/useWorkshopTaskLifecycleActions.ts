@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import {
   appendStatusHistory,
   buildStatusHistoryEvent,
+  updateLatestInProgressStatusHistoryTimestamp,
 } from '@/lib/utils/workshopTaskStatusHistory';
 import { inferMaintenanceLink } from '@/lib/utils/workshopMaintenanceSync';
 import type { CompletionData } from '@/components/workshop-tasks/MarkTaskCompleteDialog';
@@ -253,7 +254,10 @@ export function useWorkshopTaskLifecycleActions({
 
       const completedAt = new Date(data.completedAt);
       const completedAtIso = completedAt.toISOString();
-      const intermediateAtIso = new Date(completedAt.getTime() - 1).toISOString();
+      const createdAtIso = data.createdAt ? new Date(data.createdAt).toISOString() : undefined;
+      const intermediateAtIso = data.intermediateAt
+        ? new Date(data.intermediateAt).toISOString()
+        : new Date(completedAt.getTime() - 1).toISOString();
 
       const { data: latestTask, error: fetchError } = await supabase
         .from('actions')
@@ -285,6 +289,7 @@ export function useWorkshopTaskLifecycleActions({
         const { error: intermediateError } = await supabase
           .from('actions')
           .update({
+            ...(createdAtIso ? { created_at: createdAtIso } : {}),
             status: 'logged',
             logged_at: intermediateAtIso,
             logged_by: userId || null,
@@ -297,6 +302,11 @@ export function useWorkshopTaskLifecycleActions({
           console.error('Error in intermediate step:', intermediateError);
           throw intermediateError;
         }
+      } else if (data.intermediateAt) {
+        nextHistory = updateLatestInProgressStatusHistoryTimestamp(
+          nextHistory,
+          intermediateAtIso
+        );
       }
 
       const completeEvent = buildStatusHistoryEvent({
@@ -317,6 +327,8 @@ export function useWorkshopTaskLifecycleActions({
       const { error } = await supabase
         .from('actions')
         .update({
+          ...(createdAtIso ? { created_at: createdAtIso } : {}),
+          ...(data.intermediateAt ? { logged_at: intermediateAtIso } : {}),
           status: 'completed',
           actioned: true,
           actioned_at: completedAtIso,

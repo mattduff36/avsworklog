@@ -21,7 +21,11 @@ import { MarkTaskCompleteDialog, type CompletionData } from '@/components/worksh
 import { OfficeActionDialog } from './OfficeActionDialog';
 import { QuickEditPopover } from './QuickEditPopover';
 import { getTaskContent, type AlertType } from '@/lib/utils/serviceTaskCreation';
-import { appendStatusHistory, buildStatusHistoryEvent } from '@/lib/utils/workshopTaskStatusHistory';
+import {
+  appendStatusHistory,
+  buildStatusHistoryEvent,
+  updateLatestInProgressStatusHistoryTimestamp,
+} from '@/lib/utils/workshopTaskStatusHistory';
 import { inferMaintenanceLink } from '@/lib/utils/workshopMaintenanceSync';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
@@ -138,6 +142,7 @@ function formatDistanceReading(
 interface WorkshopTask {
   id: string;
   created_at: string;
+  logged_at?: string | null;
   status: string;
   title?: string;
   description: string;
@@ -832,7 +837,10 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       const supabase = createClient();
       const completedAt = new Date(data.completedAt);
       const completedAtIso = completedAt.toISOString();
-      const intermediateAtIso = new Date(completedAt.getTime() - 1).toISOString();
+      const createdAtIso = data.createdAt ? new Date(data.createdAt).toISOString() : undefined;
+      const intermediateAtIso = data.intermediateAt
+        ? new Date(data.intermediateAt).toISOString()
+        : new Date(completedAt.getTime() - 1).toISOString();
 
       // Fetch latest status_history from database to ensure we have current state
       const { data: latestTask, error: fetchError } = await supabase
@@ -852,6 +860,8 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         : [];
 
       let updatePayload: Record<string, unknown> = {
+        ...(createdAtIso ? { created_at: createdAtIso } : {}),
+        ...(data.intermediateAt ? { logged_at: intermediateAtIso } : {}),
         status: 'completed',
         actioned: true,
         actioned_at: completedAtIso,
@@ -878,6 +888,11 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
           logged_comment: data.intermediateComment,
           logged_by: user?.id || null,
         };
+      } else if (data.intermediateAt) {
+        nextHistory = updateLatestInProgressStatusHistoryTimestamp(
+          nextHistory,
+          intermediateAtIso
+        );
       }
 
       const completeEvent = buildStatusHistoryEvent({
