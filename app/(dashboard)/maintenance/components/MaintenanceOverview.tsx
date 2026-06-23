@@ -830,7 +830,9 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       setUpdatingStatus(prev => new Set(prev).add(taskId));
 
       const supabase = createClient();
-      const now = new Date();
+      const completedAt = new Date(data.completedAt);
+      const completedAtIso = completedAt.toISOString();
+      const intermediateAtIso = new Date(completedAt.getTime() - 1).toISOString();
 
       // Fetch latest status_history from database to ensure we have current state
       const { data: latestTask, error: fetchError } = await supabase
@@ -852,11 +854,11 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
       let updatePayload: Record<string, unknown> = {
         status: 'completed',
         actioned: true,
-        actioned_at: now.toISOString(),
+        actioned_at: completedAtIso,
         actioned_comment: data.completedComment,
         actioned_by: user?.id || null,
         actioned_signature_data: data.completedSignatureData || null,
-        actioned_signed_at: data.completedSignedAt || null,
+        actioned_signed_at: data.completedSignatureData ? completedAtIso : null,
       };
 
       if (requiresIntermediateStep) {
@@ -866,13 +868,13 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
           body: data.intermediateComment,
           authorId: user?.id || null,
           authorName: profile?.full_name || null,
-          createdAt: now.toISOString(),
+          createdAt: intermediateAtIso,
         });
         nextHistory = appendStatusHistory(nextHistory, intermediateEvent);
 
         updatePayload = {
           ...updatePayload,
-          logged_at: now.toISOString(),
+          logged_at: intermediateAtIso,
           logged_comment: data.intermediateComment,
           logged_by: user?.id || null,
         };
@@ -886,10 +888,10 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
         meta: data.completedSignatureData
           ? {
               signature_data: data.completedSignatureData,
-              signed_at: data.completedSignedAt || new Date(now.getTime() + 1).toISOString(),
+              signed_at: completedAtIso,
             }
           : undefined,
-        createdAt: new Date(now.getTime() + 1).toISOString(),
+        createdAt: completedAtIso,
       });
       nextHistory = appendStatusHistory(nextHistory, completeEvent);
 
@@ -922,7 +924,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                 ...data.maintenanceUpdates,
                 assetType: completingTask.plant_id ? 'plant' : completingTask.hgv_id ? 'hgv' : 'van',
                 task_id: taskId,
-                completed_at: now.toISOString(),
+                completed_at: completedAtIso,
                 task_title: completingTask.title,
                 task_description: completingTask.description,
                 task_category_name: completingTask.workshop_task_categories?.name,

@@ -37,6 +37,7 @@ export interface TaskForCompletion {
 export interface CompletionData {
   intermediateComment: string;
   completedComment: string;
+  completedAt: string;
   completedSignatureData?: string;
   completedSignedAt?: string;
   maintenanceUpdates?: CompletionFieldValues;
@@ -51,6 +52,17 @@ interface MarkTaskCompleteDialogProps {
   userId?: string | null;
 }
 
+function toLocalDateTimeInputValue(date: Date): string {
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return localDate.toISOString().slice(0, 16);
+}
+
+function parseLocalDateTimeInput(value: string): Date | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 export function MarkTaskCompleteDialog({
   open,
   onOpenChange,
@@ -63,6 +75,9 @@ export function MarkTaskCompleteDialog({
   const contentRef = useRef<HTMLDivElement>(null);
   const [intermediateComment, setIntermediateComment] = useState('');
   const [completedComment, setCompletedComment] = useState('');
+  const [completedAtLocal, setCompletedAtLocal] = useState('');
+  const [maxCompletedAtLocal, setMaxCompletedAtLocal] = useState('');
+  const [initialCompletedAtLocal, setInitialCompletedAtLocal] = useState('');
   const [completedSignatureData, setCompletedSignatureData] = useState<string | null>(null);
   const [completedSignedAt, setCompletedSignedAt] = useState<string | null>(null);
   const [showSignaturePad, setShowSignaturePad] = useState(false);
@@ -86,8 +101,12 @@ export function MarkTaskCompleteDialog({
   useEffect(() => {
     if (open && task) {
       queueMicrotask(() => {
+        const defaultCompletedAtLocal = toLocalDateTimeInputValue(new Date());
+        setInitialCompletedAtLocal(defaultCompletedAtLocal);
+        setMaxCompletedAtLocal(defaultCompletedAtLocal);
         setIntermediateComment('');
         setCompletedComment('');
+        setCompletedAtLocal(defaultCompletedAtLocal);
         setCompletedSignatureData(null);
         setCompletedSignedAt(null);
         setShowSignaturePad(false);
@@ -125,6 +144,12 @@ export function MarkTaskCompleteDialog({
 
   const handleConfirm = async () => {
     if (!task) return;
+    const completedAtDate = parseLocalDateTimeInput(completedAtLocal);
+    const maxCompletedAtDate = parseLocalDateTimeInput(maxCompletedAtLocal);
+    if (!completedAtDate || (maxCompletedAtDate && completedAtDate.getTime() > maxCompletedAtDate.getTime())) {
+      triggerShakeAnimation(contentRef.current);
+      return;
+    }
 
     // Prepare maintenance updates (convert string values to appropriate types)
     const processedMaintenanceUpdates: CompletionFieldValues = {};
@@ -146,6 +171,7 @@ export function MarkTaskCompleteDialog({
     const completed = await onConfirm({
       intermediateComment: intermediateComment.trim(),
       completedComment: completedComment.trim(),
+      completedAt: completedAtDate.toISOString(),
       completedSignatureData: completedSignatureData || undefined,
       completedSignedAt: completedSignedAt || undefined,
       maintenanceUpdates: Object.keys(processedMaintenanceUpdates).length > 0 
@@ -161,6 +187,9 @@ export function MarkTaskCompleteDialog({
     void clearDraft();
     setIntermediateComment('');
     setCompletedComment('');
+    setCompletedAtLocal('');
+    setInitialCompletedAtLocal('');
+    setMaxCompletedAtLocal('');
     setCompletedSignatureData(null);
     setCompletedSignedAt(null);
     setShowSignaturePad(false);
@@ -168,19 +197,26 @@ export function MarkTaskCompleteDialog({
     onOpenChange(false);
   };
 
+  const completedAtDate = parseLocalDateTimeInput(completedAtLocal);
+  const maxCompletedAtDate = parseLocalDateTimeInput(maxCompletedAtLocal);
+  const isCompletedAtValid =
+    Boolean(completedAtDate) &&
+    (!maxCompletedAtDate || completedAtDate!.getTime() <= maxCompletedAtDate.getTime());
   const isValid =
     (!requiresIntermediateStep || (intermediateComment.trim() && intermediateComment.length <= 300)) &&
     completedComment.trim() &&
     completedComment.length <= 500 &&
+    isCompletedAtValid &&
     (!requiresCompletionSignature || Boolean(completedSignatureData)) &&
     validateMaintenanceFields();
   const isDirty = useMemo(
     () =>
       intermediateComment.trim().length > 0 ||
       completedComment.trim().length > 0 ||
+      (completedAtLocal !== '' && completedAtLocal !== initialCompletedAtLocal) ||
       Boolean(completedSignatureData) ||
       Object.values(maintenanceFields).some((value) => value !== undefined && value !== null && `${value}`.trim() !== ''),
-    [intermediateComment, completedComment, completedSignatureData, maintenanceFields]
+    [intermediateComment, completedComment, completedAtLocal, initialCompletedAtLocal, completedSignatureData, maintenanceFields]
   );
   const { clearDraft } = useWorkshopDraftPersistence({
     enabled: open && Boolean(task),
@@ -190,6 +226,7 @@ export function MarkTaskCompleteDialog({
     value: {
       intermediateComment,
       completedComment,
+      completedAtLocal,
       completedSignatureData,
       completedSignedAt,
       maintenanceFields,
@@ -198,6 +235,7 @@ export function MarkTaskCompleteDialog({
     onRestore: (draft) => {
       setIntermediateComment(draft.intermediateComment || '');
       setCompletedComment(draft.completedComment || '');
+      setCompletedAtLocal(draft.completedAtLocal || initialCompletedAtLocal || toLocalDateTimeInputValue(new Date()));
       setCompletedSignatureData(draft.completedSignatureData || null);
       setCompletedSignedAt(draft.completedSignedAt || null);
       setMaintenanceFields(draft.maintenanceFields || {});
@@ -294,6 +332,26 @@ export function MarkTaskCompleteDialog({
               </p>
             </div>
           )}
+
+          {/* Completion Comment */}
+          <div className="space-y-2">
+            <Label htmlFor="completed-at">
+              Completed Date &amp; Time <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="completed-at"
+              type="datetime-local"
+              value={completedAtLocal}
+              max={maxCompletedAtLocal}
+              onFocus={() => setMaxCompletedAtLocal(toLocalDateTimeInputValue(new Date()))}
+              onChange={(e) => setCompletedAtLocal(e.target.value)}
+              className={tabletModeEnabled ? 'text-base' : undefined}
+              disabled={isSubmitting}
+            />
+            <p className="text-xs text-muted-foreground">
+              Confirm the real completion date. This date is used for future maintenance due dates.
+            </p>
+          </div>
 
           {/* Completion Comment */}
           <div className="space-y-2">

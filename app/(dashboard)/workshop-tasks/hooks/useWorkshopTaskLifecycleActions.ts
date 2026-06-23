@@ -251,7 +251,9 @@ export function useWorkshopTaskLifecycleActions({
     try {
       setUpdatingStatus(prev => new Set(prev).add(taskId));
 
-      const now = new Date();
+      const completedAt = new Date(data.completedAt);
+      const completedAtIso = completedAt.toISOString();
+      const intermediateAtIso = new Date(completedAt.getTime() - 1).toISOString();
 
       const { data: latestTask, error: fetchError } = await supabase
         .from('actions')
@@ -276,7 +278,7 @@ export function useWorkshopTaskLifecycleActions({
           body: data.intermediateComment,
           authorId: userId || null,
           authorName: profileName || null,
-          createdAt: now.toISOString(),
+          createdAt: intermediateAtIso,
         });
         nextHistory = appendStatusHistory(nextHistory, intermediateEvent);
 
@@ -284,7 +286,7 @@ export function useWorkshopTaskLifecycleActions({
           .from('actions')
           .update({
             status: 'logged',
-            logged_at: now.toISOString(),
+            logged_at: intermediateAtIso,
             logged_by: userId || null,
             logged_comment: data.intermediateComment,
             status_history: nextHistory,
@@ -305,10 +307,10 @@ export function useWorkshopTaskLifecycleActions({
         meta: data.completedSignatureData
           ? {
               signature_data: data.completedSignatureData,
-              signed_at: data.completedSignedAt || new Date(now.getTime() + 1).toISOString(),
+              signed_at: completedAtIso,
             }
           : undefined,
-        createdAt: new Date(now.getTime() + 1).toISOString(),
+        createdAt: completedAtIso,
       });
       nextHistory = appendStatusHistory(nextHistory, completeEvent);
 
@@ -317,11 +319,11 @@ export function useWorkshopTaskLifecycleActions({
         .update({
           status: 'completed',
           actioned: true,
-          actioned_at: new Date(now.getTime() + 1).toISOString(),
+          actioned_at: completedAtIso,
           actioned_by: userId || null,
           actioned_comment: data.completedComment,
           actioned_signature_data: data.completedSignatureData || null,
-          actioned_signed_at: data.completedSignedAt || null,
+          actioned_signed_at: data.completedSignatureData ? completedAtIso : null,
           status_history: nextHistory,
         })
         .eq('id', taskId);
@@ -353,7 +355,7 @@ export function useWorkshopTaskLifecycleActions({
                 ...data.maintenanceUpdates,
                 assetType,
                 task_id: taskId,
-                completed_at: now.toISOString(),
+                completed_at: completedAtIso,
                 task_title: completingTask.title,
                 task_description: completingTask.description,
                 task_category_name: completingTask.workshop_task_categories?.name,
