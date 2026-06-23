@@ -1,5 +1,30 @@
 [
   {
+    "version": "0626.38.0",
+    "updateKind": "major",
+    "title": "Timesheets update",
+    "description": "Updated Timesheets, Workshop Tasks, Dashboard, and Navigation.",
+    "summary": "Updated Timesheets, Workshop Tasks, Dashboard, and Navigation.",
+    "details": [
+      "Covered timesheets, workshop Tasks, dashboard, and and Navigation.",
+      "Updated Timesheets, Workshop Tasks, Dashboard, and Navigation.",
+      "Published as a larger app update because it included broader workflow changes.",
+      "The release time shown is when the version record was created."
+    ],
+    "areas": [
+      "Timesheets",
+      "Workshop Tasks",
+      "Dashboard",
+      "And Navigation"
+    ],
+    "areaKeys": [
+      "timesheets",
+      "workshop-tasks",
+      "dashboard"
+    ],
+    "pushedAt": "2026-06-23T21:08:20.781Z"
+  },
+  {
     "version": "0626.37.0",
     "updateKind": "major",
     "title": "Workshop Tasks update",

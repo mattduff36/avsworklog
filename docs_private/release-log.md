@@ -2,6 +2,20 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.38.0
+
+**GIT COMMIT MESSAGE**
+`feat(timesheets): update Timesheets, Workshop Tasks, Dashboard, and Navigation`
+
+**PUSHED AT**
+2026-06-23T21:08:20.781Z
+
+**WHAT CHANGED**
+Update Timesheets, Workshop Tasks, Dashboard, and Navigation.
+
+**COMMITS IN THIS RELEASE**
+- `feat(timesheets): update Timesheets, Workshop Tasks, Dashboard, and Navigation`
+
 ## 0626.37.0
 
 **GIT COMMIT MESSAGE**
