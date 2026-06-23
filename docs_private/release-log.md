@@ -2,6 +2,20 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.36.0
+
+**GIT COMMIT MESSAGE**
+`feat(workshop-tasks): update Workshop Tasks and Quotes`
+
+**PUSHED AT**
+2026-06-23T16:44:23.551Z
+
+**WHAT CHANGED**
+Update Workshop Tasks and Quotes.
+
+**COMMITS IN THIS RELEASE**
+- `feat(workshop-tasks): update Workshop Tasks and Quotes`
+
 ## 0626.35.0
 
 **GIT COMMIT MESSAGE**
