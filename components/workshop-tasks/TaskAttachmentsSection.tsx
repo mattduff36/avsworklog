@@ -34,6 +34,7 @@ export function TaskAttachmentsSection({ taskId, taskStatus, onUpdate }: TaskAtt
   const [activeAttachmentId, setActiveAttachmentId] = useState<string | null>(null);
   const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<string | null>(null);
   const [undoingAttachmentId, setUndoingAttachmentId] = useState<string | null>(null);
+  const [activeSectionKeyByAttachmentId, setActiveSectionKeyByAttachmentId] = useState<Record<string, string>>({});
 
   const isTaskCompleted = taskStatus === 'completed';
   const activeAttachment = useMemo(
@@ -85,6 +86,17 @@ export function TaskAttachmentsSection({ taskId, taskStatus, onUpdate }: TaskAtt
     if (!open) {
       setActiveAttachmentId(null);
     }
+  };
+
+  const handleActiveSectionChange = (sectionKey: string) => {
+    if (!activeAttachmentId) return;
+    setActiveSectionKeyByAttachmentId((prev) => {
+      if (prev[activeAttachmentId] === sectionKey) return prev;
+      return {
+        ...prev,
+        [activeAttachmentId]: sectionKey,
+      };
+    });
   };
 
   const handleSaveSchemaResponses = async (
@@ -349,6 +361,8 @@ export function TaskAttachmentsSection({ taskId, taskStatus, onUpdate }: TaskAtt
               readOnly={isTaskCompleted || activeAttachment.status === 'completed'}
               isCompleted={activeAttachment.status === 'completed'}
               attachmentId={activeAttachment.id}
+              initialActiveSectionKey={activeSectionKeyByAttachmentId[activeAttachment.id]}
+              onActiveSectionChange={handleActiveSectionChange}
               canUndoComplete={!isTaskCompleted && activeAttachment.status === 'completed' && canUndoAttachmentCompletion(activeAttachment.completed_at)}
               undoCompleteLabel={formatAttachmentUndoRemaining(activeAttachment.completed_at)}
               onUndoComplete={() => handleUndoComplete(activeAttachment)}

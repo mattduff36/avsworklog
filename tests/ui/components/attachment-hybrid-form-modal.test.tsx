@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import type { ComponentProps } from 'react';
+import { useState, type ComponentProps } from 'react';
 import { TabletModeProvider } from '@/components/layout/tablet-mode-context';
 import { AttachmentHybridFormModal } from '@/components/workshop-tasks/AttachmentHybridFormModal';
 import type { AttachmentSchemaResponse, AttachmentSchemaSnapshot } from '@/types/workshop-attachments-v2';
@@ -167,18 +167,55 @@ const existingInspectionResponses: AttachmentSchemaResponse[] = [
   },
 ];
 
-function renderInspectionModal(existingResponses: AttachmentSchemaResponse[]) {
+interface RenderInspectionModalOptions {
+  initialActiveSectionKey?: string;
+  onActiveSectionChange?: (sectionKey: string) => void;
+  onOpenChange?: (open: boolean) => void;
+}
+
+function renderInspectionModal(
+  existingResponses: AttachmentSchemaResponse[],
+  options: RenderInspectionModalOptions = {},
+) {
   return (
     <TabletModeProvider>
       <AttachmentHybridFormModal
         open
-        onOpenChange={vi.fn()}
+        onOpenChange={options.onOpenChange || vi.fn()}
         templateName="6 Week Inspection - HGV"
         snapshot={snapshot}
         existingResponses={existingResponses}
         attachmentId="attachment-refresh"
+        initialActiveSectionKey={options.initialActiveSectionKey}
+        onActiveSectionChange={options.onActiveSectionChange}
         onSave={vi.fn(async () => undefined)}
       />
+    </TabletModeProvider>
+  );
+}
+
+function ReopenInspectionModalHarness() {
+  const [open, setOpen] = useState(true);
+  const [activeSectionKey, setActiveSectionKey] = useState<string | undefined>();
+
+  return (
+    <TabletModeProvider>
+      <button type="button" onClick={() => setOpen(true)}>
+        Open attachment
+      </button>
+      {open && (
+        <AttachmentHybridFormModal
+          open
+          onOpenChange={setOpen}
+          templateName="6 Week Inspection - HGV"
+          snapshot={snapshot}
+          existingResponses={existingInspectionResponses}
+          attachmentId="attachment-refresh"
+          initialActiveSectionKey={activeSectionKey}
+          onActiveSectionChange={setActiveSectionKey}
+          onSave={vi.fn(async () => undefined)}
+        />
+      )}
     </TabletModeProvider>
   );
 }
@@ -347,6 +384,23 @@ describe('AttachmentHybridFormModal', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('textbox', { name: /inspector name/i })).toHaveValue('Unsaved Inspector');
+    });
+  });
+
+  it('reopens to the previous active section after dismissal', async () => {
+    render(<ReopenInspectionModalHarness />);
+
+    fireEvent.click(screen.getByRole('button', { name: /declaration/i }));
+    expect(screen.getByRole('textbox', { name: /inspector name/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Close' })[0]);
+    await waitFor(() => {
+      expect(screen.queryByRole('textbox', { name: /inspector name/i })).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /open attachment/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('textbox', { name: /inspector name/i })).toBeInTheDocument();
     });
   });
 

@@ -33,6 +33,8 @@ interface AttachmentHybridFormModalProps {
   readOnly?: boolean;
   isCompleted?: boolean;
   attachmentId?: string;
+  initialActiveSectionKey?: string;
+  onActiveSectionChange?: (sectionKey: string) => void;
   onSave: (responses: AttachmentSchemaResponse[], markComplete: boolean) => Promise<void>;
   canUndoComplete?: boolean;
   undoCompleteLabel?: string | null;
@@ -267,6 +269,8 @@ export function AttachmentHybridFormModal({
   readOnly = false,
   isCompleted = false,
   attachmentId,
+  initialActiveSectionKey,
+  onActiveSectionChange,
   onSave,
   canUndoComplete = false,
   undoCompleteLabel = null,
@@ -297,14 +301,23 @@ export function AttachmentHybridFormModal({
     if (initializedSessionKeyRef.current === formSessionKey) return;
     initializedSessionKeyRef.current = formSessionKey;
 
-    setActiveSectionKey(sections[0]?.section_key || '');
+    const initialSectionKey = initialActiveSectionKey
+      && sections.some((section) => section.section_key === initialActiveSectionKey)
+      ? initialActiveSectionKey
+      : sections[0]?.section_key || '';
+    setActiveSectionKey(initialSectionKey);
     setActiveSignatureKey(null);
 
     const initialResponseState = getInitialResponseState(existingResponses);
     setResponses(initialResponseState.responses);
     setSignatureNames(initialResponseState.signatureNames);
     setInitialResponsesFingerprint(initialResponseState.fingerprint);
-  }, [existingResponses, formSessionKey, open, sections]);
+  }, [existingResponses, formSessionKey, initialActiveSectionKey, open, sections]);
+
+  useEffect(() => {
+    if (!open || !activeSectionKey) return;
+    onActiveSectionChange?.(activeSectionKey);
+  }, [activeSectionKey, onActiveSectionChange, open]);
 
   const activeSection = sections.find((section) => section.section_key === activeSectionKey) || sections[0];
   const totalFields = sections.reduce((sum, section) => sum + section.fields.length, 0);
