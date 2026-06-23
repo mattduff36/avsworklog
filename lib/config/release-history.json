@@ -1,5 +1,26 @@
 [
   {
+    "version": "0626.37.0",
+    "updateKind": "major",
+    "title": "Workshop Tasks update",
+    "description": "Updated workshop tasks.",
+    "summary": "Updated workshop tasks.",
+    "details": [
+      "Covered workshop tasks and workshop Tasks.",
+      "Updated workshop tasks.",
+      "Published as a larger app update because it included broader workflow changes.",
+      "The release time shown is when the version record was created."
+    ],
+    "areas": [
+      "Workshop tasks",
+      "Workshop Tasks"
+    ],
+    "areaKeys": [
+      "workshop-tasks"
+    ],
+    "pushedAt": "2026-06-23T17:01:23.834Z"
+  },
+  {
     "version": "0626.36.0",
     "updateKind": "major",
     "title": "Workshop Tasks update",
