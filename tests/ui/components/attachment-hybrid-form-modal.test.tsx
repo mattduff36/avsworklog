@@ -169,8 +169,11 @@ const existingInspectionResponses: AttachmentSchemaResponse[] = [
 
 interface RenderInspectionModalOptions {
   initialActiveSectionKey?: string;
+  initialScrollTop?: number;
   onActiveSectionChange?: (sectionKey: string) => void;
+  onScrollPositionChange?: (scrollTop: number) => void;
   onOpenChange?: (open: boolean) => void;
+  onSave?: (responses: AttachmentSchemaResponse[], markComplete: boolean) => Promise<void>;
 }
 
 function renderInspectionModal(
@@ -187,8 +190,10 @@ function renderInspectionModal(
         existingResponses={existingResponses}
         attachmentId="attachment-refresh"
         initialActiveSectionKey={options.initialActiveSectionKey}
+        initialScrollTop={options.initialScrollTop}
         onActiveSectionChange={options.onActiveSectionChange}
-        onSave={vi.fn(async () => undefined)}
+        onScrollPositionChange={options.onScrollPositionChange}
+        onSave={options.onSave || vi.fn(async () => undefined)}
       />
     </TabletModeProvider>
   );
@@ -197,6 +202,7 @@ function renderInspectionModal(
 function ReopenInspectionModalHarness() {
   const [open, setOpen] = useState(true);
   const [activeSectionKey, setActiveSectionKey] = useState<string | undefined>();
+  const [scrollTop, setScrollTop] = useState(0);
 
   return (
     <TabletModeProvider>
@@ -212,7 +218,9 @@ function ReopenInspectionModalHarness() {
           existingResponses={existingInspectionResponses}
           attachmentId="attachment-refresh"
           initialActiveSectionKey={activeSectionKey}
+          initialScrollTop={scrollTop}
           onActiveSectionChange={setActiveSectionKey}
+          onScrollPositionChange={setScrollTop}
           onSave={vi.fn(async () => undefined)}
         />
       )}
@@ -387,6 +395,70 @@ describe('AttachmentHybridFormModal', () => {
     });
   });
 
+  it('saves dirty drafts before dismissing the modal', async () => {
+    const onSave = vi.fn(async () => undefined);
+    const onOpenChange = vi.fn();
+    render(renderInspectionModal(existingInspectionResponses, { onSave, onOpenChange }));
+
+    fireEvent.click(screen.getByRole('button', { name: /declaration/i }));
+    fireEvent.change(screen.getByRole('textbox', { name: /inspector name/i }), {
+      target: { value: 'Dismissed Inspector' },
+    });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Close' })[0]);
+
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledTimes(1);
+    });
+    expect(onSave.mock.calls[0][1]).toBe(false);
+    expect(onSave.mock.calls[0][0]).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        section_key: 'declaration',
+        field_key: 'inspector_name',
+        response_value: 'Dismissed Inspector',
+      }),
+    ]));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('keeps dirty modal open when dismissal save fails', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const onSave = vi.fn(async () => {
+      throw new Error('Save failed');
+    });
+    const onOpenChange = vi.fn();
+
+    render(renderInspectionModal(existingInspectionResponses, { onSave, onOpenChange }));
+
+    fireEvent.click(screen.getByRole('button', { name: /declaration/i }));
+    fireEvent.change(screen.getByRole('textbox', { name: /inspector name/i }), {
+      target: { value: 'Still Open Inspector' },
+    });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Close' })[0]);
+
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledTimes(1);
+    });
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    expect(screen.getByRole('textbox', { name: /inspector name/i })).toHaveValue('Still Open Inspector');
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('explicit discard closes dirty modal without saving', () => {
+    const onSave = vi.fn(async () => undefined);
+    const onOpenChange = vi.fn();
+    render(renderInspectionModal(existingInspectionResponses, { onSave, onOpenChange }));
+
+    fireEvent.click(screen.getByRole('button', { name: /declaration/i }));
+    fireEvent.change(screen.getByRole('textbox', { name: /inspector name/i }), {
+      target: { value: 'Discarded Inspector' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /discard changes/i }));
+
+    expect(onSave).not.toHaveBeenCalled();
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
   it('reopens to the previous active section after dismissal', async () => {
     render(<ReopenInspectionModalHarness />);
 
@@ -401,6 +473,24 @@ describe('AttachmentHybridFormModal', () => {
     fireEvent.click(screen.getByRole('button', { name: /open attachment/i }));
     await waitFor(() => {
       expect(screen.getByRole('textbox', { name: /inspector name/i })).toBeInTheDocument();
+    });
+  });
+
+  it('reopens to the previous scroll position after dismissal', async () => {
+    render(<ReopenInspectionModalHarness />);
+
+    const scrollArea = screen.getByTestId('attachment-form-scroll-area');
+    scrollArea.scrollTop = 420;
+    fireEvent.scroll(scrollArea);
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Close' })[0]);
+    await waitFor(() => {
+      expect(screen.queryByTestId('attachment-form-scroll-area')).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /open attachment/i }));
+    await waitFor(() => {
+      expect(screen.getByTestId('attachment-form-scroll-area').scrollTop).toBe(420);
     });
   });
 

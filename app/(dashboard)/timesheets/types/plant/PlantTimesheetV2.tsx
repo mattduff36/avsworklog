@@ -31,6 +31,7 @@ import {
   toHoursInput,
   type PlantEntryDraft,
 } from './plant-timesheet-v2-utils';
+import { isDuplicateTimesheetWeekError } from '@/lib/utils/timesheet-errors';
 
 interface PlantTimesheetV2Props {
   weekEnding: string;
@@ -381,11 +382,13 @@ export function PlantTimesheetV2({
 
       router.push('/timesheets');
     } catch (saveError) {
-      console.error('Error saving plant timesheet:', saveError);
-      const typedError = saveError as { message?: string; code?: string };
+      const isDuplicateTimesheetError = isDuplicateTimesheetWeekError(saveError);
+      if (!isDuplicateTimesheetError) {
+        console.error('Error saving plant timesheet:', saveError);
+      }
       if (
         !existingTimesheetId &&
-        (typedError?.code === '23505' || typedError?.message?.includes('timesheets_user_id_week_ending_key'))
+        isDuplicateTimesheetError
       ) {
         const { data: duplicate } = await supabase
           .from('timesheets')

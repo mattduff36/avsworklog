@@ -300,7 +300,7 @@ function DashboardLayoutShell({
   }, []);
 
   if (showLoadingOnly) {
-    return <PageLoader message="Loading SquireApp" />;
+    return <PageLoader message="Loading SquiresApp" />;
   }
 
   return (

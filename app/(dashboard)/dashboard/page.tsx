@@ -453,7 +453,7 @@ export default function DashboardPage() {
   const isDashboardLoading = permissionsLoading || !profile?.id;
 
   if (isDashboardLoading) {
-    return <PageLoader message="Loading SquireApp" />;
+    return <PageLoader message="Loading SquiresApp" />;
   }
 
   return (

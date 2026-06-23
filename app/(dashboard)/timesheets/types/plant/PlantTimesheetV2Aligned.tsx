@@ -78,6 +78,7 @@ import {
   isSubsistencePaymentRequired,
   syncSubsistenceRemark,
 } from '@/lib/utils/timesheet-subsistence';
+import { isDuplicateTimesheetWeekError } from '@/lib/utils/timesheet-errors';
 import {
   applyPendingTrainingBookingsToOffDayStates,
   formatHalfDayTrainingRemark,
@@ -1345,18 +1346,19 @@ export function PlantTimesheetV2({
 
       router.push('/timesheets');
     } catch (saveError) {
+      const isDuplicateTimesheetError = isDuplicateTimesheetWeekError(saveError);
       const shouldLogError =
+        !isDuplicateTimesheetError &&
         !isAuthErrorStatus(getErrorStatus(saveError)) &&
         !isNetworkFetchError(saveError);
 
       if (shouldLogError) {
         console.error('Error saving plant timesheet:', saveError);
       }
-      const typedError = saveError as { message?: string; code?: string };
 
       if (
         !existingTimesheetId &&
-        (typedError?.code === '23505' || typedError?.message?.includes('timesheets_user_id_week_ending_key'))
+        isDuplicateTimesheetError
       ) {
         const { data: duplicate } = await supabase
           .from('timesheets')

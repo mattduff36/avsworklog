@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type UIEvent } from 'react';
 import Image from 'next/image';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
@@ -34,7 +34,9 @@ interface AttachmentHybridFormModalProps {
   isCompleted?: boolean;
   attachmentId?: string;
   initialActiveSectionKey?: string;
+  initialScrollTop?: number;
   onActiveSectionChange?: (sectionKey: string) => void;
+  onScrollPositionChange?: (scrollTop: number) => void;
   onSave: (responses: AttachmentSchemaResponse[], markComplete: boolean) => Promise<void>;
   canUndoComplete?: boolean;
   undoCompleteLabel?: string | null;
@@ -52,6 +54,12 @@ interface InitialResponseState {
   responses: Record<string, LocalResponseValue>;
   signatureNames: Record<string, string>;
   fingerprint: string;
+}
+
+interface SaveAttachmentOptions {
+  markComplete: boolean;
+  closeOnSuccess?: boolean;
+  showSuccessToast?: boolean;
 }
 
 const MARKING_CODE_OPTIONS = [
@@ -270,7 +278,9 @@ export function AttachmentHybridFormModal({
   isCompleted = false,
   attachmentId,
   initialActiveSectionKey,
+  initialScrollTop = 0,
   onActiveSectionChange,
+  onScrollPositionChange,
   onSave,
   canUndoComplete = false,
   undoCompleteLabel = null,
@@ -291,11 +301,14 @@ export function AttachmentHybridFormModal({
   const [initialResponsesFingerprint, setInitialResponsesFingerprint] = useState<string | null>(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const initializedSessionKeyRef = useRef<string | null>(null);
+  const restoredScrollSessionKeyRef = useRef<string | null>(null);
+  const mainScrollAreaRef = useRef<HTMLDivElement | null>(null);
   const formSessionKey = `${attachmentId || 'new-attachment'}:${snapshot.id}:${snapshot.template_version_id}`;
 
   useEffect(() => {
     if (!open) {
       initializedSessionKeyRef.current = null;
+      restoredScrollSessionKeyRef.current = null;
       return;
     }
     if (initializedSessionKeyRef.current === formSessionKey) return;
@@ -318,6 +331,15 @@ export function AttachmentHybridFormModal({
     if (!open || !activeSectionKey) return;
     onActiveSectionChange?.(activeSectionKey);
   }, [activeSectionKey, onActiveSectionChange, open]);
+
+  useEffect(() => {
+    if (!open || !activeSectionKey || restoredScrollSessionKeyRef.current === formSessionKey) return;
+    const scrollArea = mainScrollAreaRef.current;
+    if (!scrollArea) return;
+
+    restoredScrollSessionKeyRef.current = formSessionKey;
+    scrollArea.scrollTop = initialScrollTop;
+  }, [activeSectionKey, formSessionKey, initialScrollTop, open]);
 
   const activeSection = sections.find((section) => section.section_key === activeSectionKey) || sections[0];
   const totalFields = sections.reduce((sum, section) => sum + section.fields.length, 0);
@@ -433,13 +455,17 @@ export function AttachmentHybridFormModal({
     return payload;
   }
 
-  async function handleSave(markComplete: boolean) {
-    if (saving || readOnly) return;
+  async function saveAttachment({
+    markComplete,
+    closeOnSuccess = false,
+    showSuccessToast = true,
+  }: SaveAttachmentOptions): Promise<boolean> {
+    if (saving || readOnly) return false;
     const invalidField = markComplete ? findFirstInvalidRequired(sections, responses) : null;
     if (invalidField) {
       setActiveSectionKey(invalidField.sectionKey);
       toast.error(`Complete required field: ${invalidField.label}`);
-      return;
+      return false;
     }
 
     const payload = buildResponsesPayload(responses);
@@ -449,8 +475,12 @@ export function AttachmentHybridFormModal({
       await onSave(payload, markComplete);
       setInitialResponsesFingerprint(getResponsesFingerprint(responses));
       void clearDraft();
-      toast.success(markComplete ? 'Attachment completed' : 'Draft saved');
-      if (markComplete) onOpenChange(false);
+      if (showSuccessToast) {
+        toast.success(markComplete ? 'Attachment completed' : 'Draft saved');
+      }
+      setSaving(false);
+      if (markComplete || closeOnSuccess) onOpenChange(false);
+      return true;
     } catch (error) {
       if (isExpectedAttachmentPersistenceError(error)) {
         console.warn('Attachment save was rejected:', error);
@@ -458,9 +488,13 @@ export function AttachmentHybridFormModal({
         console.error('Error saving schema attachment responses:', error);
       }
       toast.error(getAttachmentPersistenceErrorMessage(error));
-    } finally {
       setSaving(false);
+      return false;
     }
+  }
+
+  async function handleSave(markComplete: boolean) {
+    await saveAttachment({ markComplete });
   }
 
   function navigateSection(direction: 'next' | 'previous') {
@@ -470,6 +504,10 @@ export function AttachmentHybridFormModal({
     const nextIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1;
     if (nextIndex < 0 || nextIndex >= sections.length) return;
     setActiveSectionKey(sections[nextIndex].section_key);
+  }
+
+  function handleMainScroll(event: UIEvent<HTMLDivElement>) {
+    onScrollPositionChange?.(event.currentTarget.scrollTop);
   }
 
   async function handleDownloadPdf() {
@@ -740,11 +778,23 @@ export function AttachmentHybridFormModal({
   }
 
   function handleDialogOpenChange(nextOpen: boolean) {
-    if (!nextOpen && !readOnly && !saving && !undoingComplete && isDirty) {
-      toast.info('Save or discard your draft before closing.');
+    if (nextOpen) {
+      onOpenChange(true);
       return;
     }
-    onOpenChange(nextOpen);
+
+    if (saving || undoingComplete) return;
+
+    if (!readOnly && !isCompleted && isDirty) {
+      void saveAttachment({
+        markComplete: false,
+        closeOnSuccess: true,
+        showSuccessToast: false,
+      });
+      return;
+    }
+
+    onOpenChange(false);
   }
 
   function discardDraftAndClose() {
@@ -862,7 +912,12 @@ export function AttachmentHybridFormModal({
           </aside>
 
           <main className="min-h-0">
-            <ScrollArea className="h-[62vh]">
+            <ScrollArea
+              ref={mainScrollAreaRef}
+              className="h-[62vh]"
+              onScroll={handleMainScroll}
+              data-testid="attachment-form-scroll-area"
+            >
               {activeSection ? (
                 <div className="p-5 space-y-4">
                   <div className="flex items-center justify-between">

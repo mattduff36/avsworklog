@@ -66,6 +66,7 @@ import {
   isSubsistencePaymentRequired,
   syncSubsistenceRemark,
 } from '@/lib/utils/timesheet-subsistence';
+import { isDuplicateTimesheetWeekError } from '@/lib/utils/timesheet-errors';
 import {
   applyPendingTrainingBookingsToOffDayStates,
   formatHalfDayTrainingRemark,
@@ -1516,7 +1517,10 @@ export function CivilsTimesheet({
 
       router.push('/timesheets');
     } catch (err: unknown) {
+      const error = err as { code?: string; message?: string; details?: string; hint?: string };
+      const isDuplicateTimesheetError = isDuplicateTimesheetWeekError(err);
       const shouldLogError =
+        !isDuplicateTimesheetError &&
         !isAuthErrorStatus(getErrorStatus(err)) &&
         !isNetworkFetchError(err);
 
@@ -1524,11 +1528,9 @@ export function CivilsTimesheet({
         console.error('Error saving timesheet:', err);
         console.error('Error details:', JSON.stringify(err, null, 2));
       }
-      
+
       // Handle errors
-      const error = err as { code?: string; message?: string; details?: string; hint?: string };
-      
-      if (error?.code === '23505' || error?.message?.includes('duplicate key') || error?.message?.includes('timesheets_user_id_week_ending_key')) {
+      if (isDuplicateTimesheetError) {
         // Only handle duplicate error if we're not updating an existing timesheet
         if (!existingTimesheetId) {
           // Find the existing timesheet and redirect user to edit it
