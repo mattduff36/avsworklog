@@ -136,6 +136,9 @@ describe('release version logic', () => {
       version: '0526.1.0',
       primaryCommitMessage: 'feat(fleet): improve plant table layout',
       whatChanged: 'Improved plant table layout.',
+      releaseDetails: [
+        'Improved the fleet table so plant assets are easier to review.',
+      ],
       commitMessages: [
         'feat(fleet): import plant assets',
         'fix(fleet): normalize serial numbers',
@@ -149,6 +152,8 @@ describe('release version logic', () => {
     expect(entry).toContain('**PUSHED AT**');
     expect(entry).toContain('2026-05-21T14:00:29Z');
     expect(entry).toContain('**WHAT CHANGED**');
+    expect(entry).toContain('**VERSION HISTORY DETAILS**');
+    expect(entry).toContain('- Improved the fleet table so plant assets are easier to review.');
     expect(entry).toContain('**COMMITS IN THIS RELEASE**');
     expect(entry).toContain('- `fix(fleet): normalize serial numbers`');
   });
@@ -166,6 +171,9 @@ describe('release version logic', () => {
       '',
       '**WHAT CHANGED**',
       'Handle transient API lookup failures.',
+      '',
+      '**VERSION HISTORY DETAILS**',
+      '- Fixed background lookup retries so temporary failures are handled before users see an error.',
       '',
       '**COMMITS IN THIS RELEASE**',
       '- `fix(api): handle transient lookup failures`',
@@ -198,9 +206,7 @@ describe('release version logic', () => {
         description: 'Handled temporary background services lookup problems.',
         summary: 'Handled temporary background services lookup problems.',
         details: [
-          'Covered background services.',
-          'Handled temporary lookup problems.',
-          'Published as a smaller improvement release for fixes, maintenance, or supporting updates.',
+          'Fixed background lookup retries so temporary failures are handled before users see an error.',
         ],
         areas: ['Background services'],
         areaKeys: ['background-services'],
@@ -213,10 +219,7 @@ describe('release version logic', () => {
         description: 'Updated fleet workflow and background services.',
         summary: 'Updated fleet workflow and background services.',
         details: [
-          'Covered fleet workflow and background services.',
           'Updated fleet workflow.',
-          'Published as a larger app update because it included broader workflow changes.',
-          'The release time shown is when the version record was created.',
         ],
         areas: ['Fleet workflow', 'Background services'],
         areaKeys: ['fleet', 'background-services'],
@@ -251,6 +254,31 @@ describe('release version logic', () => {
     });
   });
 
+  it('normalizes release areas without leading conjunctions or case duplicates', () => {
+    const releaseLog = [
+      '# Production release log',
+      '',
+      'Private changelog for production builds. Newest entries first.',
+      '',
+      '## 0626.39.0',
+      '',
+      '**GIT COMMIT MESSAGE**',
+      '`feat(inventory): update Inventory, Sign in, Customers, Dashboard, Navigation, and Profile`',
+      '',
+      '**WHAT CHANGED**',
+      'Update Inventory, Sign in, Customers, Dashboard, Navigation, and Profile.',
+      '',
+      '**COMMITS IN THIS RELEASE**',
+      '- `feat(inventory): update Inventory, Sign in, Customers, Dashboard, Navigation, and Profile`',
+      '',
+    ].join('\n');
+
+    expect(buildReleaseHistoryEntries(releaseLog)[0]).toMatchObject({
+      areas: ['Inventory', 'Sign in', 'Customers', 'Dashboard', 'Navigation', 'Profile'],
+      details: ['Updated Inventory, Sign in, Customers, Dashboard, Navigation, and Profile.'],
+    });
+  });
+
   it('builds recent release month tabs and filters entries by month', () => {
     const history = [
       {
@@ -278,6 +306,12 @@ describe('release version logic', () => {
     expect(getRecentReleaseHistoryMonths(history, 2)).toEqual([
       { key: '0626', label: 'June 2026' },
       { key: '0526', label: 'May 2026' },
+    ]);
+    expect(getRecentReleaseHistoryMonths(history)).toEqual([
+      { key: '0626', label: 'June 2026' },
+      { key: '0526', label: 'May 2026' },
+      { key: '0426', label: 'April 2026' },
+      { key: '0326', label: 'March 2026' },
     ]);
     expect(getReleaseHistoryEntriesForMonth(history, '0526')).toEqual([history[1]]);
   });

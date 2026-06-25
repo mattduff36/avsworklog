@@ -6,13 +6,9 @@
     "description": "Updated user management.",
     "summary": "Updated user management.",
     "details": [
-      "Covered user management and user Management.",
-      "Updated user management.",
-      "Published as a larger app update because it included broader workflow changes.",
-      "The release time shown is when the version record was created."
+      "Updated user management."
     ],
     "areas": [
-      "User management",
       "User Management"
     ],
     "areaKeys": [
@@ -27,10 +23,7 @@
     "description": "Updated Inventory, Sign in, Customers, Dashboard, Navigation, and Profile.",
     "summary": "Updated Inventory, Sign in, Customers, Dashboard, Navigation, and Profile.",
     "details": [
-      "Covered inventory, sign in, customers, dashboard, navigation, and and Profile.",
-      "Updated Inventory, Sign in, Customers, Dashboard, Navigation, and Profile.",
-      "Published as a larger app update because it included broader workflow changes.",
-      "The release time shown is when the version record was created."
+      "Updated Inventory, Sign in, Customers, Dashboard, Navigation, and Profile."
     ],
     "areas": [
       "Inventory",
@@ -38,14 +31,15 @@
       "Customers",
       "Dashboard",
       "Navigation",
-      "And Profile"
+      "Profile"
     ],
     "areaKeys": [
       "inventory",
       "sign-in",
       "customers",
       "dashboard",
-      "navigation"
+      "navigation",
+      "profile"
     ],
     "pushedAt": "2026-06-25T08:34:38.965Z"
   },
@@ -56,21 +50,19 @@
     "description": "Updated Timesheets, Workshop Tasks, Dashboard, and Navigation.",
     "summary": "Updated Timesheets, Workshop Tasks, Dashboard, and Navigation.",
     "details": [
-      "Covered timesheets, workshop Tasks, dashboard, and and Navigation.",
-      "Updated Timesheets, Workshop Tasks, Dashboard, and Navigation.",
-      "Published as a larger app update because it included broader workflow changes.",
-      "The release time shown is when the version record was created."
+      "Updated Timesheets, Workshop Tasks, Dashboard, and Navigation."
     ],
     "areas": [
       "Timesheets",
       "Workshop Tasks",
       "Dashboard",
-      "And Navigation"
+      "Navigation"
     ],
     "areaKeys": [
       "timesheets",
       "workshop-tasks",
-      "dashboard"
+      "dashboard",
+      "navigation"
     ],
     "pushedAt": "2026-06-23T21:08:20.781Z"
   },
@@ -81,13 +73,9 @@
     "description": "Updated workshop tasks.",
     "summary": "Updated workshop tasks.",
     "details": [
-      "Covered workshop tasks and workshop Tasks.",
-      "Updated workshop tasks.",
-      "Published as a larger app update because it included broader workflow changes.",
-      "The release time shown is when the version record was created."
+      "Updated workshop tasks."
     ],
     "areas": [
-      "Workshop tasks",
       "Workshop Tasks"
     ],
     "areaKeys": [
@@ -102,10 +90,7 @@
     "description": "Updated Workshop Tasks and Quotes.",
     "summary": "Updated Workshop Tasks and Quotes.",
     "details": [
-      "Covered workshop Tasks and quotes.",
-      "Updated Workshop Tasks and Quotes.",
-      "Published as a larger app update because it included broader workflow changes.",
-      "The release time shown is when the version record was created."
+      "Updated Workshop Tasks and Quotes."
     ],
     "areas": [
       "Workshop Tasks",
@@ -124,19 +109,17 @@
     "description": "Updated Workshop Tasks, Maintenance, and Actions.",
     "summary": "Updated Workshop Tasks, Maintenance, and Actions.",
     "details": [
-      "Covered workshop Tasks, maintenance, and and Actions.",
-      "Updated Workshop Tasks, Maintenance, and Actions.",
-      "Published as a larger app update because it included broader workflow changes.",
-      "The release time shown is when the version record was created."
+      "Updated Workshop Tasks, Maintenance, and Actions."
     ],
     "areas": [
       "Workshop Tasks",
       "Maintenance",
-      "And Actions"
+      "Actions"
     ],
     "areaKeys": [
       "workshop-tasks",
-      "maintenance"
+      "maintenance",
+      "actions"
     ],
     "pushedAt": "2026-06-23T15:39:33.306Z"
   },
@@ -147,19 +130,17 @@
     "description": "Updated Workshop Tasks, Maintenance, and Actions.",
     "summary": "Updated Workshop Tasks, Maintenance, and Actions.",
     "details": [
-      "Covered workshop Tasks, maintenance, and and Actions.",
-      "Updated Workshop Tasks, Maintenance, and Actions.",
-      "Published as a larger app update because it included broader workflow changes.",
-      "The release time shown is when the version record was created."
+      "Updated Workshop Tasks, Maintenance, and Actions."
     ],
     "areas": [
       "Workshop Tasks",
       "Maintenance",
-      "And Actions"
+      "Actions"
     ],
     "areaKeys": [
       "workshop-tasks",
-      "maintenance"
+      "maintenance",
+      "actions"
     ],
     "pushedAt": "2026-06-23T15:21:32.598Z"
   },
@@ -170,10 +151,7 @@
     "description": "Updated quotes.",
     "summary": "Updated quotes.",
     "details": [
-      "Covered quotes.",
-      "Updated quotes.",
-      "Published as a larger app update because it included broader workflow changes.",
-      "The release time shown is when the version record was created."
+      "Updated quotes."
     ],
     "areas": [
       "Quotes"
@@ -190,19 +168,17 @@
     "description": "Updated Quotes, Data storage, and Notifications.",
     "summary": "Updated Quotes, Data storage, and Notifications.",
     "details": [
-      "Covered quotes, data storage, and and Notifications.",
-      "Updated Quotes, Data storage, and Notifications.",
-      "Published as a larger app update because it included broader workflow changes.",
-      "The release time shown is when the version record was created."
+      "Updated Quotes, Data storage, and Notifications."
     ],
     "areas": [
       "Quotes",
       "Data storage",
-      "And Notifications"
+      "Notifications"
     ],
     "areaKeys": [
       "quotes",
-      "data-storage"
+      "data-storage",
+      "notifications"
     ],
     "pushedAt": "2026-06-23T09:23:14.540Z"
   },
@@ -213,10 +189,7 @@
     "description": "Updated Workshop Tasks and Daily Tasks.",
     "summary": "Updated Workshop Tasks and Daily Tasks.",
     "details": [
-      "Covered workshop Tasks and daily Tasks.",
-      "Updated Workshop Tasks and Daily Tasks.",
-      "Published as a larger app update because it included broader workflow changes.",
-      "The release time shown is when the version record was created."
+      "Updated Workshop Tasks and Daily Tasks."
     ],
     "areas": [
       "Workshop Tasks",
@@ -235,10 +208,7 @@
     "description": "Suppress temporary plant history fetch errors.",
     "summary": "Suppress temporary plant history fetch errors.",
     "details": [
-      "Covered fleet.",
-      "Suppress temporary plant history fetch errors.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates.",
-      "The release time shown is when the version record was created."
+      "Suppress temporary plant history fetch errors."
     ],
     "areas": [
       "Fleet"
@@ -255,10 +225,7 @@
     "description": "Updated Debug tools and Timesheets.",
     "summary": "Updated Debug tools and Timesheets.",
     "details": [
-      "Covered debug tools and timesheets.",
-      "Updated Debug tools and Timesheets.",
-      "Published as a larger app update because it included broader workflow changes.",
-      "The release time shown is when the version record was created."
+      "Updated Debug tools and Timesheets."
     ],
     "areas": [
       "Debug tools",
@@ -277,10 +244,7 @@
     "description": "Updated timesheets.",
     "summary": "Updated timesheets.",
     "details": [
-      "Covered timesheets.",
-      "Updated timesheets.",
-      "Published as a larger app update because it included broader workflow changes.",
-      "The release time shown is when the version record was created."
+      "Updated timesheets."
     ],
     "areas": [
       "Timesheets"
@@ -297,10 +261,7 @@
     "description": "Updated inventory.",
     "summary": "Updated inventory.",
     "details": [
-      "Covered inventory.",
-      "Updated inventory.",
-      "Published as a larger app update because it included broader workflow changes.",
-      "The release time shown is when the version record was created."
+      "Updated inventory."
     ],
     "areas": [
       "Inventory"
@@ -317,10 +278,7 @@
     "description": "Updated Inventory and Data storage.",
     "summary": "Updated Inventory and Data storage.",
     "details": [
-      "Covered inventory and data storage.",
-      "Updated Inventory and Data storage.",
-      "Published as a larger app update because it included broader workflow changes.",
-      "The release time shown is when the version record was created."
+      "Updated Inventory and Data storage."
     ],
     "areas": [
       "Inventory",
@@ -339,10 +297,7 @@
     "description": "Updated Inventory and PDF document documents.",
     "summary": "Updated Inventory and PDF document documents.",
     "details": [
-      "Covered inventory and pDF document documents.",
-      "Updated Inventory and PDF document documents.",
-      "Published as a larger app update because it included broader workflow changes.",
-      "The release time shown is when the version record was created."
+      "Updated Inventory and PDF document documents."
     ],
     "areas": [
       "Inventory",
@@ -360,11 +315,8 @@
     "description": "Updated Debug tools and Inventory.",
     "summary": "Updated Debug tools and Inventory.",
     "details": [
-      "Covered debug tools and inventory.",
       "Added job-code correction tools.",
-      "Improved inventory screens.",
-      "Published as a larger app update because it included broader workflow changes.",
-      "The release time shown is when the version record was created."
+      "Improved inventory screens."
     ],
     "areas": [
       "Debug tools",
@@ -383,19 +335,17 @@
     "description": "Updated finalise commit summaries, mobile text size controls, and background services.",
     "summary": "Updated finalise commit summaries, mobile text size controls, and background services.",
     "details": [
-      "Covered finalise commit summaries, mobile text size controls, and background services, and release automation.",
-      "Updated finalise commit summaries, mobile text size controls, and background services.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates.",
-      "The release time shown is when the version record was created."
+      "Updated finalise commit summaries, mobile text size controls, and background services."
     ],
     "areas": [
+      "Release automation",
       "Finalise commit summaries",
       "Mobile text size controls",
-      "And background services",
-      "Release automation"
+      "Background services"
     ],
     "areaKeys": [
-      "release-automation"
+      "release-automation",
+      "background-services"
     ],
     "pushedAt": "2026-06-19T09:48:25.869Z"
   },
@@ -406,10 +356,7 @@
     "description": "Updated fleet workflow and data storage. Related app improvements were included in the same release.",
     "summary": "Updated fleet workflow and data storage. Related app improvements were included in the same release.",
     "details": [
-      "Covered fleet workflow and data storage.",
-      "Updated fleet workflow, data storage.",
-      "Published as a larger app update because it included broader workflow changes.",
-      "The release time shown is when the version record was created."
+      "Updated fleet workflow, data storage."
     ],
     "areas": [
       "Fleet workflow",
@@ -428,10 +375,7 @@
     "description": "Updated data storage and background services. Related app improvements were included in the same release.",
     "summary": "Updated data storage and background services. Related app improvements were included in the same release.",
     "details": [
-      "Covered data storage and background services.",
-      "Updated data storage, background services.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates.",
-      "The release time shown is when the version record was created."
+      "Updated data storage, background services."
     ],
     "areas": [
       "Data storage",
@@ -450,10 +394,7 @@
     "description": "Updated maintenance workflow and background services.",
     "summary": "Updated maintenance workflow and background services.",
     "details": [
-      "Covered maintenance workflow and background services.",
-      "Updated maintenance workflow and background services.",
-      "Published as a larger app update because it included broader workflow changes.",
-      "The release time shown is when the version record was created."
+      "Updated maintenance workflow and background services."
     ],
     "areas": [
       "Maintenance workflow",
@@ -472,15 +413,12 @@
     "description": "Updated did not work absence handling and background services.",
     "summary": "Updated did not work absence handling and background services.",
     "details": [
-      "Covered did not work absence handling, background services, and timesheets.",
-      "Updated did not work absence handling and background services.",
-      "Published as a larger app update because it included broader workflow changes.",
-      "The release time shown is when the version record was created."
+      "Updated did not work absence handling and background services."
     ],
     "areas": [
+      "Timesheets",
       "Did not work absence handling",
-      "Background services",
-      "Timesheets"
+      "Background services"
     ],
     "areaKeys": [
       "timesheets",
@@ -495,10 +433,7 @@
     "description": "Updated fleet workflow.",
     "summary": "Updated fleet workflow.",
     "details": [
-      "Covered fleet workflow.",
-      "Updated fleet workflow.",
-      "Published as a larger app update because it included broader workflow changes.",
-      "The release time shown is when the version record was created."
+      "Updated fleet workflow."
     ],
     "areas": [
       "Fleet workflow"
@@ -515,15 +450,12 @@
     "description": "Updated did not work absence handling and background services.",
     "summary": "Updated did not work absence handling and background services.",
     "details": [
-      "Covered did not work absence handling, background services, and timesheets.",
-      "Updated did not work absence handling and background services.",
-      "Published as a larger app update because it included broader workflow changes.",
-      "The release time shown is when the version record was created."
+      "Updated did not work absence handling and background services."
     ],
     "areas": [
+      "Timesheets",
       "Did not work absence handling",
-      "Background services",
-      "Timesheets"
+      "Background services"
     ],
     "areaKeys": [
       "timesheets",
@@ -538,10 +470,7 @@
     "description": "Updated background services.",
     "summary": "Updated background services.",
     "details": [
-      "Covered background services.",
-      "Updated background services.",
-      "Published as a larger app update because it included broader workflow changes.",
-      "The release time shown is when the version record was created."
+      "Updated background services."
     ],
     "areas": [
       "Background services"
@@ -558,14 +487,11 @@
     "description": "Updated general app maintenance.",
     "summary": "Updated general app maintenance.",
     "details": [
-      "Covered general app maintenance and app screens.",
-      "Updated general app maintenance.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates.",
-      "The release time shown is when the version record was created."
+      "Updated general app maintenance."
     ],
     "areas": [
-      "General app maintenance",
-      "App screens"
+      "App screens",
+      "General app maintenance"
     ],
     "areaKeys": [
       "app-screens"
@@ -576,18 +502,15 @@
     "version": "0626.18.2",
     "updateKind": "minor",
     "title": "Release automation maintenance update",
-    "description": "Updated finalise commit summaries, maintenance workflow, and release automation. Related app improvements were included in the same release.",
-    "summary": "Updated finalise commit summaries, maintenance workflow, and release automation. Related app improvements were included in the same release.",
+    "description": "Updated release automation, finalise commit summaries, and maintenance workflow. Related app improvements were included in the same release.",
+    "summary": "Updated release automation, finalise commit summaries, and maintenance workflow. Related app improvements were included in the same release.",
     "details": [
-      "Covered finalise commit summaries, maintenance workflow, and release automation.",
-      "Updated finalise commit summaries, maintenance workflow.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates.",
-      "The release time shown is when the version record was created."
+      "Updated finalise commit summaries, maintenance workflow."
     ],
     "areas": [
+      "Release automation",
       "Finalise commit summaries",
-      "Maintenance workflow",
-      "Release automation"
+      "Maintenance workflow"
     ],
     "areaKeys": [
       "release-automation"
@@ -601,9 +524,7 @@
     "description": "Handled temporary type lookup problems.",
     "summary": "Handled temporary type lookup problems.",
     "details": [
-      "Covered timesheets.",
-      "Handled temporary type lookup problems.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Handled temporary type lookup problems."
     ],
     "areas": [
       "Timesheets"
@@ -617,17 +538,15 @@
     "version": "0626.18.0",
     "updateKind": "major",
     "title": "Timesheets update",
-    "description": "Updated timesheet workflow, data storage, and timesheets. Related app improvements were included in the same release.",
-    "summary": "Updated timesheet workflow, data storage, and timesheets. Related app improvements were included in the same release.",
+    "description": "Updated timesheets, timesheet workflow, and data storage. Related app improvements were included in the same release.",
+    "summary": "Updated timesheets, timesheet workflow, and data storage. Related app improvements were included in the same release.",
     "details": [
-      "Covered timesheet workflow, data storage, and timesheets.",
-      "Updated timesheet workflow, data storage.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated timesheet workflow, data storage."
     ],
     "areas": [
+      "Timesheets",
       "Timesheet workflow",
-      "Data storage",
-      "Timesheets"
+      "Data storage"
     ],
     "areaKeys": [
       "timesheets",
@@ -642,13 +561,11 @@
     "description": "Updated timesheet workflow.",
     "summary": "Updated timesheet workflow.",
     "details": [
-      "Covered timesheet workflow and timesheets.",
-      "Updated timesheet workflow.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated timesheet workflow."
     ],
     "areas": [
-      "Timesheet workflow",
-      "Timesheets"
+      "Timesheets",
+      "Timesheet workflow"
     ],
     "areaKeys": [
       "timesheets"
@@ -662,9 +579,7 @@
     "description": "Updated fleet workflow and background services.",
     "summary": "Updated fleet workflow and background services.",
     "details": [
-      "Covered fleet workflow and background services.",
-      "Updated fleet workflow and background services.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated fleet workflow and background services."
     ],
     "areas": [
       "Fleet workflow",
@@ -683,9 +598,7 @@
     "description": "Handled temporary PDF document load failures.",
     "summary": "Handled temporary PDF document load failures.",
     "details": [
-      "Covered pDF documents.",
-      "Handled temporary PDF document load failures.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Handled temporary PDF document load failures."
     ],
     "areas": [
       "PDF documents"
@@ -702,9 +615,7 @@
     "description": "Updated background services.",
     "summary": "Updated background services.",
     "details": [
-      "Covered background services.",
-      "Updated background services.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated background services."
     ],
     "areas": [
       "Background services"
@@ -721,13 +632,11 @@
     "description": "Updated general app maintenance.",
     "summary": "Updated general app maintenance.",
     "details": [
-      "Covered general app maintenance and dashboard.",
-      "Updated general app maintenance.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated general app maintenance."
     ],
     "areas": [
-      "General app maintenance",
-      "Dashboard"
+      "Dashboard",
+      "General app maintenance"
     ],
     "areaKeys": [
       "dashboard"
@@ -741,9 +650,7 @@
     "description": "Updated sidebar navigation styling and absence workflow. Related app improvements were included in the same release.",
     "summary": "Updated sidebar navigation styling and absence workflow. Related app improvements were included in the same release.",
     "details": [
-      "Covered sidebar navigation styling and absence workflow.",
-      "Updated sidebar navigation styling, absence workflow.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated sidebar navigation styling, absence workflow."
     ],
     "areas": [
       "Sidebar navigation styling",
@@ -761,9 +668,7 @@
     "description": "Page job-code catalog results.",
     "summary": "Page job-code catalog results.",
     "details": [
-      "Covered timesheets.",
-      "Page job-code catalog results.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Page job-code catalog results."
     ],
     "areas": [
       "Timesheets"
@@ -780,8 +685,7 @@
     "description": "Handled usage session timing issues.",
     "summary": "Handled usage session timing issues.",
     "details": [
-      "Handled usage session timing issues.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Handled usage session timing issues."
     ],
     "areas": [],
     "areaKeys": [],
@@ -791,17 +695,15 @@
     "version": "0626.14.0",
     "updateKind": "major",
     "title": "Timesheets update",
-    "description": "Updated timesheet workflow, data storage, and timesheets. Related app improvements were included in the same release.",
-    "summary": "Updated timesheet workflow, data storage, and timesheets. Related app improvements were included in the same release.",
+    "description": "Updated timesheets, timesheet workflow, and data storage. Related app improvements were included in the same release.",
+    "summary": "Updated timesheets, timesheet workflow, and data storage. Related app improvements were included in the same release.",
     "details": [
-      "Covered timesheet workflow, data storage, and timesheets.",
-      "Updated timesheet workflow, data storage.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated timesheet workflow, data storage."
     ],
     "areas": [
+      "Timesheets",
       "Timesheet workflow",
-      "Data storage",
-      "Timesheets"
+      "Data storage"
     ],
     "areaKeys": [
       "timesheets",
@@ -816,9 +718,7 @@
     "description": "Updated general app maintenance.",
     "summary": "Updated general app maintenance.",
     "details": [
-      "Covered general app maintenance.",
-      "Updated general app maintenance.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated general app maintenance."
     ],
     "areas": [
       "General app maintenance"
@@ -833,9 +733,7 @@
     "description": "Updated background services.",
     "summary": "Updated background services.",
     "details": [
-      "Covered background services.",
-      "Updated background services.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated background services."
     ],
     "areas": [
       "Background services"
@@ -852,13 +750,11 @@
     "description": "Updated timesheet workflow.",
     "summary": "Updated timesheet workflow.",
     "details": [
-      "Covered timesheet workflow and timesheets.",
-      "Updated timesheet workflow.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated timesheet workflow."
     ],
     "areas": [
-      "Timesheet workflow",
-      "Timesheets"
+      "Timesheets",
+      "Timesheet workflow"
     ],
     "areaKeys": [
       "timesheets"
@@ -869,17 +765,15 @@
     "version": "0626.11.0",
     "updateKind": "major",
     "title": "Absence & Leave update",
-    "description": "Updated absence workflow, maintenance workflow, and absence & Leave. Related app improvements were included in the same release.",
-    "summary": "Updated absence workflow, maintenance workflow, and absence & Leave. Related app improvements were included in the same release.",
+    "description": "Updated absence & Leave, absence workflow, and maintenance workflow. Related app improvements were included in the same release.",
+    "summary": "Updated absence & Leave, absence workflow, and maintenance workflow. Related app improvements were included in the same release.",
     "details": [
-      "Covered absence workflow, maintenance workflow, and absence & Leave.",
-      "Updated absence workflow, maintenance workflow.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated absence workflow, maintenance workflow."
     ],
     "areas": [
+      "Absence & Leave",
       "Absence workflow",
-      "Maintenance workflow",
-      "Absence & Leave"
+      "Maintenance workflow"
     ],
     "areaKeys": [
       "absence"
@@ -893,13 +787,11 @@
     "description": "Updated test coverage.",
     "summary": "Updated test coverage.",
     "details": [
-      "Covered test coverage and app reliability.",
-      "Updated test coverage.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated test coverage."
     ],
     "areas": [
-      "Test coverage",
-      "App reliability"
+      "App reliability",
+      "Test coverage"
     ],
     "areaKeys": [
       "app-reliability"
@@ -910,17 +802,15 @@
     "version": "0626.10.0",
     "updateKind": "major",
     "title": "Timesheets update",
-    "description": "Updated timesheet workflow, data storage, and timesheets. Related app improvements were included in the same release.",
-    "summary": "Updated timesheet workflow, data storage, and timesheets. Related app improvements were included in the same release.",
+    "description": "Updated timesheets, timesheet workflow, and data storage. Related app improvements were included in the same release.",
+    "summary": "Updated timesheets, timesheet workflow, and data storage. Related app improvements were included in the same release.",
     "details": [
-      "Covered timesheet workflow, data storage, and timesheets.",
-      "Updated timesheet workflow, data storage.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated timesheet workflow, data storage."
     ],
     "areas": [
+      "Timesheets",
       "Timesheet workflow",
-      "Data storage",
-      "Timesheets"
+      "Data storage"
     ],
     "areaKeys": [
       "timesheets",
@@ -932,17 +822,15 @@
     "version": "0626.9.0",
     "updateKind": "major",
     "title": "Timesheets update",
-    "description": "Updated timesheet workflow, data storage, and timesheets. Related app improvements were included in the same release.",
-    "summary": "Updated timesheet workflow, data storage, and timesheets. Related app improvements were included in the same release.",
+    "description": "Updated timesheets, timesheet workflow, and data storage. Related app improvements were included in the same release.",
+    "summary": "Updated timesheets, timesheet workflow, and data storage. Related app improvements were included in the same release.",
     "details": [
-      "Covered timesheet workflow, data storage, and timesheets.",
-      "Updated timesheet workflow, data storage.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated timesheet workflow, data storage."
     ],
     "areas": [
+      "Timesheets",
       "Timesheet workflow",
-      "Data storage",
-      "Timesheets"
+      "Data storage"
     ],
     "areaKeys": [
       "timesheets",
@@ -957,13 +845,11 @@
     "description": "Updated test coverage.",
     "summary": "Updated test coverage.",
     "details": [
-      "Covered test coverage and app reliability.",
-      "Updated test coverage.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated test coverage."
     ],
     "areas": [
-      "Test coverage",
-      "App reliability"
+      "App reliability",
+      "Test coverage"
     ],
     "areaKeys": [
       "app-reliability"
@@ -977,13 +863,11 @@
     "description": "Updated test coverage.",
     "summary": "Updated test coverage.",
     "details": [
-      "Covered test coverage and app reliability.",
-      "Updated test coverage.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated test coverage."
     ],
     "areas": [
-      "Test coverage",
-      "App reliability"
+      "App reliability",
+      "Test coverage"
     ],
     "areaKeys": [
       "app-reliability"
@@ -997,13 +881,11 @@
     "description": "Updated test coverage.",
     "summary": "Updated test coverage.",
     "details": [
-      "Covered test coverage and app reliability.",
-      "Updated test coverage.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated test coverage."
     ],
     "areas": [
-      "Test coverage",
-      "App reliability"
+      "App reliability",
+      "Test coverage"
     ],
     "areaKeys": [
       "app-reliability"
@@ -1017,13 +899,11 @@
     "description": "Updated test coverage.",
     "summary": "Updated test coverage.",
     "details": [
-      "Covered test coverage and app reliability.",
-      "Updated test coverage.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated test coverage."
     ],
     "areas": [
-      "Test coverage",
-      "App reliability"
+      "App reliability",
+      "Test coverage"
     ],
     "areaKeys": [
       "app-reliability"
@@ -1037,13 +917,11 @@
     "description": "Updated general app maintenance.",
     "summary": "Updated general app maintenance.",
     "details": [
-      "Covered general app maintenance and dashboard.",
-      "Updated general app maintenance.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated general app maintenance."
     ],
     "areas": [
-      "General app maintenance",
-      "Dashboard"
+      "Dashboard",
+      "General app maintenance"
     ],
     "areaKeys": [
       "dashboard"
@@ -1057,9 +935,7 @@
     "description": "Updated background services.",
     "summary": "Updated background services.",
     "details": [
-      "Covered background services.",
-      "Updated background services.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated background services."
     ],
     "areas": [
       "Background services"
@@ -1076,9 +952,7 @@
     "description": "Handled duplicate item save errors.",
     "summary": "Handled duplicate item save errors.",
     "details": [
-      "Covered inventory.",
-      "Handled duplicate item save errors.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Handled duplicate item save errors."
     ],
     "areas": [
       "Inventory"
@@ -1095,9 +969,7 @@
     "description": "Avoid logging expected inspection errors.",
     "summary": "Avoid logging expected inspection errors.",
     "details": [
-      "Covered daily Tasks.",
-      "Avoid logging expected inspection errors.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Avoid logging expected inspection errors."
     ],
     "areas": [
       "Daily Tasks"
@@ -1114,9 +986,7 @@
     "description": "Updated sidebar navigation styling and mobile text size controls. Related app improvements were included in the same release.",
     "summary": "Updated sidebar navigation styling and mobile text size controls. Related app improvements were included in the same release.",
     "details": [
-      "Covered sidebar navigation styling and mobile text size controls.",
-      "Updated sidebar navigation styling, mobile text size controls.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated sidebar navigation styling, mobile text size controls."
     ],
     "areas": [
       "Sidebar navigation styling",
@@ -1134,9 +1004,7 @@
     "description": "Updated background services.",
     "summary": "Updated background services.",
     "details": [
-      "Covered background services.",
-      "Updated background services.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated background services."
     ],
     "areas": [
       "Background services"
@@ -1153,9 +1021,7 @@
     "description": "Updated sidebar navigation styling and mobile text size controls. Related app improvements were included in the same release.",
     "summary": "Updated sidebar navigation styling and mobile text size controls. Related app improvements were included in the same release.",
     "details": [
-      "Covered sidebar navigation styling and mobile text size controls.",
-      "Updated sidebar navigation styling, mobile text size controls.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated sidebar navigation styling, mobile text size controls."
     ],
     "areas": [
       "Sidebar navigation styling",
@@ -1173,13 +1039,11 @@
     "description": "Updated test coverage.",
     "summary": "Updated test coverage.",
     "details": [
-      "Covered test coverage and app reliability.",
-      "Updated test coverage.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated test coverage."
     ],
     "areas": [
-      "Test coverage",
-      "App reliability"
+      "App reliability",
+      "Test coverage"
     ],
     "areaKeys": [
       "app-reliability"
@@ -1193,13 +1057,11 @@
     "description": "Updated general app maintenance.",
     "summary": "Updated general app maintenance.",
     "details": [
-      "Covered general app maintenance and dashboard.",
-      "Updated general app maintenance.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated general app maintenance."
     ],
     "areas": [
-      "General app maintenance",
-      "Dashboard"
+      "Dashboard",
+      "General app maintenance"
     ],
     "areaKeys": [
       "dashboard"
@@ -1210,17 +1072,15 @@
     "version": "0626.6.0",
     "updateKind": "major",
     "title": "Daily Tasks update",
-    "description": "Updated inspection workflows, fleet workflow, and daily Tasks. Related app improvements were included in the same release.",
-    "summary": "Updated inspection workflows, fleet workflow, and daily Tasks. Related app improvements were included in the same release.",
+    "description": "Updated daily Tasks, inspection workflows, and fleet workflow. Related app improvements were included in the same release.",
+    "summary": "Updated daily Tasks, inspection workflows, and fleet workflow. Related app improvements were included in the same release.",
     "details": [
-      "Covered inspection workflows, fleet workflow, and daily Tasks.",
-      "Updated inspection workflows, fleet workflow.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated inspection workflows, fleet workflow."
     ],
     "areas": [
+      "Daily Tasks",
       "Inspection workflows",
-      "Fleet workflow",
-      "Daily Tasks"
+      "Fleet workflow"
     ],
     "areaKeys": [
       "daily-tasks"
@@ -1234,13 +1094,11 @@
     "description": "Updated test coverage.",
     "summary": "Updated test coverage.",
     "details": [
-      "Covered test coverage and app reliability.",
-      "Updated test coverage.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated test coverage."
     ],
     "areas": [
-      "Test coverage",
-      "App reliability"
+      "App reliability",
+      "Test coverage"
     ],
     "areaKeys": [
       "app-reliability"
@@ -1254,9 +1112,7 @@
     "description": "Updated data storage and automation scripts.",
     "summary": "Updated data storage and automation scripts.",
     "details": [
-      "Covered data storage and automation scripts.",
-      "Updated data storage and automation scripts.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated data storage and automation scripts."
     ],
     "areas": [
       "Data storage",
@@ -1274,9 +1130,7 @@
     "description": "Updated sidebar navigation styling and maintenance workflow. Related app improvements were included in the same release.",
     "summary": "Updated sidebar navigation styling and maintenance workflow. Related app improvements were included in the same release.",
     "details": [
-      "Covered sidebar navigation styling and maintenance workflow.",
-      "Updated sidebar navigation styling, maintenance workflow.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated sidebar navigation styling, maintenance workflow."
     ],
     "areas": [
       "Sidebar navigation styling",
@@ -1294,9 +1148,7 @@
     "description": "Updated data storage and background services. Related app improvements were included in the same release.",
     "summary": "Updated data storage and background services. Related app improvements were included in the same release.",
     "details": [
-      "Covered data storage and background services.",
-      "Updated data storage, background services.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated data storage, background services."
     ],
     "areas": [
       "Data storage",
@@ -1312,17 +1164,15 @@
     "version": "0626.5.0",
     "updateKind": "major",
     "title": "Daily Tasks update",
-    "description": "Updated inspection workflows, background services, and daily Tasks. Related app improvements were included in the same release.",
-    "summary": "Updated inspection workflows, background services, and daily Tasks. Related app improvements were included in the same release.",
+    "description": "Updated daily Tasks, inspection workflows, and background services. Related app improvements were included in the same release.",
+    "summary": "Updated daily Tasks, inspection workflows, and background services. Related app improvements were included in the same release.",
     "details": [
-      "Covered inspection workflows, background services, and daily Tasks.",
-      "Updated inspection workflows, background services.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated inspection workflows, background services."
     ],
     "areas": [
+      "Daily Tasks",
       "Inspection workflows",
-      "Background services",
-      "Daily Tasks"
+      "Background services"
     ],
     "areaKeys": [
       "daily-tasks",
@@ -1337,9 +1187,7 @@
     "description": "Updated maintenance workflow and inspection workflows. Related app improvements were included in the same release.",
     "summary": "Updated maintenance workflow and inspection workflows. Related app improvements were included in the same release.",
     "details": [
-      "Covered maintenance workflow and inspection workflows.",
-      "Updated maintenance workflow, inspection workflows.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated maintenance workflow, inspection workflows."
     ],
     "areas": [
       "Maintenance workflow",
@@ -1357,9 +1205,7 @@
     "description": "Updated data storage and background services. Related app improvements were included in the same release.",
     "summary": "Updated data storage and background services. Related app improvements were included in the same release.",
     "details": [
-      "Covered data storage and background services.",
-      "Updated data storage, background services.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated data storage, background services."
     ],
     "areas": [
       "Data storage",
@@ -1375,17 +1221,15 @@
     "version": "0626.3.0",
     "updateKind": "major",
     "title": "Navigation update",
-    "description": "Updated mobile text size controls, did not work absence handling, and navigation. Related app improvements were included in the same release.",
-    "summary": "Updated mobile text size controls, did not work absence handling, and navigation. Related app improvements were included in the same release.",
+    "description": "Updated navigation, mobile text size controls, and did not work absence handling. Related app improvements were included in the same release.",
+    "summary": "Updated navigation, mobile text size controls, and did not work absence handling. Related app improvements were included in the same release.",
     "details": [
-      "Covered mobile text size controls, did not work absence handling, and navigation.",
-      "Updated mobile text size controls, did not work absence handling.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated mobile text size controls, did not work absence handling."
     ],
     "areas": [
+      "Navigation",
       "Mobile text size controls",
-      "Did not work absence handling",
-      "Navigation"
+      "Did not work absence handling"
     ],
     "areaKeys": [
       "navigation"
@@ -1396,17 +1240,15 @@
     "version": "0626.2.5",
     "updateKind": "minor",
     "title": "Release automation maintenance update",
-    "description": "Updated finalise commit summaries, maintenance workflow, and release automation. Related app improvements were included in the same release.",
-    "summary": "Updated finalise commit summaries, maintenance workflow, and release automation. Related app improvements were included in the same release.",
+    "description": "Updated release automation, finalise commit summaries, and maintenance workflow. Related app improvements were included in the same release.",
+    "summary": "Updated release automation, finalise commit summaries, and maintenance workflow. Related app improvements were included in the same release.",
     "details": [
-      "Covered finalise commit summaries, maintenance workflow, and release automation.",
-      "Updated finalise commit summaries, maintenance workflow.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated finalise commit summaries, maintenance workflow."
     ],
     "areas": [
+      "Release automation",
       "Finalise commit summaries",
-      "Maintenance workflow",
-      "Release automation"
+      "Maintenance workflow"
     ],
     "areaKeys": [
       "release-automation"
@@ -1420,15 +1262,13 @@
     "description": "Updated test coverage. Ignore browser event promise noise.",
     "summary": "Updated test coverage. Ignore browser event promise noise.",
     "details": [
-      "Covered test coverage. Ignore browser event promise noise, app reliability, and error reporting.",
       "Updated test coverage.",
-      "Ignore browser event promise noise.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Ignore browser event promise noise."
     ],
     "areas": [
-      "Test coverage. Ignore browser event promise noise",
       "App reliability",
-      "Error reporting"
+      "Error reporting",
+      "Test coverage. Ignore browser event promise noise"
     ],
     "areaKeys": [
       "app-reliability",
@@ -1443,9 +1283,7 @@
     "description": "Updated data storage and background services. Related app improvements were included in the same release.",
     "summary": "Updated data storage and background services. Related app improvements were included in the same release.",
     "details": [
-      "Covered data storage and background services.",
-      "Updated data storage, background services.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated data storage, background services."
     ],
     "areas": [
       "Data storage",
@@ -1464,9 +1302,7 @@
     "description": "Updated data storage and background services.",
     "summary": "Updated data storage and background services.",
     "details": [
-      "Covered data storage and background services.",
-      "Updated data storage and background services.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated data storage and background services."
     ],
     "areas": [
       "Data storage",
@@ -1482,17 +1318,15 @@
     "version": "0626.2.1",
     "updateKind": "minor",
     "title": "Release automation maintenance update",
-    "description": "Updated finalise commit summaries, inspection workflows, and release automation. Related app improvements were included in the same release.",
-    "summary": "Updated finalise commit summaries, inspection workflows, and release automation. Related app improvements were included in the same release.",
+    "description": "Updated release automation, finalise commit summaries, and inspection workflows. Related app improvements were included in the same release.",
+    "summary": "Updated release automation, finalise commit summaries, and inspection workflows. Related app improvements were included in the same release.",
     "details": [
-      "Covered finalise commit summaries, inspection workflows, and release automation.",
-      "Updated finalise commit summaries, inspection workflows.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated finalise commit summaries, inspection workflows."
     ],
     "areas": [
+      "Release automation",
       "Finalise commit summaries",
-      "Inspection workflows",
-      "Release automation"
+      "Inspection workflows"
     ],
     "areaKeys": [
       "release-automation"
@@ -1503,17 +1337,15 @@
     "version": "0626.2.0",
     "updateKind": "major",
     "title": "Absence & Leave update",
-    "description": "Updated absence workflow, maintenance workflow, and absence & Leave. Related app improvements were included in the same release.",
-    "summary": "Updated absence workflow, maintenance workflow, and absence & Leave. Related app improvements were included in the same release.",
+    "description": "Updated absence & Leave, absence workflow, and maintenance workflow. Related app improvements were included in the same release.",
+    "summary": "Updated absence & Leave, absence workflow, and maintenance workflow. Related app improvements were included in the same release.",
     "details": [
-      "Covered absence workflow, maintenance workflow, and absence & Leave.",
-      "Updated absence workflow, maintenance workflow.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated absence workflow, maintenance workflow."
     ],
     "areas": [
+      "Absence & Leave",
       "Absence workflow",
-      "Maintenance workflow",
-      "Absence & Leave"
+      "Maintenance workflow"
     ],
     "areaKeys": [
       "absence"
@@ -1527,9 +1359,7 @@
     "description": "Updated maintenance workflow and inspection workflows. Related app improvements were included in the same release.",
     "summary": "Updated maintenance workflow and inspection workflows. Related app improvements were included in the same release.",
     "details": [
-      "Covered maintenance workflow and inspection workflows.",
-      "Updated maintenance workflow, inspection workflows.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated maintenance workflow, inspection workflows."
     ],
     "areas": [
       "Maintenance workflow",
@@ -1547,13 +1377,11 @@
     "description": "Updated general app maintenance.",
     "summary": "Updated general app maintenance.",
     "details": [
-      "Covered general app maintenance and dashboard.",
-      "Updated general app maintenance.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated general app maintenance."
     ],
     "areas": [
-      "General app maintenance",
-      "Dashboard"
+      "Dashboard",
+      "General app maintenance"
     ],
     "areaKeys": [
       "dashboard"
@@ -1567,13 +1395,11 @@
     "description": "Updated general app maintenance.",
     "summary": "Updated general app maintenance.",
     "details": [
-      "Covered general app maintenance and dashboard.",
-      "Updated general app maintenance.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated general app maintenance."
     ],
     "areas": [
-      "General app maintenance",
-      "Dashboard"
+      "Dashboard",
+      "General app maintenance"
     ],
     "areaKeys": [
       "dashboard"
@@ -1587,13 +1413,11 @@
     "description": "Updated general app maintenance.",
     "summary": "Updated general app maintenance.",
     "details": [
-      "Covered general app maintenance and dashboard.",
-      "Updated general app maintenance.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated general app maintenance."
     ],
     "areas": [
-      "General app maintenance",
-      "Dashboard"
+      "Dashboard",
+      "General app maintenance"
     ],
     "areaKeys": [
       "dashboard"
@@ -1607,9 +1431,7 @@
     "description": "Updated data storage and background services. Related app improvements were included in the same release.",
     "summary": "Updated data storage and background services. Related app improvements were included in the same release.",
     "details": [
-      "Covered data storage and background services.",
-      "Updated data storage, background services.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated data storage, background services."
     ],
     "areas": [
       "Data storage",
@@ -1628,9 +1450,7 @@
     "description": "Handled temporary usage telemetry errors.",
     "summary": "Handled temporary usage telemetry errors.",
     "details": [
-      "Covered background services.",
-      "Handled temporary usage telemetry errors.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Handled temporary usage telemetry errors."
     ],
     "areas": [
       "Background services"
@@ -1647,13 +1467,11 @@
     "description": "Updated test coverage.",
     "summary": "Updated test coverage.",
     "details": [
-      "Covered test coverage and app reliability.",
-      "Updated test coverage.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated test coverage."
     ],
     "areas": [
-      "Test coverage",
-      "App reliability"
+      "App reliability",
+      "Test coverage"
     ],
     "areaKeys": [
       "app-reliability"
@@ -1667,9 +1485,7 @@
     "description": "Updated background services.",
     "summary": "Updated background services.",
     "details": [
-      "Covered background services.",
-      "Updated background services.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated background services."
     ],
     "areas": [
       "Background services"
@@ -1683,17 +1499,15 @@
     "version": "0526.28.0",
     "updateKind": "major",
     "title": "Absence & Leave update",
-    "description": "Updated absence workflow, timesheet workflow, and absence & Leave. Related app improvements were included in the same release.",
-    "summary": "Updated absence workflow, timesheet workflow, and absence & Leave. Related app improvements were included in the same release.",
+    "description": "Updated absence & Leave, absence workflow, and timesheet workflow. Related app improvements were included in the same release.",
+    "summary": "Updated absence & Leave, absence workflow, and timesheet workflow. Related app improvements were included in the same release.",
     "details": [
-      "Covered absence workflow, timesheet workflow, and absence & Leave.",
-      "Updated absence workflow, timesheet workflow.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated absence workflow, timesheet workflow."
     ],
     "areas": [
+      "Absence & Leave",
       "Absence workflow",
-      "Timesheet workflow",
-      "Absence & Leave"
+      "Timesheet workflow"
     ],
     "areaKeys": [
       "absence"
@@ -1707,13 +1521,11 @@
     "description": "Updated test coverage.",
     "summary": "Updated test coverage.",
     "details": [
-      "Covered test coverage and app reliability.",
-      "Updated test coverage.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated test coverage."
     ],
     "areas": [
-      "Test coverage",
-      "App reliability"
+      "App reliability",
+      "Test coverage"
     ],
     "areaKeys": [
       "app-reliability"
@@ -1727,13 +1539,11 @@
     "description": "Updated test coverage.",
     "summary": "Updated test coverage.",
     "details": [
-      "Covered test coverage and app reliability.",
-      "Updated test coverage.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated test coverage."
     ],
     "areas": [
-      "Test coverage",
-      "App reliability"
+      "App reliability",
+      "Test coverage"
     ],
     "areaKeys": [
       "app-reliability"
@@ -1747,9 +1557,7 @@
     "description": "Updated general app maintenance.",
     "summary": "Updated general app maintenance.",
     "details": [
-      "Covered general app maintenance.",
-      "Updated general app maintenance.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated general app maintenance."
     ],
     "areas": [
       "General app maintenance"
@@ -1764,9 +1572,7 @@
     "description": "Updated sidebar navigation styling and mobile text size controls. Related app improvements were included in the same release.",
     "summary": "Updated sidebar navigation styling and mobile text size controls. Related app improvements were included in the same release.",
     "details": [
-      "Covered sidebar navigation styling and mobile text size controls.",
-      "Updated sidebar navigation styling, mobile text size controls.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated sidebar navigation styling, mobile text size controls."
     ],
     "areas": [
       "Sidebar navigation styling",
@@ -1784,13 +1590,11 @@
     "description": "Added mobile text size controls.",
     "summary": "Added mobile text size controls.",
     "details": [
-      "Covered mobile text size controls and navigation.",
-      "Added mobile text size controls.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Added mobile text size controls."
     ],
     "areas": [
-      "Mobile text size controls",
-      "Navigation"
+      "Navigation",
+      "Mobile text size controls"
     ],
     "areaKeys": [
       "navigation"
@@ -1804,9 +1608,7 @@
     "description": "Updated maintenance workflow and automation scripts.",
     "summary": "Updated maintenance workflow and automation scripts.",
     "details": [
-      "Covered maintenance workflow and automation scripts.",
-      "Updated maintenance workflow and automation scripts.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated maintenance workflow and automation scripts."
     ],
     "areas": [
       "Maintenance workflow",
@@ -1824,9 +1626,7 @@
     "description": "Updated maintenance workflow and automation scripts.",
     "summary": "Updated maintenance workflow and automation scripts.",
     "details": [
-      "Covered maintenance workflow and automation scripts.",
-      "Updated maintenance workflow and automation scripts.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated maintenance workflow and automation scripts."
     ],
     "areas": [
       "Maintenance workflow",
@@ -1844,9 +1644,7 @@
     "description": "Updated maintenance workflow and automation scripts.",
     "summary": "Updated maintenance workflow and automation scripts.",
     "details": [
-      "Covered maintenance workflow and automation scripts.",
-      "Updated maintenance workflow and automation scripts.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated maintenance workflow and automation scripts."
     ],
     "areas": [
       "Maintenance workflow",
@@ -1864,9 +1662,7 @@
     "description": "Updated maintenance workflow and automation scripts.",
     "summary": "Updated maintenance workflow and automation scripts.",
     "details": [
-      "Covered maintenance workflow and automation scripts.",
-      "Updated maintenance workflow and automation scripts.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated maintenance workflow and automation scripts."
     ],
     "areas": [
       "Maintenance workflow",
@@ -1884,9 +1680,7 @@
     "description": "Updated maintenance workflow and automation scripts.",
     "summary": "Updated maintenance workflow and automation scripts.",
     "details": [
-      "Covered maintenance workflow and automation scripts.",
-      "Updated maintenance workflow and automation scripts.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated maintenance workflow and automation scripts."
     ],
     "areas": [
       "Maintenance workflow",
@@ -1901,18 +1695,16 @@
     "version": "0526.21.5",
     "updateKind": "minor",
     "title": "Error reporting improvements",
-    "description": "Updated sidebar navigation styling, fleet workflow. Ignore expected dvla lookup misses, and error reporting. Related app improvements were included in the same release.",
-    "summary": "Updated sidebar navigation styling, fleet workflow. Ignore expected dvla lookup misses, and error reporting. Related app improvements were included in the same release.",
+    "description": "Updated error reporting, sidebar navigation styling, and fleet workflow. Ignore expected dvla lookup misses. Related app improvements were included in the same release.",
+    "summary": "Updated error reporting, sidebar navigation styling, and fleet workflow. Ignore expected dvla lookup misses. Related app improvements were included in the same release.",
     "details": [
-      "Covered sidebar navigation styling, fleet workflow. Ignore expected dvla lookup misses, and error reporting.",
       "Updated sidebar navigation styling, fleet workflow.",
-      "Ignore expected dvla lookup misses.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Ignore expected dvla lookup misses."
     ],
     "areas": [
+      "Error reporting",
       "Sidebar navigation styling",
-      "Fleet workflow. Ignore expected dvla lookup misses",
-      "Error reporting"
+      "Fleet workflow. Ignore expected dvla lookup misses"
     ],
     "areaKeys": [
       "navigation",
@@ -1927,13 +1719,11 @@
     "description": "Updated general app maintenance.",
     "summary": "Updated general app maintenance.",
     "details": [
-      "Covered general app maintenance and app screens.",
-      "Updated general app maintenance.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated general app maintenance."
     ],
     "areas": [
-      "General app maintenance",
-      "App screens"
+      "App screens",
+      "General app maintenance"
     ],
     "areaKeys": [
       "app-screens"
@@ -1947,14 +1737,12 @@
     "description": "Repair profile overview and hgv error handling.",
     "summary": "Repair profile overview and hgv error handling.",
     "details": [
-      "Covered repair profile overview, hgv error handling, and error reporting.",
-      "Repair profile overview and hgv error handling.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Repair profile overview and hgv error handling."
     ],
     "areas": [
+      "Error reporting",
       "Repair profile overview",
-      "Hgv error handling",
-      "Error reporting"
+      "Hgv error handling"
     ],
     "areaKeys": [
       "error-reporting"
@@ -1968,13 +1756,11 @@
     "description": "Updated general app maintenance.",
     "summary": "Updated general app maintenance.",
     "details": [
-      "Covered general app maintenance and app screens.",
-      "Updated general app maintenance.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated general app maintenance."
     ],
     "areas": [
-      "General app maintenance",
-      "App screens"
+      "App screens",
+      "General app maintenance"
     ],
     "areaKeys": [
       "app-screens"
@@ -1988,13 +1774,11 @@
     "description": "Updated automation scripts.",
     "summary": "Updated automation scripts.",
     "details": [
-      "Covered automation scripts and release automation.",
-      "Updated automation scripts.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated automation scripts."
     ],
     "areas": [
-      "Automation scripts",
-      "Release automation"
+      "Release automation",
+      "Automation scripts"
     ],
     "areaKeys": [
       "release-automation"
@@ -2005,17 +1789,15 @@
     "version": "0526.21.0",
     "updateKind": "major",
     "title": "Navigation update",
-    "description": "Updated mobile text size controls, absence workflow, and navigation. Related app improvements were included in the same release.",
-    "summary": "Updated mobile text size controls, absence workflow, and navigation. Related app improvements were included in the same release.",
+    "description": "Updated navigation, mobile text size controls, and absence workflow. Related app improvements were included in the same release.",
+    "summary": "Updated navigation, mobile text size controls, and absence workflow. Related app improvements were included in the same release.",
     "details": [
-      "Covered mobile text size controls, absence workflow, and navigation.",
-      "Updated mobile text size controls, absence workflow.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated mobile text size controls, absence workflow."
     ],
     "areas": [
+      "Navigation",
       "Mobile text size controls",
-      "Absence workflow",
-      "Navigation"
+      "Absence workflow"
     ],
     "areaKeys": [
       "navigation"
@@ -2029,9 +1811,7 @@
     "description": "Updated data storage and background services. Related app improvements were included in the same release.",
     "summary": "Updated data storage and background services. Related app improvements were included in the same release.",
     "details": [
-      "Covered data storage and background services.",
-      "Updated data storage, background services.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated data storage, background services."
     ],
     "areas": [
       "Data storage",
@@ -2050,13 +1830,11 @@
     "description": "Updated general app maintenance.",
     "summary": "Updated general app maintenance.",
     "details": [
-      "Covered general app maintenance and app screens.",
-      "Updated general app maintenance.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated general app maintenance."
     ],
     "areas": [
-      "General app maintenance",
-      "App screens"
+      "App screens",
+      "General app maintenance"
     ],
     "areaKeys": [
       "app-screens"
@@ -2067,17 +1845,15 @@
     "version": "0526.20.2",
     "updateKind": "minor",
     "title": "Release automation maintenance update",
-    "description": "Updated finalise commit summaries, inspection workflows, and release automation. Related app improvements were included in the same release.",
-    "summary": "Updated finalise commit summaries, inspection workflows, and release automation. Related app improvements were included in the same release.",
+    "description": "Updated release automation, finalise commit summaries, and inspection workflows. Related app improvements were included in the same release.",
+    "summary": "Updated release automation, finalise commit summaries, and inspection workflows. Related app improvements were included in the same release.",
     "details": [
-      "Covered finalise commit summaries, inspection workflows, and release automation.",
-      "Updated finalise commit summaries, inspection workflows.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated finalise commit summaries, inspection workflows."
     ],
     "areas": [
+      "Release automation",
       "Finalise commit summaries",
-      "Inspection workflows",
-      "Release automation"
+      "Inspection workflows"
     ],
     "areaKeys": [
       "release-automation"
@@ -2088,17 +1864,15 @@
     "version": "0526.20.1",
     "updateKind": "minor",
     "title": "Release automation maintenance update",
-    "description": "Updated finalise commit summaries, inspection workflows, and release automation. Related app improvements were included in the same release.",
-    "summary": "Updated finalise commit summaries, inspection workflows, and release automation. Related app improvements were included in the same release.",
+    "description": "Updated release automation, finalise commit summaries, and inspection workflows. Related app improvements were included in the same release.",
+    "summary": "Updated release automation, finalise commit summaries, and inspection workflows. Related app improvements were included in the same release.",
     "details": [
-      "Covered finalise commit summaries, inspection workflows, and release automation.",
-      "Updated finalise commit summaries, inspection workflows.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated finalise commit summaries, inspection workflows."
     ],
     "areas": [
+      "Release automation",
       "Finalise commit summaries",
-      "Inspection workflows",
-      "Release automation"
+      "Inspection workflows"
     ],
     "areaKeys": [
       "release-automation"
@@ -2112,13 +1886,11 @@
     "description": "Updated timesheet workflow.",
     "summary": "Updated timesheet workflow.",
     "details": [
-      "Covered timesheet workflow and timesheets.",
-      "Updated timesheet workflow.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated timesheet workflow."
     ],
     "areas": [
-      "Timesheet workflow",
-      "Timesheets"
+      "Timesheets",
+      "Timesheet workflow"
     ],
     "areaKeys": [
       "timesheets"
@@ -2132,9 +1904,7 @@
     "description": "Updated background services.",
     "summary": "Updated background services.",
     "details": [
-      "Covered background services.",
-      "Updated background services.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated background services."
     ],
     "areas": [
       "Background services"
@@ -2151,9 +1921,7 @@
     "description": "Updated background services and automation scripts.",
     "summary": "Updated background services and automation scripts.",
     "details": [
-      "Covered background services and automation scripts.",
-      "Updated background services and automation scripts.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated background services and automation scripts."
     ],
     "areas": [
       "Background services",
@@ -2171,9 +1939,7 @@
     "description": "Updated data storage and background services. Related app improvements were included in the same release.",
     "summary": "Updated data storage and background services. Related app improvements were included in the same release.",
     "details": [
-      "Covered data storage and background services.",
-      "Updated data storage, background services.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated data storage, background services."
     ],
     "areas": [
       "Data storage",
@@ -2192,13 +1958,11 @@
     "description": "Updated general app maintenance.",
     "summary": "Updated general app maintenance.",
     "details": [
-      "Covered general app maintenance and app screens.",
-      "Updated general app maintenance.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated general app maintenance."
     ],
     "areas": [
-      "General app maintenance",
-      "App screens"
+      "App screens",
+      "General app maintenance"
     ],
     "areaKeys": [
       "app-screens"
@@ -2209,17 +1973,15 @@
     "version": "0526.17.0",
     "updateKind": "major",
     "title": "Absence & Leave update",
-    "description": "Updated absence workflow, inspection workflows, and absence & Leave. Related app improvements were included in the same release.",
-    "summary": "Updated absence workflow, inspection workflows, and absence & Leave. Related app improvements were included in the same release.",
+    "description": "Updated absence & Leave, absence workflow, and inspection workflows. Related app improvements were included in the same release.",
+    "summary": "Updated absence & Leave, absence workflow, and inspection workflows. Related app improvements were included in the same release.",
     "details": [
-      "Covered absence workflow, inspection workflows, and absence & Leave.",
-      "Updated absence workflow, inspection workflows.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated absence workflow, inspection workflows."
     ],
     "areas": [
+      "Absence & Leave",
       "Absence workflow",
-      "Inspection workflows",
-      "Absence & Leave"
+      "Inspection workflows"
     ],
     "areaKeys": [
       "absence"
@@ -2230,18 +1992,16 @@
     "version": "0526.16.1",
     "updateKind": "minor",
     "title": "Error reporting improvements",
-    "description": "Updated sidebar navigation styling, maintenance workflow. Filter notification fetch network noise, and error reporting. Related app improvements were included in the same release.",
-    "summary": "Updated sidebar navigation styling, maintenance workflow. Filter notification fetch network noise, and error reporting. Related app improvements were included in the same release.",
+    "description": "Updated error reporting, sidebar navigation styling, and maintenance workflow. Filter notification fetch network noise. Related app improvements were included in the same release.",
+    "summary": "Updated error reporting, sidebar navigation styling, and maintenance workflow. Filter notification fetch network noise. Related app improvements were included in the same release.",
     "details": [
-      "Covered sidebar navigation styling, maintenance workflow. Filter notification fetch network noise, and error reporting.",
       "Updated sidebar navigation styling, maintenance workflow.",
-      "Filter notification fetch network noise.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Filter notification fetch network noise."
     ],
     "areas": [
+      "Error reporting",
       "Sidebar navigation styling",
-      "Maintenance workflow. Filter notification fetch network noise",
-      "Error reporting"
+      "Maintenance workflow. Filter notification fetch network noise"
     ],
     "areaKeys": [
       "navigation",
@@ -2256,14 +2016,12 @@
     "description": "Updated mobile text size controls and background services.",
     "summary": "Updated mobile text size controls and background services.",
     "details": [
-      "Covered mobile text size controls, background services, and navigation.",
-      "Updated mobile text size controls and background services.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated mobile text size controls and background services."
     ],
     "areas": [
+      "Navigation",
       "Mobile text size controls",
-      "Background services",
-      "Navigation"
+      "Background services"
     ],
     "areaKeys": [
       "navigation",
@@ -2278,13 +2036,11 @@
     "description": "Updated test coverage.",
     "summary": "Updated test coverage.",
     "details": [
-      "Covered test coverage and app reliability.",
-      "Updated test coverage.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated test coverage."
     ],
     "areas": [
-      "Test coverage",
-      "App reliability"
+      "App reliability",
+      "Test coverage"
     ],
     "areaKeys": [
       "app-reliability"
@@ -2295,17 +2051,15 @@
     "version": "0526.15.1",
     "updateKind": "minor",
     "title": "Release automation maintenance update",
-    "description": "Updated finalise commit summaries, maintenance workflow, and release automation. Related app improvements were included in the same release.",
-    "summary": "Updated finalise commit summaries, maintenance workflow, and release automation. Related app improvements were included in the same release.",
+    "description": "Updated release automation, finalise commit summaries, and maintenance workflow. Related app improvements were included in the same release.",
+    "summary": "Updated release automation, finalise commit summaries, and maintenance workflow. Related app improvements were included in the same release.",
     "details": [
-      "Covered finalise commit summaries, maintenance workflow, and release automation.",
-      "Updated finalise commit summaries, maintenance workflow.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated finalise commit summaries, maintenance workflow."
     ],
     "areas": [
+      "Release automation",
       "Finalise commit summaries",
-      "Maintenance workflow",
-      "Release automation"
+      "Maintenance workflow"
     ],
     "areaKeys": [
       "release-automation"
@@ -2316,17 +2070,15 @@
     "version": "0526.15.0",
     "updateKind": "major",
     "title": "Absence & Leave update",
-    "description": "Updated absence workflow, maintenance workflow, and absence & Leave. Related app improvements were included in the same release.",
-    "summary": "Updated absence workflow, maintenance workflow, and absence & Leave. Related app improvements were included in the same release.",
+    "description": "Updated absence & Leave, absence workflow, and maintenance workflow. Related app improvements were included in the same release.",
+    "summary": "Updated absence & Leave, absence workflow, and maintenance workflow. Related app improvements were included in the same release.",
     "details": [
-      "Covered absence workflow, maintenance workflow, and absence & Leave.",
-      "Updated absence workflow, maintenance workflow.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated absence workflow, maintenance workflow."
     ],
     "areas": [
+      "Absence & Leave",
       "Absence workflow",
-      "Maintenance workflow",
-      "Absence & Leave"
+      "Maintenance workflow"
     ],
     "areaKeys": [
       "absence"
@@ -2340,9 +2092,7 @@
     "description": "Updated fleet workflow.",
     "summary": "Updated fleet workflow.",
     "details": [
-      "Covered fleet workflow.",
-      "Updated fleet workflow.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated fleet workflow."
     ],
     "areas": [
       "Fleet workflow"
@@ -2359,9 +2109,7 @@
     "description": "Updated background services.",
     "summary": "Updated background services.",
     "details": [
-      "Covered background services.",
-      "Updated background services.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated background services."
     ],
     "areas": [
       "Background services"
@@ -2378,14 +2126,12 @@
     "description": "Updated timesheet workflow and background services.",
     "summary": "Updated timesheet workflow and background services.",
     "details": [
-      "Covered timesheet workflow, background services, and timesheets.",
-      "Updated timesheet workflow and background services.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated timesheet workflow and background services."
     ],
     "areas": [
+      "Timesheets",
       "Timesheet workflow",
-      "Background services",
-      "Timesheets"
+      "Background services"
     ],
     "areaKeys": [
       "timesheets",
@@ -2400,14 +2146,12 @@
     "description": "Updated archive tabs and ignore periods.",
     "summary": "Updated archive tabs and ignore periods.",
     "details": [
-      "Covered archive tabs, ignore periods, and actions.",
-      "Updated archive tabs and ignore periods.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated archive tabs and ignore periods."
     ],
     "areas": [
+      "Actions",
       "Archive tabs",
-      "Ignore periods",
-      "Actions"
+      "Ignore periods"
     ],
     "areaKeys": [
       "actions"
@@ -2421,9 +2165,7 @@
     "description": "Updated background services.",
     "summary": "Updated background services.",
     "details": [
-      "Covered background services.",
-      "Updated background services.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated background services."
     ],
     "areas": [
       "Background services"
@@ -2440,15 +2182,13 @@
     "description": "Updated fleet workflow and background services. Sync approval summary counts.",
     "summary": "Updated fleet workflow and background services. Sync approval summary counts.",
     "details": [
-      "Covered fleet workflow, background services. Sync approval summary counts, and dashboard.",
       "Updated fleet workflow and background services.",
-      "Sync approval summary counts.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Sync approval summary counts."
     ],
     "areas": [
+      "Dashboard",
       "Fleet workflow",
-      "Background services. Sync approval summary counts",
-      "Dashboard"
+      "Background services. Sync approval summary counts"
     ],
     "areaKeys": [
       "fleet",
@@ -2463,9 +2203,7 @@
     "description": "Allow cross-team reminder assignment.",
     "summary": "Allow cross-team reminder assignment.",
     "details": [
-      "Covered actions.",
-      "Allow cross-team reminder assignment.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Allow cross-team reminder assignment."
     ],
     "areas": [
       "Actions"
@@ -2482,9 +2220,7 @@
     "description": "Updated background services.",
     "summary": "Updated background services.",
     "details": [
-      "Covered background services.",
-      "Updated background services.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated background services."
     ],
     "areas": [
       "Background services"
@@ -2501,9 +2237,7 @@
     "description": "Updated general app maintenance.",
     "summary": "Updated general app maintenance.",
     "details": [
-      "Covered general app maintenance.",
-      "Updated general app maintenance.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated general app maintenance."
     ],
     "areas": [
       "General app maintenance"
@@ -2515,17 +2249,15 @@
     "version": "0526.8.0",
     "updateKind": "major",
     "title": "Daily Tasks update",
-    "description": "Updated inspection workflows, data storage, and daily Tasks. Related app improvements were included in the same release.",
-    "summary": "Updated inspection workflows, data storage, and daily Tasks. Related app improvements were included in the same release.",
+    "description": "Updated daily Tasks, inspection workflows, and data storage. Related app improvements were included in the same release.",
+    "summary": "Updated daily Tasks, inspection workflows, and data storage. Related app improvements were included in the same release.",
     "details": [
-      "Covered inspection workflows, data storage, and daily Tasks.",
-      "Updated inspection workflows, data storage.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated inspection workflows, data storage."
     ],
     "areas": [
+      "Daily Tasks",
       "Inspection workflows",
-      "Data storage",
-      "Daily Tasks"
+      "Data storage"
     ],
     "areaKeys": [
       "daily-tasks",
@@ -2540,13 +2272,11 @@
     "description": "Updated general app maintenance.",
     "summary": "Updated general app maintenance.",
     "details": [
-      "Covered general app maintenance and dashboard.",
-      "Updated general app maintenance.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated general app maintenance."
     ],
     "areas": [
-      "General app maintenance",
-      "Dashboard"
+      "Dashboard",
+      "General app maintenance"
     ],
     "areaKeys": [
       "dashboard"
@@ -2560,9 +2290,7 @@
     "description": "Improved sidebar navigation styling.",
     "summary": "Improved sidebar navigation styling.",
     "details": [
-      "Covered sidebar navigation styling.",
-      "Improved sidebar navigation styling.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Improved sidebar navigation styling."
     ],
     "areas": [
       "Sidebar navigation styling"
@@ -2579,14 +2307,12 @@
     "description": "Updated finalise commit summaries and sidebar navigation styling.",
     "summary": "Updated finalise commit summaries and sidebar navigation styling.",
     "details": [
-      "Covered finalise commit summaries, sidebar navigation styling, and release automation.",
-      "Updated finalise commit summaries and sidebar navigation styling.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated finalise commit summaries and sidebar navigation styling."
     ],
     "areas": [
+      "Release automation",
       "Finalise commit summaries",
-      "Sidebar navigation styling",
-      "Release automation"
+      "Sidebar navigation styling"
     ],
     "areaKeys": [
       "release-automation"
@@ -2597,17 +2323,15 @@
     "version": "0526.7.0",
     "updateKind": "major",
     "title": "Absence & Leave update",
-    "description": "Updated absence workflow, timesheet workflow, and absence & Leave. Related app improvements were included in the same release.",
-    "summary": "Updated absence workflow, timesheet workflow, and absence & Leave. Related app improvements were included in the same release.",
+    "description": "Updated absence & Leave, absence workflow, and timesheet workflow. Related app improvements were included in the same release.",
+    "summary": "Updated absence & Leave, absence workflow, and timesheet workflow. Related app improvements were included in the same release.",
     "details": [
-      "Covered absence workflow, timesheet workflow, and absence & Leave.",
-      "Updated absence workflow, timesheet workflow.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated absence workflow, timesheet workflow."
     ],
     "areas": [
+      "Absence & Leave",
       "Absence workflow",
-      "Timesheet workflow",
-      "Absence & Leave"
+      "Timesheet workflow"
     ],
     "areaKeys": [
       "absence"
@@ -2621,13 +2345,11 @@
     "description": "Added reminder workflow management.",
     "summary": "Added reminder workflow management.",
     "details": [
-      "Covered reminder workflow management and actions.",
-      "Added reminder workflow management.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Added reminder workflow management."
     ],
     "areas": [
-      "Reminder workflow management",
-      "Actions"
+      "Actions",
+      "Reminder workflow management"
     ],
     "areaKeys": [
       "actions"
@@ -2641,13 +2363,11 @@
     "description": "Improved finalise commit summaries.",
     "summary": "Improved finalise commit summaries.",
     "details": [
-      "Covered finalise commit summaries and release automation.",
-      "Improved finalise commit summaries.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Improved finalise commit summaries."
     ],
     "areas": [
-      "Finalise commit summaries",
-      "Release automation"
+      "Release automation",
+      "Finalise commit summaries"
     ],
     "areaKeys": [
       "release-automation"
@@ -2661,9 +2381,7 @@
     "description": "Updated general app maintenance.",
     "summary": "Updated general app maintenance.",
     "details": [
-      "Covered general app maintenance.",
-      "Updated general app maintenance.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated general app maintenance."
     ],
     "areas": [
       "General app maintenance"
@@ -2678,13 +2396,11 @@
     "description": "Added mobile text size controls.",
     "summary": "Added mobile text size controls.",
     "details": [
-      "Covered mobile text size controls and navigation.",
-      "Added mobile text size controls.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Added mobile text size controls."
     ],
     "areas": [
-      "Mobile text size controls",
-      "Navigation"
+      "Navigation",
+      "Mobile text size controls"
     ],
     "areaKeys": [
       "navigation"
@@ -2695,17 +2411,15 @@
     "version": "0526.4.0",
     "updateKind": "major",
     "title": "Navigation update",
-    "description": "Updated mobile text size controls, inspection workflows, and navigation. Related app improvements were included in the same release.",
-    "summary": "Updated mobile text size controls, inspection workflows, and navigation. Related app improvements were included in the same release.",
+    "description": "Updated navigation, mobile text size controls, and inspection workflows. Related app improvements were included in the same release.",
+    "summary": "Updated navigation, mobile text size controls, and inspection workflows. Related app improvements were included in the same release.",
     "details": [
-      "Covered mobile text size controls, inspection workflows, and navigation.",
-      "Updated mobile text size controls, inspection workflows.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated mobile text size controls, inspection workflows."
     ],
     "areas": [
+      "Navigation",
       "Mobile text size controls",
-      "Inspection workflows",
-      "Navigation"
+      "Inspection workflows"
     ],
     "areaKeys": [
       "navigation"
@@ -2719,9 +2433,7 @@
     "description": "Updated fleet workflow.",
     "summary": "Updated fleet workflow.",
     "details": [
-      "Covered fleet workflow.",
-      "Updated fleet workflow.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated fleet workflow."
     ],
     "areas": [
       "Fleet workflow"
@@ -2738,13 +2450,11 @@
     "description": "Updated general app maintenance.",
     "summary": "Updated general app maintenance.",
     "details": [
-      "Covered general app maintenance and dashboard.",
-      "Updated general app maintenance.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated general app maintenance."
     ],
     "areas": [
-      "General app maintenance",
-      "Dashboard"
+      "Dashboard",
+      "General app maintenance"
     ],
     "areaKeys": [
       "dashboard"
@@ -2758,13 +2468,11 @@
     "description": "Improved finalise commit summaries.",
     "summary": "Improved finalise commit summaries.",
     "details": [
-      "Covered finalise commit summaries and release automation.",
-      "Improved finalise commit summaries.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Improved finalise commit summaries."
     ],
     "areas": [
-      "Finalise commit summaries",
-      "Release automation"
+      "Release automation",
+      "Finalise commit summaries"
     ],
     "areaKeys": [
       "release-automation"
@@ -2778,13 +2486,11 @@
     "description": "Updated general app maintenance.",
     "summary": "Updated general app maintenance.",
     "details": [
-      "Covered general app maintenance and app screens.",
-      "Updated general app maintenance.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated general app maintenance."
     ],
     "areas": [
-      "General app maintenance",
-      "App screens"
+      "App screens",
+      "General app maintenance"
     ],
     "areaKeys": [
       "app-screens"
@@ -2798,14 +2504,12 @@
     "description": "Updated mobile text size controls and background services.",
     "summary": "Updated mobile text size controls and background services.",
     "details": [
-      "Covered mobile text size controls, background services, and navigation.",
-      "Updated mobile text size controls and background services.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Updated mobile text size controls and background services."
     ],
     "areas": [
+      "Navigation",
       "Mobile text size controls",
-      "Background services",
-      "Navigation"
+      "Background services"
     ],
     "areaKeys": [
       "navigation",
@@ -2820,13 +2524,11 @@
     "description": "Updated test coverage.",
     "summary": "Updated test coverage.",
     "details": [
-      "Covered test coverage and app reliability.",
-      "Updated test coverage.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Updated test coverage."
     ],
     "areas": [
-      "Test coverage",
-      "App reliability"
+      "App reliability",
+      "Test coverage"
     ],
     "areaKeys": [
       "app-reliability"
@@ -2840,15 +2542,13 @@
     "description": "Updated maintenance workflow. Add production release version display and bump automation.",
     "summary": "Updated maintenance workflow. Add production release version display and bump automation.",
     "details": [
-      "Covered maintenance workflow. Add production release version display, bump automation, and help and FAQ.",
       "Updated maintenance workflow.",
-      "Added production release version display and bump automation.",
-      "Published as a larger app update because it included broader workflow changes."
+      "Added production release version display and bump automation."
     ],
     "areas": [
+      "Help and FAQ",
       "Maintenance workflow. Add production release version display",
-      "Bump automation",
-      "Help and FAQ"
+      "Bump automation"
     ],
     "areaKeys": [
       "maintenance",
@@ -2863,15 +2563,13 @@
     "description": "Added help page production version display, automatic version bumps on main branch pushes, and this private release log format.",
     "summary": "Added help page production version display, automatic version bumps on main branch pushes, and this private release log format.",
     "details": [
-      "Covered help page production version display, automatic version bumps on main branch pushes, and this private release log format, and release automation.",
-      "Initialise production release version tracking.",
-      "Published as a smaller improvement release for fixes, maintenance, or supporting updates."
+      "Initialise production release version tracking."
     ],
     "areas": [
+      "Release automation",
       "Help page production version display",
       "Automatic version bumps on main branch pushes",
-      "And this private release log format",
-      "Release automation"
+      "This private release log format"
     ],
     "areaKeys": [
       "release-automation"

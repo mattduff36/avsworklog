@@ -29,6 +29,7 @@ export interface ParsedReleaseLogEntry {
   version: string;
   primaryCommitMessage: string | null;
   whatChanged: string;
+  detailBullets: string[];
   commitMessages: string[];
   pushedAt: string | null;
 }
@@ -57,11 +58,12 @@ const MAJOR_TYPES = new Set(['feat']);
 const MINOR_TYPES = new Set(['fix', 'chore', 'docs', 'test', 'refactor', 'perf', 'style']);
 const SKIP_VERSION_MARKER = '[skip version]';
 const RELEASE_VERSION_HEADING_PATTERN = /^##\s+(\d{4}\.\d+\.\d+)\s*$/gmu;
-const DEFAULT_RELEASE_HISTORY_MONTH_LIMIT = 6;
+const DEFAULT_RELEASE_HISTORY_MONTH_LIMIT = 4;
 const RELEASE_LOG_LABELS = new Set([
   '**GIT COMMIT MESSAGE**',
   '**PUSHED AT**',
   '**WHAT CHANGED**',
+  '**VERSION HISTORY DETAILS**',
   '**COMMITS IN THIS RELEASE**',
 ]);
 const FRIENDLY_SCOPE_LABELS: Record<string, string> = {
@@ -286,10 +288,15 @@ export function formatReleaseLogEntry(options: {
   version: string;
   primaryCommitMessage: string;
   whatChanged: string;
+  releaseDetails?: string[];
   commitMessages: string[];
   pushedAt?: string | null;
 }): string {
   const commitBullets = options.commitMessages.map((message) => `- \`${message}\``).join('\n');
+  const releaseDetails = uniqueStrings((options.releaseDetails ?? []).map((detail) => ensureSentence(detail)));
+  const releaseDetailLines = releaseDetails.length > 0
+    ? ['', '**VERSION HISTORY DETAILS**', ...releaseDetails.map((detail) => `- ${detail}`)]
+    : [];
   const pushedAtLines = options.pushedAt ? ['', '**PUSHED AT**', options.pushedAt] : [];
 
   return [
@@ -301,6 +308,7 @@ export function formatReleaseLogEntry(options: {
     '',
     '**WHAT CHANGED**',
     options.whatChanged,
+    ...releaseDetailLines,
     '',
     '**COMMITS IN THIS RELEASE**',
     commitBullets,
@@ -337,17 +345,17 @@ function getSectionValue(lines: string[], label: string): string {
   return values.join(' ').trim();
 }
 
-function getCommitMessagesFromSection(lines: string[]): string[] {
-  const index = lines.findIndex((line) => line.trim() === '**COMMITS IN THIS RELEASE**');
+function getBulletValuesFromSection(lines: string[], label: string): string[] {
+  const index = lines.findIndex((line) => line.trim() === label);
   if (index === -1) {
     return [];
   }
 
-  const messages: string[] = [];
+  const values: string[] = [];
   for (let lineIndex = index + 1; lineIndex < lines.length; lineIndex += 1) {
     const line = lines[lineIndex]?.trim() ?? '';
     if (!line) {
-      if (messages.length > 0) break;
+      if (values.length > 0) break;
       continue;
     }
 
@@ -356,11 +364,21 @@ function getCommitMessagesFromSection(lines: string[]): string[] {
     }
 
     if (line.startsWith('- ')) {
-      messages.push(stripInlineCode(line.slice(2)));
+      values.push(line.slice(2).trim());
     }
   }
 
-  return messages;
+  return uniqueStrings(values);
+}
+
+function getCommitMessagesFromSection(lines: string[]): string[] {
+  return getBulletValuesFromSection(lines, '**COMMITS IN THIS RELEASE**').map(stripInlineCode);
+}
+
+function getReleaseDetailBulletsFromSection(lines: string[]): string[] {
+  return getBulletValuesFromSection(lines, '**VERSION HISTORY DETAILS**').map((detail) =>
+    ensureSentence(makePastTenseOpening(sentenceCase(makeFriendlyReleaseText(stripInlineCode(detail)))))
+  );
 }
 
 function sentenceCase(value: string): string {
@@ -455,6 +473,7 @@ function normalizeAreaLabel(value: string): string {
   const trimmed = stripVagueAreaCount(value)
     .replace(/[.!?]$/u, '')
     .replace(/^(add|added|fix|fixed|handle|handled|improve|improved|normalize|normalized|publish|published|update|updated)\s+/iu, '')
+    .replace(/^(and|or)\s+/iu, '')
     .trim();
 
   if (!trimmed || /^\d+\s+more areas?$/iu.test(trimmed)) {
@@ -486,7 +505,13 @@ function extractAreasFromText(value: string): string[] {
 }
 
 function removeRedundantAreas(areas: string[]): string[] {
-  const uniqueAreas = uniqueStrings(areas);
+  const seenAreas = new Set<string>();
+  const uniqueAreas = areas.filter((area) => {
+    const normalizedArea = area.trim().toLowerCase();
+    if (!normalizedArea || seenAreas.has(normalizedArea)) return false;
+    seenAreas.add(normalizedArea);
+    return true;
+  });
 
   return uniqueAreas.filter((area) => {
     const normalizedArea = area.toLowerCase();
@@ -547,7 +572,7 @@ function buildReleaseHistoryAreas(entry: ParsedReleaseLogEntry, commits: ParsedC
   const scopedAreas = getReleaseAreasFromScopes(commits.map((commit) => commit.scope));
   const describedAreas = extractAreasFromText(entry.whatChanged);
 
-  return removeRedundantAreas([...describedAreas, ...scopedAreas]);
+  return removeRedundantAreas([...scopedAreas, ...describedAreas]);
 }
 
 function buildReleaseHistoryAreaKeys(areas: string[], commits: ParsedCommit[]): string[] {
@@ -578,24 +603,19 @@ function buildFriendlyCommitDetail(commit: ParsedCommit): string {
   return ensureSentence(makePastTenseOpening(sentenceCase(friendlySubject)));
 }
 
-function buildReleaseHistoryDetails(
-  entry: ParsedReleaseLogEntry,
-  commits: ParsedCommit[],
-  areas: string[],
-  updateKind: ReleaseHistoryUpdateKind
-): string[] {
+function buildReleaseHistoryDetails(entry: ParsedReleaseLogEntry, commits: ParsedCommit[], areas: string[]): string[] {
+  if (entry.detailBullets.length > 0) {
+    return uniqueStrings(entry.detailBullets);
+  }
+
   const areaDetail = areas.length > 0 ? `Covered ${formatFriendlyList(areas)}.` : '';
   const commitDetails = commits.map(buildFriendlyCommitDetail);
-  const releaseKindDetail =
-    updateKind === 'major'
-      ? 'Published as a larger app update because it included broader workflow changes.'
-      : 'Published as a smaller improvement release for fixes, maintenance, or supporting updates.';
+  if (commitDetails.length > 0) {
+    return uniqueStrings(commitDetails);
+  }
 
   return uniqueStrings([
     areaDetail,
-    ...commitDetails,
-    releaseKindDetail,
-    entry.pushedAt ? 'The release time shown is when the version record was created.' : '',
   ]);
 }
 
@@ -615,7 +635,7 @@ function buildReleaseHistoryEntry(
     title: buildReleaseHistoryTitle(entry),
     description: summary,
     summary,
-    details: buildReleaseHistoryDetails(entry, commits, areas, updateKind),
+    details: buildReleaseHistoryDetails(entry, commits, areas),
     areas,
     areaKeys,
     pushedAt: entry.pushedAt ?? timestampLookup[entry.version] ?? null,
@@ -634,6 +654,7 @@ export function parseReleaseLogEntries(content: string): ParsedReleaseLogEntry[]
       version: heading[1] ?? '',
       primaryCommitMessage: stripInlineCode(getSectionValue(lines, '**GIT COMMIT MESSAGE**')) || null,
       whatChanged: getSectionValue(lines, '**WHAT CHANGED**'),
+      detailBullets: getReleaseDetailBulletsFromSection(lines),
       commitMessages: getCommitMessagesFromSection(lines),
       pushedAt: getSectionValue(lines, '**PUSHED AT**') || null,
     };

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildFinaliseReleaseSummaryEvidence,
+  buildReleaseDetailFallbackBullets,
   formatReleaseVersionCommitMessage,
   getFinaliseTimingSummaryLines,
   summarizeFinaliseChanges,
@@ -71,6 +73,23 @@ describe('finalise change summaries', () => {
     expect(summary.commitMessage).toBe('feat(inventory): update inventory');
     expect(summary.fileCount).toBe(1);
     expect(summary.areas).toEqual(['Inventory']);
+  });
+
+  it('builds descriptive release detail fallback bullets from changed files and commits', () => {
+    const changedFiles = [
+      'app/(dashboard)/inventory/page.tsx',
+      'app/api/inventory/route.ts',
+      'tests/unit/inventory-route.test.ts',
+    ];
+    const commitMessages = ['feat(inventory): add stock adjustment workflow'];
+
+    expect(buildFinaliseReleaseSummaryEvidence(changedFiles, commitMessages).tasks[0]).toMatchObject({
+      area: 'Inventory',
+      subject: 'add stock adjustment workflow',
+    });
+    expect(buildReleaseDetailFallbackBullets(changedFiles, commitMessages)).toContain(
+      'Added stock adjustment workflow, with changes to background routes, app screens, and automated tests.'
+    );
   });
 
   it('uses the primary change summary for release version commits', () => {
