@@ -1,5 +1,34 @@
 [
   {
+    "version": "0626.39.0",
+    "updateKind": "major",
+    "title": "Inventory update",
+    "description": "Updated Inventory, Sign in, Customers, Dashboard, Navigation, and Profile.",
+    "summary": "Updated Inventory, Sign in, Customers, Dashboard, Navigation, and Profile.",
+    "details": [
+      "Covered inventory, sign in, customers, dashboard, navigation, and and Profile.",
+      "Updated Inventory, Sign in, Customers, Dashboard, Navigation, and Profile.",
+      "Published as a larger app update because it included broader workflow changes.",
+      "The release time shown is when the version record was created."
+    ],
+    "areas": [
+      "Inventory",
+      "Sign in",
+      "Customers",
+      "Dashboard",
+      "Navigation",
+      "And Profile"
+    ],
+    "areaKeys": [
+      "inventory",
+      "sign-in",
+      "customers",
+      "dashboard",
+      "navigation"
+    ],
+    "pushedAt": "2026-06-25T08:34:38.965Z"
+  },
+  {
     "version": "0626.38.0",
     "updateKind": "major",
     "title": "Timesheets update",
