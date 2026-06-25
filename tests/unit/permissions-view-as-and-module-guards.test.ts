@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { shouldGrantFullAccessSnapshot } from '@/app/api/me/permissions/route';
+import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
 
 function readSource(relativePath: string): string {
   const absolutePath = path.join(process.cwd(), relativePath);
@@ -53,6 +54,44 @@ describe('shouldGrantFullAccessSnapshot', () => {
         is_super_admin: false,
         is_actual_super_admin: false,
         is_viewing_as: false,
+      })
+    ).toBe(true);
+  });
+});
+
+describe('hasEffectiveRoleFullAccess', () => {
+  it('does not grant actual superadmin bypass while viewing as an employee role', () => {
+    expect(
+      hasEffectiveRoleFullAccess({
+        role_name: 'employee',
+        role_class: 'employee',
+        is_super_admin: false,
+        is_actual_super_admin: true,
+        is_viewing_as: true,
+      })
+    ).toBe(false);
+  });
+
+  it('keeps actual superadmin bypass outside view-as mode', () => {
+    expect(
+      hasEffectiveRoleFullAccess({
+        role_name: 'employee',
+        role_class: 'employee',
+        is_super_admin: false,
+        is_actual_super_admin: true,
+        is_viewing_as: false,
+      })
+    ).toBe(true);
+  });
+
+  it('still grants full access for effective admin roles during view-as', () => {
+    expect(
+      hasEffectiveRoleFullAccess({
+        role_name: 'admin',
+        role_class: 'admin',
+        is_super_admin: false,
+        is_actual_super_admin: true,
+        is_viewing_as: true,
       })
     ).toBe(true);
   });

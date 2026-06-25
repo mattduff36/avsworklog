@@ -43,7 +43,7 @@ export function hasRoleFullAccess(
 export function hasEffectiveRoleFullAccess(
   role: Pick<
     EffectiveAdminRoleLike,
-    'role_name' | 'role_class' | 'is_super_admin' | 'is_actual_super_admin'
+    'role_name' | 'role_class' | 'is_super_admin' | 'is_actual_super_admin' | 'is_viewing_as'
   > | null | undefined
 ): boolean {
   if (!role) {
@@ -51,7 +51,7 @@ export function hasEffectiveRoleFullAccess(
   }
 
   return (
-    Boolean(role.is_actual_super_admin) ||
+    (Boolean(role.is_actual_super_admin) && role.is_viewing_as !== true) ||
     Boolean(role.is_super_admin) ||
     role.role_class === 'admin' ||
     normalizeRoleName(role.role_name) === 'admin'

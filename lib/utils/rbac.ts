@@ -30,7 +30,8 @@ export async function getEffectiveModuleAccessLevel(moduleName: ModuleName): Pro
     effectiveRole.user_id,
     effectiveRole.role_id,
     createAdminClient(),
-    effectiveRole.team_id
+    effectiveRole.team_id,
+    { includeUserOverrides: effectiveRole.is_viewing_as !== true }
   );
 
   return permissionLevels[moduleName] || 0;

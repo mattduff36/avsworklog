@@ -8,6 +8,7 @@ export const CHECK_INTERVAL_DAYS = CHECK_INTERVAL_MONTHS * DAYS_PER_INVENTORY_CH
 export const DUE_SOON_DAYS = 7;
 export const INVENTORY_UNKNOWN_LOCATION_NAME = 'Unknown';
 export const INVENTORY_YARD_LOCATION_NAME = 'Yard';
+export const INVENTORY_WORKSHOP_TEAM_ID = 'workshop_yard';
 
 interface InventoryCheckScheduleItem {
   last_checked_at: string | null;
@@ -19,6 +20,15 @@ interface InventorySpecialStatusItem extends InventoryCheckScheduleItem {
   location?: Pick<InventoryLocation, 'name'> | null;
   unknown_location_entered_at?: string | null;
   created_at?: string | null;
+}
+
+interface InventoryTeamContext {
+  teamId?: string | null;
+  teamName?: string | null;
+}
+
+interface InventoryPrimaryLocationSelectionContext extends InventoryTeamContext {
+  currentLocationId?: string | null;
 }
 
 export function getInventoryCheckIntervalDays(item: Pick<InventoryItem, 'check_interval_days'>): number {
@@ -57,6 +67,31 @@ export function isInventoryYardLocation(
   location: Pick<InventoryLocation, 'name'> | null | undefined
 ): boolean {
   return isYardInventoryLocationName(location?.name);
+}
+
+export function isWorkshopInventoryTeam(context: InventoryTeamContext): boolean {
+  const teamId = context.teamId?.trim().toLowerCase();
+  const teamName = context.teamName?.trim().toLowerCase();
+
+  return teamId === INVENTORY_WORKSHOP_TEAM_ID || teamName?.includes('workshop') === true;
+}
+
+export function canShareInventoryPrimaryLocation(
+  location: Pick<InventoryLocation, 'name'> | null | undefined,
+  context: InventoryTeamContext
+): boolean {
+  return isWorkshopInventoryTeam(context) && isInventoryYardLocation(location);
+}
+
+export function canSelectInventoryPrimaryLocation(
+  location: Pick<InventoryLocation, 'id' | 'name' | 'is_active' | 'assigned_user_names'>,
+  context: InventoryPrimaryLocationSelectionContext
+): boolean {
+  if (location.is_active === false) return false;
+  if (location.id === context.currentLocationId) return true;
+  if (canShareInventoryPrimaryLocation(location, context)) return true;
+
+  return (location.assigned_user_names?.length || 0) === 0;
 }
 
 export function isInventoryCheckExempt(item: Partial<InventorySpecialStatusItem>): boolean {

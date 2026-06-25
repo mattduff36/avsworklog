@@ -44,7 +44,8 @@ async function canReadCustomersModule(): Promise<{ allowed: boolean } | null> {
     current.profile.id,
     effectiveRole.role_id,
     createAdminClient(),
-    effectiveRole.team_id
+    effectiveRole.team_id,
+    { includeUserOverrides: effectiveRole.is_viewing_as !== true }
   );
 
   return { allowed: permissions.customers === true };

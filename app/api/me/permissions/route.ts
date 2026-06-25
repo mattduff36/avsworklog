@@ -93,13 +93,15 @@ export async function GET() {
           current.profile.id,
           effectiveRole.role_id,
           admin,
-          effectiveRole.team_id
+          effectiveRole.team_id,
+          { includeUserOverrides: effectiveRole.is_viewing_as !== true }
         ),
         getPermissionLevelsForUser(
           current.profile.id,
           effectiveRole.role_id,
           admin,
-          effectiveRole.team_id
+          effectiveRole.team_id,
+          { includeUserOverrides: effectiveRole.is_viewing_as !== true }
         ),
         getSensitivePinModules(admin),
       ])

@@ -965,7 +965,8 @@ export async function getPermissionLevelsForUser(
   userId: string,
   effectiveRoleId?: string | null,
   supabaseAdmin: SupabaseAdminClient = createAdminClient(),
-  effectiveTeamId?: string | null
+  effectiveTeamId?: string | null,
+  options?: { includeUserOverrides?: boolean }
 ): Promise<Record<ModuleName, PermissionAccessLevel>> {
   const { data, error } = await supabaseAdmin
     .from('profiles')
@@ -1006,16 +1007,20 @@ export async function getPermissionLevelsForUser(
 
   const teamId = effectiveTeamId || profile?.team_id || null;
 
+  const includeUserOverrides = options?.includeUserOverrides !== false;
+
   const [modules, teamPermissionsResult, userPermissionsResult] = await Promise.all([
     getPermissionModules(supabaseAdmin),
     supabaseAdmin
       .from('team_module_permissions')
       .select('team_id, module_name, enabled')
       .eq('team_id', teamId || ''),
-    supabaseAdmin
-      .from('user_module_permissions')
-      .select('module_name, access_level')
-      .eq('user_id', userId),
+    includeUserOverrides
+      ? supabaseAdmin
+        .from('user_module_permissions')
+        .select('module_name, access_level')
+        .eq('user_id', userId)
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
   if (teamPermissionsResult.error) {
@@ -1059,9 +1064,10 @@ export async function getPermissionSetForUser(
   userId: string,
   effectiveRoleId?: string | null,
   supabaseAdmin: SupabaseAdminClient = createAdminClient(),
-  effectiveTeamId?: string | null
+  effectiveTeamId?: string | null,
+  options?: { includeUserOverrides?: boolean }
 ): Promise<Set<ModuleName>> {
-  const levels = await getPermissionLevelsForUser(userId, effectiveRoleId, supabaseAdmin, effectiveTeamId);
+  const levels = await getPermissionLevelsForUser(userId, effectiveRoleId, supabaseAdmin, effectiveTeamId, options);
   return new Set<ModuleName>(
     ALL_MODULES.filter((moduleName) => (levels[moduleName] || 0) > 0)
   );
@@ -1071,13 +1077,15 @@ export async function getPermissionMapForUser(
   userId: string,
   effectiveRoleId?: string | null,
   supabaseAdmin: SupabaseAdminClient = createAdminClient(),
-  effectiveTeamId?: string | null
+  effectiveTeamId?: string | null,
+  options?: { includeUserOverrides?: boolean }
 ): Promise<Record<ModuleName, boolean>> {
   const permissionSet = await getPermissionSetForUser(
     userId,
     effectiveRoleId,
     supabaseAdmin,
-    effectiveTeamId
+    effectiveTeamId,
+    options
   );
   const permissionMap = createEmptyModulePermissionRecord();
 

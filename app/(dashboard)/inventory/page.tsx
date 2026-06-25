@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { PageLoader } from '@/components/ui/page-loader';
@@ -22,7 +23,12 @@ import { InventoryLocationsPanel } from './components/InventoryLocationsPanel';
 import { InventoryRetireItemDialog } from './components/InventoryRetireItemDialog';
 import { InventoryTable, type InventoryTableQuickFilter } from './components/InventoryTable';
 import { MoveInventoryDialog } from './components/MoveInventoryDialog';
-import { checkIntervalMonthsToDays, getInventoryCheckStatus, isInventoryUnknownLocation } from './utils';
+import {
+  canSelectInventoryPrimaryLocation,
+  checkIntervalMonthsToDays,
+  getInventoryCheckStatus,
+  isInventoryUnknownLocation,
+} from './utils';
 import type {
   FleetAssetOption,
   InventoryContext,
@@ -207,6 +213,20 @@ export default function InventoryPage() {
   const unknownLocation = useMemo(
     () => locations.find((location) => isInventoryUnknownLocation(location)) || null,
     [locations]
+  );
+
+  const primaryLocationOptions = useMemo(
+    () => locations.filter((location) => canSelectInventoryPrimaryLocation(location, {
+      currentLocationId: inventoryContext?.user_location?.location_id || null,
+      teamId: inventoryContext?.team_id || null,
+      teamName: inventoryContext?.team_name || null,
+    })),
+    [
+      inventoryContext?.team_id,
+      inventoryContext?.team_name,
+      inventoryContext?.user_location?.location_id,
+      locations,
+    ]
   );
 
   const smallToolsItems = useMemo(
@@ -525,8 +545,11 @@ export default function InventoryPage() {
   if (inventoryLoadError && !inventoryContext) {
     return (
       <AppPageShell width="wide">
+        <InventoryDevelopmentBanner />
+
         <AppPageHeader
           title="Inventory"
+          titleMeta={<InventoryBetaBadge />}
           description="Set your location, view assigned inventory, and claim or move items."
           icon={<PackageSearch className="h-5 w-5" />}
         />
@@ -541,8 +564,11 @@ export default function InventoryPage() {
   if (!isManagerOrAdmin) {
     return (
       <AppPageShell width="wide">
+        <InventoryDevelopmentBanner />
+
         <AppPageHeader
           title="Inventory"
+          titleMeta={<InventoryBetaBadge />}
           description={employeeLocationName ? `Current location: ${employeeLocationName}` : 'Set your location, view assigned inventory, and claim or move items.'}
           icon={<PackageSearch className="h-5 w-5" />}
           actions={employeeLocationName ? (
@@ -558,7 +584,7 @@ export default function InventoryPage() {
 
         <InventoryEmployeeView
           items={items}
-          locations={locations}
+          locations={primaryLocationOptions}
           categoryLabels={categoryLabels}
           userLocation={inventoryContext?.user_location || null}
           onSetUserLocation={handleSetUserLocation}
@@ -577,7 +603,7 @@ export default function InventoryPage() {
 
         <ChangeInventoryLocationDialog
           open={changeLocationDialogOpen}
-          locations={locations}
+          locations={primaryLocationOptions}
           userLocation={inventoryContext?.user_location || null}
           onClose={() => setChangeLocationDialogOpen(false)}
           onSubmit={({ locationId, reason }) => handleSetUserLocation(locationId, reason)}
@@ -588,8 +614,11 @@ export default function InventoryPage() {
 
   return (
     <AppPageShell width="wide">
+      <InventoryDevelopmentBanner />
+
       <AppPageHeader
         title="Inventory"
+        titleMeta={<InventoryBetaBadge />}
         description={employeeLocationName
           ? `Current location: ${employeeLocationName}`
           : 'Track small tools, plant, signs, equipment, locations, and check status.'
@@ -864,7 +893,7 @@ export default function InventoryPage() {
 
       <ChangeInventoryLocationDialog
         open={changeLocationDialogOpen}
-        locations={locations}
+        locations={primaryLocationOptions}
         userLocation={inventoryContext?.user_location || null}
         allowUnset
         onClose={() => setChangeLocationDialogOpen(false)}
@@ -872,6 +901,25 @@ export default function InventoryPage() {
         onUnset={handleUnsetUserLocation}
       />
     </AppPageShell>
+  );
+}
+
+function InventoryDevelopmentBanner() {
+  return (
+    <div className="rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-center text-xs font-medium text-amber-100 sm:text-sm">
+      Inventory module is still in development.
+    </div>
+  );
+}
+
+function InventoryBetaBadge() {
+  return (
+    <Badge
+      variant="outline"
+      className="w-fit border-inventory/30 bg-inventory-soft px-2 py-0 text-[10px] font-semibold uppercase tracking-[0.16em] text-inventory"
+    >
+      Beta
+    </Badge>
   );
 }
 

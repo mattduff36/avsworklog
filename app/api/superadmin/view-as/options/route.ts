@@ -44,7 +44,7 @@ export async function GET() {
   const [{ data: roles, error: rolesError }, { data: teams, error: teamsError }] = await Promise.all([
     admin
       .from('roles')
-      .select('id, name, display_name, is_super_admin, is_manager_admin')
+      .select('id, name, display_name, role_class, is_super_admin, is_manager_admin')
       .order('is_super_admin', { ascending: false })
       .order('is_manager_admin', { ascending: false })
       .order('display_name', { ascending: true }),

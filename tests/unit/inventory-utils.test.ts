@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  canSelectInventoryPrimaryLocation,
+  canShareInventoryPrimaryLocation,
   CHECK_INTERVAL_DAYS,
   CHECK_INTERVAL_MONTHS,
   formatInventoryCheckIntervalMonths,
@@ -12,6 +14,7 @@ import {
   hasInventoryCheckLapsed,
   isInventoryMoveCheckBlocked,
   isInventoryYardExitBlocked,
+  isWorkshopInventoryTeam,
 } from '@/app/(dashboard)/inventory/utils';
 
 describe('inventory utils', () => {
@@ -63,6 +66,33 @@ describe('inventory utils', () => {
     })).toBe('not_required');
 
     vi.useRealTimers();
+  });
+
+  it('allows only workshop team members to share Yard as a primary location', () => {
+    const yardLocation = {
+      id: 'yard-location',
+      name: 'Yard',
+      is_active: true,
+      assigned_user_names: ['Workshop One'],
+    };
+    const storesLocation = {
+      id: 'stores-location',
+      name: 'Stores',
+      is_active: true,
+      assigned_user_names: ['Stores One'],
+    };
+
+    expect(isWorkshopInventoryTeam({ teamId: 'workshop_yard', teamName: null })).toBe(true);
+    expect(isWorkshopInventoryTeam({ teamId: 'transport', teamName: 'Transport' })).toBe(false);
+    expect(canShareInventoryPrimaryLocation(yardLocation, { teamId: 'workshop_yard' })).toBe(true);
+    expect(canShareInventoryPrimaryLocation(yardLocation, { teamId: 'transport' })).toBe(false);
+    expect(canSelectInventoryPrimaryLocation(yardLocation, { teamId: 'workshop_yard' })).toBe(true);
+    expect(canSelectInventoryPrimaryLocation(yardLocation, { teamId: 'transport' })).toBe(false);
+    expect(canSelectInventoryPrimaryLocation(storesLocation, {
+      currentLocationId: 'stores-location',
+      teamId: 'transport',
+    })).toBe(true);
+    expect(canSelectInventoryPrimaryLocation(storesLocation, { teamId: 'workshop_yard' })).toBe(false);
   });
 
   it('calculates unknown-location age from movement or created date fallback', () => {

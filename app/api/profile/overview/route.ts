@@ -170,7 +170,9 @@ async function buildPermissionSummary(
         acc[moduleName] = 5;
         return acc;
       }, {} as Record<ModuleName, PermissionAccessLevel>)
-    : await getPermissionLevelsForUser(userId, effectiveRole.role_id, admin, effectiveRole.team_id);
+    : await getPermissionLevelsForUser(userId, effectiveRole.role_id, admin, effectiveRole.team_id, {
+      includeUserOverrides: effectiveRole.is_viewing_as !== true,
+    });
 
   const modulesByName = new Map(modules.map((module) => [module.module_name, module]));
   const accessibleModules = ALL_MODULES

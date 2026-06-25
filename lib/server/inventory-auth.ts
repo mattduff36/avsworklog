@@ -9,6 +9,8 @@ export interface InventoryAccessResult {
   isManagerOrAdmin?: boolean;
   roleName?: string | null;
   roleClass?: 'admin' | 'manager' | 'employee' | null;
+  teamId?: string | null;
+  teamName?: string | null;
 }
 
 export async function requireInventoryAccess(): Promise<InventoryAccessResult> {
@@ -32,6 +34,8 @@ export async function requireInventoryAccess(): Promise<InventoryAccessResult> {
     isManagerOrAdmin: accessLevel >= 4,
     roleName: effectiveRole.role_name,
     roleClass: effectiveRole.role_class,
+    teamId: effectiveRole.team_id,
+    teamName: effectiveRole.team_name,
   };
 }
 

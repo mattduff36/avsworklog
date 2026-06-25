@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireInventoryAccess, requireInventoryManagerAccess } from '@/lib/server/inventory-auth';
+import { canShareInventoryPrimaryLocation } from '@/app/(dashboard)/inventory/utils';
 
 interface UpdateLocationBody {
   location_id?: string;
@@ -10,6 +11,12 @@ interface UpdateLocationBody {
 interface ExistingUserLocationRow {
   location_id: string | null;
   location?: { is_active: boolean | null } | { is_active: boolean | null }[] | null;
+}
+
+interface InventoryLocationRow {
+  id: string;
+  name: string;
+  is_active: boolean | null;
 }
 
 function pickExistingLocation(
@@ -62,13 +69,32 @@ export async function PATCH(request: NextRequest) {
     const admin = createAdminClient();
     const { data: location, error: locationError } = await admin
       .from('inventory_locations')
-      .select('id, is_active')
+      .select('id, name, is_active')
       .eq('id', locationId)
       .maybeSingle();
 
     if (locationError) throw locationError;
-    if (!location?.is_active) {
+    const typedLocation = location as InventoryLocationRow | null;
+    if (!typedLocation?.is_active) {
       return NextResponse.json({ error: 'Location not found' }, { status: 404 });
+    }
+
+    const canShareLocation = canShareInventoryPrimaryLocation(typedLocation, {
+      teamId: access.teamId,
+      teamName: access.teamName,
+    });
+    if (!canShareLocation) {
+      const { data: conflictingAssignments, error: conflictError } = await admin
+        .from('inventory_user_locations')
+        .select('user_id')
+        .eq('location_id', locationId)
+        .neq('user_id', access.userId)
+        .limit(1);
+
+      if (conflictError) throw conflictError;
+      if ((conflictingAssignments || []).length > 0) {
+        return NextResponse.json({ error: 'Location is already assigned to another user' }, { status: 400 });
+      }
     }
 
     const { data: existingUserLocation, error: existingError } = await admin

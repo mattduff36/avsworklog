@@ -406,7 +406,9 @@ export async function GET() {
   const permissions =
     hasEffectiveRoleFullAccess(effectiveRole)
       ? createFullAccessPermissionMap()
-      : await getPermissionMapForUser(userId, effectiveRole.role_id, admin, effectiveRole.team_id);
+      : await getPermissionMapForUser(userId, effectiveRole.role_id, admin, effectiveRole.team_id, {
+        includeUserOverrides: effectiveRole.is_viewing_as !== true,
+      });
 
   const canViewApprovals = permissions.approvals;
   const canViewActions = permissions.actions;

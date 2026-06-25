@@ -154,6 +154,8 @@ export interface InventoryContext {
   is_manager_or_admin: boolean;
   role_name: string | null;
   role_class: 'admin' | 'manager' | 'employee' | null;
+  team_id: string | null;
+  team_name: string | null;
   user_location: InventoryUserLocation | null;
 }
 

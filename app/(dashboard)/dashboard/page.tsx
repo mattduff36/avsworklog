@@ -544,6 +544,7 @@ export default function DashboardPage() {
                 formType.id === 'maintenance' &&
                 !showPrimaryBadgeLoading &&
                 (maintenanceDueSoonCount > 0 || maintenanceOverdueCount > 0);
+              const showInventoryBetaBadge = formType.id === 'inventory';
               // Yellow backgrounds need dark text for contrast
               const needsDarkText = formType.color === 'avs-yellow';
               const textColorClass = needsDarkText ? 'text-slate-900' : 'text-white';
@@ -581,9 +582,19 @@ export default function DashboardPage() {
                       </div>
                     )}
                     <Icon className={tabletModeEnabled ? 'h-12 w-12' : 'h-8 w-8'} />
-                    <span className={`font-semibold leading-tight ${tabletModeEnabled ? 'text-base' : 'text-2xl'}`}>
-                      {formType.title}
-                    </span>
+                    <div className="flex flex-col items-center gap-1">
+                      <span className={`font-semibold leading-tight ${tabletModeEnabled ? 'text-base' : 'text-2xl'}`}>
+                        {formType.title}
+                      </span>
+                      {showInventoryBetaBadge ? (
+                        <Badge
+                          variant="outline"
+                          className="border-white/30 bg-white/10 px-2 py-0 text-[10px] font-semibold uppercase tracking-[0.16em] text-white"
+                        >
+                          Beta
+                        </Badge>
+                      ) : null}
+                    </div>
                     {formType.subtitle && (
                       <span
                         className={`pointer-events-none absolute bottom-2 left-2 right-2 truncate leading-tight opacity-90 max-[350px]:hidden ${tabletModeEnabled ? 'text-xs' : 'text-base'} ${textColorClass}`}

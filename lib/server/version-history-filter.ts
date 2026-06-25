@@ -175,7 +175,8 @@ export async function getCurrentReleaseHistoryAccess(): Promise<ReleaseHistoryAc
         current.profile.id,
         effectiveRole.role_id || null,
         admin,
-        effectiveRole.team_id || null
+        effectiveRole.team_id || null,
+        { includeUserOverrides: effectiveRole.is_viewing_as !== true }
       ),
     getPermissionModules(admin),
   ]);

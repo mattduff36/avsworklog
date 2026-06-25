@@ -8,6 +8,7 @@ interface AppPageShellProps extends HTMLAttributes<HTMLDivElement> {
 
 interface AppPageHeaderProps {
   title: string;
+  titleMeta?: ReactNode;
   description?: string;
   leading?: ReactNode;
   icon?: ReactNode;
@@ -47,6 +48,7 @@ export function AppPageShell({
 
 export function AppPageHeader({
   title,
+  titleMeta,
   description,
   leading,
   icon,
@@ -70,7 +72,10 @@ export function AppPageHeader({
             </div>
           ) : null}
           <div className={cn('min-w-0 space-y-1', headingClassName)}>
-            <h1 className={cn('break-words text-3xl font-bold text-foreground', titleClassName)}>{title}</h1>
+            <div className="flex min-w-0 flex-wrap items-center gap-3">
+              <h1 className={cn('break-words text-3xl font-bold text-foreground', titleClassName)}>{title}</h1>
+              {titleMeta}
+            </div>
             {description ? <p className={cn('text-sm text-muted-foreground', descriptionClassName)}>{description}</p> : null}
           </div>
         </div>

@@ -26,6 +26,8 @@ export async function GET() {
       is_manager_or_admin: access.isManagerOrAdmin === true,
       role_name: access.roleName,
       role_class: access.roleClass,
+      team_id: access.teamId,
+      team_name: access.teamName,
       user_location: data || null,
     });
   } catch (error) {

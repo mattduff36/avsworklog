@@ -78,17 +78,18 @@ interface EffectiveRole {
   team_name?: string | null;
 }
 
-interface OrgTeamsQueryClient {
-  from: (relation: 'org_teams') => {
-    select: (columns: 'id, name') => {
-      eq: (column: 'id', value: string) => {
-        single: () => Promise<{
-          data: { id: string; name: string } | null;
-          error: { message?: string } | null;
-        }>;
-      };
-    };
-  };
+interface ViewAsRoleOption {
+  id: string;
+  name: string;
+  display_name: string;
+  role_class?: 'admin' | 'manager' | 'employee';
+  is_manager_admin: boolean;
+  is_super_admin: boolean;
+}
+
+interface ViewAsTeamOption {
+  id: string;
+  name: string;
 }
 
 interface AuthRecoveryOptions {
@@ -261,6 +262,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [effectiveRole, setEffectiveRole] = useState<EffectiveRole | null>(null);
+  const [effectiveRoleLoading, setEffectiveRoleLoading] = useState(false);
   const [supabase, setSupabase] = useState<BrowserSupabaseClient | null>(null);
   const [viewAsSelection, setViewAsSelection] = useState<ViewAsSelection>({ roleId: '', teamId: '' });
 
@@ -315,6 +317,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setUser(null);
     setProfile(null);
     setEffectiveRole(null);
+    setEffectiveRoleLoading(false);
   }, []);
 
   const invalidateAuthScopedQueries = useCallback(async () => {
@@ -550,12 +553,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const isActualSuper =
       profile?.super_admin === true || profile?.role?.is_super_admin === true;
 
-    if ((!viewAsRoleId && !viewAsTeamId) || !isActualSuper || !supabase) {
+    if ((!viewAsRoleId && !viewAsTeamId) || !isActualSuper) {
       setEffectiveRole(null);
+      setEffectiveRoleLoading(false);
       return;
     }
 
-    const currentSupabase = supabase;
+    let cancelled = false;
+    setEffectiveRoleLoading(true);
 
     async function fetchEffectiveRole() {
       try {
@@ -572,15 +577,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
               }
             : null;
 
+        const response = await fetch('/api/superadmin/view-as/options', { cache: 'no-store' });
+        const data = await response.json() as {
+          roles?: ViewAsRoleOption[];
+          teams?: ViewAsTeamOption[];
+          error?: string;
+        };
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to load view-as metadata');
+        }
+
         if (viewAsRoleId) {
-          const { data, error } = await currentSupabase
-            .from('roles')
-            .select('name, display_name, role_class, is_manager_admin, is_super_admin')
-            .eq('id', viewAsRoleId)
-            .single();
-          if (!error && data) {
+          const selectedRole = (data.roles || []).find((role) => role.id === viewAsRoleId);
+          if (selectedRole) {
             nextRole = {
-              ...(data as EffectiveRole),
+              name: selectedRole.name,
+              display_name: selectedRole.display_name,
+              role_class: selectedRole.role_class,
+              is_manager_admin: selectedRole.is_manager_admin,
+              is_super_admin: selectedRole.is_super_admin,
               team_id: nextRole?.team_id ?? profile?.team_id ?? null,
               team_name: null,
             };
@@ -588,14 +604,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
 
         if (viewAsTeamId) {
-          const orgTeamsClient = currentSupabase as unknown as OrgTeamsQueryClient;
-          const { data: teamData, error: teamError } = await orgTeamsClient
-            .from('org_teams')
-            .select('id, name')
-            .eq('id', viewAsTeamId)
-            .single();
-
-          if (!teamError && teamData) {
+          const selectedTeam = (data.teams || []).find((team) => team.id === viewAsTeamId);
+          if (selectedTeam) {
             nextRole = {
               ...(nextRole ?? {
                 name: profile?.role?.name || '',
@@ -604,20 +614,32 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 is_manager_admin: profile?.role?.is_manager_admin || false,
                 is_super_admin: profile?.role?.is_super_admin || false,
               }),
-              team_id: teamData.id,
-              team_name: teamData.name,
+              team_id: selectedTeam.id,
+              team_name: selectedTeam.name,
             };
           }
         }
 
-        setEffectiveRole(nextRole);
+        if (!cancelled) {
+          setEffectiveRole(nextRole);
+        }
       } catch {
-        setEffectiveRole(null);
+        if (!cancelled) {
+          setEffectiveRole(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setEffectiveRoleLoading(false);
+        }
       }
     }
 
     void fetchEffectiveRole();
-  }, [profile, supabase, viewAsSelection]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profile, viewAsSelection]);
 
   useEffect(() => installGlobalAuthAwareFetch(), []);
 
@@ -753,13 +775,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const isActualSuperAdmin =
     profile?.super_admin === true || profile?.role?.is_super_admin === true;
-  const isViewingAs = isActualSuperAdmin && effectiveRole !== null;
+  const hasActiveViewAsSelection =
+    isActualSuperAdmin && (viewAsSelection.roleId !== '' || viewAsSelection.teamId !== '');
+  const isViewingAs = hasActiveViewAsSelection;
   const roleForFlags = isViewingAs ? effectiveRole : profile?.role ?? null;
 
   const value = useMemo<AuthContextValue>(() => ({
     user,
     profile,
-    loading,
+    loading: loading || effectiveRoleLoading,
     signIn,
     signOut,
     signUp,
@@ -776,6 +800,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     forceAuthRedirect,
   }), [
     effectiveRole,
+    effectiveRoleLoading,
     forceAuthRedirect,
     isActualSuperAdmin,
     isViewingAs,

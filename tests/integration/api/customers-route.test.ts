@@ -117,7 +117,8 @@ describe('GET /api/customers', () => {
       'user-1',
       'role-1',
       expect.any(Object),
-      'team-1'
+      'team-1',
+      { includeUserOverrides: true }
     );
     expect(range).toHaveBeenCalledWith(5, 14);
     expect(payload.customers).toEqual([
