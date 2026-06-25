@@ -2,6 +2,20 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0626.40.0
+
+**GIT COMMIT MESSAGE**
+`feat(admin-users): update user management`
+
+**PUSHED AT**
+2026-06-25T10:35:40.607Z
+
+**WHAT CHANGED**
+Update user management.
+
+**COMMITS IN THIS RELEASE**
+- `feat(admin-users): update user management`
+
 ## 0626.39.0
 
 **GIT COMMIT MESSAGE**

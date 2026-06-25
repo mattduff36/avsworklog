@@ -1,5 +1,26 @@
 [
   {
+    "version": "0626.40.0",
+    "updateKind": "major",
+    "title": "User Management update",
+    "description": "Updated user management.",
+    "summary": "Updated user management.",
+    "details": [
+      "Covered user management and user Management.",
+      "Updated user management.",
+      "Published as a larger app update because it included broader workflow changes.",
+      "The release time shown is when the version record was created."
+    ],
+    "areas": [
+      "User management",
+      "User Management"
+    ],
+    "areaKeys": [
+      "user-management"
+    ],
+    "pushedAt": "2026-06-25T10:35:40.607Z"
+  },
+  {
     "version": "0626.39.0",
     "updateKind": "major",
     "title": "Inventory update",
