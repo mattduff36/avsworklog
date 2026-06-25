@@ -56,6 +56,11 @@ import { useBrowserSupabaseClient } from '@/lib/hooks/useBrowserSupabaseClient';
 import { fetchAdminTeamDirectory } from '@/lib/admin/team-directory-client';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
+import {
+  SensitiveModuleGate,
+  SensitiveModuleSessionManager,
+  useSensitiveModuleAccess,
+} from '@/components/security/SensitiveModuleGate';
 import type { Database } from '@/types/database';
 import type { WorkShiftPattern, WorkShiftTemplate } from '@/types/work-shifts';
 import { WORK_SHIFT_DAY_LABELS, WORK_SHIFT_DAY_ORDER } from '@/types/work-shifts';
@@ -290,6 +295,7 @@ export default function UsersAdminPage() {
   const searchParams = useSearchParams();
   const { user: currentUser, profile, isAdmin, isSuperAdmin, isActualSuperAdmin, loading: authLoading } = useAuth();
   const { hasPermission: canManageUsers, loading: permissionLoading } = usePermissionCheck('admin-users', false);
+  const sensitiveAccess = useSensitiveModuleAccess('admin-users', { enabled: canManageUsers });
   const supabase = useBrowserSupabaseClient();
   const [activeTab, setActiveTab] = useState<TabType>('users');
   const isAdminActor = isAdmin || isSuperAdmin || isActualSuperAdmin;
@@ -297,6 +303,7 @@ export default function UsersAdminPage() {
   const canManageRoleDefinitions = isAdminActor || isManagerActor;
   const canEditRolePermissions = isAdminActor;
   const canQuickEditAssignments = isAdminActor;
+  const canAccessUserAdmin = canManageUsers && sensitiveAccess.canAccess;
 
   // State
   const [users, setUsers] = useState<ProfileWithEmail[]>([]);
@@ -603,10 +610,10 @@ export default function UsersAdminPage() {
       }
     }
 
-    if (canManageUsers) {
+    if (canAccessUserAdmin) {
       fetchRoles();
     }
-  }, [canManageUsers, isManagerActor, supabase]);
+  }, [canAccessUserAdmin, isManagerActor, supabase]);
 
   // Fetch users
   useEffect(function () {
@@ -627,11 +634,11 @@ export default function UsersAdminPage() {
       }
     }
 
-    if (canManageUsers) {
+    if (canAccessUserAdmin) {
       fetchUsers();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canManageUsers]);
+  }, [canAccessUserAdmin]);
 
   useEffect(() => {
     if (!addDialogOpen) return;
@@ -668,10 +675,10 @@ export default function UsersAdminPage() {
       }
     }
 
-    if (canManageUsers) {
+    if (canAccessUserAdmin) {
       fetchOnboardingContext();
     }
-  }, [canManageUsers]);
+  }, [canAccessUserAdmin]);
 
   // Fetch team metadata used by the Org V2 admin UI
   useEffect(function () {
@@ -700,10 +707,10 @@ export default function UsersAdminPage() {
       }
     }
 
-    if (canManageUsers) {
+    if (canAccessUserAdmin) {
       fetchHierarchyMetadata();
     }
-  }, [canManageUsers]);
+  }, [canAccessUserAdmin]);
 
   // Search and role filter
   useEffect(function () {
@@ -1246,7 +1253,7 @@ export default function UsersAdminPage() {
   }
 
   // Show loading while auth is being checked
-  if (!supabase || authLoading || permissionLoading) {
+  if (!supabase || authLoading || permissionLoading || sensitiveAccess.loading) {
     return <PageLoader message="Loading user admin..." />;
   }
 
@@ -1269,8 +1276,17 @@ export default function UsersAdminPage() {
     );
   }
 
+  if (!sensitiveAccess.canAccess) {
+    return (
+      <AppPageShell width="wide" className="2xl:max-w-[92rem]">
+        <SensitiveModuleGate moduleLabel="User Management" access={sensitiveAccess} />
+      </AppPageShell>
+    );
+  }
+
   return (
     <AppPageShell width="wide" className="2xl:max-w-[92rem]">
+      <SensitiveModuleSessionManager moduleLabel="User Management" access={sensitiveAccess} />
       <AppPageHeader
         title="User Management"
         description="Manage users, roles, and permissions"

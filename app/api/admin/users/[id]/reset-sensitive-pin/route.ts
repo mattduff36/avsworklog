@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { canEffectiveRoleAccessModule, canEffectiveRoleAssignRole } from '@/lib/utils/rbac';
+import { canEffectiveRoleAssignRole } from '@/lib/utils/rbac';
+import { requireAdminUsersModuleAccess } from '@/lib/server/admin-users-module-access';
 import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
 import { adminResetSensitivePin } from '@/lib/server/sensitive-pin';
 import { logServerError } from '@/lib/utils/server-error-logger';
@@ -15,13 +16,8 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const canAccessUserAdmin = await canEffectiveRoleAccessModule('admin-users');
-    if (!canAccessUserAdmin) {
-      return NextResponse.json(
-        { error: 'Forbidden: admin-users access required' },
-        { status: 403 }
-      );
-    }
+    const sensitiveAccessResponse = await requireAdminUsersModuleAccess();
+    if (sensitiveAccessResponse) return sensitiveAccessResponse;
 
     const userId = (await params).id;
     const supabase = await createClient();

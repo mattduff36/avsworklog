@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { NextResponse } from 'next/server';
 
 const mocks = vi.hoisted(() => {
   const createSupabaseAdminClient = vi.fn();
@@ -13,6 +14,7 @@ const mocks = vi.hoisted(() => {
   const sendPasswordEmail = vi.fn();
   const canEffectiveRoleAccessModule = vi.fn();
   const canEffectiveRoleAssignRole = vi.fn();
+  const requireAdminUsersModuleAccess = vi.fn();
   const generateSecurePassword = vi.fn(() => 'AVSa1B2');
   const logServerError = vi.fn().mockResolvedValue(undefined);
 
@@ -29,6 +31,7 @@ const mocks = vi.hoisted(() => {
     sendPasswordEmail,
     canEffectiveRoleAccessModule,
     canEffectiveRoleAssignRole,
+    requireAdminUsersModuleAccess,
     generateSecurePassword,
     logServerError,
   };
@@ -53,6 +56,10 @@ vi.mock('@/lib/utils/email', () => ({
 vi.mock('@/lib/utils/rbac', () => ({
   canEffectiveRoleAccessModule: mocks.canEffectiveRoleAccessModule,
   canEffectiveRoleAssignRole: mocks.canEffectiveRoleAssignRole,
+}));
+
+vi.mock('@/lib/server/admin-users-module-access', () => ({
+  requireAdminUsersModuleAccess: mocks.requireAdminUsersModuleAccess,
 }));
 
 vi.mock('@/lib/utils/server-error-logger', () => ({
@@ -107,6 +114,7 @@ describe('POST /api/admin/users/[id]/reset-password', () => {
 
     mocks.canEffectiveRoleAccessModule.mockResolvedValue(true);
     mocks.canEffectiveRoleAssignRole.mockResolvedValue(true);
+    mocks.requireAdminUsersModuleAccess.mockResolvedValue(null);
     mocks.getUserById.mockResolvedValue({
       data: {
         user: {
@@ -149,7 +157,12 @@ describe('POST /api/admin/users/[id]/reset-password', () => {
   });
 
   it('rejects non-admin access before attempting a reset', async () => {
-    mocks.canEffectiveRoleAccessModule.mockResolvedValue(false);
+    mocks.requireAdminUsersModuleAccess.mockResolvedValue(
+      NextResponse.json(
+        { error: 'Forbidden: admin-users access required' },
+        { status: 403 }
+      )
+    );
 
     const request = new Request('http://localhost/api/admin/users/user-1/reset-password', {
       method: 'POST',

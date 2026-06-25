@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import pg from 'pg';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { requireAdminUsersModuleAccess } from '@/lib/server/admin-users-module-access';
 import { isHiddenSystemTestAccountEmail } from '@/lib/utils/system-test-accounts';
 
 // Helper to create admin client with service role key
@@ -70,13 +70,8 @@ async function fetchLastActiveByUserId(userIds: string[]): Promise<Map<string, s
 
 export async function GET() {
   try {
-    const canAccessUserAdmin = await canEffectiveRoleAccessModule('admin-users');
-    if (!canAccessUserAdmin) {
-      return NextResponse.json(
-        { error: 'Forbidden: admin-users access required' },
-        { status: 403 }
-      );
-    }
+    const sensitiveAccessResponse = await requireAdminUsersModuleAccess();
+    if (sensitiveAccessResponse) return sensitiveAccessResponse;
 
     // Fetch ALL auth users by paginating (default page size is 50)
     const supabaseAdmin = getSupabaseAdmin();

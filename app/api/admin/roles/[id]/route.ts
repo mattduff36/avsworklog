@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isEffectiveRoleAdminOrSuper } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { requireAdminUsersModuleAccess } from '@/lib/server/admin-users-module-access';
 import type { GetRoleResponse, UpdateRoleRequest } from '@/types/roles';
 import { managerFlagFromRoleClass, normalizeRoleInternalName } from '@/lib/utils/role-name';
 import { isRetiredRoleName } from '@/lib/config/roles-core';
@@ -24,6 +25,9 @@ export async function GET(
     if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const sensitiveAccessResponse = await requireAdminUsersModuleAccess();
+    if (sensitiveAccessResponse) return sensitiveAccessResponse;
 
     const isAuthorized = await isEffectiveRoleAdminOrSuper();
     if (!isAuthorized) {
@@ -100,6 +104,9 @@ export async function PATCH(
     if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const sensitiveAccessResponse = await requireAdminUsersModuleAccess();
+    if (sensitiveAccessResponse) return sensitiveAccessResponse;
 
     const isAuthorized = await isEffectiveRoleAdminOrSuper();
     if (!isAuthorized) {
@@ -252,6 +259,9 @@ export async function DELETE(
     if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const sensitiveAccessResponse = await requireAdminUsersModuleAccess();
+    if (sensitiveAccessResponse) return sensitiveAccessResponse;
 
     const isAuthorized = await isEffectiveRoleAdminOrSuper();
     if (!isAuthorized) {
