@@ -277,6 +277,60 @@ describe('Quotes page customer access states', () => {
     }));
   });
 
+  it('does not log transient customer metadata fetch failures as console errors', async () => {
+    mockUsePermissionCheck.mockImplementation((moduleName: string) => {
+      if (moduleName === 'quotes' || moduleName === 'customers') {
+        return { hasPermission: true, loading: false };
+      }
+
+      return { hasPermission: false, loading: false };
+    });
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+
+      if (url === '/api/quotes/metadata?include_customers=true') {
+        throw new TypeError('Load failed');
+      }
+
+      if (url.includes('/api/quotes/metadata')) {
+        return {
+          ok: true,
+          json: async () => ({
+            managerOptions: [],
+            approvers: [],
+          }),
+        } as Response;
+      }
+
+      return {
+        ok: true,
+        json: async () => ({}),
+      } as Response;
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    try {
+      render(<QuotesPage />);
+
+      const newQuoteButton = await screen.findByRole('button', { name: 'New Quote' });
+      await waitFor(() => expect(newQuoteButton).not.toBeDisabled());
+
+      fireEvent.click(newQuoteButton);
+
+      await waitFor(() => {
+        expect(fetchMock).toHaveBeenCalledWith('/api/quotes/metadata?include_customers=true');
+      });
+      expect(consoleErrorSpy).not.toHaveBeenCalledWith(
+        'Error fetching quote customers:',
+        expect.any(TypeError),
+        expect.objectContaining({ errorContextId: 'quotes-fetch-customers-error' })
+      );
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
   it('renders quote page tabs in the requested order', async () => {
     render(<QuotesPage />);
 

@@ -10,6 +10,7 @@ import { AppPageShell } from '@/components/layout/AppPageShell';
 import { Archive, BriefcaseBusiness, CalendarClock, LayoutDashboard, Plus, Receipt, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
+import { isNetworkFetchError } from '@/lib/utils/http-error';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -459,7 +460,9 @@ export default function QuotesPage() {
       return true;
     } catch (error) {
       const errorContextId = 'quotes-fetch-customers-error';
-      console.error('Error fetching quote customers:', error, { errorContextId });
+      if (!isNetworkFetchError(error)) {
+        console.error('Error fetching quote customers:', error, { errorContextId });
+      }
       toast.error('Unable to load customers right now.', { id: errorContextId });
       return false;
     } finally {

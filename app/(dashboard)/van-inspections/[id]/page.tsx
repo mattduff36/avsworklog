@@ -138,13 +138,16 @@ export default function ViewInspectionPage() {
           )
         `)
         .eq('id', id)
-        .single() as { data: InspectionWithDetails | null; error: unknown };
+        .maybeSingle() as { data: InspectionWithDetails | null; error: unknown };
 
       if (inspectionError) throw inspectionError;
+      if (!inspectionData) {
+        setError('Inspection not found');
+        return;
+      }
       
       // Check if user has access
       if (
-        inspectionData &&
         !canAccessScopedInspection({
           ownerUserId: inspectionData.user_id,
           currentUserId: user?.id,
