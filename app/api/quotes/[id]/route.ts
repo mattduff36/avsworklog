@@ -108,6 +108,10 @@ function getQuoteCustomerRecipientEmails(current: Awaited<ReturnType<typeof fetc
   return emails;
 }
 
+function getQuoteCustomerCopyExclusionIds(requesterId?: string | null): string[] {
+  return requesterId ? [requesterId] : [];
+}
+
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
@@ -218,7 +222,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         );
       }
 
-      const quoteCopyEmails = await getQuoteEmailCcEmails(admin, 'quote_customer_email_copy', [user.id, current.quote.requester_id]);
+      const quoteCopyEmails = await getQuoteEmailCcEmails(
+        admin,
+        'quote_customer_email_copy',
+        getQuoteCustomerCopyExclusionIds(current.quote.requester_id)
+      );
       const emailResult = await sendQuoteToCustomerEmail(current, [
         current.quote.manager_email || '',
         ...quoteCopyEmails,
@@ -305,7 +313,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         );
       }
 
-      const quoteCopyEmails = await getQuoteEmailCcEmails(admin, 'quote_customer_email_copy', [user.id, current.quote.requester_id]);
+      const quoteCopyEmails = await getQuoteEmailCcEmails(
+        admin,
+        'quote_customer_email_copy',
+        getQuoteCustomerCopyExclusionIds(current.quote.requester_id)
+      );
       const emailResult = await sendQuoteToCustomerEmail(current, [
         current.quote.manager_email || '',
         ...quoteCopyEmails,

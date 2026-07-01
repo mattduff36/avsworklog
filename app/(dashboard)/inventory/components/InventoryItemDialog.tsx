@@ -30,11 +30,11 @@ import {
 } from '../types';
 import {
   CHECK_INTERVAL_MONTHS,
-  formatInventoryLocationOptionLabel,
   isInventoryCheckExempt,
   isInventoryUnknownLocation,
 } from '../utils';
 import { toast } from 'sonner';
+import { InventoryLocationSelect } from './InventoryLocationSelect';
 
 interface InventoryItemDialogProps {
   open: boolean;
@@ -167,21 +167,11 @@ export function InventoryItemDialog({
 
               <div className="space-y-2">
                 <Label>Location *</Label>
-                <Select
-                  value={form.location_id || undefined}
+                <InventoryLocationSelect
+                  value={form.location_id}
                   onValueChange={(value) => updateField('location_id', value)}
-                >
-                  <SelectTrigger className="bg-slate-800 border-slate-600">
-                    <SelectValue placeholder="Select location" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {locations.map((location) => (
-                      <SelectItem key={location.id} value={location.id}>
-                        {formatInventoryLocationOptionLabel(location)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  locations={locations}
+                />
               </div>
             </div>
 

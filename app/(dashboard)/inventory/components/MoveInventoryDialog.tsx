@@ -12,13 +12,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -29,7 +22,8 @@ import {
 } from '@/lib/checklists/inventory-service-checklist';
 import { InventoryCheckModal, type InventoryChecklistSubmitPayload } from './InventoryCheckModal';
 import type { InventoryCheckStatus, InventoryItem, InventoryLocation, InventoryMovePayload } from '../types';
-import { formatInventoryLocationOptionLabel, getCheckStatusLabel } from '../utils';
+import { getCheckStatusLabel } from '../utils';
+import { InventoryLocationSelect } from './InventoryLocationSelect';
 
 interface MoveInventoryDialogProps {
   open: boolean;
@@ -183,24 +177,14 @@ export function MoveInventoryDialog({
 
             <div className="space-y-2">
               <Label>Destination Location *</Label>
-              <Select
+              <InventoryLocationSelect
                 value={locationId}
                 onValueChange={(value) => {
                   setLocationId(value);
                   setBlockedItems([]);
                 }}
-              >
-                <SelectTrigger className="bg-slate-800 border-slate-600">
-                  <SelectValue placeholder="Select location" />
-                </SelectTrigger>
-                <SelectContent>
-                  {locations.map((location) => (
-                    <SelectItem key={location.id} value={location.id}>
-                      {formatInventoryLocationOptionLabel(location)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                locations={locations}
+              />
             </div>
 
             <div className="space-y-2">

@@ -31,6 +31,7 @@ import {
   getInventoryCheckIntervalMonths,
   getInventoryCheckStatus,
   getInventoryDueDate,
+  getInventoryLocationsWithYardFirst,
   isInventoryCheckExempt,
   isInventoryYardLocation,
   isInventoryUnknownLocation,
@@ -301,14 +302,13 @@ export function InventoryTable({
         acc[key] = (acc[key] || 0) + 1;
         return acc;
       }, {});
-      const options = (locationFilterLocations || [])
+      const options = getInventoryLocationsWithYardFirst(locationFilterLocations || [])
         .filter((location) => (counts[location.id] || 0) > 0)
         .map((location) => ({
           value: location.id,
           label: formatInventoryLocationOptionLabel(location),
           count: counts[location.id] || 0,
-        }))
-        .sort((a, b) => a.label.localeCompare(b.label));
+        }));
 
       if ((counts[NO_LOCATION_FILTER] || 0) > 0) {
         options.push({
@@ -486,6 +486,10 @@ export function InventoryTable({
               options={locationFilterOptions}
               onSelectedValuesChange={setLocationFilters}
               triggerClassName="sm:w-[240px]"
+              searchable
+              searchPlaceholder="Search locations..."
+              emptyLabel="No locations found"
+              allOptionPosition="bottom"
             />
           ) : null}
         </div>

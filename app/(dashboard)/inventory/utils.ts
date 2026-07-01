@@ -206,3 +206,17 @@ export function formatInventoryLocationOptionLabel(location: InventoryLocation):
 
   return `${locationLabel} - ${assignedUserLabel}`;
 }
+
+export function getInventoryLocationsWithYardFirst<TLocation extends Pick<InventoryLocation, 'name'>>(
+  locations: readonly TLocation[]
+): TLocation[] {
+  const yardLocations: TLocation[] = [];
+  const otherLocations: TLocation[] = [];
+
+  locations.forEach((location) => {
+    if (isInventoryYardLocation(location)) yardLocations.push(location);
+    else otherLocations.push(location);
+  });
+
+  return [...yardLocations, ...otherLocations];
+}

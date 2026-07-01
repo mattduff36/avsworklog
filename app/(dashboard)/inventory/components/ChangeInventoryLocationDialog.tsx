@@ -11,16 +11,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import type { InventoryLocation, InventoryUserLocation } from '../types';
-import { formatInventoryLocationOptionLabel } from '../utils';
+import { InventoryLocationSelect } from './InventoryLocationSelect';
 
 interface ChangeInventoryLocationDialogProps {
   open: boolean;
@@ -96,18 +89,11 @@ export function ChangeInventoryLocationDialog({
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
               <Label>New Location</Label>
-              <Select value={locationId} onValueChange={setLocationId}>
-                <SelectTrigger className="border-slate-600 bg-slate-800">
-                  <SelectValue placeholder="Select location" />
-                </SelectTrigger>
-                <SelectContent>
-                  {locations.map((location) => (
-                    <SelectItem key={location.id} value={location.id}>
-                      {formatInventoryLocationOptionLabel(location)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <InventoryLocationSelect
+                value={locationId}
+                onValueChange={setLocationId}
+                locations={locations}
+              />
             </div>
 
             <div className="space-y-2">

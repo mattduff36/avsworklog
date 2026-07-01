@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
 export interface MultiSelectFilterOption<TValue extends string> {
@@ -18,6 +19,10 @@ interface MultiSelectFilterProps<TValue extends string> {
   options: readonly MultiSelectFilterOption<TValue>[];
   onSelectedValuesChange: (values: TValue[]) => void;
   triggerClassName?: string;
+  searchable?: boolean;
+  searchPlaceholder?: string;
+  emptyLabel?: string;
+  allOptionPosition?: 'top' | 'bottom';
 }
 
 function getMultiSelectTriggerLabel<TValue extends string>({
@@ -43,10 +48,30 @@ export function MultiSelectFilter<TValue extends string>({
   options,
   onSelectedValuesChange,
   triggerClassName,
+  searchable = false,
+  searchPlaceholder = 'Search...',
+  emptyLabel = 'No options found',
+  allOptionPosition = 'top',
 }: MultiSelectFilterProps<TValue>) {
   const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const panelId = `${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-filter-menu`;
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const filteredOptions = searchable && normalizedSearchQuery
+    ? options.filter((option) => option.label.toLowerCase().includes(normalizedSearchQuery))
+    : options;
+
+  function closeMenu() {
+    setOpen(false);
+    setSearchQuery('');
+  }
+
+  function toggleMenu() {
+    const nextOpen = !open;
+    setOpen(nextOpen);
+    if (!nextOpen) setSearchQuery('');
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -54,11 +79,11 @@ export function MultiSelectFilter<TValue extends string>({
     function handlePointerDown(event: PointerEvent) {
       const target = event.target;
       if (!(target instanceof Node)) return;
-      if (!containerRef.current?.contains(target)) setOpen(false);
+      if (!containerRef.current?.contains(target)) closeMenu();
     }
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') setOpen(false);
+      if (event.key === 'Escape') closeMenu();
     }
 
     document.addEventListener('pointerdown', handlePointerDown);
@@ -79,6 +104,18 @@ export function MultiSelectFilter<TValue extends string>({
     onSelectedValuesChange([...selectedValues, value]);
   }
 
+  const allOption = (
+    <label className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-3 py-2 text-left hover:bg-slate-800">
+      <input
+        type="checkbox"
+        checked={selectedValues.length === 0}
+        onChange={() => onSelectedValuesChange([])}
+        className="h-4 w-4 accent-avs-yellow"
+      />
+      <span>{allLabel}</span>
+    </label>
+  );
+
   return (
     <div ref={containerRef} className={cn('relative w-full sm:w-[150px]', triggerClassName)}>
       <Button
@@ -86,7 +123,7 @@ export function MultiSelectFilter<TValue extends string>({
         variant="outline"
         aria-expanded={open}
         aria-controls={panelId}
-        onClick={() => setOpen((current) => !current)}
+        onClick={toggleMenu}
         className="w-full justify-between border-slate-600 bg-slate-800 text-white hover:bg-slate-700"
       >
         <span className="truncate">
@@ -100,17 +137,22 @@ export function MultiSelectFilter<TValue extends string>({
           id={panelId}
           className="absolute left-0 top-full z-40 mt-1 max-h-72 w-full overflow-y-auto rounded-md border border-slate-700 bg-slate-950 p-1 text-sm text-slate-200 shadow-xl"
         >
+          {searchable ? (
+            <div className="sticky top-0 z-10 border-b border-slate-800 bg-slate-950 p-2">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                <Input
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder={searchPlaceholder}
+                  className="h-9 border-slate-700 bg-slate-900 pl-9 text-white placeholder:text-slate-500"
+                />
+              </div>
+            </div>
+          ) : null}
           <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
-          <label className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-3 py-2 text-left hover:bg-slate-800">
-            <input
-              type="checkbox"
-              checked={selectedValues.length === 0}
-              onChange={() => onSelectedValuesChange([])}
-              className="h-4 w-4 accent-avs-yellow"
-            />
-            <span>{allLabel}</span>
-          </label>
-          {options.map((option) => (
+          {allOptionPosition === 'top' ? allOption : null}
+          {filteredOptions.map((option) => (
             <label
               key={option.value}
               className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-3 py-2 text-left hover:bg-slate-800"
@@ -127,6 +169,12 @@ export function MultiSelectFilter<TValue extends string>({
               ) : null}
             </label>
           ))}
+          {filteredOptions.length === 0 ? (
+            <div className="px-3 py-6 text-center text-sm text-slate-400">{emptyLabel}</div>
+          ) : null}
+          {allOptionPosition === 'bottom' ? (
+            <div className="mt-1 border-t border-slate-800 pt-1">{allOption}</div>
+          ) : null}
         </div>
       ) : null}
     </div>

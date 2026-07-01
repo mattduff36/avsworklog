@@ -50,7 +50,6 @@ import {
   checkIntervalMonthsToDays,
   formatInventoryCheckIntervalMonths,
   formatInventoryDate,
-  formatInventoryLocationOptionLabel,
   formatInventoryUnknownLocationAge,
   getCheckStatusLabel,
   getInventoryCheckIntervalMonths,
@@ -61,6 +60,7 @@ import {
   isInventoryYardLocation,
   shouldMuteInventoryCheckBadge,
 } from '../../utils';
+import { InventoryLocationSelect } from '../../components/InventoryLocationSelect';
 
 interface MovementProfile {
   full_name: string | null;
@@ -494,21 +494,11 @@ export default function InventoryItemDetailPage() {
 
                       <div className="space-y-2">
                         <Label>Location *</Label>
-                        <Select
-                          value={editForm.location_id || undefined}
+                        <InventoryLocationSelect
+                          value={editForm.location_id}
                           onValueChange={(value) => updateEditField('location_id', value)}
-                        >
-                          <SelectTrigger className="bg-slate-800 border-slate-600">
-                            <SelectValue placeholder="Select location" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {locations.map((location) => (
-                              <SelectItem key={location.id} value={location.id}>
-                                {formatInventoryLocationOptionLabel(location)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          locations={locations}
+                        />
                       </div>
                     </div>
 

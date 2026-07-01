@@ -5,17 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { MapPin, PackageSearch, Send } from 'lucide-react';
 import type { InventoryItem, InventoryLocation, InventoryMovePayload, InventoryUserLocation } from '../types';
-import { formatInventoryLocationOptionLabel } from '../utils';
+import { InventoryLocationSelect } from './InventoryLocationSelect';
 import { InventoryTable } from './InventoryTable';
 
 const LOCATION_NOT_SHOWN_VALUE = '__location_not_shown__';
@@ -99,24 +92,6 @@ export function InventoryEmployeeView({
     }
   }
 
-  function renderLocationOptions() {
-    return (
-      <>
-        {locations.map((location) => (
-          <SelectItem key={location.id} value={location.id}>
-            {formatInventoryLocationOptionLabel(location)}
-          </SelectItem>
-        ))}
-        <SelectItem
-          value={LOCATION_NOT_SHOWN_VALUE}
-          className="mt-1 border-t border-amber-500/30 bg-amber-500/10 font-semibold text-amber-200 focus:bg-amber-500/20 focus:text-amber-100"
-        >
-          Location not shown
-        </SelectItem>
-      </>
-    );
-  }
-
   function renderLocationRequestCard() {
     if (!isRequestingMissingLocation) return null;
 
@@ -192,14 +167,17 @@ export function InventoryEmployeeView({
             </p>
             <div className="space-y-2">
               <Label>Location</Label>
-              <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
-                <SelectTrigger className="bg-slate-800 border-slate-600">
-                  <SelectValue placeholder="Choose your location" />
-                </SelectTrigger>
-                <SelectContent>
-                  {renderLocationOptions()}
-                </SelectContent>
-              </Select>
+              <InventoryLocationSelect
+                value={selectedLocationId}
+                onValueChange={setSelectedLocationId}
+                locations={locations}
+                placeholder="Choose your location"
+                extraOptions={[{
+                  value: LOCATION_NOT_SHOWN_VALUE,
+                  label: 'Location not shown',
+                  className: 'mt-1 border-t border-amber-500/30 bg-amber-500/10 font-semibold text-amber-200 hover:bg-amber-500/20 focus:bg-amber-500/20',
+                }]}
+              />
             </div>
             <Button
               onClick={handleSetLocation}

@@ -307,6 +307,68 @@ describe('PATCH /api/quotes/[id]', () => {
     }));
   });
 
+  it.each(['confirm_and_send', 'approve_and_send'])(
+    'keeps the sender eligible for customer email copies when sending on behalf via %s',
+    async (action) => {
+      const { PATCH } = await import('@/app/api/quotes/[id]/route');
+      mockGetQuoteEmailCcEmails.mockResolvedValueOnce([
+        'charlotte@avsquires.co.uk',
+        'ops-copy@avsquires.co.uk',
+      ]);
+      mockFetchQuoteBundle.mockResolvedValue({
+        quote: {
+          id: 'quote-1',
+          status: action === 'confirm_and_send' ? 'draft' : 'approved',
+          is_latest_version: true,
+          quote_reference: 'Q-001',
+          quote_thread_id: 'thread-1',
+          subject_line: 'Fence repairs',
+          pricing_mode: 'itemized',
+          requester_id: 'manager-neil',
+          manager_email: 'neil@avsquires.co.uk',
+          attention_email: 'alex@example.com',
+          customer: {
+            id: 'customer-1',
+            company_name: 'Acme Ltd',
+            contact_email: 'alex@example.com',
+            contact_name: 'Alex',
+            short_name: 'Acme',
+          },
+        },
+        lineItems: [],
+        attachments: [],
+        invoices: [],
+        versions: [],
+        selectedSecondaryContacts: [],
+        invoiceSummary: {
+          invoicedTotal: 0,
+          remainingBalance: 0,
+          lastInvoiceAt: null,
+          status: 'not_invoiced',
+        },
+      });
+
+      const request = new NextRequest('http://localhost/api/quotes/quote-1', {
+        method: 'PATCH',
+        body: JSON.stringify({ action }),
+      });
+
+      const response = await PATCH(request, { params: Promise.resolve({ id: 'quote-1' }) });
+
+      expect(response.status).toBe(200);
+      expect(mockGetQuoteEmailCcEmails).toHaveBeenCalledWith(
+        expect.anything(),
+        'quote_customer_email_copy',
+        ['manager-neil']
+      );
+      expect(mockSendQuoteToCustomerEmail).toHaveBeenCalledWith(
+        expect.anything(),
+        ['neil@avsquires.co.uk', 'charlotte@avsquires.co.uk', 'ops-copy@avsquires.co.uk'],
+        'sender@avsquires.co.uk'
+      );
+    }
+  );
+
   it('duplicates a quote with a fresh selected-manager quote number', async () => {
     const { PATCH } = await import('@/app/api/quotes/[id]/route');
     const sourceBundle = {
