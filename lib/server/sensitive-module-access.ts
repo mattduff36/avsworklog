@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { ModuleName } from '@/types/roles';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
-import { getSensitiveModulePinState } from '@/lib/server/sensitive-pin';
+import { extendCurrentSensitiveModuleAccess, getSensitiveModulePinState } from '@/lib/server/sensitive-pin';
 
 export async function requireSensitiveModuleAccess(moduleName: ModuleName): Promise<NextResponse | null> {
   const canAccessModule = await canEffectiveRoleAccessModule(moduleName);
@@ -11,6 +11,10 @@ export async function requireSensitiveModuleAccess(moduleName: ModuleName): Prom
 
   const state = await getSensitiveModulePinState(moduleName);
   if (!state.required || state.unlocked) {
+    if (state.required && state.unlocked) {
+      await extendCurrentSensitiveModuleAccess();
+    }
+
     return null;
   }
 

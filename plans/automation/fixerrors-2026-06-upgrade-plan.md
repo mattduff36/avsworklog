@@ -4,7 +4,7 @@ overview: Implement approved monthly automation advisor suggestions from docs_pr
 todos:
   - id: improve-source-extraction
     content: Improve source extraction when stack traces lack source files
-    status: pending
+    status: completed
 isProject: false
 ---
 

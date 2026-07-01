@@ -627,6 +627,32 @@ export async function unlockSensitiveModuleWithPin(params: {
   return getSensitiveModulePinState(params.moduleName, current);
 }
 
+export async function extendCurrentSensitiveModuleAccess(
+  currentContext?: CurrentAuthenticatedProfile
+): Promise<string> {
+  const current = currentContext ?? await getCurrentAuthenticatedProfile();
+  if (!current) throw new Error('Unauthorized');
+
+  const sessionId = current.validation.session?.id;
+  if (!sessionId) {
+    throw new Error('Sensitive PIN unlock requires an active app session');
+  }
+
+  const admin = createAdminClient();
+  const nowIso = new Date().toISOString();
+  const expiresAt = getUnlockExpiry();
+  const { error: updateError } = await admin
+    .from('sensitive_pin_unlocks')
+    .update({ expires_at: expiresAt })
+    .eq('profile_id', current.profile.id)
+    .eq('session_id', sessionId)
+    .gt('expires_at', nowIso);
+
+  if (updateError) throw new Error(updateError.message);
+
+  return expiresAt;
+}
+
 export async function renewSensitiveModuleAccess(
   moduleName: SensitiveAccessModuleName,
   currentContext?: CurrentAuthenticatedProfile
@@ -655,15 +681,7 @@ export async function renewSensitiveModuleAccess(
     throw new Error('Sensitive access PIN required for protected modules.');
   }
 
-  const expiresAt = getUnlockExpiry();
-  const { error: updateError } = await admin
-    .from('sensitive_pin_unlocks')
-    .update({ expires_at: expiresAt })
-    .eq('profile_id', current.profile.id)
-    .eq('session_id', sessionId)
-    .gt('expires_at', nowIso);
-
-  if (updateError) throw new Error(updateError.message);
+  await extendCurrentSensitiveModuleAccess(current);
 
   return getSensitiveModulePinState(moduleName, current);
 }

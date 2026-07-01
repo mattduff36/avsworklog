@@ -10,7 +10,7 @@ import { AppPageShell } from '@/components/layout/AppPageShell';
 import { Archive, BriefcaseBusiness, CalendarClock, LayoutDashboard, Plus, Receipt, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
-import { isNetworkFetchError } from '@/lib/utils/http-error';
+import { createStatusError, getErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -113,7 +113,7 @@ function buildFormRequestError(payload: { error?: string; field_errors?: Record<
 
 async function buildResponseError(response: Response, fallback: string) {
   const payload = await response.json().catch(() => null) as { error?: string } | null;
-  return new Error(payload?.error || fallback);
+  return createStatusError(payload?.error || fallback, response.status, payload);
 }
 
 function buildQuotePayload(data: QuoteFormData) {
@@ -291,6 +291,7 @@ export default function QuotesPage() {
   const { hasPermission: canViewCustomers, loading: customerPermissionLoading } = usePermissionCheck('customers', false);
   const { isAdmin, isSuperAdmin, isActualSuperAdmin } = useAuth();
   const sensitiveAccess = useSensitiveModuleAccess('quotes');
+  const refreshSensitiveAccess = sensitiveAccess.refresh;
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -374,6 +375,11 @@ export default function QuotesPage() {
   const legacyManagerFilter = managerParam === 'all' || legacyManagerIds.has(managerParam) ? managerParam : 'all';
   const canEditLegacyQuotes = isAdmin || isSuperAdmin || isActualSuperAdmin;
 
+  const handleQuotesSensitiveAccessRequired = useCallback(async (toastId: string) => {
+    await refreshSensitiveAccess();
+    toast.info('Quotes locked. Enter your sensitive PIN to continue.', { id: toastId });
+  }, [refreshSensitiveAccess]);
+
   const fetchData = useCallback(async () => {
     try {
       const url = customerId ? `/api/quotes?customer_id=${customerId}` : '/api/quotes';
@@ -386,6 +392,9 @@ export default function QuotesPage() {
       ]);
 
       setQuotes(quotesResult.items);
+      if (!metadataRes.ok) {
+        throw await buildResponseError(metadataRes, 'Failed to load quote metadata');
+      }
       if (metadataRes.ok) {
         const data = await metadataRes.json();
         if (data.customers) {
@@ -397,12 +406,18 @@ export default function QuotesPage() {
       }
     } catch (error) {
       const errorContextId = 'quotes-fetch-data-error';
+      if (getErrorStatus(error) === 428) {
+        setQuotes([]);
+        await handleQuotesSensitiveAccessRequired(errorContextId);
+        return;
+      }
+
       console.error('Error fetching data:', error, { errorContextId });
       toast.error('Unable to load quotes right now.', { id: errorContextId });
     } finally {
       setLoading(false);
     }
-  }, [canViewCustomers, customerId]);
+  }, [canViewCustomers, customerId, handleQuotesSensitiveAccessRequired]);
 
   const fetchLegacyQuotes = useCallback(async () => {
     setLegacyLoading(true);
@@ -415,12 +430,19 @@ export default function QuotesPage() {
       setHasLoadedLegacyQuotes(true);
     } catch (error) {
       const errorContextId = 'quotes-fetch-legacy-error';
+      if (getErrorStatus(error) === 428) {
+        setLegacyQuotes([]);
+        setHasLoadedLegacyQuotes(false);
+        await handleQuotesSensitiveAccessRequired(errorContextId);
+        return;
+      }
+
       console.error('Error fetching legacy quotes:', error, { errorContextId });
       toast.error('Unable to load legacy quotes right now.', { id: errorContextId });
     } finally {
       setLegacyLoading(false);
     }
-  }, []);
+  }, [handleQuotesSensitiveAccessRequired]);
 
   const fetchProjectNumbers = useCallback(async () => {
     setProjectNumbersLoading(true);
@@ -435,12 +457,19 @@ export default function QuotesPage() {
       setHasLoadedProjectNumbers(true);
     } catch (error) {
       const errorContextId = 'quotes-fetch-project-numbers-error';
+      if (getErrorStatus(error) === 428) {
+        setProjectNumbers([]);
+        setHasLoadedProjectNumbers(false);
+        await handleQuotesSensitiveAccessRequired(errorContextId);
+        return;
+      }
+
       console.error('Error fetching quote project numbers:', error, { errorContextId });
       toast.error('Unable to load quote projects right now.', { id: errorContextId });
     } finally {
       setProjectNumbersLoading(false);
     }
-  }, []);
+  }, [handleQuotesSensitiveAccessRequired]);
 
   const fetchCustomers = useCallback(async () => {
     if (!canViewCustomers) return false;
@@ -460,6 +489,13 @@ export default function QuotesPage() {
       return true;
     } catch (error) {
       const errorContextId = 'quotes-fetch-customers-error';
+      if (getErrorStatus(error) === 428) {
+        setCustomers([]);
+        setHasLoadedCustomers(false);
+        await handleQuotesSensitiveAccessRequired(errorContextId);
+        return false;
+      }
+
       if (!isNetworkFetchError(error)) {
         console.error('Error fetching quote customers:', error, { errorContextId });
       }
@@ -468,7 +504,7 @@ export default function QuotesPage() {
     } finally {
       setCustomersLoading(false);
     }
-  }, [canViewCustomers]);
+  }, [canViewCustomers, handleQuotesSensitiveAccessRequired]);
 
   const refreshProjectNumbersTab = useCallback(async () => {
     await Promise.all([
