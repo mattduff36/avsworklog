@@ -2,6 +2,26 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.0.0
+
+**GIT COMMIT MESSAGE**
+`feat(inventory): update Inventory and Quotes`
+
+**PUSHED AT**
+2026-07-01T07:50:24.566Z
+
+**WHAT CHANGED**
+Update Inventory and Quotes. Handle quote and van inspection fetch errors.
+
+**VERSION HISTORY DETAILS**
+- Updated Inventory and Quotes, with changes to app screens.
+- Updated quotes, with changes to background routes, app screens, and automated tests.
+- Updated daily tasks, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `feat(inventory): update Inventory and Quotes`
+- `fix(errors): handle quote and van inspection fetch errors`
+
 ## 0626.40.1
 
 **GIT COMMIT MESSAGE**

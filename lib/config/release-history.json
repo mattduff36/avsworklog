@@ -1,5 +1,28 @@
 [
   {
+    "version": "0726.0.0",
+    "updateKind": "minor",
+    "title": "Inventory update",
+    "description": "Updated Inventory and Quotes. Handle quote and van inspection fetch errors.",
+    "summary": "Updated Inventory and Quotes. Handle quote and van inspection fetch errors.",
+    "details": [
+      "Updated Inventory and Quotes, with changes to app screens.",
+      "Updated quotes, with changes to background routes, app screens, and automated tests.",
+      "Updated daily tasks, with changes to app screens."
+    ],
+    "areas": [
+      "Inventory",
+      "Error reporting",
+      "Quotes. Handle quote",
+      "Van inspection fetch errors"
+    ],
+    "areaKeys": [
+      "inventory",
+      "error-reporting"
+    ],
+    "pushedAt": "2026-07-01T07:50:24.566Z"
+  },
+  {
     "version": "0626.40.1",
     "updateKind": "minor",
     "title": "Release automation maintenance update",
