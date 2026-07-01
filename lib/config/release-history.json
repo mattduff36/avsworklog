@@ -1,5 +1,22 @@
 [
   {
+    "version": "0726.1.0",
+    "updateKind": "major",
+    "title": "Quotes update",
+    "description": "Updated quotes.",
+    "summary": "Updated quotes.",
+    "details": [
+      "Updated quotes, with changes to app screens."
+    ],
+    "areas": [
+      "Quotes"
+    ],
+    "areaKeys": [
+      "quotes"
+    ],
+    "pushedAt": "2026-07-01T09:36:10.389Z"
+  },
+  {
     "version": "0726.0.0",
     "updateKind": "minor",
     "title": "Inventory update",
