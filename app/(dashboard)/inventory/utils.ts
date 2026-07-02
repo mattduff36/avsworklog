@@ -17,7 +17,7 @@ interface InventoryCheckScheduleItem {
 
 interface InventorySpecialStatusItem extends InventoryCheckScheduleItem {
   category?: string | null;
-  location?: Pick<InventoryLocation, 'name'> | null;
+  location?: Pick<InventoryLocation, 'name' | 'location_type'> | null;
   unknown_location_entered_at?: string | null;
   created_at?: string | null;
 }
@@ -58,14 +58,16 @@ export function isYardInventoryLocationName(name: string | null | undefined): bo
 }
 
 export function isInventoryUnknownLocation(
-  location: Pick<InventoryLocation, 'name'> | null | undefined
+  location: Pick<InventoryLocation, 'name'> & Partial<Pick<InventoryLocation, 'location_type'>> | null | undefined
 ): boolean {
+  if (location?.location_type === 'unknown') return true;
   return isUnknownInventoryLocationName(location?.name);
 }
 
 export function isInventoryYardLocation(
-  location: Pick<InventoryLocation, 'name'> | null | undefined
+  location: Pick<InventoryLocation, 'name'> & Partial<Pick<InventoryLocation, 'location_type'>> | null | undefined
 ): boolean {
+  if (location?.location_type === 'yard') return true;
   return isYardInventoryLocationName(location?.name);
 }
 
@@ -77,14 +79,14 @@ export function isWorkshopInventoryTeam(context: InventoryTeamContext): boolean 
 }
 
 export function canShareInventoryPrimaryLocation(
-  location: Pick<InventoryLocation, 'name'> | null | undefined,
+  location: Pick<InventoryLocation, 'name'> & Partial<Pick<InventoryLocation, 'location_type'>> | null | undefined,
   context: InventoryTeamContext
 ): boolean {
   return isWorkshopInventoryTeam(context) && isInventoryYardLocation(location);
 }
 
 export function canSelectInventoryPrimaryLocation(
-  location: Pick<InventoryLocation, 'id' | 'name' | 'is_active' | 'assigned_user_names'>,
+  location: Pick<InventoryLocation, 'id' | 'name' | 'is_active' | 'assigned_user_names'> & Partial<Pick<InventoryLocation, 'location_type'>>,
   context: InventoryPrimaryLocationSelectionContext
 ): boolean {
   if (location.is_active === false) return false;
@@ -122,8 +124,8 @@ export function hasInventoryCheckLapsed(item: InventoryCheckScheduleItem): boole
 }
 
 export function isInventoryYardExitBlocked(
-  item: InventoryCheckScheduleItem & { location?: Pick<InventoryLocation, 'name'> | null },
-  destinationLocation: Pick<InventoryLocation, 'name'> | null | undefined
+  item: InventoryCheckScheduleItem & { location?: Pick<InventoryLocation, 'name'> & Partial<Pick<InventoryLocation, 'location_type'>> | null },
+  destinationLocation: Pick<InventoryLocation, 'name'> & Partial<Pick<InventoryLocation, 'location_type'>> | null | undefined
 ): boolean {
   if (!isInventoryYardLocation(item.location)) return false;
   if (isInventoryYardLocation(destinationLocation)) return false;
@@ -132,7 +134,7 @@ export function isInventoryYardExitBlocked(
 
 export function isInventoryMoveCheckBlocked(
   item: InventorySpecialStatusItem,
-  destinationLocation: Pick<InventoryLocation, 'name'> | null | undefined
+  destinationLocation: Pick<InventoryLocation, 'name'> & Partial<Pick<InventoryLocation, 'location_type'>> | null | undefined
 ): boolean {
   if (isInventoryYardExitBlocked(item, destinationLocation)) return true;
   if (isInventoryYardLocation(destinationLocation)) return false;
@@ -200,9 +202,13 @@ export function formatInventoryLocationOptionLabel(location: InventoryLocation):
     .map((value) => value?.trim())
     .filter(Boolean)
     .join(' - ');
-  const locationLabel = location.linked_asset_type === 'van' && linkedVanLabel
+  const linkedAssetLabel = location.linked_asset_type && linkedVanLabel
     ? `[${linkedVanLabel}]`
-    : location.name;
+    : null;
+  const siteReferenceLabel = location.location_type === 'site' && location.external_reference
+    ? `[${location.external_reference}]`
+    : null;
+  const locationLabel = linkedAssetLabel || siteReferenceLabel || location.name;
 
   return `${locationLabel} - ${assignedUserLabel}`;
 }
@@ -219,4 +225,18 @@ export function getInventoryLocationsWithYardFirst<TLocation extends Pick<Invent
   });
 
   return [...yardLocations, ...otherLocations];
+}
+
+function getInventoryLocationTypeLabel(location: Pick<InventoryLocation, 'location_type'>): string {
+  if (location.location_type === 'yard') return 'Yard';
+  if (location.location_type === 'unknown') return 'Unknown';
+  if (location.location_type === 'van') return 'Van';
+  if (location.location_type === 'hgv') return 'HGV';
+  if (location.location_type === 'plant') return 'Plant';
+  if (location.location_type === 'site') return 'Site';
+  return 'Manual';
+}
+
+export function formatInventoryLocationTypeLabel(location: Pick<InventoryLocation, 'location_type'>): string {
+  return getInventoryLocationTypeLabel(location);
 }

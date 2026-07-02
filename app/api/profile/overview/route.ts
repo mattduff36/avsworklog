@@ -9,6 +9,7 @@ import { fetchCarryoverMapForFinancialYear, getEffectiveAllowance } from '@/lib/
 import { getCurrentFinancialYear } from '@/lib/utils/date';
 import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
 import { getEffectiveRole } from '@/lib/utils/view-as';
+import { getCurrentFleetAssignmentSummary } from '@/lib/server/profile-fleet-assignments';
 import type { ProfileOverviewPayload } from '@/types/profile';
 import {
   ALL_MODULES,
@@ -429,10 +430,11 @@ export async function GET() {
       }
     }
 
-    const [managers, projectAssignments, permissionSummary] = await Promise.all([
+    const [managers, projectAssignments, permissionSummary, currentFleetAssignment] = await Promise.all([
       buildManagerSummaries(admin, profileRow, teamValue as Record<string, unknown> | null),
       buildProjectAssignmentSummaries(admin, user.id),
       buildPermissionSummary(admin, user.id),
+      getCurrentFleetAssignmentSummary(admin, user.id),
     ]);
     const response: ProfileOverviewPayload = {
       prd_epic_id: PROFILE_HUB_PRD_EPIC_ID,
@@ -463,6 +465,7 @@ export async function GET() {
         remaining: allowance - approvedTaken - pendingTotal,
       },
       project_assignments: projectAssignments,
+      current_fleet_assignment: currentFleetAssignment,
       permission_summary: permissionSummary,
       help_shortcuts: {
         has_unresolved_suggestions: (unresolvedSuggestionsCount || 0) > 0,

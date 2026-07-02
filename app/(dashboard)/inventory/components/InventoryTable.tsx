@@ -24,7 +24,6 @@ import {
   Truck,
 } from 'lucide-react';
 import {
-  formatInventoryLocationOptionLabel,
   formatInventoryDate,
   formatInventoryUnknownLocationAge,
   getCheckStatusLabel,
@@ -51,6 +50,7 @@ type SortField = 'item_number' | 'serial_number' | 'name' | 'location' | 'last_c
 type SortDir = 'asc' | 'desc';
 const NO_LOCATION_FILTER = '__no_location__';
 const INVENTORY_STATUS_FILTER_ORDER: InventoryCheckStatus[] = ['overdue', 'due_soon', 'needs_check', 'not_required', 'ok'];
+const LOCATION_FILTER_GROUP_ORDER = ['manual', 'van', 'site', 'hgv', 'plant', 'unknown'] as const;
 
 interface InventoryTableProps {
   items: InventoryItem[];
@@ -126,6 +126,48 @@ function renderLocationWithHint(item: InventoryItem) {
 function getVanLocationNickname(item: InventoryItem): string | null {
   if (item.location?.linked_asset_type !== 'van') return null;
   return item.location.linked_asset_nickname?.trim() || null;
+}
+
+function getLocationFilterGroupKey(location: InventoryLocation): (typeof LOCATION_FILTER_GROUP_ORDER)[number] {
+  if (location.location_type === 'van') return 'van';
+  if (location.location_type === 'site') return 'site';
+  if (location.location_type === 'hgv') return 'hgv';
+  if (location.location_type === 'plant') return 'plant';
+  if (location.location_type === 'unknown') return 'unknown';
+  return 'manual';
+}
+
+function getLocationFilterGroupLabel(location: InventoryLocation): string {
+  const groupKey = getLocationFilterGroupKey(location);
+  if (groupKey === 'van') return 'Vans';
+  if (groupKey === 'site') return 'Sites';
+  if (groupKey === 'hgv') return 'HGVs';
+  if (groupKey === 'plant') return 'Plant';
+  if (groupKey === 'unknown') return 'Unknown';
+  return 'Manual Locations';
+}
+
+function getLocationFilterLabel(location: InventoryLocation): string {
+  const linkedAssetLabel = [location.linked_asset_label, location.linked_asset_nickname]
+    .map((value) => value?.trim())
+    .filter(Boolean)
+    .join(' - ');
+
+  if (linkedAssetLabel) return `[${linkedAssetLabel}]`;
+
+  if (location.location_type === 'site' && location.external_reference) {
+    const siteTitle = location.name
+      .replace(/^site\s*-\s*/i, '')
+      .replace(new RegExp(`^${location.external_reference}\\s*-\\s*`, 'i'), '')
+      .trim();
+    return siteTitle ? `[${location.external_reference} - ${siteTitle}]` : `[${location.external_reference}]`;
+  }
+
+  return location.name;
+}
+
+function getLocationFilterDescription(location: InventoryLocation): string {
+  return location.assigned_user_names?.length ? location.assigned_user_names.join(', ') : 'Unassigned';
 }
 
 function renderLocationDetails(item: InventoryItem) {
@@ -302,11 +344,31 @@ export function InventoryTable({
         acc[key] = (acc[key] || 0) + 1;
         return acc;
       }, {});
+      const groupOrderByKey = new Map<string, number>(
+        LOCATION_FILTER_GROUP_ORDER.map((groupKey, index) => [groupKey, index])
+      );
       const options = getInventoryLocationsWithYardFirst(locationFilterLocations || [])
         .filter((location) => (counts[location.id] || 0) > 0)
+        .sort((a, b) => {
+          const aGroup = getLocationFilterGroupKey(a);
+          const bGroup = getLocationFilterGroupKey(b);
+          const groupCompare = (groupOrderByKey.get(aGroup) || 0) - (groupOrderByKey.get(bGroup) || 0);
+          if (groupCompare !== 0) return groupCompare;
+          return getLocationFilterLabel(a).localeCompare(getLocationFilterLabel(b), undefined, { sensitivity: 'base' });
+        })
         .map((location) => ({
           value: location.id,
-          label: formatInventoryLocationOptionLabel(location),
+          label: getLocationFilterLabel(location),
+          description: getLocationFilterDescription(location),
+          groupLabel: getLocationFilterGroupLabel(location),
+          searchLabel: [
+            location.name,
+            location.external_reference,
+            location.linked_asset_label,
+            location.linked_asset_nickname,
+            getLocationFilterDescription(location),
+            getLocationFilterGroupLabel(location),
+          ].filter(Boolean).join(' '),
           count: counts[location.id] || 0,
         }));
 
@@ -314,6 +376,9 @@ export function InventoryTable({
         options.push({
           value: NO_LOCATION_FILTER,
           label: 'No Location',
+          description: 'Unassigned',
+          groupLabel: 'Unknown',
+          searchLabel: 'No Location Unassigned Unknown',
           count: counts[NO_LOCATION_FILTER],
         });
       }
@@ -485,11 +550,13 @@ export function InventoryTable({
               selectedValues={locationFilters}
               options={locationFilterOptions}
               onSelectedValuesChange={setLocationFilters}
-              triggerClassName="sm:w-[240px]"
+              triggerClassName="sm:w-[260px]"
+              panelClassName="left-auto right-0 max-h-[min(36rem,calc(100vh-8rem))] w-[min(28rem,calc(100vw-2rem))]"
               searchable
               searchPlaceholder="Search locations..."
               emptyLabel="No locations found"
               allOptionPosition="bottom"
+              showPanelLabel={false}
             />
           ) : null}
         </div>

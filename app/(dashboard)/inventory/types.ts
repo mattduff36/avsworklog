@@ -8,6 +8,12 @@ export type InventoryCheckStatus = 'ok' | 'due_soon' | 'overdue' | 'needs_check'
 
 export type FleetAssetLinkType = 'van' | 'hgv' | 'plant';
 
+export type InventoryLocationType = 'yard' | 'unknown' | 'van' | 'hgv' | 'plant' | 'site' | 'manual';
+
+export type InventoryLocationSourceType = 'system' | 'fleet' | 'quote' | 'project_number' | 'manual';
+
+export type InventoryLocationSyncStatus = 'manual' | 'synced' | 'needs_review' | 'archived';
+
 export interface InventoryLocation {
   id: string;
   name: string;
@@ -16,6 +22,12 @@ export interface InventoryLocation {
   linked_van_id: string | null;
   linked_hgv_id: string | null;
   linked_plant_id: string | null;
+  location_type: InventoryLocationType;
+  source_type: InventoryLocationSourceType | null;
+  source_id: string | null;
+  external_reference: string | null;
+  sync_status: InventoryLocationSyncStatus;
+  source_synced_at: string | null;
   item_count?: number;
   created_at: string;
   updated_at: string;
@@ -25,6 +37,17 @@ export interface InventoryLocation {
   linked_asset_label?: string | null;
   linked_asset_nickname?: string | null;
   assigned_user_names?: string[];
+}
+
+export interface CurrentFleetAssignment {
+  id: string;
+  user_id: string;
+  asset_type: FleetAssetLinkType;
+  asset_id: string;
+  asset_label: string | null;
+  asset_nickname: string | null;
+  source_location_id: string | null;
+  assigned_at: string;
 }
 
 export interface InventoryItemCategory {
@@ -157,12 +180,15 @@ export interface InventoryContext {
   team_id: string | null;
   team_name: string | null;
   user_location: InventoryUserLocation | null;
+  is_user_location_valid?: boolean;
+  current_fleet_assignment?: CurrentFleetAssignment | null;
 }
 
 export const INVENTORY_CATEGORY_LABELS: Record<string, string> = {
   hired_plant: 'Hired Plant',
   signs: 'Signs',
   minor_plant: 'Minor Plant',
+  site_items: 'Site Items',
   van_stock: 'Van Stock',
   tools: 'Tools',
   equipment: 'Equipment',

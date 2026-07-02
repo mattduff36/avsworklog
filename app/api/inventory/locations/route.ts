@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireInventoryAccess, requireInventoryManagerAccess } from '@/lib/server/inventory-auth';
 import type { FleetAssetLinkType } from '@/app/(dashboard)/inventory/types';
+import { buildLinkedAssetColumns, getLocationTypeForLinkedAsset } from '@/lib/server/inventory-locations';
 
 interface LocationRequestBody {
   name?: string;
@@ -13,17 +14,6 @@ interface LocationRequestBody {
 interface InventoryLocationAssigneeRow {
   location_id: string | null;
   user?: { full_name: string | null } | { full_name: string | null }[] | null;
-}
-
-function buildLinkedAssetColumns(body: LocationRequestBody) {
-  const linkedAssetType = body.linked_asset_type || 'none';
-  const linkedAssetId = body.linked_asset_id?.trim() || null;
-
-  return {
-    linked_van_id: linkedAssetType === 'van' ? linkedAssetId : null,
-    linked_hgv_id: linkedAssetType === 'hgv' ? linkedAssetId : null,
-    linked_plant_id: linkedAssetType === 'plant' ? linkedAssetId : null,
-  };
 }
 
 function pickAssigneeProfile(
@@ -170,6 +160,7 @@ export async function POST(request: NextRequest) {
 
     const body = (await request.json()) as LocationRequestBody;
     const name = body.name?.trim();
+    const linkedAssetType = body.linked_asset_type || 'none';
     if (!name) {
       return NextResponse.json({ error: 'Location name is required' }, { status: 400 });
     }
@@ -179,7 +170,10 @@ export async function POST(request: NextRequest) {
       .insert({
         name,
         description: body.description?.trim() || null,
-        ...buildLinkedAssetColumns(body),
+        location_type: getLocationTypeForLinkedAsset(linkedAssetType),
+        source_type: linkedAssetType === 'none' ? 'manual' : 'fleet',
+        sync_status: linkedAssetType === 'none' ? 'manual' : 'needs_review',
+        ...buildLinkedAssetColumns(linkedAssetType, body.linked_asset_id),
         created_by: access.userId,
         updated_by: access.userId,
       })
@@ -188,7 +182,10 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       if (error.code === '23505') {
-        return NextResponse.json({ error: 'An active location with this name already exists' }, { status: 400 });
+        return NextResponse.json(
+          { error: 'An active location with this name or linked asset already exists' },
+          { status: 400 }
+        );
       }
       throw error;
     }

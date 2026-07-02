@@ -5,6 +5,8 @@ import {
   CHECK_INTERVAL_DAYS,
   CHECK_INTERVAL_MONTHS,
   formatInventoryCheckIntervalMonths,
+  formatInventoryLocationOptionLabel,
+  formatInventoryLocationTypeLabel,
   formatInventoryUnknownLocationAge,
   formatInventoryDate,
   getInventoryCheckIntervalDays,
@@ -12,6 +14,7 @@ import {
   getInventoryCheckStatus,
   getInventoryDueDate,
   hasInventoryCheckLapsed,
+  isInventoryUnknownLocation,
   isInventoryMoveCheckBlocked,
   isInventoryYardExitBlocked,
   isWorkshopInventoryTeam,
@@ -66,6 +69,15 @@ describe('inventory utils', () => {
     })).toBe('not_required');
 
     vi.useRealTimers();
+  });
+
+  it('uses typed Yard and Unknown locations before name fallbacks', () => {
+    expect(isInventoryUnknownLocation({ name: 'Holding', location_type: 'unknown' })).toBe(true);
+    expect(isInventoryUnknownLocation({ name: 'Unknown' })).toBe(true);
+    expect(canShareInventoryPrimaryLocation(
+      { name: 'Main depot', location_type: 'yard' },
+      { teamId: 'workshop_yard' }
+    )).toBe(true);
   });
 
   it('allows only workshop team members to share Yard as a primary location', () => {
@@ -186,5 +198,29 @@ describe('inventory utils', () => {
     }, vanLocation)).toBe(false);
 
     vi.useRealTimers();
+  });
+
+  it('formats typed site and asset-backed location labels', () => {
+    expect(formatInventoryLocationTypeLabel({ location_type: 'site' })).toBe('Site');
+    expect(formatInventoryLocationOptionLabel({
+      id: 'site-location',
+      name: 'Site - 12345-AB',
+      description: null,
+      is_active: true,
+      linked_van_id: null,
+      linked_hgv_id: null,
+      linked_plant_id: null,
+      location_type: 'site',
+      source_type: 'quote',
+      source_id: 'quote-id',
+      external_reference: '12345-AB',
+      sync_status: 'synced',
+      source_synced_at: null,
+      created_at: '2026-07-02T00:00:00Z',
+      updated_at: '2026-07-02T00:00:00Z',
+      created_by: null,
+      updated_by: null,
+      assigned_user_names: [],
+    })).toBe('[12345-AB] - Unassigned');
   });
 });

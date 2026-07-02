@@ -42,9 +42,14 @@ function buildAdmin({
   const state = {
     conflictQueryCount: 0,
     upserts: [] as Array<Record<string, unknown>>,
+    rpcs: [] as Array<{ name: string; payload: Record<string, unknown> }>,
   };
 
   const admin = {
+    async rpc(name: string, payload: Record<string, unknown>) {
+      state.rpcs.push({ name, payload });
+      return { data: null, error: null };
+    },
     from(table: string) {
       if (table === 'inventory_locations') {
         return {
@@ -88,6 +93,16 @@ function buildAdmin({
                   async maybeSingle() {
                     return { data: existingUserLocation, error: null };
                   },
+                  async single() {
+                    return {
+                      data: {
+                        user_id: 'user-1',
+                        location_id: location.id,
+                        location,
+                      },
+                      error: null,
+                    };
+                  },
                 };
               },
             };
@@ -105,6 +120,26 @@ function buildAdmin({
                         location,
                       },
                       error: null,
+                    };
+                  },
+                };
+              },
+            };
+          },
+        };
+      }
+
+      if (table === 'profile_fleet_assignments') {
+        return {
+          select() {
+            return {
+              eq() {
+                return {
+                  is() {
+                    return {
+                      async maybeSingle() {
+                        return { data: null, error: null };
+                      },
                     };
                   },
                 };
@@ -166,13 +201,17 @@ describe('inventory user location route', () => {
 
     expect(response.status).toBe(200);
     expect(state.conflictQueryCount).toBe(0);
-    expect(state.upserts).toEqual([
-      expect.objectContaining({
-        user_id: 'user-1',
-        location_id: 'yard-location',
-        updated_by: 'user-1',
-      }),
+    expect(state.rpcs).toEqual([
+      {
+        name: 'inventory_set_user_location_with_assignment',
+        payload: expect.objectContaining({
+          p_user_id: 'user-1',
+          p_location_id: 'yard-location',
+          p_actor_user_id: 'user-1',
+        }),
+      },
     ]);
+    expect(state.upserts).toHaveLength(0);
   });
 
   it('still rejects assigned non-Yard locations for workshop users', async () => {

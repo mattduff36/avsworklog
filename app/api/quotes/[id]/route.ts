@@ -28,6 +28,7 @@ import {
 } from '@/lib/server/quote-recipient-contacts';
 import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
 import { canManageQuoteSage } from '@/lib/server/quote-sage-access';
+import { syncQuoteSiteLocation } from '@/lib/server/inventory-site-location-sync';
 
 type QuoteFieldErrors = Record<string, string>;
 
@@ -130,6 +131,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     if (sensitiveAccessResponse) return sensitiveAccessResponse;
 
     const bundle = await fetchQuoteBundle(admin, id);
+    await syncQuoteSiteLocation(admin, bundle.quote, user.id);
     const canManageSage = await canManageQuoteSage();
 
     return NextResponse.json({

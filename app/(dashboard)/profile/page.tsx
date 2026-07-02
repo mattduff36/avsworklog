@@ -582,6 +582,7 @@ function ProfilePageContent() {
             annualLeaveSummary={overview.annual_leave_summary}
             permissionModules={overview.permission_summary.modules}
             helpShortcuts={overview.help_shortcuts}
+            currentFleetAssignment={overview.current_fleet_assignment}
           />
         </TabsContent>
 

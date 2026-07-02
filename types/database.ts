@@ -2839,6 +2839,12 @@ export type Database = {
           linked_van_id: string | null
           linked_hgv_id: string | null
           linked_plant_id: string | null
+          location_type: 'yard' | 'unknown' | 'van' | 'hgv' | 'plant' | 'site' | 'manual'
+          source_type: 'system' | 'fleet' | 'quote' | 'project_number' | 'manual' | null
+          source_id: string | null
+          external_reference: string | null
+          sync_status: 'manual' | 'synced' | 'needs_review' | 'archived'
+          source_synced_at: string | null
           created_at: string
           updated_at: string
           created_by: string | null
@@ -2852,6 +2858,12 @@ export type Database = {
           linked_van_id?: string | null
           linked_hgv_id?: string | null
           linked_plant_id?: string | null
+          location_type?: 'yard' | 'unknown' | 'van' | 'hgv' | 'plant' | 'site' | 'manual'
+          source_type?: 'system' | 'fleet' | 'quote' | 'project_number' | 'manual' | null
+          source_id?: string | null
+          external_reference?: string | null
+          sync_status?: 'manual' | 'synced' | 'needs_review' | 'archived'
+          source_synced_at?: string | null
           created_at?: string
           updated_at?: string
           created_by?: string | null
@@ -2865,6 +2877,12 @@ export type Database = {
           linked_van_id?: string | null
           linked_hgv_id?: string | null
           linked_plant_id?: string | null
+          location_type?: 'yard' | 'unknown' | 'van' | 'hgv' | 'plant' | 'site' | 'manual'
+          source_type?: 'system' | 'fleet' | 'quote' | 'project_number' | 'manual' | null
+          source_id?: string | null
+          external_reference?: string | null
+          sync_status?: 'manual' | 'synced' | 'needs_review' | 'archived'
+          source_synced_at?: string | null
           created_at?: string
           updated_at?: string
           created_by?: string | null
@@ -4154,6 +4172,107 @@ export type Database = {
             columns: ['team_id']
             isOneToOne: false
             referencedRelation: 'org_teams'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      profile_fleet_assignments: {
+        Row: {
+          id: string
+          user_id: string
+          linked_van_id: string | null
+          linked_hgv_id: string | null
+          linked_plant_id: string | null
+          source: 'inventory_location' | 'admin'
+          source_location_id: string | null
+          change_reason: string | null
+          assigned_by: string | null
+          ended_by: string | null
+          assigned_at: string
+          ended_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          linked_van_id?: string | null
+          linked_hgv_id?: string | null
+          linked_plant_id?: string | null
+          source?: 'inventory_location' | 'admin'
+          source_location_id?: string | null
+          change_reason?: string | null
+          assigned_by?: string | null
+          ended_by?: string | null
+          assigned_at?: string
+          ended_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          linked_van_id?: string | null
+          linked_hgv_id?: string | null
+          linked_plant_id?: string | null
+          source?: 'inventory_location' | 'admin'
+          source_location_id?: string | null
+          change_reason?: string | null
+          assigned_by?: string | null
+          ended_by?: string | null
+          assigned_at?: string
+          ended_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'profile_fleet_assignments_assigned_by_fkey'
+            columns: ['assigned_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'profile_fleet_assignments_ended_by_fkey'
+            columns: ['ended_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'profile_fleet_assignments_linked_hgv_id_fkey'
+            columns: ['linked_hgv_id']
+            isOneToOne: false
+            referencedRelation: 'hgvs'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'profile_fleet_assignments_linked_plant_id_fkey'
+            columns: ['linked_plant_id']
+            isOneToOne: false
+            referencedRelation: 'plant'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'profile_fleet_assignments_linked_van_id_fkey'
+            columns: ['linked_van_id']
+            isOneToOne: false
+            referencedRelation: 'vans'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'profile_fleet_assignments_source_location_id_fkey'
+            columns: ['source_location_id']
+            isOneToOne: false
+            referencedRelation: 'inventory_locations'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'profile_fleet_assignments_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
             referencedColumns: ['id']
           },
         ]
@@ -8710,7 +8829,41 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      inventory_move_items_with_batch: {
+        Args: {
+          p_item_ids: string[]
+          p_destination_location_id: string
+          p_note: string | null
+          p_moved_by: string
+          p_move_scope: string
+          p_group_id: string | null
+        }
+        Returns: {
+          item_id: string
+          from_location_id: string | null
+          to_location_id: string
+          movement_batch_id: string
+        }[]
+      }
+      inventory_clear_user_location_with_assignment: {
+        Args: {
+          p_user_id: string
+          p_actor_user_id: string
+        }
+        Returns: undefined
+      }
+      inventory_set_user_location_with_assignment: {
+        Args: {
+          p_user_id: string
+          p_location_id: string
+          p_change_reason: string | null
+          p_actor_user_id: string
+        }
+        Returns: {
+          user_id: string
+          location_id: string
+        }[]
+      }
     }
     Enums: {
       check__absences__half_day_session: 'AM' | 'PM'

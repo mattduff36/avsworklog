@@ -3,6 +3,12 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { requireInventoryManagerAccess } from '@/lib/server/inventory-auth';
 import { INVENTORY_UNKNOWN_LOCATION_NAME, isUnknownInventoryLocationName } from '@/app/(dashboard)/inventory/utils';
 import type { FleetAssetLinkType } from '@/app/(dashboard)/inventory/types';
+import {
+  buildLinkedAssetColumns,
+  canManuallyRelinkInventoryLocation,
+  getLocationTypeForLinkedAsset,
+  isGeneratedInventoryLocation,
+} from '@/lib/server/inventory-locations';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -13,19 +19,6 @@ interface LocationUpdateBody {
   description?: string | null;
   linked_asset_type?: FleetAssetLinkType | 'none';
   linked_asset_id?: string | null;
-}
-
-function buildLinkedAssetColumns(body: LocationUpdateBody) {
-  if (body.linked_asset_type === undefined) return {};
-
-  const linkedAssetType = body.linked_asset_type;
-  const linkedAssetId = body.linked_asset_id?.trim() || null;
-
-  return {
-    linked_van_id: linkedAssetType === 'van' ? linkedAssetId : null,
-    linked_hgv_id: linkedAssetType === 'hgv' ? linkedAssetId : null,
-    linked_plant_id: linkedAssetType === 'plant' ? linkedAssetId : null,
-  };
 }
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
@@ -40,7 +33,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const admin = createAdminClient();
     const { data: currentLocation, error: currentLocationError } = await admin
       .from('inventory_locations')
-      .select('id, name')
+      .select('id, name, location_type')
       .eq('id', id)
       .single();
 
@@ -52,7 +45,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     if (
-      isUnknownInventoryLocationName(currentLocation.name) &&
+      (currentLocation.location_type === 'unknown' || isUnknownInventoryLocationName(currentLocation.name)) &&
       body.name !== undefined &&
       !isUnknownInventoryLocationName(body.name)
     ) {
@@ -64,8 +57,20 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     const update: Record<string, unknown> = {
       updated_by: access.userId,
-      ...buildLinkedAssetColumns(body),
     };
+
+    if (body.linked_asset_type !== undefined) {
+      if (!canManuallyRelinkInventoryLocation(currentLocation)) {
+        return NextResponse.json(
+          { error: 'Generated inventory locations cannot be manually relinked' },
+          { status: 400 }
+        );
+      }
+      update.location_type = getLocationTypeForLinkedAsset(body.linked_asset_type);
+      update.source_type = body.linked_asset_type === 'none' ? 'manual' : 'fleet';
+      update.sync_status = body.linked_asset_type === 'none' ? 'manual' : 'needs_review';
+      Object.assign(update, buildLinkedAssetColumns(body.linked_asset_type, body.linked_asset_id));
+    }
 
     if (body.name !== undefined) {
       const name = body.name.trim();
@@ -87,7 +92,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     if (error) {
       if (error.code === '23505') {
-        return NextResponse.json({ error: 'An active location with this name already exists' }, { status: 400 });
+        return NextResponse.json(
+          { error: 'An active location with this name or linked asset already exists' },
+          { status: 400 }
+        );
       }
       if (error.code === 'PGRST116') {
         return NextResponse.json({ error: 'Location not found' }, { status: 404 });
@@ -113,7 +121,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     const admin = createAdminClient();
     const { data: location, error: locationError } = await admin
       .from('inventory_locations')
-      .select('id, name')
+      .select('id, name, location_type')
       .eq('id', id)
       .single();
 
@@ -124,9 +132,16 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
       throw locationError;
     }
 
-    if (isUnknownInventoryLocationName(location.name)) {
+    if (location.location_type === 'unknown' || isUnknownInventoryLocationName(location.name)) {
       return NextResponse.json(
         { error: `${INVENTORY_UNKNOWN_LOCATION_NAME} is a system location and cannot be removed` },
+        { status: 400 }
+      );
+    }
+
+    if (isGeneratedInventoryLocation(location)) {
+      return NextResponse.json(
+        { error: 'Generated inventory locations are managed by sync and cannot be removed manually' },
         { status: 400 }
       );
     }
@@ -161,6 +176,17 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
       .eq('location_id', id);
 
     if (userLocationError) throw userLocationError;
+
+    const { error: assignmentError } = await admin
+      .from('profile_fleet_assignments')
+      .update({
+        ended_at: new Date().toISOString(),
+        ended_by: access.userId,
+      })
+      .eq('source_location_id', id)
+      .is('ended_at', null);
+
+    if (assignmentError) throw assignmentError;
 
     return NextResponse.json({ success: true });
   } catch (error) {

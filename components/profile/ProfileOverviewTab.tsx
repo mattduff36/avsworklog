@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { AlertTriangle, CalendarDays, ClipboardCheck, Crown, PlaneTakeoff } from 'lucide-react';
+import { AlertTriangle, CalendarDays, ClipboardCheck, Crown, PlaneTakeoff, Truck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { ProfileHelpShortcuts } from '@/components/profile/ProfileHelpShortcuts';
@@ -19,6 +19,7 @@ interface ProfileOverviewTabProps {
   annualLeaveSummary: ProfileAnnualLeaveSummary;
   permissionModules: ProfilePermissionSummaryItem[];
   helpShortcuts: ProfileOverviewPayload['help_shortcuts'];
+  currentFleetAssignment: ProfileOverviewPayload['current_fleet_assignment'];
 }
 
 function getInitials(fullName: string): string {
@@ -66,6 +67,7 @@ export function ProfileOverviewTab({
   annualLeaveSummary,
   permissionModules,
   helpShortcuts,
+  currentFleetAssignment,
 }: ProfileOverviewTabProps) {
   const initials = getInitials(profile.full_name);
   const roleBadge = getRoleBadgeProps(profile);
@@ -114,6 +116,21 @@ export function ProfileOverviewTab({
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">Active modules</p>
                   <p className="text-2xl font-semibold text-avs-yellow">{permissionModules.length}</p>
                 </div>
+              </div>
+
+              <div className="mt-4 rounded-lg border border-border bg-slate-950/40 p-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <Truck className="h-4 w-4 text-sky-300" />
+                  Current fleet asset
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {currentFleetAssignment
+                    ? `${currentFleetAssignment.asset_type.toUpperCase()} ${[
+                      currentFleetAssignment.asset_label,
+                      currentFleetAssignment.asset_nickname,
+                    ].filter(Boolean).join(' - ') || currentFleetAssignment.asset_id}`
+                    : 'No current fleet asset assignment'}
+                </p>
               </div>
 
               <div className="grid grid-cols-[repeat(auto-fit,minmax(6.25rem,1fr))] gap-3 sm:grid-cols-1 md:grid-cols-3 xl:mt-4">

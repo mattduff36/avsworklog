@@ -59,6 +59,8 @@ export function InventoryLocationSelect({
         searchLabel: [
           label,
           location.name,
+          location.location_type,
+          location.external_reference,
           location.linked_asset_label,
           location.linked_asset_nickname,
           ...(location.assigned_user_names || []),

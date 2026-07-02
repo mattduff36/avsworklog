@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizeInventoryItemNumber, requireInventoryManagerAccess } from '@/lib/server/inventory-auth';
+import { InventoryMoveError, moveInventoryItems, toInventoryMoveErrorResponse } from '@/lib/server/inventory-move';
 import { isInventoryRetireReason, type InventoryCategory, type InventoryRetireReason, type InventoryStatus } from '@/app/(dashboard)/inventory/types';
 
 interface RouteParams {
@@ -46,6 +47,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const { id } = await params;
     const body = (await request.json()) as InventoryItemUpdateBody;
     const admin = createAdminClient();
+    let requestedLocationId: string | null = null;
     const update: Record<string, unknown> = {
       updated_by: access.userId,
     };
@@ -78,17 +80,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         return NextResponse.json({ error: 'Location is required' }, { status: 400 });
       }
 
-      const { data: location, error: locationError } = await admin
-        .from('inventory_locations')
-        .select('id, is_active')
-        .eq('id', locationId)
-        .single();
-
-      if (locationError || !location?.is_active) {
-        return NextResponse.json({ error: 'Location not found' }, { status: 404 });
-      }
-
-      update.location_id = locationId;
+      requestedLocationId = locationId;
     }
     if (body.last_checked_at !== undefined) update.last_checked_at = cleanOptionalDate(body.last_checked_at);
     if (body.check_interval_days !== undefined) {
@@ -111,7 +103,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       }
     }
 
-    const { data, error } = await admin
+    const { data: updatedData, error } = await admin
       .from('inventory_items')
       .update(update)
       .eq('id', id)
@@ -132,8 +124,36 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       throw error;
     }
 
-    return NextResponse.json({ item: normalizeMinorPlantDetailRelation(data as InventoryItemRow) });
+    let responseItem = updatedData;
+    if (requestedLocationId && updatedData.location_id !== requestedLocationId) {
+      await moveInventoryItems(admin, {
+        itemIds: [id],
+        destinationLocationId: requestedLocationId,
+        note: 'Moved from inventory item edit',
+        scope: 'single',
+        movedBy: access.userId,
+      });
+
+      const { data: movedData, error: movedLoadError } = await admin
+        .from('inventory_items')
+        .select(`
+          *,
+          location:inventory_locations(*),
+          minor_plant_detail:inventory_minor_plant_details(*)
+        `)
+        .eq('id', id)
+        .single();
+
+      if (movedLoadError) throw movedLoadError;
+      responseItem = movedData;
+    }
+
+    return NextResponse.json({ item: normalizeMinorPlantDetailRelation(responseItem as InventoryItemRow) });
   } catch (error) {
+    if (error instanceof InventoryMoveError) {
+      const response = toInventoryMoveErrorResponse(error);
+      return NextResponse.json(response.body, { status: response.status });
+    }
     console.error('Error updating inventory item:', error);
     return NextResponse.json({ error: 'Failed to update inventory item' }, { status: 500 });
   }

@@ -7,12 +7,14 @@ const {
   mockGenerateQuoteReferenceForManager,
   mockGetInitialsFromName,
   mockGetQuoteManagerOption,
+  mockSyncProjectNumberSiteLocation,
 } = vi.hoisted(() => ({
   mockCreateClient: vi.fn(),
   mockCreateAdminClient: vi.fn(),
   mockGenerateQuoteReferenceForManager: vi.fn(),
   mockGetInitialsFromName: vi.fn(),
   mockGetQuoteManagerOption: vi.fn(),
+  mockSyncProjectNumberSiteLocation: vi.fn(),
 }));
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -35,6 +37,10 @@ vi.mock('@/lib/server/quote-workflow', () => ({
   getQuoteManagerOption: mockGetQuoteManagerOption,
 }));
 
+vi.mock('@/lib/server/inventory-site-location-sync', () => ({
+  syncProjectNumberSiteLocation: mockSyncProjectNumberSiteLocation,
+}));
+
 describe('POST /api/quotes/project-numbers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -55,6 +61,11 @@ describe('POST /api/quotes/project-numbers', () => {
     mockGenerateQuoteReferenceForManager.mockResolvedValue({
       quoteReference: '60001-MD',
       initials: 'MD',
+    });
+    mockSyncProjectNumberSiteLocation.mockResolvedValue({
+      action: 'created',
+      location_id: 'site-location-1',
+      external_reference: '60001-MD',
     });
   });
 
@@ -120,6 +131,16 @@ describe('POST /api/quotes/project-numbers', () => {
       title: 'Emergency enabling works',
       created_by: 'user-1',
     }));
+    expect(mockSyncProjectNumberSiteLocation).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        id: 'project-1',
+        project_reference: '60001-MD',
+        title: 'Emergency enabling works',
+        status: 'open',
+      }),
+      'user-1'
+    );
     expect(payload.project.project_reference).toBe('60001-MD');
   });
 

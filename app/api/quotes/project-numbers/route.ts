@@ -10,6 +10,7 @@ import {
   getQuoteManagerOption,
 } from '@/lib/server/quote-workflow';
 import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
+import { syncProjectNumberSiteLocation } from '@/lib/server/inventory-site-location-sync';
 
 type QuoteProjectNumberRow = Database['public']['Tables']['quote_project_numbers']['Row'];
 type QuoteProjectCostRow = Database['public']['Tables']['quote_project_costs']['Row'];
@@ -561,6 +562,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if ('project' in result && result.project) {
+      await syncProjectNumberSiteLocation(admin, result.project as QuoteProjectNumberRow, user.id);
+    }
+
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     console.error('Error creating quote project number:', error);
@@ -594,6 +599,10 @@ export async function PATCH(request: NextRequest) {
         { error: 'Please correct the highlighted fields and try again.', field_errors: result.fieldErrors },
         { status: 400 }
       );
+    }
+
+    if ('project' in result && result.project) {
+      await syncProjectNumberSiteLocation(admin, result.project as QuoteProjectNumberRow, user.id);
     }
 
     return NextResponse.json(result);

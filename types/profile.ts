@@ -81,6 +81,17 @@ export interface ProfileProjectAssignmentSummaryItem {
   signed_at: string | null;
 }
 
+export interface ProfileFleetAssignmentSummary {
+  id: string;
+  user_id: string;
+  asset_type: 'van' | 'hgv' | 'plant';
+  asset_id: string;
+  asset_label: string | null;
+  asset_nickname: string | null;
+  source_location_id: string | null;
+  assigned_at: string;
+}
+
 export interface ProfilePermissionSummaryItem {
   module_name: ModuleName;
   display_name: string;
@@ -100,6 +111,7 @@ export interface ProfileOverviewPayload {
   absences: ProfileAbsenceSummaryItem[];
   annual_leave_summary: ProfileAnnualLeaveSummary;
   project_assignments: ProfileProjectAssignmentSummaryItem[];
+  current_fleet_assignment: ProfileFleetAssignmentSummary | null;
   permission_summary: {
     effective_team_name: string | null;
     has_sensitive_module_access: boolean;

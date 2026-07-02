@@ -4,6 +4,16 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -44,6 +54,13 @@ import type {
   InventoryCheckStatus,
 } from './types';
 
+interface ConfirmActionState {
+  title: string;
+  description: string;
+  actionLabel: string;
+  onConfirm: () => Promise<void>;
+}
+
 export default function InventoryPage() {
   const { hasPermission: canViewInventory, loading: permissionLoading } = usePermissionCheck('inventory', false);
   const router = useRouter();
@@ -68,6 +85,7 @@ export default function InventoryPage() {
   const [editingLocation, setEditingLocation] = useState<InventoryLocation | null>(null);
   const [movingItems, setMovingItems] = useState<InventoryItem[]>([]);
   const [restoringMinorPlantItems, setRestoringMinorPlantItems] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<ConfirmActionState | null>(null);
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
   const [inventoryTableQuickFilter, setInventoryTableQuickFilter] = useState<InventoryTableQuickFilter>({
     version: 0,
@@ -349,10 +367,16 @@ export default function InventoryPage() {
 
   async function handleUpdateLocation(data: InventoryLocationFormData) {
     if (!editingLocation) return;
+    const payload = editingLocation.location_type === 'manual'
+      ? data
+      : {
+        name: data.name,
+        description: data.description,
+      };
     const response = await fetch(`/api/inventory/locations/${editingLocation.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     });
     await parseJsonResponse(response, 'Failed to update inventory location');
     toast.success('Location updated');
@@ -361,14 +385,19 @@ export default function InventoryPage() {
   }
 
   async function handleRemoveLocation(location: InventoryLocation) {
-    if (!window.confirm(`Remove ${location.name}? Locations with active items cannot be removed.`)) return;
-
-    const response = await fetch(`/api/inventory/locations/${location.id}`, {
-      method: 'DELETE',
+    setConfirmAction({
+      title: `Remove ${location.name}?`,
+      description: 'Locations with active items cannot be removed. This also clears any users assigned to the location.',
+      actionLabel: 'Remove Location',
+      onConfirm: async () => {
+        const response = await fetch(`/api/inventory/locations/${location.id}`, {
+          method: 'DELETE',
+        });
+        await parseJsonResponse(response, 'Failed to remove inventory location');
+        toast.success('Location removed');
+        await fetchInventoryData();
+      },
     });
-    await parseJsonResponse(response, 'Failed to remove inventory location');
-    toast.success('Location removed');
-    await fetchInventoryData();
   }
 
   async function handleMoveItems(payload: InventoryMovePayload) {
@@ -396,31 +425,36 @@ export default function InventoryPage() {
 
   async function handleRestoreMinorPlantToPlant(itemsToRestore: InventoryItem[]) {
     if (itemsToRestore.length === 0) return;
-    if (!window.confirm(`Move ${itemsToRestore.length} Minor Plant item${itemsToRestore.length === 1 ? '' : 's'} back to the Plant asset table?`)) return;
-
-    setRestoringMinorPlantItems(true);
-    try {
-      const response = await fetch('/api/inventory/minor-plant/restore-to-plant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ item_ids: itemsToRestore.map((item) => item.id) }),
-      });
-      const result = await parseJsonResponse(response, 'Failed to move Minor Plant items back to Plant assets');
-      toast.success('Minor Plant items moved to Plant assets', {
-        description: `${result.restored_count || 0} moved${result.skipped_count ? `, ${result.skipped_count} skipped` : ''}.`,
-      });
-      if (result.skipped_count) {
-        toast.warning('Some Minor Plant items were skipped', {
-          description: 'Only items linked to a source Plant asset can be restored automatically.',
-        });
-      }
-      setSelectedItemIds(new Set());
-      await fetchInventoryData();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to move Minor Plant items back to Plant assets');
-    } finally {
-      setRestoringMinorPlantItems(false);
-    }
+    setConfirmAction({
+      title: 'Move Minor Plant back to Plant assets?',
+      description: `This will move ${itemsToRestore.length} Minor Plant item${itemsToRestore.length === 1 ? '' : 's'} back to the Plant asset table where possible.`,
+      actionLabel: 'Move Items',
+      onConfirm: async () => {
+        setRestoringMinorPlantItems(true);
+        try {
+          const response = await fetch('/api/inventory/minor-plant/restore-to-plant', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ item_ids: itemsToRestore.map((item) => item.id) }),
+          });
+          const result = await parseJsonResponse(response, 'Failed to move Minor Plant items back to Plant assets');
+          toast.success('Minor Plant items moved to Plant assets', {
+            description: `${result.restored_count || 0} moved${result.skipped_count ? `, ${result.skipped_count} skipped` : ''}.`,
+          });
+          if (result.skipped_count) {
+            toast.warning('Some Minor Plant items were skipped', {
+              description: 'Only items linked to a source Plant asset can be restored automatically.',
+            });
+          }
+          setSelectedItemIds(new Set());
+          await fetchInventoryData();
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : 'Failed to move Minor Plant items back to Plant assets');
+        } finally {
+          setRestoringMinorPlantItems(false);
+        }
+      },
+    });
   }
 
   async function handleSetUserLocation(locationId: string, changeReason?: string) {
@@ -490,14 +524,19 @@ export default function InventoryPage() {
       toast.error('Move items to another category before deleting this category');
       return;
     }
-    if (!window.confirm(`Delete category ${category.name}?`)) return;
-
-    const response = await fetch(`/api/inventory/categories/${category.id}`, {
-      method: 'DELETE',
+    setConfirmAction({
+      title: `Delete category ${category.name}?`,
+      description: 'This removes the category from future inventory use.',
+      actionLabel: 'Delete Category',
+      onConfirm: async () => {
+        const response = await fetch(`/api/inventory/categories/${category.id}`, {
+          method: 'DELETE',
+        });
+        await parseJsonResponse(response, 'Failed to delete inventory category');
+        toast.success('Inventory category deleted');
+        await fetchInventoryData();
+      },
     });
-    await parseJsonResponse(response, 'Failed to delete inventory category');
-    toast.success('Inventory category deleted');
-    await fetchInventoryData();
   }
 
   async function handleCreateGroup(data: { name: string; description: string; item_ids: string[] }) {
@@ -523,14 +562,19 @@ export default function InventoryPage() {
   }
 
   async function handleRemoveGroup(group: InventoryItemGroup) {
-    if (!window.confirm(`Remove group ${group.name}? Items will stay in their current locations.`)) return;
-
-    const response = await fetch(`/api/inventory/groups/${group.id}`, {
-      method: 'DELETE',
+    setConfirmAction({
+      title: `Remove group ${group.name}?`,
+      description: 'Items will stay in their current locations.',
+      actionLabel: 'Remove Group',
+      onConfirm: async () => {
+        const response = await fetch(`/api/inventory/groups/${group.id}`, {
+          method: 'DELETE',
+        });
+        await parseJsonResponse(response, 'Failed to remove inventory group');
+        toast.success('Inventory group removed');
+        await fetchInventoryData();
+      },
     });
-    await parseJsonResponse(response, 'Failed to remove inventory group');
-    toast.success('Inventory group removed');
-    await fetchInventoryData();
   }
 
   if (permissionLoading || loading) {
@@ -587,10 +631,11 @@ export default function InventoryPage() {
           locations={primaryLocationOptions}
           categoryLabels={categoryLabels}
           userLocation={inventoryContext?.user_location || null}
+          currentFleetAssignment={inventoryContext?.current_fleet_assignment || null}
           onSetUserLocation={handleSetUserLocation}
           onRequestLocation={handleRequestLocation}
-          onMoveItems={moveInventoryItems}
           onOpenMoveDialog={setMovingItems}
+          onChangeLocation={() => setChangeLocationDialogOpen(true)}
         />
 
         <MoveInventoryDialog
@@ -891,6 +936,11 @@ export default function InventoryPage() {
         onSubmit={handleMoveItems}
       />
 
+      <InventoryConfirmActionDialog
+        action={confirmAction}
+        onClose={() => setConfirmAction(null)}
+      />
+
       <ChangeInventoryLocationDialog
         open={changeLocationDialogOpen}
         locations={primaryLocationOptions}
@@ -901,6 +951,43 @@ export default function InventoryPage() {
         onUnset={handleUnsetUserLocation}
       />
     </AppPageShell>
+  );
+}
+
+interface InventoryConfirmActionDialogProps {
+  action: ConfirmActionState | null;
+  onClose: () => void;
+}
+
+function InventoryConfirmActionDialog({ action, onClose }: InventoryConfirmActionDialogProps) {
+  const [isRunning, setIsRunning] = useState(false);
+
+  async function handleConfirm() {
+    if (!action) return;
+    setIsRunning(true);
+    try {
+      await action.onConfirm();
+      onClose();
+    } finally {
+      setIsRunning(false);
+    }
+  }
+
+  return (
+    <AlertDialog open={Boolean(action)} onOpenChange={(open) => { if (!open && !isRunning) onClose(); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{action?.title || 'Confirm action'}</AlertDialogTitle>
+          <AlertDialogDescription>{action?.description || 'This action cannot be undone.'}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isRunning}>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={(event) => { event.preventDefault(); void handleConfirm(); }} disabled={isRunning}>
+            {action?.actionLabel || 'Confirm'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 

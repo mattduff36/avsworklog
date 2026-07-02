@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { MapPin, PackageSearch, Send } from 'lucide-react';
-import type { InventoryItem, InventoryLocation, InventoryMovePayload, InventoryUserLocation } from '../types';
+import { MapPin, PackageSearch, Send, Truck } from 'lucide-react';
+import type { CurrentFleetAssignment, InventoryItem, InventoryLocation, InventoryUserLocation } from '../types';
 import { InventoryLocationSelect } from './InventoryLocationSelect';
 import { InventoryTable } from './InventoryTable';
 
@@ -18,10 +19,11 @@ interface InventoryEmployeeViewProps {
   locations: InventoryLocation[];
   categoryLabels?: Record<string, string>;
   userLocation: InventoryUserLocation | null;
+  currentFleetAssignment?: CurrentFleetAssignment | null;
   onSetUserLocation: (locationId: string) => Promise<void>;
   onRequestLocation: (payload: { suggested_name: string; note: string }) => Promise<void>;
-  onMoveItems: (items: InventoryItem[], payload: InventoryMovePayload) => Promise<void>;
   onOpenMoveDialog: (items: InventoryItem[]) => void;
+  onChangeLocation: () => void;
 }
 
 export function InventoryEmployeeView({
@@ -29,10 +31,11 @@ export function InventoryEmployeeView({
   locations,
   categoryLabels,
   userLocation,
+  currentFleetAssignment,
   onSetUserLocation,
   onRequestLocation,
-  onMoveItems,
   onOpenMoveDialog,
+  onChangeLocation,
 }: InventoryEmployeeViewProps) {
   const initialLocationId = userLocation?.location?.is_active === false ? '' : userLocation?.location_id || '';
   const [selectedLocationId, setSelectedLocationId] = useState(initialLocationId);
@@ -142,12 +145,7 @@ export function InventoryEmployeeView({
       return;
     }
 
-    await onMoveItems([item], {
-      location_id: activeLocation.id,
-      note: 'Claimed from employee inventory view',
-      scope: 'claim',
-      group_id: null,
-    });
+    onOpenMoveDialog([item]);
     setClaimSearch('');
   }
 
@@ -196,6 +194,35 @@ export function InventoryEmployeeView({
 
   return (
     <div className="space-y-6">
+      <Card className="border-slate-700 bg-slate-900/70">
+        <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2 text-sm font-medium text-white">
+              <MapPin className="h-4 w-4 text-inventory" />
+              Current inventory location: {activeLocation.name}
+            </div>
+            {currentFleetAssignment ? (
+              <div className="mt-2">
+                <Badge variant="outline" className="border-blue-500/30 bg-blue-500/10 text-blue-300">
+                  <Truck className="mr-1 h-3 w-3" />
+                  Linked {currentFleetAssignment.asset_type.toUpperCase()}: {[
+                    currentFleetAssignment.asset_label,
+                    currentFleetAssignment.asset_nickname,
+                  ].filter(Boolean).join(' - ') || 'Fleet asset'}
+                </Badge>
+              </div>
+            ) : (
+              <p className="mt-1 text-xs text-muted-foreground">
+                This location is not linked to a current fleet asset assignment.
+              </p>
+            )}
+          </div>
+          <Button variant="outline" onClick={onChangeLocation} className="border-slate-600">
+            Change Location
+          </Button>
+        </CardContent>
+      </Card>
+
       <Card className="border-slate-700 bg-slate-900/70">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-white">

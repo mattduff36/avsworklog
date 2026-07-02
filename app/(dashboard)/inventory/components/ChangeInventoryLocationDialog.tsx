@@ -41,6 +41,10 @@ export function ChangeInventoryLocationDialog({
   const [isSaving, setIsSaving] = useState(false);
   const [isUnsetting, setIsUnsetting] = useState(false);
   const isSameLocation = hasActiveExistingLocation && locationId === userLocation?.location_id;
+  const selectedLocation = locations.find((location) => location.id === locationId) || null;
+  const selectedFleetLabel = selectedLocation
+    ? [selectedLocation.linked_asset_label, selectedLocation.linked_asset_nickname].filter(Boolean).join(' - ')
+    : '';
 
   useEffect(() => {
     if (!open) return;
@@ -94,6 +98,13 @@ export function ChangeInventoryLocationDialog({
                 onValueChange={setLocationId}
                 locations={locations}
               />
+              {selectedLocation ? (
+                <p className="text-xs text-muted-foreground">
+                  {selectedLocation.linked_asset_type
+                    ? `Saving this location will set your current fleet assignment to ${selectedLocation.linked_asset_type.toUpperCase()} ${selectedFleetLabel || selectedLocation.name}.`
+                    : 'Saving this location will clear any current fleet asset assignment on your profile.'}
+                </p>
+              ) : null}
             </div>
 
             <div className="space-y-2">

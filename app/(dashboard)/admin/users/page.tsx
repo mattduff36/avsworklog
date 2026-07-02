@@ -109,7 +109,14 @@ interface UserActivitySummary {
   last_sign_in_at?: string | null;
   last_active_at?: string | null;
 }
-type ProfileWithEmail = ProfileWithRole & UserActivitySummary;
+interface AdminFleetAssignmentSummary {
+  asset_type: 'van' | 'hgv' | 'plant';
+  asset_label: string | null;
+  asset_nickname: string | null;
+}
+type ProfileWithEmail = ProfileWithRole & UserActivitySummary & {
+  current_fleet_assignment?: AdminFleetAssignmentSummary | null;
+};
 
 type TabType = 'users' | 'roles' | 'teams' | 'permissions';
 type UserStatusTab = 'active' | 'deleted';
@@ -236,6 +243,12 @@ function normalizeHalfDayString(rawValue: string): string {
 
 function isDeletedUserProfile(user: { full_name?: string | null }): boolean {
   return Boolean(user.full_name?.includes('(Deleted User)'));
+}
+
+function formatAdminFleetAssignment(assignment: AdminFleetAssignmentSummary | null | undefined): string {
+  if (!assignment) return '-';
+  const assetLabel = [assignment.asset_label, assignment.asset_nickname].filter(Boolean).join(' - ');
+  return `${assignment.asset_type.toUpperCase()} ${assetLabel || 'Fleet asset'}`;
 }
 
 function UserTableAvatar({ user }: { user: ProfileWithEmail }) {
@@ -551,6 +564,64 @@ export default function UsersAdminPage() {
       .order('full_name', { ascending: true });
 
     if (profilesError) throw profilesError;
+    const profileRows = (profiles as unknown as ProfileWithRole[]) || [];
+
+    const profileIds = profileRows.map((profile) => profile.id);
+    const { data: assignmentRows, error: assignmentError } = profileIds.length > 0
+      ? await supabase
+        .from('profile_fleet_assignments')
+        .select(`
+          user_id,
+          linked_van_id,
+          linked_hgv_id,
+          linked_plant_id,
+          van:vans!profile_fleet_assignments_linked_van_id_fkey(reg_number, nickname),
+          hgv:hgvs!profile_fleet_assignments_linked_hgv_id_fkey(reg_number, nickname),
+          plant:plant!profile_fleet_assignments_linked_plant_id_fkey(plant_id, reg_number, nickname)
+        `)
+        .in('user_id', profileIds)
+        .is('ended_at', null)
+      : { data: [], error: null };
+
+    if (assignmentError) throw assignmentError;
+
+    const assignmentByUserId = new Map<string, AdminFleetAssignmentSummary>();
+    ((assignmentRows || []) as Array<{
+      user_id: string;
+      linked_van_id: string | null;
+      linked_hgv_id: string | null;
+      linked_plant_id: string | null;
+      van?: { reg_number: string | null; nickname: string | null } | { reg_number: string | null; nickname: string | null }[] | null;
+      hgv?: { reg_number: string | null; nickname: string | null } | { reg_number: string | null; nickname: string | null }[] | null;
+      plant?: { plant_id: string | null; reg_number: string | null; nickname: string | null } | { plant_id: string | null; reg_number: string | null; nickname: string | null }[] | null;
+    }>).forEach((assignment) => {
+      const van = Array.isArray(assignment.van) ? assignment.van[0] : assignment.van;
+      const hgv = Array.isArray(assignment.hgv) ? assignment.hgv[0] : assignment.hgv;
+      const plant = Array.isArray(assignment.plant) ? assignment.plant[0] : assignment.plant;
+      if (assignment.linked_van_id) {
+        assignmentByUserId.set(assignment.user_id, {
+          asset_type: 'van',
+          asset_label: van?.reg_number || null,
+          asset_nickname: van?.nickname || null,
+        });
+        return;
+      }
+      if (assignment.linked_hgv_id) {
+        assignmentByUserId.set(assignment.user_id, {
+          asset_type: 'hgv',
+          asset_label: hgv?.reg_number || null,
+          asset_nickname: hgv?.nickname || null,
+        });
+        return;
+      }
+      if (assignment.linked_plant_id) {
+        assignmentByUserId.set(assignment.user_id, {
+          asset_type: 'plant',
+          asset_label: plant?.reg_number || plant?.plant_id || null,
+          asset_nickname: plant?.nickname || null,
+        });
+      }
+    });
 
     // Fetch auth users to get emails (via API route)
     const response = await fetch('/api/admin/users/list-with-emails');
@@ -566,11 +637,12 @@ export default function UsersAdminPage() {
     );
 
     // Merge profiles with emails
-    return filterHiddenSystemTestAccounts((profiles as unknown as ProfileWithRole[])?.map(profile => ({
+    return filterHiddenSystemTestAccounts(profileRows.map(profile => ({
       ...profile,
       email: authUserMap.get(profile.id)?.email || '',
       last_sign_in_at: authUserMap.get(profile.id)?.last_sign_in_at || null,
       last_active_at: authUserMap.get(profile.id)?.last_active_at || null,
+      current_fleet_assignment: assignmentByUserId.get(profile.id) || null,
     })) || [] as ProfileWithEmail[]);
   }
 
@@ -1550,7 +1622,7 @@ export default function UsersAdminPage() {
               </div>
             ) : (
               <div className="border border-slate-700 rounded-lg overflow-x-auto overflow-y-hidden">
-                <Table className="min-w-[980px]">
+                <Table className="min-w-[1120px]">
                   <TableHeader>
                     <TableRow className="border-slate-700 hover:bg-slate-800/50">
                       <TableHead className="text-muted-foreground">Name</TableHead>
@@ -1559,6 +1631,7 @@ export default function UsersAdminPage() {
                       <TableHead className="text-muted-foreground">Role</TableHead>
                       <TableHead className="text-muted-foreground">Team</TableHead>
                       <TableHead className="text-muted-foreground">Line Manager(s)</TableHead>
+                      <TableHead className="text-muted-foreground">Fleet Asset</TableHead>
                       <TableHead className="text-muted-foreground">Created</TableHead>
                       <TableHead className="text-right text-muted-foreground">Actions</TableHead>
                     </TableRow>
@@ -1574,7 +1647,7 @@ export default function UsersAdminPage() {
                       <Fragment key={user.id}>
                         {startsNewTeam && (
                           <TableRow key={`${currentTeamKey}-divider`} className="border-slate-600 bg-slate-950/40 hover:bg-slate-950/40">
-                            <TableCell colSpan={8} className="py-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                            <TableCell colSpan={9} className="py-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
                               {teamLabel}
                             </TableCell>
                           </TableRow>
@@ -1637,6 +1710,15 @@ export default function UsersAdminPage() {
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {getDisplayedManagers(user.line_manager_id, user.secondary_manager_id)}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {user.current_fleet_assignment ? (
+                            <Badge variant="outline" className="border-blue-500/30 bg-blue-500/10 text-blue-300">
+                              {formatAdminFleetAssignment(user.current_fleet_assignment)}
+                            </Badge>
+                          ) : (
+                            '-'
+                          )}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           <div className="flex items-center gap-2 text-sm">
