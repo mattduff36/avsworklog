@@ -229,8 +229,9 @@ export async function POST(request: NextRequest) {
       pdfFilePath = uploadData.path;
     }
 
-    // Create message
-    const { data: message, error: messageError } = await supabase
+    // Create message with the admin client after explicit module authorization.
+    // The authenticated client can be narrower than the app's effective-role access model.
+    const { data: message, error: messageError } = await admin
       .from('messages')
       .insert({
         type: type as MessageType,
@@ -264,7 +265,7 @@ export async function POST(request: NextRequest) {
       status: 'PENDING' as const
     }));
 
-    const { error: recipientsError } = await supabase
+    const { error: recipientsError } = await admin
       .from('message_recipients')
       .insert(recipientRecords);
 
@@ -272,7 +273,7 @@ export async function POST(request: NextRequest) {
       console.error('Error creating recipients:', recipientsError);
       
       // Clean up message and PDF if recipients creation failed
-      await supabase.from('messages').delete().eq('id', message.id);
+      await admin.from('messages').delete().eq('id', message.id);
       if (pdfFilePath) {
         await admin.storage.from('toolbox-talk-pdfs').remove([pdfFilePath]);
       }

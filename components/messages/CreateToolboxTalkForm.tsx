@@ -76,50 +76,44 @@ export function CreateToolboxTalkForm({ onSuccess }: CreateToolboxTalkFormProps)
   }
 
   async function handleSendToRecipients(employeeIds: string[]) {
-    try {
-      // Use FormData to support file upload
-      const formData = new FormData();
-      formData.append('type', 'TOOLBOX_TALK');
-      formData.append('subject', subject);
-      formData.append('body', body);
-      formData.append('recipient_type', 'individual');
-      formData.append('recipient_user_ids', JSON.stringify(employeeIds));
-      formData.append('priority', priority);
-      formData.append(
-        'acceptance_delay_minutes',
-        priority === 'URGENT' ? String(Number.parseInt(acceptanceDelayMinutes, 10)) : '0'
-      );
-      
-      if (pdfFile) {
-        formData.append('pdf_file', pdfFile);
-      }
+    // Use FormData to support file upload
+    const formData = new FormData();
+    formData.append('type', 'TOOLBOX_TALK');
+    formData.append('subject', subject);
+    formData.append('body', body);
+    formData.append('recipient_type', 'individual');
+    formData.append('recipient_user_ids', JSON.stringify(employeeIds));
+    formData.append('priority', priority);
+    formData.append(
+      'acceptance_delay_minutes',
+      priority === 'URGENT' ? String(Number.parseInt(acceptanceDelayMinutes, 10)) : '0'
+    );
 
-      const response = await fetch('/api/messages', {
-        method: 'POST',
-        body: formData
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to send Toolbox Talk');
-      }
-
-      toast.success(`Toolbox Talk sent to ${data.recipients_created} employee(s)`);
-      
-      // Reset form
-      setSubject('');
-      setBody('');
-      setPriority('HIGH');
-      setAcceptanceDelayMinutes('');
-      setPdfFile(null);
-
-      onSuccess?.();
-
-    } catch (error) {
-      console.error('Error sending Toolbox Talk:', error);
-      throw error;
+    if (pdfFile) {
+      formData.append('pdf_file', pdfFile);
     }
+
+    const response = await fetch('/api/messages', {
+      method: 'POST',
+      body: formData
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to send Toolbox Talk');
+    }
+
+    toast.success(`Toolbox Talk sent to ${data.recipients_created} employee(s)`);
+
+    // Reset form
+    setSubject('');
+    setBody('');
+    setPriority('HIGH');
+    setAcceptanceDelayMinutes('');
+    setPdfFile(null);
+
+    onSuccess?.();
   }
 
   return (
