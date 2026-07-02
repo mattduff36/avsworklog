@@ -2,6 +2,31 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.2.0
+
+**GIT COMMIT MESSAGE**
+`feat(inventory): update Inventory, Profile, Data storage, Quotes, Projects, Help and FAQ, User Management, and Fleet`
+
+**PUSHED AT**
+2026-07-02T22:34:41.446Z
+
+**WHAT CHANGED**
+Update Inventory, Profile, Data storage, Quotes, Projects, Help and FAQ, User Management, and Fleet. Create messages with authorized server writes.
+
+**VERSION HISTORY DETAILS**
+- Updated Inventory, Profile, Data storage, Quotes, Projects, Help and FAQ, User Management, and Fleet, with changes to background routes, app screens, shared logic, automation scripts, automated tests, data storage, and documentation.
+- Updated data storage, with changes to shared typing, automation scripts, and data storage.
+- Updated profile, with changes to background routes, app screens, interface components, shared logic, and shared typing.
+- Updated help and FAQ, with changes to documentation.
+- Updated notifications, with changes to background routes, interface components, and automated tests.
+- Updated quotes, with changes to background routes and automated tests.
+- Updated fleet, with changes to shared logic.
+- Updated projects, with changes to background routes and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(inventory): update Inventory, Profile, Data storage, Quotes, Projects, Help and FAQ, User Management, and Fleet`
+- `fix(toolbox-talks): create messages with authorized server writes`
+
 ## 0726.1.0
 
 **GIT COMMIT MESSAGE**

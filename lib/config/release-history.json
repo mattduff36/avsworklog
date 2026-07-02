@@ -1,5 +1,44 @@
 [
   {
+    "version": "0726.2.0",
+    "updateKind": "major",
+    "title": "Inventory update",
+    "description": "Updated Inventory, Profile, Data storage, Quotes, Projects, Help and FAQ, User Management, and Fleet. Create messages with authorized server writes.",
+    "summary": "Updated Inventory, Profile, Data storage, Quotes, Projects, Help and FAQ, User Management, and Fleet. Create messages with authorized server writes.",
+    "details": [
+      "Updated Inventory, Profile, Data storage, Quotes, Projects, Help and FAQ, User Management, and Fleet, with changes to background routes, app screens, shared logic, automation scripts, automated tests, data storage, and documentation.",
+      "Updated data storage, with changes to shared typing, automation scripts, and data storage.",
+      "Updated profile, with changes to background routes, app screens, interface components, shared logic, and shared typing.",
+      "Updated help and FAQ, with changes to documentation.",
+      "Updated notifications, with changes to background routes, interface components, and automated tests.",
+      "Updated quotes, with changes to background routes and automated tests.",
+      "Updated fleet, with changes to shared logic.",
+      "Updated projects, with changes to background routes and automated tests."
+    ],
+    "areas": [
+      "Inventory",
+      "Toolbox Talks",
+      "Profile",
+      "Data storage",
+      "Quotes",
+      "Projects",
+      "Help",
+      "FAQ",
+      "User Management",
+      "Fleet. Create messages with authorized server writes"
+    ],
+    "areaKeys": [
+      "inventory",
+      "toolbox-talks",
+      "profile",
+      "data-storage",
+      "quotes",
+      "projects",
+      "user-management"
+    ],
+    "pushedAt": "2026-07-02T22:34:41.446Z"
+  },
+  {
     "version": "0726.1.0",
     "updateKind": "major",
     "title": "Quotes update",
