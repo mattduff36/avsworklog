@@ -8,7 +8,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { MapPin, PackageSearch, Send, Truck } from 'lucide-react';
-import type { CurrentFleetAssignment, InventoryItem, InventoryLocation, InventoryUserLocation } from '../types';
+import type {
+  CurrentFleetAssignment,
+  InventoryItem,
+  InventoryLocation,
+  InventoryUserLocation,
+  InventoryUserSiteLocation,
+} from '../types';
 import { InventoryLocationSelect } from './InventoryLocationSelect';
 import { InventoryTable } from './InventoryTable';
 
@@ -19,6 +25,7 @@ interface InventoryEmployeeViewProps {
   locations: InventoryLocation[];
   categoryLabels?: Record<string, string>;
   userLocation: InventoryUserLocation | null;
+  secondarySiteLocations?: InventoryUserSiteLocation[];
   currentFleetAssignment?: CurrentFleetAssignment | null;
   onSetUserLocation: (locationId: string) => Promise<void>;
   onRequestLocation: (payload: { suggested_name: string; note: string }) => Promise<void>;
@@ -31,6 +38,7 @@ export function InventoryEmployeeView({
   locations,
   categoryLabels,
   userLocation,
+  secondarySiteLocations = [],
   currentFleetAssignment,
   onSetUserLocation,
   onRequestLocation,
@@ -53,9 +61,23 @@ export function InventoryEmployeeView({
     setSelectedLocationId(userLocation?.location?.is_active === false ? '' : userLocation?.location_id || '');
   }, [userLocation?.location?.is_active, userLocation?.location_id]);
 
-  const locationItems = useMemo(
-    () => items.filter((item) => item.status === 'active' && item.location_id === activeLocation?.id),
-    [activeLocation?.id, items]
+  const activeItemsByLocationId = useMemo(() => {
+    const nextItemsByLocationId = new Map<string, InventoryItem[]>();
+    items.forEach((item) => {
+      if (item.status !== 'active') return;
+      const locationItems = nextItemsByLocationId.get(item.location_id) || [];
+      locationItems.push(item);
+      nextItemsByLocationId.set(item.location_id, locationItems);
+    });
+    return nextItemsByLocationId;
+  }, [items]);
+  const locationItems = activeLocation ? activeItemsByLocationId.get(activeLocation.id) || [] : [];
+  const activeSecondarySiteLocations = useMemo(
+    () => secondarySiteLocations.filter((siteLocation) => (
+      siteLocation.location?.is_active === true &&
+      siteLocation.location.location_type === 'site'
+    )),
+    [secondarySiteLocations]
   );
   const claimableItems = useMemo(() => {
     const query = claimSearch.trim().toLowerCase();
@@ -244,6 +266,47 @@ export function InventoryEmployeeView({
           )}
         </CardContent>
       </Card>
+
+      {activeSecondarySiteLocations.length > 0 ? (
+        <div className="space-y-4">
+          {activeSecondarySiteLocations.map((siteLocation) => {
+            const site = siteLocation.location;
+            if (!site) return null;
+            const siteItems = activeItemsByLocationId.get(site.id) || [];
+
+            return (
+              <Card key={siteLocation.location_id} className="border-slate-700 bg-slate-900/70">
+                <CardHeader>
+                  <CardTitle className="flex flex-wrap items-center gap-2 text-white">
+                    <MapPin className="h-5 w-5 text-inventory" />
+                    Site: {site.name}
+                    <Badge variant="outline" className="border-blue-500/30 bg-blue-500/10 text-blue-300">
+                      Secondary Location
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {site.description ? (
+                    <p className="mb-4 text-sm text-muted-foreground">{site.description}</p>
+                  ) : null}
+                  {siteItems.length === 0 ? (
+                    <p className="py-8 text-center text-sm text-muted-foreground">No active inventory items are currently assigned to this Site location.</p>
+                  ) : (
+                    <InventoryTable
+                      items={siteItems}
+                      selectedItemIds={selectedItemIds}
+                      onSelectedItemIdsChange={setSelectedItemIds}
+                      onMove={onOpenMoveDialog}
+                      categoryLabels={categoryLabels}
+                      tableLabel={site.external_reference ? `site ${site.external_reference}` : site.name}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      ) : null}
 
       <Card className="border-slate-700 bg-slate-900/70">
         <CardHeader>

@@ -50,7 +50,11 @@ type SortField = 'item_number' | 'serial_number' | 'name' | 'location' | 'last_c
 type SortDir = 'asc' | 'desc';
 const NO_LOCATION_FILTER = '__no_location__';
 const INVENTORY_STATUS_FILTER_ORDER: InventoryCheckStatus[] = ['overdue', 'due_soon', 'needs_check', 'not_required', 'ok'];
-const LOCATION_FILTER_GROUP_ORDER = ['manual', 'van', 'site', 'hgv', 'plant', 'unknown'] as const;
+const LOCATION_FILTER_GROUP_ORDER = ['manual', 'van', 'site', 'legacy_quote', 'hgv', 'plant', 'unknown'] as const;
+const COLLAPSIBLE_LOCATION_FILTER_GROUPS = ['Vans', 'Sites', 'Legacy Sites', 'HGVs', 'Plant'] as const;
+const LOCATION_FILTER_MINIMUM_SEARCH_CHARACTERS = {
+  'Legacy Sites': 3,
+} as const;
 
 interface InventoryTableProps {
   items: InventoryItem[];
@@ -130,6 +134,7 @@ function getVanLocationNickname(item: InventoryItem): string | null {
 
 function getLocationFilterGroupKey(location: InventoryLocation): (typeof LOCATION_FILTER_GROUP_ORDER)[number] {
   if (location.location_type === 'van') return 'van';
+  if (location.location_type === 'site' && location.source_type === 'legacy_quote') return 'legacy_quote';
   if (location.location_type === 'site') return 'site';
   if (location.location_type === 'hgv') return 'hgv';
   if (location.location_type === 'plant') return 'plant';
@@ -141,6 +146,7 @@ function getLocationFilterGroupLabel(location: InventoryLocation): string {
   const groupKey = getLocationFilterGroupKey(location);
   if (groupKey === 'van') return 'Vans';
   if (groupKey === 'site') return 'Sites';
+  if (groupKey === 'legacy_quote') return 'Legacy Sites';
   if (groupKey === 'hgv') return 'HGVs';
   if (groupKey === 'plant') return 'Plant';
   if (groupKey === 'unknown') return 'Unknown';
@@ -156,6 +162,14 @@ function getLocationFilterLabel(location: InventoryLocation): string {
   if (linkedAssetLabel) return `[${linkedAssetLabel}]`;
 
   if (location.location_type === 'site' && location.external_reference) {
+    if (location.source_type === 'legacy_quote') {
+      const legacyTitle = location.name
+        .replace(/^legacy quote\s*-\s*/i, '')
+        .replace(new RegExp(`^${location.external_reference}\\s*-\\s*`, 'i'), '')
+        .trim();
+      return legacyTitle ? `[${location.external_reference} - ${legacyTitle}]` : `[${location.external_reference}]`;
+    }
+
     const siteTitle = location.name
       .replace(/^site\s*-\s*/i, '')
       .replace(new RegExp(`^${location.external_reference}\\s*-\\s*`, 'i'), '')
@@ -348,7 +362,7 @@ export function InventoryTable({
         LOCATION_FILTER_GROUP_ORDER.map((groupKey, index) => [groupKey, index])
       );
       const options = getInventoryLocationsWithYardFirst(locationFilterLocations || [])
-        .filter((location) => (counts[location.id] || 0) > 0)
+        .filter((location) => getLocationFilterGroupKey(location) !== 'unknown')
         .sort((a, b) => {
           const aGroup = getLocationFilterGroupKey(a);
           const bGroup = getLocationFilterGroupKey(b);
@@ -360,7 +374,7 @@ export function InventoryTable({
           value: location.id,
           label: getLocationFilterLabel(location),
           description: getLocationFilterDescription(location),
-          groupLabel: getLocationFilterGroupLabel(location),
+          groupLabel: getLocationFilterGroupKey(location) === 'manual' ? undefined : getLocationFilterGroupLabel(location),
           searchLabel: [
             location.name,
             location.external_reference,
@@ -371,17 +385,6 @@ export function InventoryTable({
           ].filter(Boolean).join(' '),
           count: counts[location.id] || 0,
         }));
-
-      if ((counts[NO_LOCATION_FILTER] || 0) > 0) {
-        options.push({
-          value: NO_LOCATION_FILTER,
-          label: 'No Location',
-          description: 'Unassigned',
-          groupLabel: 'Unknown',
-          searchLabel: 'No Location Unassigned Unknown',
-          count: counts[NO_LOCATION_FILTER],
-        });
-      }
 
       return options;
     },
@@ -557,6 +560,8 @@ export function InventoryTable({
               emptyLabel="No locations found"
               allOptionPosition="bottom"
               showPanelLabel={false}
+              collapsibleGroupLabels={COLLAPSIBLE_LOCATION_FILTER_GROUPS}
+              minimumSearchCharactersByGroupLabel={LOCATION_FILTER_MINIMUM_SEARCH_CHARACTERS}
             />
           ) : null}
         </div>

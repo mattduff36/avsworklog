@@ -50,6 +50,27 @@ export async function requireInventoryManagerAccess(): Promise<InventoryAccessRe
   return access;
 }
 
+export function isInventorySupervisorOrHigher(access: InventoryAccessResult): boolean {
+  const roleName = access.roleName?.trim().toLowerCase();
+  return (
+    access.isManagerOrAdmin === true ||
+    access.roleClass === 'admin' ||
+    access.roleClass === 'manager' ||
+    roleName === 'supervisor'
+  );
+}
+
+export async function requireInventorySupervisorAccess(): Promise<InventoryAccessResult> {
+  const access = await requireInventoryAccess();
+  if (!access.allowed) return access;
+
+  if (!isInventorySupervisorOrHigher(access)) {
+    return { allowed: false, status: 403, error: 'Supervisor or higher access required' };
+  }
+
+  return access;
+}
+
 export function normalizeInventoryItemNumber(itemNumber: string): string {
   return itemNumber.toUpperCase().replace(/\s+/g, '').trim();
 }

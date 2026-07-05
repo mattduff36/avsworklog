@@ -18,6 +18,7 @@ interface LocationRow {
   id: string;
   name: string;
   is_active: boolean;
+  location_type?: 'yard' | 'unknown' | 'van' | 'hgv' | 'plant' | 'site' | 'manual';
 }
 
 interface BuildAdminOptions {
@@ -234,5 +235,27 @@ describe('inventory user location route', () => {
     await expect(response.json()).resolves.toMatchObject({ error: 'Location is already assigned to another user' });
     expect(state.conflictQueryCount).toBe(1);
     expect(state.upserts).toHaveLength(0);
+  });
+
+  it('rejects Site locations as primary user locations', async () => {
+    const { admin, state } = buildAdmin({
+      location: {
+        id: 'site-location',
+        name: 'Site - 12345',
+        is_active: true,
+        location_type: 'site',
+      },
+    });
+    vi.mocked(createAdminClient).mockReturnValue(admin as never);
+
+    const response = await PATCH(buildRequest('site-location'));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Site locations can only be assigned as secondary locations by a supervisor or higher',
+    });
+    expect(state.conflictQueryCount).toBe(0);
+    expect(state.upserts).toHaveLength(0);
+    expect(state.rpcs).toHaveLength(0);
   });
 });

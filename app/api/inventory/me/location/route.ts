@@ -94,6 +94,12 @@ export async function PATCH(request: NextRequest) {
     if (!typedLocation?.is_active) {
       return NextResponse.json({ error: 'Location not found' }, { status: 404 });
     }
+    if (typedLocation.location_type === 'site') {
+      return NextResponse.json(
+        { error: 'Site locations can only be assigned as secondary locations by a supervisor or higher' },
+        { status: 400 }
+      );
+    }
 
     const canShareLocation = canShareInventoryPrimaryLocation(typedLocation, {
       teamId: access.teamId,

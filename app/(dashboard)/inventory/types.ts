@@ -10,7 +10,7 @@ export type FleetAssetLinkType = 'van' | 'hgv' | 'plant';
 
 export type InventoryLocationType = 'yard' | 'unknown' | 'van' | 'hgv' | 'plant' | 'site' | 'manual';
 
-export type InventoryLocationSourceType = 'system' | 'fleet' | 'quote' | 'project_number' | 'manual';
+export type InventoryLocationSourceType = 'system' | 'fleet' | 'quote' | 'project_number' | 'legacy_quote' | 'manual';
 
 export type InventoryLocationSyncStatus = 'manual' | 'synced' | 'needs_review' | 'archived';
 
@@ -172,14 +172,25 @@ export interface InventoryUserLocation {
   location?: InventoryLocation | null;
 }
 
+export interface InventoryUserSiteLocation {
+  user_id: string;
+  location_id: string;
+  assigned_by: string | null;
+  assigned_at: string;
+  note: string | null;
+  location?: InventoryLocation | null;
+}
+
 export interface InventoryContext {
   user_id: string;
   is_manager_or_admin: boolean;
+  can_manage_site_locations?: boolean;
   role_name: string | null;
   role_class: 'admin' | 'manager' | 'employee' | null;
   team_id: string | null;
   team_name: string | null;
   user_location: InventoryUserLocation | null;
+  secondary_site_locations?: InventoryUserSiteLocation[];
   is_user_location_valid?: boolean;
   current_fleet_assignment?: CurrentFleetAssignment | null;
 }

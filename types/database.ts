@@ -2840,7 +2840,7 @@ export type Database = {
           linked_hgv_id: string | null
           linked_plant_id: string | null
           location_type: 'yard' | 'unknown' | 'van' | 'hgv' | 'plant' | 'site' | 'manual'
-          source_type: 'system' | 'fleet' | 'quote' | 'project_number' | 'manual' | null
+          source_type: 'system' | 'fleet' | 'quote' | 'project_number' | 'legacy_quote' | 'manual' | null
           source_id: string | null
           external_reference: string | null
           sync_status: 'manual' | 'synced' | 'needs_review' | 'archived'
@@ -2859,7 +2859,7 @@ export type Database = {
           linked_hgv_id?: string | null
           linked_plant_id?: string | null
           location_type?: 'yard' | 'unknown' | 'van' | 'hgv' | 'plant' | 'site' | 'manual'
-          source_type?: 'system' | 'fleet' | 'quote' | 'project_number' | 'manual' | null
+          source_type?: 'system' | 'fleet' | 'quote' | 'project_number' | 'legacy_quote' | 'manual' | null
           source_id?: string | null
           external_reference?: string | null
           sync_status?: 'manual' | 'synced' | 'needs_review' | 'archived'
@@ -2878,7 +2878,7 @@ export type Database = {
           linked_hgv_id?: string | null
           linked_plant_id?: string | null
           location_type?: 'yard' | 'unknown' | 'van' | 'hgv' | 'plant' | 'site' | 'manual'
-          source_type?: 'system' | 'fleet' | 'quote' | 'project_number' | 'manual' | null
+          source_type?: 'system' | 'fleet' | 'quote' | 'project_number' | 'legacy_quote' | 'manual' | null
           source_id?: string | null
           external_reference?: string | null
           sync_status?: 'manual' | 'synced' | 'needs_review' | 'archived'
@@ -3051,6 +3051,52 @@ export type Database = {
           },
           {
             foreignKeyName: 'inventory_user_locations_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      inventory_user_site_locations: {
+        Row: {
+          user_id: string
+          location_id: string
+          assigned_by: string | null
+          assigned_at: string
+          note: string | null
+        }
+        Insert: {
+          user_id: string
+          location_id: string
+          assigned_by?: string | null
+          assigned_at?: string
+          note?: string | null
+        }
+        Update: {
+          user_id?: string
+          location_id?: string
+          assigned_by?: string | null
+          assigned_at?: string
+          note?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'inventory_user_site_locations_assigned_by_fkey'
+            columns: ['assigned_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_user_site_locations_location_id_fkey'
+            columns: ['location_id']
+            isOneToOne: false
+            referencedRelation: 'inventory_locations'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_user_site_locations_user_id_fkey'
             columns: ['user_id']
             isOneToOne: false
             referencedRelation: 'profiles'

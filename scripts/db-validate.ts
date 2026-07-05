@@ -69,6 +69,7 @@ const REQUIRED_COLUMNS: Record<string, string[]> = {
   ],
   inventory_item_movements: ['id', 'item_id', 'from_location_id', 'to_location_id', 'movement_batch_id', 'moved_by'],
   inventory_user_locations: ['user_id', 'location_id', 'change_reason', 'updated_by'],
+  inventory_user_site_locations: ['user_id', 'location_id', 'assigned_by', 'assigned_at', 'note'],
   inventory_item_categories: ['id', 'slug', 'name', 'is_active', 'sort_order'],
   inventory_minor_plant_details: ['id', 'inventory_item_id', 'source_plant_id', 'serial_number'],
   profile_fleet_assignments: [
@@ -103,6 +104,9 @@ const REQUIRED_FKS: Array<{ table: string; column: string; referencesTable: stri
   { table: 'inventory_item_movements', column: 'to_location_id', referencesTable: 'inventory_locations' },
   { table: 'inventory_user_locations', column: 'user_id', referencesTable: 'profiles' },
   { table: 'inventory_user_locations', column: 'location_id', referencesTable: 'inventory_locations' },
+  { table: 'inventory_user_site_locations', column: 'user_id', referencesTable: 'profiles' },
+  { table: 'inventory_user_site_locations', column: 'location_id', referencesTable: 'inventory_locations' },
+  { table: 'inventory_user_site_locations', column: 'assigned_by', referencesTable: 'profiles' },
   { table: 'inventory_minor_plant_details', column: 'inventory_item_id', referencesTable: 'inventory_items' },
   { table: 'inventory_minor_plant_details', column: 'source_plant_id', referencesTable: 'plant' },
   { table: 'profile_fleet_assignments', column: 'user_id', referencesTable: 'profiles' },

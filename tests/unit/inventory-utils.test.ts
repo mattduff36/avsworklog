@@ -105,6 +105,13 @@ describe('inventory utils', () => {
       teamId: 'transport',
     })).toBe(true);
     expect(canSelectInventoryPrimaryLocation(storesLocation, { teamId: 'workshop_yard' })).toBe(false);
+    expect(canSelectInventoryPrimaryLocation({
+      id: 'site-location',
+      name: 'Site - 12345',
+      is_active: true,
+      assigned_user_names: [],
+      location_type: 'site',
+    }, { teamId: 'transport' })).toBe(false);
   });
 
   it('calculates unknown-location age from movement or created date fallback', () => {

@@ -3,6 +3,11 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { requireInventoryAccess, requireInventoryManagerAccess } from '@/lib/server/inventory-auth';
 import type { FleetAssetLinkType } from '@/app/(dashboard)/inventory/types';
 import { buildLinkedAssetColumns, getLocationTypeForLinkedAsset } from '@/lib/server/inventory-locations';
+import type { Database } from '@/types/database';
+
+const SUPABASE_PAGE_SIZE = 1000;
+
+type InventoryLocationRow = Database['public']['Tables']['inventory_locations']['Row'];
 
 interface LocationRequestBody {
   name?: string;
@@ -23,20 +28,65 @@ function pickAssigneeProfile(
   return Array.isArray(user) ? user[0] ?? null : user;
 }
 
-function getAssignedUserNamesByLocationId(rows: InventoryLocationAssigneeRow[]): Map<string, string[]> {
+function getAssignedUserNamesByLocationId(...rowGroups: InventoryLocationAssigneeRow[][]): Map<string, string[]> {
   const namesByLocationId = new Map<string, string[]>();
 
-  rows.forEach((row) => {
+  rowGroups.flat().forEach((row) => {
     const fullName = pickAssigneeProfile(row.user)?.full_name?.trim();
     if (!row.location_id || !fullName) return;
 
     const names = namesByLocationId.get(row.location_id) || [];
-    names.push(fullName);
+    if (!names.includes(fullName)) names.push(fullName);
     namesByLocationId.set(row.location_id, names);
   });
 
   namesByLocationId.forEach((names) => names.sort((a, b) => a.localeCompare(b)));
   return namesByLocationId;
+}
+
+async function loadActiveInventoryLocations(
+  admin: ReturnType<typeof createAdminClient>
+): Promise<InventoryLocationRow[]> {
+  const locations: InventoryLocationRow[] = [];
+
+  for (let offset = 0; ; offset += SUPABASE_PAGE_SIZE) {
+    const { data, error } = await admin
+      .from('inventory_locations')
+      .select('*')
+      .eq('is_active', true)
+      .order('name', { ascending: true })
+      .range(offset, offset + SUPABASE_PAGE_SIZE - 1);
+
+    if (error) throw error;
+
+    const page = data || [];
+    locations.push(...page);
+    if (page.length < SUPABASE_PAGE_SIZE) break;
+  }
+
+  return locations;
+}
+
+async function loadActiveInventoryItemLocationIds(
+  admin: ReturnType<typeof createAdminClient>
+): Promise<Array<{ location_id: string | null }>> {
+  const rows: Array<{ location_id: string | null }> = [];
+
+  for (let offset = 0; ; offset += SUPABASE_PAGE_SIZE) {
+    const { data, error } = await admin
+      .from('inventory_items')
+      .select('location_id')
+      .eq('status', 'active')
+      .range(offset, offset + SUPABASE_PAGE_SIZE - 1);
+
+    if (error) throw error;
+
+    const page = data || [];
+    rows.push(...page);
+    if (page.length < SUPABASE_PAGE_SIZE) break;
+  }
+
+  return rows;
 }
 
 export async function GET() {
@@ -47,16 +97,9 @@ export async function GET() {
     }
 
     const admin = createAdminClient();
-    const [locationsResult, itemsResult, vansResult, hgvsResult, plantResult, assignedUsersResult] = await Promise.all([
-      admin
-        .from('inventory_locations')
-        .select('*')
-        .eq('is_active', true)
-        .order('name', { ascending: true }),
-      admin
-        .from('inventory_items')
-        .select('location_id')
-        .eq('status', 'active'),
+    const [locationRows, itemLocationRows, vansResult, hgvsResult, plantResult, assignedUsersResult, assignedSiteUsersResult] = await Promise.all([
+      loadActiveInventoryLocations(admin),
+      loadActiveInventoryItemLocationIds(admin),
       admin
         .from('vans')
         .select('id, reg_number, nickname'),
@@ -72,17 +115,22 @@ export async function GET() {
           location_id,
           user:profiles!inventory_user_locations_user_id_fkey(full_name)
         `),
+      admin
+        .from('inventory_user_site_locations')
+        .select(`
+          location_id,
+          user:profiles!inventory_user_site_locations_user_id_fkey(full_name)
+        `),
     ]);
 
-    if (locationsResult.error) throw locationsResult.error;
-    if (itemsResult.error) throw itemsResult.error;
     if (vansResult.error) throw vansResult.error;
     if (hgvsResult.error) throw hgvsResult.error;
     if (plantResult.error) throw plantResult.error;
     if (assignedUsersResult.error) throw assignedUsersResult.error;
+    if (assignedSiteUsersResult.error) throw assignedSiteUsersResult.error;
 
     const countByLocationId = new Map<string, number>();
-    (itemsResult.data || []).forEach((item) => {
+    itemLocationRows.forEach((item) => {
       if (!item.location_id) return;
       countByLocationId.set(item.location_id, (countByLocationId.get(item.location_id) || 0) + 1);
     });
@@ -90,10 +138,11 @@ export async function GET() {
     const hgvById = new Map((hgvsResult.data || []).map((hgv) => [hgv.id, hgv]));
     const plantById = new Map((plantResult.data || []).map((asset) => [asset.id, asset]));
     const assignedUserNamesByLocationId = getAssignedUserNamesByLocationId(
-      (assignedUsersResult.data || []) as unknown as InventoryLocationAssigneeRow[]
+      (assignedUsersResult.data || []) as unknown as InventoryLocationAssigneeRow[],
+      (assignedSiteUsersResult.data || []) as unknown as InventoryLocationAssigneeRow[]
     );
 
-    const locations = (locationsResult.data || []).map((location) => ({
+    const locations = locationRows.map((location) => ({
       ...location,
       item_count: countByLocationId.get(location.id) || 0,
       assigned_user_names: assignedUserNamesByLocationId.get(location.id) || [],

@@ -31,6 +31,11 @@ import { InventoryGroupsPanel } from './components/InventoryGroupsPanel';
 import { InventoryLocationDialog } from './components/InventoryLocationDialog';
 import { InventoryLocationsPanel } from './components/InventoryLocationsPanel';
 import { InventoryRetireItemDialog } from './components/InventoryRetireItemDialog';
+import {
+  InventorySiteAssignmentsPanel,
+  type InventorySiteAssignment,
+  type InventorySiteAssignmentUser,
+} from './components/InventorySiteAssignmentsPanel';
 import { InventoryTable, type InventoryTableQuickFilter } from './components/InventoryTable';
 import { MoveInventoryDialog } from './components/MoveInventoryDialog';
 import {
@@ -71,6 +76,9 @@ export default function InventoryPage() {
   const [locations, setLocations] = useState<InventoryLocation[]>([]);
   const [fleetAssets, setFleetAssets] = useState<FleetAssetOption[]>([]);
   const [inventoryContext, setInventoryContext] = useState<InventoryContext | null>(null);
+  const [siteAssignmentUsers, setSiteAssignmentUsers] = useState<InventorySiteAssignmentUser[]>([]);
+  const [assignableSiteLocations, setAssignableSiteLocations] = useState<InventoryLocation[]>([]);
+  const [siteAssignments, setSiteAssignments] = useState<InventorySiteAssignment[]>([]);
   const [groups, setGroups] = useState<InventoryItemGroup[]>([]);
   const [categories, setCategories] = useState<InventoryItemCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,7 +111,16 @@ export default function InventoryPage() {
       }
 
       const isManagerOrAdmin = contextPayload.is_manager_or_admin === true;
-      const [{ items: inventoryItems }, { items: retiredInventoryItems }, locationsResponse, fleetAssetsResponse, categoriesResponse, groupsResponse] = await Promise.all([
+      const canManageSiteLocations = contextPayload.can_manage_site_locations === true;
+      const [
+        { items: inventoryItems },
+        { items: retiredInventoryItems },
+        locationsResponse,
+        fleetAssetsResponse,
+        categoriesResponse,
+        groupsResponse,
+        siteAssignmentsResponse,
+      ] = await Promise.all([
         fetchAllPaginatedItems<InventoryItem>('/api/inventory', 'inventory', {
           limit: 500,
           errorMessage: 'Failed to fetch inventory items',
@@ -118,6 +135,7 @@ export default function InventoryPage() {
         fetch('/api/inventory/fleet-assets', { cache: 'no-store' }),
         fetch('/api/inventory/categories', { cache: 'no-store' }),
         isManagerOrAdmin ? fetch('/api/inventory/groups', { cache: 'no-store' }) : Promise.resolve(null),
+        canManageSiteLocations ? fetch('/api/inventory/site-assignments', { cache: 'no-store' }) : Promise.resolve(null),
       ]);
 
       const locationsPayload = await locationsResponse.json();
@@ -140,6 +158,13 @@ export default function InventoryPage() {
         throw new Error(groupsPayload.error || 'Failed to fetch inventory groups');
       }
 
+      const siteAssignmentsPayload = siteAssignmentsResponse
+        ? await siteAssignmentsResponse.json()
+        : { active_sites: [], users: [], assignments: [] };
+      if (siteAssignmentsResponse && !siteAssignmentsResponse.ok) {
+        throw new Error(siteAssignmentsPayload.error || 'Failed to fetch Site assignments');
+      }
+
       setInventoryContext(contextPayload);
       setItems(inventoryItems);
       setRetiredItems(retiredInventoryItems);
@@ -147,6 +172,9 @@ export default function InventoryPage() {
       setFleetAssets(fleetAssetsPayload.assets || []);
       setCategories(categoriesPayload.categories || []);
       setGroups(groupsPayload.groups || []);
+      setSiteAssignmentUsers(siteAssignmentsPayload.users || []);
+      setAssignableSiteLocations(siteAssignmentsPayload.active_sites || []);
+      setSiteAssignments(siteAssignmentsPayload.assignments || []);
       setInventoryLoadError(null);
     } catch (error) {
       console.error('Error fetching inventory data:', error);
@@ -235,13 +263,16 @@ export default function InventoryPage() {
 
   const primaryLocationOptions = useMemo(
     () => locations.filter((location) => canSelectInventoryPrimaryLocation(location, {
-      currentLocationId: inventoryContext?.user_location?.location_id || null,
+      currentLocationId: inventoryContext?.is_user_location_valid === false
+        ? null
+        : inventoryContext?.user_location?.location_id || null,
       teamId: inventoryContext?.team_id || null,
       teamName: inventoryContext?.team_name || null,
     })),
     [
       inventoryContext?.team_id,
       inventoryContext?.team_name,
+      inventoryContext?.is_user_location_valid,
       inventoryContext?.user_location?.location_id,
       locations,
     ]
@@ -487,6 +518,28 @@ export default function InventoryPage() {
     toast.success('Location request sent');
   }
 
+  async function handleAssignSiteLocation({ userId, locationId }: { userId: string; locationId: string }) {
+    const response = await fetch('/api/inventory/site-assignments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, location_id: locationId }),
+    });
+    await parseJsonResponse(response, 'Failed to assign Site location');
+    toast.success('Site location assigned');
+    await fetchInventoryData();
+  }
+
+  async function handleRemoveSiteLocationAssignment({ userId, locationId }: { userId: string; locationId: string }) {
+    const response = await fetch('/api/inventory/site-assignments', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, location_id: locationId }),
+    });
+    await parseJsonResponse(response, 'Failed to remove Site location assignment');
+    toast.success('Site location assignment removed');
+    await fetchInventoryData();
+  }
+
   function buildInventoryCategoryPayload(data: InventoryItemCategoryFormData) {
     const sortOrder = Number.parseInt(data.sort_order, 10);
     return {
@@ -582,9 +635,12 @@ export default function InventoryPage() {
   }
 
   const isManagerOrAdmin = inventoryContext?.is_manager_or_admin === true;
-  const employeeLocationName = inventoryContext?.user_location?.location?.is_active === false
+  const employeeUserLocation = inventoryContext?.is_user_location_valid === false
     ? null
-    : inventoryContext?.user_location?.location?.name || null;
+    : inventoryContext?.user_location || null;
+  const employeeLocationName = employeeUserLocation?.location?.is_active === false
+    ? null
+    : employeeUserLocation?.location?.name || null;
 
   if (inventoryLoadError && !inventoryContext) {
     return (
@@ -626,11 +682,22 @@ export default function InventoryPage() {
           <InventoryLoadErrorNotice message={inventoryLoadError} onRetry={fetchInventoryData} />
         ) : null}
 
+        {inventoryContext?.can_manage_site_locations ? (
+          <InventorySiteAssignmentsPanel
+            users={siteAssignmentUsers}
+            activeSites={assignableSiteLocations}
+            assignments={siteAssignments}
+            onAssign={handleAssignSiteLocation}
+            onRemove={handleRemoveSiteLocationAssignment}
+          />
+        ) : null}
+
         <InventoryEmployeeView
           items={items}
           locations={primaryLocationOptions}
           categoryLabels={categoryLabels}
-          userLocation={inventoryContext?.user_location || null}
+          userLocation={employeeUserLocation}
+          secondarySiteLocations={inventoryContext?.secondary_site_locations || []}
           currentFleetAssignment={inventoryContext?.current_fleet_assignment || null}
           onSetUserLocation={handleSetUserLocation}
           onRequestLocation={handleRequestLocation}
@@ -649,7 +716,7 @@ export default function InventoryPage() {
         <ChangeInventoryLocationDialog
           open={changeLocationDialogOpen}
           locations={primaryLocationOptions}
-          userLocation={inventoryContext?.user_location || null}
+          userLocation={employeeUserLocation}
           onClose={() => setChangeLocationDialogOpen(false)}
           onSubmit={({ locationId, reason }) => handleSetUserLocation(locationId, reason)}
         />
@@ -875,6 +942,15 @@ export default function InventoryPage() {
               Add Location
             </Button>
           </div>
+          {inventoryContext?.can_manage_site_locations ? (
+            <InventorySiteAssignmentsPanel
+              users={siteAssignmentUsers}
+              activeSites={assignableSiteLocations}
+              assignments={siteAssignments}
+              onAssign={handleAssignSiteLocation}
+              onRemove={handleRemoveSiteLocationAssignment}
+            />
+          ) : null}
           <InventoryLocationsPanel
             locations={locations}
             fleetAssets={fleetAssets}
@@ -944,7 +1020,7 @@ export default function InventoryPage() {
       <ChangeInventoryLocationDialog
         open={changeLocationDialogOpen}
         locations={primaryLocationOptions}
-        userLocation={inventoryContext?.user_location || null}
+        userLocation={employeeUserLocation}
         allowUnset
         onClose={() => setChangeLocationDialogOpen(false)}
         onSubmit={({ locationId, reason }) => handleSetUserLocation(locationId, reason)}

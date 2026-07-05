@@ -90,6 +90,7 @@ export function canSelectInventoryPrimaryLocation(
   context: InventoryPrimaryLocationSelectionContext
 ): boolean {
   if (location.is_active === false) return false;
+  if (location.location_type === 'site') return false;
   if (location.id === context.currentLocationId) return true;
   if (canShareInventoryPrimaryLocation(location, context)) return true;
 
@@ -206,7 +207,9 @@ export function formatInventoryLocationOptionLabel(location: InventoryLocation):
     ? `[${linkedVanLabel}]`
     : null;
   const siteReferenceLabel = location.location_type === 'site' && location.external_reference
-    ? `[${location.external_reference}]`
+    ? location.source_type === 'legacy_quote'
+      ? `[Legacy ${location.external_reference}]`
+      : `[${location.external_reference}]`
     : null;
   const locationLabel = linkedAssetLabel || siteReferenceLabel || location.name;
 
