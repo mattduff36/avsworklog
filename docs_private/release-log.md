@@ -2,6 +2,26 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.3.0
+
+**GIT COMMIT MESSAGE**
+`feat(inventory): update Inventory, Data storage, Quotes, and Sign in`
+
+**PUSHED AT**
+2026-07-05T23:57:40.247Z
+
+**WHAT CHANGED**
+Update Inventory, Data storage, Quotes, and Sign in.
+
+**VERSION HISTORY DETAILS**
+- Updated Inventory, Data storage, Quotes, and Sign in, with changes to background routes, app screens, shared logic, automation scripts, automated tests, and data storage.
+- Updated data storage, with changes to shared typing, automation scripts, and data storage.
+- Updated quotes, with changes to automation scripts and data storage.
+- Updated sign in, with changes to shared logic.
+
+**COMMITS IN THIS RELEASE**
+- `feat(inventory): update Inventory, Data storage, Quotes, and Sign in`
+
 ## 0726.2.0
 
 **GIT COMMIT MESSAGE**
