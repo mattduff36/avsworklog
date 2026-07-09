@@ -553,7 +553,11 @@ function NewHgvInspectionContent() {
         return draft.id;
       } catch (err) {
         const errorContextId = 'hgv-inspections-new-silent-draft-save-error';
-        console.error('Silent draft save failed:', err, { errorContextId });
+        if (isNetworkFetchError(err)) {
+          console.warn('Silent HGV draft save skipped due transient network error', { errorContextId });
+        } else if (!isAuthErrorStatus(getErrorStatus(err))) {
+          console.error('Silent draft save failed:', err, { errorContextId });
+        }
         if (!silent) {
           toast.error('Could not auto-save draft. Please try again.', { id: errorContextId });
         }

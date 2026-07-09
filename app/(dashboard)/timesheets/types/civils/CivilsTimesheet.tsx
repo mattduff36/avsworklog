@@ -1414,7 +1414,6 @@ export function CivilsTimesheet({
           .eq('timesheet_id', timesheetId);
         
         if (deleteError) {
-          console.error('Error deleting timesheet entries:', deleteError);
           throw new Error(`Failed to delete timesheet entries: ${deleteError.message}`);
         }
       }
@@ -1463,7 +1462,6 @@ export function CivilsTimesheet({
         .select('id, day_of_week');
 
       if (entriesError) {
-        console.error('Error inserting timesheet entries:', entriesError);
         throw new Error(`Failed to insert timesheet entries: ${entriesError.message}`);
       }
 
@@ -1488,7 +1486,6 @@ export function CivilsTimesheet({
           .insert(jobCodesToInsert);
 
         if (jobCodesError) {
-          console.error('Error inserting timesheet entry job codes:', jobCodesError);
           throw new Error(`Failed to insert timesheet job codes: ${jobCodesError.message}`);
         }
       }
