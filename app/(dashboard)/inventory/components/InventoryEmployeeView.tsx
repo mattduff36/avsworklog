@@ -20,6 +20,7 @@ import type {
 } from '../types';
 import { InventoryLocationSelect } from './InventoryLocationSelect';
 import { InventoryTable } from './InventoryTable';
+import { HardwareQuantityRow } from './HardwareQuantityRow';
 import { HardwareTransferDialog } from './HardwareTransferDialog';
 
 const LOCATION_NOT_SHOWN_VALUE = '__location_not_shown__';
@@ -402,17 +403,11 @@ export function InventoryEmployeeView({
                   </div>
                   <div className="divide-y divide-slate-800">
                     {locationBalances.map((balance) => (
-                      <div
+                      <HardwareQuantityRow
                         key={`${balance.hardware_item_id}:${location.id}`}
-                        className="flex items-center justify-between gap-4 px-4 py-3"
-                      >
-                        <span className="text-sm text-slate-200">
-                          {hardwareItemById.get(balance.hardware_item_id)?.name || 'Hardware item'}
-                        </span>
-                        <Badge className="bg-inventory/15 font-mono text-inventory-light hover:bg-inventory/20">
-                          {balance.quantity.toLocaleString()}
-                        </Badge>
-                      </div>
+                        label={hardwareItemById.get(balance.hardware_item_id)?.name || 'Hardware item'}
+                        quantity={balance.quantity}
+                      />
                     ))}
                   </div>
                 </div>

@@ -21,13 +21,20 @@ Add quantity-based, non-serialised Hardware stock to the Inventory module withou
 - All active location types are eligible.
 - Managers and admins can view company totals and per-location balances.
 - Employee views show positive balances only.
-- Management stock matrices show only locations whose company-wide Hardware total is
-  positive. Zero item balances remain available within those stocked locations for
-  bulk stock operations.
+- The management Hardware Overview shows one expandable row per active Hardware item,
+  including items with zero company-wide stock. A missing Yard balance record is
+  treated as zero.
+- Managers can filter the unified Overview to items whose Yard balance is zero.
+  Expanded rows show positive location balances; zero balances are omitted.
+- Overview Add, Remove, and Recount selection remains scoped to concrete positive
+  non-Yard item/location rows for Yard-zero items. Yard-zero items with no positive
+  alternate balance remain visible but have no selectable balance.
 
 ### HW-003: Stock adjustments
 
 - Managers and admins can apply atomic multi-row Add, Remove, and Recount operations.
+- Manager and admin adjustment workflows are available from Inventory Overview >
+  Hardware, not Inventory Settings.
 - Managers and admins can record an incoming Delivery directly from any active
   catalogue item, including items with zero company-wide stock, by selecting an
   active destination location and entering a positive whole-number quantity.
@@ -38,6 +45,8 @@ Add quantity-based, non-serialised Hardware stock to the Inventory module withou
 ### HW-004: Transfers
 
 - Managers and admins can transfer stock between any two active Inventory locations.
+- Manager and admin transfer workflows are available from Inventory Overview >
+  Hardware.
 - Employees can transfer stock between any active Inventory locations when at
   least one side is their valid primary location or an assigned secondary Site
   location. This supports collecting stock into, or dispatching stock from,
@@ -57,13 +66,16 @@ Add quantity-based, non-serialised Hardware stock to the Inventory module withou
 ### HW-006: Manager experience
 
 - Inventory Overview includes a Hardware tab beside Small Tools and Minor Plant.
-- The tab shows one row per active Hardware type, its company-wide total, and expandable non-zero location balances.
-- Inventory Settings includes Hardware Stock management for catalogue maintenance, filtering, stock matrix operations, and transfers.
+- The tab is the unified operational Hardware workspace. It shows one row per active
+  Hardware type, its company-wide total, expandable non-zero location balances,
+  search and location filters, a Yard-zero filter, stock adjustments, and transfers.
+- Inventory Settings includes a Hardware Catalogue area for adding, renaming,
+  archiving, and restoring Hardware item types only.
 - The Hardware catalogue remains complete and actionable when an item has zero
-  company-wide stock. The zero-total omission applies to location result sets,
-  not catalogue entries.
-- Hardware locations with a zero aggregate quantity are not fetched or materialised
-  in overview or stock-matrix result sets.
+  company-wide stock. Incoming stock is recorded from the active item row in Overview.
+  The zero-total omission applies to location result sets, not catalogue entries.
+- Hardware locations with a zero aggregate quantity are not materialised in Overview
+  balance result sets.
 
 ### HW-007: Employee experience
 

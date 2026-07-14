@@ -29,7 +29,7 @@ import { InventoryItemDialog } from './components/InventoryItemDialog';
 import { InventoryEmployeeView } from './components/InventoryEmployeeView';
 import { InventoryGroupsPanel } from './components/InventoryGroupsPanel';
 import { HardwareOverviewPanel } from './components/HardwareOverviewPanel';
-import { HardwareStockPanel } from './components/HardwareStockPanel';
+import { HardwareCataloguePanel } from './components/HardwareCataloguePanel';
 import { InventoryLocationDialog } from './components/InventoryLocationDialog';
 import { InventoryLocationsPanel } from './components/InventoryLocationsPanel';
 import { InventoryRetireItemDialog } from './components/InventoryRetireItemDialog';
@@ -72,6 +72,28 @@ interface ConfirmActionState {
   onConfirm: () => Promise<void>;
 }
 
+type InventoryOverviewTab = 'small_tools' | 'minor_plant' | 'hardware' | 'retired';
+
+function getInventoryOverviewHref(overviewTab: InventoryOverviewTab): string {
+  const overviewByTab: Record<InventoryOverviewTab, string> = {
+    small_tools: 'small-tools',
+    minor_plant: 'minor-plant',
+    hardware: 'hardware',
+    retired: 'retired',
+  };
+  return `/inventory?overview=${overviewByTab[overviewTab]}`;
+}
+
+function getInventoryOverviewTab(requestedOverview: string | null): InventoryOverviewTab {
+  const tabByOverview: Record<string, InventoryOverviewTab> = {
+    'small-tools': 'small_tools',
+    'minor-plant': 'minor_plant',
+    hardware: 'hardware',
+    retired: 'retired',
+  };
+  return requestedOverview ? tabByOverview[requestedOverview] || 'small_tools' : 'small_tools';
+}
+
 function getUniqueInventoryLocations(
   candidates: Array<InventoryLocation | null | undefined>,
 ): InventoryLocation[] {
@@ -105,7 +127,7 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [inventoryLoadError, setInventoryLoadError] = useState<string | null>(null);
   const [pageTab, setPageTab] = useState<'overview' | 'locations' | 'settings'>('overview');
-  const [overviewTab, setOverviewTab] = useState<'small_tools' | 'minor_plant' | 'hardware' | 'retired'>('small_tools');
+  const [overviewTab, setOverviewTab] = useState<InventoryOverviewTab>('small_tools');
   const [settingsTab, setSettingsTab] = useState<'categories' | 'groups' | 'hardware'>('categories');
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
@@ -248,15 +270,7 @@ export default function InventoryPage() {
     }
 
     setPageTab('overview');
-    setOverviewTab(
-      requestedOverview === 'retired'
-        ? 'retired'
-        : requestedOverview === 'minor-plant'
-          ? 'minor_plant'
-          : requestedOverview === 'hardware'
-            ? 'hardware'
-            : 'small_tools',
-    );
+    setOverviewTab(getInventoryOverviewTab(requestedOverview));
   }, [searchParams]);
 
   const summary = useMemo(() => {
@@ -366,7 +380,7 @@ export default function InventoryPage() {
       : overviewTab;
     setPageTab('overview');
     setOverviewTab(nextOverviewTab);
-    router.push(nextOverviewTab === 'minor_plant' ? '/inventory?overview=minor-plant' : '/inventory', { scroll: false });
+    router.push(getInventoryOverviewHref(nextOverviewTab), { scroll: false });
   }
 
   function applyInventorySummaryFilter(params: {
@@ -939,16 +953,7 @@ export default function InventoryPage() {
             return;
           }
           setPageTab('overview');
-          router.push(
-            overviewTab === 'retired'
-              ? '/inventory?overview=retired'
-              : overviewTab === 'minor_plant'
-                ? '/inventory?overview=minor-plant'
-                : overviewTab === 'hardware'
-                  ? '/inventory?overview=hardware'
-                  : '/inventory',
-            { scroll: false },
-          );
+          router.push(getInventoryOverviewHref(overviewTab), { scroll: false });
         }}
       >
         <TabsList>
@@ -987,7 +992,7 @@ export default function InventoryPage() {
                 </TabsTrigger>
                 <TabsTrigger value="hardware" className="gap-2">
                   <Boxes className="h-4 w-4" />
-                  Hardware Stock
+                  Hardware Catalogue
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -998,18 +1003,9 @@ export default function InventoryPage() {
           <Tabs
             value={overviewTab}
             onValueChange={(value) => {
-              const nextOverviewTab = value as 'small_tools' | 'minor_plant' | 'hardware' | 'retired';
+              const nextOverviewTab = value as InventoryOverviewTab;
               setOverviewTab(nextOverviewTab);
-              router.push(
-                nextOverviewTab === 'retired'
-                  ? '/inventory?overview=retired'
-                  : nextOverviewTab === 'minor_plant'
-                    ? '/inventory?overview=minor-plant'
-                    : nextOverviewTab === 'hardware'
-                      ? '/inventory?overview=hardware'
-                      : '/inventory',
-                { scroll: false },
-              );
+              router.push(getInventoryOverviewHref(nextOverviewTab), { scroll: false });
             }}
           >
             <div className="flex justify-end">
@@ -1041,7 +1037,7 @@ export default function InventoryPage() {
                 onSelectedItemIdsChange={setSelectedItemIds}
                 onDelete={setRetiringItem}
                 onMove={setMovingItems}
-                onOpenDetails={(item) => router.push('/inventory/items/' + item.id + '?fromTab=overview')}
+                onOpenDetails={(item) => router.push('/inventory/items/' + item.id + '?fromTab=overview&overview=small-tools')}
                 locationFilterLocations={smallToolsLocations}
                 categoryLabels={categoryLabels}
                 tableLabel="small tools"
@@ -1072,6 +1068,9 @@ export default function InventoryPage() {
               <HardwareOverviewPanel
                 items={hardwareItems}
                 balances={hardwareBalances}
+                locations={knownLocations}
+                onAdjust={handleHardwareAdjustment}
+                onTransfer={handleHardwareTransfer}
               />
             </TabsContent>
 
@@ -1142,14 +1141,11 @@ export default function InventoryPage() {
           ) : null}
 
           {settingsTab === 'hardware' ? (
-            <HardwareStockPanel
+            <HardwareCataloguePanel
               items={hardwareItems}
               balances={hardwareBalances}
-              locations={hardwareLocations}
               onCreateItem={handleCreateHardwareItem}
               onUpdateItem={handleUpdateHardwareItem}
-              onAdjust={handleHardwareAdjustment}
-              onTransfer={handleHardwareTransfer}
             />
           ) : null}
         </TabsContent>

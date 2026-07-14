@@ -22,6 +22,28 @@ test.describe('@inventory @critical Inventory', () => {
     });
   });
 
+  test('explicit Small Tools and Hardware overview deep links are reachable', async ({ page }) => {
+    await gotoWithTimeoutSkip(
+      page,
+      '/inventory?overview=small-tools',
+      'Small Tools inventory route timed out in this environment',
+    );
+    await expect(page).toHaveURL(/\/inventory\?overview=small-tools$/);
+    await expect(page.locator('body')).toContainText(/inventory|small tools|item/i, {
+      timeout: 10_000,
+    });
+
+    await gotoWithTimeoutSkip(
+      page,
+      '/inventory?overview=hardware',
+      'Hardware inventory route timed out in this environment',
+    );
+    await expect(page).toHaveURL(/\/inventory\?overview=hardware$/);
+    await expect(page.locator('body')).toContainText(/inventory|hardware|stock/i, {
+      timeout: 10_000,
+    });
+  });
+
   test('Yard kiosk is isolated from the dashboard and fails closed for non-kiosk accounts', async ({ page }) => {
     await gotoWithTimeoutSkip(page, '/yard-kiosk', 'Yard kiosk route timed out in this environment');
 
