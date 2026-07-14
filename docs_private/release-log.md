@@ -2,6 +2,28 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.4.0
+
+**GIT COMMIT MESSAGE**
+`feat(daily-tasks): update daily tasks`
+
+**PUSHED AT**
+2026-07-14T10:41:14.740Z
+
+**WHAT CHANGED**
+Update daily tasks. Track quantity-based hardware stock. Suppress HGV save network console errors.
+
+**VERSION HISTORY DETAILS**
+- Track quantity-based hardware stock, with changes to background routes, app screens, shared logic, automation scripts, automated tests, data storage, and documentation.
+- Updated data storage, with changes to shared typing, automation scripts, and data storage.
+- Updated help and FAQ, with changes to documentation.
+- Updated daily tasks, with changes to app screens and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(daily-tasks): update daily tasks`
+- `feat(inventory): track quantity-based hardware stock`
+- `fix(runtime): suppress HGV save network console errors`
+
 ## 0726.3.1
 
 **GIT COMMIT MESSAGE**

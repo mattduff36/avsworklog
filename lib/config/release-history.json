@@ -1,5 +1,27 @@
 [
   {
+    "version": "0726.4.0",
+    "updateKind": "major",
+    "title": "Daily Tasks update",
+    "description": "Updated daily tasks. Track quantity-based hardware stock. Suppress HGV save network console errors.",
+    "summary": "Updated daily tasks. Track quantity-based hardware stock. Suppress HGV save network console errors.",
+    "details": [
+      "Track quantity-based hardware stock, with changes to background routes, app screens, shared logic, automation scripts, automated tests, data storage, and documentation.",
+      "Updated data storage, with changes to shared typing, automation scripts, and data storage.",
+      "Updated help and FAQ, with changes to documentation.",
+      "Updated daily tasks, with changes to app screens and automated tests."
+    ],
+    "areas": [
+      "Daily Tasks",
+      "Inventory"
+    ],
+    "areaKeys": [
+      "daily-tasks",
+      "inventory"
+    ],
+    "pushedAt": "2026-07-14T10:41:14.740Z"
+  },
+  {
     "version": "0726.3.1",
     "updateKind": "minor",
     "title": "Runtime improvements",
