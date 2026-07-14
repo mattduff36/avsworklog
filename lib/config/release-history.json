@@ -1,5 +1,23 @@
 [
   {
+    "version": "0726.6.1",
+    "updateKind": "minor",
+    "title": "Inventory improvements",
+    "description": "Restore employee Hardware transfers. Integrate Yard inventory kiosk.",
+    "summary": "Restore employee Hardware transfers. Integrate Yard inventory kiosk.",
+    "details": [
+      "Restore employee Hardware transfers, with changes to background routes, app screens, automated tests, and documentation.",
+      "Updated help and FAQ, with changes to documentation."
+    ],
+    "areas": [
+      "Inventory"
+    ],
+    "areaKeys": [
+      "inventory"
+    ],
+    "pushedAt": "2026-07-14T16:31:50.683Z"
+  },
+  {
     "version": "0726.6.0",
     "updateKind": "major",
     "title": "Dashboard update",
