@@ -2,6 +2,36 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.7.0
+
+**GIT COMMIT MESSAGE**
+`feat(inventory): update Inventory, Help and FAQ, Sign in, and Quotes`
+
+**PUSHED AT**
+2026-07-14T20:05:55.583Z
+
+**WHAT CHANGED**
+Update Inventory, Help and FAQ, Sign in, and Quotes. Replace Hardware archive with deletion. Remove Yard-zero row badges. Unify hardware stock workflow. Restore employee Hardware transfers.
+
+**VERSION HISTORY DETAILS**
+- Updated Inventory, Help and FAQ, Sign in, and Quotes, with changes to background routes, app screens, shared logic, automation scripts, automated tests, data storage, and documentation.
+- Updated help and FAQ, with changes to documentation.
+- Updated data storage, with changes to automation scripts and data storage.
+- Updated sign in, with changes to background routes and automated tests.
+- Updated quotes, with changes to app screens.
+- Updated navigation, with changes to shared logic.
+
+**COMMITS IN THIS RELEASE**
+- `feat(inventory): update Inventory, Help and FAQ, Sign in, and Quotes`
+- `feat(inventory): replace Hardware archive with deletion`
+- `fix(inventory): remove Yard-zero row badges`
+- `feat(inventory): unify hardware stock workflow`
+- `merge: restore employee Hardware transfers`
+
+# Production release log
+
+Private changelog for production builds. Newest entries first.
+
 ## 0726.6.1
 
 **GIT COMMIT MESSAGE**

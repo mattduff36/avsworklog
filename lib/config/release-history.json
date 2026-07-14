@@ -1,5 +1,31 @@
 [
   {
+    "version": "0726.7.0",
+    "updateKind": "major",
+    "title": "Inventory update",
+    "description": "Updated Inventory, Help and FAQ, Sign in, and Quotes. Replace Hardware archive with deletion. Remove Yard-zero row badges. Unify hardware stock workflow. Restore employee Hardware transfers.",
+    "summary": "Updated Inventory, Help and FAQ, Sign in, and Quotes. Replace Hardware archive with deletion. Remove Yard-zero row badges. Unify hardware stock workflow. Restore employee Hardware transfers.",
+    "details": [
+      "Updated Inventory, Help and FAQ, Sign in, and Quotes, with changes to background routes, app screens, shared logic, automation scripts, automated tests, data storage, and documentation.",
+      "Updated help and FAQ, with changes to documentation.",
+      "Updated data storage, with changes to automation scripts and data storage.",
+      "Updated sign in, with changes to background routes and automated tests.",
+      "Updated quotes, with changes to app screens.",
+      "Updated navigation, with changes to shared logic."
+    ],
+    "areas": [
+      "Inventory",
+      "Help",
+      "FAQ",
+      "Sign in"
+    ],
+    "areaKeys": [
+      "inventory",
+      "sign-in"
+    ],
+    "pushedAt": "2026-07-14T20:05:55.583Z"
+  },
+  {
     "version": "0726.6.1",
     "updateKind": "minor",
     "title": "Inventory improvements",
