@@ -17,6 +17,9 @@ active Inventory location.
   `/yard-kiosk` before any general redirect target.
 - If automatic launch does not complete, the configured kiosk profile alone
   sees a primary-dashboard `Launch Kiosk` tile linking to `/yard-kiosk`.
+- If the configured kiosk profile remains on `/dashboard`, the dashboard
+  automatically replaces that route with `/yard-kiosk` after 10 seconds.
+  Navigating elsewhere during the delay cancels the fallback launch.
 - On `/yard-kiosk`, the configured kiosk profile is offered biometric
   enrollment when the dedicated device has no active credential and its prompt
   has not been dismissed. Enrollment and dismissal remain bound to that single
@@ -80,6 +83,9 @@ active Inventory location.
 
 - The tablet signs in through the normal application login and relies on
   operating-system kiosk mode. There is no in-app dashboard exit.
+- The Yard Inventory logo remains available throughout the kiosk workflow.
+  Holding it for three seconds reveals a hidden admin menu containing only
+  `Log out`; logout requires confirmation and returns the device to sign-in.
 - Recoverable errors preserve the basket, offline state blocks submission, and
   duplicate submissions are prevented.
 - Success shows a large receipt and automatically resets for the next

@@ -21,6 +21,7 @@ import type {
 } from '@/lib/inventory/kiosk-types';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { YardKioskBasket } from './YardKioskBasket';
+import { YardKioskAdminMenu } from './YardKioskAdminMenu';
 import { YardKioskItemPicker } from './YardKioskItemPicker';
 import { YardKioskLocationPager } from './YardKioskLocationPager';
 import { YardKioskModeSelect } from './YardKioskModeSelect';
@@ -178,6 +179,7 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
       />
       <header className="flex items-center justify-between border-b border-white/10 bg-slate-950/75 px-6 backdrop-blur-xl">
         <div className="flex items-center gap-4">
+          <YardKioskAdminMenu disabled={state.phase === 'submitting'} />
           {showBack ? (
             <button
               type="button"
@@ -190,11 +192,7 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
             >
               <ArrowLeft className="h-7 w-7" />
             </button>
-          ) : (
-            <span className="grid h-12 w-12 place-items-center rounded-2xl bg-amber-300 text-slate-950">
-              <PackageOpen className="h-7 w-7" />
-            </span>
-          )}
+          ) : null}
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-black tracking-tight">Yard Inventory</h1>

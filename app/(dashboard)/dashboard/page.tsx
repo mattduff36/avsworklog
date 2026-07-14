@@ -31,6 +31,7 @@ import { usePermissionSnapshot } from '@/lib/hooks/usePermissionSnapshot';
 import { useRamsAssignmentSummary } from '@/lib/hooks/useNavMetrics';
 import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError, createStatusError } from '@/lib/utils/http-error';
 import { canAccessDebugConsole } from '@/lib/utils/debug-access';
+import { YardKioskAutoLaunch } from './components/YardKioskAutoLaunch';
 
 type PendingApprovalCount = {
   type: 'timesheets' | 'absences';
@@ -466,6 +467,7 @@ export default function DashboardPage() {
 
   return (
     <AppPageShell className="space-y-8">
+      <YardKioskAutoLaunch enabled={canLaunchYardKiosk} />
       
       {!tabletModeEnabled && !isDashboardLoading && (
         <div className="bg-slate-900 rounded-lg p-4 md:p-5 border border-slate-700 relative overflow-hidden">
