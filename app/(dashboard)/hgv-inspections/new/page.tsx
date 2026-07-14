@@ -1281,9 +1281,16 @@ function NewHgvInspectionContent() {
         toast.success('Draft saved');
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to save inspection';
       const errorContextId = 'hgv-inspections-new-save-inspection-error';
-      console.error('Error saving HGV inspection:', err, { errorContextId });
+      const isNetworkError = isNetworkFetchError(err);
+      const message = isNetworkError
+        ? 'Could not save inspection because the network request failed. Please check your connection and try again.'
+        : err instanceof Error ? err.message : 'Failed to save inspection';
+      if (isNetworkError) {
+        console.warn('HGV inspection save failed due transient network error', { errorContextId });
+      } else if (!isAuthErrorStatus(getErrorStatus(err))) {
+        console.error('Error saving HGV inspection:', err, { errorContextId });
+      }
       setError(message);
       toast.error(message, { id: errorContextId });
     } finally {
