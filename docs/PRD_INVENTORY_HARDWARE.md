@@ -8,9 +8,10 @@ Add quantity-based, non-serialised Hardware stock to the Inventory module withou
 
 ### HW-001: Shared catalogue
 
-- Managers and admins can add, rename, and archive Hardware item types.
+- Managers and admins can add, rename, and delete unused Hardware item types.
 - The catalogue is ordered alphabetically by name; manual sort order is not exposed or accepted by the application.
-- An item type cannot be archived while any location has a non-zero balance.
+- An item type cannot be deleted after a balance or immutable audit-history record
+  references it.
 - The initial active catalogue contains Heras fencing, Cones, Cone tops, Road plates,
   Derv tank, Machine breaker, Floor saw, Generator, and Tamp.
 - Initial balances are zero.
@@ -21,7 +22,7 @@ Add quantity-based, non-serialised Hardware stock to the Inventory module withou
 - All active location types are eligible.
 - Managers and admins can view company totals and per-location balances.
 - Employee views show positive balances only.
-- The management Hardware Overview shows one expandable row per active Hardware item,
+- The management Hardware Overview shows one expandable row per Hardware item,
   including items with zero company-wide stock. A missing Yard balance record is
   treated as zero.
 - Managers can filter the unified Overview to items whose Yard balance is zero.
@@ -35,7 +36,7 @@ Add quantity-based, non-serialised Hardware stock to the Inventory module withou
 - Managers and admins can apply atomic multi-row Add, Remove, and Recount operations.
 - Manager and admin adjustment workflows are available from Inventory Overview >
   Hardware, not Inventory Settings.
-- Managers and admins can record an incoming Delivery directly from any active
+- Managers and admins can record an incoming Delivery directly from any
   catalogue item, including items with zero company-wide stock, by selecting an
   active destination location and entering a positive whole-number quantity.
 - Every adjustment requires a standard reason: Delivery, Return, Used, Lost, Scrapped, Damaged, Stocktake correction, or Other.
@@ -66,11 +67,11 @@ Add quantity-based, non-serialised Hardware stock to the Inventory module withou
 ### HW-006: Manager experience
 
 - Inventory Overview includes a Hardware tab beside Small Tools and Minor Plant.
-- The tab is the unified operational Hardware workspace. It shows one row per active
+- The tab is the unified operational Hardware workspace. It shows one row per
   Hardware type, its company-wide total, expandable non-zero location balances,
   search and location filters, a Yard-zero filter, stock adjustments, and transfers.
 - Inventory Settings includes a Hardware Catalogue area for adding, renaming,
-  archiving, and restoring Hardware item types only.
+  and deleting unused Hardware item types only.
 - The Hardware catalogue remains complete and actionable when an item has zero
   company-wide stock. Incoming stock is recorded from the active item row in Overview.
   The zero-total omission applies to location result sets, not catalogue entries.
@@ -89,7 +90,8 @@ Add quantity-based, non-serialised Hardware stock to the Inventory module withou
 ### HW-008: Access control
 
 - Reading Hardware requires Inventory module access.
-- Catalogue and adjustment writes require manager/admin Inventory access.
+- Catalogue create, rename, delete, and adjustment writes require manager/admin
+  Inventory access.
 - Transfer authorization is revalidated by the API for every request.
 - Yard kiosk authorization is revalidated independently and does not grant its
   profile manager, catalogue, adjustment, or ordinary unrestricted transfer access.

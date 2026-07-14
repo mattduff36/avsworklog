@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Archive, Boxes, Pencil, RotateCcw } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { Boxes, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -18,8 +17,9 @@ interface HardwareCataloguePanelProps {
   onCreateItem: (data: { name: string }) => Promise<void>;
   onUpdateItem: (
     item: InventoryHardwareItem,
-    data: { name?: string; is_active?: boolean },
+    data: { name: string },
   ) => Promise<void>;
+  onRemoveItem: (item: InventoryHardwareItem) => Promise<void>;
 }
 
 export function HardwareCataloguePanel({
@@ -27,6 +27,7 @@ export function HardwareCataloguePanel({
   balances,
   onCreateItem,
   onUpdateItem,
+  onRemoveItem,
 }: HardwareCataloguePanelProps) {
   const [editingItem, setEditingItem] = useState<InventoryHardwareItem | null>(null);
   const [catalogueName, setCatalogueName] = useState('');
@@ -90,16 +91,14 @@ export function HardwareCataloguePanel({
             </p>
           ) : sortedItems.map((item) => {
             const total = totalByItem.get(item.id) || 0;
+            const canDelete = item.can_delete ?? total === 0;
             return (
               <div
                 key={item.id}
                 className="flex flex-col gap-3 rounded-lg border border-slate-700 bg-slate-800/50 p-3 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-white">{item.name}</span>
-                    {!item.is_active ? <Badge variant="secondary">Archived</Badge> : null}
-                  </div>
+                  <span className="font-semibold text-white">{item.name}</span>
                   <p className="mt-1 text-xs text-muted-foreground">
                     Total stock: {total.toLocaleString()} units
                   </p>
@@ -110,16 +109,17 @@ export function HardwareCataloguePanel({
                     Edit
                   </Button>
                   <Button
-                    size="sm"
+                    size="icon"
                     variant="outline"
-                    disabled={item.is_active && total > 0}
-                    title={item.is_active && total > 0 ? 'Reduce all balances to zero before archiving' : undefined}
-                    onClick={() => onUpdateItem(item, { is_active: !item.is_active })}
+                    disabled={!canDelete}
+                    title={canDelete
+                      ? 'Delete Hardware item'
+                      : 'Hardware items with stock balances or audit history cannot be deleted'}
+                    aria-label={`Delete ${item.name}`}
+                    onClick={() => onRemoveItem(item)}
+                    className="border-red-500/30 text-red-300 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    {item.is_active
-                      ? <Archive className="mr-1 h-3.5 w-3.5" />
-                      : <RotateCcw className="mr-1 h-3.5 w-3.5" />}
-                    {item.is_active ? 'Archive' : 'Restore'}
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               </div>

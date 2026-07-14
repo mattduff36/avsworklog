@@ -696,7 +696,7 @@ export default function InventoryPage() {
 
   async function handleUpdateHardwareItem(
     item: InventoryHardwareItem,
-    data: { name?: string; is_active?: boolean },
+    data: { name: string },
   ) {
     const response = await fetch(`/api/inventory/hardware/${item.id}`, {
       method: 'PATCH',
@@ -704,8 +704,29 @@ export default function InventoryPage() {
       body: JSON.stringify(data),
     });
     await parseJsonResponse(response, 'Failed to update Hardware item');
-    toast.success(data.is_active === false ? 'Hardware item archived' : data.is_active === true ? 'Hardware item restored' : 'Hardware item updated');
+    toast.success('Hardware item updated');
     await fetchInventoryData();
+  }
+
+  async function handleRemoveHardwareItem(item: InventoryHardwareItem) {
+    if (item.can_delete === false) {
+      toast.error('Hardware items with stock balances or audit history cannot be deleted');
+      return;
+    }
+
+    setConfirmAction({
+      title: `Delete ${item.name}?`,
+      description: 'This permanently removes the Hardware item from the catalogue.',
+      actionLabel: 'Delete Hardware Item',
+      onConfirm: async () => {
+        const response = await fetch(`/api/inventory/hardware/${item.id}`, {
+          method: 'DELETE',
+        });
+        await parseJsonResponse(response, 'Failed to delete Hardware item');
+        toast.success('Hardware item deleted');
+        await fetchInventoryData();
+      },
+    });
   }
 
   async function handleHardwareAdjustment(payload: InventoryHardwareAdjustmentPayload) {
@@ -1146,6 +1167,7 @@ export default function InventoryPage() {
               balances={hardwareBalances}
               onCreateItem={handleCreateHardwareItem}
               onUpdateItem={handleUpdateHardwareItem}
+              onRemoveItem={handleRemoveHardwareItem}
             />
           ) : null}
         </TabsContent>

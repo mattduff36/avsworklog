@@ -91,6 +91,7 @@ export interface InventoryHardwareItem {
   created_by: string | null;
   updated_by: string | null;
   total_quantity?: number;
+  can_delete?: boolean;
 }
 
 export interface InventoryHardwareBalance {

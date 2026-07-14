@@ -74,9 +74,11 @@ describe('Inventory Hardware catalogue route', () => {
     expect(itemQuery.order).toHaveBeenNthCalledWith(2, 'id', { ascending: true });
     expect(balanceQuery.gt).toHaveBeenCalledWith('quantity', 0);
     expect(payload.items[0].total_quantity).toBe(5);
+    expect(payload.items[0].can_delete).toBe(false);
     expect(payload.items[1]).toMatchObject({
       id: 'fencing',
       total_quantity: 0,
+      can_delete: true,
     });
     expect(payload.balances).toHaveLength(1);
   });

@@ -9,17 +9,18 @@ import type { InventoryHardwareItem } from '@/app/(dashboard)/inventory/types';
 function makeHardwareItem(
   id: string,
   name: string,
-  isActive = true,
+  canDelete?: boolean,
 ): InventoryHardwareItem {
   return {
     id,
     name,
     name_normalized: name.toLowerCase(),
-    is_active: isActive,
+    is_active: true,
     created_at: '2026-07-14T00:00:00.000Z',
     updated_at: '2026-07-14T00:00:00.000Z',
     created_by: null,
     updated_by: null,
+    can_delete: canDelete,
   };
 }
 
@@ -39,6 +40,7 @@ describe('HardwareCataloguePanel', () => {
         }]}
         onCreateItem={vi.fn()}
         onUpdateItem={vi.fn()}
+        onRemoveItem={vi.fn()}
       />,
     );
 
@@ -62,6 +64,7 @@ describe('HardwareCataloguePanel', () => {
         balances={[]}
         onCreateItem={onCreateItem}
         onUpdateItem={onUpdateItem}
+        onRemoveItem={vi.fn()}
       />,
     );
 
@@ -79,14 +82,14 @@ describe('HardwareCataloguePanel', () => {
     });
   });
 
-  it('blocks archiving stocked items and restores archived items', () => {
-    const stocked = makeHardwareItem('stocked', 'Stocked');
-    const archived = makeHardwareItem('archived', 'Archived', false);
-    const onUpdateItem = vi.fn().mockResolvedValue(undefined);
+  it('shows the category-style delete icon only for unused items', () => {
+    const stocked = makeHardwareItem('stocked', 'Stocked', false);
+    const unused = makeHardwareItem('unused', 'Unused', true);
+    const onRemoveItem = vi.fn().mockResolvedValue(undefined);
 
     render(
       <HardwareCataloguePanel
-        items={[stocked, archived]}
+        items={[stocked, unused]}
         balances={[{
           id: 'stocked-balance',
           hardware_item_id: stocked.id,
@@ -94,12 +97,14 @@ describe('HardwareCataloguePanel', () => {
           quantity: 1,
         }]}
         onCreateItem={vi.fn()}
-        onUpdateItem={onUpdateItem}
+        onUpdateItem={vi.fn()}
+        onRemoveItem={onRemoveItem}
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Archive' })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: 'Restore' }));
-    expect(onUpdateItem).toHaveBeenCalledWith(archived, { is_active: true });
+    expect(screen.getByRole('button', { name: 'Delete Stocked' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Unused' }));
+    expect(onRemoveItem).toHaveBeenCalledWith(unused);
+    expect(screen.queryByText('Archived')).not.toBeInTheDocument();
   });
 });

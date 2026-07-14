@@ -40,13 +40,39 @@ export async function GET() {
       `)
       .gt('quantity', 0);
 
-    const [{ data: items, error: itemsError }, { data: balances, error: balancesError }] = await Promise.all([
+    const balanceReferenceQuery = access.isManagerOrAdmin
+      ? admin
+        .from('inventory_hardware_balances')
+        .select('hardware_item_id')
+      : Promise.resolve({
+        data: [] as Array<{ hardware_item_id: string }>,
+        error: null,
+      });
+    const transactionReferenceQuery = access.isManagerOrAdmin
+      ? admin
+        .from('inventory_hardware_transactions')
+        .select('hardware_item_id')
+      : Promise.resolve({
+        data: [] as Array<{ hardware_item_id: string }>,
+        error: null,
+      });
+
+    const [
+      { data: items, error: itemsError },
+      { data: balances, error: balancesError },
+      { data: balanceReferences, error: balanceReferencesError },
+      { data: transactionReferences, error: transactionReferencesError },
+    ] = await Promise.all([
       itemQuery,
       balanceQuery,
+      balanceReferenceQuery,
+      transactionReferenceQuery,
     ]);
 
     if (itemsError) throw itemsError;
     if (balancesError) throw balancesError;
+    if (balanceReferencesError) throw balanceReferencesError;
+    if (transactionReferencesError) throw transactionReferencesError;
 
     const totals = new Map<string, number>();
     for (const balance of balances || []) {
@@ -55,11 +81,16 @@ export async function GET() {
         (totals.get(balance.hardware_item_id) || 0) + balance.quantity,
       );
     }
+    const referencedItemIds = new Set([
+      ...(balanceReferences || []).map((balance) => balance.hardware_item_id),
+      ...(transactionReferences || []).map((transaction) => transaction.hardware_item_id),
+    ]);
 
     return NextResponse.json({
       items: (items || []).map((item) => ({
         ...item,
         total_quantity: totals.get(item.id) || 0,
+        can_delete: access.isManagerOrAdmin && !referencedItemIds.has(item.id),
       })),
       balances: balances || [],
       responsible_location_ids: responsibleLocationIds || [],
