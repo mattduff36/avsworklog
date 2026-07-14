@@ -105,6 +105,20 @@ export function InventoryEmployeeView({
     () => new Map(hardwareItems.map((item) => [item.id, item])),
     [hardwareItems],
   );
+  const hardwareTransferLocations = useMemo(() => {
+    const locationsById = new Map(
+      responsibleHardwareLocations.map((location) => [location.id, location]),
+    );
+    for (const balance of hardwareBalances) {
+      if (balance.quantity > 0 && balance.location?.is_active !== false) {
+        if (balance.location) locationsById.set(balance.location.id, balance.location);
+      }
+    }
+    return [...locationsById.values()];
+  }, [hardwareBalances, responsibleHardwareLocations]);
+  const hasTransferableHardware = hardwareBalances.some((balance) => (
+    balance.quantity > 0 && hardwareItemById.get(balance.hardware_item_id)?.is_active === true
+  ));
   const positiveHardwareByLocation = useMemo(() => {
     const grouped = new Map<string, InventoryHardwareBalance[]>();
     for (const balance of hardwareBalances) {
@@ -357,7 +371,7 @@ export function InventoryEmployeeView({
               Quantity stock held at locations you are responsible for.
             </p>
           </div>
-          {onTransferHardware && responsibleHardwareLocations.length > 1 ? (
+          {onTransferHardware && hasTransferableHardware ? (
             <Button variant="outline" onClick={() => setHardwareTransferOpen(true)} className="shrink-0 border-slate-600">
               <ArrowRightLeft className="mr-2 h-4 w-4" />
               Transfer
@@ -438,8 +452,8 @@ export function InventoryEmployeeView({
           open={hardwareTransferOpen}
           items={hardwareItems}
           balances={hardwareBalances}
-          locations={responsibleHardwareLocations}
-          eligibleLocationIds={responsibleHardwareLocations.map((location) => location.id)}
+          locations={hardwareTransferLocations}
+          responsibleLocationIds={responsibleHardwareLocations.map((location) => location.id)}
           onClose={() => setHardwareTransferOpen(false)}
           onSubmit={onTransferHardware}
         />

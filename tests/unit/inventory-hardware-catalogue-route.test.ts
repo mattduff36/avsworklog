@@ -17,6 +17,7 @@ vi.mock('@/lib/server/inventory-hardware', () => ({
 import { GET, POST } from '@/app/api/inventory/hardware/route';
 import { requireInventoryAccess, requireInventoryManagerAccess } from '@/lib/server/inventory-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getResponsibleHardwareLocationIds } from '@/lib/server/inventory-hardware';
 
 function buildResolvedQuery(data: unknown[]) {
   const result = { data, error: null };
@@ -78,6 +79,37 @@ describe('Inventory Hardware catalogue route', () => {
       total_quantity: 0,
     });
     expect(payload.balances).toHaveLength(1);
+  });
+
+  it('returns company-wide positive source balances to employees', async () => {
+    vi.mocked(requireInventoryAccess).mockResolvedValue({
+      allowed: true,
+      status: 200,
+      userId: 'employee-1',
+      isManagerOrAdmin: false,
+    });
+    vi.mocked(getResponsibleHardwareLocationIds).mockResolvedValue(['van-location']);
+
+    const itemQuery = buildResolvedQuery([
+      { id: 'cones', name: 'Cones', is_active: true },
+    ]);
+    const balanceQuery = buildResolvedQuery([
+      { hardware_item_id: 'cones', location_id: 'yard-location', quantity: 20 },
+      { hardware_item_id: 'cones', location_id: 'van-location', quantity: 2 },
+    ]);
+    vi.mocked(createAdminClient).mockReturnValue({
+      from(table: string) {
+        return table === 'inventory_hardware_items' ? itemQuery : balanceQuery;
+      },
+    } as never);
+
+    const response = await GET();
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(balanceQuery.in).not.toHaveBeenCalled();
+    expect(payload.balances).toHaveLength(2);
+    expect(payload.responsible_location_ids).toEqual(['van-location']);
   });
 
   it('does not accept or persist a client-provided sort order', async () => {

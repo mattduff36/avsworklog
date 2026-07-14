@@ -52,11 +52,11 @@ export async function POST(request: NextRequest) {
       );
       const hasUnauthorizedLocation = body.lines.some((line) => (
         !responsibleLocationIds.has(line.from_location_id)
-        || !responsibleLocationIds.has(line.to_location_id)
+        && !responsibleLocationIds.has(line.to_location_id)
       ));
       if (hasUnauthorizedLocation) {
         return NextResponse.json(
-          { error: 'Employees can transfer Hardware only between their responsible locations' },
+          { error: 'Employees can transfer Hardware only when one side is one of their responsible locations' },
           { status: 403 },
         );
       }

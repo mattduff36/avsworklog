@@ -2,6 +2,29 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.6.1
+
+**GIT COMMIT MESSAGE**
+`fix(inventory): restore employee Hardware transfers`
+
+**PUSHED AT**
+2026-07-14T16:31:50.683Z
+
+**WHAT CHANGED**
+Restore employee Hardware transfers. Integrate Yard inventory kiosk.
+
+**VERSION HISTORY DETAILS**
+- Restore employee Hardware transfers, with changes to background routes, app screens, automated tests, and documentation.
+- Updated help and FAQ, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `fix(inventory): restore employee Hardware transfers`
+- `merge: integrate Yard inventory kiosk`
+
+# Production release log
+
+Private changelog for production builds. Newest entries first.
+
 ## 0726.6.0
 
 **GIT COMMIT MESSAGE**

@@ -140,7 +140,7 @@ describe('Inventory Hardware mutation routes', () => {
     }));
   });
 
-  it('blocks employee transfers outside responsible locations', async () => {
+  it('blocks employee transfers between two unrelated locations', async () => {
     vi.mocked(requireInventoryAccess).mockResolvedValue({
       allowed: true,
       status: 200,
@@ -153,7 +153,7 @@ describe('Inventory Hardware mutation routes', () => {
       lines: [{
         item_id: 'item-1',
         from_location_id: 'other-location',
-        to_location_id: 'primary-location',
+        to_location_id: 'another-location',
         quantity: 1,
       }],
     }));
@@ -176,6 +176,30 @@ describe('Inventory Hardware mutation routes', () => {
         item_id: 'item-1',
         from_location_id: 'primary-location',
         to_location_id: 'site-location',
+        quantity: 4,
+      }],
+    }));
+
+    expect(response.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith('inventory_transfer_hardware_stock', expect.objectContaining({
+      p_actor: 'employee-1',
+    }));
+  });
+
+  it('allows employees to collect Hardware from another location', async () => {
+    vi.mocked(requireInventoryAccess).mockResolvedValue({
+      allowed: true,
+      status: 200,
+      userId: 'employee-1',
+      isManagerOrAdmin: false,
+    });
+    vi.mocked(getResponsibleHardwareLocationIds).mockResolvedValue(['primary-location']);
+
+    const response = await transferHardware(buildRequest('/api/inventory/hardware/transfers', {
+      lines: [{
+        item_id: 'item-1',
+        from_location_id: 'yard-location',
+        to_location_id: 'primary-location',
         quantity: 4,
       }],
     }));

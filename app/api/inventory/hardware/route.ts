@@ -40,14 +40,6 @@ export async function GET() {
       `)
       .gt('quantity', 0);
 
-    if (!access.isManagerOrAdmin) {
-      if (responsibleLocationIds?.length) {
-        balanceQuery.in('location_id', responsibleLocationIds);
-      } else {
-        balanceQuery.eq('location_id', '00000000-0000-0000-0000-000000000000');
-      }
-    }
-
     const [{ data: items, error: itemsError }, { data: balances, error: balancesError }] = await Promise.all([
       itemQuery,
       balanceQuery,
