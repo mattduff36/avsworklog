@@ -24,6 +24,7 @@ interface InventoryLocationSelectProps {
   onValueChange: (value: string, location?: InventoryLocation) => void;
   placeholder?: string;
   searchPlaceholder?: string;
+  ariaLabel?: string;
   triggerClassName?: string;
   disabled?: boolean;
   extraOptions?: InventoryLocationSelectExtraOption[];
@@ -48,6 +49,7 @@ export function InventoryLocationSelect({
   onValueChange,
   placeholder = 'Select location',
   searchPlaceholder = 'Search locations...',
+  ariaLabel,
   triggerClassName,
   disabled = false,
   extraOptions = [],
@@ -177,6 +179,7 @@ export function InventoryLocationSelect({
           variant="outline"
           role="combobox"
           aria-expanded={open}
+          aria-label={ariaLabel}
           disabled={disabled}
           className={cn(
             'w-full justify-between border-slate-600 bg-slate-800 text-left font-normal text-white hover:bg-slate-700',

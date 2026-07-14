@@ -44,7 +44,7 @@ describe('Inventory Hardware catalogue route', () => {
     vi.clearAllMocks();
   });
 
-  it('loads only positive balances and orders catalogue names deterministically', async () => {
+  it('keeps zero-stock catalogue items while loading only positive location balances', async () => {
     vi.mocked(requireInventoryAccess).mockResolvedValue({
       allowed: true,
       status: 200,
@@ -54,6 +54,7 @@ describe('Inventory Hardware catalogue route', () => {
 
     const itemQuery = buildResolvedQuery([
       { id: 'cones', name: 'Cones', is_active: true },
+      { id: 'fencing', name: 'Heras fencing', is_active: true },
     ]);
     const balanceQuery = buildResolvedQuery([
       { hardware_item_id: 'cones', location_id: 'yard', quantity: 5 },
@@ -72,6 +73,11 @@ describe('Inventory Hardware catalogue route', () => {
     expect(itemQuery.order).toHaveBeenNthCalledWith(2, 'id', { ascending: true });
     expect(balanceQuery.gt).toHaveBeenCalledWith('quantity', 0);
     expect(payload.items[0].total_quantity).toBe(5);
+    expect(payload.items[1]).toMatchObject({
+      id: 'fencing',
+      total_quantity: 0,
+    });
+    expect(payload.balances).toHaveLength(1);
   });
 
   it('does not accept or persist a client-provided sort order', async () => {

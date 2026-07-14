@@ -5,6 +5,7 @@ import {
   Archive,
   ArrowRightLeft,
   Boxes,
+  PackagePlus,
   Pencil,
   Plus,
   RotateCcw,
@@ -49,6 +50,7 @@ import type {
   InventoryLocation,
 } from '../types';
 import { INVENTORY_HARDWARE_ADJUSTMENT_REASONS } from '../types';
+import { HardwareAddStockDialog } from './HardwareAddStockDialog';
 import { HardwareTransferDialog } from './HardwareTransferDialog';
 
 interface HardwareStockPanelProps {
@@ -92,6 +94,7 @@ export function HardwareStockPanel({
   const [adjustmentNote, setAdjustmentNote] = useState('');
   const [isAdjusting, setIsAdjusting] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
+  const [receivingItem, setReceivingItem] = useState<InventoryHardwareItem | null>(null);
   const [editingItem, setEditingItem] = useState<InventoryHardwareItem | null>(null);
   const [catalogName, setCatalogName] = useState('');
   const [isSavingCatalog, setIsSavingCatalog] = useState(false);
@@ -204,7 +207,7 @@ export function HardwareStockPanel({
   async function submitAdjustment(event: React.FormEvent) {
     event.preventDefault();
     if (!adjustmentOperation || selectedRows.length === 0) return;
-    const quantity = Number.parseInt(adjustmentQuantity, 10);
+    const quantity = Number(adjustmentQuantity);
     const validQuantity = adjustmentOperation === 'recount' ? quantity >= 0 : quantity > 0;
     if (!Number.isInteger(quantity) || !validQuantity) return;
     if (adjustmentReason === 'Other' && !adjustmentNote.trim()) return;
@@ -378,7 +381,13 @@ export function HardwareStockPanel({
                       {total.toLocaleString()} units company-wide
                     </p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    {item.is_active ? (
+                      <Button size="sm" onClick={() => setReceivingItem(item)}>
+                        <PackagePlus className="mr-1 h-3.5 w-3.5" />
+                        Add stock
+                      </Button>
+                    ) : null}
                     <Button size="sm" variant="outline" onClick={() => setEditingItem(item)}>
                       <Pencil className="mr-1 h-3.5 w-3.5" />
                       Edit
@@ -510,6 +519,13 @@ export function HardwareStockPanel({
         locations={locations}
         onClose={() => setTransferOpen(false)}
         onSubmit={onTransfer}
+      />
+
+      <HardwareAddStockDialog
+        item={receivingItem}
+        locations={locations}
+        onClose={() => setReceivingItem(null)}
+        onSubmit={onAdjust}
       />
     </div>
   );

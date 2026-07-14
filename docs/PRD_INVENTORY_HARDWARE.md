@@ -28,6 +28,9 @@ Add quantity-based, non-serialised Hardware stock to the Inventory module withou
 ### HW-003: Stock adjustments
 
 - Managers and admins can apply atomic multi-row Add, Remove, and Recount operations.
+- Managers and admins can record an incoming Delivery directly from any active
+  catalogue item, including items with zero company-wide stock, by selecting an
+  active destination location and entering a positive whole-number quantity.
 - Every adjustment requires a standard reason: Delivery, Return, Used, Lost, Scrapped, Damaged, Stocktake correction, or Other.
 - Other requires a note. Notes are optional for standard reasons.
 - Removing more stock than is available is rejected.
@@ -49,6 +52,9 @@ Add quantity-based, non-serialised Hardware stock to the Inventory module withou
 - Inventory Overview includes a Hardware tab beside Small Tools and Minor Plant.
 - The tab shows one row per active Hardware type, its company-wide total, and expandable non-zero location balances.
 - Inventory Settings includes Hardware Stock management for catalogue maintenance, filtering, stock matrix operations, and transfers.
+- The Hardware catalogue remains complete and actionable when an item has zero
+  company-wide stock. The zero-total omission applies to location result sets,
+  not catalogue entries.
 - Hardware locations with a zero aggregate quantity are not fetched or materialised
   in overview or stock-matrix result sets.
 

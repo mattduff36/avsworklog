@@ -58,6 +58,49 @@ describe('Inventory Hardware mutation routes', () => {
     expect(createAdminClient).not.toHaveBeenCalled();
   });
 
+  it('applies a positive whole-number delivery through the audited adjustment RPC', async () => {
+    vi.mocked(requireInventoryManagerAccess).mockResolvedValue({
+      allowed: true,
+      status: 200,
+      userId: 'manager-1',
+      isManagerOrAdmin: true,
+    });
+
+    const response = await adjustHardware(buildRequest('/api/inventory/hardware/adjustments', {
+      operation_type: 'add',
+      reason: 'Delivery',
+      note: 'Incoming order 123',
+      lines: [{ item_id: 'item-1', location_id: 'location-1', quantity: 12 }],
+    }));
+
+    expect(response.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith('inventory_apply_hardware_adjustments', {
+      p_operation_type: 'add',
+      p_reason: 'Delivery',
+      p_note: 'Incoming order 123',
+      p_lines: [{ item_id: 'item-1', location_id: 'location-1', quantity: 12 }],
+      p_actor: 'manager-1',
+    });
+  });
+
+  it.each([0, 1.5])('rejects invalid add quantity %s before mutation', async (quantity) => {
+    vi.mocked(requireInventoryManagerAccess).mockResolvedValue({
+      allowed: true,
+      status: 200,
+      userId: 'manager-1',
+      isManagerOrAdmin: true,
+    });
+
+    const response = await adjustHardware(buildRequest('/api/inventory/hardware/adjustments', {
+      operation_type: 'add',
+      reason: 'Delivery',
+      lines: [{ item_id: 'item-1', location_id: 'location-1', quantity }],
+    }));
+
+    expect(response.status).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
   it('requires a note for Other adjustments', async () => {
     vi.mocked(requireInventoryManagerAccess).mockResolvedValue({
       allowed: true,
