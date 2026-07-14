@@ -38,7 +38,11 @@ Add quantity-based, non-serialised Hardware stock to the Inventory module withou
 ### HW-004: Transfers
 
 - Managers and admins can transfer stock between any two active Inventory locations.
-- Employees can transfer stock only between their valid primary location and assigned secondary Site locations.
+- Employees can transfer stock between any active Inventory locations when at
+  least one side is their valid primary location or an assigned secondary Site
+  location. This supports collecting stock into, or dispatching stock from,
+  locations they are responsible for without permitting unrelated third-party
+  transfers.
 - The database-configured Yard kiosk actor is a narrow exception: it can transfer
   stock only when exactly one side is the active Yard and the other side is an
   active non-Yard location, as defined by `YK-002` and `YK-006`.
@@ -64,8 +68,11 @@ Add quantity-based, non-serialised Hardware stock to the Inventory module withou
 ### HW-007: Employee experience
 
 - Standard employee Inventory views include a separate Hardware section.
-- Positive balances are grouped by the employee's primary location and assigned secondary Site locations.
-- Employees can transfer quantities only between those responsible locations.
+- Positive balances remain grouped by the employee's primary location and
+  assigned secondary Site locations.
+- The transfer picker can use company-wide positive balances as sources and any
+  active location as the destination, while the API requires one side of every
+  line to be a location the employee is responsible for.
 
 ### HW-008: Access control
 

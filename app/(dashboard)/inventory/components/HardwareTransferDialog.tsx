@@ -34,7 +34,7 @@ interface HardwareTransferDialogProps {
   items: InventoryHardwareItem[];
   balances: InventoryHardwareBalance[];
   locations: InventoryLocation[];
-  eligibleLocationIds?: string[];
+  responsibleLocationIds?: string[];
   onClose: () => void;
   onSubmit: (payload: InventoryHardwareTransferPayload) => Promise<void>;
 }
@@ -44,7 +44,7 @@ export function HardwareTransferDialog({
   items,
   balances,
   locations,
-  eligibleLocationIds,
+  responsibleLocationIds,
   onClose,
   onSubmit,
 }: HardwareTransferDialogProps) {
@@ -55,26 +55,32 @@ export function HardwareTransferDialog({
   const [note, setNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const eligibleIds = useMemo(
-    () => new Set(eligibleLocationIds || locations.map((location) => location.id)),
-    [eligibleLocationIds, locations],
+  const responsibleIds = useMemo(
+    () => new Set(responsibleLocationIds || []),
+    [responsibleLocationIds],
   );
-  const restrictDestinations = eligibleLocationIds !== undefined;
   const activeLocations = useMemo(
-    () => locations.filter((location) => location.is_active && eligibleIds.has(location.id)),
-    [eligibleIds, locations],
+    () => locations.filter((location) => location.is_active),
+    [locations],
+  );
+  const stockedItemIds = useMemo(
+    () => new Set(
+      balances
+        .filter((balance) => balance.quantity > 0)
+        .map((balance) => balance.hardware_item_id),
+    ),
+    [balances],
   );
   const activeItems = useMemo(
-    () => items.filter((item) => item.is_active),
-    [items],
+    () => items.filter((item) => item.is_active && stockedItemIds.has(item.id)),
+    [items, stockedItemIds],
   );
   const itemBalances = useMemo(
     () => balances.filter((balance) => (
       balance.hardware_item_id === itemId
       && balance.quantity > 0
-      && eligibleIds.has(balance.location_id)
     )),
-    [balances, eligibleIds, itemId],
+    [balances, itemId],
   );
   const sourceLocationIds = useMemo(
     () => new Set(itemBalances.map((balance) => balance.location_id)),
@@ -83,6 +89,8 @@ export function HardwareTransferDialog({
   const availableQuantity = itemBalances.find(
     (balance) => balance.location_id === fromLocationId,
   )?.quantity || 0;
+  const sourceIsResponsible = responsibleLocationIds === undefined
+    || responsibleIds.has(fromLocationId);
   const parsedQuantity = Number.parseInt(quantity, 10);
   const canSubmit = Boolean(
     itemId
@@ -166,7 +174,7 @@ export function HardwareTransferDialog({
                 value={fromLocationId}
                 onValueChange={(value) => {
                   setFromLocationId(value);
-                  if (value === toLocationId) setToLocationId('');
+                  setToLocationId('');
                 }}
                 disabled={!itemId}
               >
@@ -190,20 +198,7 @@ export function HardwareTransferDialog({
 
             <div className="space-y-2">
               <Label>To</Label>
-              {restrictDestinations ? (
-                <Select value={toLocationId} onValueChange={setToLocationId} disabled={!fromLocationId}>
-                  <SelectTrigger className="border-slate-600 bg-slate-800">
-                    <SelectValue placeholder="Destination" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {activeLocations
-                      .filter((location) => location.id !== fromLocationId)
-                      .map((location) => (
-                        <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              ) : (
+              {sourceIsResponsible ? (
                 <InventoryLocationSelect
                   value={toLocationId}
                   onValueChange={setToLocationId}
@@ -213,6 +208,21 @@ export function HardwareTransferDialog({
                   serverSearch
                   locationFilter={(location) => location.id !== fromLocationId}
                 />
+              ) : (
+                <Select value={toLocationId} onValueChange={setToLocationId} disabled={!fromLocationId}>
+                  <SelectTrigger className="border-slate-600 bg-slate-800">
+                    <SelectValue placeholder="Destination" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeLocations
+                      .filter((location) => (
+                        location.id !== fromLocationId && responsibleIds.has(location.id)
+                      ))
+                      .map((location) => (
+                        <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
               )}
             </div>
           </div>

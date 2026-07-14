@@ -1,7 +1,7 @@
 /** @vitest-environment happy-dom */
 /// <reference types="@testing-library/jest-dom/vitest" />
 
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { InventoryEmployeeView } from '@/app/(dashboard)/inventory/components/InventoryEmployeeView';
 import type {
@@ -56,6 +56,16 @@ const siteLocation: InventoryLocation = {
   updated_at: '2026-07-05T00:00:00.000Z',
   created_by: null,
   updated_by: null,
+};
+
+const yardLocation: InventoryLocation = {
+  ...primaryLocation,
+  id: 'yard-location',
+  name: 'Yard',
+  linked_van_id: null,
+  location_type: 'yard',
+  source_type: 'manual',
+  source_id: null,
 };
 
 const cones: InventoryHardwareItem = {
@@ -181,5 +191,37 @@ describe('InventoryEmployeeView', () => {
     expect(screen.getByText('12')).toBeInTheDocument();
     expect(screen.queryByText('Tamp')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /transfer/i })).toBeEnabled();
+  });
+
+  it('opens Hardware transfer for an employee with one responsible location', () => {
+    render(
+      <InventoryEmployeeView
+        items={[]}
+        locations={[primaryLocation]}
+        userLocation={{
+          user_id: 'user-1',
+          location_id: primaryLocation.id,
+          location: primaryLocation,
+        }}
+        hardwareItems={[cones]}
+        hardwareBalances={[{
+          id: 'yard-balance',
+          hardware_item_id: cones.id,
+          location_id: yardLocation.id,
+          quantity: 20,
+          location: yardLocation,
+        }]}
+        currentFleetAssignment={null}
+        onSetUserLocation={vi.fn()}
+        onRequestLocation={vi.fn()}
+        onOpenMoveDialog={vi.fn()}
+        onChangeLocation={vi.fn()}
+        onTransferHardware={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /transfer/i }));
+
+    expect(screen.getByRole('heading', { name: 'Transfer Hardware' })).toBeInTheDocument();
   });
 });

@@ -94,8 +94,8 @@ Hardware quantity changes must use the dedicated atomic stock functions:
 - Add, Remove, and Recount create an adjustment batch and immutable balance lines.
 - Transfer creates paired source and destination lines in one batch.
 - Managers and admins may transfer between any active locations.
-- Employees may transfer only between their valid primary location and assigned
-  secondary Site locations.
+- Employees may transfer between active locations when at least one side is
+  their valid primary location or an assigned secondary Site location.
 - The configured Yard kiosk profile may transfer only between the active Yard
   and one active non-Yard location. This exception is isolated to the kiosk API
   and does not broaden ordinary employee transfer permissions.
