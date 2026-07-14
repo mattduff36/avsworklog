@@ -184,6 +184,7 @@ export function MoveInventoryDialog({
                   setBlockedItems([]);
                 }}
                 locations={locations}
+                serverSearch
               />
             </div>
 

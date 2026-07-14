@@ -14,7 +14,6 @@ const item: InventoryHardwareItem = {
   name: 'Cones',
   name_normalized: 'cones',
   is_active: true,
-  sort_order: 20,
   created_at: '2026-07-14T00:00:00.000Z',
   updated_at: '2026-07-14T00:00:00.000Z',
   created_by: null,

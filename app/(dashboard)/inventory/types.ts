@@ -86,7 +86,6 @@ export interface InventoryHardwareItem {
   name: string;
   name_normalized: string;
   is_active: boolean;
-  sort_order: number;
   created_at: string;
   updated_at: string;
   created_by: string | null;

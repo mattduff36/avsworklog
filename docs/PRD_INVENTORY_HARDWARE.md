@@ -8,18 +8,11 @@ Add quantity-based, non-serialised Hardware stock to the Inventory module withou
 
 ### HW-001: Shared catalogue
 
-- Managers and admins can add, rename, reorder, and archive Hardware item types.
+- Managers and admins can add, rename, and archive Hardware item types.
+- The catalogue is ordered alphabetically by name; manual sort order is not exposed or accepted by the application.
 - An item type cannot be archived while any location has a non-zero balance.
-- The initial active catalogue is:
-  1. Heras fencing
-  2. Cones
-  3. Cone tops
-  4. Road plates
-  5. Derv tank
-  6. Machine breaker
-  7. Floor saw
-  8. Generator
-  9. Tamp
+- The initial active catalogue contains Heras fencing, Cones, Cone tops, Road plates,
+  Derv tank, Machine breaker, Floor saw, Generator, and Tamp.
 - Initial balances are zero.
 
 ### HW-002: Location balances
@@ -27,7 +20,10 @@ Add quantity-based, non-serialised Hardware stock to the Inventory module withou
 - Each Hardware item type has a non-negative whole-number balance at each active Inventory location.
 - All active location types are eligible.
 - Managers and admins can view company totals and per-location balances.
-- Zero balances remain available in management views but are hidden from employee views.
+- Employee views show positive balances only.
+- Management stock matrices show only locations whose company-wide Hardware total is
+  positive. Zero item balances remain available within those stocked locations for
+  bulk stock operations.
 
 ### HW-003: Stock adjustments
 
@@ -53,6 +49,8 @@ Add quantity-based, non-serialised Hardware stock to the Inventory module withou
 - Inventory Overview includes a Hardware tab beside Small Tools and Minor Plant.
 - The tab shows one row per active Hardware type, its company-wide total, and expandable non-zero location balances.
 - Inventory Settings includes Hardware Stock management for catalogue maintenance, filtering, stock matrix operations, and transfers.
+- Hardware locations with a zero aggregate quantity are not fetched or materialised
+  in overview or stock-matrix result sets.
 
 ### HW-007: Employee experience
 

@@ -65,6 +65,20 @@ The canonical rules are:
 
 Routes that update `inventory_items.location_id` directly must delegate to the same move logic or reject direct location edits.
 
+## Location Discovery
+
+The Inventory Locations management tab must not preload the complete active
+location dataset. It performs server-side name search after at least three
+characters, clears stale results below that threshold, and returns a bounded,
+deterministically ordered result set. Operational location selectors use the
+same server-backed search so large location datasets are not sent to the client
+on initial Inventory load.
+
+Area-specific filters and stock views only materialise locations with a
+non-zero item count or quantity for that area. Empty assigned/current
+locations and destination selectors remain available where they are required
+for assignment, movement, or intentional empty-state workflows.
+
 ## Hardware Stock Balances
 
 Quantity-based Hardware uses the same `inventory_locations` rows but does not use

@@ -362,7 +362,10 @@ export function InventoryTable({
         LOCATION_FILTER_GROUP_ORDER.map((groupKey, index) => [groupKey, index])
       );
       const options = getInventoryLocationsWithYardFirst(locationFilterLocations || [])
-        .filter((location) => getLocationFilterGroupKey(location) !== 'unknown')
+        .filter((location) => (
+          getLocationFilterGroupKey(location) !== 'unknown'
+          && (counts[location.id] || 0) > 0
+        ))
         .sort((a, b) => {
           const aGroup = getLocationFilterGroupKey(a);
           const bGroup = getLocationFilterGroupKey(b);

@@ -20,6 +20,7 @@ interface ChangeInventoryLocationDialogProps {
   locations: InventoryLocation[];
   userLocation: InventoryUserLocation | null;
   allowUnset?: boolean;
+  locationFilter?: (location: InventoryLocation) => boolean;
   onClose: () => void;
   onSubmit: (payload: { locationId: string; reason: string }) => Promise<void>;
   onUnset?: () => Promise<void>;
@@ -30,6 +31,7 @@ export function ChangeInventoryLocationDialog({
   locations,
   userLocation,
   allowUnset = false,
+  locationFilter,
   onClose,
   onSubmit,
   onUnset,
@@ -41,7 +43,9 @@ export function ChangeInventoryLocationDialog({
   const [isSaving, setIsSaving] = useState(false);
   const [isUnsetting, setIsUnsetting] = useState(false);
   const isSameLocation = hasActiveExistingLocation && locationId === userLocation?.location_id;
-  const selectedLocation = locations.find((location) => location.id === locationId) || null;
+  const [selectedLocation, setSelectedLocation] = useState<InventoryLocation | null>(
+    hasActiveExistingLocation ? userLocation?.location || null : null,
+  );
   const selectedFleetLabel = selectedLocation
     ? [selectedLocation.linked_asset_label, selectedLocation.linked_asset_nickname].filter(Boolean).join(' - ')
     : '';
@@ -49,8 +53,9 @@ export function ChangeInventoryLocationDialog({
   useEffect(() => {
     if (!open) return;
     setLocationId(userLocation?.location_id && userLocation.location?.is_active !== false ? userLocation.location_id : '');
+    setSelectedLocation(userLocation?.location?.is_active !== false ? userLocation?.location || null : null);
     setReason('');
-  }, [open, userLocation?.location?.is_active, userLocation?.location_id]);
+  }, [open, userLocation?.location, userLocation?.location?.is_active, userLocation?.location_id]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -95,8 +100,13 @@ export function ChangeInventoryLocationDialog({
               <Label>New Location</Label>
               <InventoryLocationSelect
                 value={locationId}
-                onValueChange={setLocationId}
+                onValueChange={(value, location) => {
+                  setLocationId(value);
+                  setSelectedLocation(location || locations.find((candidate) => candidate.id === value) || null);
+                }}
                 locations={locations}
+                serverSearch
+                locationFilter={locationFilter}
               />
               {selectedLocation ? (
                 <p className="text-xs text-muted-foreground">

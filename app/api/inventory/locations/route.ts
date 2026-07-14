@@ -5,7 +5,9 @@ import type { FleetAssetLinkType } from '@/app/(dashboard)/inventory/types';
 import { buildLinkedAssetColumns, getLocationTypeForLinkedAsset } from '@/lib/server/inventory-locations';
 import type { Database } from '@/types/database';
 
-const SUPABASE_PAGE_SIZE = 1000;
+export const INVENTORY_LOCATION_SEARCH_MIN_CHARACTERS = 3;
+export const INVENTORY_LOCATION_SEARCH_DEFAULT_LIMIT = 50;
+const INVENTORY_LOCATION_SEARCH_MAX_LIMIT = 100;
 
 type InventoryLocationRow = Database['public']['Tables']['inventory_locations']['Row'];
 
@@ -44,85 +46,105 @@ function getAssignedUserNamesByLocationId(...rowGroups: InventoryLocationAssigne
   return namesByLocationId;
 }
 
-async function loadActiveInventoryLocations(
-  admin: ReturnType<typeof createAdminClient>
-): Promise<InventoryLocationRow[]> {
-  const locations: InventoryLocationRow[] = [];
-
-  for (let offset = 0; ; offset += SUPABASE_PAGE_SIZE) {
-    const { data, error } = await admin
-      .from('inventory_locations')
-      .select('*')
-      .eq('is_active', true)
-      .order('name', { ascending: true })
-      .range(offset, offset + SUPABASE_PAGE_SIZE - 1);
-
-    if (error) throw error;
-
-    const page = data || [];
-    locations.push(...page);
-    if (page.length < SUPABASE_PAGE_SIZE) break;
-  }
-
-  return locations;
+function normalizeLocationSearchLimit(value: string | null): number {
+  const parsed = Number.parseInt(value || '', 10);
+  if (!Number.isFinite(parsed)) return INVENTORY_LOCATION_SEARCH_DEFAULT_LIMIT;
+  return Math.min(Math.max(parsed, 1), INVENTORY_LOCATION_SEARCH_MAX_LIMIT);
 }
 
-async function loadActiveInventoryItemLocationIds(
-  admin: ReturnType<typeof createAdminClient>
-): Promise<Array<{ location_id: string | null }>> {
-  const rows: Array<{ location_id: string | null }> = [];
-
-  for (let offset = 0; ; offset += SUPABASE_PAGE_SIZE) {
-    const { data, error } = await admin
-      .from('inventory_items')
-      .select('location_id')
-      .eq('status', 'active')
-      .range(offset, offset + SUPABASE_PAGE_SIZE - 1);
-
-    if (error) throw error;
-
-    const page = data || [];
-    rows.push(...page);
-    if (page.length < SUPABASE_PAGE_SIZE) break;
-  }
-
-  return rows;
+function escapeIlikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, '\\$&');
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const access = await requireInventoryAccess();
     if (!access.allowed) {
       return NextResponse.json({ error: access.error }, { status: access.status });
     }
 
+    const { searchParams } = new URL(request.url);
+    const search = searchParams.get('search')?.trim() || '';
+    if (search.length < INVENTORY_LOCATION_SEARCH_MIN_CHARACTERS) {
+      return NextResponse.json({
+        locations: [],
+        minimum_search_characters: INVENTORY_LOCATION_SEARCH_MIN_CHARACTERS,
+      });
+    }
+
     const admin = createAdminClient();
-    const [locationRows, itemLocationRows, vansResult, hgvsResult, plantResult, assignedUsersResult, assignedSiteUsersResult] = await Promise.all([
-      loadActiveInventoryLocations(admin),
-      loadActiveInventoryItemLocationIds(admin),
+    const limit = normalizeLocationSearchLimit(searchParams.get('limit'));
+    const { data: locationData, error: locationsError } = await admin
+      .from('inventory_locations')
+      .select('*')
+      .eq('is_active', true)
+      .ilike('name', `%${escapeIlikePattern(search)}%`)
+      .order('name', { ascending: true })
+      .order('id', { ascending: true })
+      .limit(limit);
+
+    if (locationsError) throw locationsError;
+
+    const locationRows = (locationData || []) as InventoryLocationRow[];
+    if (locationRows.length === 0) {
+      return NextResponse.json({
+        locations: [],
+        minimum_search_characters: INVENTORY_LOCATION_SEARCH_MIN_CHARACTERS,
+      });
+    }
+
+    const locationIds = locationRows.map((location) => location.id);
+    const vanIds = locationRows.flatMap((location) => location.linked_van_id ? [location.linked_van_id] : []);
+    const hgvIds = locationRows.flatMap((location) => location.linked_hgv_id ? [location.linked_hgv_id] : []);
+    const plantIds = locationRows.flatMap((location) => location.linked_plant_id ? [location.linked_plant_id] : []);
+    const [
+      itemLocationsResult,
+      vansResult,
+      hgvsResult,
+      plantResult,
+      assignedUsersResult,
+      assignedSiteUsersResult,
+    ] = await Promise.all([
       admin
-        .from('vans')
-        .select('id, reg_number, nickname'),
-      admin
-        .from('hgvs')
-        .select('id, reg_number, nickname'),
-      admin
-        .from('plant')
-        .select('id, plant_id, reg_number, nickname'),
+        .from('inventory_items')
+        .select('location_id')
+        .eq('status', 'active')
+        .in('location_id', locationIds),
+      vanIds.length > 0
+        ? admin
+          .from('vans')
+          .select('id, reg_number, nickname')
+          .in('id', vanIds)
+        : Promise.resolve({ data: [], error: null }),
+      hgvIds.length > 0
+        ? admin
+          .from('hgvs')
+          .select('id, reg_number, nickname')
+          .in('id', hgvIds)
+        : Promise.resolve({ data: [], error: null }),
+      plantIds.length > 0
+        ? admin
+          .from('plant')
+          .select('id, plant_id, reg_number, nickname')
+          .in('id', plantIds)
+        : Promise.resolve({ data: [], error: null }),
       admin
         .from('inventory_user_locations')
         .select(`
           location_id,
           user:profiles!inventory_user_locations_user_id_fkey(full_name)
-        `),
+        `)
+        .in('location_id', locationIds),
       admin
         .from('inventory_user_site_locations')
         .select(`
           location_id,
           user:profiles!inventory_user_site_locations_user_id_fkey(full_name)
-        `),
+        `)
+        .in('location_id', locationIds),
     ]);
 
+    if (itemLocationsResult.error) throw itemLocationsResult.error;
     if (vansResult.error) throw vansResult.error;
     if (hgvsResult.error) throw hgvsResult.error;
     if (plantResult.error) throw plantResult.error;
@@ -130,7 +152,7 @@ export async function GET() {
     if (assignedSiteUsersResult.error) throw assignedSiteUsersResult.error;
 
     const countByLocationId = new Map<string, number>();
-    itemLocationRows.forEach((item) => {
+    (itemLocationsResult.data || []).forEach((item) => {
       if (!item.location_id) return;
       countByLocationId.set(item.location_id, (countByLocationId.get(item.location_id) || 0) + 1);
     });
@@ -149,7 +171,10 @@ export async function GET() {
       ...getLinkedAssetDisplay(location, vanById, hgvById, plantById),
     }));
 
-    return NextResponse.json({ locations });
+    return NextResponse.json({
+      locations,
+      minimum_search_characters: INVENTORY_LOCATION_SEARCH_MIN_CHARACTERS,
+    });
   } catch (error) {
     console.error('Error fetching inventory locations:', error);
     return NextResponse.json({ error: 'Failed to fetch inventory locations' }, { status: 500 });

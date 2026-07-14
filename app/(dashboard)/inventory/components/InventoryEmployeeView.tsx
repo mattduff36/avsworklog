@@ -33,6 +33,7 @@ interface InventoryEmployeeViewProps {
   currentFleetAssignment?: CurrentFleetAssignment | null;
   hardwareItems?: InventoryHardwareItem[];
   hardwareBalances?: InventoryHardwareBalance[];
+  locationFilter?: (location: InventoryLocation) => boolean;
   onSetUserLocation: (locationId: string) => Promise<void>;
   onRequestLocation: (payload: { suggested_name: string; note: string }) => Promise<void>;
   onOpenMoveDialog: (items: InventoryItem[]) => void;
@@ -49,6 +50,7 @@ export function InventoryEmployeeView({
   currentFleetAssignment,
   hardwareItems = [],
   hardwareBalances = [],
+  locationFilter,
   onSetUserLocation,
   onRequestLocation,
   onOpenMoveDialog,
@@ -231,6 +233,8 @@ export function InventoryEmployeeView({
                   label: 'Location not shown',
                   className: 'mt-1 border-t border-amber-500/30 bg-amber-500/10 font-semibold text-amber-200 hover:bg-amber-500/20 focus:bg-amber-500/20',
                 }]}
+                serverSearch
+                locationFilter={locationFilter}
               />
             </div>
             <Button

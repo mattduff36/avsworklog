@@ -1,18 +1,23 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Link2, MapPin, Pencil, Trash2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Link2, Loader2, MapPin, Pencil, Search, Trash2 } from 'lucide-react';
 import type { FleetAssetOption, InventoryLocation } from '../types';
 import { formatInventoryLocationTypeLabel } from '../utils';
 
 interface InventoryLocationsPanelProps {
-  locations: InventoryLocation[];
   fleetAssets: FleetAssetOption[];
   onEdit: (location: InventoryLocation) => void;
   onRemove: (location: InventoryLocation) => void;
+  refreshVersion?: number;
 }
+
+const MINIMUM_SEARCH_CHARACTERS = 3;
+const SEARCH_DEBOUNCE_MS = 300;
 
 function getLinkedAssetLabel(location: InventoryLocation, fleetAssets: FleetAssetOption[]): string | null {
   const linkedAssetId = location.linked_van_id || location.linked_hgv_id || location.linked_plant_id;
@@ -21,14 +26,99 @@ function getLinkedAssetLabel(location: InventoryLocation, fleetAssets: FleetAsse
 }
 
 export function InventoryLocationsPanel({
-  locations,
   fleetAssets,
   onEdit,
   onRemove,
+  refreshVersion = 0,
 }: InventoryLocationsPanelProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [locations, setLocations] = useState<InventoryLocation[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const normalizedSearch = searchQuery.trim();
+
+  useEffect(() => {
+    if (normalizedSearch.length < MINIMUM_SEARCH_CHARACTERS) {
+      setLocations([]);
+      setLoading(false);
+      setError('');
+      return;
+    }
+
+    setLocations([]);
+    setLoading(true);
+    setError('');
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const response = await fetch(
+          `/api/inventory/locations?search=${encodeURIComponent(normalizedSearch)}&limit=50`,
+          { cache: 'no-store', signal: controller.signal },
+        );
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || 'Failed to search inventory locations');
+        setLocations(payload.locations || []);
+      } catch (searchError) {
+        if (controller.signal.aborted) return;
+        setLocations([]);
+        setError(searchError instanceof Error ? searchError.message : 'Failed to search inventory locations');
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [normalizedSearch, refreshVersion]);
+
+  const status = normalizedSearch.length < MINIMUM_SEARCH_CHARACTERS
+    ? 'Enter at least 3 characters to search locations.'
+    : loading
+      ? 'Searching locations...'
+      : error
+        ? error
+        : locations.length === 0
+          ? `No locations found matching “${normalizedSearch}”.`
+          : '';
+
   return (
     <Card className="border-slate-700 bg-slate-900/70">
       <CardContent className="p-0">
+        <div className="border-b border-slate-700 p-4">
+          <div className="relative max-w-xl">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+            <Input
+              value={searchQuery}
+              onChange={(event) => {
+                const nextSearchQuery = event.target.value;
+                setSearchQuery(nextSearchQuery);
+                setLocations([]);
+                setError('');
+                setLoading(nextSearchQuery.trim().length >= MINIMUM_SEARCH_CHARACTERS);
+              }}
+              placeholder="Search locations (minimum 3 characters)"
+              className="border-slate-600 bg-slate-800 pl-9 text-white placeholder:text-slate-500"
+              aria-label="Search inventory locations"
+            />
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Search by location name. Up to 50 matching locations are shown.
+          </p>
+        </div>
+
+        {status ? (
+          <div
+            className={`flex items-center justify-center gap-2 px-4 py-10 text-center text-sm ${error ? 'text-red-300' : 'text-muted-foreground'}`}
+            role={error ? 'alert' : 'status'}
+            aria-live="polite"
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {status}
+          </div>
+        ) : (
+        <>
         <div className="hidden md:block">
           <table className="w-full text-sm">
             <thead>
@@ -135,6 +225,8 @@ export function InventoryLocationsPanel({
             );
           })}
         </div>
+        </>
+        )}
       </CardContent>
     </Card>
   );

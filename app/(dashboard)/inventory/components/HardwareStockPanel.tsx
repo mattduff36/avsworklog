@@ -55,10 +55,10 @@ interface HardwareStockPanelProps {
   items: InventoryHardwareItem[];
   balances: InventoryHardwareBalance[];
   locations: InventoryLocation[];
-  onCreateItem: (data: { name: string; sort_order: number }) => Promise<void>;
+  onCreateItem: (data: { name: string }) => Promise<void>;
   onUpdateItem: (
     item: InventoryHardwareItem,
-    data: { name?: string; sort_order?: number; is_active?: boolean },
+    data: { name?: string; is_active?: boolean },
   ) => Promise<void>;
   onAdjust: (payload: InventoryHardwareAdjustmentPayload) => Promise<void>;
   onTransfer: (payload: InventoryHardwareTransferPayload) => Promise<void>;
@@ -94,17 +94,30 @@ export function HardwareStockPanel({
   const [transferOpen, setTransferOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryHardwareItem | null>(null);
   const [catalogName, setCatalogName] = useState('');
-  const [catalogSortOrder, setCatalogSortOrder] = useState('');
   const [isSavingCatalog, setIsSavingCatalog] = useState(false);
 
+  const stockedLocationIds = useMemo(
+    () => new Set(
+      balances
+        .filter((balance) => balance.quantity > 0)
+        .map((balance) => balance.location_id),
+    ),
+    [balances],
+  );
   const activeLocations = useMemo(
     () => locations
-      .filter((location) => location.is_active)
-      .toSorted((a, b) => a.name.localeCompare(b.name)),
-    [locations],
+      .filter((location) => location.is_active && stockedLocationIds.has(location.id))
+      .toSorted((a, b) => (
+        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+        || a.id.localeCompare(b.id)
+      )),
+    [locations, stockedLocationIds],
   );
   const sortedItems = useMemo(
-    () => [...items].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)),
+    () => [...items].sort((a, b) => (
+      a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+      || a.id.localeCompare(b.id)
+    )),
     [items],
   );
   const activeItems = useMemo(
@@ -163,11 +176,9 @@ export function HardwareStockPanel({
   useEffect(() => {
     if (!editingItem) {
       setCatalogName('');
-      setCatalogSortOrder('');
       return;
     }
     setCatalogName(editingItem.name);
-    setCatalogSortOrder(String(editingItem.sort_order));
   }, [editingItem]);
 
   function toggleRow(key: string, checked: boolean) {
@@ -223,21 +234,17 @@ export function HardwareStockPanel({
 
     setIsSavingCatalog(true);
     try {
-      const sortOrder = Number.parseInt(catalogSortOrder, 10);
       if (editingItem) {
         await onUpdateItem(editingItem, {
           name: catalogName.trim(),
-          sort_order: Number.isInteger(sortOrder) ? sortOrder : 0,
         });
       } else {
         await onCreateItem({
           name: catalogName.trim(),
-          sort_order: Number.isInteger(sortOrder) ? sortOrder : 0,
         });
       }
       setEditingItem(null);
       setCatalogName('');
-      setCatalogSortOrder('');
     } finally {
       setIsSavingCatalog(false);
     }
@@ -254,7 +261,7 @@ export function HardwareStockPanel({
                 Hardware Stock Matrix
               </CardTitle>
               <p className="mt-1 text-sm text-muted-foreground">
-                Zero balances are included here so deliveries and stocktakes can be entered in bulk.
+                Only locations holding Hardware stock are shown. Zero item balances remain available within those locations for stock operations.
               </p>
             </div>
             <Button
@@ -368,7 +375,7 @@ export function HardwareStockPanel({
                       {!item.is_active ? <Badge variant="secondary">Archived</Badge> : null}
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Sort {item.sort_order} · {total.toLocaleString()} units company-wide
+                      {total.toLocaleString()} units company-wide
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -405,17 +412,6 @@ export function HardwareStockPanel({
                   id="hardware_catalog_name"
                   value={catalogName}
                   onChange={(event) => setCatalogName(event.target.value)}
-                  className="border-slate-600 bg-slate-800"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="hardware_catalog_sort_order">Sort order</Label>
-                <Input
-                  id="hardware_catalog_sort_order"
-                  type="number"
-                  step={1}
-                  value={catalogSortOrder}
-                  onChange={(event) => setCatalogSortOrder(event.target.value)}
                   className="border-slate-600 bg-slate-800"
                 />
               </div>

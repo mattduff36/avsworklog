@@ -139,7 +139,6 @@ export default function InventoryItemDetailPage() {
   const params = useParams<{ itemId: string }>();
   const itemId = params.itemId;
   const [payload, setPayload] = useState<InventoryHistoryPayload | null>(null);
-  const [locations, setLocations] = useState<InventoryLocation[]>([]);
   const [categories, setCategories] = useState<InventoryItemCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [checkedAt, setCheckedAt] = useState(new Date().toISOString().slice(0, 10));
@@ -153,29 +152,27 @@ export default function InventoryItemDetailPage() {
   const [savingDetails, setSavingDetails] = useState(false);
   const [detailsSubmitError, setDetailsSubmitError] = useState('');
   const [downloadingCheckId, setDownloadingCheckId] = useState<string | null>(null);
+  const [selectedEditLocation, setSelectedEditLocation] = useState<InventoryLocation | null>(null);
 
   const fetchHistory = useCallback(async () => {
     try {
-      const [historyResponse, locationsResponse, categoriesResponse] = await Promise.all([
+      const [historyResponse, categoriesResponse] = await Promise.all([
         fetch(`/api/inventory/${itemId}/history`, { cache: 'no-store' }),
-        fetch('/api/inventory/locations', { cache: 'no-store' }),
         fetch('/api/inventory/categories', { cache: 'no-store' }),
       ]);
 
-      const [historyData, locationsData, categoriesData] = await Promise.all([
+      const [historyData, categoriesData] = await Promise.all([
         historyResponse.json(),
-        locationsResponse.json(),
         categoriesResponse.json(),
       ]);
 
       if (!historyResponse.ok) throw new Error(historyData.error || 'Failed to fetch inventory item history');
-      if (!locationsResponse.ok) throw new Error(locationsData.error || 'Failed to fetch inventory locations');
       if (!categoriesResponse.ok) throw new Error(categoriesData.error || 'Failed to fetch inventory categories');
 
       setPayload(historyData);
-      setLocations(locationsData.locations || []);
       setCategories(categoriesData.categories || []);
       setEditForm(buildItemEditForm(historyData.item));
+      setSelectedEditLocation(historyData.item.location || null);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to load inventory item');
     } finally {
@@ -199,7 +196,10 @@ export default function InventoryItemDetailPage() {
   }
 
   function handleCancelDetailsEdit() {
-    if (payload?.item) setEditForm(buildItemEditForm(payload.item));
+    if (payload?.item) {
+      setEditForm(buildItemEditForm(payload.item));
+      setSelectedEditLocation(payload.item.location || null);
+    }
     setDetailsSubmitError('');
     setIsEditingDetails(false);
   }
@@ -318,7 +318,6 @@ export default function InventoryItemDetailPage() {
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((category) => [category.slug, category.name] as const)
     : (Object.entries(INVENTORY_CATEGORY_LABELS) as Array<[InventoryCategory, string]>);
-  const selectedEditLocation = locations.find((location) => location.id === editForm.location_id) || null;
   const isUnknownLocationSelected = isInventoryUnknownLocation(selectedEditLocation);
 
   return (
@@ -496,8 +495,12 @@ export default function InventoryItemDetailPage() {
                         <Label>Location *</Label>
                         <InventoryLocationSelect
                           value={editForm.location_id}
-                          onValueChange={(value) => updateEditField('location_id', value)}
-                          locations={locations}
+                          onValueChange={(value, location) => {
+                            updateEditField('location_id', value);
+                            setSelectedEditLocation(location || null);
+                          }}
+                          locations={item.location ? [item.location] : []}
+                          serverSearch
                         />
                       </div>
                     </div>
