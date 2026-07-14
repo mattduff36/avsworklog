@@ -125,4 +125,60 @@ describe('inventory locations route', () => {
       expect.objectContaining({ id: yard.id, item_count: 2 }),
     ]);
   });
+
+  it('returns one exact active Yard lookup by stable id', async () => {
+    vi.mocked(requireInventoryAccess).mockResolvedValue({
+      allowed: true,
+      status: 200,
+      userId: 'admin-user',
+      isManagerOrAdmin: true,
+    });
+    const yard = buildLocation('yard-stable-id', 'Yard');
+    const locationQuery = buildSearchQuery([yard]);
+    vi.mocked(createAdminClient).mockReturnValue({
+      from: vi.fn(() => locationQuery),
+    } as never);
+
+    const response = await GET(new NextRequest(
+      'http://localhost/api/inventory/locations?lookup=yard',
+    ));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(locationQuery.eq).toHaveBeenNthCalledWith(1, 'name', 'Yard');
+    expect(locationQuery.eq).toHaveBeenNthCalledWith(2, 'location_type', 'yard');
+    expect(locationQuery.eq).toHaveBeenNthCalledWith(3, 'is_active', true);
+    expect(locationQuery.order).toHaveBeenNthCalledWith(1, 'created_at', { ascending: true });
+    expect(locationQuery.order).toHaveBeenNthCalledWith(2, 'id', { ascending: true });
+    expect(locationQuery.limit).toHaveBeenCalledWith(2);
+    expect(payload.location).toEqual(expect.objectContaining({
+      id: 'yard-stable-id',
+      name: 'Yard',
+      is_active: true,
+    }));
+  });
+
+  it('leaves the Yard lookup unselected when matching rows are ambiguous', async () => {
+    vi.mocked(requireInventoryAccess).mockResolvedValue({
+      allowed: true,
+      status: 200,
+      userId: 'admin-user',
+      isManagerOrAdmin: true,
+    });
+    const locationQuery = buildSearchQuery([
+      buildLocation('yard-one', 'Yard'),
+      buildLocation('yard-two', 'Yard'),
+    ]);
+    vi.mocked(createAdminClient).mockReturnValue({
+      from: vi.fn(() => locationQuery),
+    } as never);
+
+    const response = await GET(new NextRequest(
+      'http://localhost/api/inventory/locations?lookup=yard',
+    ));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.location).toBeNull();
+  });
 });

@@ -64,6 +64,24 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
+    if (searchParams.get('lookup') === 'yard') {
+      const { data, error } = await createAdminClient()
+        .from('inventory_locations')
+        .select('*')
+        .eq('name', 'Yard')
+        .eq('location_type', 'yard')
+        .eq('is_active', true)
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
+        .limit(2);
+
+      if (error) throw error;
+      const matchingYards = (data || []) as InventoryLocationRow[];
+      return NextResponse.json({
+        location: matchingYards.length === 1 ? matchingYards[0] : null,
+      });
+    }
+
     const search = searchParams.get('search')?.trim() || '';
     if (search.length < INVENTORY_LOCATION_SEARCH_MIN_CHARACTERS) {
       return NextResponse.json({
