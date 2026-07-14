@@ -40,7 +40,7 @@ export function YardKioskBasket({
   const DirectionIcon = direction === 'take' ? ArrowUpFromLine : ArrowDownToLine;
 
   return (
-    <aside className="grid h-full min-h-0 grid-rows-[auto_auto_1fr_auto] overflow-hidden rounded-[1.75rem] border border-white/10 bg-slate-950/80 shadow-2xl shadow-black/25">
+    <aside className="grid h-full min-h-0 min-w-0 grid-rows-[auto_auto_1fr_auto] overflow-hidden rounded-[1.75rem] border border-white/10 bg-slate-950/80 shadow-2xl shadow-black/25">
       <div className="border-b border-white/10 p-4">
         <div className="flex items-start gap-3">
           <span className={`grid h-12 w-12 flex-none place-items-center rounded-2xl ${
@@ -50,7 +50,7 @@ export function YardKioskBasket({
           </span>
           <div className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
-              {direction === 'take' ? 'Taking to' : 'Returning from'}
+              {direction === 'take' ? 'Collecting for' : 'Returning from'}
             </p>
             <h2 className="truncate text-xl font-black text-white">{counterpart.name}</h2>
           </div>

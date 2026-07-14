@@ -34,6 +34,11 @@ interface KioskLocationRow {
   is_active: boolean;
 }
 
+interface KioskLocationAssigneeRow {
+  location_id: string | null;
+  user?: { full_name: string | null } | Array<{ full_name: string | null }> | null;
+}
+
 interface KioskSerializedRow {
   id: string;
   item_number: string;
@@ -52,6 +57,7 @@ interface KioskHardwareBalanceRow {
 }
 
 type KioskRpcRow = YardKioskReceipt;
+const KIOSK_LOCATION_PAGE_SIZE = 1000;
 
 export interface InventoryKioskAccessResult {
   allowed: boolean;
@@ -84,7 +90,42 @@ function isUuid(value: unknown): value is string {
     && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
-function toKioskLocation(row: KioskLocationRow) {
+function getAssigneeProfile(
+  user: KioskLocationAssigneeRow['user'],
+): { full_name: string | null } | null {
+  if (!user) return null;
+  return Array.isArray(user) ? user[0] ?? null : user;
+}
+
+function getAssigneeNamesByLocationId(
+  rows: KioskLocationAssigneeRow[],
+): Map<string, string[]> {
+  const namesByLocationId = new Map<string, Map<string, string>>();
+
+  rows.forEach((row) => {
+    const fullName = getAssigneeProfile(row.user)?.full_name?.trim();
+    if (!row.location_id || !fullName) return;
+
+    const names = namesByLocationId.get(row.location_id) ?? new Map<string, string>();
+    const normalizedName = fullName.toLocaleLowerCase();
+    if (!names.has(normalizedName)) names.set(normalizedName, fullName);
+    namesByLocationId.set(row.location_id, names);
+  });
+
+  return new Map(
+    Array.from(namesByLocationId.entries(), ([locationId, names]) => [
+      locationId,
+      Array.from(names.values()).sort((left, right) => left.localeCompare(right)),
+    ]),
+  );
+}
+
+function toKioskLocation(
+  row: KioskLocationRow,
+  primaryUserNames: string[] = [],
+  secondaryUserNames: string[] = [],
+) {
+  const primaryNames = new Set(primaryUserNames.map((name) => name.toLocaleLowerCase()));
   return {
     id: row.id,
     name: row.name,
@@ -92,6 +133,10 @@ function toKioskLocation(row: KioskLocationRow) {
     location_type: row.location_type,
     source_type: row.source_type,
     external_reference: row.external_reference,
+    primary_user_names: primaryUserNames,
+    secondary_user_names: secondaryUserNames.filter(
+      (name) => !primaryNames.has(name.toLocaleLowerCase()),
+    ),
   };
 }
 
@@ -112,6 +157,36 @@ async function loadActiveYard(admin: InventoryAdminClient): Promise<KioskLocatio
   if (error) throw error;
   const rows = (data || []) as KioskLocationRow[];
   return rows.length === 1 ? rows[0] : null;
+}
+
+async function loadKioskLocations(
+  admin: InventoryAdminClient,
+  yardId: string,
+  includeLegacyQuotes: boolean,
+): Promise<KioskLocationRow[]> {
+  const locations: KioskLocationRow[] = [];
+
+  for (let offset = 0; ; offset += KIOSK_LOCATION_PAGE_SIZE) {
+    let query = admin
+      .from('inventory_locations')
+      .select('id, name, description, location_type, source_type, external_reference, is_active')
+      .eq('is_active', true)
+      .neq('id', yardId);
+    if (!includeLegacyQuotes) {
+      query = query.neq('source_type', 'legacy_quote');
+    }
+    const { data, error } = await query
+      .order('location_type', { ascending: true })
+      .order('name', { ascending: true })
+      .range(offset, offset + KIOSK_LOCATION_PAGE_SIZE - 1);
+
+    if (error) throw error;
+    const page = (data || []) as KioskLocationRow[];
+    locations.push(...page);
+    if (page.length < KIOSK_LOCATION_PAGE_SIZE) break;
+  }
+
+  return locations;
 }
 
 export async function requireInventoryKioskAccess(): Promise<InventoryKioskAccessResult> {
@@ -199,20 +274,8 @@ export async function getYardKioskBootstrap(
 ): Promise<YardKioskBootstrapResponse> {
   assertKioskAccess(access);
   const admin = createAdminClient();
-  let locationQuery = admin
-    .from('inventory_locations')
-    .select('id, name, description, location_type, source_type, external_reference, is_active')
-    .eq('is_active', true)
-    .neq('id', access.yard.id);
-  if (!options.includeLegacyQuotes) {
-    locationQuery = locationQuery.neq('source_type', 'legacy_quote');
-  }
-
-  const [{ data: locations, error: locationsError }, { data: categories, error: categoriesError }] = await Promise.all([
-    locationQuery
-      .order('location_type', { ascending: true })
-      .order('name', { ascending: true })
-      .limit(500),
+  const [locationRows, { data: categories, error: categoriesError }] = await Promise.all([
+    loadKioskLocations(admin, access.yard.id, options.includeLegacyQuotes === true),
     admin
       .from('inventory_item_categories')
       .select('id, slug, name, sort_order')
@@ -221,13 +284,49 @@ export async function getYardKioskBootstrap(
       .order('name', { ascending: true }),
   ]);
 
-  if (locationsError) throw locationsError;
   if (categoriesError) throw categoriesError;
+
+  const locationIds = locationRows.map((location) => location.id);
+  const [primaryAssignmentsResult, secondaryAssignmentsResult] = locationIds.length > 0
+    ? await Promise.all([
+        admin
+          .from('inventory_user_locations')
+          .select(`
+            location_id,
+            user:profiles!inventory_user_locations_user_id_fkey(full_name)
+          `)
+          .limit(5000),
+        admin
+          .from('inventory_user_site_locations')
+          .select(`
+            location_id,
+            user:profiles!inventory_user_site_locations_user_id_fkey(full_name)
+          `)
+          .limit(5000),
+      ])
+    : [
+        { data: [], error: null },
+        { data: [], error: null },
+      ];
+
+  if (primaryAssignmentsResult.error) throw primaryAssignmentsResult.error;
+  if (secondaryAssignmentsResult.error) throw secondaryAssignmentsResult.error;
+
+  const primaryNamesByLocationId = getAssigneeNamesByLocationId(
+    (primaryAssignmentsResult.data || []) as unknown as KioskLocationAssigneeRow[],
+  );
+  const secondaryNamesByLocationId = getAssigneeNamesByLocationId(
+    (secondaryAssignmentsResult.data || []) as unknown as KioskLocationAssigneeRow[],
+  );
 
   return {
     configured: true,
     yard: toKioskLocation(access.yard),
-    locations: ((locations || []) as KioskLocationRow[]).map(toKioskLocation),
+    locations: locationRows.map((location) => toKioskLocation(
+      location,
+      primaryNamesByLocationId.get(location.id) || [],
+      secondaryNamesByLocationId.get(location.id) || [],
+    )),
     categories: categories || [],
   };
 }

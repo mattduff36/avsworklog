@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useReducer, useState } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import {
   AlertCircle,
   ArrowLeft,
+  ArrowRight,
   MapPinned,
   PackageOpen,
   RefreshCw,
@@ -22,11 +23,14 @@ import type {
 import { useAuth } from '@/lib/hooks/useAuth';
 import { YardKioskBasket } from './YardKioskBasket';
 import { YardKioskAdminMenu } from './YardKioskAdminMenu';
+import { YardKioskInactivityGuard } from './YardKioskInactivityGuard';
 import { YardKioskItemPicker } from './YardKioskItemPicker';
+import { YardKioskInstructionOverlay } from './YardKioskInstructionOverlay';
 import { YardKioskLocationPager } from './YardKioskLocationPager';
 import { YardKioskModeSelect } from './YardKioskModeSelect';
 import { YardKioskReceipt as YardKioskReceiptView } from './YardKioskReceipt';
 import {
+  getYardKioskGuidance,
   INITIAL_YARD_KIOSK_STATE,
   yardKioskReducer,
 } from '../yard-kiosk-state';
@@ -51,6 +55,8 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
   const [state, dispatch] = useReducer(yardKioskReducer, INITIAL_YARD_KIOSK_STATE);
   const [offline, setOffline] = useState(false);
   const [locations, setLocations] = useState<YardKioskLocation[]>(bootstrap.locations);
+  const legacyLocationRequestIdRef = useRef(0);
+  const workflowSessionIdRef = useRef(0);
 
   useEffect(() => {
     const updateOnlineStatus = () => setOffline(!window.navigator.onLine);
@@ -66,6 +72,7 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
   const loadStock = useCallback(async (
     direction: YardKioskDirection,
     counterpart: YardKioskLocation,
+    expectedSessionId = workflowSessionIdRef.current,
   ) => {
     try {
       const params = new URLSearchParams({
@@ -77,8 +84,10 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
       });
       const payload = await response.json() as ApiErrorPayload & { items?: YardKioskStockItem[] };
       if (!response.ok) throw new Error(payload.error || 'Failed to load available stock');
+      if (workflowSessionIdRef.current !== expectedSessionId) return;
       dispatch({ type: 'STOCK_LOADED', stock: payload.items || [] });
     } catch (error) {
+      if (workflowSessionIdRef.current !== expectedSessionId) return;
       dispatch({
         type: 'STOCK_FAILED',
         message: error instanceof Error ? error.message : 'Failed to load available stock',
@@ -87,25 +96,32 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
   }, []);
 
   function handleDirection(direction: YardKioskDirection) {
+    legacyLocationRequestIdRef.current += 1;
+    workflowSessionIdRef.current += 1;
     setLocations(bootstrap.locations);
     dispatch({ type: 'SELECT_DIRECTION', direction });
   }
 
   function handleLocation(location: YardKioskLocation) {
     if (!state.direction) return;
+    legacyLocationRequestIdRef.current += 1;
     setLocations(bootstrap.locations);
     dispatch({ type: 'SELECT_LOCATION', location });
-    void loadStock(state.direction, location);
+    void loadStock(state.direction, location, workflowSessionIdRef.current);
   }
 
   async function handleLegacyQuoteLocationOptIn(includeLegacyQuotes: boolean) {
+    const requestId = legacyLocationRequestIdRef.current + 1;
+    legacyLocationRequestIdRef.current = requestId;
     const response = await fetch(
       `/api/inventory/kiosk/bootstrap${includeLegacyQuotes ? '?includeLegacyQuotes=true' : ''}`,
       { cache: 'no-store' },
     );
     const payload = await response.json() as ApiErrorPayload & YardKioskBootstrapResponse;
     if (!response.ok) throw new Error(payload.error || 'Failed to load locations');
-    setLocations(payload.locations || []);
+    if (legacyLocationRequestIdRef.current === requestId) {
+      setLocations(payload.locations || []);
+    }
   }
 
   async function handleSubmit() {
@@ -116,6 +132,7 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
       || state.phase === 'submitting'
     ) return;
 
+    const expectedSessionId = workflowSessionIdRef.current;
     dispatch({ type: 'SUBMIT_START' });
     try {
       const response = await fetch('/api/inventory/kiosk/submit', {
@@ -135,6 +152,7 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
         }),
       });
       const payload = await response.json() as ApiErrorPayload & YardKioskReceipt;
+      if (workflowSessionIdRef.current !== expectedSessionId) return;
       if (!response.ok) {
         dispatch({
           type: 'SUBMIT_FAILED',
@@ -142,12 +160,13 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
           blockedItems: payload.blocked_items,
         });
         if (response.status === 409) {
-          void loadStock(state.direction, state.counterpart);
+          void loadStock(state.direction, state.counterpart, expectedSessionId);
         }
         return;
       }
       dispatch({ type: 'SUBMIT_SUCCEEDED', receipt: payload });
     } catch (error) {
+      if (workflowSessionIdRef.current !== expectedSessionId) return;
       dispatch({
         type: 'SUBMIT_FAILED',
         message: error instanceof Error ? error.message : 'The transfer could not be completed',
@@ -159,14 +178,41 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
     dispatch({ type: 'REMOVE_LINE', kind: line.kind, itemId: line.item_id });
   }
 
-  const showBack = state.phase === 'location' || state.phase === 'items';
-  const stepLabel = state.phase === 'mode'
-    ? 'Choose direction'
-    : state.phase === 'location'
-      ? 'Choose location'
-      : state.phase === 'receipt'
-        ? 'Complete'
-        : 'Choose stock';
+  function handleWorkflowBack() {
+    legacyLocationRequestIdRef.current += 1;
+    workflowSessionIdRef.current += 1;
+    setLocations(bootstrap.locations);
+    dispatch({ type: 'BACK' });
+  }
+
+  const handleWorkflowReset = useCallback(() => {
+    legacyLocationRequestIdRef.current += 1;
+    workflowSessionIdRef.current += 1;
+    setLocations(bootstrap.locations);
+    dispatch({ type: 'RESET' });
+  }, [bootstrap.locations]);
+
+  function handleWorkflowForward() {
+    if (state.phase === 'items') {
+      void handleSubmit();
+      return;
+    }
+    if (state.phase === 'receipt') handleWorkflowReset();
+  }
+
+  const guidance = getYardKioskGuidance(state);
+  const workflowBackLabel = state.phase === 'location'
+    ? 'Back to direction selection'
+    : state.phase === 'items'
+      ? 'Back to location selection'
+      : null;
+  const workflowForwardLabel = state.phase === 'items'
+    ? 'Confirm transfer and continue'
+    : state.phase === 'receipt'
+      ? 'Start new transfer'
+      : null;
+  const workflowForwardDisabled =
+    state.phase === 'items' && (state.basket.length === 0 || offline);
 
   return (
     <main
@@ -177,40 +223,57 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
         profileId={profile?.id}
         canCheck={!authLoading && Boolean(profile?.id)}
       />
-      <header className="flex items-center justify-between border-b border-white/10 bg-slate-950/75 px-6 backdrop-blur-xl">
-        <div className="flex items-center gap-4">
-          <YardKioskAdminMenu disabled={state.phase === 'submitting'} />
-          {showBack ? (
+      <header
+        data-testid="yard-kiosk-workflow-nav"
+        className="grid grid-cols-[3.5rem_19rem_minmax(0,1fr)_15rem_3.5rem] items-center gap-3 border-b border-white/10 bg-slate-950/75 px-3 backdrop-blur-xl"
+      >
+        <div
+          data-testid="workflow-back-slot"
+          className="grid h-14 w-14 place-items-center justify-self-start"
+        >
+          {workflowBackLabel ? (
             <button
               type="button"
-              aria-label="Go back"
-              onClick={() => {
-                setLocations(bootstrap.locations);
-                dispatch({ type: 'BACK' });
-              }}
-              className="grid h-12 w-12 place-items-center rounded-2xl border border-white/10 bg-white/5 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+              aria-label={workflowBackLabel}
+              onClick={handleWorkflowBack}
+              className="grid h-14 w-14 place-items-center rounded-2xl border border-white/10 bg-white/5 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
             >
               <ArrowLeft className="h-7 w-7" />
             </button>
-          ) : null}
-          <div>
+          ) : (
+            <span aria-hidden="true" className="h-14 w-14" />
+          )}
+        </div>
+
+        <div
+          data-testid="workflow-brand-slot"
+          className="flex w-full items-center gap-4"
+        >
+          <YardKioskAdminMenu disabled={state.phase === 'submitting'} />
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-black tracking-tight">Yard Inventory</h1>
               <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-amber-200">
                 Kiosk
               </span>
             </div>
-            <p className="text-sm font-medium text-slate-400">{stepLabel}</p>
+            <p className="text-sm font-medium text-slate-400">{guidance.stepLabel}</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center justify-end">
           {offline ? (
             <span className="flex items-center gap-2 rounded-xl bg-red-500/15 px-3 py-2 text-sm font-bold text-red-100">
               <WifiOff className="h-4 w-4" />
               Offline
             </span>
           ) : null}
+        </div>
+
+        <div
+          data-testid="workflow-status-slot"
+          className="flex w-60 items-center justify-end gap-3 justify-self-end"
+        >
           <span className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold text-slate-300">
             <MapPinned className="h-4 w-4 text-amber-300" />
             {bootstrap.yard.name}
@@ -229,15 +292,46 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
             })}
           </div>
         </div>
+
+        <div
+          data-testid="workflow-forward-slot"
+          className="grid h-14 w-14 place-items-center justify-self-end"
+        >
+          {workflowForwardLabel ? (
+            <button
+              type="button"
+              aria-label={workflowForwardLabel}
+              disabled={workflowForwardDisabled}
+              onClick={handleWorkflowForward}
+              className="grid h-14 w-14 place-items-center rounded-2xl border border-white/10 bg-white/5 text-white disabled:cursor-not-allowed disabled:opacity-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+            >
+              <ArrowRight className="h-7 w-7" />
+            </button>
+          ) : (
+            <span aria-hidden="true" className="h-14 w-14" />
+          )}
+        </div>
       </header>
 
       <div className="relative min-h-0 overflow-hidden">
+        {state.phase !== 'mode' ? (
+          <YardKioskInactivityGuard onTimeout={handleWorkflowReset} />
+        ) : null}
+
+        {guidance.instructionKey && guidance.message ? (
+          <YardKioskInstructionOverlay
+            instructionKey={guidance.instructionKey}
+            message={guidance.message}
+          />
+        ) : null}
+
         {state.phase === 'mode' ? (
           <YardKioskModeSelect yardName={bootstrap.yard.name} onSelect={handleDirection} />
         ) : null}
 
         {state.phase === 'location' && state.direction ? (
           <YardKioskLocationPager
+            key={`${state.direction}:location`}
             direction={state.direction}
             locations={locations}
             onSelect={handleLocation}
@@ -248,33 +342,46 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
         {(state.phase === 'items' || state.phase === 'submitting')
           && state.direction
           && state.counterpart ? (
-          <div className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_21rem] gap-4 p-4">
-            <YardKioskItemPicker
-              categories={bootstrap.categories}
-              items={state.stock}
-              basket={state.basket}
-              searchQuery={state.searchQuery}
-              activeCategory={state.category}
-              loading={state.loadingStock}
-              onSearchChange={(query) => dispatch({ type: 'SET_SEARCH', query })}
-              onCategoryChange={(category) => dispatch({ type: 'SET_CATEGORY', category })}
-              onAddSerialized={(item) => dispatch({ type: 'ADD_SERIALIZED', item })}
-              onSetHardwareQuantity={(item, quantity) => dispatch({
-                type: 'SET_HARDWARE_QUANTITY',
-                item,
-                quantity,
-              })}
-            />
-            <YardKioskBasket
-              direction={state.direction}
-              counterpart={state.counterpart}
-              basket={state.basket}
-              offline={offline}
-              submitting={state.phase === 'submitting'}
-              onRemove={handleRemove}
-              onClear={() => dispatch({ type: 'CLEAR_BASKET' })}
-              onSubmit={() => void handleSubmit()}
-            />
+          <div
+            data-testid="yard-kiosk-items-layout"
+            className="grid h-full min-h-0 min-w-0 grid-cols-[minmax(0,1fr)_21rem] gap-4 overflow-hidden p-4"
+          >
+            <div
+              data-testid="yard-kiosk-item-pane"
+              className="h-full min-h-0 min-w-0 overflow-hidden"
+            >
+              <YardKioskItemPicker
+                categories={bootstrap.categories}
+                items={state.stock}
+                basket={state.basket}
+                searchQuery={state.searchQuery}
+                activeCategory={state.category}
+                loading={state.loadingStock}
+                onSearchChange={(query) => dispatch({ type: 'SET_SEARCH', query })}
+                onCategoryChange={(category) => dispatch({ type: 'SET_CATEGORY', category })}
+                onAddSerialized={(item) => dispatch({ type: 'ADD_SERIALIZED', item })}
+                onSetHardwareQuantity={(item, quantity) => dispatch({
+                  type: 'SET_HARDWARE_QUANTITY',
+                  item,
+                  quantity,
+                })}
+              />
+            </div>
+            <div
+              data-testid="yard-kiosk-basket-pane"
+              className="h-full min-h-0 min-w-0 overflow-hidden"
+            >
+              <YardKioskBasket
+                direction={state.direction}
+                counterpart={state.counterpart}
+                basket={state.basket}
+                offline={offline}
+                submitting={state.phase === 'submitting'}
+                onRemove={handleRemove}
+                onClear={() => dispatch({ type: 'CLEAR_BASKET' })}
+                onSubmit={() => void handleSubmit()}
+              />
+            </div>
           </div>
         ) : null}
 
@@ -286,10 +393,7 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
             direction={state.direction}
             counterpart={state.counterpart}
             receipt={state.receipt}
-              onReset={() => {
-                setLocations(bootstrap.locations);
-                dispatch({ type: 'RESET' });
-              }}
+            onReset={handleWorkflowReset}
           />
         ) : null}
 

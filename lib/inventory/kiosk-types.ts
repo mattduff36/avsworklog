@@ -25,6 +25,8 @@ export interface YardKioskLocation extends Pick<
   | 'linked_asset_nickname'
 > {
   location_type: InventoryLocationType;
+  primary_user_names: string[];
+  secondary_user_names: string[];
 }
 
 export interface YardKioskSerializedStockItem {

@@ -21,7 +21,7 @@ export function YardKioskModeSelect({ yardName, onSelect }: YardKioskModeSelectP
           <ArrowUpFromLine className="h-11 w-11" aria-hidden />
         </span>
         <span>
-          <span className="block text-5xl font-black tracking-tight text-white">Take</span>
+          <span className="block text-5xl font-black tracking-tight text-white">Collect</span>
           <span className="mt-2 block text-xl font-medium text-amber-100/80">
             Move stock from {yardName}
           </span>

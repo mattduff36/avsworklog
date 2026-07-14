@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   INITIAL_YARD_KIOSK_STATE,
   getBasketSummary,
+  getYardKioskGuidance,
   yardKioskReducer,
 } from '@/app/yard-kiosk/yard-kiosk-state';
 import type { YardKioskStockItem } from '@/lib/inventory/kiosk-types';
@@ -37,7 +38,10 @@ describe('Yard kiosk state', () => {
         name: 'Van AB12 CDE',
         description: null,
         location_type: 'van',
+        source_type: null,
         external_reference: null,
+        primary_user_names: [],
+        secondary_user_names: [],
       },
     });
 
@@ -100,5 +104,115 @@ describe('Yard kiosk state', () => {
     expect(failed.phase).toBe('items');
     expect(failed.basket).toEqual(withItem.basket);
     expect(failed.error).toBe('Stock changed');
+  });
+
+  it('fully discards partial workflow and receipt state on reset', () => {
+    const reset = yardKioskReducer({
+      ...INITIAL_YARD_KIOSK_STATE,
+      phase: 'receipt',
+      direction: 'take',
+      counterpart: {
+        id: '33333333-3333-4333-8333-333333333333',
+        name: 'Van AB12 CDE',
+        description: null,
+        location_type: 'van',
+        source_type: null,
+        external_reference: null,
+        primary_user_names: [],
+        secondary_user_names: [],
+      },
+      stock: [serializedItem],
+      basket: [{
+        kind: 'serialized',
+        item_id: serializedItem.id,
+        item_number: serializedItem.item_number,
+        name: serializedItem.name,
+        category: serializedItem.category,
+      }],
+      searchQuery: 'breaker',
+      category: 'tools',
+      loadingStock: true,
+      error: 'Draft error',
+      blockedItems: [{
+        id: serializedItem.id,
+        item_number: serializedItem.item_number,
+        name: serializedItem.name,
+        check_status: serializedItem.check_status,
+      }],
+      receipt: {
+        kiosk_batch_id: 'batch-one',
+        movement_batch_id: 'movement-one',
+        hardware_batch_id: null,
+        serialized_count: 1,
+        hardware_line_count: 0,
+      },
+    }, { type: 'RESET' });
+
+    expect(reset).toEqual(INITIAL_YARD_KIOSK_STATE);
+  });
+
+  it('provides action guidance for every direction-aware workflow state', () => {
+    expect(getYardKioskGuidance(INITIAL_YARD_KIOSK_STATE)).toMatchObject({
+      instructionKey: null,
+      message: null,
+      stepLabel: 'Choose direction',
+    });
+    expect(getYardKioskGuidance({
+      ...INITIAL_YARD_KIOSK_STATE,
+      phase: 'location',
+      direction: 'take',
+    }).message).toBe('Select the destination location');
+    expect(getYardKioskGuidance({
+      ...INITIAL_YARD_KIOSK_STATE,
+      phase: 'location',
+      direction: 'return',
+    }).message).toBe('Select the source location');
+    expect(getYardKioskGuidance({
+      ...INITIAL_YARD_KIOSK_STATE,
+      phase: 'items',
+      direction: 'take',
+    }).message).toBe('Select stock to collect from Yard');
+    expect(getYardKioskGuidance({
+      ...INITIAL_YARD_KIOSK_STATE,
+      phase: 'items',
+      direction: 'return',
+    }).message).toBe('Select stock to return to Yard');
+    expect(getYardKioskGuidance({
+      ...INITIAL_YARD_KIOSK_STATE,
+      phase: 'items',
+      direction: 'take',
+      basket: [{
+        kind: 'serialized',
+        item_id: serializedItem.id,
+        item_number: serializedItem.item_number,
+        name: serializedItem.name,
+        category: serializedItem.category,
+      }],
+    }).message).toBe('Review your basket, then confirm');
+    expect(getYardKioskGuidance({
+      ...INITIAL_YARD_KIOSK_STATE,
+      phase: 'submitting',
+      direction: 'take',
+      counterpart: {
+        id: '33333333-3333-4333-8333-333333333333',
+        name: 'Van AB12 CDE',
+        description: null,
+        location_type: 'van',
+        source_type: null,
+        external_reference: null,
+        primary_user_names: [],
+        secondary_user_names: [],
+      },
+    }).message).toBe('Moving stock to Van AB12 CDE');
+    expect(getYardKioskGuidance({
+      ...INITIAL_YARD_KIOSK_STATE,
+      phase: 'submitting',
+      direction: 'return',
+    }).message).toBe('Returning stock to Yard');
+    expect(getYardKioskGuidance({
+      ...INITIAL_YARD_KIOSK_STATE,
+      phase: 'receipt',
+      direction: 'take',
+    }).message).toBe('Transfer complete');
   });
 });

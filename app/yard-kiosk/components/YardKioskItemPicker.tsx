@@ -1,13 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   Box,
   Boxes,
   Check,
-  ChevronLeft,
-  ChevronRight,
   Minus,
   PackageSearch,
   Plus,
@@ -27,8 +25,10 @@ import type {
   YardKioskCategory,
   YardKioskStockItem,
 } from '@/lib/inventory/kiosk-types';
+import { YardKioskPagerNavigation } from './YardKioskPagerNavigation';
 
 const ITEMS_PER_PAGE = 6;
+const MAX_VISIBLE_ITEMS = 24;
 
 interface ItemPage {
   id: string;
@@ -81,7 +81,6 @@ export function YardKioskItemPicker({
   onSetHardwareQuantity,
 }: YardKioskItemPickerProps) {
   const pagerRef = useRef<HTMLDivElement>(null);
-  const [pageIndex, setPageIndex] = useState(0);
   const [hardwareItem, setHardwareItem] = useState<Extract<YardKioskStockItem, { kind: 'hardware' }> | null>(null);
   const [quantity, setQuantity] = useState(1);
 
@@ -90,42 +89,64 @@ export function YardKioskItemPicker({
     [categories],
   );
 
-  const pages = useMemo(() => {
+  const matchingItems = useMemo(() => {
+    const categoryItems = activeCategory === 'all'
+      ? items
+      : activeCategory === 'hardware'
+        ? items.filter((item) => item.kind === 'hardware')
+        : items.filter(
+          (item) => item.kind === 'serialized' && item.category === activeCategory,
+        );
     const query = searchQuery.trim().toLowerCase();
-    if (query) {
-      const matches = items.filter((item) => (
+    if (!query) return categoryItems;
+    return categoryItems.filter((item) => (
         item.name.toLowerCase().includes(query)
         || (item.kind === 'serialized' && item.item_number.toLowerCase().includes(query))
-      ));
-      return chunkItemPages('search', `Search results · ${matches.length}`, matches);
-    }
-
-    const serializedCategories = Array.from(new Set(
-      items.flatMap((item) => item.kind === 'serialized' ? [item.category] : []),
     ));
-    const hardware = items.filter((item) => item.kind === 'hardware');
-    return [
-      ...chunkItemPages('all', 'All available stock', items),
-      ...serializedCategories.flatMap((category) => chunkItemPages(
-        category,
-        categoryLabels.get(category) || category.replaceAll('_', ' '),
-        items.filter((item) => item.kind === 'serialized' && item.category === category),
-      )),
-      ...chunkItemPages('hardware', 'Hardware', hardware),
-    ];
-  }, [categoryLabels, items, searchQuery]);
+  }, [activeCategory, items, searchQuery]);
+  const requiresNarrowing = matchingItems.length > MAX_VISIBLE_ITEMS;
 
-  useEffect(() => {
-    const index = Math.max(0, pages.findIndex((page) => page.category === activeCategory));
-    const element = pagerRef.current;
-    if (element) element.scrollTo({ left: element.clientWidth * index, behavior: 'smooth' });
-  }, [activeCategory, pages]);
+  const pages = useMemo(() => {
+    if (requiresNarrowing) return [];
+    const title = searchQuery.trim()
+      ? `Search results · ${matchingItems.length}`
+      : activeCategory === 'all'
+        ? 'All available stock'
+        : activeCategory === 'hardware'
+          ? 'Hardware'
+          : categoryLabels.get(activeCategory) || activeCategory.replaceAll('_', ' ');
+    return chunkItemPages(activeCategory, title, matchingItems);
+  }, [
+    activeCategory,
+    categoryLabels,
+    matchingItems,
+    requiresNarrowing,
+    searchQuery,
+  ]);
+  const pagerContextKey = `${activeCategory}:${searchQuery}:${requiresNarrowing}`;
+  const [pagerState, setPagerState] = useState({ contextKey: pagerContextKey, index: 0 });
+  const currentPageIndex = pagerState.contextKey === pagerContextKey
+    ? Math.min(pagerState.index, Math.max(0, pages.length - 1))
+    : 0;
+
+  function resetPager() {
+    setPagerState({ contextKey: pagerContextKey, index: 0 });
+    pagerRef.current?.scrollTo({ left: 0, behavior: 'smooth' });
+  }
+
+  function handleSearchChange(query: string) {
+    resetPager();
+    onSearchChange(query);
+  }
+
+  function handleCategoryChange(category: string) {
+    resetPager();
+    onCategoryChange(category);
+  }
 
   function goToPage(index: number) {
     const nextIndex = Math.max(0, Math.min(pages.length - 1, index));
-    setPageIndex(nextIndex);
-    const nextPage = pages[nextIndex];
-    if (nextPage && nextPage.category !== activeCategory) onCategoryChange(nextPage.category);
+    setPagerState({ contextKey: pagerContextKey, index: nextIndex });
     pagerRef.current?.scrollTo({
       left: pagerRef.current.clientWidth * nextIndex,
       behavior: 'smooth',
@@ -136,7 +157,10 @@ export function YardKioskItemPicker({
     const element = pagerRef.current;
     if (!element?.clientWidth) return;
     const nextIndex = Math.round(element.scrollLeft / element.clientWidth);
-    setPageIndex(nextIndex);
+    setPagerState({
+      contextKey: pagerContextKey,
+      index: Math.min(Math.max(0, pages.length - 1), nextIndex),
+    });
   }
 
   function getBasketLine(item: YardKioskStockItem) {
@@ -157,7 +181,10 @@ export function YardKioskItemPicker({
 
   return (
     <>
-      <section className="grid h-full min-h-0 grid-rows-[auto_auto_1fr_auto] gap-3">
+      <section
+        data-testid="yard-kiosk-item-picker"
+        className="grid h-full min-h-0 min-w-0 grid-rows-[auto_auto_1fr_auto] gap-3 overflow-hidden"
+      >
         <div className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {[
             { slug: 'all', name: 'All stock' },
@@ -171,10 +198,10 @@ export function YardKioskItemPicker({
             <button
               key={category.slug}
               type="button"
-              onClick={() => onCategoryChange(category.slug)}
-              aria-pressed={!searchQuery && activeCategory === category.slug}
+              onClick={() => handleCategoryChange(category.slug)}
+              aria-pressed={activeCategory === category.slug}
               className={`h-11 flex-none rounded-xl px-4 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 ${
-                !searchQuery && activeCategory === category.slug
+                activeCategory === category.slug
                   ? 'bg-amber-300 text-slate-950'
                   : 'border border-white/10 bg-white/5 text-slate-300'
               }`}
@@ -191,29 +218,22 @@ export function YardKioskItemPicker({
             <input
               type="search"
               value={searchQuery}
-              onChange={(event) => onSearchChange(event.target.value)}
+              onChange={(event) => handleSearchChange(event.target.value)}
               placeholder="Search item name or item number…"
               className="h-12 w-full rounded-xl border border-white/10 bg-slate-950/70 pl-12 pr-4 text-base text-white outline-none placeholder:text-slate-500 focus:border-amber-300/70"
             />
           </label>
-          <button
-            type="button"
-            aria-label="Previous item page"
-            onClick={() => goToPage(pageIndex - 1)}
-            disabled={pageIndex === 0}
-            className="grid h-12 w-12 flex-none place-items-center rounded-xl border border-white/10 bg-white/5 text-white disabled:opacity-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
-          >
-            <ChevronLeft className="h-6 w-6" />
-          </button>
-          <button
-            type="button"
-            aria-label="Next item page"
-            onClick={() => goToPage(pageIndex + 1)}
-            disabled={pageIndex >= pages.length - 1}
-            className="grid h-12 w-12 flex-none place-items-center rounded-xl border border-white/10 bg-white/5 text-white disabled:opacity-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
-          >
-            <ChevronRight className="h-6 w-6" />
-          </button>
+          {!requiresNarrowing && pages.length > 0 ? (
+            <YardKioskPagerNavigation
+              label="Item page navigation"
+              previousLabel="Previous item page"
+              nextLabel="Next item page"
+              canGoPrevious={currentPageIndex > 0}
+              canGoNext={currentPageIndex < pages.length - 1}
+              onPrevious={() => goToPage(currentPageIndex - 1)}
+              onNext={() => goToPage(currentPageIndex + 1)}
+            />
+          ) : null}
         </div>
 
         <div className="relative min-h-0 overflow-hidden">
@@ -222,6 +242,25 @@ export function YardKioskItemPicker({
               <div className="text-center">
                 <PackageSearch className="mx-auto h-12 w-12 animate-pulse text-amber-300" />
                 <p className="mt-3 text-lg font-bold text-white">Loading available stock…</p>
+              </div>
+            </div>
+          ) : requiresNarrowing ? (
+            <div
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+              className="grid h-full place-items-center rounded-2xl border border-amber-300/25 bg-amber-300/[0.06] px-8 text-center"
+            >
+              <div className="max-w-2xl">
+                <Search className="mx-auto h-14 w-14 text-amber-300" aria-hidden />
+                <p className="mt-4 text-3xl font-black tracking-tight text-white">
+                  {searchQuery.trim()
+                    ? 'Keep typing to narrow the stock list'
+                    : 'Start typing to narrow the stock list'}
+                </p>
+                <p aria-hidden="true" className="mt-2 text-lg font-bold text-amber-100/75">
+                  {matchingItems.length} matching items
+                </p>
               </div>
             </div>
           ) : pages.length === 0 ? (
@@ -241,7 +280,12 @@ export function YardKioskItemPicker({
               className="flex h-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
               {pages.map((page) => (
-                <div key={page.id} className="grid h-full w-full flex-none snap-start grid-rows-[auto_1fr] gap-2">
+                <div
+                  key={page.id}
+                  className="grid h-full w-full flex-none snap-start grid-rows-[auto_1fr] gap-2 px-1"
+                  role="group"
+                  aria-label={page.title}
+                >
                   <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-200">
                     {page.title}
                   </p>
@@ -301,20 +345,22 @@ export function YardKioskItemPicker({
           )}
         </div>
 
-        <div className="flex h-2 items-center justify-center gap-1.5" aria-label="Item pages">
-          {pages.map((page, index) => (
-            <button
-              key={page.id}
-              type="button"
-              aria-label={`Go to ${page.title}`}
-              aria-current={index === pageIndex ? 'page' : undefined}
-              onClick={() => goToPage(index)}
-              className={`h-1.5 rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 ${
-                index === pageIndex ? 'w-7 bg-amber-300' : 'w-1.5 bg-white/20'
-              }`}
-            />
-          ))}
-        </div>
+        {pages.length > 0 ? (
+          <div className="flex h-2 items-center justify-center gap-1.5" aria-label="Item pages">
+            {pages.map((page, index) => (
+              <button
+                key={page.id}
+                type="button"
+                aria-label={`Go to ${page.title}`}
+                aria-current={index === currentPageIndex ? 'page' : undefined}
+                onClick={() => goToPage(index)}
+                className={`h-1.5 rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 ${
+                  index === currentPageIndex ? 'w-7 bg-amber-300' : 'w-1.5 bg-white/20'
+                }`}
+              />
+            ))}
+          </div>
+        ) : <div className="h-2" aria-hidden="true" />}
       </section>
 
       <Dialog open={Boolean(hardwareItem)} onOpenChange={(open) => { if (!open) setHardwareItem(null); }}>

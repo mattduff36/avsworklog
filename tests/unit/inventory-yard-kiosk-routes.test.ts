@@ -31,8 +31,11 @@ const allowedAccess = {
     name: 'Yard',
     description: null,
     location_type: 'yard' as const,
+    source_type: null,
     external_reference: null,
     is_active: true,
+    primary_user_names: [],
+    secondary_user_names: [],
   },
 };
 
@@ -80,8 +83,10 @@ describe('Inventory Yard kiosk routes', () => {
   it('passes the local legacy quote opt-in to bootstrap discovery', async () => {
     vi.mocked(requireInventoryKioskAccess).mockResolvedValue(allowedAccess);
     vi.mocked(getYardKioskBootstrap).mockResolvedValue({
+      configured: true,
       yard: allowedAccess.yard,
       locations: [],
+      categories: [],
     });
 
     const defaultResponse = await getBootstrap(new NextRequest(

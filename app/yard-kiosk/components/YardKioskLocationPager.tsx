@@ -3,8 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Building2,
-  ChevronLeft,
-  ChevronRight,
   HardHat,
   MapPin,
   Search,
@@ -20,8 +18,23 @@ import {
   togglePinnedYardKioskLocation,
 } from '../yard-kiosk-storage';
 import { LegacyQuoteLocationOptIn } from '@/app/(dashboard)/inventory/components/LegacyQuoteLocationOptIn';
+import {
+  YARD_KIOSK_INLINE_CONTROL_HEIGHT,
+  YARD_KIOSK_INLINE_CONTROL_RADIUS,
+  YARD_KIOSK_INLINE_CONTROL_SURFACE,
+  YardKioskPagerNavigation,
+} from './YardKioskPagerNavigation';
 
 const PAGE_SIZE = 8;
+
+type LocationFilter = 'all' | 'manual' | 'vans' | 'sites';
+
+const LOCATION_FILTERS: Array<{ value: LocationFilter; label: string }> = [
+  { value: 'all', label: 'All' },
+  { value: 'manual', label: 'Manual' },
+  { value: 'vans', label: 'Vans' },
+  { value: 'sites', label: 'Sites' },
+];
 
 interface LocationPage {
   id: string;
@@ -58,6 +71,16 @@ function getLocationIcon(type: YardKioskLocation['location_type']) {
   return MapPin;
 }
 
+function matchesLocationFilter(
+  location: YardKioskLocation,
+  filter: LocationFilter,
+): boolean {
+  if (filter === 'manual') return location.location_type === 'manual';
+  if (filter === 'vans') return location.location_type === 'van';
+  if (filter === 'sites') return location.location_type === 'site';
+  return true;
+}
+
 export function YardKioskLocationPager({
   direction,
   locations,
@@ -66,40 +89,69 @@ export function YardKioskLocationPager({
 }: YardKioskLocationPagerProps) {
   const pagerRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState('');
+  const [activeFilter, setActiveFilter] = useState<LocationFilter>('all');
   const [pageIndex, setPageIndex] = useState(0);
   const [recentIds, setRecentIds] = useState<string[]>([]);
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
   const [includeLegacyQuotes, setIncludeLegacyQuotes] = useState(false);
+  const legacyRequestIdRef = useRef(0);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
+      setPageIndex(0);
       setRecentIds(getRecentYardKioskLocationIds());
       setPinnedIds(getPinnedYardKioskLocationIds());
+      pagerRef.current?.scrollTo({ left: 0, behavior: 'auto' });
     }, 0);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [direction]);
 
-  const pages = useMemo(() => {
+  const matchingLocations = useMemo(() => {
+    const filteredLocations = locations.filter(
+      (location) => (
+        (includeLegacyQuotes || location.source_type !== 'legacy_quote')
+        && matchesLocationFilter(location, activeFilter)
+      ),
+    );
     const normalizedQuery = query.trim().toLowerCase();
-    if (normalizedQuery) {
-      const matches = locations.filter((location) => (
+    if (!normalizedQuery) return filteredLocations;
+    return filteredLocations.filter((location) => (
         location.name.toLowerCase().includes(normalizedQuery)
         || location.external_reference?.toLowerCase().includes(normalizedQuery)
         || location.description?.toLowerCase().includes(normalizedQuery)
-      ));
-      return chunkLocations('search', `Search results · ${matches.length}`, matches);
+    ));
+  }, [activeFilter, includeLegacyQuotes, locations, query]);
+
+  const pages = useMemo(() => {
+    const normalizedQuery = query.trim();
+    if (normalizedQuery) {
+      return chunkLocations(
+        'search',
+        `Search results · ${matchingLocations.length}`,
+        matchingLocations,
+      );
+    }
+    if (activeFilter !== 'all') {
+      const filterLabel =
+        LOCATION_FILTERS.find((filter) => filter.value === activeFilter)?.label
+        ?? 'Locations';
+      return chunkLocations(activeFilter, filterLabel, matchingLocations);
     }
 
-    const byId = new Map(locations.map((location) => [location.id, location]));
+    const byId = new Map(matchingLocations.map((location) => [location.id, location]));
     const priorityIds = [...pinnedIds, ...recentIds.filter((id) => !pinnedIds.includes(id))];
     const priority = priorityIds.flatMap((id) => {
       const location = byId.get(id);
       return location ? [location] : [];
     });
-    const vans = locations.filter((location) => location.location_type === 'van');
-    const sites = locations.filter((location) => location.location_type === 'site');
-    const fleet = locations.filter((location) => ['hgv', 'plant'].includes(location.location_type));
-    const other = locations.filter((location) => !['van', 'site', 'hgv', 'plant'].includes(location.location_type));
+    const vans = matchingLocations.filter((location) => location.location_type === 'van');
+    const sites = matchingLocations.filter((location) => location.location_type === 'site');
+    const fleet = matchingLocations.filter(
+      (location) => ['hgv', 'plant'].includes(location.location_type),
+    );
+    const other = matchingLocations.filter(
+      (location) => !['van', 'site', 'hgv', 'plant'].includes(location.location_type),
+    );
 
     return [
       ...chunkLocations('recent', 'Pinned & recent', priority),
@@ -108,10 +160,17 @@ export function YardKioskLocationPager({
       ...chunkLocations('fleet', 'Fleet & plant', fleet),
       ...chunkLocations('other', 'Other locations', other),
     ];
-  }, [locations, pinnedIds, query, recentIds]);
+  }, [activeFilter, matchingLocations, pinnedIds, query, recentIds]);
+  const currentPageIndex = Math.min(pageIndex, Math.max(0, pages.length - 1));
 
   function handleQueryChange(value: string) {
     setQuery(value);
+    setPageIndex(0);
+    pagerRef.current?.scrollTo({ left: 0, behavior: 'smooth' });
+  }
+
+  function handleFilterChange(filter: LocationFilter) {
+    setActiveFilter(filter);
     setPageIndex(0);
     pagerRef.current?.scrollTo({ left: 0, behavior: 'smooth' });
   }
@@ -128,7 +187,10 @@ export function YardKioskLocationPager({
   function handleScroll() {
     const element = pagerRef.current;
     if (!element?.clientWidth) return;
-    setPageIndex(Math.round(element.scrollLeft / element.clientWidth));
+    setPageIndex(Math.min(
+      Math.max(0, pages.length - 1),
+      Math.round(element.scrollLeft / element.clientWidth),
+    ));
   }
 
   function handleSelect(location: YardKioskLocation) {
@@ -141,16 +203,25 @@ export function YardKioskLocationPager({
   }
 
   async function handleIncludeLegacyQuotesChange(nextIncludeLegacyQuotes: boolean) {
-    await onIncludeLegacyQuotesChange(nextIncludeLegacyQuotes);
+    const requestId = legacyRequestIdRef.current + 1;
+    legacyRequestIdRef.current = requestId;
     setIncludeLegacyQuotes(nextIncludeLegacyQuotes);
     setQuery('');
     setPageIndex(0);
+    pagerRef.current?.scrollTo({ left: 0, behavior: 'smooth' });
+    try {
+      await onIncludeLegacyQuotesChange(nextIncludeLegacyQuotes);
+    } catch {
+      if (legacyRequestIdRef.current === requestId) {
+        setIncludeLegacyQuotes(!nextIncludeLegacyQuotes);
+      }
+    }
   }
 
   return (
     <section className="grid h-full min-h-0 grid-rows-[auto_auto_1fr_auto] gap-3 px-6 pb-5 pt-4">
-      <div className="flex items-end justify-between gap-4">
-        <div>
+      <div className="flex min-w-0 items-end justify-between gap-3">
+        <div className="min-w-0">
           <p className="text-sm font-bold uppercase tracking-[0.2em] text-slate-400">
             {direction === 'take' ? 'Destination' : 'Returning from'}
           </p>
@@ -158,45 +229,78 @@ export function YardKioskLocationPager({
             {direction === 'take' ? 'Where is it going?' : 'Where is it coming from?'}
           </h2>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-none flex-row flex-nowrap items-center gap-2">
           <LegacyQuoteLocationOptIn
             enabled={includeLegacyQuotes}
             onEnabledChange={(enabled) => { void handleIncludeLegacyQuotesChange(enabled); }}
             size="default"
-            className="border-white/20 bg-white/5 text-white hover:bg-white/10"
+            label="Include legacy sites"
+            className={[
+              'border px-4 text-sm font-black',
+              includeLegacyQuotes
+                ? 'border-amber-300/50 bg-amber-300/10 text-amber-100 hover:bg-amber-300/15'
+                : 'border-white/10 bg-transparent text-slate-500 hover:bg-white/5 hover:text-slate-300',
+              YARD_KIOSK_INLINE_CONTROL_HEIGHT,
+              YARD_KIOSK_INLINE_CONTROL_RADIUS,
+            ].join(' ')}
           />
-          <button
-            type="button"
-            aria-label="Previous location page"
-            onClick={() => goToPage(pageIndex - 1)}
-            disabled={pageIndex === 0}
-            className="grid h-12 w-12 place-items-center rounded-2xl border border-white/10 bg-white/5 text-white disabled:opacity-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
-          >
-            <ChevronLeft className="h-7 w-7" />
-          </button>
-          <button
-            type="button"
-            aria-label="Next location page"
-            onClick={() => goToPage(pageIndex + 1)}
-            disabled={pageIndex >= pages.length - 1}
-            className="grid h-12 w-12 place-items-center rounded-2xl border border-white/10 bg-white/5 text-white disabled:opacity-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
-          >
-            <ChevronRight className="h-7 w-7" />
-          </button>
+          <YardKioskPagerNavigation
+            label="Location page navigation"
+            previousLabel="Previous location page"
+            nextLabel="Next location page"
+            canGoPrevious={currentPageIndex > 0}
+            canGoNext={currentPageIndex < pages.length - 1}
+            onPrevious={() => goToPage(currentPageIndex - 1)}
+            onNext={() => goToPage(currentPageIndex + 1)}
+          />
         </div>
       </div>
 
-      <label className="relative block">
-        <Search className="pointer-events-none absolute left-5 top-1/2 h-6 w-6 -translate-y-1/2 text-slate-400" />
-        <span className="sr-only">Search locations</span>
-        <input
-          type="search"
-          value={query}
-          onChange={(event) => handleQueryChange(event.target.value)}
-          placeholder="Search a van, site, fleet asset or location…"
-          className="h-14 w-full rounded-2xl border border-white/10 bg-slate-900/80 pl-14 pr-5 text-lg text-white outline-none placeholder:text-slate-500 focus:border-amber-300/70 focus:ring-2 focus:ring-amber-300/20"
-        />
-      </label>
+      <div className="flex flex-nowrap items-center gap-3 max-[900px]:flex-wrap">
+        <label className="relative min-w-0 flex-1 max-[900px]:w-full max-[900px]:flex-none">
+          <Search className="pointer-events-none absolute left-5 top-1/2 h-6 w-6 -translate-y-1/2 text-slate-400" />
+          <span className="sr-only">Search locations</span>
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => handleQueryChange(event.target.value)}
+            placeholder="Search a van, site, fleet asset or location…"
+            className={[
+              'w-full bg-slate-900/80 pl-14 pr-5 text-lg text-white outline-none',
+              'placeholder:text-slate-500 focus:border-amber-300/70 focus:ring-2',
+              'focus:ring-amber-300/20',
+              YARD_KIOSK_INLINE_CONTROL_HEIGHT,
+              YARD_KIOSK_INLINE_CONTROL_RADIUS,
+              YARD_KIOSK_INLINE_CONTROL_SURFACE,
+            ].join(' ')}
+          />
+        </label>
+        <div
+          role="radiogroup"
+          aria-label="Filter locations"
+          className="flex flex-none flex-row flex-nowrap items-center gap-3"
+        >
+          {LOCATION_FILTERS.map((filter) => {
+            const selected = activeFilter === filter.value;
+            return (
+              <button
+                key={filter.value}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => handleFilterChange(filter.value)}
+                className={`${YARD_KIOSK_INLINE_CONTROL_HEIGHT} ${YARD_KIOSK_INLINE_CONTROL_RADIUS} w-20 border px-2 text-center text-sm font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 ${
+                  selected
+                    ? 'border-amber-300 bg-amber-300 text-slate-950'
+                    : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'
+                }`}
+              >
+                {filter.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       <div
         ref={pagerRef}
@@ -206,7 +310,7 @@ export function YardKioskLocationPager({
         {pages.length > 0 ? pages.map((page) => (
           <div
             key={page.id}
-            className="grid h-full w-full flex-none snap-start grid-rows-[auto_1fr] gap-2"
+            className="grid h-full w-full flex-none snap-start grid-rows-[auto_1fr] gap-2 px-1"
             role="group"
             aria-label={page.title}
           >
@@ -232,6 +336,31 @@ export function YardKioskLocationPager({
                         <span className="mt-1 block text-xs font-bold uppercase tracking-wider text-slate-400">
                           {location.external_reference || location.location_type}
                         </span>
+                        {location.primary_user_names.length > 0
+                          || location.secondary_user_names.length > 0 ? (
+                          <span className="mt-2 block space-y-1 border-t border-white/10 pt-2 text-[11px] leading-tight">
+                            {location.primary_user_names.length > 0 ? (
+                              <span className="flex min-w-0 items-start gap-1.5">
+                                <span className="flex-none font-black uppercase tracking-wide text-amber-200">
+                                  Primary
+                                </span>
+                                <span className="line-clamp-2 text-slate-300">
+                                  {location.primary_user_names.join(', ')}
+                                </span>
+                              </span>
+                            ) : null}
+                            {location.secondary_user_names.length > 0 ? (
+                              <span className="flex min-w-0 items-start gap-1.5">
+                                <span className="flex-none font-black uppercase tracking-wide text-cyan-200">
+                                  Secondary
+                                </span>
+                                <span className="line-clamp-2 text-slate-300">
+                                  {location.secondary_user_names.join(', ')}
+                                </span>
+                              </span>
+                            ) : null}
+                          </span>
+                        ) : null}
                       </span>
                     </button>
                     <button
@@ -265,10 +394,10 @@ export function YardKioskLocationPager({
             key={page.id}
             type="button"
             aria-label={`Go to ${page.title}`}
-            aria-current={index === pageIndex ? 'page' : undefined}
+            aria-current={index === currentPageIndex ? 'page' : undefined}
             onClick={() => goToPage(index)}
             className={`h-2 rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 ${
-              index === pageIndex ? 'w-8 bg-amber-300' : 'w-2 bg-white/20'
+              index === currentPageIndex ? 'w-8 bg-amber-300' : 'w-2 bg-white/20'
             }`}
           />
         ))}

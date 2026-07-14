@@ -9,6 +9,7 @@ interface LegacyQuoteLocationOptInProps {
   onEnabledChange: (enabled: boolean) => void;
   className?: string;
   size?: 'sm' | 'default';
+  label?: string;
 }
 
 export function LegacyQuoteLocationOptIn({
@@ -16,6 +17,7 @@ export function LegacyQuoteLocationOptIn({
   onEnabledChange,
   className,
   size = 'sm',
+  label,
 }: LegacyQuoteLocationOptInProps) {
   return (
     <Button
@@ -31,7 +33,7 @@ export function LegacyQuoteLocationOptIn({
       )}
     >
       <History className="mr-2 h-4 w-4" />
-      {enabled ? 'Legacy quotes included' : 'Include legacy quotes'}
+      {label ?? (enabled ? 'Legacy quotes included' : 'Include legacy quotes')}
     </Button>
   );
 }

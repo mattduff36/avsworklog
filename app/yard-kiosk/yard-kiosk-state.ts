@@ -23,6 +23,12 @@ export interface YardKioskState {
   receipt: YardKioskReceipt | null;
 }
 
+export interface YardKioskGuidance {
+  instructionKey: string | null;
+  message: string | null;
+  stepLabel: string;
+}
+
 export const INITIAL_YARD_KIOSK_STATE: YardKioskState = {
   phase: 'mode',
   direction: null,
@@ -202,4 +208,74 @@ export function getBasketSummary(basket: YardKioskBasketLine[]) {
     },
     { serialized: 0, hardwareLines: 0, hardwareUnits: 0 },
   );
+}
+
+export function getYardKioskGuidance(state: YardKioskState): YardKioskGuidance {
+  const direction = state.direction ?? 'take';
+
+  if (state.phase === 'mode') {
+    return {
+      instructionKey: null,
+      message: null,
+      stepLabel: 'Choose direction',
+    };
+  }
+
+  if (state.phase === 'location') {
+    return direction === 'take'
+      ? {
+          instructionKey: 'location:take',
+          message: 'Select the destination location',
+          stepLabel: 'Choose destination',
+        }
+      : {
+          instructionKey: 'location:return',
+          message: 'Select the source location',
+          stepLabel: 'Choose source',
+        };
+  }
+
+  if (state.phase === 'items') {
+    if (state.basket.length > 0) {
+      return {
+        instructionKey: `items:${direction}:review`,
+        message: 'Review your basket, then confirm',
+        stepLabel: 'Review basket',
+      };
+    }
+
+    return direction === 'take'
+      ? {
+          instructionKey: 'items:take:select',
+          message: 'Select stock to collect from Yard',
+          stepLabel: 'Choose stock',
+        }
+      : {
+          instructionKey: 'items:return:select',
+          message: 'Select stock to return to Yard',
+          stepLabel: 'Choose stock',
+        };
+  }
+
+  if (state.phase === 'submitting') {
+    return direction === 'take'
+      ? {
+          instructionKey: 'submitting:take',
+          message: state.counterpart
+            ? `Moving stock to ${state.counterpart.name}`
+            : 'Moving stock from Yard',
+          stepLabel: 'Confirming transfer',
+        }
+      : {
+          instructionKey: 'submitting:return',
+          message: 'Returning stock to Yard',
+          stepLabel: 'Confirming transfer',
+        };
+  }
+
+  return {
+    instructionKey: `receipt:${direction}`,
+    message: 'Transfer complete',
+    stepLabel: 'Complete',
+  };
 }
