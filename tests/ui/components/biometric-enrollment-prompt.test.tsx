@@ -48,6 +48,31 @@ describe('BiometricEnrollmentPrompt', () => {
     global.fetch = fetchMock as unknown as typeof fetch;
   });
 
+  it('does not offer biometric enrollment when the server suppresses the prompt', async () => {
+    const onCheckComplete = vi.fn();
+    fetchMock.mockResolvedValueOnce(new Response(
+      JSON.stringify({
+        credentials_configured: false,
+        prompt_dismissed: true,
+        prompt_suppressed: true,
+      }),
+      { status: 200 },
+    ));
+
+    render(
+      <BiometricEnrollmentPrompt
+        profileId="kiosk-profile"
+        canCheck={true}
+        onOpenChange={vi.fn()}
+        onCheckComplete={onCheckComplete}
+      />,
+    );
+
+    await waitFor(() => expect(onCheckComplete).toHaveBeenCalled());
+    expect(screen.queryByRole('heading', { name: 'Enable Biometric Login?' }))
+      .not.toBeInTheDocument();
+  });
+
   it('does not show setup loading text when the prompt is dismissed', async () => {
     let resolveDismiss: () => void = () => undefined;
     const dismissRequest = new Promise<Response>((resolve) => {

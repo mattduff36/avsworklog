@@ -15,6 +15,8 @@ active Inventory location.
   Inventory module access.
 - Successful password or biometric login for the configured profile launches
   `/yard-kiosk` before any general redirect target.
+- Automatic biometric-enrollment prompts are suppressed for the configured
+  kiosk profile so unattended kiosk sessions are not interrupted.
 - Kiosk transfers record that profile as the actor. The kiosk does not collect
   an individual employee identity.
 - An unconfigured, disabled, or different profile cannot load kiosk stock or
