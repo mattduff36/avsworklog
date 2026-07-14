@@ -1,5 +1,31 @@
 [
   {
+    "version": "0726.9.0",
+    "updateKind": "major",
+    "title": "Inventory update",
+    "description": "Updated Inventory, Help and FAQ, Quotes, and Navigation.",
+    "summary": "Updated Inventory, Help and FAQ, Quotes, and Navigation.",
+    "details": [
+      "Updated Inventory, Help and FAQ, Quotes, and Navigation, with changes to app screens, shared logic, automated tests, and documentation.",
+      "Updated help and FAQ, with changes to documentation.",
+      "Updated navigation across 1 changed file.",
+      "Updated quotes, with changes to app screens."
+    ],
+    "areas": [
+      "Inventory",
+      "Help",
+      "FAQ",
+      "Quotes",
+      "Navigation"
+    ],
+    "areaKeys": [
+      "inventory",
+      "quotes",
+      "navigation"
+    ],
+    "pushedAt": "2026-07-14T22:30:40.950Z"
+  },
+  {
     "version": "0726.8.0",
     "updateKind": "major",
     "title": "Dashboard update",
