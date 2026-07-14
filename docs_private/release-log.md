@@ -2,6 +2,28 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.5.0
+
+**GIT COMMIT MESSAGE**
+`feat(inventory): update Inventory and Help and FAQ`
+
+**PUSHED AT**
+2026-07-14T11:26:53.081Z
+
+**WHAT CHANGED**
+Update Inventory and Help and FAQ.
+
+**VERSION HISTORY DETAILS**
+- Updated Inventory and Help and FAQ, with changes to background routes, app screens, automated tests, and documentation.
+- Updated help and FAQ, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `feat(inventory): update Inventory and Help and FAQ`
+
+# Production release log
+
+Private changelog for production builds. Newest entries first.
+
 ## 0726.4.0
 
 **GIT COMMIT MESSAGE**
