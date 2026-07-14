@@ -8,6 +8,7 @@ import { getAppAuthProfile } from '@/lib/server/app-auth/profile';
 import { issueAppSession, validateAppSession, revokeAppSession } from '@/lib/server/app-auth/session';
 import { createClient } from '@/lib/supabase/server';
 import { trackServerUsageEvent } from '@/lib/server/user-analytics';
+import { getInventoryKioskPostLoginPath } from '@/lib/server/inventory-kiosk';
 import type { Database } from '@/types/database';
 
 interface LoginRequestBody {
@@ -103,7 +104,10 @@ export async function POST(request: NextRequest) {
       await revokeAppSession(existing.session.id, 'replaced_by_password_login', nextSession.row.id);
     }
 
-    const profile = await getAppAuthProfile(user.id, user.email || null);
+    const [profile, postLoginPath] = await Promise.all([
+      getAppAuthProfile(user.id, user.email || null),
+      getInventoryKioskPostLoginPath(user.id),
+    ]);
     await trackServerUsageEvent({
       eventName: 'auth_login_success',
       userId: user.id,
@@ -126,6 +130,7 @@ export async function POST(request: NextRequest) {
         id: profile.id,
         must_change_password: profile.must_change_password,
       },
+      post_login_path: postLoginPath,
     });
 
     clearAllAuthCookies(request, response);

@@ -163,6 +163,26 @@ export async function requireInventoryKioskAccess(): Promise<InventoryKioskAcces
   };
 }
 
+export async function getInventoryKioskPostLoginPath(
+  profileId: string,
+): Promise<'/yard-kiosk' | null> {
+  if (!profileId) return null;
+
+  const { data, error } = await createAdminClient()
+    .from('inventory_kiosk_config')
+    .select('id')
+    .eq('id', 1)
+    .eq('kiosk_user_id', profileId)
+    .eq('is_enabled', true)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Failed to resolve Yard kiosk post-login route:', error);
+    return null;
+  }
+  return data ? '/yard-kiosk' : null;
+}
+
 function assertKioskAccess(
   access: InventoryKioskAccessResult,
 ): asserts access is InventoryKioskAccessResult & { allowed: true; userId: string; yard: KioskLocationRow } {

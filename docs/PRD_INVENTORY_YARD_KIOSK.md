@@ -13,6 +13,8 @@ active Inventory location.
 - The kiosk is a private authenticated route used by one dedicated profile.
 - The authorised profile is configured directly in the database and must have
   Inventory module access.
+- Successful password or biometric login for the configured profile launches
+  `/yard-kiosk` before any general redirect target.
 - Kiosk transfers record that profile as the actor. The kiosk does not collect
   an individual employee identity.
 - An unconfigured, disabled, or different profile cannot load kiosk stock or

@@ -31,6 +31,7 @@ interface WebAuthnOptionsResponse {
 
 interface AuthResponsePayload {
   profile?: { must_change_password?: boolean | null };
+  post_login_path?: string | null;
   error?: string;
 }
 
@@ -73,6 +74,8 @@ export default function LoginPage() {
 
   function getPostLoginRedirect(payload?: AuthResponsePayload | null): string {
     if (payload?.profile?.must_change_password === true) return '/change-password';
+    const postLoginPath = payload?.post_login_path || null;
+    if (isSafeRedirectTarget(postLoginPath)) return postLoginPath;
 
     const redirectTarget =
       typeof window === 'undefined'

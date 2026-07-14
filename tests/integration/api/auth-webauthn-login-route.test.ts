@@ -10,6 +10,7 @@ const {
   revokeAppSessionMock,
   validateAppSessionMock,
   getAppAuthProfileMock,
+  getInventoryKioskPostLoginPathMock,
 } = vi.hoisted(() => ({
   verifyAuthenticationResponseMock: vi.fn(),
   consumeWebAuthnChallengeMock: vi.fn(),
@@ -20,6 +21,7 @@ const {
   revokeAppSessionMock: vi.fn(),
   validateAppSessionMock: vi.fn(),
   getAppAuthProfileMock: vi.fn(),
+  getInventoryKioskPostLoginPathMock: vi.fn(),
 }));
 
 vi.mock('@simplewebauthn/server', () => ({
@@ -60,6 +62,10 @@ vi.mock('@/lib/server/app-auth/profile', () => ({
   getAppAuthProfile: getAppAuthProfileMock,
 }));
 
+vi.mock('@/lib/server/inventory-kiosk', () => ({
+  getInventoryKioskPostLoginPath: getInventoryKioskPostLoginPathMock,
+}));
+
 vi.mock('@/lib/server/webauthn/audit', () => ({
   createWebAuthnAuditEvent: vi.fn(),
 }));
@@ -94,6 +100,7 @@ describe('auth webauthn login verify route', () => {
     });
     revokeAppSessionMock.mockResolvedValue(undefined);
     updateWebAuthnCredentialCounterMock.mockResolvedValue(undefined);
+    getInventoryKioskPostLoginPathMock.mockResolvedValue(null);
     getAppAuthProfileMock.mockResolvedValue({
       id: 'profile-1',
       email: 'person@example.com',
@@ -148,5 +155,36 @@ describe('auth webauthn login verify route', () => {
       credentialId: 'credential-1',
       counter: 2,
     });
+  });
+
+  it('returns the configured kiosk path after biometric login', async () => {
+    getInventoryKioskPostLoginPathMock.mockResolvedValue('/yard-kiosk');
+    const request = new Request('http://localhost/api/auth/webauthn/login/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        challenge: 'challenge-1',
+        profileId: 'profile-1',
+        response: {
+          id: 'credential-1',
+          rawId: 'credential-1',
+          type: 'public-key',
+          response: {
+            authenticatorData: 'authenticator-data',
+            clientDataJSON: 'client-data',
+            signature: 'signature',
+            userHandle: 'user-handle',
+          },
+          clientExtensionResults: {},
+        },
+      }),
+    });
+
+    const response = await verifyPost(request as never);
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.post_login_path).toBe('/yard-kiosk');
+    expect(getInventoryKioskPostLoginPathMock).toHaveBeenCalledWith('profile-1');
   });
 });
