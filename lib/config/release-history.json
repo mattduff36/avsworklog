@@ -1,5 +1,51 @@
 [
   {
+    "version": "0726.6.0",
+    "updateKind": "major",
+    "title": "Dashboard update",
+    "description": "Added Yard kiosk launch fallback. Suppress biometric prompt for Yard kiosk. Launch configured Yard kiosk. Unify Hardware stock entry. Add Yard kiosk transfers. Add catalogue stock receipt.",
+    "summary": "Added Yard kiosk launch fallback. Suppress biometric prompt for Yard kiosk. Launch configured Yard kiosk. Unify Hardware stock entry. Add Yard kiosk transfers. Add catalogue stock receipt.",
+    "details": [
+      "Launch configured Yard kiosk, with changes to background routes, app screens, shared logic, automation scripts, automated tests, data storage, and documentation.",
+      "Suppress biometric prompt for Yard kiosk, with changes to background routes, interface components, shared logic, and automated tests.",
+      "Updated data storage, with changes to shared typing, automation scripts, and data storage.",
+      "Updated help and FAQ, with changes to documentation.",
+      "Added Yard kiosk launch fallback, with changes to app screens.",
+      "Updated navigation across 1 changed file."
+    ],
+    "areas": [
+      "Dashboard",
+      "Sign in",
+      "Inventory"
+    ],
+    "areaKeys": [
+      "dashboard",
+      "sign-in",
+      "inventory"
+    ],
+    "pushedAt": "2026-07-14T14:53:18.088Z"
+  },
+  {
+    "version": "0726.5.0",
+    "updateKind": "major",
+    "title": "Inventory update",
+    "description": "Updated Inventory and Help and FAQ.",
+    "summary": "Updated Inventory and Help and FAQ.",
+    "details": [
+      "Updated Inventory and Help and FAQ, with changes to background routes, app screens, automated tests, and documentation.",
+      "Updated help and FAQ, with changes to documentation."
+    ],
+    "areas": [
+      "Inventory",
+      "Help",
+      "FAQ"
+    ],
+    "areaKeys": [
+      "inventory"
+    ],
+    "pushedAt": "2026-07-14T11:26:53.081Z"
+  },
+  {
     "version": "0726.4.0",
     "updateKind": "major",
     "title": "Daily Tasks update",

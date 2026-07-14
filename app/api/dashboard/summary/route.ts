@@ -29,6 +29,7 @@ import {
   ensureFleetInspectionReminderActionsFresh,
 } from '@/lib/server/reminders/ensure-fleet-inspection-actions-fresh';
 import { DEBUG_ERROR_LOG_HIDDEN_ADMIN_EMAIL } from '@/lib/utils/error-log-filters';
+import { getInventoryKioskPostLoginPath } from '@/lib/server/inventory-kiosk';
 
 type PermissionMap = Record<(typeof ALL_MODULES)[number], boolean>;
 
@@ -402,7 +403,10 @@ export async function GET() {
   const userId = current.profile.id;
   const supabase = await createClient();
   const admin = createAdminClient();
-  const effectiveRole = await getEffectiveRole();
+  const [effectiveRole, kioskPostLoginPath] = await Promise.all([
+    getEffectiveRole(),
+    getInventoryKioskPostLoginPath(userId),
+  ]);
   const permissions =
     hasEffectiveRoleFullAccess(effectiveRole)
       ? createFullAccessPermissionMap()
@@ -539,6 +543,7 @@ export async function GET() {
 
   return NextResponse.json({
     success: true,
+    kiosk_launch_available: kioskPostLoginPath === '/yard-kiosk',
     metrics: {
       approvals: {
         timesheets: approvalsMetrics.summaryTimesheets,

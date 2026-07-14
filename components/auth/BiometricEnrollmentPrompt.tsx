@@ -32,6 +32,7 @@ interface WebAuthnOptionsResponse {
 interface WebAuthnStatusResponse {
   credentials_configured?: boolean;
   prompt_dismissed?: boolean;
+  prompt_suppressed?: boolean;
 }
 
 interface BiometricEnrollmentPromptProps {
@@ -86,6 +87,8 @@ export function BiometricEnrollmentPrompt({
       );
       const payload = (await response.json().catch(() => ({}))) as WebAuthnStatusResponse;
       if (!mounted || !response.ok) return;
+
+      if (payload.prompt_suppressed) return;
 
       if (payload.credentials_configured) {
         markLocalBiometricLoginEnabled(profileId);

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { NextRequest } from 'next/server';
 
 vi.mock('@/lib/server/inventory-auth', () => ({
   requireInventoryAccess: vi.fn(),
@@ -13,7 +14,7 @@ import { requireInventoryAccess } from '@/lib/server/inventory-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { GET } from '@/app/api/inventory/locations/route';
 
-function buildLocation(id: string, name: string, locationType = 'site', sourceType = 'legacy_quote') {
+function buildLocation(id: string, name: string) {
   return {
     id,
     name,
@@ -22,11 +23,11 @@ function buildLocation(id: string, name: string, locationType = 'site', sourceTy
     linked_van_id: null,
     linked_hgv_id: null,
     linked_plant_id: null,
-    location_type: locationType,
-    source_type: sourceType,
+    location_type: 'yard',
+    source_type: 'system',
     source_id: null,
     external_reference: null,
-    sync_status: sourceType === 'manual' ? 'manual' : 'synced',
+    sync_status: 'synced',
     source_synced_at: null,
     created_at: '2026-01-01T00:00:00.000Z',
     updated_at: '2026-01-01T00:00:00.000Z',
@@ -35,33 +36,36 @@ function buildLocation(id: string, name: string, locationType = 'site', sourceTy
   };
 }
 
-function buildRangeQuery<T>(pages: T[][]) {
-  return {
-    select() {
-      return {
-        eq() {
-          return {
-            order() {
-              return {
-                async range(offset: number) {
-                  const pageIndex = Math.floor(offset / 1000);
-                  return { data: pages[pageIndex] || [], error: null };
-                },
-              };
-            },
-            async range(offset: number) {
-              const pageIndex = Math.floor(offset / 1000);
-              return { data: pages[pageIndex] || [], error: null };
-            },
-          };
-        },
-      };
-    },
+function buildSearchQuery<T>(data: T[]) {
+  const query = {
+    select: vi.fn(),
+    eq: vi.fn(),
+    ilike: vi.fn(),
+    order: vi.fn(),
+    limit: vi.fn(),
   };
+  query.select.mockReturnValue(query);
+  query.eq.mockReturnValue(query);
+  query.ilike.mockReturnValue(query);
+  query.order.mockReturnValue(query);
+  query.limit.mockResolvedValue({ data, error: null });
+  return query;
+}
+
+function buildFilteredQuery<T>(data: T[]) {
+  const query = {
+    select: vi.fn(),
+    eq: vi.fn(),
+    in: vi.fn(),
+  };
+  query.select.mockReturnValue(query);
+  query.eq.mockReturnValue(query);
+  query.in.mockResolvedValue({ data, error: null });
+  return query;
 }
 
 describe('inventory locations route', () => {
-  it('paginates inventory locations beyond the Supabase 1000 row default', async () => {
+  it('returns no locations below the three-character search threshold', async () => {
     vi.mocked(requireInventoryAccess).mockResolvedValue({
       allowed: true,
       status: 200,
@@ -69,45 +73,112 @@ describe('inventory locations route', () => {
       isManagerOrAdmin: true,
     });
 
-    const legacyLocations = Array.from({ length: 1000 }, (_, index) => (
-      buildLocation(`legacy-${index}`, `Legacy ${index}`)
-    ));
-    const normalLocations = [
-      buildLocation('yard-location', 'Yard', 'yard', 'system'),
-      buildLocation('van-location', 'Van - NU75 VGT', 'van', 'fleet'),
-    ];
-    const activeItemLocations = [
-      { location_id: 'yard-location' },
-      { location_id: 'van-location' },
-    ];
+    const response = await GET(new NextRequest('http://localhost/api/inventory/locations?search=ya'));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.locations).toEqual([]);
+    expect(payload.minimum_search_characters).toBe(3);
+    expect(createAdminClient).not.toHaveBeenCalled();
+  });
+
+  it('filters and limits matching locations in the database query', async () => {
+    vi.mocked(requireInventoryAccess).mockResolvedValue({
+      allowed: true,
+      status: 200,
+      userId: 'admin-user',
+      isManagerOrAdmin: true,
+    });
+
+    const yard = buildLocation('yard-location', 'Main Yard');
+    const locationQuery = buildSearchQuery([yard]);
+    const itemQuery = buildFilteredQuery([
+      { location_id: yard.id },
+      { location_id: yard.id },
+    ]);
+    const userAssignmentsQuery = buildFilteredQuery([]);
+    const siteAssignmentsQuery = buildFilteredQuery([]);
 
     const admin = {
       from(table: string) {
-        if (table === 'inventory_locations') {
-          return buildRangeQuery([legacyLocations, normalLocations]);
-        }
-        if (table === 'inventory_items') {
-          return buildRangeQuery([activeItemLocations]);
-        }
-        if (table === 'vans' || table === 'hgvs' || table === 'plant') {
-          return { select: () => ({ data: [], error: null }) };
-        }
-        if (table === 'inventory_user_locations' || table === 'inventory_user_site_locations') {
-          return { select: () => ({ data: [], error: null }) };
-        }
+        if (table === 'inventory_locations') return locationQuery;
+        if (table === 'inventory_items') return itemQuery;
+        if (table === 'inventory_user_locations') return userAssignmentsQuery;
+        if (table === 'inventory_user_site_locations') return siteAssignmentsQuery;
         throw new Error(`Unexpected table ${table}`);
       },
     };
     vi.mocked(createAdminClient).mockReturnValue(admin as never);
 
-    const response = await GET();
+    const response = await GET(new NextRequest(
+      'http://localhost/api/inventory/locations?search=yard&limit=25',
+    ));
     const payload = await response.json();
 
     expect(response.status).toBe(200);
-    expect(payload.locations).toHaveLength(1002);
-    expect(payload.locations).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: 'yard-location', item_count: 1 }),
-      expect.objectContaining({ id: 'van-location', item_count: 1 }),
-    ]));
+    expect(locationQuery.ilike).toHaveBeenCalledWith('name', '%yard%');
+    expect(locationQuery.order).toHaveBeenNthCalledWith(1, 'name', { ascending: true });
+    expect(locationQuery.order).toHaveBeenNthCalledWith(2, 'id', { ascending: true });
+    expect(locationQuery.limit).toHaveBeenCalledWith(25);
+    expect(itemQuery.in).toHaveBeenCalledWith('location_id', [yard.id]);
+    expect(payload.locations).toEqual([
+      expect.objectContaining({ id: yard.id, item_count: 2 }),
+    ]);
+  });
+
+  it('returns one exact active Yard lookup by stable id', async () => {
+    vi.mocked(requireInventoryAccess).mockResolvedValue({
+      allowed: true,
+      status: 200,
+      userId: 'admin-user',
+      isManagerOrAdmin: true,
+    });
+    const yard = buildLocation('yard-stable-id', 'Yard');
+    const locationQuery = buildSearchQuery([yard]);
+    vi.mocked(createAdminClient).mockReturnValue({
+      from: vi.fn(() => locationQuery),
+    } as never);
+
+    const response = await GET(new NextRequest(
+      'http://localhost/api/inventory/locations?lookup=yard',
+    ));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(locationQuery.eq).toHaveBeenNthCalledWith(1, 'name', 'Yard');
+    expect(locationQuery.eq).toHaveBeenNthCalledWith(2, 'location_type', 'yard');
+    expect(locationQuery.eq).toHaveBeenNthCalledWith(3, 'is_active', true);
+    expect(locationQuery.order).toHaveBeenNthCalledWith(1, 'created_at', { ascending: true });
+    expect(locationQuery.order).toHaveBeenNthCalledWith(2, 'id', { ascending: true });
+    expect(locationQuery.limit).toHaveBeenCalledWith(2);
+    expect(payload.location).toEqual(expect.objectContaining({
+      id: 'yard-stable-id',
+      name: 'Yard',
+      is_active: true,
+    }));
+  });
+
+  it('leaves the Yard lookup unselected when matching rows are ambiguous', async () => {
+    vi.mocked(requireInventoryAccess).mockResolvedValue({
+      allowed: true,
+      status: 200,
+      userId: 'admin-user',
+      isManagerOrAdmin: true,
+    });
+    const locationQuery = buildSearchQuery([
+      buildLocation('yard-one', 'Yard'),
+      buildLocation('yard-two', 'Yard'),
+    ]);
+    vi.mocked(createAdminClient).mockReturnValue({
+      from: vi.fn(() => locationQuery),
+    } as never);
+
+    const response = await GET(new NextRequest(
+      'http://localhost/api/inventory/locations?lookup=yard',
+    ));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.location).toBeNull();
   });
 });

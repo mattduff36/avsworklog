@@ -5,6 +5,7 @@ import {
   Archive,
   ArrowRightLeft,
   Boxes,
+  PackagePlus,
   Pencil,
   Plus,
   RotateCcw,
@@ -49,16 +50,20 @@ import type {
   InventoryLocation,
 } from '../types';
 import { INVENTORY_HARDWARE_ADJUSTMENT_REASONS } from '../types';
+import {
+  HardwareStockQuantityDialog,
+  type HardwareStockQuantityDialogCopy,
+} from './HardwareStockQuantityDialog';
 import { HardwareTransferDialog } from './HardwareTransferDialog';
 
 interface HardwareStockPanelProps {
   items: InventoryHardwareItem[];
   balances: InventoryHardwareBalance[];
   locations: InventoryLocation[];
-  onCreateItem: (data: { name: string; sort_order: number }) => Promise<void>;
+  onCreateItem: (data: { name: string }) => Promise<void>;
   onUpdateItem: (
     item: InventoryHardwareItem,
-    data: { name?: string; sort_order?: number; is_active?: boolean },
+    data: { name?: string; is_active?: boolean },
   ) => Promise<void>;
   onAdjust: (payload: InventoryHardwareAdjustmentPayload) => Promise<void>;
   onTransfer: (payload: InventoryHardwareTransferPayload) => Promise<void>;
@@ -69,6 +74,12 @@ interface MatrixRow {
   item: InventoryHardwareItem;
   location: InventoryLocation;
   quantity: number;
+}
+
+interface HardwareStockEntryContext {
+  source: 'matrix' | 'catalogue';
+  items: InventoryHardwareItem[];
+  copy: HardwareStockQuantityDialogCopy;
 }
 
 const ALL_ITEMS = 'all-items';
@@ -92,19 +103,33 @@ export function HardwareStockPanel({
   const [adjustmentNote, setAdjustmentNote] = useState('');
   const [isAdjusting, setIsAdjusting] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
+  const [stockEntry, setStockEntry] = useState<HardwareStockEntryContext | null>(null);
   const [editingItem, setEditingItem] = useState<InventoryHardwareItem | null>(null);
   const [catalogName, setCatalogName] = useState('');
-  const [catalogSortOrder, setCatalogSortOrder] = useState('');
   const [isSavingCatalog, setIsSavingCatalog] = useState(false);
 
+  const stockedLocationIds = useMemo(
+    () => new Set(
+      balances
+        .filter((balance) => balance.quantity > 0)
+        .map((balance) => balance.location_id),
+    ),
+    [balances],
+  );
   const activeLocations = useMemo(
     () => locations
-      .filter((location) => location.is_active)
-      .toSorted((a, b) => a.name.localeCompare(b.name)),
-    [locations],
+      .filter((location) => location.is_active && stockedLocationIds.has(location.id))
+      .toSorted((a, b) => (
+        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+        || a.id.localeCompare(b.id)
+      )),
+    [locations, stockedLocationIds],
   );
   const sortedItems = useMemo(
-    () => [...items].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)),
+    () => [...items].sort((a, b) => (
+      a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+      || a.id.localeCompare(b.id)
+    )),
     [items],
   );
   const activeItems = useMemo(
@@ -163,11 +188,9 @@ export function HardwareStockPanel({
   useEffect(() => {
     if (!editingItem) {
       setCatalogName('');
-      setCatalogSortOrder('');
       return;
     }
     setCatalogName(editingItem.name);
-    setCatalogSortOrder(String(editingItem.sort_order));
   }, [editingItem]);
 
   function toggleRow(key: string, checked: boolean) {
@@ -183,17 +206,48 @@ export function HardwareStockPanel({
     setSelectedKeys(checked ? new Set(matrixRows.map((row) => row.key)) : new Set());
   }
 
-  function openAdjustment(operation: InventoryHardwareAdjustmentOperation) {
+  function openAdjustment(operation: Exclude<InventoryHardwareAdjustmentOperation, 'add'>) {
     setAdjustmentOperation(operation);
     setAdjustmentQuantity('');
-    setAdjustmentReason(operation === 'add' ? 'Delivery' : operation === 'remove' ? 'Used' : 'Stocktake correction');
+    setAdjustmentReason(operation === 'remove' ? 'Used' : 'Stocktake correction');
     setAdjustmentNote('');
+  }
+
+  function openMatrixStockEntry() {
+    const uniqueItems = [...new Map(
+      selectedRows.map((row) => [row.item.id, row.item]),
+    ).values()];
+    setStockEntry({
+      source: 'matrix',
+      items: uniqueItems,
+      copy: {
+        title: 'Add Hardware Quantity',
+        description: `Add the same quantity to ${uniqueItems.length} selected Hardware ${uniqueItems.length === 1 ? 'item' : 'items'} at one active destination location.`,
+        noteLabel: 'Note',
+        submitLabel: 'Apply Adjustment',
+        submittingLabel: 'Saving...',
+      },
+    });
+  }
+
+  function openCatalogueStockEntry(item: InventoryHardwareItem) {
+    setStockEntry({
+      source: 'catalogue',
+      items: [item],
+      copy: {
+        title: 'Add stock',
+        description: `Record an incoming delivery of ${item.name} at an active Inventory location.`,
+        noteLabel: 'Delivery note',
+        submitLabel: 'Add stock',
+        submittingLabel: 'Adding stock...',
+      },
+    });
   }
 
   async function submitAdjustment(event: React.FormEvent) {
     event.preventDefault();
     if (!adjustmentOperation || selectedRows.length === 0) return;
-    const quantity = Number.parseInt(adjustmentQuantity, 10);
+    const quantity = Number(adjustmentQuantity);
     const validQuantity = adjustmentOperation === 'recount' ? quantity >= 0 : quantity > 0;
     if (!Number.isInteger(quantity) || !validQuantity) return;
     if (adjustmentReason === 'Other' && !adjustmentNote.trim()) return;
@@ -223,21 +277,17 @@ export function HardwareStockPanel({
 
     setIsSavingCatalog(true);
     try {
-      const sortOrder = Number.parseInt(catalogSortOrder, 10);
       if (editingItem) {
         await onUpdateItem(editingItem, {
           name: catalogName.trim(),
-          sort_order: Number.isInteger(sortOrder) ? sortOrder : 0,
         });
       } else {
         await onCreateItem({
           name: catalogName.trim(),
-          sort_order: Number.isInteger(sortOrder) ? sortOrder : 0,
         });
       }
       setEditingItem(null);
       setCatalogName('');
-      setCatalogSortOrder('');
     } finally {
       setIsSavingCatalog(false);
     }
@@ -254,7 +304,7 @@ export function HardwareStockPanel({
                 Hardware Stock Matrix
               </CardTitle>
               <p className="mt-1 text-sm text-muted-foreground">
-                Zero balances are included here so deliveries and stocktakes can be entered in bulk.
+                Only locations holding Hardware stock are shown. Zero item balances remain available within those locations for stock operations.
               </p>
             </div>
             <Button
@@ -297,7 +347,7 @@ export function HardwareStockPanel({
             <Badge variant="outline" className="border-slate-600 text-slate-200">
               {selectedRows.length} selected
             </Badge>
-            <Button size="sm" onClick={() => openAdjustment('add')} disabled={selectedRows.length === 0}>
+            <Button size="sm" onClick={openMatrixStockEntry} disabled={selectedRows.length === 0}>
               <Plus className="mr-1 h-3.5 w-3.5" />
               Add
             </Button>
@@ -321,26 +371,34 @@ export function HardwareStockPanel({
                       aria-label="Select all visible Hardware balances"
                     />
                   </TableHead>
-                  <TableHead>Hardware item</TableHead>
+                  <TableHead className="w-1/2">Hardware item</TableHead>
                   <TableHead>Location</TableHead>
-                  <TableHead className="text-right">Quantity</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {matrixRows.map((row) => (
+                {matrixRows.length === 0 ? (
+                  <TableRow className="border-slate-800">
+                    <TableCell colSpan={3} className="py-8 text-center text-sm text-muted-foreground">
+                      No Hardware stock rows match the current filters.
+                    </TableCell>
+                  </TableRow>
+                ) : matrixRows.map((row) => (
                   <TableRow key={row.key} className="border-slate-800">
                     <TableCell>
                       <Checkbox
                         checked={selectedKeys.has(row.key)}
                         onCheckedChange={(checked) => toggleRow(row.key, checked === true)}
-                        aria-label={`Select ${row.item.name} at ${row.location.name}`}
+                        aria-label={`Select ${row.item.name}, quantity ${row.quantity}, at ${row.location.name}`}
                       />
                     </TableCell>
-                    <TableCell className="font-medium text-white">{row.item.name}</TableCell>
-                    <TableCell className="text-slate-300">{row.location.name}</TableCell>
-                    <TableCell className="text-right font-mono font-semibold text-white">
-                      {row.quantity.toLocaleString()}
+                    <TableCell className="font-medium text-white">
+                      <span aria-label={`${row.item.name}, quantity ${row.quantity}`}>
+                        <span aria-hidden="true">
+                          {row.item.name} ({row.quantity.toLocaleString()})
+                        </span>
+                      </span>
                     </TableCell>
+                    <TableCell className="text-slate-300">{row.location.name}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -368,10 +426,16 @@ export function HardwareStockPanel({
                       {!item.is_active ? <Badge variant="secondary">Archived</Badge> : null}
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Sort {item.sort_order} · {total.toLocaleString()} units company-wide
+                      Total: {total.toLocaleString()} units
                     </p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    {item.is_active ? (
+                      <Button size="sm" onClick={() => openCatalogueStockEntry(item)}>
+                        <PackagePlus className="mr-1 h-3.5 w-3.5" />
+                        Add stock
+                      </Button>
+                    ) : null}
                     <Button size="sm" variant="outline" onClick={() => setEditingItem(item)}>
                       <Pencil className="mr-1 h-3.5 w-3.5" />
                       Edit
@@ -408,17 +472,6 @@ export function HardwareStockPanel({
                   className="border-slate-600 bg-slate-800"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="hardware_catalog_sort_order">Sort order</Label>
-                <Input
-                  id="hardware_catalog_sort_order"
-                  type="number"
-                  step={1}
-                  value={catalogSortOrder}
-                  onChange={(event) => setCatalogSortOrder(event.target.value)}
-                  className="border-slate-600 bg-slate-800"
-                />
-              </div>
               <div className="flex gap-2">
                 <Button type="submit" disabled={!catalogName.trim() || isSavingCatalog}>
                   {editingItem ? 'Save Changes' : 'Add Item'}
@@ -438,11 +491,9 @@ export function HardwareStockPanel({
         <DialogContent className="border-slate-700 bg-slate-900 sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-white">
-              {adjustmentOperation === 'add'
-                ? 'Add Hardware Quantity'
-                : adjustmentOperation === 'remove'
-                  ? 'Remove Hardware Quantity'
-                  : 'Recount Hardware Quantity'}
+              {adjustmentOperation === 'remove'
+                ? 'Remove Hardware Quantity'
+                : 'Recount Hardware Quantity'}
             </DialogTitle>
             <DialogDescription>
               This operation will apply to {selectedRows.length} selected item/location {selectedRows.length === 1 ? 'balance' : 'balances'}.
@@ -515,6 +566,21 @@ export function HardwareStockPanel({
         onClose={() => setTransferOpen(false)}
         onSubmit={onTransfer}
       />
+
+      {stockEntry ? (
+        <HardwareStockQuantityDialog
+          open
+          items={stockEntry.items}
+          knownLocations={locations}
+          copy={stockEntry.copy}
+          allowReasonSelection={stockEntry.source === 'matrix'}
+          onClose={() => setStockEntry(null)}
+          onSubmit={onAdjust}
+          onSuccess={() => {
+            if (stockEntry.source === 'matrix') setSelectedKeys(new Set());
+          }}
+        />
+      ) : null}
     </div>
   );
 }

@@ -54,7 +54,7 @@ export function InventoryItemDialog({
   const [form, setForm] = useState<InventoryItemFormData>(EMPTY_INVENTORY_ITEM_FORM);
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState('');
-  const selectedLocation = locations.find((location) => location.id === form.location_id) || null;
+  const [selectedLocation, setSelectedLocation] = useState<InventoryLocation | null>(null);
   const hasSpecialCheckStatus = isInventoryCheckExempt({
     category: form.category,
     location: selectedLocation,
@@ -68,6 +68,7 @@ export function InventoryItemDialog({
       ...EMPTY_INVENTORY_ITEM_FORM,
       category: categories[0]?.slug || EMPTY_INVENTORY_ITEM_FORM.category,
     });
+    setSelectedLocation(null);
   }, [categories, open]);
 
   const categoryOptions = categories.length > 0
@@ -169,8 +170,12 @@ export function InventoryItemDialog({
                 <Label>Location *</Label>
                 <InventoryLocationSelect
                   value={form.location_id}
-                  onValueChange={(value) => updateField('location_id', value)}
+                  onValueChange={(value, location) => {
+                    updateField('location_id', value);
+                    setSelectedLocation(location || locations.find((candidate) => candidate.id === value) || null);
+                  }}
                   locations={locations}
+                  serverSearch
                 />
               </div>
             </div>

@@ -38,7 +38,10 @@ export function HardwareOverviewPanel({
   const activeItems = useMemo(
     () => items
       .filter((item) => item.is_active)
-      .toSorted((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)),
+      .toSorted((a, b) => (
+        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+        || a.id.localeCompare(b.id)
+      )),
     [items],
   );
 

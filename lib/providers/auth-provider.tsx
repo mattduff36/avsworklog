@@ -115,6 +115,7 @@ interface AuthContextValue {
       error?: string;
       user?: { id: string; email: string | null };
       profile?: { id: string; must_change_password?: boolean | null };
+      post_login_path?: string | null;
     } | null;
     error: { message: string } | null;
   }>;
@@ -703,6 +704,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       error?: string;
       user?: { id: string; email: string | null };
       profile?: { id: string; must_change_password?: boolean | null };
+      post_login_path?: string | null;
     };
 
     if (!response.ok) {

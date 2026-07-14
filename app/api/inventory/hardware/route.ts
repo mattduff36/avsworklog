@@ -5,7 +5,6 @@ import { getResponsibleHardwareLocationIds } from '@/lib/server/inventory-hardwa
 
 interface CreateHardwareItemBody {
   name?: string;
-  sort_order?: number;
 }
 
 export async function GET() {
@@ -19,8 +18,8 @@ export async function GET() {
     const itemQuery = admin
       .from('inventory_hardware_items')
       .select('*')
-      .order('sort_order', { ascending: true })
-      .order('name', { ascending: true });
+      .order('name', { ascending: true })
+      .order('id', { ascending: true });
 
     if (!access.isManagerOrAdmin) {
       itemQuery.eq('is_active', true);
@@ -38,10 +37,10 @@ export async function GET() {
         location_id,
         quantity,
         location:inventory_locations(*)
-      `);
+      `)
+      .gt('quantity', 0);
 
     if (!access.isManagerOrAdmin) {
-      balanceQuery.gt('quantity', 0);
       if (responsibleLocationIds?.length) {
         balanceQuery.in('location_id', responsibleLocationIds);
       } else {
@@ -96,7 +95,6 @@ export async function POST(request: NextRequest) {
       .from('inventory_hardware_items')
       .insert({
         name,
-        sort_order: Number.isInteger(body.sort_order) ? body.sort_order : 0,
         created_by: access.userId,
         updated_by: access.userId,
       })

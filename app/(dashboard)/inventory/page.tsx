@@ -72,6 +72,20 @@ interface ConfirmActionState {
   onConfirm: () => Promise<void>;
 }
 
+function getUniqueInventoryLocations(
+  candidates: Array<InventoryLocation | null | undefined>,
+): InventoryLocation[] {
+  const locationsById = new Map<string, InventoryLocation>();
+  for (const location of candidates) {
+    if (location) locationsById.set(location.id, location);
+  }
+  return Array.from(locationsById.values());
+}
+
+function getInventoryItemLocations(inventoryItems: InventoryItem[]): InventoryLocation[] {
+  return getUniqueInventoryLocations(inventoryItems.map((item) => item.location));
+}
+
 export default function InventoryPage() {
   const { hasPermission: canViewInventory, loading: permissionLoading } = usePermissionCheck('inventory', false);
   const router = useRouter();
@@ -79,7 +93,6 @@ export default function InventoryPage() {
 
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [retiredItems, setRetiredItems] = useState<InventoryItem[]>([]);
-  const [locations, setLocations] = useState<InventoryLocation[]>([]);
   const [fleetAssets, setFleetAssets] = useState<FleetAssetOption[]>([]);
   const [inventoryContext, setInventoryContext] = useState<InventoryContext | null>(null);
   const [siteAssignmentUsers, setSiteAssignmentUsers] = useState<InventorySiteAssignmentUser[]>([]);
@@ -103,6 +116,7 @@ export default function InventoryPage() {
   const [restoringMinorPlantItems, setRestoringMinorPlantItems] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmActionState | null>(null);
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+  const [locationSearchVersion, setLocationSearchVersion] = useState(0);
   const [inventoryTableQuickFilter, setInventoryTableQuickFilter] = useState<InventoryTableQuickFilter>({
     version: 0,
     statusFilters: [],
@@ -123,7 +137,6 @@ export default function InventoryPage() {
       const [
         { items: inventoryItems },
         { items: retiredInventoryItems },
-        locationsResponse,
         fleetAssetsResponse,
         categoriesResponse,
         hardwareResponse,
@@ -140,18 +153,12 @@ export default function InventoryPage() {
             errorMessage: 'Failed to fetch retired inventory items',
           })
           : Promise.resolve({ items: [] as InventoryItem[], firstPagePayload: null }),
-        fetch('/api/inventory/locations', { cache: 'no-store' }),
         fetch('/api/inventory/fleet-assets', { cache: 'no-store' }),
         fetch('/api/inventory/categories', { cache: 'no-store' }),
         fetch('/api/inventory/hardware', { cache: 'no-store' }),
         isManagerOrAdmin ? fetch('/api/inventory/groups', { cache: 'no-store' }) : Promise.resolve(null),
         canManageSiteLocations ? fetch('/api/inventory/site-assignments', { cache: 'no-store' }) : Promise.resolve(null),
       ]);
-
-      const locationsPayload = await locationsResponse.json();
-      if (!locationsResponse.ok) {
-        throw new Error(locationsPayload.error || 'Failed to fetch inventory locations');
-      }
 
       const fleetAssetsPayload = await fleetAssetsResponse.json();
       if (!fleetAssetsResponse.ok) {
@@ -183,7 +190,6 @@ export default function InventoryPage() {
       setInventoryContext(contextPayload);
       setItems(inventoryItems);
       setRetiredItems(retiredInventoryItems);
-      setLocations(locationsPayload.locations || []);
       setFleetAssets(fleetAssetsPayload.assets || []);
       setCategories(categoriesPayload.categories || []);
       setHardwareItems(hardwarePayload.items || []);
@@ -281,36 +287,77 @@ export default function InventoryPage() {
     [categories]
   );
 
-  const unknownLocation = useMemo(
-    () => locations.find((location) => isInventoryUnknownLocation(location)) || null,
-    [locations]
+  const smallToolsItems = useMemo(
+    () => items.filter((item) => item.category !== 'minor_plant'),
+    [items]
+  );
+  const minorPlantItems = useMemo(
+    () => items.filter((item) => item.category === 'minor_plant'),
+    [items]
   );
 
-  const primaryLocationOptions = useMemo(
-    () => locations.filter((location) => canSelectInventoryPrimaryLocation(location, {
+  const smallToolsLocations = useMemo(
+    () => getInventoryItemLocations(smallToolsItems),
+    [smallToolsItems],
+  );
+  const minorPlantLocations = useMemo(
+    () => getInventoryItemLocations(minorPlantItems),
+    [minorPlantItems],
+  );
+  const retiredLocations = useMemo(
+    () => getInventoryItemLocations(retiredItems),
+    [retiredItems],
+  );
+  const hardwareLocations = useMemo(
+    () => getUniqueInventoryLocations(
+      hardwareBalances
+        .filter((balance) => balance.quantity > 0)
+        .map((balance) => balance.location),
+    ),
+    [hardwareBalances],
+  );
+  const knownLocations = useMemo(
+    () => getUniqueInventoryLocations([
+      ...smallToolsLocations,
+      ...minorPlantLocations,
+      ...retiredLocations,
+      ...hardwareLocations,
+      inventoryContext?.user_location?.location,
+      ...(inventoryContext?.secondary_site_locations || []).map((entry) => entry.location),
+      ...assignableSiteLocations,
+    ]),
+    [
+      assignableSiteLocations,
+      hardwareLocations,
+      inventoryContext?.secondary_site_locations,
+      inventoryContext?.user_location?.location,
+      minorPlantLocations,
+      retiredLocations,
+      smallToolsLocations,
+    ],
+  );
+  const unknownLocation = useMemo(
+    () => knownLocations.find((location) => isInventoryUnknownLocation(location)) || null,
+    [knownLocations],
+  );
+  const filterPrimaryLocation = useCallback(
+    (location: InventoryLocation) => canSelectInventoryPrimaryLocation(location, {
       currentLocationId: inventoryContext?.is_user_location_valid === false
         ? null
         : inventoryContext?.user_location?.location_id || null,
       teamId: inventoryContext?.team_id || null,
       teamName: inventoryContext?.team_name || null,
-    })),
+    }),
     [
       inventoryContext?.team_id,
       inventoryContext?.team_name,
       inventoryContext?.is_user_location_valid,
       inventoryContext?.user_location?.location_id,
-      locations,
-    ]
+    ],
   );
-
-  const smallToolsItems = useMemo(
-    () => items.filter((item) => item.category !== 'minor_plant'),
-    [items]
-  );
-
-  const minorPlantItems = useMemo(
-    () => items.filter((item) => item.category === 'minor_plant'),
-    [items]
+  const primaryLocationOptions = useMemo(
+    () => knownLocations.filter(filterPrimaryLocation),
+    [filterPrimaryLocation, knownLocations],
   );
 
   function openInventoryOverviewForSummaryFilter() {
@@ -420,6 +467,7 @@ export default function InventoryPage() {
     });
     await parseJsonResponse(response, 'Failed to create inventory location');
     toast.success('Location added');
+    setLocationSearchVersion((version) => version + 1);
     await fetchInventoryData();
   }
 
@@ -439,6 +487,7 @@ export default function InventoryPage() {
     await parseJsonResponse(response, 'Failed to update inventory location');
     toast.success('Location updated');
     setEditingLocation(null);
+    setLocationSearchVersion((version) => version + 1);
     await fetchInventoryData();
   }
 
@@ -453,6 +502,7 @@ export default function InventoryPage() {
         });
         await parseJsonResponse(response, 'Failed to remove inventory location');
         toast.success('Location removed');
+        setLocationSearchVersion((version) => version + 1);
         await fetchInventoryData();
       },
     });
@@ -619,7 +669,7 @@ export default function InventoryPage() {
     });
   }
 
-  async function handleCreateHardwareItem(data: { name: string; sort_order: number }) {
+  async function handleCreateHardwareItem(data: { name: string }) {
     const response = await fetch('/api/inventory/hardware', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -632,7 +682,7 @@ export default function InventoryPage() {
 
   async function handleUpdateHardwareItem(
     item: InventoryHardwareItem,
-    data: { name?: string; sort_order?: number; is_active?: boolean },
+    data: { name?: string; is_active?: boolean },
   ) {
     const response = await fetch(`/api/inventory/hardware/${item.id}`, {
       method: 'PATCH',
@@ -775,6 +825,7 @@ export default function InventoryPage() {
           currentFleetAssignment={inventoryContext?.current_fleet_assignment || null}
           hardwareItems={hardwareItems}
           hardwareBalances={hardwareBalances}
+          locationFilter={filterPrimaryLocation}
           onSetUserLocation={handleSetUserLocation}
           onRequestLocation={handleRequestLocation}
           onOpenMoveDialog={setMovingItems}
@@ -785,7 +836,7 @@ export default function InventoryPage() {
         <MoveInventoryDialog
           open={movingItems.length > 0}
           items={movingItems}
-          locations={locations}
+          locations={knownLocations}
           onClose={() => setMovingItems([])}
           onSubmit={handleMoveItems}
         />
@@ -794,6 +845,7 @@ export default function InventoryPage() {
           open={changeLocationDialogOpen}
           locations={primaryLocationOptions}
           userLocation={employeeUserLocation}
+          locationFilter={filterPrimaryLocation}
           onClose={() => setChangeLocationDialogOpen(false)}
           onSubmit={({ locationId, reason }) => handleSetUserLocation(locationId, reason)}
         />
@@ -990,7 +1042,7 @@ export default function InventoryPage() {
                 onDelete={setRetiringItem}
                 onMove={setMovingItems}
                 onOpenDetails={(item) => router.push('/inventory/items/' + item.id + '?fromTab=overview')}
-                locationFilterLocations={locations}
+                locationFilterLocations={smallToolsLocations}
                 categoryLabels={categoryLabels}
                 tableLabel="small tools"
                 quickFilter={inventoryTableQuickFilter}
@@ -1008,7 +1060,7 @@ export default function InventoryPage() {
                 onBulkAction={handleRestoreMinorPlantToPlant}
                 bulkActionLabel={restoringMinorPlantItems ? 'Moving to Plant Assets...' : 'Move to Plant Assets'}
                 onOpenDetails={(item) => router.push('/inventory/items/' + item.id + '?fromTab=overview&overview=minor-plant')}
-                locationFilterLocations={locations}
+                locationFilterLocations={minorPlantLocations}
                 categoryLabels={categoryLabels}
                 tableLabel="minor plant"
                 showMinorPlantDetails
@@ -1031,7 +1083,7 @@ export default function InventoryPage() {
                 onMove={() => {}}
                 onRestore={handleRestoreItem}
                 onOpenDetails={(item) => router.push('/inventory/items/' + item.id + '?fromTab=overview&overview=retired')}
-                locationFilterLocations={locations}
+                locationFilterLocations={retiredLocations}
                 categoryLabels={categoryLabels}
                 tableLabel="retired inventory"
                 showMinorPlantDetails={retiredItems.some((item) => item.category === 'minor_plant')}
@@ -1062,10 +1114,10 @@ export default function InventoryPage() {
             />
           ) : null}
           <InventoryLocationsPanel
-            locations={locations}
             fleetAssets={fleetAssets}
             onEdit={(location) => { setEditingLocation(location); setLocationDialogOpen(true); }}
             onRemove={handleRemoveLocation}
+            refreshVersion={locationSearchVersion}
           />
         </TabsContent>
 
@@ -1093,7 +1145,7 @@ export default function InventoryPage() {
             <HardwareStockPanel
               items={hardwareItems}
               balances={hardwareBalances}
-              locations={locations}
+              locations={hardwareLocations}
               onCreateItem={handleCreateHardwareItem}
               onUpdateItem={handleUpdateHardwareItem}
               onAdjust={handleHardwareAdjustment}
@@ -1105,7 +1157,7 @@ export default function InventoryPage() {
 
       <InventoryItemDialog
         open={itemDialogOpen}
-        locations={locations}
+        locations={knownLocations}
         categories={categories}
         onClose={() => setItemDialogOpen(false)}
         onSubmit={handleCreateItem}
@@ -1129,7 +1181,7 @@ export default function InventoryPage() {
       <MoveInventoryDialog
         open={movingItems.length > 0}
         items={movingItems}
-        locations={locations}
+        locations={knownLocations}
         onClose={() => setMovingItems([])}
         onSubmit={handleMoveItems}
       />
@@ -1143,6 +1195,7 @@ export default function InventoryPage() {
         open={changeLocationDialogOpen}
         locations={primaryLocationOptions}
         userLocation={employeeUserLocation}
+        locationFilter={filterPrimaryLocation}
         allowUnset
         onClose={() => setChangeLocationDialogOpen(false)}
         onSubmit={({ locationId, reason }) => handleSetUserLocation(locationId, reason)}

@@ -5,9 +5,13 @@ import { createSupabaseQueryMock } from '@/tests/utils/supabase-query-mock';
 vi.mock('@/lib/server/app-auth/session', () => ({
   getCurrentAuthenticatedProfile: vi.fn(),
 }));
+vi.mock('@/lib/server/inventory-kiosk', () => ({
+  getInventoryKioskPostLoginPath: vi.fn(),
+}));
 
 import { GET } from '@/app/api/dashboard/summary/route';
 import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
+import { getInventoryKioskPostLoginPath } from '@/lib/server/inventory-kiosk';
 import { DEBUG_ERROR_LOG_HIDDEN_ADMIN_EMAIL } from '@/lib/utils/error-log-filters';
 
 vi.mock('@/lib/supabase/server');
@@ -53,6 +57,7 @@ function createReminderActionsSummaryQuery(rows: Array<Record<string, unknown>>)
 describe('GET /api/dashboard/summary', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getInventoryKioskPostLoginPath).mockResolvedValue(null);
   });
 
   it('returns 401 when unauthenticated', async () => {
@@ -88,6 +93,7 @@ describe('GET /api/dashboard/summary', () => {
         cookieExpiresAt: null,
       },
     } as never);
+    vi.mocked(getInventoryKioskPostLoginPath).mockResolvedValue('/yard-kiosk');
     vi.mocked(getEffectiveRole).mockResolvedValue({
       role_id: 'employee-role',
       role_name: 'employee',
@@ -269,6 +275,7 @@ describe('GET /api/dashboard/summary', () => {
     const payload = await response.json();
 
     expect(response.status).toBe(200);
+    expect(payload.kiosk_launch_available).toBe(true);
     expect(payload.metrics).toEqual({
       approvals: {
         timesheets: 1,
@@ -399,6 +406,7 @@ describe('GET /api/dashboard/summary', () => {
     const payload = await response.json();
 
     expect(response.status).toBe(200);
+    expect(payload.kiosk_launch_available).toBe(false);
     expect(payload.metrics).toEqual({
       approvals: {
         timesheets: 2,

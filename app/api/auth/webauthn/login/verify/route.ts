@@ -10,6 +10,7 @@ import { getAppAuthProfile } from '@/lib/server/app-auth/profile';
 import { issueAppSession, revokeAppSession, validateAppSession } from '@/lib/server/app-auth/session';
 import { getWebAuthnRequestConfig } from '@/lib/server/webauthn/config';
 import { trackServerUsageEvent } from '@/lib/server/user-analytics';
+import { getInventoryKioskPostLoginPath } from '@/lib/server/inventory-kiosk';
 import {
   consumeWebAuthnChallenge,
   getCredentialPublicKey,
@@ -143,7 +144,10 @@ export async function POST(request: NextRequest) {
       await revokeAppSession(existing.session.id, 'replaced_by_biometric_login', nextSession.row.id);
     }
 
-    const profile = await getAppAuthProfile(credential.profile_id, null);
+    const [profile, postLoginPath] = await Promise.all([
+      getAppAuthProfile(credential.profile_id, null),
+      getInventoryKioskPostLoginPath(credential.profile_id),
+    ]);
     await trackServerUsageEvent({
       eventName: 'auth_login_success',
       userId: credential.profile_id,
@@ -176,6 +180,7 @@ export async function POST(request: NextRequest) {
         id: profile.id,
         must_change_password: profile.must_change_password,
       },
+      post_login_path: postLoginPath,
     });
 
     clearAllAuthCookies(request, response);

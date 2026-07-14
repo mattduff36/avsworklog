@@ -27,6 +27,7 @@ import type {
   InventoryHardwareTransferPayload,
   InventoryLocation,
 } from '../types';
+import { InventoryLocationSelect } from './InventoryLocationSelect';
 
 interface HardwareTransferDialogProps {
   open: boolean;
@@ -58,6 +59,7 @@ export function HardwareTransferDialog({
     () => new Set(eligibleLocationIds || locations.map((location) => location.id)),
     [eligibleLocationIds, locations],
   );
+  const restrictDestinations = eligibleLocationIds !== undefined;
   const activeLocations = useMemo(
     () => locations.filter((location) => location.is_active && eligibleIds.has(location.id)),
     [eligibleIds, locations],
@@ -188,18 +190,30 @@ export function HardwareTransferDialog({
 
             <div className="space-y-2">
               <Label>To</Label>
-              <Select value={toLocationId} onValueChange={setToLocationId} disabled={!fromLocationId}>
-                <SelectTrigger className="border-slate-600 bg-slate-800">
-                  <SelectValue placeholder="Destination" />
-                </SelectTrigger>
-                <SelectContent>
-                  {activeLocations
-                    .filter((location) => location.id !== fromLocationId)
-                    .map((location) => (
-                      <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+              {restrictDestinations ? (
+                <Select value={toLocationId} onValueChange={setToLocationId} disabled={!fromLocationId}>
+                  <SelectTrigger className="border-slate-600 bg-slate-800">
+                    <SelectValue placeholder="Destination" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeLocations
+                      .filter((location) => location.id !== fromLocationId)
+                      .map((location) => (
+                        <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <InventoryLocationSelect
+                  value={toLocationId}
+                  onValueChange={setToLocationId}
+                  locations={activeLocations.filter((location) => location.id !== fromLocationId)}
+                  disabled={!fromLocationId}
+                  placeholder="Destination"
+                  serverSearch
+                  locationFilter={(location) => location.id !== fromLocationId}
+                />
+              )}
             </div>
           </div>
 

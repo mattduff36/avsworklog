@@ -21,7 +21,8 @@ import {
   FileText,
   Calendar,
   LockKeyhole,
-  Loader2
+  Loader2,
+  MonitorPlay,
 } from 'lucide-react';
 import { getEnabledForms } from '@/lib/config/forms';
 import type { ModuleName } from '@/types/roles';
@@ -107,6 +108,7 @@ export default function DashboardPage() {
   const [maintenanceOverdueCount, setMaintenanceOverdueCount] = useState(0);
   const [remindersPendingCount, setRemindersPendingCount] = useState(0);
   const [actionsUnassignedCount, setActionsUnassignedCount] = useState(0);
+  const [canLaunchYardKiosk, setCanLaunchYardKiosk] = useState(false);
   const [badgesLoading, setBadgesLoading] = useState(true);
   const [metricsErrorStatus, setMetricsErrorStatus] = useState<number | null>(null);
   const [showCompactGreeting, setShowCompactGreeting] = useState(false);
@@ -183,12 +185,14 @@ export default function DashboardPage() {
         maintenanceOverdueCount: 0,
         remindersPendingCount: 0,
         actionsUnassignedCount: 0,
+        kioskLaunchAvailable: false,
       };
     }
     const response = await fetch('/api/dashboard/summary', { cache: 'no-store' });
     const rawPayload = await response.text();
     const payload = rawPayload ? JSON.parse(rawPayload) as {
       error?: string;
+      kiosk_launch_available?: boolean;
       metrics?: {
         approvals?: { timesheets?: number; absences?: number };
         badges?: {
@@ -233,6 +237,7 @@ export default function DashboardPage() {
       maintenanceOverdueCount,
       remindersPendingCount,
       actionsUnassignedCount,
+      kioskLaunchAvailable: payload.kiosk_launch_available === true,
     };
   }, [canViewApprovals]);
 
@@ -248,6 +253,7 @@ export default function DashboardPage() {
     setMaintenanceOverdueCount(metrics.maintenanceOverdueCount);
     setRemindersPendingCount(metrics.remindersPendingCount);
     setActionsUnassignedCount(metrics.actionsUnassignedCount);
+    setCanLaunchYardKiosk(metrics.kioskLaunchAvailable);
   }, []);
 
   const loadDashboardMetrics = useCallback(async (): Promise<number | null> => {
@@ -280,6 +286,7 @@ export default function DashboardPage() {
         setMaintenanceOverdueCount(0);
         setRemindersPendingCount(0);
         setActionsUnassignedCount(0);
+        setCanLaunchYardKiosk(false);
       }
 
       return errorStatus;
@@ -437,6 +444,7 @@ export default function DashboardPage() {
       if (b.id === 'reminders') return 1;
       return 0;
     });
+  const primaryTileAnimationOffset = canLaunchYardKiosk ? 1 : 0;
   const managementTileBadgeCountByHref: Record<string, number> = {
     '/approvals': approvalsTileBadgeCount,
     '/actions': actionsUnassignedCount,
@@ -525,6 +533,25 @@ export default function DashboardPage() {
       <div>
         <TooltipProvider>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+              {canLaunchYardKiosk ? (
+                <Link href="/yard-kiosk">
+                  <div
+                    className="relative flex aspect-square cursor-pointer flex-col items-center justify-center space-y-3 overflow-hidden rounded-lg bg-inventory p-6 text-center text-white shadow-lg transition-all duration-200 hover:scale-105 hover:opacity-90 animate-tile-pop"
+                    style={{ animationDelay: '0ms' }}
+                  >
+                    <MonitorPlay className={tabletModeEnabled ? 'h-12 w-12' : 'h-8 w-8'} />
+                    <span className={`font-semibold leading-tight ${tabletModeEnabled ? 'text-base' : 'text-2xl'}`}>
+                      Launch Kiosk
+                    </span>
+                    <span
+                      className={`pointer-events-none absolute bottom-2 left-2 right-2 truncate leading-tight opacity-90 max-[350px]:hidden ${tabletModeEnabled ? 'text-xs' : 'text-base'}`}
+                      aria-hidden
+                    >
+                      Yard inventory mode
+                    </span>
+                  </div>
+                </Link>
+              ) : null}
               {/* Active Forms */}
               {renderedQuickActionTiles.map((formType, index) => {
               const Icon = formType.icon;
@@ -557,7 +584,7 @@ export default function DashboardPage() {
                 >
                   <div
                     className={`relative overflow-hidden bg-${formType.color} hover:opacity-90 hover:scale-105 transition-all duration-200 rounded-lg p-6 text-center shadow-lg ${isRemindersTile ? 'aspect-[2/1]' : 'aspect-square'} flex flex-col items-center justify-center space-y-3 cursor-pointer animate-tile-pop ${textColorClass}`}
-                    style={{ animationDelay: `${index * 75}ms` }}
+                    style={{ animationDelay: `${(index + primaryTileAnimationOffset) * 75}ms` }}
                   >
                     {showPrimaryBadgeLoading ? (
                       <div className="absolute top-2 right-2 bg-slate-500/80 rounded-full h-10 w-10 flex items-center justify-center shadow-lg ring-2 ring-white animate-pulse">

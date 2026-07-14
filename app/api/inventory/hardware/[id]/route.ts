@@ -8,7 +8,6 @@ interface RouteParams {
 
 interface UpdateHardwareItemBody {
   name?: string;
-  sort_order?: number;
   is_active?: boolean;
 }
 
@@ -61,9 +60,6 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         return NextResponse.json({ error: 'Hardware item name is required' }, { status: 400 });
       }
       update.name = name;
-    }
-    if (body.sort_order !== undefined) {
-      update.sort_order = Number.isInteger(body.sort_order) ? body.sort_order : 0;
     }
     if (body.is_active !== undefined) {
       update.is_active = body.is_active;
