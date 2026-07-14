@@ -2,6 +2,33 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.6.0
+
+**GIT COMMIT MESSAGE**
+`feat(dashboard): add Yard kiosk launch fallback`
+
+**PUSHED AT**
+2026-07-14T14:53:18.088Z
+
+**WHAT CHANGED**
+Add Yard kiosk launch fallback. Suppress biometric prompt for Yard kiosk. Launch configured Yard kiosk. Unify Hardware stock entry. Add Yard kiosk transfers. Add catalogue stock receipt.
+
+**VERSION HISTORY DETAILS**
+- Launch configured Yard kiosk, with changes to background routes, app screens, shared logic, automation scripts, automated tests, data storage, and documentation.
+- Suppress biometric prompt for Yard kiosk, with changes to background routes, interface components, shared logic, and automated tests.
+- Updated data storage, with changes to shared typing, automation scripts, and data storage.
+- Updated help and FAQ, with changes to documentation.
+- Added Yard kiosk launch fallback, with changes to app screens.
+- Updated navigation across 1 changed file.
+
+**COMMITS IN THIS RELEASE**
+- `feat(dashboard): add Yard kiosk launch fallback`
+- `fix(auth): suppress biometric prompt for Yard kiosk`
+- `feat(inventory): launch configured Yard kiosk`
+- `feat(inventory): unify Hardware stock entry`
+- `feat(inventory): add Yard kiosk transfers`
+- `feat(inventory): add catalogue stock receipt`
+
 ## 0726.5.0
 
 **GIT COMMIT MESSAGE**
