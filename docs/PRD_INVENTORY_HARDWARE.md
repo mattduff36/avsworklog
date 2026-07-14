@@ -39,6 +39,9 @@ Add quantity-based, non-serialised Hardware stock to the Inventory module withou
 
 - Managers and admins can transfer stock between any two active Inventory locations.
 - Employees can transfer stock only between their valid primary location and assigned secondary Site locations.
+- The database-configured Yard kiosk actor is a narrow exception: it can transfer
+  stock only when exactly one side is the active Yard and the other side is an
+  active non-Yard location, as defined by `YK-002` and `YK-006`.
 - Transfers are atomic, reject insufficient stock, and preserve company-wide totals.
 
 ### HW-005: Audit history
@@ -69,6 +72,8 @@ Add quantity-based, non-serialised Hardware stock to the Inventory module withou
 - Reading Hardware requires Inventory module access.
 - Catalogue and adjustment writes require manager/admin Inventory access.
 - Transfer authorization is revalidated by the API for every request.
+- Yard kiosk authorization is revalidated independently and does not grant its
+  profile manager, catalogue, adjustment, or ordinary unrestricted transfer access.
 
 ## Non-goals
 

@@ -20,6 +20,10 @@ Location identity is type and source based:
 
 `name` and `description` are display metadata. Business rules should not infer location meaning from names once `location_type` has been backfilled. During rollout, code may keep name-based Yard and Unknown fallbacks for compatibility.
 
+Only one active location may have `location_type = 'yard'`. The Yard kiosk
+resolves that row automatically and fails closed when no active Yard is
+available.
+
 ## Source Metadata
 
 Generated locations should store source metadata:
@@ -92,6 +96,25 @@ Hardware quantity changes must use the dedicated atomic stock functions:
 - Managers and admins may transfer between any active locations.
 - Employees may transfer only between their valid primary location and assigned
   secondary Site locations.
+- The configured Yard kiosk profile may transfer only between the active Yard
+  and one active non-Yard location. This exception is isolated to the kiosk API
+  and does not broaden ordinary employee transfer permissions.
 
 Serialized movement checks do not apply to Hardware stock. Hardware transaction
 authorization and available quantity must be validated independently.
+
+## Yard Kiosk
+
+The Yard kiosk is an authenticated, fixed-location workflow defined in
+`docs/PRD_INVENTORY_YARD_KIOSK.md`.
+
+- Take transactions derive Yard as the source and the selected counterpart as
+  the destination.
+- Return transactions derive the selected counterpart as the source and Yard as
+  the destination.
+- One basket uses one direction and one counterpart location.
+- Mixed serialized and Hardware baskets commit in one database transaction.
+- Serialized items must be active, at the derived source, and allowed by the
+  canonical check rules. Hardware quantities must be available at the source.
+- Kiosk APIs derive actor and all location ids server-side; clients submit only
+  direction, counterpart, serialized ids, and Hardware item quantities.

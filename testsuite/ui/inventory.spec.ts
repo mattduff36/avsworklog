@@ -21,4 +21,19 @@ test.describe('@inventory @critical Inventory', () => {
       timeout: 10_000,
     });
   });
+
+  test('Yard kiosk is isolated from the dashboard and fails closed for non-kiosk accounts', async ({ page }) => {
+    await gotoWithTimeoutSkip(page, '/yard-kiosk', 'Yard kiosk route timed out in this environment');
+
+    await expect(page.locator('body')).toContainText(/yard inventory/i, { timeout: 10_000 });
+    const takeButton = page.getByRole('button', { name: /take/i });
+
+    if (await takeButton.isVisible().catch(() => false)) {
+      await takeButton.click();
+      await expect(page.getByText(/where is it going/i)).toBeVisible();
+      await expect(page.getByRole('navigation')).toHaveCount(0);
+    } else {
+      await expect(page.locator('body')).toContainText(/not authorised|unavailable|not configured/i);
+    }
+  });
 });

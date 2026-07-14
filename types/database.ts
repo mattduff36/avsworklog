@@ -2304,6 +2304,48 @@ export type Database = {
           },
         ]
       }
+      inventory_kiosk_config: {
+        Row: {
+          id: number
+          kiosk_user_id: string
+          is_enabled: boolean
+          note: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: number
+          kiosk_user_id: string
+          is_enabled?: boolean
+          note?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: number
+          kiosk_user_id?: string
+          is_enabled?: boolean
+          note?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'inventory_kiosk_config_kiosk_user_id_fkey'
+            columns: ['kiosk_user_id']
+            isOneToOne: true
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_kiosk_config_updated_by_fkey'
+            columns: ['updated_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       inventory_hardware_items: {
         Row: {
           id: string
@@ -2509,6 +2551,78 @@ export type Database = {
           {
             foreignKeyName: 'inventory_hardware_transactions_transfer_location_id_fkey'
             columns: ['transfer_location_id']
+            isOneToOne: false
+            referencedRelation: 'inventory_locations'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      inventory_kiosk_transfer_batches: {
+        Row: {
+          id: string
+          direction: string
+          yard_location_id: string
+          counterpart_location_id: string
+          movement_batch_id: string | null
+          hardware_batch_id: string | null
+          note: string | null
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          direction: string
+          yard_location_id: string
+          counterpart_location_id: string
+          movement_batch_id?: string | null
+          hardware_batch_id?: string | null
+          note?: string | null
+          created_by: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          direction?: string
+          yard_location_id?: string
+          counterpart_location_id?: string
+          movement_batch_id?: string | null
+          hardware_batch_id?: string | null
+          note?: string | null
+          created_by?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'inventory_kiosk_transfer_batches_counterpart_location_id_fkey'
+            columns: ['counterpart_location_id']
+            isOneToOne: false
+            referencedRelation: 'inventory_locations'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_kiosk_transfer_batches_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_kiosk_transfer_batches_hardware_batch_id_fkey'
+            columns: ['hardware_batch_id']
+            isOneToOne: false
+            referencedRelation: 'inventory_hardware_transaction_batches'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_kiosk_transfer_batches_movement_batch_id_fkey'
+            columns: ['movement_batch_id']
+            isOneToOne: false
+            referencedRelation: 'inventory_item_movement_batches'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_kiosk_transfer_batches_yard_location_id_fkey'
+            columns: ['yard_location_id']
             isOneToOne: false
             referencedRelation: 'inventory_locations'
             referencedColumns: ['id']
@@ -9096,6 +9210,23 @@ export type Database = {
         }
         Returns: string
       }
+      inventory_kiosk_execute_transfer_basket: {
+        Args: {
+          p_actor: string
+          p_direction: string
+          p_counterpart_location_id: string
+          p_serialized_item_ids: string[]
+          p_hardware_lines: Json
+          p_note: string | null
+        }
+        Returns: {
+          kiosk_batch_id: string
+          movement_batch_id: string | null
+          hardware_batch_id: string | null
+          serialized_count: number
+          hardware_line_count: number
+        }[]
+      }
       inventory_transfer_hardware_stock: {
         Args: {
           p_lines: Json
@@ -9158,7 +9289,7 @@ export type Database = {
       check__inspection_items__status: 'ok' | 'attention' | 'defect' | 'na'
       check__inspection_orphan_children_archive__child_table: 'inspection_items' | 'inspection_photos'
       check__inventory_item_groups__status: 'active' | 'inactive'
-      check__inventory_item_movement_batches__move_scope: 'single' | 'bulk' | 'group' | 'claim'
+      check__inventory_item_movement_batches__move_scope: 'single' | 'bulk' | 'group' | 'claim' | 'kiosk'
       check__inventory_items__status: 'active' | 'retired'
       check__inventory_location_requests__status: 'pending' | 'approved' | 'rejected' | 'duplicate'
       check__maintenance_categories__responsibility: 'workshop' | 'office'
