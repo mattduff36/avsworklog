@@ -7,9 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { MapPin, PackageSearch, Send, Truck } from 'lucide-react';
+import { ArrowRightLeft, Boxes, MapPin, PackageSearch, Send, Truck } from 'lucide-react';
 import type {
   CurrentFleetAssignment,
+  InventoryHardwareBalance,
+  InventoryHardwareItem,
+  InventoryHardwareTransferPayload,
   InventoryItem,
   InventoryLocation,
   InventoryUserLocation,
@@ -17,6 +20,7 @@ import type {
 } from '../types';
 import { InventoryLocationSelect } from './InventoryLocationSelect';
 import { InventoryTable } from './InventoryTable';
+import { HardwareTransferDialog } from './HardwareTransferDialog';
 
 const LOCATION_NOT_SHOWN_VALUE = '__location_not_shown__';
 
@@ -27,10 +31,13 @@ interface InventoryEmployeeViewProps {
   userLocation: InventoryUserLocation | null;
   secondarySiteLocations?: InventoryUserSiteLocation[];
   currentFleetAssignment?: CurrentFleetAssignment | null;
+  hardwareItems?: InventoryHardwareItem[];
+  hardwareBalances?: InventoryHardwareBalance[];
   onSetUserLocation: (locationId: string) => Promise<void>;
   onRequestLocation: (payload: { suggested_name: string; note: string }) => Promise<void>;
   onOpenMoveDialog: (items: InventoryItem[]) => void;
   onChangeLocation: () => void;
+  onTransferHardware?: (payload: InventoryHardwareTransferPayload) => Promise<void>;
 }
 
 export function InventoryEmployeeView({
@@ -40,10 +47,13 @@ export function InventoryEmployeeView({
   userLocation,
   secondarySiteLocations = [],
   currentFleetAssignment,
+  hardwareItems = [],
+  hardwareBalances = [],
   onSetUserLocation,
   onRequestLocation,
   onOpenMoveDialog,
   onChangeLocation,
+  onTransferHardware,
 }: InventoryEmployeeViewProps) {
   const initialLocationId = userLocation?.location?.is_active === false ? '' : userLocation?.location_id || '';
   const [selectedLocationId, setSelectedLocationId] = useState(initialLocationId);
@@ -53,6 +63,7 @@ export function InventoryEmployeeView({
   const [isRequestingLocation, setIsRequestingLocation] = useState(false);
   const [claimSearch, setClaimSearch] = useState('');
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+  const [hardwareTransferOpen, setHardwareTransferOpen] = useState(false);
 
   const activeLocation = userLocation?.location?.is_active === false ? null : userLocation?.location || null;
   const isRequestingMissingLocation = selectedLocationId === LOCATION_NOT_SHOWN_VALUE;
@@ -79,6 +90,29 @@ export function InventoryEmployeeView({
     )),
     [secondarySiteLocations]
   );
+  const responsibleHardwareLocations = useMemo(
+    () => [
+      ...(activeLocation ? [activeLocation] : []),
+      ...activeSecondarySiteLocations.flatMap((siteLocation) => (
+        siteLocation.location ? [siteLocation.location] : []
+      )),
+    ],
+    [activeLocation, activeSecondarySiteLocations],
+  );
+  const hardwareItemById = useMemo(
+    () => new Map(hardwareItems.map((item) => [item.id, item])),
+    [hardwareItems],
+  );
+  const positiveHardwareByLocation = useMemo(() => {
+    const grouped = new Map<string, InventoryHardwareBalance[]>();
+    for (const balance of hardwareBalances) {
+      if (balance.quantity <= 0 || !hardwareItemById.get(balance.hardware_item_id)?.is_active) continue;
+      const locationBalances = grouped.get(balance.location_id) || [];
+      locationBalances.push(balance);
+      grouped.set(balance.location_id, locationBalances);
+    }
+    return grouped;
+  }, [hardwareBalances, hardwareItemById]);
   const claimableItems = useMemo(() => {
     const query = claimSearch.trim().toLowerCase();
     if (!activeLocation || !query) return [];
@@ -309,6 +343,68 @@ export function InventoryEmployeeView({
       ) : null}
 
       <Card className="border-slate-700 bg-slate-900/70">
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-white">
+              <Boxes className="h-5 w-5 text-inventory" />
+              Hardware
+            </CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Quantity stock held at locations you are responsible for.
+            </p>
+          </div>
+          {onTransferHardware && responsibleHardwareLocations.length > 1 ? (
+            <Button variant="outline" onClick={() => setHardwareTransferOpen(true)} className="shrink-0 border-slate-600">
+              <ArrowRightLeft className="mr-2 h-4 w-4" />
+              Transfer
+            </Button>
+          ) : null}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {responsibleHardwareLocations.every(
+            (location) => (positiveHardwareByLocation.get(location.id) || []).length === 0,
+          ) ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              No Hardware stock is currently assigned to your locations.
+            </p>
+          ) : (
+            responsibleHardwareLocations.map((location) => {
+              const locationBalances = (positiveHardwareByLocation.get(location.id) || [])
+                .toSorted((a, b) => (
+                  (hardwareItemById.get(a.hardware_item_id)?.name || '')
+                    .localeCompare(hardwareItemById.get(b.hardware_item_id)?.name || '')
+                ));
+              if (locationBalances.length === 0) return null;
+
+              return (
+                <div key={location.id} className="overflow-hidden rounded-lg border border-slate-700">
+                  <div className="flex items-center gap-2 border-b border-slate-700 bg-slate-950/40 px-4 py-3">
+                    <MapPin className="h-4 w-4 text-inventory" />
+                    <span className="font-semibold text-white">{location.name}</span>
+                  </div>
+                  <div className="divide-y divide-slate-800">
+                    {locationBalances.map((balance) => (
+                      <div
+                        key={`${balance.hardware_item_id}:${location.id}`}
+                        className="flex items-center justify-between gap-4 px-4 py-3"
+                      >
+                        <span className="text-sm text-slate-200">
+                          {hardwareItemById.get(balance.hardware_item_id)?.name || 'Hardware item'}
+                        </span>
+                        <Badge className="bg-inventory/15 font-mono text-inventory-light hover:bg-inventory/20">
+                          {balance.quantity.toLocaleString()}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="border-slate-700 bg-slate-900/70">
         <CardHeader>
           <CardTitle className="text-white">Claim An Item</CardTitle>
         </CardHeader>
@@ -332,6 +428,18 @@ export function InventoryEmployeeView({
           ))}
         </CardContent>
       </Card>
+
+      {onTransferHardware ? (
+        <HardwareTransferDialog
+          open={hardwareTransferOpen}
+          items={hardwareItems}
+          balances={hardwareBalances}
+          locations={responsibleHardwareLocations}
+          eligibleLocationIds={responsibleHardwareLocations.map((location) => location.id)}
+          onClose={() => setHardwareTransferOpen(false)}
+          onSubmit={onTransferHardware}
+        />
+      ) : null}
     </div>
   );
 }

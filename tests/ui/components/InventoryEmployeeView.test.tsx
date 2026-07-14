@@ -4,7 +4,11 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { InventoryEmployeeView } from '@/app/(dashboard)/inventory/components/InventoryEmployeeView';
-import type { InventoryItem, InventoryLocation } from '@/app/(dashboard)/inventory/types';
+import type {
+  InventoryHardwareItem,
+  InventoryItem,
+  InventoryLocation,
+} from '@/app/(dashboard)/inventory/types';
 
 vi.mock('@/app/(dashboard)/inventory/components/InventoryTable', () => ({
   InventoryTable: ({ items, tableLabel }: { items: InventoryItem[]; tableLabel?: string }) => (
@@ -50,6 +54,18 @@ const siteLocation: InventoryLocation = {
   source_synced_at: null,
   created_at: '2026-07-05T00:00:00.000Z',
   updated_at: '2026-07-05T00:00:00.000Z',
+  created_by: null,
+  updated_by: null,
+};
+
+const cones: InventoryHardwareItem = {
+  id: 'hardware-cones',
+  name: 'Cones',
+  name_normalized: 'cones',
+  is_active: true,
+  sort_order: 20,
+  created_at: '2026-07-14T00:00:00.000Z',
+  updated_at: '2026-07-14T00:00:00.000Z',
   created_by: null,
   updated_by: null,
 };
@@ -112,5 +128,59 @@ describe('InventoryEmployeeView', () => {
     expect(screen.getByText('Site: Site - 12345 - Yard Entrance')).toBeInTheDocument();
     expect(screen.getByText('Secondary Location')).toBeInTheDocument();
     expect(screen.getByText(/site 12345: Site Barrier/)).toBeInTheDocument();
+  });
+
+  it('groups positive Hardware balances by responsible location and hides zero balances', () => {
+    render(
+      <InventoryEmployeeView
+        items={[]}
+        locations={[primaryLocation]}
+        userLocation={{
+          user_id: 'user-1',
+          location_id: primaryLocation.id,
+          location: primaryLocation,
+        }}
+        secondarySiteLocations={[{
+          user_id: 'user-1',
+          location_id: siteLocation.id,
+          assigned_by: 'supervisor-1',
+          assigned_at: '2026-07-05T00:00:00.000Z',
+          note: null,
+          location: siteLocation,
+        }]}
+        hardwareItems={[
+          cones,
+          { ...cones, id: 'hardware-tamp', name: 'Tamp', name_normalized: 'tamp' },
+        ]}
+        hardwareBalances={[
+          {
+            id: 'balance-1',
+            hardware_item_id: cones.id,
+            location_id: primaryLocation.id,
+            quantity: 12,
+            location: primaryLocation,
+          },
+          {
+            id: 'balance-2',
+            hardware_item_id: 'hardware-tamp',
+            location_id: siteLocation.id,
+            quantity: 0,
+            location: siteLocation,
+          },
+        ]}
+        currentFleetAssignment={null}
+        onSetUserLocation={vi.fn()}
+        onRequestLocation={vi.fn()}
+        onOpenMoveDialog={vi.fn()}
+        onChangeLocation={vi.fn()}
+        onTransferHardware={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Hardware')).toBeInTheDocument();
+    expect(screen.getByText('Cones')).toBeInTheDocument();
+    expect(screen.getByText('12')).toBeInTheDocument();
+    expect(screen.queryByText('Tamp')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /transfer/i })).toBeEnabled();
   });
 });

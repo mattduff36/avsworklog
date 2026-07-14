@@ -2304,6 +2304,217 @@ export type Database = {
           },
         ]
       }
+      inventory_hardware_items: {
+        Row: {
+          id: string
+          name: string
+          name_normalized: string
+          is_active: boolean
+          sort_order: number
+          created_at: string
+          updated_at: string
+          created_by: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          name: string
+          is_active?: boolean
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          name?: string
+          is_active?: boolean
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'inventory_hardware_items_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_hardware_items_updated_by_fkey'
+            columns: ['updated_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      inventory_hardware_balances: {
+        Row: {
+          id: string
+          hardware_item_id: string
+          location_id: string
+          quantity: number
+          created_at: string
+          updated_at: string
+          created_by: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          hardware_item_id: string
+          location_id: string
+          quantity?: number
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          hardware_item_id?: string
+          location_id?: string
+          quantity?: number
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'inventory_hardware_balances_hardware_item_id_fkey'
+            columns: ['hardware_item_id']
+            isOneToOne: false
+            referencedRelation: 'inventory_hardware_items'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_hardware_balances_location_id_fkey'
+            columns: ['location_id']
+            isOneToOne: false
+            referencedRelation: 'inventory_locations'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_hardware_balances_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_hardware_balances_updated_by_fkey'
+            columns: ['updated_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      inventory_hardware_transaction_batches: {
+        Row: {
+          id: string
+          operation_type: string
+          reason: string
+          note: string | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          operation_type: string
+          reason: string
+          note?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          operation_type?: string
+          reason?: string
+          note?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'inventory_hardware_transaction_batches_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      inventory_hardware_transactions: {
+        Row: {
+          id: string
+          batch_id: string
+          hardware_item_id: string
+          location_id: string
+          transfer_location_id: string | null
+          quantity_delta: number
+          quantity_before: number
+          quantity_after: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          batch_id: string
+          hardware_item_id: string
+          location_id: string
+          transfer_location_id?: string | null
+          quantity_delta: number
+          quantity_before: number
+          quantity_after: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          batch_id?: string
+          hardware_item_id?: string
+          location_id?: string
+          transfer_location_id?: string | null
+          quantity_delta?: number
+          quantity_before?: number
+          quantity_after?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'inventory_hardware_transactions_batch_id_fkey'
+            columns: ['batch_id']
+            isOneToOne: false
+            referencedRelation: 'inventory_hardware_transaction_batches'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_hardware_transactions_hardware_item_id_fkey'
+            columns: ['hardware_item_id']
+            isOneToOne: false
+            referencedRelation: 'inventory_hardware_items'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_hardware_transactions_location_id_fkey'
+            columns: ['location_id']
+            isOneToOne: false
+            referencedRelation: 'inventory_locations'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_hardware_transactions_transfer_location_id_fkey'
+            columns: ['transfer_location_id']
+            isOneToOne: false
+            referencedRelation: 'inventory_locations'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       inventory_import_batches: {
         Row: {
           id: string
@@ -8875,6 +9086,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      inventory_apply_hardware_adjustments: {
+        Args: {
+          p_operation_type: string
+          p_reason: string
+          p_note: string | null
+          p_lines: Json
+          p_actor: string
+        }
+        Returns: string
+      }
+      inventory_transfer_hardware_stock: {
+        Args: {
+          p_lines: Json
+          p_note: string | null
+          p_actor: string
+        }
+        Returns: string
+      }
       inventory_move_items_with_batch: {
         Args: {
           p_item_ids: string[]

@@ -155,7 +155,7 @@ describe('Child Tables Reference Integrity', () => {
     expect(error).toBeNull();
   });
 
-  it('no orphan inspection_items (every inspection_id exists in van or plant)', async () => {
+  it('no orphan inspection_items (every inspection_id exists in van, plant, or HGV)', async () => {
     const { data: orphans, error } = await supabase
       .from('inspection_items')
       .select('id, inspection_id')
@@ -166,20 +166,29 @@ describe('Child Tables Reference Integrity', () => {
       const inspectionIds = [...new Set(orphans.map((o: { inspection_id: string }) => o.inspection_id))];
 
       for (const inspId of inspectionIds.slice(0, 10)) {
-        const { data: vanMatch } = await supabase
-          .from('van_inspections')
-          .select('id')
-          .eq('id', inspId)
-          .limit(1);
+        const [{ data: vanMatch }, { data: plantMatch }, { data: hgvMatch }] = await Promise.all([
+          supabase
+            .from('van_inspections')
+            .select('id')
+            .eq('id', inspId)
+            .limit(1),
+          supabase
+            .from('plant_inspections')
+            .select('id')
+            .eq('id', inspId)
+            .limit(1),
+          supabase
+            .from('hgv_inspections')
+            .select('id')
+            .eq('id', inspId)
+            .limit(1),
+        ]);
+        const exists = Boolean(vanMatch?.length || plantMatch?.length || hgvMatch?.length);
 
-        const { data: plantMatch } = await supabase
-          .from('plant_inspections')
-          .select('id')
-          .eq('id', inspId)
-          .limit(1);
-
-        const exists = (vanMatch && vanMatch.length > 0) || (plantMatch && plantMatch.length > 0);
-        expect(exists, `Orphan inspection_item with inspection_id=${inspId}`).toBe(true);
+        expect(
+          exists,
+          `Persistent orphan inspection_item with inspection_id=${inspId}`,
+        ).toBe(true);
       }
     }
   });

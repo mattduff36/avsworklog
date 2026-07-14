@@ -69,6 +69,64 @@ export interface InventoryItemCategoryFormData {
   sort_order: string;
 }
 
+export type InventoryHardwareAdjustmentOperation = 'add' | 'remove' | 'recount';
+
+export type InventoryHardwareAdjustmentReason =
+  | 'Delivery'
+  | 'Return'
+  | 'Used'
+  | 'Lost'
+  | 'Scrapped'
+  | 'Damaged'
+  | 'Stocktake correction'
+  | 'Other';
+
+export interface InventoryHardwareItem {
+  id: string;
+  name: string;
+  name_normalized: string;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
+  total_quantity?: number;
+}
+
+export interface InventoryHardwareBalance {
+  id: string | null;
+  hardware_item_id: string;
+  location_id: string;
+  quantity: number;
+  location?: InventoryLocation | null;
+}
+
+export interface InventoryHardwareAdjustmentLine {
+  item_id: string;
+  location_id: string;
+  quantity: number;
+}
+
+export interface InventoryHardwareAdjustmentPayload {
+  operation_type: InventoryHardwareAdjustmentOperation;
+  reason: InventoryHardwareAdjustmentReason;
+  note?: string;
+  lines: InventoryHardwareAdjustmentLine[];
+}
+
+export interface InventoryHardwareTransferLine {
+  item_id: string;
+  from_location_id: string;
+  to_location_id: string;
+  quantity: number;
+}
+
+export interface InventoryHardwareTransferPayload {
+  note?: string;
+  lines: InventoryHardwareTransferLine[];
+}
+
 export interface InventoryItem {
   id: string;
   item_number: string;
@@ -212,6 +270,17 @@ export const INVENTORY_RETIRE_REASONS: InventoryRetireReason[] = [
   'Lost',
   'Damaged',
   'Returned',
+  'Other',
+];
+
+export const INVENTORY_HARDWARE_ADJUSTMENT_REASONS: InventoryHardwareAdjustmentReason[] = [
+  'Delivery',
+  'Return',
+  'Used',
+  'Lost',
+  'Scrapped',
+  'Damaged',
+  'Stocktake correction',
   'Other',
 ];
 

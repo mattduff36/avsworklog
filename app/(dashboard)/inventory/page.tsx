@@ -21,13 +21,15 @@ import { PageLoader } from '@/components/ui/page-loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
-import { AlertTriangle, Archive, CheckCircle2, MapPin, PackageSearch, Plus, Settings, Truck } from 'lucide-react';
+import { AlertTriangle, Archive, Boxes, CheckCircle2, MapPin, PackageSearch, Plus, Settings, Truck } from 'lucide-react';
 import { toast } from 'sonner';
 import { ChangeInventoryLocationDialog } from './components/ChangeInventoryLocationDialog';
 import { InventoryCategoriesPanel } from './components/InventoryCategoriesPanel';
 import { InventoryItemDialog } from './components/InventoryItemDialog';
 import { InventoryEmployeeView } from './components/InventoryEmployeeView';
 import { InventoryGroupsPanel } from './components/InventoryGroupsPanel';
+import { HardwareOverviewPanel } from './components/HardwareOverviewPanel';
+import { HardwareStockPanel } from './components/HardwareStockPanel';
 import { InventoryLocationDialog } from './components/InventoryLocationDialog';
 import { InventoryLocationsPanel } from './components/InventoryLocationsPanel';
 import { InventoryRetireItemDialog } from './components/InventoryRetireItemDialog';
@@ -47,6 +49,10 @@ import {
 import type {
   FleetAssetOption,
   InventoryContext,
+  InventoryHardwareAdjustmentPayload,
+  InventoryHardwareBalance,
+  InventoryHardwareItem,
+  InventoryHardwareTransferPayload,
   InventoryItemGroup,
   InventoryItem,
   InventoryItemCategory,
@@ -81,11 +87,13 @@ export default function InventoryPage() {
   const [siteAssignments, setSiteAssignments] = useState<InventorySiteAssignment[]>([]);
   const [groups, setGroups] = useState<InventoryItemGroup[]>([]);
   const [categories, setCategories] = useState<InventoryItemCategory[]>([]);
+  const [hardwareItems, setHardwareItems] = useState<InventoryHardwareItem[]>([]);
+  const [hardwareBalances, setHardwareBalances] = useState<InventoryHardwareBalance[]>([]);
   const [loading, setLoading] = useState(true);
   const [inventoryLoadError, setInventoryLoadError] = useState<string | null>(null);
   const [pageTab, setPageTab] = useState<'overview' | 'locations' | 'settings'>('overview');
-  const [overviewTab, setOverviewTab] = useState<'small_tools' | 'minor_plant' | 'retired'>('small_tools');
-  const [settingsTab, setSettingsTab] = useState<'categories' | 'groups'>('categories');
+  const [overviewTab, setOverviewTab] = useState<'small_tools' | 'minor_plant' | 'hardware' | 'retired'>('small_tools');
+  const [settingsTab, setSettingsTab] = useState<'categories' | 'groups' | 'hardware'>('categories');
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
   const [changeLocationDialogOpen, setChangeLocationDialogOpen] = useState(false);
@@ -118,6 +126,7 @@ export default function InventoryPage() {
         locationsResponse,
         fleetAssetsResponse,
         categoriesResponse,
+        hardwareResponse,
         groupsResponse,
         siteAssignmentsResponse,
       ] = await Promise.all([
@@ -134,6 +143,7 @@ export default function InventoryPage() {
         fetch('/api/inventory/locations', { cache: 'no-store' }),
         fetch('/api/inventory/fleet-assets', { cache: 'no-store' }),
         fetch('/api/inventory/categories', { cache: 'no-store' }),
+        fetch('/api/inventory/hardware', { cache: 'no-store' }),
         isManagerOrAdmin ? fetch('/api/inventory/groups', { cache: 'no-store' }) : Promise.resolve(null),
         canManageSiteLocations ? fetch('/api/inventory/site-assignments', { cache: 'no-store' }) : Promise.resolve(null),
       ]);
@@ -151,6 +161,11 @@ export default function InventoryPage() {
       const categoriesPayload = await categoriesResponse.json();
       if (!categoriesResponse.ok) {
         throw new Error(categoriesPayload.error || 'Failed to fetch inventory categories');
+      }
+
+      const hardwarePayload = await hardwareResponse.json();
+      if (!hardwareResponse.ok) {
+        throw new Error(hardwarePayload.error || 'Failed to fetch Hardware stock');
       }
 
       const groupsPayload = groupsResponse ? await groupsResponse.json() : { groups: [] };
@@ -171,6 +186,8 @@ export default function InventoryPage() {
       setLocations(locationsPayload.locations || []);
       setFleetAssets(fleetAssetsPayload.assets || []);
       setCategories(categoriesPayload.categories || []);
+      setHardwareItems(hardwarePayload.items || []);
+      setHardwareBalances(hardwarePayload.balances || []);
       setGroups(groupsPayload.groups || []);
       setSiteAssignmentUsers(siteAssignmentsPayload.users || []);
       setAssignableSiteLocations(siteAssignmentsPayload.active_sites || []);
@@ -218,14 +235,22 @@ export default function InventoryPage() {
         return;
       }
       setPageTab('settings');
-      if (requestedSettings === 'groups' || requestedSettings === 'categories') {
+      if (requestedSettings === 'groups' || requestedSettings === 'categories' || requestedSettings === 'hardware') {
         setSettingsTab(requestedSettings);
       }
       return;
     }
 
     setPageTab('overview');
-    setOverviewTab(requestedOverview === 'retired' ? 'retired' : requestedOverview === 'minor-plant' ? 'minor_plant' : 'small_tools');
+    setOverviewTab(
+      requestedOverview === 'retired'
+        ? 'retired'
+        : requestedOverview === 'minor-plant'
+          ? 'minor_plant'
+          : requestedOverview === 'hardware'
+            ? 'hardware'
+            : 'small_tools',
+    );
   }, [searchParams]);
 
   const summary = useMemo(() => {
@@ -289,7 +314,9 @@ export default function InventoryPage() {
   );
 
   function openInventoryOverviewForSummaryFilter() {
-    const nextOverviewTab = overviewTab === 'retired' ? 'small_tools' : overviewTab;
+    const nextOverviewTab = overviewTab === 'retired' || overviewTab === 'hardware'
+      ? 'small_tools'
+      : overviewTab;
     setPageTab('overview');
     setOverviewTab(nextOverviewTab);
     router.push(nextOverviewTab === 'minor_plant' ? '/inventory?overview=minor-plant' : '/inventory', { scroll: false });
@@ -592,6 +619,53 @@ export default function InventoryPage() {
     });
   }
 
+  async function handleCreateHardwareItem(data: { name: string; sort_order: number }) {
+    const response = await fetch('/api/inventory/hardware', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    await parseJsonResponse(response, 'Failed to create Hardware item');
+    toast.success('Hardware item created');
+    await fetchInventoryData();
+  }
+
+  async function handleUpdateHardwareItem(
+    item: InventoryHardwareItem,
+    data: { name?: string; sort_order?: number; is_active?: boolean },
+  ) {
+    const response = await fetch(`/api/inventory/hardware/${item.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    await parseJsonResponse(response, 'Failed to update Hardware item');
+    toast.success(data.is_active === false ? 'Hardware item archived' : data.is_active === true ? 'Hardware item restored' : 'Hardware item updated');
+    await fetchInventoryData();
+  }
+
+  async function handleHardwareAdjustment(payload: InventoryHardwareAdjustmentPayload) {
+    const response = await fetch('/api/inventory/hardware/adjustments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    await parseJsonResponse(response, 'Failed to update Hardware stock');
+    toast.success('Hardware stock updated');
+    await fetchInventoryData();
+  }
+
+  async function handleHardwareTransfer(payload: InventoryHardwareTransferPayload) {
+    const response = await fetch('/api/inventory/hardware/transfers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    await parseJsonResponse(response, 'Failed to transfer Hardware stock');
+    toast.success('Hardware stock transferred');
+    await fetchInventoryData();
+  }
+
   async function handleCreateGroup(data: { name: string; description: string; item_ids: string[] }) {
     const response = await fetch('/api/inventory/groups', {
       method: 'POST',
@@ -699,10 +773,13 @@ export default function InventoryPage() {
           userLocation={employeeUserLocation}
           secondarySiteLocations={inventoryContext?.secondary_site_locations || []}
           currentFleetAssignment={inventoryContext?.current_fleet_assignment || null}
+          hardwareItems={hardwareItems}
+          hardwareBalances={hardwareBalances}
           onSetUserLocation={handleSetUserLocation}
           onRequestLocation={handleRequestLocation}
           onOpenMoveDialog={setMovingItems}
           onChangeLocation={() => setChangeLocationDialogOpen(true)}
+          onTransferHardware={handleHardwareTransfer}
         />
 
         <MoveInventoryDialog
@@ -810,7 +887,16 @@ export default function InventoryPage() {
             return;
           }
           setPageTab('overview');
-              router.push(overviewTab === 'retired' ? '/inventory?overview=retired' : overviewTab === 'minor_plant' ? '/inventory?overview=minor-plant' : '/inventory', { scroll: false });
+          router.push(
+            overviewTab === 'retired'
+              ? '/inventory?overview=retired'
+              : overviewTab === 'minor_plant'
+                ? '/inventory?overview=minor-plant'
+                : overviewTab === 'hardware'
+                  ? '/inventory?overview=hardware'
+                  : '/inventory',
+            { scroll: false },
+          );
         }}
       >
         <TabsList>
@@ -833,7 +919,7 @@ export default function InventoryPage() {
             <Tabs
               value={settingsTab}
               onValueChange={(value) => {
-                const nextSettingsTab = value as 'categories' | 'groups';
+                const nextSettingsTab = value as 'categories' | 'groups' | 'hardware';
                 setSettingsTab(nextSettingsTab);
                 router.push(`/inventory?tab=settings&settings=${nextSettingsTab}`, { scroll: false });
               }}
@@ -847,6 +933,10 @@ export default function InventoryPage() {
                   <PackageSearch className="h-4 w-4" />
                   Groups
                 </TabsTrigger>
+                <TabsTrigger value="hardware" className="gap-2">
+                  <Boxes className="h-4 w-4" />
+                  Hardware Stock
+                </TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
@@ -856,9 +946,18 @@ export default function InventoryPage() {
           <Tabs
             value={overviewTab}
             onValueChange={(value) => {
-              const nextOverviewTab = value as 'small_tools' | 'minor_plant' | 'retired';
+              const nextOverviewTab = value as 'small_tools' | 'minor_plant' | 'hardware' | 'retired';
               setOverviewTab(nextOverviewTab);
-              router.push(nextOverviewTab === 'retired' ? '/inventory?overview=retired' : nextOverviewTab === 'minor_plant' ? '/inventory?overview=minor-plant' : '/inventory', { scroll: false });
+              router.push(
+                nextOverviewTab === 'retired'
+                  ? '/inventory?overview=retired'
+                  : nextOverviewTab === 'minor_plant'
+                    ? '/inventory?overview=minor-plant'
+                    : nextOverviewTab === 'hardware'
+                      ? '/inventory?overview=hardware'
+                      : '/inventory',
+                { scroll: false },
+              );
             }}
           >
             <div className="flex justify-end">
@@ -870,6 +969,10 @@ export default function InventoryPage() {
                 <TabsTrigger value="minor_plant" className="gap-2">
                   <Truck className="h-4 w-4" />
                   Minor Plant
+                </TabsTrigger>
+                <TabsTrigger value="hardware" className="gap-2">
+                  <Boxes className="h-4 w-4" />
+                  Hardware
                 </TabsTrigger>
                 <TabsTrigger value="retired" className="gap-2">
                   <Archive className="h-4 w-4" />
@@ -910,6 +1013,13 @@ export default function InventoryPage() {
                 tableLabel="minor plant"
                 showMinorPlantDetails
                 quickFilter={inventoryTableQuickFilter}
+              />
+            </TabsContent>
+
+            <TabsContent value="hardware" className="mt-4">
+              <HardwareOverviewPanel
+                items={hardwareItems}
+                balances={hardwareBalances}
               />
             </TabsContent>
 
@@ -976,6 +1086,18 @@ export default function InventoryPage() {
               onCreate={handleCreateGroup}
               onUpdate={handleUpdateGroup}
               onRemove={handleRemoveGroup}
+            />
+          ) : null}
+
+          {settingsTab === 'hardware' ? (
+            <HardwareStockPanel
+              items={hardwareItems}
+              balances={hardwareBalances}
+              locations={locations}
+              onCreateItem={handleCreateHardwareItem}
+              onUpdateItem={handleUpdateHardwareItem}
+              onAdjust={handleHardwareAdjustment}
+              onTransfer={handleHardwareTransfer}
             />
           ) : null}
         </TabsContent>

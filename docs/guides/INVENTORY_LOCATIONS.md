@@ -54,7 +54,7 @@ The inventory location selection remains the source event for this assignment; p
 
 ## Movement Rules
 
-All item location changes must go through the canonical move logic so that movement batches, movement history, and check-blocking rules remain consistent.
+All serialized item location changes must go through the canonical move logic so that movement batches, movement history, and check-blocking rules remain consistent.
 
 The canonical rules are:
 
@@ -64,3 +64,20 @@ The canonical rules are:
 - same-location moves should be rejected without creating movement history.
 
 Routes that update `inventory_items.location_id` directly must delegate to the same move logic or reject direct location edits.
+
+## Hardware Stock Balances
+
+Quantity-based Hardware uses the same `inventory_locations` rows but does not use
+`inventory_items`. A Hardware catalogue item may have one non-negative integer
+balance per location.
+
+Hardware quantity changes must use the dedicated atomic stock functions:
+
+- Add, Remove, and Recount create an adjustment batch and immutable balance lines.
+- Transfer creates paired source and destination lines in one batch.
+- Managers and admins may transfer between any active locations.
+- Employees may transfer only between their valid primary location and assigned
+  secondary Site locations.
+
+Serialized movement checks do not apply to Hardware stock. Hardware transaction
+authorization and available quantity must be validated independently.
