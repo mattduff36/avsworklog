@@ -397,11 +397,6 @@ export function HardwareOverviewPanel({
                             className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                           />
                           <span className="truncate font-semibold text-white">{item.name}</span>
-                          {yardQuantity === 0 ? (
-                            <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-200">
-                              Yard zero
-                            </Badge>
-                          ) : null}
                           <Badge className="shrink-0 bg-inventory/15 text-inventory-light hover:bg-inventory/20">
                             {total.toLocaleString()} total
                           </Badge>
