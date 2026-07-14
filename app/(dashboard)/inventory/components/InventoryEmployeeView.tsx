@@ -22,6 +22,8 @@ import { InventoryLocationSelect } from './InventoryLocationSelect';
 import { InventoryTable } from './InventoryTable';
 import { HardwareQuantityRow } from './HardwareQuantityRow';
 import { HardwareTransferDialog } from './HardwareTransferDialog';
+import { isLegacyQuoteInventoryLocation } from '../utils';
+import { LegacyQuoteLocationOptIn } from './LegacyQuoteLocationOptIn';
 
 const LOCATION_NOT_SHOWN_VALUE = '__location_not_shown__';
 
@@ -65,6 +67,7 @@ export function InventoryEmployeeView({
   const [isSavingLocation, setIsSavingLocation] = useState(false);
   const [isRequestingLocation, setIsRequestingLocation] = useState(false);
   const [claimSearch, setClaimSearch] = useState('');
+  const [includeLegacyQuoteClaims, setIncludeLegacyQuoteClaims] = useState(false);
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
   const [hardwareTransferOpen, setHardwareTransferOpen] = useState(false);
 
@@ -139,10 +142,14 @@ export function InventoryEmployeeView({
       .filter((item) => (
         item.item_number.toLowerCase().includes(query) ||
         item.name.toLowerCase().includes(query) ||
-        (item.location?.name || '').toLowerCase().includes(query)
+        (
+          includeLegacyQuoteClaims || !isLegacyQuoteInventoryLocation(item.location)
+            ? item.location?.name || ''
+            : ''
+        ).toLowerCase().includes(query)
       ))
       .slice(0, 8);
-  }, [activeLocation, claimSearch, items]);
+  }, [activeLocation, claimSearch, includeLegacyQuoteClaims, items]);
 
   async function handleSetLocation() {
     if (!selectedLocationId || isRequestingMissingLocation) return;
@@ -250,6 +257,7 @@ export function InventoryEmployeeView({
                 }]}
                 serverSearch
                 locationFilter={locationFilter}
+                allowLegacyQuoteOptIn={false}
               />
             </div>
             <Button
@@ -427,6 +435,10 @@ export function InventoryEmployeeView({
             onChange={(event) => setClaimSearch(event.target.value)}
             placeholder="Search item name, ID, or current location"
             className="bg-slate-800 border-slate-600"
+          />
+          <LegacyQuoteLocationOptIn
+            enabled={includeLegacyQuoteClaims}
+            onEnabledChange={setIncludeLegacyQuoteClaims}
           />
           {claimableItems.map((item) => (
             <div key={item.id} className="flex flex-col gap-3 rounded-lg border border-slate-700 bg-slate-800/50 p-3 sm:flex-row sm:items-center sm:justify-between">

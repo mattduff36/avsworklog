@@ -54,16 +54,21 @@ async function loadActiveSiteLocation(
 }
 
 async function loadActiveSiteLocations(
-  admin: ReturnType<typeof createAdminClient>
+  admin: ReturnType<typeof createAdminClient>,
+  includeLegacyQuotes: boolean,
 ): Promise<InventoryLocationRow[]> {
   const locations: InventoryLocationRow[] = [];
 
   for (let offset = 0; ; offset += SUPABASE_PAGE_SIZE) {
-    const { data, error } = await admin
+    let query = admin
       .from('inventory_locations')
       .select('*')
       .eq('is_active', true)
-      .eq('location_type', 'site')
+      .eq('location_type', 'site');
+    if (!includeLegacyQuotes) {
+      query = query.neq('source_type', 'legacy_quote');
+    }
+    const { data, error } = await query
       .order('name', { ascending: true })
       .range(offset, offset + SUPABASE_PAGE_SIZE - 1);
 
@@ -77,7 +82,7 @@ async function loadActiveSiteLocations(
   return locations;
 }
 
-export async function GET() {
+export async function GET(request?: NextRequest) {
   try {
     const access = await requireInventorySupervisorAccess();
     if (!access.allowed) {
@@ -85,8 +90,9 @@ export async function GET() {
     }
 
     const admin = createAdminClient();
+    const includeLegacyQuotes = request?.nextUrl.searchParams.get('includeLegacyQuotes') === 'true';
     const inventoryUserIdsPromise = getUsersWithPermission('inventory');
-    const activeSitesPromise = loadActiveSiteLocations(admin);
+    const activeSitesPromise = loadActiveSiteLocations(admin, includeLegacyQuotes);
     const assignmentsPromise = admin
       .from('inventory_user_site_locations')
       .select(`
@@ -109,7 +115,6 @@ export async function GET() {
     if (assignmentsResult.error) throw assignmentsResult.error;
 
     const activeSites = activeSitesResult;
-    const activeSiteIds = new Set(activeSites.map((site) => site.id));
     const users = inventoryUserIds.length > 0
       ? await admin
         .from('profiles')
@@ -122,7 +127,10 @@ export async function GET() {
 
     const assignments = ((assignmentsResult.data || []) as unknown as AssignmentRelationRow[])
       .map(normalizeAssignment)
-      .filter((assignment) => activeSiteIds.has(assignment.location_id));
+      .filter((assignment) => (
+        assignment.location?.is_active === true
+        && assignment.location.location_type === 'site'
+      ));
 
     return NextResponse.json({
       active_sites: activeSites,

@@ -32,6 +32,7 @@ import {
   getInventoryDueDate,
   getInventoryLocationsWithYardFirst,
   isInventoryCheckExempt,
+  isLegacyQuoteInventoryLocation,
   isInventoryYardLocation,
   isInventoryUnknownLocation,
   shouldMuteInventoryCheckBadge,
@@ -45,6 +46,7 @@ import {
   type InventoryRetireReason,
 } from '../types';
 import { useLoadMorePagination } from '@/lib/hooks/useLoadMorePagination';
+import { LegacyQuoteLocationOptIn } from './LegacyQuoteLocationOptIn';
 
 type SortField = 'item_number' | 'serial_number' | 'name' | 'location' | 'last_checked_at';
 type SortDir = 'asc' | 'desc';
@@ -236,6 +238,7 @@ export function InventoryTable({
   const [retireReasonFilters, setRetireReasonFilters] = useState<InventoryRetireReason[]>([]);
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [includeLegacyQuotes, setIncludeLegacyQuotes] = useState(false);
   const showLocationFilter = Boolean(locationFilterLocations?.length);
   const showSerialNumberColumn = showMinorPlantDetails && items.some((item) => Boolean(item.minor_plant_detail?.serial_number));
   const paginationKey = [
@@ -253,6 +256,9 @@ export function InventoryTable({
     const query = search.trim().toLowerCase();
     const filtered = items.filter((item) => {
       const locationName = item.location?.name || '';
+      const locationSearchName = includeLegacyQuotes || !isLegacyQuoteInventoryLocation(item.location)
+        ? locationName
+        : '';
       const linkedVanNickname = getVanLocationNickname(item) || '';
       const serialNumber = item.minor_plant_detail?.serial_number || '';
       const checkStatus = getInventoryCheckStatus(item);
@@ -278,7 +284,7 @@ export function InventoryTable({
         item.item_number.toLowerCase().includes(query) ||
         serialNumber.toLowerCase().includes(query) ||
         item.name.toLowerCase().includes(query) ||
-        locationName.toLowerCase().includes(query) ||
+        locationSearchName.toLowerCase().includes(query) ||
         linkedVanNickname.toLowerCase().includes(query) ||
         retireReason.toLowerCase().includes(query)
       );
@@ -302,7 +308,7 @@ export function InventoryTable({
       const compare = String(aValue).localeCompare(String(bValue), undefined, { sensitivity: 'base' });
       return sortDir === 'asc' ? compare : -compare;
     });
-  }, [categoryFilters, items, locationFilters, retireReasonFilters, retiredMode, search, sortDir, sortField, statusFilters]);
+  }, [categoryFilters, includeLegacyQuotes, items, locationFilters, retireReasonFilters, retiredMode, search, sortDir, sortField, statusFilters]);
 
   const {
     visibleItems,
@@ -364,6 +370,11 @@ export function InventoryTable({
       const options = getInventoryLocationsWithYardFirst(locationFilterLocations || [])
         .filter((location) => (
           getLocationFilterGroupKey(location) !== 'unknown'
+          && (
+            includeLegacyQuotes
+            || !isLegacyQuoteInventoryLocation(location)
+            || locationFilters.includes(location.id)
+          )
           && (counts[location.id] || 0) > 0
         ))
         .sort((a, b) => {
@@ -391,7 +402,7 @@ export function InventoryTable({
 
       return options;
     },
-    [items, locationFilterLocations]
+    [includeLegacyQuotes, items, locationFilterLocations, locationFilters]
   );
   const retireReasonFilterOptions = useMemo<MultiSelectFilterOption<InventoryRetireReason>[]>(
     () => {
@@ -505,6 +516,12 @@ export function InventoryTable({
       <div className="flex flex-col gap-2 lg:items-end">
         <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Filters</p>
         <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:justify-end">
+          {showLocationFilter ? (
+            <LegacyQuoteLocationOptIn
+              enabled={includeLegacyQuotes}
+              onEnabledChange={setIncludeLegacyQuotes}
+            />
+          ) : null}
           {hasAnyFilters ? (
             <Button
               variant="outline"
@@ -565,6 +582,9 @@ export function InventoryTable({
               showPanelLabel={false}
               collapsibleGroupLabels={COLLAPSIBLE_LOCATION_FILTER_GROUPS}
               minimumSearchCharactersByGroupLabel={LOCATION_FILTER_MINIMUM_SEARCH_CHARACTERS}
+              onOpenChange={(open) => {
+                if (!open) setIncludeLegacyQuotes(false);
+              }}
             />
           ) : null}
         </div>

@@ -1,29 +1,16 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ArrowRightLeft,
   Boxes,
   ChevronDown,
-  PackagePlus,
-  Plus,
-  RotateCcw,
   Search,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -31,37 +18,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import type {
-  InventoryHardwareAdjustmentOperation,
-  InventoryHardwareAdjustmentPayload,
-  InventoryHardwareAdjustmentReason,
   InventoryHardwareBalance,
   InventoryHardwareItem,
   InventoryHardwareTransferPayload,
   InventoryLocation,
 } from '../types';
-import { INVENTORY_HARDWARE_ADJUSTMENT_REASONS } from '../types';
-import { isInventoryYardLocation } from '../utils';
-import {
-  HardwareStockQuantityDialog,
-  type HardwareStockQuantityDialogCopy,
-} from './HardwareStockQuantityDialog';
+import { isLegacyQuoteInventoryLocation } from '../utils';
 import { HardwareTransferDialog } from './HardwareTransferDialog';
 import { HardwareQuantityRow } from './HardwareQuantityRow';
+import { LegacyQuoteLocationOptIn } from './LegacyQuoteLocationOptIn';
 
 interface HardwareOverviewPanelProps {
   items: InventoryHardwareItem[];
   balances: InventoryHardwareBalance[];
   locations: InventoryLocation[];
-  onAdjust: (payload: InventoryHardwareAdjustmentPayload) => Promise<void>;
   onTransfer: (payload: InventoryHardwareTransferPayload) => Promise<void>;
-}
-
-interface HardwareStockEntryContext {
-  source: 'item' | 'selection';
-  items: InventoryHardwareItem[];
-  copy: HardwareStockQuantityDialogCopy;
 }
 
 const ALL_LOCATIONS = 'all-locations';
@@ -70,21 +42,13 @@ export function HardwareOverviewPanel({
   items,
   balances,
   locations,
-  onAdjust,
   onTransfer,
 }: HardwareOverviewPanelProps) {
   const [search, setSearch] = useState('');
-  const [yardZeroOnly, setYardZeroOnly] = useState(false);
   const [locationFilter, setLocationFilter] = useState(ALL_LOCATIONS);
-  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [includeLegacyQuotes, setIncludeLegacyQuotes] = useState(false);
   const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(new Set());
-  const [adjustmentOperation, setAdjustmentOperation] = useState<Exclude<InventoryHardwareAdjustmentOperation, 'add'> | null>(null);
-  const [adjustmentQuantity, setAdjustmentQuantity] = useState('');
-  const [adjustmentReason, setAdjustmentReason] = useState<InventoryHardwareAdjustmentReason>('Used');
-  const [adjustmentNote, setAdjustmentNote] = useState('');
-  const [isAdjusting, setIsAdjusting] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
-  const [stockEntry, setStockEntry] = useState<HardwareStockEntryContext | null>(null);
 
   const locationById = useMemo(() => {
     const mappedLocations = new Map(locations.map((location) => [location.id, location]));
@@ -96,12 +60,14 @@ export function HardwareOverviewPanel({
 
   const activeLocations = useMemo(
     () => [...locationById.values()]
-      .filter((location) => location.is_active)
+      .filter((location) => location.is_active && (
+        includeLegacyQuotes || !isLegacyQuoteInventoryLocation(location)
+      ))
       .toSorted((a, b) => (
         a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
         || a.id.localeCompare(b.id)
       )),
-    [locationById],
+    [includeLegacyQuotes, locationById],
   );
 
   const positiveBalancesByItem = useMemo(() => {
@@ -131,24 +97,10 @@ export function HardwareOverviewPanel({
     [items],
   );
 
-  const yardQuantityByItem = useMemo(() => {
-    const quantities = new Map<string, number>();
-    for (const balance of balances) {
-      const location = balance.location || locationById.get(balance.location_id);
-      if (!isInventoryYardLocation(location)) continue;
-      quantities.set(
-        balance.hardware_item_id,
-        (quantities.get(balance.hardware_item_id) || 0) + balance.quantity,
-      );
-    }
-    return quantities;
-  }, [balances, locationById]);
-
   const filteredItems = useMemo(() => {
     const query = search.trim().toLowerCase();
     return activeItems.filter((item) => {
       const itemBalances = positiveBalancesByItem.get(item.id) || [];
-      if (yardZeroOnly && (yardQuantityByItem.get(item.id) || 0) > 0) return false;
       if (
         locationFilter !== ALL_LOCATIONS
         && !itemBalances.some((balance) => balance.location_id === locationFilter)
@@ -158,46 +110,23 @@ export function HardwareOverviewPanel({
       if (!query) return true;
       return item.name.toLowerCase().includes(query)
         || itemBalances.some((balance) => (
-          (balance.location?.name || locationById.get(balance.location_id)?.name || '')
+          (includeLegacyQuotes || !isLegacyQuoteInventoryLocation(
+            balance.location || locationById.get(balance.location_id),
+          )
+            ? balance.location?.name || locationById.get(balance.location_id)?.name || ''
+            : '')
             .toLowerCase()
             .includes(query)
         ));
     });
   }, [
     activeItems,
+    includeLegacyQuotes,
     locationById,
     locationFilter,
     positiveBalancesByItem,
     search,
-    yardQuantityByItem,
-    yardZeroOnly,
   ]);
-
-  const selectableBalances = useMemo(
-    () => filteredItems.flatMap((item) => {
-      if ((yardQuantityByItem.get(item.id) || 0) > 0) return [];
-      return (positiveBalancesByItem.get(item.id) || []).filter((balance) => {
-        const location = balance.location || locationById.get(balance.location_id);
-        return !isInventoryYardLocation(location);
-      });
-    }),
-    [filteredItems, locationById, positiveBalancesByItem, yardQuantityByItem],
-  );
-
-  const selectedBalances = useMemo(
-    () => selectableBalances.filter((balance) => (
-      selectedKeys.has(`${balance.hardware_item_id}:${balance.location_id}`)
-    )),
-    [selectableBalances, selectedKeys],
-  );
-
-  const allVisibleSelected = selectableBalances.length > 0 && selectableBalances.every((balance) => (
-    selectedKeys.has(`${balance.hardware_item_id}:${balance.location_id}`)
-  ));
-
-  useEffect(() => {
-    setSelectedKeys(new Set());
-  }, [locationFilter, search, yardZeroOnly]);
 
   function toggleExpandedItem(itemId: string) {
     setExpandedItemIds((current) => {
@@ -206,86 +135,6 @@ export function HardwareOverviewPanel({
       else next.add(itemId);
       return next;
     });
-  }
-
-  function toggleBalance(balance: InventoryHardwareBalance, selected: boolean) {
-    const key = `${balance.hardware_item_id}:${balance.location_id}`;
-    setSelectedKeys((current) => {
-      const next = new Set(current);
-      if (selected) next.add(key);
-      else next.delete(key);
-      return next;
-    });
-  }
-
-  function toggleAllVisible(selected: boolean) {
-    setSelectedKeys(selected
-      ? new Set(selectableBalances.map((balance) => `${balance.hardware_item_id}:${balance.location_id}`))
-      : new Set());
-  }
-
-  function openItemStockEntry(item: InventoryHardwareItem) {
-    setStockEntry({
-      source: 'item',
-      items: [item],
-      copy: {
-        title: 'Add stock',
-        description: `Record incoming stock of ${item.name} at an active Inventory location.`,
-        noteLabel: 'Delivery note',
-        submitLabel: 'Add stock',
-        submittingLabel: 'Adding stock...',
-      },
-    });
-  }
-
-  function openSelectedStockEntry() {
-    const selectedItemIds = new Set(selectedBalances.map((balance) => balance.hardware_item_id));
-    const selectedItems = activeItems.filter((item) => selectedItemIds.has(item.id));
-    setStockEntry({
-      source: 'selection',
-      items: selectedItems,
-      copy: {
-        title: 'Add Hardware Quantity',
-        description: `Add the same quantity to ${selectedItems.length} selected Hardware ${selectedItems.length === 1 ? 'item' : 'items'} at one active destination location.`,
-        noteLabel: 'Note',
-        submitLabel: 'Apply Adjustment',
-        submittingLabel: 'Saving...',
-      },
-    });
-  }
-
-  function openAdjustment(operation: Exclude<InventoryHardwareAdjustmentOperation, 'add'>) {
-    setAdjustmentOperation(operation);
-    setAdjustmentQuantity('');
-    setAdjustmentReason(operation === 'remove' ? 'Used' : 'Stocktake correction');
-    setAdjustmentNote('');
-  }
-
-  async function submitAdjustment(event: React.FormEvent) {
-    event.preventDefault();
-    if (!adjustmentOperation || selectedBalances.length === 0) return;
-    const quantity = Number(adjustmentQuantity);
-    const validQuantity = adjustmentOperation === 'recount' ? quantity >= 0 : quantity > 0;
-    if (!Number.isInteger(quantity) || !validQuantity) return;
-    if (adjustmentReason === 'Other' && !adjustmentNote.trim()) return;
-
-    setIsAdjusting(true);
-    try {
-      await onAdjust({
-        operation_type: adjustmentOperation,
-        reason: adjustmentReason,
-        note: adjustmentNote,
-        lines: selectedBalances.map((balance) => ({
-          item_id: balance.hardware_item_id,
-          location_id: balance.location_id,
-          quantity,
-        })),
-      });
-      setAdjustmentOperation(null);
-      setSelectedKeys(new Set());
-    } finally {
-      setIsAdjusting(false);
-    }
   }
 
   return (
@@ -299,7 +148,7 @@ export function HardwareOverviewPanel({
                 Hardware Stock
               </CardTitle>
               <p className="mt-1 text-sm text-muted-foreground">
-                View company-wide quantities, replenish stock, reconcile balances, and transfer Hardware.
+                View company-wide quantities and transfer Hardware.
               </p>
             </div>
             <Button variant="outline" onClick={() => setTransferOpen(true)} className="border-slate-600">
@@ -319,7 +168,13 @@ export function HardwareOverviewPanel({
                 className="border-slate-600 bg-slate-800 pl-9"
               />
             </div>
-            <Select value={locationFilter} onValueChange={setLocationFilter}>
+            <Select
+              value={locationFilter}
+              onValueChange={setLocationFilter}
+              onOpenChange={(open) => {
+                if (!open) setIncludeLegacyQuotes(false);
+              }}
+            >
               <SelectTrigger className="border-slate-600 bg-slate-800" aria-label="Filter Hardware by location">
                 <SelectValue />
               </SelectTrigger>
@@ -330,39 +185,10 @@ export function HardwareOverviewPanel({
                 ))}
               </SelectContent>
             </Select>
-            <label className="flex min-h-10 items-center gap-2 rounded-md border border-slate-600 bg-slate-800 px-3 text-sm text-slate-200">
-              <Checkbox
-                checked={yardZeroOnly}
-                onCheckedChange={(checked) => setYardZeroOnly(checked === true)}
-                aria-label="Show only items with zero Yard stock"
-              />
-              Yard stock = 0
-            </label>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-700 bg-slate-950/40 p-3">
-            <Checkbox
-              checked={allVisibleSelected}
-              onCheckedChange={(checked) => toggleAllVisible(checked === true)}
-              aria-label="Select all visible eligible Hardware balances"
+            <LegacyQuoteLocationOptIn
+              enabled={includeLegacyQuotes}
+              onEnabledChange={setIncludeLegacyQuotes}
             />
-            <Badge variant="outline" className="border-slate-600 text-slate-200">
-              {selectedBalances.length} selected
-            </Badge>
-            <Button size="sm" onClick={openSelectedStockEntry} disabled={selectedBalances.length === 0}>
-              <Plus className="mr-1 h-3.5 w-3.5" />
-              Add
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => openAdjustment('remove')} disabled={selectedBalances.length === 0}>
-              Remove
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => openAdjustment('recount')} disabled={selectedBalances.length === 0}>
-              <RotateCcw className="mr-1 h-3.5 w-3.5" />
-              Recount
-            </Button>
-            <span className="text-xs text-muted-foreground">
-              Balance selection is available for positive non-Yard stock when Yard stock is zero.
-            </span>
           </div>
 
           <div className="overflow-hidden rounded-lg border border-slate-700">
@@ -380,12 +206,11 @@ export function HardwareOverviewPanel({
                     ? itemBalances
                     : itemBalances.filter((balance) => balance.location_id === locationFilter);
                   const total = itemBalances.reduce((sum, balance) => sum + balance.quantity, 0);
-                  const yardQuantity = yardQuantityByItem.get(item.id) || 0;
                   const isExpanded = expandedItemIds.has(item.id);
 
                   return (
                     <div key={item.id}>
-                      <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="px-4 py-3">
                         <button
                           type="button"
                           aria-expanded={isExpanded}
@@ -401,10 +226,6 @@ export function HardwareOverviewPanel({
                             {total.toLocaleString()} total
                           </Badge>
                         </button>
-                        <Button size="sm" onClick={() => openItemStockEntry(item)}>
-                          <PackagePlus className="mr-1 h-3.5 w-3.5" />
-                          Add stock
-                        </Button>
                       </div>
                       {isExpanded ? (
                         <div className="border-t border-slate-800 bg-slate-950/30 p-3 sm:pl-10">
@@ -420,17 +241,12 @@ export function HardwareOverviewPanel({
                             >
                               {visibleBalances.map((balance) => {
                                 const location = balance.location || locationById.get(balance.location_id);
-                                const selectable = yardQuantity === 0 && !isInventoryYardLocation(location);
-                                const key = `${item.id}:${balance.location_id}`;
                                 return (
                                   <HardwareQuantityRow
-                                    key={key}
+                                    key={`${item.id}:${balance.location_id}`}
                                     label={location?.name || 'Unknown location'}
                                     quantity={balance.quantity}
                                     showLocationIcon
-                                    selected={selectedKeys.has(key)}
-                                    selectionLabel={`Select ${item.name}, quantity ${balance.quantity}, at ${location?.name || 'Unknown location'}`}
-                                    onSelectedChange={selectable ? (selected) => toggleBalance(balance, selected) : undefined}
                                   />
                                 );
                               })}
@@ -447,98 +263,14 @@ export function HardwareOverviewPanel({
         </CardContent>
       </Card>
 
-      <Dialog open={adjustmentOperation !== null} onOpenChange={(open) => { if (!open) setAdjustmentOperation(null); }}>
-        <DialogContent className="border-slate-700 bg-slate-900 sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="text-white">
-              {adjustmentOperation === 'remove' ? 'Remove Hardware Quantity' : 'Recount Hardware Quantity'}
-            </DialogTitle>
-            <DialogDescription>
-              This operation will apply to {selectedBalances.length} selected item/location {selectedBalances.length === 1 ? 'balance' : 'balances'}.
-            </DialogDescription>
-          </DialogHeader>
-          <form className="space-y-4" onSubmit={submitAdjustment}>
-            <div className="space-y-2">
-              <Label htmlFor="hardware_adjustment_quantity">
-                {adjustmentOperation === 'recount' ? 'New counted quantity' : 'Quantity'}
-              </Label>
-              <Input
-                id="hardware_adjustment_quantity"
-                type="number"
-                min={adjustmentOperation === 'recount' ? 0 : 1}
-                step={1}
-                value={adjustmentQuantity}
-                onChange={(event) => setAdjustmentQuantity(event.target.value)}
-                className="border-slate-600 bg-slate-800"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Reason</Label>
-              <Select value={adjustmentReason} onValueChange={(value) => setAdjustmentReason(value as InventoryHardwareAdjustmentReason)}>
-                <SelectTrigger className="border-slate-600 bg-slate-800">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {INVENTORY_HARDWARE_ADJUSTMENT_REASONS.map((reason) => (
-                    <SelectItem key={reason} value={reason}>{reason}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="hardware_adjustment_note">
-                Note {adjustmentReason === 'Other' ? '(required)' : '(optional)'}
-              </Label>
-              <Textarea
-                id="hardware_adjustment_note"
-                value={adjustmentNote}
-                onChange={(event) => setAdjustmentNote(event.target.value)}
-                className="border-slate-600 bg-slate-800"
-                rows={3}
-              />
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setAdjustmentOperation(null)} disabled={isAdjusting}>
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={
-                  isAdjusting
-                  || !adjustmentQuantity
-                  || (adjustmentReason === 'Other' && !adjustmentNote.trim())
-                }
-              >
-                {isAdjusting ? 'Saving...' : 'Apply Adjustment'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
       <HardwareTransferDialog
         open={transferOpen}
         items={items}
         balances={balances}
-        locations={activeLocations}
+        locations={[...locationById.values()]}
         onClose={() => setTransferOpen(false)}
         onSubmit={onTransfer}
       />
-
-      {stockEntry ? (
-        <HardwareStockQuantityDialog
-          open
-          items={stockEntry.items}
-          knownLocations={activeLocations}
-          copy={stockEntry.copy}
-          allowReasonSelection={stockEntry.source === 'selection'}
-          onClose={() => setStockEntry(null)}
-          onSubmit={onAdjust}
-          onSuccess={() => {
-            if (stockEntry.source === 'selection') setSelectedKeys(new Set());
-          }}
-        />
-      ) : null}
     </div>
   );
 }

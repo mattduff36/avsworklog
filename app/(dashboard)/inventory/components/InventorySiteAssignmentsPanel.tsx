@@ -14,6 +14,8 @@ import {
 } from '@/components/ui/select';
 import { MapPin, Trash2, UserPlus } from 'lucide-react';
 import type { InventoryLocation } from '../types';
+import { isLegacyQuoteInventoryLocation } from '../utils';
+import { LegacyQuoteLocationOptIn } from './LegacyQuoteLocationOptIn';
 
 export interface InventorySiteAssignmentUser {
   id: string;
@@ -37,6 +39,7 @@ interface InventorySiteAssignmentsPanelProps {
   assignments: InventorySiteAssignment[];
   onAssign: (payload: { userId: string; locationId: string }) => Promise<void>;
   onRemove: (payload: { userId: string; locationId: string }) => Promise<void>;
+  onIncludeLegacyQuotesChange: (includeLegacyQuotes: boolean) => Promise<void>;
 }
 
 function getUserLabel(user: InventorySiteAssignmentUser | null | undefined): string {
@@ -57,11 +60,13 @@ export function InventorySiteAssignmentsPanel({
   assignments,
   onAssign,
   onRemove,
+  onIncludeLegacyQuotesChange,
 }: InventorySiteAssignmentsPanelProps) {
   const [selectedUserId, setSelectedUserId] = useState('');
   const [selectedLocationId, setSelectedLocationId] = useState('');
   const [saving, setSaving] = useState(false);
   const [removingKey, setRemovingKey] = useState<string | null>(null);
+  const [includeLegacyQuotes, setIncludeLegacyQuotes] = useState(false);
 
   const assignedSiteIdsForSelectedUser = useMemo(() => new Set(
     assignments
@@ -70,9 +75,18 @@ export function InventorySiteAssignmentsPanel({
   ), [assignments, selectedUserId]);
 
   const availableSites = useMemo(
-    () => activeSites.filter((site) => !assignedSiteIdsForSelectedUser.has(site.id)),
-    [activeSites, assignedSiteIdsForSelectedUser]
+    () => activeSites.filter((site) => (
+      !assignedSiteIdsForSelectedUser.has(site.id)
+      && (includeLegacyQuotes || !isLegacyQuoteInventoryLocation(site))
+    )),
+    [activeSites, assignedSiteIdsForSelectedUser, includeLegacyQuotes]
   );
+
+  async function handleIncludeLegacyQuotesChange(nextIncludeLegacyQuotes: boolean) {
+    setIncludeLegacyQuotes(nextIncludeLegacyQuotes);
+    setSelectedLocationId('');
+    await onIncludeLegacyQuotesChange(nextIncludeLegacyQuotes);
+  }
 
   async function handleAssign() {
     if (!selectedUserId || !selectedLocationId) return;
@@ -124,7 +138,16 @@ export function InventorySiteAssignmentsPanel({
 
           <div className="space-y-2">
             <Label>Active Site Location</Label>
-            <Select value={selectedLocationId} onValueChange={setSelectedLocationId} disabled={!selectedUserId}>
+            <Select
+              value={selectedLocationId}
+              onValueChange={setSelectedLocationId}
+              disabled={!selectedUserId}
+              onOpenChange={(open) => {
+                if (!open && includeLegacyQuotes) {
+                  void handleIncludeLegacyQuotesChange(false);
+                }
+              }}
+            >
               <SelectTrigger className="border-slate-600 bg-slate-800">
                 <SelectValue placeholder="Select Site" />
               </SelectTrigger>
@@ -134,6 +157,11 @@ export function InventorySiteAssignmentsPanel({
                 ))}
               </SelectContent>
             </Select>
+            <LegacyQuoteLocationOptIn
+              enabled={includeLegacyQuotes}
+              onEnabledChange={(enabled) => { void handleIncludeLegacyQuotesChange(enabled); }}
+              className="mt-2"
+            />
           </div>
 
           <Button

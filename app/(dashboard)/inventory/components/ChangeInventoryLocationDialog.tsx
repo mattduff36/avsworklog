@@ -107,6 +107,7 @@ export function ChangeInventoryLocationDialog({
                 locations={locations}
                 serverSearch
                 locationFilter={locationFilter}
+                allowLegacyQuoteOptIn={false}
               />
               {selectedLocation ? (
                 <p className="text-xs text-muted-foreground">

@@ -77,6 +77,30 @@ describe('Inventory Yard kiosk routes', () => {
     );
   });
 
+  it('passes the local legacy quote opt-in to bootstrap discovery', async () => {
+    vi.mocked(requireInventoryKioskAccess).mockResolvedValue(allowedAccess);
+    vi.mocked(getYardKioskBootstrap).mockResolvedValue({
+      yard: allowedAccess.yard,
+      locations: [],
+    });
+
+    const defaultResponse = await getBootstrap(new NextRequest(
+      'http://localhost/api/inventory/kiosk/bootstrap',
+    ));
+    expect(defaultResponse.status).toBe(200);
+    expect(getYardKioskBootstrap).toHaveBeenLastCalledWith(allowedAccess, {
+      includeLegacyQuotes: false,
+    });
+
+    const optedInResponse = await getBootstrap(new NextRequest(
+      'http://localhost/api/inventory/kiosk/bootstrap?includeLegacyQuotes=true',
+    ));
+    expect(optedInResponse.status).toBe(200);
+    expect(getYardKioskBootstrap).toHaveBeenLastCalledWith(allowedAccess, {
+      includeLegacyQuotes: true,
+    });
+  });
+
   it('submits the browser basket only through the atomic kiosk service', async () => {
     vi.mocked(requireInventoryKioskAccess).mockResolvedValue(allowedAccess);
     vi.mocked(submitYardKioskBasket).mockResolvedValue({

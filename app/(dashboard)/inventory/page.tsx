@@ -30,6 +30,7 @@ import { InventoryEmployeeView } from './components/InventoryEmployeeView';
 import { InventoryGroupsPanel } from './components/InventoryGroupsPanel';
 import { HardwareOverviewPanel } from './components/HardwareOverviewPanel';
 import { HardwareCataloguePanel } from './components/HardwareCataloguePanel';
+import { HardwareStockPanel } from './components/HardwareStockPanel';
 import { InventoryLocationDialog } from './components/InventoryLocationDialog';
 import { InventoryLocationsPanel } from './components/InventoryLocationsPanel';
 import { InventoryRetireItemDialog } from './components/InventoryRetireItemDialog';
@@ -631,6 +632,15 @@ export default function InventoryPage() {
     await fetchInventoryData();
   }
 
+  async function handleSiteAssignmentLegacyQuoteOptIn(includeLegacyQuotes: boolean) {
+    const params = includeLegacyQuotes ? '?includeLegacyQuotes=true' : '';
+    const response = await fetch(`/api/inventory/site-assignments${params}`, { cache: 'no-store' });
+    const payload = await parseJsonResponse(response, 'Failed to fetch Site assignments');
+    setSiteAssignmentUsers(payload.users || []);
+    setAssignableSiteLocations(payload.active_sites || []);
+    setSiteAssignments(payload.assignments || []);
+  }
+
   function buildInventoryCategoryPayload(data: InventoryItemCategoryFormData) {
     const sortOrder = Number.parseInt(data.sort_order, 10);
     return {
@@ -848,6 +858,7 @@ export default function InventoryPage() {
             assignments={siteAssignments}
             onAssign={handleAssignSiteLocation}
             onRemove={handleRemoveSiteLocationAssignment}
+            onIncludeLegacyQuotesChange={handleSiteAssignmentLegacyQuoteOptIn}
           />
         ) : null}
 
@@ -1090,7 +1101,6 @@ export default function InventoryPage() {
                 items={hardwareItems}
                 balances={hardwareBalances}
                 locations={knownLocations}
-                onAdjust={handleHardwareAdjustment}
                 onTransfer={handleHardwareTransfer}
               />
             </TabsContent>
@@ -1131,6 +1141,7 @@ export default function InventoryPage() {
               assignments={siteAssignments}
               onAssign={handleAssignSiteLocation}
               onRemove={handleRemoveSiteLocationAssignment}
+              onIncludeLegacyQuotesChange={handleSiteAssignmentLegacyQuoteOptIn}
             />
           ) : null}
           <InventoryLocationsPanel
@@ -1162,13 +1173,21 @@ export default function InventoryPage() {
           ) : null}
 
           {settingsTab === 'hardware' ? (
-            <HardwareCataloguePanel
-              items={hardwareItems}
-              balances={hardwareBalances}
-              onCreateItem={handleCreateHardwareItem}
-              onUpdateItem={handleUpdateHardwareItem}
-              onRemoveItem={handleRemoveHardwareItem}
-            />
+            <>
+              <HardwareStockPanel
+                items={hardwareItems}
+                balances={hardwareBalances}
+                locations={knownLocations}
+                onAdjust={handleHardwareAdjustment}
+              />
+              <HardwareCataloguePanel
+                items={hardwareItems}
+                balances={hardwareBalances}
+                onCreateItem={handleCreateHardwareItem}
+                onUpdateItem={handleUpdateHardwareItem}
+                onRemoveItem={handleRemoveHardwareItem}
+              />
+            </>
           ) : null}
         </TabsContent>
       </Tabs>

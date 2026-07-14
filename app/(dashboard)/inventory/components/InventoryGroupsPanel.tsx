@@ -10,6 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { PackagePlus, Pencil, Trash2, Users } from 'lucide-react';
 import type { InventoryItem, InventoryItemGroup } from '../types';
+import { isLegacyQuoteInventoryLocation } from '../utils';
+import { LegacyQuoteLocationOptIn } from './LegacyQuoteLocationOptIn';
 
 interface InventoryGroupFormData {
   name: string;
@@ -42,6 +44,7 @@ export function InventoryGroupsPanel({
   const [editingGroup, setEditingGroup] = useState<InventoryItemGroup | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [search, setSearch] = useState('');
+  const [includeLegacyQuotes, setIncludeLegacyQuotes] = useState(false);
 
   useEffect(() => {
     if (!editingGroup) {
@@ -75,11 +78,15 @@ export function InventoryGroupsPanel({
         return (
           item.name.toLowerCase().includes(query) ||
           item.item_number.toLowerCase().includes(query) ||
-          (item.location?.name || '').toLowerCase().includes(query)
+          (
+            includeLegacyQuotes || !isLegacyQuoteInventoryLocation(item.location)
+              ? item.location?.name || ''
+              : ''
+          ).toLowerCase().includes(query)
         );
       })
       .slice(0, 80);
-  }, [groupedItemIds, items, search]);
+  }, [groupedItemIds, includeLegacyQuotes, items, search]);
 
   function toggleItem(itemId: string, checked: boolean) {
     setForm((current) => ({
@@ -169,6 +176,10 @@ export function InventoryGroupsPanel({
                 value={form.name}
                 onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
                 className="bg-slate-800 border-slate-600"
+              />
+              <LegacyQuoteLocationOptIn
+                enabled={includeLegacyQuotes}
+                onEnabledChange={setIncludeLegacyQuotes}
               />
             </div>
             <div className="space-y-2">

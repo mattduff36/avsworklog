@@ -10,7 +10,9 @@ import type { InventoryLocation } from '../types';
 import {
   formatInventoryLocationOptionLabel,
   getInventoryLocationsWithYardFirst,
+  isLegacyQuoteInventoryLocation,
 } from '../utils';
+import { LegacyQuoteLocationOptIn } from './LegacyQuoteLocationOptIn';
 
 interface InventoryLocationSelectExtraOption {
   value: string;
@@ -30,6 +32,7 @@ interface InventoryLocationSelectProps {
   extraOptions?: InventoryLocationSelectExtraOption[];
   serverSearch?: boolean;
   locationFilter?: (location: InventoryLocation) => boolean;
+  allowLegacyQuoteOptIn?: boolean;
 }
 
 interface InventoryLocationSelectOption {
@@ -55,12 +58,14 @@ export function InventoryLocationSelect({
   extraOptions = [],
   serverSearch = false,
   locationFilter,
+  allowLegacyQuoteOptIn = true,
 }: InventoryLocationSelectProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<InventoryLocation[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
+  const [includeLegacyQuotes, setIncludeLegacyQuotes] = useState(false);
   const [selectedServerLocation, setSelectedServerLocation] = useState<InventoryLocation | null>(
     locations.find((location) => location.id === value) || null,
   );
@@ -89,8 +94,13 @@ export function InventoryLocationSelect({
     const controller = new AbortController();
     const timeoutId = window.setTimeout(async () => {
       try {
+        const params = new URLSearchParams({
+          search: normalizedSearchQuery,
+          limit: '50',
+        });
+        if (includeLegacyQuotes) params.set('includeLegacyQuotes', 'true');
         const response = await fetch(
-          `/api/inventory/locations?search=${encodeURIComponent(normalizedSearchQuery)}&limit=50`,
+          `/api/inventory/locations?${params}`,
           { cache: 'no-store', signal: controller.signal },
         );
         const payload = await response.json();
@@ -109,11 +119,12 @@ export function InventoryLocationSelect({
       window.clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [normalizedSearchQuery, open, serverSearch]);
+  }, [includeLegacyQuotes, normalizedSearchQuery, open, serverSearch]);
 
   const options = useMemo<InventoryLocationSelectOption[]>(() => {
     const sourceLocations = serverSearch ? searchResults : locations;
     const locationOptions = getInventoryLocationsWithYardFirst(sourceLocations)
+      .filter((location) => includeLegacyQuotes || !isLegacyQuoteInventoryLocation(location))
       .filter((location) => locationFilter?.(location) ?? true)
       .map((location) => {
         const label = formatInventoryLocationOptionLabel(location);
@@ -141,7 +152,7 @@ export function InventoryLocationSelect({
         searchLabel: option.label,
       })),
     ];
-  }, [extraOptions, locationFilter, locations, searchResults, serverSearch]);
+  }, [extraOptions, includeLegacyQuotes, locationFilter, locations, searchResults, serverSearch]);
 
   const selectedLocation = [...searchResults, ...locations].find((location) => location.id === value)
     || (selectedServerLocation?.id === value ? selectedServerLocation : null);
@@ -162,7 +173,10 @@ export function InventoryLocationSelect({
 
   function handleOpenChange(nextOpen: boolean) {
     setOpen(nextOpen);
-    if (!nextOpen) setSearchQuery('');
+    if (!nextOpen) {
+      setSearchQuery('');
+      setIncludeLegacyQuotes(false);
+    }
   }
 
   function handleSelect(option: InventoryLocationSelectOption) {
@@ -214,6 +228,13 @@ export function InventoryLocationSelect({
               aria-label={searchPlaceholder}
             />
           </div>
+          {allowLegacyQuoteOptIn ? (
+            <LegacyQuoteLocationOptIn
+              enabled={includeLegacyQuotes}
+              onEnabledChange={setIncludeLegacyQuotes}
+              className="mt-2 w-full justify-center"
+            />
+          ) : null}
         </div>
         <div className="max-h-64 overflow-y-auto p-1">
           {serverSearch && normalizedSearchQuery.length < MINIMUM_SERVER_SEARCH_CHARACTERS ? (

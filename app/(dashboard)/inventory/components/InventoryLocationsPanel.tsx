@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Link2, Loader2, MapPin, Pencil, Search, Trash2 } from 'lucide-react';
 import type { FleetAssetOption, InventoryLocation } from '../types';
 import { formatInventoryLocationTypeLabel } from '../utils';
+import { LegacyQuoteLocationOptIn } from './LegacyQuoteLocationOptIn';
 
 interface InventoryLocationsPanelProps {
   fleetAssets: FleetAssetOption[];
@@ -35,6 +36,7 @@ export function InventoryLocationsPanel({
   const [locations, setLocations] = useState<InventoryLocation[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [includeLegacyQuotes, setIncludeLegacyQuotes] = useState(false);
   const normalizedSearch = searchQuery.trim();
 
   useEffect(() => {
@@ -51,8 +53,10 @@ export function InventoryLocationsPanel({
     const controller = new AbortController();
     const timeoutId = window.setTimeout(async () => {
       try {
+        const params = new URLSearchParams({ search: normalizedSearch, limit: '50' });
+        if (includeLegacyQuotes) params.set('includeLegacyQuotes', 'true');
         const response = await fetch(
-          `/api/inventory/locations?search=${encodeURIComponent(normalizedSearch)}&limit=50`,
+          `/api/inventory/locations?${params}`,
           { cache: 'no-store', signal: controller.signal },
         );
         const payload = await response.json();
@@ -71,7 +75,7 @@ export function InventoryLocationsPanel({
       window.clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [normalizedSearch, refreshVersion]);
+  }, [includeLegacyQuotes, normalizedSearch, refreshVersion]);
 
   const status = normalizedSearch.length < MINIMUM_SEARCH_CHARACTERS
     ? 'Enter at least 3 characters to search locations.'
@@ -103,6 +107,11 @@ export function InventoryLocationsPanel({
               aria-label="Search inventory locations"
             />
           </div>
+          <LegacyQuoteLocationOptIn
+            enabled={includeLegacyQuotes}
+            onEnabledChange={setIncludeLegacyQuotes}
+            className="mt-3"
+          />
           <p className="mt-2 text-xs text-muted-foreground">
             Search by location name. Up to 50 matching locations are shown.
           </p>

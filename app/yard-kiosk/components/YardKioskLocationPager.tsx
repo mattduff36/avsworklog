@@ -19,6 +19,7 @@ import {
   rememberYardKioskLocation,
   togglePinnedYardKioskLocation,
 } from '../yard-kiosk-storage';
+import { LegacyQuoteLocationOptIn } from '@/app/(dashboard)/inventory/components/LegacyQuoteLocationOptIn';
 
 const PAGE_SIZE = 8;
 
@@ -32,6 +33,7 @@ interface YardKioskLocationPagerProps {
   direction: YardKioskDirection;
   locations: YardKioskLocation[];
   onSelect: (location: YardKioskLocation) => void;
+  onIncludeLegacyQuotesChange: (includeLegacyQuotes: boolean) => Promise<void>;
 }
 
 function chunkLocations(
@@ -60,12 +62,14 @@ export function YardKioskLocationPager({
   direction,
   locations,
   onSelect,
+  onIncludeLegacyQuotesChange,
 }: YardKioskLocationPagerProps) {
   const pagerRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState('');
   const [pageIndex, setPageIndex] = useState(0);
   const [recentIds, setRecentIds] = useState<string[]>([]);
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
+  const [includeLegacyQuotes, setIncludeLegacyQuotes] = useState(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -136,6 +140,13 @@ export function YardKioskLocationPager({
     setPinnedIds(togglePinnedYardKioskLocation(locationId));
   }
 
+  async function handleIncludeLegacyQuotesChange(nextIncludeLegacyQuotes: boolean) {
+    await onIncludeLegacyQuotesChange(nextIncludeLegacyQuotes);
+    setIncludeLegacyQuotes(nextIncludeLegacyQuotes);
+    setQuery('');
+    setPageIndex(0);
+  }
+
   return (
     <section className="grid h-full min-h-0 grid-rows-[auto_auto_1fr_auto] gap-3 px-6 pb-5 pt-4">
       <div className="flex items-end justify-between gap-4">
@@ -148,6 +159,12 @@ export function YardKioskLocationPager({
           </h2>
         </div>
         <div className="flex items-center gap-2">
+          <LegacyQuoteLocationOptIn
+            enabled={includeLegacyQuotes}
+            onEnabledChange={(enabled) => { void handleIncludeLegacyQuotesChange(enabled); }}
+            size="default"
+            className="border-white/20 bg-white/5 text-white hover:bg-white/10"
+          />
           <button
             type="button"
             aria-label="Previous location page"

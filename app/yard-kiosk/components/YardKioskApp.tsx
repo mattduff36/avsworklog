@@ -10,6 +10,7 @@ import {
   WifiOff,
   X,
 } from 'lucide-react';
+import { BiometricEnrollmentPrompt } from '@/components/auth/BiometricEnrollmentPrompt';
 import type {
   YardKioskBasketLine,
   YardKioskBootstrapResponse,
@@ -18,6 +19,7 @@ import type {
   YardKioskReceipt,
   YardKioskStockItem,
 } from '@/lib/inventory/kiosk-types';
+import { useAuth } from '@/lib/hooks/useAuth';
 import { YardKioskBasket } from './YardKioskBasket';
 import { YardKioskItemPicker } from './YardKioskItemPicker';
 import { YardKioskLocationPager } from './YardKioskLocationPager';
@@ -44,8 +46,10 @@ interface ApiErrorPayload {
 }
 
 export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
+  const { profile, loading: authLoading } = useAuth();
   const [state, dispatch] = useReducer(yardKioskReducer, INITIAL_YARD_KIOSK_STATE);
   const [offline, setOffline] = useState(false);
+  const [locations, setLocations] = useState<YardKioskLocation[]>(bootstrap.locations);
 
   useEffect(() => {
     const updateOnlineStatus = () => setOffline(!window.navigator.onLine);
@@ -82,13 +86,25 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
   }, []);
 
   function handleDirection(direction: YardKioskDirection) {
+    setLocations(bootstrap.locations);
     dispatch({ type: 'SELECT_DIRECTION', direction });
   }
 
   function handleLocation(location: YardKioskLocation) {
     if (!state.direction) return;
+    setLocations(bootstrap.locations);
     dispatch({ type: 'SELECT_LOCATION', location });
     void loadStock(state.direction, location);
+  }
+
+  async function handleLegacyQuoteLocationOptIn(includeLegacyQuotes: boolean) {
+    const response = await fetch(
+      `/api/inventory/kiosk/bootstrap${includeLegacyQuotes ? '?includeLegacyQuotes=true' : ''}`,
+      { cache: 'no-store' },
+    );
+    const payload = await response.json() as ApiErrorPayload & YardKioskBootstrapResponse;
+    if (!response.ok) throw new Error(payload.error || 'Failed to load locations');
+    setLocations(payload.locations || []);
   }
 
   async function handleSubmit() {
@@ -156,13 +172,20 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
       data-yard-kiosk="true"
       className="fixed inset-0 z-[100] grid h-dvh w-screen grid-rows-[4.75rem_1fr] overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.12),_transparent_32%),linear-gradient(135deg,#020617_0%,#0f172a_52%,#111827_100%)] text-white"
     >
+      <BiometricEnrollmentPrompt
+        profileId={profile?.id}
+        canCheck={!authLoading && Boolean(profile?.id)}
+      />
       <header className="flex items-center justify-between border-b border-white/10 bg-slate-950/75 px-6 backdrop-blur-xl">
         <div className="flex items-center gap-4">
           {showBack ? (
             <button
               type="button"
               aria-label="Go back"
-              onClick={() => dispatch({ type: 'BACK' })}
+              onClick={() => {
+                setLocations(bootstrap.locations);
+                dispatch({ type: 'BACK' });
+              }}
               className="grid h-12 w-12 place-items-center rounded-2xl border border-white/10 bg-white/5 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
             >
               <ArrowLeft className="h-7 w-7" />
@@ -218,8 +241,9 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
         {state.phase === 'location' && state.direction ? (
           <YardKioskLocationPager
             direction={state.direction}
-            locations={bootstrap.locations}
+            locations={locations}
             onSelect={handleLocation}
+            onIncludeLegacyQuotesChange={handleLegacyQuoteLocationOptIn}
           />
         ) : null}
 
@@ -264,7 +288,10 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
             direction={state.direction}
             counterpart={state.counterpart}
             receipt={state.receipt}
-            onReset={() => dispatch({ type: 'RESET' })}
+              onReset={() => {
+                setLocations(bootstrap.locations);
+                dispatch({ type: 'RESET' });
+              }}
           />
         ) : null}
 

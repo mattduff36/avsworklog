@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +30,7 @@ interface MultiSelectFilterProps<TValue extends string> {
   showPanelLabel?: boolean;
   collapsibleGroupLabels?: readonly string[];
   minimumSearchCharactersByGroupLabel?: Readonly<Record<string, number>>;
+  onOpenChange?: (open: boolean) => void;
 }
 
 type MultiSelectFilterRenderEntry<TValue extends string> =
@@ -75,6 +76,7 @@ export function MultiSelectFilter<TValue extends string>({
   showPanelLabel = true,
   collapsibleGroupLabels = [],
   minimumSearchCharactersByGroupLabel = {},
+  onOpenChange,
 }: MultiSelectFilterProps<TValue>) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -118,15 +120,17 @@ export function MultiSelectFilter<TValue extends string>({
     return entries;
   }, [filteredOptions, minimumSearchCharactersByGroupLabel, normalizedSearchQuery.length]);
 
-  function closeMenu() {
+  const closeMenu = useCallback(() => {
     setOpen(false);
     setSearchQuery('');
-  }
+    onOpenChange?.(false);
+  }, [onOpenChange]);
 
   function toggleMenu() {
     const nextOpen = !open;
     setOpen(nextOpen);
     if (!nextOpen) setSearchQuery('');
+    onOpenChange?.(nextOpen);
   }
 
   useEffect(() => {
@@ -149,7 +153,7 @@ export function MultiSelectFilter<TValue extends string>({
       document.removeEventListener('pointerdown', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [open]);
+  }, [closeMenu, open]);
 
   function toggleValue(value: TValue) {
     if (selectedValues.includes(value)) {

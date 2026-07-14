@@ -3,22 +3,16 @@ import { NextRequest } from 'next/server';
 
 const {
   getCurrentAuthenticatedProfile,
-  getInventoryKioskPostLoginPath,
   getActiveWebAuthnCredentialsForProfile,
   isBiometricPromptDismissed,
 } = vi.hoisted(() => ({
   getCurrentAuthenticatedProfile: vi.fn(),
-  getInventoryKioskPostLoginPath: vi.fn(),
   getActiveWebAuthnCredentialsForProfile: vi.fn(),
   isBiometricPromptDismissed: vi.fn(),
 }));
 
 vi.mock('@/lib/server/app-auth/session', () => ({
   getCurrentAuthenticatedProfile,
-}));
-
-vi.mock('@/lib/server/inventory-kiosk', () => ({
-  getInventoryKioskPostLoginPath,
 }));
 
 vi.mock('@/lib/server/webauthn/credentials', () => ({
@@ -32,13 +26,13 @@ describe('WebAuthn status route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getCurrentAuthenticatedProfile.mockResolvedValue({
-      profile: { id: 'profile-1' },
+      profile: { id: 'kiosk-profile' },
     });
+    getActiveWebAuthnCredentialsForProfile.mockResolvedValue([]);
+    isBiometricPromptDismissed.mockResolvedValue(false);
   });
 
-  it('suppresses biometric enrollment for the configured Yard kiosk profile', async () => {
-    getInventoryKioskPostLoginPath.mockResolvedValue('/yard-kiosk');
-
+  it('returns device enrollment status for the dedicated Yard kiosk profile', async () => {
     const response = await GET(new NextRequest(
       'http://localhost/api/auth/webauthn/status?deviceId=device-1',
     ));
@@ -46,10 +40,18 @@ describe('WebAuthn status route', () => {
 
     expect(response.status).toBe(200);
     expect(payload).toMatchObject({
-      prompt_dismissed: true,
-      prompt_suppressed: true,
+      credentials_configured: false,
+      credential_count: 0,
+      prompt_dismissed: false,
     });
-    expect(getActiveWebAuthnCredentialsForProfile).not.toHaveBeenCalled();
-    expect(isBiometricPromptDismissed).not.toHaveBeenCalled();
+    expect(payload).not.toHaveProperty('prompt_suppressed');
+    expect(getActiveWebAuthnCredentialsForProfile).toHaveBeenCalledWith({
+      profileId: 'kiosk-profile',
+      rawDeviceId: 'device-1',
+    });
+    expect(isBiometricPromptDismissed).toHaveBeenCalledWith({
+      profileId: 'kiosk-profile',
+      rawDeviceId: 'device-1',
+    });
   });
 });

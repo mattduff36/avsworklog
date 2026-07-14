@@ -27,7 +27,9 @@ import type {
   InventoryHardwareTransferPayload,
   InventoryLocation,
 } from '../types';
+import { isLegacyQuoteInventoryLocation } from '../utils';
 import { InventoryLocationSelect } from './InventoryLocationSelect';
+import { LegacyQuoteLocationOptIn } from './LegacyQuoteLocationOptIn';
 
 interface HardwareTransferDialogProps {
   open: boolean;
@@ -54,6 +56,7 @@ export function HardwareTransferDialog({
   const [quantity, setQuantity] = useState('');
   const [note, setNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [includeLegacyQuotes, setIncludeLegacyQuotes] = useState(false);
 
   const responsibleIds = useMemo(
     () => new Set(responsibleLocationIds || []),
@@ -62,6 +65,15 @@ export function HardwareTransferDialog({
   const activeLocations = useMemo(
     () => locations.filter((location) => location.is_active),
     [locations],
+  );
+  const discoverableActiveLocations = useMemo(
+    () => activeLocations.filter((location) => (
+      includeLegacyQuotes
+      || !isLegacyQuoteInventoryLocation(location)
+      || location.id === fromLocationId
+      || location.id === toLocationId
+    )),
+    [activeLocations, fromLocationId, includeLegacyQuotes, toLocationId],
   );
   const stockedItemIds = useMemo(
     () => new Set(
@@ -109,6 +121,7 @@ export function HardwareTransferDialog({
       setQuantity('');
       setNote('');
       setIsSubmitting(false);
+      setIncludeLegacyQuotes(false);
     }
   }, [open]);
 
@@ -182,7 +195,7 @@ export function HardwareTransferDialog({
                   <SelectValue placeholder="Source" />
                 </SelectTrigger>
                 <SelectContent>
-                  {activeLocations
+                  {discoverableActiveLocations
                     .filter((location) => sourceLocationIds.has(location.id))
                     .map((location) => {
                       const balance = itemBalances.find((row) => row.location_id === location.id);
@@ -202,7 +215,7 @@ export function HardwareTransferDialog({
                 <InventoryLocationSelect
                   value={toLocationId}
                   onValueChange={setToLocationId}
-                  locations={activeLocations.filter((location) => location.id !== fromLocationId)}
+                  locations={discoverableActiveLocations.filter((location) => location.id !== fromLocationId)}
                   disabled={!fromLocationId}
                   placeholder="Destination"
                   serverSearch
@@ -214,7 +227,7 @@ export function HardwareTransferDialog({
                     <SelectValue placeholder="Destination" />
                   </SelectTrigger>
                   <SelectContent>
-                    {activeLocations
+                    {discoverableActiveLocations
                       .filter((location) => (
                         location.id !== fromLocationId && responsibleIds.has(location.id)
                       ))
@@ -226,6 +239,10 @@ export function HardwareTransferDialog({
               )}
             </div>
           </div>
+          <LegacyQuoteLocationOptIn
+            enabled={includeLegacyQuotes}
+            onEnabledChange={setIncludeLegacyQuotes}
+          />
 
           <div className="space-y-2">
             <Label htmlFor="hardware_transfer_quantity">Quantity</Label>

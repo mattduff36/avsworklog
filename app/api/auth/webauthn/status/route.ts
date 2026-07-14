@@ -4,7 +4,6 @@ import {
   getActiveWebAuthnCredentialsForProfile,
   isBiometricPromptDismissed,
 } from '@/lib/server/webauthn/credentials';
-import { getInventoryKioskPostLoginPath } from '@/lib/server/inventory-kiosk';
 
 export const runtime = 'nodejs';
 
@@ -12,17 +11,6 @@ export async function GET(request: NextRequest) {
   const current = await getCurrentAuthenticatedProfile({ includeEmail: true });
   if (!current) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const kioskPath = await getInventoryKioskPostLoginPath(current.profile.id);
-  if (kioskPath) {
-    return NextResponse.json({
-      success: true,
-      credentials_configured: false,
-      credential_count: 0,
-      prompt_dismissed: true,
-      prompt_suppressed: true,
-    });
   }
 
   const rawDeviceId = request.nextUrl.searchParams.get('deviceId');

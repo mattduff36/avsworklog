@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import {
   getYardKioskBootstrap,
   InventoryKioskError,
@@ -6,7 +6,7 @@ import {
   toInventoryKioskErrorResponse,
 } from '@/lib/server/inventory-kiosk';
 
-export async function GET() {
+export async function GET(request?: NextRequest) {
   try {
     const access = await requireInventoryKioskAccess();
     if (!access.allowed) {
@@ -16,7 +16,9 @@ export async function GET() {
       );
     }
 
-    return NextResponse.json(await getYardKioskBootstrap(access));
+    return NextResponse.json(await getYardKioskBootstrap(access, {
+      includeLegacyQuotes: request?.nextUrl.searchParams.get('includeLegacyQuotes') === 'true',
+    }));
   } catch (error) {
     if (error instanceof InventoryKioskError) {
       const response = toInventoryKioskErrorResponse(error);

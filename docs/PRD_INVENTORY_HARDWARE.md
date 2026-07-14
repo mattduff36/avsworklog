@@ -25,19 +25,19 @@ Add quantity-based, non-serialised Hardware stock to the Inventory module withou
 - The management Hardware Overview shows one expandable row per Hardware item,
   including items with zero company-wide stock. A missing Yard balance record is
   treated as zero.
-- Managers can filter the unified Overview to items whose Yard balance is zero.
-  Expanded rows show positive location balances; zero balances are omitted.
-- Overview Add, Remove, and Recount selection remains scoped to concrete positive
-  non-Yard item/location rows for Yard-zero items. Yard-zero items with no positive
-  alternate balance remain visible but have no selectable balance.
+- Overview search and location filters do not impose a Yard-balance or company-total
+  filter. Expanded rows show positive location balances; zero balances are omitted.
+- The Settings Hardware Stock Matrix shows one grouped row per active item whose
+  Yard balance is zero, treating a missing Yard record as zero. Expanded matrix rows
+  show only positive non-Yard balances.
 
 ### HW-003: Stock adjustments
 
 - Managers and admins can apply atomic multi-row Add, Remove, and Recount operations.
-- Manager and admin adjustment workflows are available from Inventory Overview >
-  Hardware, not Inventory Settings.
+- Manager and admin adjustment workflows are available from Inventory Settings >
+  Hardware Stock Matrix, not Inventory Overview.
 - Managers and admins can record an incoming Delivery directly from any
-  catalogue item, including items with zero company-wide stock, by selecting an
+  Yard-zero matrix item, including items with zero company-wide stock, by selecting an
   active destination location and entering a positive whole-number quantity.
 - Every adjustment requires a standard reason: Delivery, Return, Used, Lost, Scrapped, Damaged, Stocktake correction, or Other.
 - Other requires a note. Notes are optional for standard reasons.
@@ -67,13 +67,14 @@ Add quantity-based, non-serialised Hardware stock to the Inventory module withou
 ### HW-006: Manager experience
 
 - Inventory Overview includes a Hardware tab beside Small Tools and Minor Plant.
-- The tab is the unified operational Hardware workspace. It shows one row per
-  Hardware type, its company-wide total, expandable non-zero location balances,
-  search and location filters, a Yard-zero filter, stock adjustments, and transfers.
-- Inventory Settings includes a Hardware Catalogue area for adding, renaming,
-  and deleting unused Hardware item types only.
+- The Overview tab shows every active Hardware type, its company-wide total,
+  expandable non-zero location balances, search and location filters, and transfers.
+  It does not expose stock adjustment or Add stock actions.
+- Inventory Settings includes the Yard-zero grouped Hardware Stock Matrix for
+  per-item stock entry and bulk adjustments, plus the Hardware Catalogue area for
+  adding, renaming, and deleting unused Hardware item types.
 - The Hardware catalogue remains complete and actionable when an item has zero
-  company-wide stock. Incoming stock is recorded from the active item row in Overview.
+  company-wide stock. Incoming stock is recorded from the active matrix item row.
   The zero-total omission applies to location result sets, not catalogue entries.
 - Hardware locations with a zero aggregate quantity are not materialised in Overview
   balance result sets.

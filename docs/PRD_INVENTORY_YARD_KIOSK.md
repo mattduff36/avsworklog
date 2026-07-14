@@ -17,8 +17,10 @@ active Inventory location.
   `/yard-kiosk` before any general redirect target.
 - If automatic launch does not complete, the configured kiosk profile alone
   sees a primary-dashboard `Launch Kiosk` tile linking to `/yard-kiosk`.
-- Automatic biometric-enrollment prompts are suppressed for the configured
-  kiosk profile so unattended kiosk sessions are not interrupted.
+- On `/yard-kiosk`, the configured kiosk profile is offered biometric
+  enrollment when the dedicated device has no active credential and its prompt
+  has not been dismissed. Enrollment and dismissal remain bound to that single
+  device.
 - Kiosk transfers record that profile as the actor. The kiosk does not collect
   an individual employee identity.
 - An unconfigured, disabled, or different profile cannot load kiosk stock or
@@ -82,6 +84,19 @@ active Inventory location.
   duplicate submissions are prevented.
 - Success shows a large receipt and automatically resets for the next
   transaction after a short countdown.
+
+### YK-009: Legacy quote locations
+
+- Locations with `source_type = 'legacy_quote'` are excluded from the default
+  counterpart-location list.
+- The location step provides a local **Include legacy quotes** control for the
+  current transaction only.
+- Enabling the control reloads the counterpart list with legacy locations;
+  backing out, completing, or resetting the transaction restores the default
+  non-legacy list.
+- A selected legacy counterpart remains valid for the current basket,
+  submission, and receipt. Server-side location-ID authorization remains
+  unchanged.
 
 ## Non-goals
 

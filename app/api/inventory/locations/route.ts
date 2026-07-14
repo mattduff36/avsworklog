@@ -92,10 +92,15 @@ export async function GET(request: NextRequest) {
 
     const admin = createAdminClient();
     const limit = normalizeLocationSearchLimit(searchParams.get('limit'));
-    const { data: locationData, error: locationsError } = await admin
+    const includeLegacyQuotes = searchParams.get('includeLegacyQuotes') === 'true';
+    let locationQuery = admin
       .from('inventory_locations')
       .select('*')
-      .eq('is_active', true)
+      .eq('is_active', true);
+    if (!includeLegacyQuotes) {
+      locationQuery = locationQuery.neq('source_type', 'legacy_quote');
+    }
+    const { data: locationData, error: locationsError } = await locationQuery
       .ilike('name', `%${escapeIlikePattern(search)}%`)
       .order('name', { ascending: true })
       .order('id', { ascending: true })

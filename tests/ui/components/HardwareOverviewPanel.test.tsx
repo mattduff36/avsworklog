@@ -1,7 +1,7 @@
 /** @vitest-environment happy-dom */
 /// <reference types="@testing-library/jest-dom/vitest" />
 
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HardwareOverviewPanel } from '@/app/(dashboard)/inventory/components/HardwareOverviewPanel';
 import type {
@@ -83,10 +83,11 @@ describe('HardwareOverviewPanel', () => {
     vi.unstubAllGlobals();
   });
 
-  it('shows all active items, company totals, expansion, search, and Yard-zero filtering', () => {
+  it('shows every active item without stock actions or Yard filtering', () => {
+    const emptyItem = makeHardwareItem('empty', 'Empty Hardware');
     render(
       <HardwareOverviewPanel
-        items={[plates, cones]}
+        items={[plates, cones, emptyItem]}
         balances={[
           {
             id: 'cones-yard',
@@ -111,13 +112,22 @@ describe('HardwareOverviewPanel', () => {
           },
         ]}
         locations={[yard, van]}
-        onAdjust={vi.fn()}
         onTransfer={vi.fn()}
       />,
     );
 
     expect(screen.getByText('31 total')).toBeInTheDocument();
     expect(screen.getByText('5 total')).toBeInTheDocument();
+    expect(screen.getByText('0 total')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /cones/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /road plates/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /empty hardware/i })).toBeInTheDocument();
+    expect(screen.queryByText('Yard stock = 0')).not.toBeInTheDocument();
+    expect(screen.queryByText(/selected$/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Recount' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add stock' })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /cones/i }));
     const balances = screen.getByRole('table', {
@@ -127,96 +137,63 @@ describe('HardwareOverviewPanel', () => {
     expect(within(balances).getByText('Van - TE57 VAN')).toBeInTheDocument();
 
     fireEvent.change(screen.getByPlaceholderText('Search Hardware or location...'), {
-      target: { value: 'Road' },
+      target: { value: 'Cones' },
     });
-    expect(screen.queryByRole('button', { name: /cones/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /road plates/i })).toBeInTheDocument();
-
-    fireEvent.change(screen.getByPlaceholderText('Search Hardware or location...'), {
-      target: { value: '' },
-    });
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Show only items with zero Yard stock' }));
-    expect(screen.queryByRole('button', { name: /cones/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /road plates/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /cones/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /road plates/i })).not.toBeInTheDocument();
   });
 
-  it('selects eligible non-Yard balances for remove and recount operations', async () => {
-    const onAdjust = vi.fn().mockResolvedValue(undefined);
-    render(
-      <HardwareOverviewPanel
-        items={[plates]}
-        balances={[{
-          id: 'plates-van',
-          hardware_item_id: plates.id,
-          location_id: van.id,
-          quantity: 5,
-          location: van,
-        }]}
-        locations={[yard, van]}
-        onAdjust={onAdjust}
-        onTransfer={vi.fn()}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: /road plates/i }));
-    fireEvent.click(screen.getByRole('checkbox', {
-      name: 'Select Road Plates, quantity 5, at Van - TE57 VAN',
-    }));
-    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
-
-    const dialog = screen.getByRole('dialog');
-    fireEvent.change(within(dialog).getByLabelText('Quantity'), { target: { value: '2' } });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Apply Adjustment' }));
-
-    await waitFor(() => {
-      expect(onAdjust).toHaveBeenCalledWith({
-        operation_type: 'remove',
-        reason: 'Used',
-        note: '',
-        lines: [{
-          item_id: plates.id,
-          location_id: van.id,
-          quantity: 2,
-        }],
-      });
-    });
-  });
-
-  it('adds stock to a zero-total item and opens the transfer workflow', async () => {
+  it('opens the transfer workflow', () => {
     const emptyItem = makeHardwareItem('empty', 'Empty Hardware');
-    const onAdjust = vi.fn().mockResolvedValue(undefined);
     render(
       <HardwareOverviewPanel
         items={[emptyItem]}
         balances={[]}
         locations={[yard, van]}
-        onAdjust={onAdjust}
         onTransfer={vi.fn()}
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add stock' }));
-    const addDialog = screen.getByRole('dialog');
-    await waitFor(() => {
-      expect(within(addDialog).getByRole('button', { name: 'Destination location' })).toHaveTextContent('Yard');
-    });
-    fireEvent.change(within(addDialog).getByLabelText('Quantity'), { target: { value: '12' } });
-    fireEvent.click(within(addDialog).getByRole('button', { name: 'Add stock' }));
-
-    await waitFor(() => {
-      expect(onAdjust).toHaveBeenCalledWith({
-        operation_type: 'add',
-        reason: 'Delivery',
-        note: '',
-        lines: [{
-          item_id: emptyItem.id,
-          location_id: yard.id,
-          quantity: 12,
-        }],
-      });
-    });
-
     fireEvent.click(screen.getByRole('button', { name: 'Transfer Stock' }));
     expect(screen.getByRole('heading', { name: 'Transfer Hardware' })).toBeInTheDocument();
+  });
+
+  it('does not search legacy quote locations until explicitly enabled', () => {
+    const legacySite: InventoryLocation = {
+      ...makeLocation('legacy-site', 'Legacy quote - 9999'),
+      location_type: 'site',
+      source_type: 'legacy_quote',
+    };
+    render(
+      <HardwareOverviewPanel
+        items={[cones, plates]}
+        balances={[
+          {
+            id: 'cones-legacy',
+            hardware_item_id: cones.id,
+            location_id: legacySite.id,
+            quantity: 4,
+            location: legacySite,
+          },
+          {
+            id: 'plates-van',
+            hardware_item_id: plates.id,
+            location_id: van.id,
+            quantity: 5,
+            location: van,
+          },
+        ]}
+        locations={[legacySite, van]}
+        onTransfer={vi.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText('Search Hardware or location...'), {
+      target: { value: '9999' },
+    });
+    expect(screen.queryByRole('button', { name: /cones/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Include legacy quotes' }));
+    expect(screen.getByRole('button', { name: /cones/i })).toBeInTheDocument();
   });
 });

@@ -83,6 +83,20 @@ non-zero item count or quantity for that area. Empty assigned/current
 locations and destination selectors remain available where they are required
 for assignment, movement, or intentional empty-state workflows.
 
+### Legacy quote discovery
+
+Locations imported from historical quotes use `source_type = 'legacy_quote'`.
+They are excluded from Inventory location discovery by default so routine
+searches remain focused on current operational locations. Each location search,
+filter, assignment picker, and Yard Kiosk transaction provides a local
+**Include legacy quotes** control when those locations are needed.
+
+The opt-in applies only to that open control or transaction. It is not stored
+in the URL or browser storage and resets when the control closes or the kiosk
+transaction resets. Existing selected, assigned, or displayed legacy locations
+remain visible and valid; the rule changes discovery only. Legacy quote sites
+remain ineligible as a user's primary Inventory location.
+
 ## Hardware Stock Balances
 
 Quantity-based Hardware uses the same `inventory_locations` rows but does not use

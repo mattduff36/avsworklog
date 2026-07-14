@@ -40,12 +40,14 @@ function buildSearchQuery<T>(data: T[]) {
   const query = {
     select: vi.fn(),
     eq: vi.fn(),
+    neq: vi.fn(),
     ilike: vi.fn(),
     order: vi.fn(),
     limit: vi.fn(),
   };
   query.select.mockReturnValue(query);
   query.eq.mockReturnValue(query);
+  query.neq.mockReturnValue(query);
   query.ilike.mockReturnValue(query);
   query.order.mockReturnValue(query);
   query.limit.mockResolvedValue({ data, error: null });
@@ -117,6 +119,7 @@ describe('inventory locations route', () => {
 
     expect(response.status).toBe(200);
     expect(locationQuery.ilike).toHaveBeenCalledWith('name', '%yard%');
+    expect(locationQuery.neq).toHaveBeenCalledWith('source_type', 'legacy_quote');
     expect(locationQuery.order).toHaveBeenNthCalledWith(1, 'name', { ascending: true });
     expect(locationQuery.order).toHaveBeenNthCalledWith(2, 'id', { ascending: true });
     expect(locationQuery.limit).toHaveBeenCalledWith(25);
@@ -124,6 +127,35 @@ describe('inventory locations route', () => {
     expect(payload.locations).toEqual([
       expect.objectContaining({ id: yard.id, item_count: 2 }),
     ]);
+  });
+
+  it('includes legacy quote locations only with explicit opt-in', async () => {
+    vi.mocked(requireInventoryAccess).mockResolvedValue({
+      allowed: true,
+      status: 200,
+      userId: 'admin-user',
+      isManagerOrAdmin: true,
+    });
+    const legacySite = {
+      ...buildLocation('legacy-site', 'Legacy quote - 1234'),
+      location_type: 'site',
+      source_type: 'legacy_quote',
+    };
+    const locationQuery = buildSearchQuery([legacySite]);
+    const emptyQuery = buildFilteredQuery([]);
+    vi.mocked(createAdminClient).mockReturnValue({
+      from: vi.fn((table: string) => {
+        if (table === 'inventory_locations') return locationQuery;
+        return emptyQuery;
+      }),
+    } as never);
+
+    const response = await GET(new NextRequest(
+      'http://localhost/api/inventory/locations?search=legacy&includeLegacyQuotes=true',
+    ));
+
+    expect(response.status).toBe(200);
+    expect(locationQuery.neq).not.toHaveBeenCalled();
   });
 
   it('returns one exact active Yard lookup by stable id', async () => {

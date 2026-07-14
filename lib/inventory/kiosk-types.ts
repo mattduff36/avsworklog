@@ -19,6 +19,7 @@ export interface YardKioskLocation extends Pick<
   | 'name'
   | 'description'
   | 'location_type'
+  | 'source_type'
   | 'external_reference'
   | 'linked_asset_label'
   | 'linked_asset_nickname'

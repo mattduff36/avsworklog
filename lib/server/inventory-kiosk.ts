@@ -29,6 +29,7 @@ interface KioskLocationRow {
   name: string;
   description: string | null;
   location_type: InventoryLocation['location_type'];
+  source_type: InventoryLocation['source_type'];
   external_reference: string | null;
   is_active: boolean;
 }
@@ -89,6 +90,7 @@ function toKioskLocation(row: KioskLocationRow) {
     name: row.name,
     description: row.description,
     location_type: row.location_type,
+    source_type: row.source_type,
     external_reference: row.external_reference,
   };
 }
@@ -101,7 +103,7 @@ function normalizeHardwareItem(row: KioskHardwareBalanceRow['item']) {
 async function loadActiveYard(admin: InventoryAdminClient): Promise<KioskLocationRow | null> {
   const { data, error } = await admin
     .from('inventory_locations')
-    .select('id, name, description, location_type, external_reference, is_active')
+    .select('id, name, description, location_type, source_type, external_reference, is_active')
     .eq('location_type', 'yard')
     .eq('is_active', true)
     .order('created_at', { ascending: true })
@@ -193,16 +195,21 @@ function assertKioskAccess(
 
 export async function getYardKioskBootstrap(
   access: InventoryKioskAccessResult,
+  options: { includeLegacyQuotes?: boolean } = {},
 ): Promise<YardKioskBootstrapResponse> {
   assertKioskAccess(access);
   const admin = createAdminClient();
+  let locationQuery = admin
+    .from('inventory_locations')
+    .select('id, name, description, location_type, source_type, external_reference, is_active')
+    .eq('is_active', true)
+    .neq('id', access.yard.id);
+  if (!options.includeLegacyQuotes) {
+    locationQuery = locationQuery.neq('source_type', 'legacy_quote');
+  }
 
   const [{ data: locations, error: locationsError }, { data: categories, error: categoriesError }] = await Promise.all([
-    admin
-      .from('inventory_locations')
-      .select('id, name, description, location_type, external_reference, is_active')
-      .eq('is_active', true)
-      .neq('id', access.yard.id)
+    locationQuery
       .order('location_type', { ascending: true })
       .order('name', { ascending: true })
       .limit(500),
@@ -236,7 +243,7 @@ async function resolveCounterpart(
 
   const { data, error } = await admin
     .from('inventory_locations')
-    .select('id, name, description, location_type, external_reference, is_active')
+    .select('id, name, description, location_type, source_type, external_reference, is_active')
     .eq('id', counterpartId)
     .eq('is_active', true)
     .neq('location_type', 'yard')

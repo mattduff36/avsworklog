@@ -71,6 +71,12 @@ export function isInventoryYardLocation(
   return isYardInventoryLocationName(location?.name);
 }
 
+export function isLegacyQuoteInventoryLocation(
+  location: Partial<Pick<InventoryLocation, 'source_type'>> | null | undefined
+): boolean {
+  return location?.source_type === 'legacy_quote';
+}
+
 export function isWorkshopInventoryTeam(context: InventoryTeamContext): boolean {
   const teamId = context.teamId?.trim().toLowerCase();
   const teamName = context.teamName?.trim().toLowerCase();
