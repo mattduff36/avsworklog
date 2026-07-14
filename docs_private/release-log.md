@@ -2,6 +2,25 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.8.0
+
+**GIT COMMIT MESSAGE**
+`feat(dashboard): update Dashboard, Inventory, and Help and FAQ`
+
+**PUSHED AT**
+2026-07-14T20:45:05.317Z
+
+**WHAT CHANGED**
+Update Dashboard, Inventory, and Help and FAQ.
+
+**VERSION HISTORY DETAILS**
+- Updated Dashboard, Inventory, and Help and FAQ, with changes to app screens.
+- Updated inventory, with changes to documentation.
+- Updated help and FAQ, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `feat(dashboard): update Dashboard, Inventory, and Help and FAQ`
+
 ## 0726.7.0
 
 **GIT COMMIT MESSAGE**

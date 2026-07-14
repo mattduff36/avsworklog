@@ -1,5 +1,28 @@
 [
   {
+    "version": "0726.8.0",
+    "updateKind": "major",
+    "title": "Dashboard update",
+    "description": "Updated Dashboard, Inventory, and Help and FAQ.",
+    "summary": "Updated Dashboard, Inventory, and Help and FAQ.",
+    "details": [
+      "Updated Dashboard, Inventory, and Help and FAQ, with changes to app screens.",
+      "Updated inventory, with changes to documentation.",
+      "Updated help and FAQ, with changes to documentation."
+    ],
+    "areas": [
+      "Dashboard",
+      "Inventory",
+      "Help",
+      "FAQ"
+    ],
+    "areaKeys": [
+      "dashboard",
+      "inventory"
+    ],
+    "pushedAt": "2026-07-14T20:45:05.317Z"
+  },
+  {
     "version": "0726.7.0",
     "updateKind": "major",
     "title": "Inventory update",
