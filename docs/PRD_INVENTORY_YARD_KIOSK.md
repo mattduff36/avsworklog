@@ -81,6 +81,11 @@ active Inventory location.
 ### YK-007: Touch experience
 
 - The UI targets landscape viewports from 1024 by 600 pixels upward.
+- Android kiosk tablets may install a dedicated `Yard Inventory` PWA from the
+  Yard kiosk route. It has its own install identity, opens `/yard-kiosk`, is
+  scoped to `/yard-kiosk` and its child routes, and requests landscape
+  orientation. The existing viewport guard remains the fallback when a browser
+  or device does not enforce the manifest orientation.
 - Primary controls are large labelled tiles with visible focus states and
   keyboard alternatives.
 - The document does not scroll. Horizontal pagers use native touch scrolling
@@ -134,6 +139,11 @@ active Inventory location.
   remain bound to the configured kiosk profile, and can be revoked from
   Inventory Settings. Revocation invalidates sessions issued to that device.
   There is no in-app dashboard exit.
+- The dedicated kiosk PWA is an online-only launcher and does not register a
+  service worker or cache an offline application shell. Inventory data and
+  transfers always require the live application. If a device outside the PWA
+  scope requires normal login, Android opens that login in Chrome before the
+  user returns to the kiosk route.
 - The Yard Inventory logo remains available throughout the kiosk workflow.
   Holding it for three seconds reveals a hidden admin menu containing only
   `Log out`; logout requires confirmation and returns the device to sign-in.

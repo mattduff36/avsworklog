@@ -14,15 +14,24 @@ interface RouteCheck {
   path: string;
   label: string;
   authenticated?: boolean;
+  manifestHref?: string;
+  appleAppTitle?: string;
 }
 
 const baseUrl = process.env.PWA_HEAD_BASE_URL || process.env.TESTSUITE_BASE_URL || 'http://localhost:4000';
 const adminStorageStatePath = resolve(process.cwd(), 'testsuite/.state/storage-state-admin.json');
+const skipAuthenticatedRoutes = process.env.PWA_HEAD_SKIP_AUTHENTICATED === '1';
 
 const publicRoutes: RouteCheck[] = [
   { path: '/', label: 'root redirect' },
   { path: '/login', label: 'login' },
   { path: '/pwa-debug', label: 'pwa debug' },
+  {
+    path: '/yard-kiosk/install',
+    label: 'Yard kiosk install',
+    manifestHref: '/manifest-yard-kiosk.json',
+    appleAppTitle: 'Yard Inventory',
+  },
 ];
 
 const authenticatedRoutes: RouteCheck[] = [
@@ -80,6 +89,7 @@ async function fetchHtml(route: RouteCheck, cookieHeader: string | null): Promis
     redirect: 'follow',
     headers: {
       accept: 'text/html',
+      'user-agent': 'Twitterbot',
       ...(route.authenticated && cookieHeader ? { cookie: cookieHeader } : {}),
     },
   });
@@ -102,12 +112,20 @@ function verifyHead(route: RouteCheck, html: string, finalUrl: string, status: n
 
   assert(getNamedMeta(head, 'apple-mobile-web-app-capable') === 'yes', `${route.label}: missing apple-mobile-web-app-capable=yes in initial head`);
   assert(getNamedMeta(head, 'mobile-web-app-capable') === 'yes', `${route.label}: missing mobile-web-app-capable=yes in initial head`);
-  assert(Boolean(getNamedMeta(head, 'apple-mobile-web-app-title')), `${route.label}: missing apple-mobile-web-app-title in initial head`);
+  const expectedAppleTitle = route.appleAppTitle || 'Squires';
+  assert(
+    getNamedMeta(head, 'apple-mobile-web-app-title') === expectedAppleTitle,
+    `${route.label}: expected apple-mobile-web-app-title=${expectedAppleTitle}`,
+  );
   assert(getNamedMeta(head, 'apple-mobile-web-app-status-bar-style') === 'black-translucent', `${route.label}: missing apple status bar meta in initial head`);
 
   const manifests = getManifestLinks(head);
   assert(manifests.length === 1, `${route.label}: expected exactly one manifest link in initial head, got ${manifests.length}`);
-  assert(manifests[0] === '/manifest.json', `${route.label}: expected canonical /manifest.json, got ${manifests[0]}`);
+  const expectedManifest = route.manifestHref || '/manifest.json';
+  assert(
+    manifests[0] === expectedManifest,
+    `${route.label}: expected ${expectedManifest}, got ${manifests[0]}`,
+  );
 
   const allManifestLinks = [...html.matchAll(/<link\b(?=[^>]*\brel=["']manifest["'])([^>]*)>/gi)];
   assert(allManifestLinks.length === 1, `${route.label}: expected exactly one manifest link in full HTML, got ${allManifestLinks.length}`);
@@ -128,16 +146,59 @@ async function verifyManifest(): Promise<void> {
   assert(manifest.display === 'standalone', `manifest.json: expected display "standalone", got ${manifest.display}`);
   assert(Array.isArray(manifest.display_override) && manifest.display_override.includes('standalone'), 'manifest.json: expected display_override to include "standalone"');
 
+  const kioskResponse = await fetch(new URL('/manifest-yard-kiosk.json', baseUrl));
+  assert(
+    kioskResponse.status === 200,
+    `manifest-yard-kiosk.json: expected HTTP 200, got ${kioskResponse.status}`,
+  );
+  const kioskManifest = await kioskResponse.json() as {
+    id?: string;
+    name?: string;
+    start_url?: string;
+    scope?: string;
+    display?: string;
+    display_override?: string[];
+    orientation?: string;
+    icons?: Array<{ sizes?: string; purpose?: string }>;
+  };
+
+  assert(kioskManifest.id === '/yard-kiosk', `manifest-yard-kiosk.json: expected distinct id "/yard-kiosk", got ${kioskManifest.id}`);
+  assert(kioskManifest.name === 'Yard Inventory', `manifest-yard-kiosk.json: expected name "Yard Inventory", got ${kioskManifest.name}`);
+  assert(kioskManifest.start_url === '/yard-kiosk', `manifest-yard-kiosk.json: expected start_url "/yard-kiosk", got ${kioskManifest.start_url}`);
+  assert(kioskManifest.scope === '/yard-kiosk', `manifest-yard-kiosk.json: expected scope "/yard-kiosk", got ${kioskManifest.scope}`);
+  assert(kioskManifest.display === 'standalone', `manifest-yard-kiosk.json: expected display "standalone", got ${kioskManifest.display}`);
+  assert(kioskManifest.orientation === 'landscape', `manifest-yard-kiosk.json: expected orientation "landscape", got ${kioskManifest.orientation}`);
+  assert(
+    Array.isArray(kioskManifest.display_override)
+      && kioskManifest.display_override.includes('standalone'),
+    'manifest-yard-kiosk.json: expected display_override to include "standalone"',
+  );
+  assert(
+    kioskManifest.icons?.some((icon) => icon.sizes === '192x192'),
+    'manifest-yard-kiosk.json: missing 192x192 icon',
+  );
+  assert(
+    kioskManifest.icons?.some((icon) => icon.sizes === '512x512'),
+    'manifest-yard-kiosk.json: missing 512x512 icon',
+  );
+  assert(
+    kioskManifest.icons?.some((icon) => icon.purpose === 'maskable'),
+    'manifest-yard-kiosk.json: missing maskable icon',
+  );
+
   const staleManifest = await fetch(new URL('/favicon/site.webmanifest', baseUrl), { redirect: 'manual' });
   assert(staleManifest.status !== 200, 'favicon/site.webmanifest: stale secondary manifest should not be served');
 }
 
 async function main() {
   const cookieHeader = readCookieHeader();
-  const routes = cookieHeader ? [...publicRoutes, ...authenticatedRoutes] : publicRoutes;
+  const canCheckAuthenticatedRoutes = Boolean(cookieHeader) && !skipAuthenticatedRoutes;
+  const routes = canCheckAuthenticatedRoutes
+    ? [...publicRoutes, ...authenticatedRoutes]
+    : publicRoutes;
 
-  if (!cookieHeader) {
-    console.warn('Admin storage state not found; authenticated PWA head routes were skipped.');
+  if (!cookieHeader || skipAuthenticatedRoutes) {
+    console.warn('Authenticated PWA head routes were unavailable or deliberately skipped.');
   }
 
   for (const route of routes) {
@@ -147,7 +208,7 @@ async function main() {
   }
 
   await verifyManifest();
-  console.log('PWA manifest OK: /manifest.json is canonical and install-scoped to /');
+  console.log('PWA manifests OK: site and Yard kiosk install identities are distinct');
 }
 
 main().catch((error) => {

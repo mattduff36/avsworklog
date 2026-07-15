@@ -1,0 +1,41 @@
+{
+  "name": "Yard Inventory",
+  "short_name": "Yard Inventory",
+  "description": "Dedicated Yard inventory transfer kiosk for A&V Squires Plant Co. Ltd.",
+  "id": "/yard-kiosk",
+  "start_url": "/yard-kiosk",
+  "scope": "/yard-kiosk",
+  "display": "standalone",
+  "display_override": ["standalone"],
+  "background_color": "#020617",
+  "theme_color": "#fcd34d",
+  "orientation": "landscape",
+  "icons": [
+    {
+      "src": "/icon-avs-yellow-20260529-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-avs-yellow-20260529-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-avs-yellow-20260529-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-avs-yellow-20260529-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "screenshots": []
+}

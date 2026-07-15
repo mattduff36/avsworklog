@@ -185,12 +185,17 @@ describe('supabase middleware cookie refresh', () => {
     const shellResponse = await updateSession(
       new NextRequest('http://localhost/yard-kiosk'),
     );
+    const installResponse = await updateSession(
+      new NextRequest('http://localhost/yard-kiosk/install'),
+    );
     const pairingResponse = await updateSession(
       new NextRequest('http://localhost/api/inventory/kiosk/pairing'),
     );
 
     expect(shellResponse.status).toBe(200);
     expect(shellResponse.headers.get('x-middleware-next')).toBe('1');
+    expect(installResponse.status).toBe(200);
+    expect(installResponse.headers.get('x-middleware-next')).toBe('1');
     expect(pairingResponse.status).toBe(200);
     expect(pairingResponse.headers.get('x-middleware-next')).toBe('1');
   });

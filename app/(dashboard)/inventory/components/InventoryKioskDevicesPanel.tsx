@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock3,
+  Download,
   ExternalLink,
   Loader2,
   Search,
@@ -220,6 +221,30 @@ export function InventoryKioskDevicesPanel() {
               {error}
             </div>
           ) : null}
+
+          <div className="flex flex-col gap-4 rounded-xl border border-amber-300/25 bg-amber-300/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="rounded-lg bg-amber-300/15 p-2 text-amber-200">
+                <Download className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="font-semibold text-white">Install the dedicated Android app</p>
+                <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-300">
+                  On the kiosk tablet, open{' '}
+                  <span className="font-medium text-white">
+                    squiresapp.com/yard-kiosk/install
+                  </span>{' '}
+                  in Chrome. Install Yard Inventory, then pair the browser below.
+                </p>
+              </div>
+            </div>
+            <Button asChild variant="outline" className="shrink-0 border-amber-300/35">
+              <a href="/yard-kiosk/install" target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="mr-2 h-4 w-4" />
+                Tablet setup page
+              </a>
+            </Button>
+          </div>
 
           <div className="rounded-xl border border-border bg-slate-950/45 p-4">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
