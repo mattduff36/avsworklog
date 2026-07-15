@@ -1,5 +1,25 @@
 [
   {
+    "version": "0726.11.0",
+    "updateKind": "major",
+    "title": "Inventory update",
+    "description": "Added dedicated Yard kiosk PWA.",
+    "summary": "Added dedicated Yard kiosk PWA.",
+    "details": [
+      "Added dedicated Yard kiosk PWA, with changes to app screens, automated tests, and documentation.",
+      "Updated navigation across 2 changed files.",
+      "Updated help and FAQ, with changes to documentation."
+    ],
+    "areas": [
+      "Inventory",
+      "Dedicated Yard kiosk PWA"
+    ],
+    "areaKeys": [
+      "inventory"
+    ],
+    "pushedAt": "2026-07-15T17:41:48.350Z"
+  },
+  {
     "version": "0726.10.0",
     "updateKind": "major",
     "title": "Inventory update",

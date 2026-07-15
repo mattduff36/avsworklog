@@ -2,6 +2,25 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.11.0
+
+**GIT COMMIT MESSAGE**
+`feat(inventory): add dedicated Yard kiosk PWA`
+
+**PUSHED AT**
+2026-07-15T17:41:48.350Z
+
+**WHAT CHANGED**
+Add dedicated Yard kiosk PWA.
+
+**VERSION HISTORY DETAILS**
+- Added dedicated Yard kiosk PWA, with changes to app screens, automated tests, and documentation.
+- Updated navigation across 2 changed files.
+- Updated help and FAQ, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `feat(inventory): add dedicated Yard kiosk PWA`
+
 ## 0726.10.0
 
 **GIT COMMIT MESSAGE**
