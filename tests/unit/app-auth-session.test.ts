@@ -16,6 +16,7 @@ const {
   sha256HexMock,
   getSupabaseUserMock,
   randomTokenMock,
+  kioskDeviceMaybeSingleMock,
 } = vi.hoisted(() => ({
   maybeSingleMock: vi.fn(),
   singleMock: vi.fn(),
@@ -26,6 +27,7 @@ const {
   sha256HexMock: vi.fn(),
   getSupabaseUserMock: vi.fn(),
   randomTokenMock: vi.fn(),
+  kioskDeviceMaybeSingleMock: vi.fn(),
 }));
 
 vi.mock('next/headers', () => ({
@@ -34,25 +36,38 @@ vi.mock('next/headers', () => ({
 
 vi.mock('@/lib/supabase/admin', () => ({
   createAdminClient: vi.fn(() => ({
-    from: vi.fn(() => ({
-      select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          maybeSingle: maybeSingleMock,
-        })),
-      })),
-      insert: vi.fn(() => ({
+    from: vi.fn((table: string) => {
+      if (table === 'inventory_kiosk_devices') {
+        const chain = {
+          eq: vi.fn(() => chain),
+          is: vi.fn(() => chain),
+          maybeSingle: kioskDeviceMaybeSingleMock,
+        };
+        return {
+          select: vi.fn(() => chain),
+        };
+      }
+
+      return {
         select: vi.fn(() => ({
-          single: singleMock,
+          eq: vi.fn(() => ({
+            maybeSingle: maybeSingleMock,
+          })),
         })),
-      })),
-      update: vi.fn(() => ({
-        eq: vi.fn(() => ({
+        insert: vi.fn(() => ({
           select: vi.fn(() => ({
             single: singleMock,
           })),
         })),
-      })),
-    })),
+        update: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            select: vi.fn(() => ({
+              single: singleMock,
+            })),
+          })),
+        })),
+      };
+    }),
     auth: {
       admin: {
         getUserById: getUserByIdMock,
@@ -138,6 +153,10 @@ describe('app auth session helpers', () => {
       return `hash:${value}`;
     });
     randomTokenMock.mockReturnValue('new-raw-secret');
+    kioskDeviceMaybeSingleMock.mockResolvedValue({
+      data: { id: 'kiosk-device-1' },
+      error: null,
+    });
     getAppAuthProfileMock.mockResolvedValue({
       id: 'user-1',
       email: 'user-1@example.com',
@@ -239,6 +258,40 @@ describe('app auth session helpers', () => {
     expect(current?.profile.id).toBe('user-1');
     expect(getAppAuthProfileMock).toHaveBeenCalledWith('user-1', 'user-1@example.com');
     expect(getUserByIdMock).toHaveBeenCalledWith('user-1');
+  });
+
+  it('rejects a kiosk device session as soon as its device is revoked', async () => {
+    maybeSingleMock.mockResolvedValueOnce({
+      data: {
+        id: 'session-1',
+        profile_id: 'user-1',
+        device_id: null,
+        kiosk_device_id: 'kiosk-device-1',
+        session_secret_hash: 'hashed-secret',
+        session_source: 'kiosk_device',
+        remember_me: true,
+        last_seen_at: '2026-04-04T12:00:00.000Z',
+        idle_expires_at: '2026-04-05T12:00:00.000Z',
+        absolute_expires_at: '2026-04-30T12:00:00.000Z',
+        revoked_at: null,
+        revoked_reason: null,
+        replaced_by_session_id: null,
+        user_agent: null,
+        ip_hash: null,
+        created_at: '2026-04-04T10:00:00.000Z',
+        updated_at: '2026-04-04T12:00:00.000Z',
+      },
+      error: null,
+    });
+    kioskDeviceMaybeSingleMock.mockResolvedValueOnce({
+      data: null,
+      error: null,
+    });
+
+    const validation = await validateAppSession();
+
+    expect(validation.status).toBe('invalid');
+    expect(validation.session).toBeNull();
   });
 
   it('falls back to the Supabase SSR user when no app-session cookie exists', async () => {

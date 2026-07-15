@@ -176,6 +176,53 @@ describe('supabase middleware cookie refresh', () => {
     expect(productionResponse.headers.get('x-middleware-next')).toBe('1');
   });
 
+  it('allows the Yard kiosk shell and pairing API without an app session', async () => {
+    mockSupabaseMiddlewareAuth({
+      user: null,
+    });
+    verifyJwtHS256Mock.mockResolvedValue(null);
+
+    const shellResponse = await updateSession(
+      new NextRequest('http://localhost/yard-kiosk'),
+    );
+    const pairingResponse = await updateSession(
+      new NextRequest('http://localhost/api/inventory/kiosk/pairing'),
+    );
+
+    expect(shellResponse.status).toBe(200);
+    expect(shellResponse.headers.get('x-middleware-next')).toBe('1');
+    expect(pairingResponse.status).toBe(200);
+    expect(pairingResponse.headers.get('x-middleware-next')).toBe('1');
+  });
+
+  it('keeps Yard kiosk data APIs protected without an app session', async () => {
+    mockSupabaseMiddlewareAuth({
+      user: null,
+    });
+    verifyJwtHS256Mock.mockResolvedValue(null);
+
+    const response = await updateSession(
+      new NextRequest('http://localhost/api/inventory/kiosk/stock'),
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
+  });
+
+  it('does not loop an unpaired Yard kiosk login redirect back to the public shell', async () => {
+    mockSupabaseMiddlewareAuth({
+      user: null,
+    });
+    verifyJwtHS256Mock.mockResolvedValue(null);
+
+    const response = await updateSession(
+      new NextRequest('http://localhost/login?redirect=%2Fyard-kiosk'),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('x-middleware-next')).toBe('1');
+  });
+
   it('redirects legacy Samsung TV display board browsers to the fallback route', async () => {
     mockSupabaseMiddlewareAuth({
       user: null,

@@ -21,12 +21,14 @@ import { upsertWebAuthnDevice, getWebAuthnDevice } from '@/lib/server/webauthn/d
 export type AppAuthSessionSource =
   | 'password_login'
   | 'session_bootstrap'
-  | 'biometric_login';
+  | 'biometric_login'
+  | 'kiosk_device';
 
 export interface AppAuthSessionRow {
   id: string;
   profile_id: string;
   device_id: string | null;
+  kiosk_device_id: string | null;
   session_secret_hash: string;
   session_source: AppAuthSessionSource;
   remember_me: boolean;
@@ -58,6 +60,7 @@ export interface IssueAppSessionOptions {
   rawDeviceId?: string | null;
   deviceLabel?: string | null;
   actorProfileId?: string | null;
+  kioskDeviceId?: string | null;
   previousSessionId?: string | null;
   revokedReason?: string | null;
 }
@@ -164,6 +167,24 @@ async function getSessionRow(sessionId: string): Promise<AppAuthSessionRow | nul
   return (data as AppAuthSessionRow | null) || null;
 }
 
+async function isKioskDeviceSessionActive(row: AppAuthSessionRow): Promise<boolean> {
+  if (row.session_source !== 'kiosk_device') return true;
+  if (!row.kiosk_device_id) return false;
+
+  const { data, error } = await createAdminClient()
+    .from('inventory_kiosk_devices')
+    .select('id')
+    .eq('id', row.kiosk_device_id)
+    .eq('kiosk_user_id', row.profile_id)
+    .is('revoked_at', null)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  return Boolean(data);
+}
+
 function shouldRotateSession(row: AppAuthSessionRow, now: Date): boolean {
   const lastSeenAt = new Date(row.last_seen_at).getTime();
   const idleExpiresAt = new Date(row.idle_expires_at).getTime();
@@ -238,6 +259,10 @@ async function updateSessionActivity(
 export async function issueAppSession(
   options: IssueAppSessionOptions
 ): Promise<{ row: AppAuthSessionRow; cookieValue: string; cookieExpiresAt: Date }> {
+  if (options.source === 'kiosk_device' && !options.kioskDeviceId) {
+    throw new Error('A trusted kiosk device is required for a kiosk device session');
+  }
+
   const admin = createAdminClient();
   const now = new Date();
   const rememberMe = options.rememberMe === true;
@@ -254,6 +279,7 @@ export async function issueAppSession(
     .insert({
       profile_id: options.profileId,
       device_id: deviceId,
+      kiosk_device_id: options.kioskDeviceId || null,
       session_secret_hash: sessionSecretHash,
       session_source: options.source,
       remember_me: rememberMe,
@@ -346,7 +372,8 @@ export async function validateAppSession(
     row.revoked_at ||
     new Date(row.absolute_expires_at) <= now ||
     new Date(row.idle_expires_at) <= now ||
-    row.session_secret_hash !== (await hashSessionSecret(cookiePayload.secret))
+    row.session_secret_hash !== (await hashSessionSecret(cookiePayload.secret)) ||
+    !(await isKioskDeviceSessionActive(row))
   ) {
     return {
       status: 'invalid',

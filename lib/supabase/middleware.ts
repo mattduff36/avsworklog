@@ -270,7 +270,11 @@ export async function updateSession(request: NextRequest) {
     if (isSafeInternalRedirectTarget(redirectTarget)) {
       const targetUrl = new URL(redirectTarget, request.nextUrl.origin)
 
-      if (targetUrl.pathname !== '/login' && isPublicBrowserPath(targetUrl.pathname)) {
+      if (
+        targetUrl.pathname !== '/login'
+        && !targetUrl.pathname.startsWith('/yard-kiosk')
+        && isPublicBrowserPath(targetUrl.pathname)
+      ) {
         const url = request.nextUrl.clone()
         url.pathname = shouldUseLegacyDisplayBoardRoute(targetUrl.pathname, request.headers.get('user-agent'))
           ? DISPLAY_BOARD_LEGACY_TV_PATH

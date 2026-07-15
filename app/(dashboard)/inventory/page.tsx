@@ -21,13 +21,14 @@ import { PageLoader } from '@/components/ui/page-loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
-import { AlertTriangle, Archive, Boxes, CheckCircle2, MapPin, PackageSearch, Plus, Settings, Truck } from 'lucide-react';
+import { AlertTriangle, Archive, Boxes, CheckCircle2, MapPin, PackageSearch, Plus, Settings, ShieldCheck, Truck } from 'lucide-react';
 import { toast } from 'sonner';
 import { ChangeInventoryLocationDialog } from './components/ChangeInventoryLocationDialog';
 import { InventoryCategoriesPanel } from './components/InventoryCategoriesPanel';
 import { InventoryItemDialog } from './components/InventoryItemDialog';
 import { InventoryEmployeeView } from './components/InventoryEmployeeView';
 import { InventoryGroupsPanel } from './components/InventoryGroupsPanel';
+import { InventoryKioskDevicesPanel } from './components/InventoryKioskDevicesPanel';
 import { HardwareOverviewPanel } from './components/HardwareOverviewPanel';
 import { HardwareCataloguePanel } from './components/HardwareCataloguePanel';
 import { HardwareStockPanel } from './components/HardwareStockPanel';
@@ -129,7 +130,7 @@ export default function InventoryPage() {
   const [inventoryLoadError, setInventoryLoadError] = useState<string | null>(null);
   const [pageTab, setPageTab] = useState<'overview' | 'locations' | 'settings'>('overview');
   const [overviewTab, setOverviewTab] = useState<InventoryOverviewTab>('small_tools');
-  const [settingsTab, setSettingsTab] = useState<'categories' | 'groups' | 'hardware'>('categories');
+  const [settingsTab, setSettingsTab] = useState<'categories' | 'groups' | 'hardware' | 'kiosk'>('categories');
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
   const [changeLocationDialogOpen, setChangeLocationDialogOpen] = useState(false);
@@ -264,7 +265,12 @@ export default function InventoryPage() {
         return;
       }
       setPageTab('settings');
-      if (requestedSettings === 'groups' || requestedSettings === 'categories' || requestedSettings === 'hardware') {
+      if (
+        requestedSettings === 'groups'
+        || requestedSettings === 'categories'
+        || requestedSettings === 'hardware'
+        || requestedSettings === 'kiosk'
+      ) {
         setSettingsTab(requestedSettings);
       }
       return;
@@ -1008,7 +1014,7 @@ export default function InventoryPage() {
             <Tabs
               value={settingsTab}
               onValueChange={(value) => {
-                const nextSettingsTab = value as 'categories' | 'groups' | 'hardware';
+                const nextSettingsTab = value as 'categories' | 'groups' | 'hardware' | 'kiosk';
                 setSettingsTab(nextSettingsTab);
                 router.push(`/inventory?tab=settings&settings=${nextSettingsTab}`, { scroll: false });
               }}
@@ -1025,6 +1031,10 @@ export default function InventoryPage() {
                 <TabsTrigger value="hardware" className="gap-2">
                   <Boxes className="h-4 w-4" />
                   Hardware Catalogue
+                </TabsTrigger>
+                <TabsTrigger value="kiosk" className="gap-2">
+                  <ShieldCheck className="h-4 w-4" />
+                  Yard Kiosks
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -1188,6 +1198,10 @@ export default function InventoryPage() {
                 onRemoveItem={handleRemoveHardwareItem}
               />
             </>
+          ) : null}
+
+          {settingsTab === 'kiosk' ? (
+            <InventoryKioskDevicesPanel />
           ) : null}
         </TabsContent>
       </Tabs>

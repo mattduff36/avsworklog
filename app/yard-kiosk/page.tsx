@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 export default async function YardKioskPage() {
   const access = await requireInventoryKioskAccess();
   if (!access.allowed && access.status === 401) {
-    redirect('/login?redirect=%2Fyard-kiosk');
+    redirect('/yard-kiosk/activate');
   }
 
   if (!access.allowed) {

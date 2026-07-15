@@ -978,8 +978,9 @@ export type Database = {
           id: string
           profile_id: string
           device_id: string | null
+          kiosk_device_id: string | null
           session_secret_hash: string
-          session_source: 'password_login' | 'session_bootstrap' | 'biometric_login'
+          session_source: 'password_login' | 'session_bootstrap' | 'biometric_login' | 'kiosk_device'
           remember_me: boolean
           last_seen_at: string
           idle_expires_at: string
@@ -996,8 +997,9 @@ export type Database = {
           id?: string
           profile_id: string
           device_id?: string | null
+          kiosk_device_id?: string | null
           session_secret_hash: string
-          session_source: 'password_login' | 'session_bootstrap' | 'biometric_login'
+          session_source: 'password_login' | 'session_bootstrap' | 'biometric_login' | 'kiosk_device'
           remember_me?: boolean
           last_seen_at?: string
           idle_expires_at: string
@@ -1014,8 +1016,9 @@ export type Database = {
           id?: string
           profile_id?: string
           device_id?: string | null
+          kiosk_device_id?: string | null
           session_secret_hash?: string
-          session_source?: 'password_login' | 'session_bootstrap' | 'biometric_login'
+          session_source?: 'password_login' | 'session_bootstrap' | 'biometric_login' | 'kiosk_device'
           remember_me?: boolean
           last_seen_at?: string
           idle_expires_at?: string
@@ -1034,6 +1037,13 @@ export type Database = {
             columns: ['device_id']
             isOneToOne: false
             referencedRelation: 'webauthn_devices'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'app_auth_sessions_kiosk_device_id_fkey'
+            columns: ['kiosk_device_id']
+            isOneToOne: false
+            referencedRelation: 'inventory_kiosk_devices'
             referencedColumns: ['id']
           },
           {
@@ -2340,6 +2350,153 @@ export type Database = {
           {
             foreignKeyName: 'inventory_kiosk_config_updated_by_fkey'
             columns: ['updated_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      inventory_kiosk_devices: {
+        Row: {
+          id: string
+          kiosk_user_id: string
+          device_token_hash: string
+          device_label: string
+          paired_by: string
+          pairing_session_id: string | null
+          last_seen_at: string | null
+          last_authenticated_at: string | null
+          revoked_at: string | null
+          revoked_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          kiosk_user_id: string
+          device_token_hash: string
+          device_label: string
+          paired_by: string
+          pairing_session_id?: string | null
+          last_seen_at?: string | null
+          last_authenticated_at?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          kiosk_user_id?: string
+          device_token_hash?: string
+          device_label?: string
+          paired_by?: string
+          pairing_session_id?: string | null
+          last_seen_at?: string | null
+          last_authenticated_at?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'inventory_kiosk_devices_kiosk_user_id_fkey'
+            columns: ['kiosk_user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_kiosk_devices_paired_by_fkey'
+            columns: ['paired_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_kiosk_devices_pairing_session_id_fkey'
+            columns: ['pairing_session_id']
+            isOneToOne: true
+            referencedRelation: 'inventory_kiosk_pairing_sessions'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_kiosk_devices_revoked_by_fkey'
+            columns: ['revoked_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      inventory_kiosk_pairing_sessions: {
+        Row: {
+          id: string
+          kiosk_user_id: string
+          device_label: string
+          confirmation_code: string | null
+          pairing_token_hash: string | null
+          status: 'active' | 'confirmed' | 'consumed' | 'cancelled' | 'expired'
+          started_by: string
+          candidate_seen_at: string | null
+          confirmed_by: string | null
+          confirmed_at: string | null
+          consumed_at: string | null
+          expires_at: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          kiosk_user_id: string
+          device_label: string
+          confirmation_code?: string | null
+          pairing_token_hash?: string | null
+          status?: 'active' | 'confirmed' | 'consumed' | 'cancelled' | 'expired'
+          started_by: string
+          candidate_seen_at?: string | null
+          confirmed_by?: string | null
+          confirmed_at?: string | null
+          consumed_at?: string | null
+          expires_at: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          kiosk_user_id?: string
+          device_label?: string
+          confirmation_code?: string | null
+          pairing_token_hash?: string | null
+          status?: 'active' | 'confirmed' | 'consumed' | 'cancelled' | 'expired'
+          started_by?: string
+          candidate_seen_at?: string | null
+          confirmed_by?: string | null
+          confirmed_at?: string | null
+          consumed_at?: string | null
+          expires_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'inventory_kiosk_pairing_sessions_confirmed_by_fkey'
+            columns: ['confirmed_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_kiosk_pairing_sessions_kiosk_user_id_fkey'
+            columns: ['kiosk_user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_kiosk_pairing_sessions_started_by_fkey'
+            columns: ['started_by']
             isOneToOne: false
             referencedRelation: 'profiles'
             referencedColumns: ['id']
@@ -9279,7 +9436,7 @@ export type Database = {
       check__actions__action_type: 'inspection_defect' | 'workshop_vehicle_task' | 'manager_action'
       check__actions__priority: 'low' | 'medium' | 'high' | 'urgent'
       check__actions__status: 'pending' | 'in_progress' | 'logged' | 'on_hold' | 'completed'
-      check__app_auth_sessions__session_source: 'password_login' | 'session_bootstrap' | 'biometric_login'
+      check__app_auth_sessions__session_source: 'password_login' | 'session_bootstrap' | 'biometric_login' | 'kiosk_device'
       check__customers__status: 'active' | 'inactive'
       check__display_board_pairing_sessions__status: 'active' | 'confirmed' | 'cancelled' | 'expired'
       check__dvla_sync_log__sync_status: 'success' | 'error'
@@ -9291,6 +9448,7 @@ export type Database = {
       check__inventory_item_groups__status: 'active' | 'inactive'
       check__inventory_item_movement_batches__move_scope: 'single' | 'bulk' | 'group' | 'claim' | 'kiosk'
       check__inventory_items__status: 'active' | 'retired'
+      check__inventory_kiosk_pairing_sessions__status: 'active' | 'confirmed' | 'consumed' | 'cancelled' | 'expired'
       check__inventory_location_requests__status: 'pending' | 'approved' | 'rejected' | 'duplicate'
       check__maintenance_categories__responsibility: 'workshop' | 'office'
       check__maintenance_categories__type: 'date' | 'mileage' | 'hours'

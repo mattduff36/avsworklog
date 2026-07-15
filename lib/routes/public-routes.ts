@@ -5,10 +5,12 @@ const PUBLIC_BROWSER_ROUTE_PREFIXES = [
   '/pwa-debug',
   '/displayboard-workshop',
   '/displayboard-workshop-tv',
+  '/yard-kiosk',
 ] as const;
 
 const PUBLIC_API_ROUTE_PREFIXES = [
   '/api/display-board/',
+  '/api/inventory/kiosk/pairing',
 ] as const;
 
 function getPathname(value: string): string {

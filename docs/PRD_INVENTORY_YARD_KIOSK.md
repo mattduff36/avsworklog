@@ -13,6 +13,13 @@ active Inventory location.
 - The kiosk is a private authenticated route used by one dedicated profile.
 - The authorised profile is configured directly in the database and must have
   Inventory module access.
+- An Inventory manager or administrator may pair a browser installation as a
+  trusted Yard kiosk device through Inventory Settings. Pairing uses a
+  short-lived, manager-confirmed code and never collects a hardware MAC address
+  or browser fingerprint.
+- A paired, active device visiting `/yard-kiosk` authenticates as the configured
+  kiosk profile without entering that profile's password. An unpaired device
+  continues through the normal password or biometric login.
 - Successful password or biometric login for the configured profile launches
   `/yard-kiosk` before any general redirect target.
 - If automatic launch does not complete, the configured kiosk profile alone
@@ -121,8 +128,12 @@ active Inventory location.
 
 ### YK-008: Kiosk lifecycle
 
-- The tablet signs in through the normal application login and relies on
-  operating-system kiosk mode. There is no in-app dashboard exit.
+- The tablet relies on operating-system kiosk mode. Its browser may use the
+  normal application login or a manager-approved trusted-device credential.
+  Trusted-device credentials are stored only in secure HTTP-only cookies,
+  remain bound to the configured kiosk profile, and can be revoked from
+  Inventory Settings. Revocation invalidates sessions issued to that device.
+  There is no in-app dashboard exit.
 - The Yard Inventory logo remains available throughout the kiosk workflow.
   Holding it for three seconds reveals a hidden admin menu containing only
   `Log out`; logout requires confirmation and returns the device to sign-in.
@@ -160,6 +171,8 @@ active Inventory location.
 
 ## Non-goals
 
+- MAC-address authentication, browser fingerprinting, or network-address
+  allow-listing.
 - Barcode or QR scanning.
 - Individual employee identification, PIN entry, or badge entry.
 - Recording checks or manager overrides from the kiosk.
