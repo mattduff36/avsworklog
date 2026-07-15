@@ -1,5 +1,26 @@
 [
   {
+    "version": "0726.10.0",
+    "updateKind": "major",
+    "title": "Inventory update",
+    "description": "Added trusted Yard kiosk pairing.",
+    "summary": "Added trusted Yard kiosk pairing.",
+    "details": [
+      "Added trusted Yard kiosk pairing, with changes to background routes, app screens, shared logic, automation scripts, automated tests, data storage, and documentation.",
+      "Updated data storage, with changes to shared typing, automation scripts, automated tests, and data storage.",
+      "Updated sign in, with changes to shared logic and automated tests.",
+      "Updated help and FAQ, with changes to documentation."
+    ],
+    "areas": [
+      "Inventory",
+      "Trusted Yard kiosk pairing"
+    ],
+    "areaKeys": [
+      "inventory"
+    ],
+    "pushedAt": "2026-07-15T17:00:14.068Z"
+  },
+  {
     "version": "0726.9.0",
     "updateKind": "major",
     "title": "Inventory update",

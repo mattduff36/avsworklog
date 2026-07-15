@@ -2,6 +2,26 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.10.0
+
+**GIT COMMIT MESSAGE**
+`feat(inventory): add trusted Yard kiosk pairing`
+
+**PUSHED AT**
+2026-07-15T17:00:14.068Z
+
+**WHAT CHANGED**
+Add trusted Yard kiosk pairing.
+
+**VERSION HISTORY DETAILS**
+- Added trusted Yard kiosk pairing, with changes to background routes, app screens, shared logic, automation scripts, automated tests, data storage, and documentation.
+- Updated data storage, with changes to shared typing, automation scripts, automated tests, and data storage.
+- Updated sign in, with changes to shared logic and automated tests.
+- Updated help and FAQ, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `feat(inventory): add trusted Yard kiosk pairing`
+
 ## 0726.9.0
 
 **GIT COMMIT MESSAGE**
