@@ -50,7 +50,11 @@ alwaysApply: true
 - Avoid boilerplate unless needed to run.
 
 ## 8. Branching and commits
-- Work on feature branches: `feature/<short-topic>`.
+- Stay on the current branch by default.
+- **NEVER** create or switch to a feature branch unless the user explicitly
+  instructs you to create or use one.
+- A request to implement, commit, finalise, or push does not imply permission
+  to create a branch.
 - Make small, focused PRs.
 - Use clear commit messages: `type(scope): summary`.
 
