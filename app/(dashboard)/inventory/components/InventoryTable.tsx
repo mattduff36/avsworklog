@@ -24,12 +24,15 @@ import {
   Truck,
 } from 'lucide-react';
 import {
+  formatInventoryLocationAssigneeLabel,
+  formatInventoryLocationLabel,
   formatInventoryDate,
   formatInventoryUnknownLocationAge,
   getCheckStatusLabel,
   getInventoryCheckIntervalMonths,
   getInventoryCheckStatus,
   getInventoryDueDate,
+  getInventoryLocationSearchLabel,
   getInventoryLocationsWithYardFirst,
   isInventoryCheckExempt,
   isLegacyQuoteInventoryLocation,
@@ -153,37 +156,6 @@ function getLocationFilterGroupLabel(location: InventoryLocation): string {
   if (groupKey === 'plant') return 'Plant';
   if (groupKey === 'unknown') return 'Unknown';
   return 'Manual Locations';
-}
-
-function getLocationFilterLabel(location: InventoryLocation): string {
-  const linkedAssetLabel = [location.linked_asset_label, location.linked_asset_nickname]
-    .map((value) => value?.trim())
-    .filter(Boolean)
-    .join(' - ');
-
-  if (linkedAssetLabel) return `[${linkedAssetLabel}]`;
-
-  if (location.location_type === 'site' && location.external_reference) {
-    if (location.source_type === 'legacy_quote') {
-      const legacyTitle = location.name
-        .replace(/^legacy quote\s*-\s*/i, '')
-        .replace(new RegExp(`^${location.external_reference}\\s*-\\s*`, 'i'), '')
-        .trim();
-      return legacyTitle ? `[${location.external_reference} - ${legacyTitle}]` : `[${location.external_reference}]`;
-    }
-
-    const siteTitle = location.name
-      .replace(/^site\s*-\s*/i, '')
-      .replace(new RegExp(`^${location.external_reference}\\s*-\\s*`, 'i'), '')
-      .trim();
-    return siteTitle ? `[${location.external_reference} - ${siteTitle}]` : `[${location.external_reference}]`;
-  }
-
-  return location.name;
-}
-
-function getLocationFilterDescription(location: InventoryLocation): string {
-  return location.assigned_user_names?.length ? location.assigned_user_names.join(', ') : 'Unassigned';
 }
 
 function renderLocationDetails(item: InventoryItem) {
@@ -382,21 +354,14 @@ export function InventoryTable({
           const bGroup = getLocationFilterGroupKey(b);
           const groupCompare = (groupOrderByKey.get(aGroup) || 0) - (groupOrderByKey.get(bGroup) || 0);
           if (groupCompare !== 0) return groupCompare;
-          return getLocationFilterLabel(a).localeCompare(getLocationFilterLabel(b), undefined, { sensitivity: 'base' });
+          return formatInventoryLocationLabel(a).localeCompare(formatInventoryLocationLabel(b), undefined, { sensitivity: 'base' });
         })
         .map((location) => ({
           value: location.id,
-          label: getLocationFilterLabel(location),
-          description: getLocationFilterDescription(location),
+          label: formatInventoryLocationLabel(location),
+          description: formatInventoryLocationAssigneeLabel(location),
           groupLabel: getLocationFilterGroupKey(location) === 'manual' ? undefined : getLocationFilterGroupLabel(location),
-          searchLabel: [
-            location.name,
-            location.external_reference,
-            location.linked_asset_label,
-            location.linked_asset_nickname,
-            getLocationFilterDescription(location),
-            getLocationFilterGroupLabel(location),
-          ].filter(Boolean).join(' '),
+          searchLabel: getInventoryLocationSearchLabel(location, [getLocationFilterGroupLabel(location)]),
           count: counts[location.id] || 0,
         }));
 

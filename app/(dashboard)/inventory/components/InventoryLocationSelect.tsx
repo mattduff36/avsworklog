@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import type { InventoryLocation } from '../types';
 import {
   formatInventoryLocationOptionLabel,
+  getInventoryLocationSearchLabel,
   getInventoryLocationsWithYardFirst,
   isLegacyQuoteInventoryLocation,
 } from '../utils';
@@ -122,7 +123,13 @@ export function InventoryLocationSelect({
   }, [includeLegacyQuotes, normalizedSearchQuery, open, serverSearch]);
 
   const options = useMemo<InventoryLocationSelectOption[]>(() => {
-    const sourceLocations = serverSearch ? searchResults : locations;
+    const sourceLocations = serverSearch
+      ? Array.from(
+        new Map(
+          [...locations, ...searchResults].map((location) => [location.id, location]),
+        ).values(),
+      )
+      : locations;
     const locationOptions = getInventoryLocationsWithYardFirst(sourceLocations)
       .filter((location) => includeLegacyQuotes || !isLegacyQuoteInventoryLocation(location))
       .filter((location) => locationFilter?.(location) ?? true)
@@ -133,15 +140,7 @@ export function InventoryLocationSelect({
           value: location.id,
           label,
           location,
-          searchLabel: [
-            label,
-            location.name,
-            location.location_type,
-            location.external_reference,
-            location.linked_asset_label,
-            location.linked_asset_nickname,
-            ...(location.assigned_user_names || []),
-          ].filter(Boolean).join(' '),
+          searchLabel: getInventoryLocationSearchLabel(location),
         };
       });
 
@@ -167,9 +166,11 @@ export function InventoryLocationSelect({
       : undefined
   );
   const normalizedClientSearchQuery = normalizedSearchQuery.toLowerCase();
-  const filteredOptions = !serverSearch && normalizedClientSearchQuery
+  const filteredOptions = normalizedClientSearchQuery
     ? options.filter((option) => option.searchLabel.toLowerCase().includes(normalizedClientSearchQuery))
     : options;
+  const showMinimumSearchHint = serverSearch
+    && normalizedSearchQuery.length < MINIMUM_SERVER_SEARCH_CHARACTERS;
 
   function handleOpenChange(nextOpen: boolean) {
     setOpen(nextOpen);
@@ -223,7 +224,7 @@ export function InventoryLocationSelect({
                   setSearching(nextSearchQuery.trim().length >= MINIMUM_SERVER_SEARCH_CHARACTERS);
                 }
               }}
-              placeholder={serverSearch ? 'Type at least 3 characters...' : searchPlaceholder}
+              placeholder={searchPlaceholder}
               className="h-9 border-slate-700 bg-slate-900 pl-9 text-white placeholder:text-slate-500"
               aria-label={searchPlaceholder}
             />
@@ -237,29 +238,12 @@ export function InventoryLocationSelect({
           ) : null}
         </div>
         <div className="max-h-64 overflow-y-auto p-1">
-          {serverSearch && normalizedSearchQuery.length < MINIMUM_SERVER_SEARCH_CHARACTERS ? (
-            <div>
-              <div className="px-3 py-6 text-center text-sm text-slate-400" aria-live="polite">
-                Enter at least 3 characters to search locations.
-              </div>
-              {options.filter((option) => !option.location).map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  role="option"
-                  aria-selected={option.value === value}
-                  onClick={() => handleSelect(option)}
-                  className={cn(
-                    'flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-slate-800 focus:bg-slate-800 focus:outline-none',
-                    option.className,
-                  )}
-                >
-                  <Check className={cn('h-4 w-4 shrink-0', option.value === value ? 'opacity-100' : 'opacity-0')} />
-                  <span className="min-w-0 flex-1 truncate">{option.label}</span>
-                </button>
-              ))}
+          {showMinimumSearchHint ? (
+            <div className="px-3 py-2 text-center text-xs text-slate-500" aria-live="polite">
+              Type at least 3 characters to search all locations.
             </div>
-          ) : searching ? (
+          ) : null}
+          {searching ? (
             <div className="flex items-center justify-center gap-2 px-3 py-6 text-sm text-slate-300" aria-live="polite">
               <Loader2 className="h-4 w-4 animate-spin" />
               Searching locations...

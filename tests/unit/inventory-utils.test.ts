@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { InventoryLocation } from '@/app/(dashboard)/inventory/types';
 import {
   canSelectInventoryPrimaryLocation,
   canShareInventoryPrimaryLocation,
@@ -13,6 +14,7 @@ import {
   getInventoryCheckIntervalMonths,
   getInventoryCheckStatus,
   getInventoryDueDate,
+  getInventoryLocationSearchLabel,
   hasInventoryCheckLapsed,
   isInventoryUnknownLocation,
   isInventoryMoveCheckBlocked,
@@ -207,11 +209,11 @@ describe('inventory utils', () => {
     vi.useRealTimers();
   });
 
-  it('formats typed site and asset-backed location labels', () => {
+  it('formats and searches typed inventory locations consistently', () => {
     expect(formatInventoryLocationTypeLabel({ location_type: 'site' })).toBe('Site');
-    expect(formatInventoryLocationOptionLabel({
+    const siteLocation: InventoryLocation = {
       id: 'site-location',
-      name: 'Site - 12345-AB',
+      name: 'Site - 12345-AB - Riverside',
       description: null,
       is_active: true,
       linked_van_id: null,
@@ -227,7 +229,14 @@ describe('inventory utils', () => {
       updated_at: '2026-07-02T00:00:00Z',
       created_by: null,
       updated_by: null,
-      assigned_user_names: [],
-    })).toBe('[12345-AB] - Unassigned');
+      assigned_user_names: ['Matt Duffill'],
+    };
+
+    expect(formatInventoryLocationOptionLabel(siteLocation)).toBe(
+      '[12345-AB - Riverside] - Matt Duffill',
+    );
+    expect(getInventoryLocationSearchLabel(siteLocation, ['Sites'])).toContain(
+      '12345-AB Matt Duffill Sites',
+    );
   });
 });

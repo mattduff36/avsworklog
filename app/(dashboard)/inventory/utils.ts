@@ -201,25 +201,55 @@ export function formatInventoryUnknownLocationAge(
   return `In Unknown for ${days} ${days === 1 ? 'day' : 'days'}`;
 }
 
-export function formatInventoryLocationOptionLabel(location: InventoryLocation): string {
-  const assignedUserLabel = location.assigned_user_names?.length
-    ? location.assigned_user_names.join(', ')
-    : 'Unassigned';
-  const linkedVanLabel = [location.linked_asset_label, location.linked_asset_nickname]
+export function formatInventoryLocationLabel(location: InventoryLocation): string {
+  const linkedAssetLabel = [location.linked_asset_label, location.linked_asset_nickname]
     .map((value) => value?.trim())
     .filter(Boolean)
     .join(' - ');
-  const linkedAssetLabel = location.linked_asset_type && linkedVanLabel
-    ? `[${linkedVanLabel}]`
-    : null;
-  const siteReferenceLabel = location.location_type === 'site' && location.external_reference
-    ? location.source_type === 'legacy_quote'
-      ? `[Legacy ${location.external_reference}]`
-      : `[${location.external_reference}]`
-    : null;
-  const locationLabel = linkedAssetLabel || siteReferenceLabel || location.name;
 
-  return `${locationLabel} - ${assignedUserLabel}`;
+  if (linkedAssetLabel) return `[${linkedAssetLabel}]`;
+
+  if (location.location_type === 'site' && location.external_reference) {
+    const titlePrefix = location.source_type === 'legacy_quote'
+      ? /^legacy quote\s*-\s*/i
+      : /^site\s*-\s*/i;
+    const siteTitle = location.name
+      .replace(titlePrefix, '')
+      .replace(new RegExp(`^${location.external_reference}\\s*-\\s*`, 'i'), '')
+      .trim();
+
+    return siteTitle
+      ? `[${location.external_reference} - ${siteTitle}]`
+      : `[${location.external_reference}]`;
+  }
+
+  return location.name;
+}
+
+export function formatInventoryLocationAssigneeLabel(location: InventoryLocation): string {
+  return location.assigned_user_names?.length
+    ? location.assigned_user_names.join(', ')
+    : 'Unassigned';
+}
+
+export function getInventoryLocationSearchLabel(
+  location: InventoryLocation,
+  additionalLabels: readonly string[] = [],
+): string {
+  return [
+    formatInventoryLocationLabel(location),
+    location.name,
+    location.location_type,
+    location.external_reference,
+    location.linked_asset_label,
+    location.linked_asset_nickname,
+    formatInventoryLocationAssigneeLabel(location),
+    ...additionalLabels,
+  ].filter(Boolean).join(' ');
+}
+
+export function formatInventoryLocationOptionLabel(location: InventoryLocation): string {
+  return `${formatInventoryLocationLabel(location)} - ${formatInventoryLocationAssigneeLabel(location)}`;
 }
 
 export function getInventoryLocationsWithYardFirst<TLocation extends Pick<InventoryLocation, 'name'>>(
