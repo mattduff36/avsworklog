@@ -8,6 +8,7 @@ interface WebAppManifest {
   start_url: string;
   scope: string;
   display: string;
+  theme_color: string;
   orientation: string;
   icons: Array<{
     src: string;
@@ -38,6 +39,10 @@ describe('Yard kiosk PWA manifest', () => {
   it('requests landscape while leaving the main app portrait-first', () => {
     expect(kioskManifest.orientation).toBe('landscape');
     expect(siteManifest.orientation).toBe('portrait-primary');
+  });
+
+  it('matches the Android status bar to the kiosk navigation bar', () => {
+    expect(kioskManifest.theme_color).toBe('#020617');
   });
 
   it('provides Android launcher and maskable icon sizes', () => {

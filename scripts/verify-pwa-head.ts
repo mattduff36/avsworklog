@@ -16,6 +16,7 @@ interface RouteCheck {
   authenticated?: boolean;
   manifestHref?: string;
   appleAppTitle?: string;
+  themeColor?: string;
 }
 
 const baseUrl = process.env.PWA_HEAD_BASE_URL || process.env.TESTSUITE_BASE_URL || 'http://localhost:4000';
@@ -31,6 +32,7 @@ const publicRoutes: RouteCheck[] = [
     label: 'Yard kiosk install',
     manifestHref: '/manifest-yard-kiosk.json',
     appleAppTitle: 'Yard Inventory',
+    themeColor: '#020617',
   },
 ];
 
@@ -118,6 +120,11 @@ function verifyHead(route: RouteCheck, html: string, finalUrl: string, status: n
     `${route.label}: expected apple-mobile-web-app-title=${expectedAppleTitle}`,
   );
   assert(getNamedMeta(head, 'apple-mobile-web-app-status-bar-style') === 'black-translucent', `${route.label}: missing apple status bar meta in initial head`);
+  const expectedThemeColor = route.themeColor || '#0f172a';
+  assert(
+    getNamedMeta(head, 'theme-color') === expectedThemeColor,
+    `${route.label}: expected theme-color=${expectedThemeColor}`,
+  );
 
   const manifests = getManifestLinks(head);
   assert(manifests.length === 1, `${route.label}: expected exactly one manifest link in initial head, got ${manifests.length}`);
@@ -158,6 +165,7 @@ async function verifyManifest(): Promise<void> {
     scope?: string;
     display?: string;
     display_override?: string[];
+    theme_color?: string;
     orientation?: string;
     icons?: Array<{ sizes?: string; purpose?: string }>;
   };
@@ -167,6 +175,7 @@ async function verifyManifest(): Promise<void> {
   assert(kioskManifest.start_url === '/yard-kiosk', `manifest-yard-kiosk.json: expected start_url "/yard-kiosk", got ${kioskManifest.start_url}`);
   assert(kioskManifest.scope === '/yard-kiosk', `manifest-yard-kiosk.json: expected scope "/yard-kiosk", got ${kioskManifest.scope}`);
   assert(kioskManifest.display === 'standalone', `manifest-yard-kiosk.json: expected display "standalone", got ${kioskManifest.display}`);
+  assert(kioskManifest.theme_color === '#020617', `manifest-yard-kiosk.json: expected theme_color "#020617", got ${kioskManifest.theme_color}`);
   assert(kioskManifest.orientation === 'landscape', `manifest-yard-kiosk.json: expected orientation "landscape", got ${kioskManifest.orientation}`);
   assert(
     Array.isArray(kioskManifest.display_override)

@@ -19,7 +19,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: 'cover',
-  themeColor: '#fcd34d',
+  themeColor: '#020617',
 };
 
 export default function YardKioskLayout({ children }: { children: ReactNode }) {
