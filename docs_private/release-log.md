@@ -2,6 +2,25 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.11.3
+
+**GIT COMMIT MESSAGE**
+`fix(inventory): restore hardware matrix selection`
+
+**PUSHED AT**
+2026-07-16T11:52:13.457Z
+
+**WHAT CHANGED**
+Simplify hardware stock actions. Restore hardware matrix selection.
+
+**VERSION HISTORY DETAILS**
+- Simplify hardware stock actions, with changes to app screens and documentation.
+- Updated help and FAQ, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `refactor(inventory): simplify hardware stock actions`
+- `fix(inventory): restore hardware matrix selection`
+
 ## 0726.11.2
 
 **GIT COMMIT MESSAGE**

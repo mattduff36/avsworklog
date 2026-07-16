@@ -1,5 +1,23 @@
 [
   {
+    "version": "0726.11.3",
+    "updateKind": "minor",
+    "title": "Inventory improvements",
+    "description": "Simplify hardware stock actions. Restore hardware matrix selection.",
+    "summary": "Simplify hardware stock actions. Restore hardware matrix selection.",
+    "details": [
+      "Simplify hardware stock actions, with changes to app screens and documentation.",
+      "Updated help and FAQ, with changes to documentation."
+    ],
+    "areas": [
+      "Inventory"
+    ],
+    "areaKeys": [
+      "inventory"
+    ],
+    "pushedAt": "2026-07-16T11:52:13.457Z"
+  },
+  {
     "version": "0726.11.2",
     "updateKind": "minor",
     "title": "Repo maintenance update",
