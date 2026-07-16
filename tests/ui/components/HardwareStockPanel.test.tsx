@@ -132,6 +132,15 @@ describe('HardwareStockPanel', () => {
     expect(within(matrix).getByRole('button', { name: 'Missing Yard' })).toBeInTheDocument();
     expect(within(matrix).getByRole('button', { name: 'Positive Yard' })).toBeInTheDocument();
     expect(within(matrix).getAllByRole('button', { name: 'Add stock' })).toHaveLength(3);
+    expect(within(matrix).getByRole('checkbox', {
+      name: 'Select all Explicit Zero stock balances',
+    })).toBeEnabled();
+    expect(within(matrix).getByRole('checkbox', {
+      name: 'Select all Missing Yard stock balances',
+    })).toBeDisabled();
+    expect(within(matrix).getByRole('checkbox', {
+      name: 'Select all Positive Yard stock balances',
+    })).toBeEnabled();
 
     fireEvent.click(within(matrix).getByRole('button', { name: 'Explicit Zero' }));
     const balances = within(matrix).getByRole('table', {
@@ -187,7 +196,7 @@ describe('HardwareStockPanel', () => {
     });
   });
 
-  it('retains bulk adjustment selection in the settings matrix', async () => {
+  it('selects grouped item balances without requiring expansion', async () => {
     const item = makeHardwareItem('plates', 'Road Plates');
     const onAdjust = vi.fn().mockResolvedValue(undefined);
     render(
@@ -205,10 +214,10 @@ describe('HardwareStockPanel', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Road Plates' }));
     fireEvent.click(screen.getByRole('checkbox', {
-      name: 'Select Road Plates, quantity 5, at Van - TE57 VAN',
+      name: 'Select all Road Plates stock balances',
     }));
+    expect(screen.getByText('1 balance selected')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
     const dialog = screen.getByRole('dialog');
     fireEvent.change(within(dialog).getByLabelText('Quantity'), { target: { value: '2' } });

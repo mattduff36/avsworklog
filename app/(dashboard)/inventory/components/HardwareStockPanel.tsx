@@ -174,6 +174,7 @@ export function HardwareStockPanel({
   );
   const allVisibleSelected = visibleBalances.length > 0
     && visibleBalances.every((entry) => selectedKeys.has(entry.key));
+  const someVisibleSelected = selectedBalances.length > 0 && !allVisibleSelected;
 
   useEffect(() => {
     setSelectedKeys(new Set());
@@ -188,13 +189,19 @@ export function HardwareStockPanel({
     });
   }
 
-  function toggleBalance(key: string, selected: boolean) {
+  function toggleBalances(keys: readonly string[], selected: boolean) {
     setSelectedKeys((current) => {
       const next = new Set(current);
-      if (selected) next.add(key);
-      else next.delete(key);
+      keys.forEach((key) => {
+        if (selected) next.add(key);
+        else next.delete(key);
+      });
       return next;
     });
+  }
+
+  function toggleBalance(key: string, selected: boolean) {
+    toggleBalances([key], selected);
   }
 
   function openAdjustment(operation: Exclude<InventoryHardwareAdjustmentOperation, 'add'>) {
@@ -281,44 +288,40 @@ export function HardwareStockPanel({
           </Select>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-700 bg-slate-950/40 p-3">
-          <Checkbox
-            checked={allVisibleSelected}
-            onCheckedChange={(checked) => {
-              setSelectedKeys(checked === true
-                ? new Set(visibleBalances.map((entry) => entry.key))
-                : new Set());
-            }}
-            aria-label="Select all visible Hardware balances"
-          />
-          <Badge variant="outline" className="border-slate-600 text-slate-200">
-            {selectedBalances.length} selected
-          </Badge>
-          <Button
-            size="sm"
-            onClick={openSelectedStockEntry}
-            disabled={selectedBalances.length === 0}
-          >
-            <Plus className="mr-1 h-3.5 w-3.5" />
-            Add
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => openAdjustment('remove')}
-            disabled={selectedBalances.length === 0}
-          >
-            Remove
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => openAdjustment('recount')}
-            disabled={selectedBalances.length === 0}
-          >
-            <RotateCcw className="mr-1 h-3.5 w-3.5" />
-            Recount
-          </Button>
+        <div className="flex flex-col gap-3 rounded-lg border border-slate-700 bg-slate-950/40 p-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-slate-300">
+            Select an item to adjust all shown locations, or expand it to select individual locations.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className="border-slate-600 text-slate-200">
+              {selectedBalances.length} {selectedBalances.length === 1 ? 'balance' : 'balances'} selected
+            </Badge>
+            <Button
+              size="sm"
+              onClick={openSelectedStockEntry}
+              disabled={selectedBalances.length === 0}
+            >
+              <Plus className="mr-1 h-3.5 w-3.5" />
+              Add
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => openAdjustment('remove')}
+              disabled={selectedBalances.length === 0}
+            >
+              Remove
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => openAdjustment('recount')}
+              disabled={selectedBalances.length === 0}
+            >
+              <RotateCcw className="mr-1 h-3.5 w-3.5" />
+              Recount
+            </Button>
+          </div>
         </div>
 
         <div className="max-h-[560px] overflow-auto rounded-lg border border-slate-700">
@@ -326,6 +329,19 @@ export function HardwareStockPanel({
             <TableCaption className="sr-only">All active Hardware items</TableCaption>
             <TableHeader className="sticky top-0 z-10 bg-slate-900">
               <TableRow className="border-slate-700">
+                <TableHead className="w-12">
+                  <Checkbox
+                    checked={allVisibleSelected ? true : someVisibleSelected ? 'indeterminate' : false}
+                    disabled={visibleBalances.length === 0}
+                    onCheckedChange={(checked) => {
+                      toggleBalances(
+                        visibleBalances.map((entry) => entry.key),
+                        checked === true,
+                      );
+                    }}
+                    aria-label="Select all visible Hardware balances"
+                  />
+                </TableHead>
                 <TableHead>Hardware item</TableHead>
                 <TableHead className="w-28 text-right">Total</TableHead>
                 <TableHead className="w-32 text-right">Action</TableHead>
@@ -335,11 +351,29 @@ export function HardwareStockPanel({
               {visibleItems.map((item) => {
                 const itemBalances = visibleBalancesByItem.get(item.id) || [];
                 const total = itemBalances.reduce((sum, entry) => sum + entry.balance.quantity, 0);
+                const selectedItemBalanceCount = itemBalances.filter((entry) => selectedKeys.has(entry.key)).length;
+                const allItemBalancesSelected = itemBalances.length > 0
+                  && selectedItemBalanceCount === itemBalances.length;
+                const someItemBalancesSelected = selectedItemBalanceCount > 0
+                  && !allItemBalancesSelected;
                 const isExpanded = expandedItemIds.has(item.id);
                 const detailsId = `hardware-matrix-details-${item.id}`;
                 return (
                   <Fragment key={item.id}>
                     <TableRow className="border-slate-800">
+                      <TableCell className="px-3 py-2">
+                        <Checkbox
+                          checked={allItemBalancesSelected ? true : someItemBalancesSelected ? 'indeterminate' : false}
+                          disabled={itemBalances.length === 0}
+                          onCheckedChange={(checked) => {
+                            toggleBalances(
+                              itemBalances.map((entry) => entry.key),
+                              checked === true,
+                            );
+                          }}
+                          aria-label={`Select all ${item.name} stock balances`}
+                        />
+                      </TableCell>
                       <TableCell className="p-0">
                         <button
                           type="button"
@@ -377,7 +411,7 @@ export function HardwareStockPanel({
                     </TableRow>
                     {isExpanded ? (
                       <TableRow id={detailsId} className="border-slate-700 bg-slate-950/30 hover:bg-slate-950/30">
-                        <TableCell colSpan={3} className="p-3 sm:pl-9">
+                        <TableCell colSpan={4} className="p-3 sm:pl-9">
                           {itemBalances.length === 0 ? (
                             <p className="py-2 text-sm text-muted-foreground">
                               No positive stock is currently held.
@@ -423,7 +457,7 @@ export function HardwareStockPanel({
               })}
               {visibleItems.length === 0 ? (
                 <TableRow className="border-slate-800">
-                  <TableCell colSpan={3} className="py-8 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={4} className="py-8 text-center text-sm text-muted-foreground">
                     No Hardware items match the current filter.
                   </TableCell>
                 </TableRow>

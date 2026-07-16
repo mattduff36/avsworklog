@@ -36,6 +36,9 @@ Add quantity-based, non-serialised Hardware stock to the Inventory module withou
 - Managers and admins can apply atomic multi-row Add, Remove, and Recount operations.
 - Manager and admin adjustment workflows are available from Inventory Settings >
   Hardware Stock Matrix, not Inventory Overview.
+- Each grouped matrix item row provides a checkbox that selects all of its currently
+  shown positive location balances. Expanding the row allows individual location
+  balances to be selected instead. The select-all checkbox reflects partial selection.
 - Managers and admins can record an incoming Delivery directly from any
   matrix item, including items with zero company-wide stock, by selecting an
   active destination location and entering a positive whole-number quantity.
