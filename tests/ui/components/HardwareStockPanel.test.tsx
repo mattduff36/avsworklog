@@ -131,16 +131,15 @@ describe('HardwareStockPanel', () => {
     expect(within(matrix).getByRole('button', { name: 'Explicit Zero' })).toBeInTheDocument();
     expect(within(matrix).getByRole('button', { name: 'Missing Yard' })).toBeInTheDocument();
     expect(within(matrix).getByRole('button', { name: 'Positive Yard' })).toBeInTheDocument();
-    expect(within(matrix).getAllByRole('button', { name: 'Add stock' })).toHaveLength(3);
-    expect(within(matrix).getByRole('checkbox', {
-      name: 'Select all Explicit Zero stock balances',
-    })).toBeEnabled();
-    expect(within(matrix).getByRole('checkbox', {
-      name: 'Select all Missing Yard stock balances',
+    expect(within(matrix).getAllByRole('button', { name: /Add .* stock/ })).toHaveLength(3);
+    expect(within(matrix).getByRole('button', {
+      name: 'Remove Missing Yard stock',
     })).toBeDisabled();
-    expect(within(matrix).getByRole('checkbox', {
-      name: 'Select all Positive Yard stock balances',
+    expect(within(matrix).getByRole('button', {
+      name: 'Recount Missing Yard stock',
     })).toBeEnabled();
+    expect(within(matrix).queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Select an item to adjust all shown locations/i)).not.toBeInTheDocument();
 
     fireEvent.click(within(matrix).getByRole('button', { name: 'Explicit Zero' }));
     const balances = within(matrix).getByRole('table', {
@@ -174,7 +173,7 @@ describe('HardwareStockPanel', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add stock' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add Cones stock' }));
     const dialog = screen.getByRole('dialog');
     await waitFor(() => {
       expect(within(dialog).getByRole('button', { name: 'Destination location' })).toHaveTextContent('Yard');
@@ -196,7 +195,7 @@ describe('HardwareStockPanel', () => {
     });
   });
 
-  it('selects grouped item balances without requiring expansion', async () => {
+  it('removes stock directly from an item action', async () => {
     const item = makeHardwareItem('plates', 'Road Plates');
     const onAdjust = vi.fn().mockResolvedValue(undefined);
     render(
@@ -214,14 +213,14 @@ describe('HardwareStockPanel', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('checkbox', {
-      name: 'Select all Road Plates stock balances',
-    }));
-    expect(screen.getByText('1 balance selected')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Road Plates stock' }));
     const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByRole('button', { name: 'Adjustment location' })).toHaveTextContent(
+      'Van - TE57 VAN',
+    );
+    expect(within(dialog).getByText('Available: 5')).toBeInTheDocument();
     fireEvent.change(within(dialog).getByLabelText('Quantity'), { target: { value: '2' } });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Apply Adjustment' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Remove stock' }));
 
     await waitFor(() => {
       expect(onAdjust).toHaveBeenCalledWith({
@@ -232,6 +231,40 @@ describe('HardwareStockPanel', () => {
           item_id: item.id,
           location_id: van.id,
           quantity: 2,
+        }],
+      });
+    });
+  });
+
+  it('recounts a zero-stock item directly from its item action', async () => {
+    const item = makeHardwareItem('generator', 'Generator');
+    const onAdjust = vi.fn().mockResolvedValue(undefined);
+    render(
+      <HardwareStockPanel
+        items={[item]}
+        balances={[]}
+        locations={[yard, van]}
+        onAdjust={onAdjust}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Recount Generator stock' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByRole('button', { name: 'Adjustment location' })).toHaveTextContent('Yard');
+    fireEvent.change(within(dialog).getByLabelText('New counted quantity'), {
+      target: { value: '0' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save recount' }));
+
+    await waitFor(() => {
+      expect(onAdjust).toHaveBeenCalledWith({
+        operation_type: 'recount',
+        reason: 'Stocktake correction',
+        note: '',
+        lines: [{
+          item_id: item.id,
+          location_id: yard.id,
+          quantity: 0,
         }],
       });
     });

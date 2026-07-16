@@ -33,12 +33,13 @@ Add quantity-based, non-serialised Hardware stock to the Inventory module withou
 
 ### HW-003: Stock adjustments
 
-- Managers and admins can apply atomic multi-row Add, Remove, and Recount operations.
+- Managers and admins can apply atomic Add, Remove, and Recount operations directly
+  from each item's Actions column.
 - Manager and admin adjustment workflows are available from Inventory Settings >
   Hardware Stock Matrix, not Inventory Overview.
-- Each grouped matrix item row provides a checkbox that selects all of its currently
-  shown positive location balances. Expanding the row allows individual location
-  balances to be selected instead. The select-all checkbox reflects partial selection.
+- Remove prompts for one of the item's positive stock locations. Recount prompts for
+  any active Inventory location. Expandable rows display location balances but do not
+  require selection before an adjustment.
 - Managers and admins can record an incoming Delivery directly from any
   matrix item, including items with zero company-wide stock, by selecting an
   active destination location and entering a positive whole-number quantity.
