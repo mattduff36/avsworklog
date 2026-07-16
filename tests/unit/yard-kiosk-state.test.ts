@@ -151,7 +151,7 @@ describe('Yard kiosk state', () => {
     expect(reset).toEqual(INITIAL_YARD_KIOSK_STATE);
   });
 
-  it('provides action guidance for every direction-aware workflow state', () => {
+  it('provides action guidance only until the basket is confirmed', () => {
     expect(getYardKioskGuidance(INITIAL_YARD_KIOSK_STATE)).toMatchObject({
       instructionKey: null,
       message: null,
@@ -203,16 +203,28 @@ describe('Yard kiosk state', () => {
         primary_user_names: [],
         secondary_user_names: [],
       },
-    }).message).toBe('Moving stock to Van AB12 CDE');
+    })).toMatchObject({
+      instructionKey: null,
+      message: null,
+      stepLabel: 'Confirming transfer',
+    });
     expect(getYardKioskGuidance({
       ...INITIAL_YARD_KIOSK_STATE,
       phase: 'submitting',
       direction: 'return',
-    }).message).toBe('Returning stock to Yard');
+    })).toMatchObject({
+      instructionKey: null,
+      message: null,
+      stepLabel: 'Confirming transfer',
+    });
     expect(getYardKioskGuidance({
       ...INITIAL_YARD_KIOSK_STATE,
       phase: 'receipt',
       direction: 'take',
-    }).message).toBe('Transfer complete');
+    })).toMatchObject({
+      instructionKey: null,
+      message: null,
+      stepLabel: 'Complete',
+    });
   });
 });

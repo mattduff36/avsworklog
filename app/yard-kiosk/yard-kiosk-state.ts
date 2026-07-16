@@ -258,24 +258,16 @@ export function getYardKioskGuidance(state: YardKioskState): YardKioskGuidance {
   }
 
   if (state.phase === 'submitting') {
-    return direction === 'take'
-      ? {
-          instructionKey: 'submitting:take',
-          message: state.counterpart
-            ? `Moving stock to ${state.counterpart.name}`
-            : 'Moving stock from Yard',
-          stepLabel: 'Confirming transfer',
-        }
-      : {
-          instructionKey: 'submitting:return',
-          message: 'Returning stock to Yard',
-          stepLabel: 'Confirming transfer',
-        };
+    return {
+      instructionKey: null,
+      message: null,
+      stepLabel: 'Confirming transfer',
+    };
   }
 
   return {
-    instructionKey: `receipt:${direction}`,
-    message: 'Transfer complete',
+    instructionKey: null,
+    message: null,
     stepLabel: 'Complete',
   };
 }

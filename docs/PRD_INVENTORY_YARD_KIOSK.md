@@ -121,12 +121,13 @@ active Inventory location.
   bounded left content pane. They never overlap the divider or right-hand
   basket. The basket and submit action remain visible and usable while item
   results are narrowed or suppressed.
-- After the initial Collect/Return screen, entering each subsequent workflow state
-  shows a prominent, non-blocking pill prompt with a strong three-pixel border
-  and generous responsive internal spacing for three seconds before it fades
-  away. The initial direction-selection screen has no timed prompt. Copy
-  reflects the active Collect or Return direction for location, stock, review,
-  submission, and completion states; rapid navigation replaces stale prompts
+- After the initial Collect/Return screen, the location, stock-selection, and
+  basket-review states show a prominent, non-blocking pill prompt with a strong
+  three-pixel border and generous responsive internal spacing for three seconds
+  before it fades away. The initial direction-selection screen and all states
+  after the user confirms the basket have no timed prompt; submitting and
+  receipt views retain their own focused status feedback. Copy reflects the
+  active Collect or Return direction, rapid navigation replaces stale prompts,
   and reduced-motion settings are respected. The pill itself is an accessible
   button that dismisses immediately by tap, click, Enter, or Space without
   reappearing until a subsequent workflow-state entry.
