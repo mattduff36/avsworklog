@@ -2,6 +2,24 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.11.2
+
+**GIT COMMIT MESSAGE**
+`chore(repo): update repository files`
+
+**PUSHED AT**
+2026-07-16T11:17:38.964Z
+
+**WHAT CHANGED**
+Update repository files.
+
+**VERSION HISTORY DETAILS**
+- Updated inventory, with changes to app screens and documentation.
+- Updated help and FAQ, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `chore(repo): update repository files`
+
 ## 0726.11.1
 
 **GIT COMMIT MESSAGE**
