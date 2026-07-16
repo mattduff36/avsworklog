@@ -2,6 +2,28 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.11.1
+
+**GIT COMMIT MESSAGE**
+`chore(cursor): require explicit branch creation`
+
+**PUSHED AT**
+2026-07-16T07:58:16.075Z
+
+**WHAT CHANGED**
+Align move location search. Require explicit branch creation.
+
+**VERSION HISTORY DETAILS**
+- Align move location search, with changes to app screens and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(inventory): align move location search`
+- `chore(cursor): require explicit branch creation`
+
+# Production release log
+
+Private changelog for production builds. Newest entries first.
+
 ## 0726.11.0
 
 **GIT COMMIT MESSAGE**

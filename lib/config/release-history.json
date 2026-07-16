@@ -1,5 +1,22 @@
 [
   {
+    "version": "0726.11.1",
+    "updateKind": "minor",
+    "title": "Cursor maintenance update",
+    "description": "Align move location search. Require explicit branch creation.",
+    "summary": "Align move location search. Require explicit branch creation.",
+    "details": [
+      "Align move location search, with changes to app screens and automated tests."
+    ],
+    "areas": [
+      "Inventory"
+    ],
+    "areaKeys": [
+      "inventory"
+    ],
+    "pushedAt": "2026-07-16T07:58:16.075Z"
+  },
+  {
     "version": "0726.11.0",
     "updateKind": "major",
     "title": "Inventory update",
