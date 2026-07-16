@@ -42,7 +42,6 @@ import type {
   InventoryLocation,
 } from '../types';
 import { INVENTORY_HARDWARE_ADJUSTMENT_REASONS } from '../types';
-import { isInventoryYardLocation } from '../utils';
 import {
   HardwareStockQuantityDialog,
   type HardwareStockQuantityDialogCopy,
@@ -114,32 +113,18 @@ export function HardwareStockPanel({
     [items],
   );
 
-  const yardQuantityByItem = useMemo(() => {
-    const quantities = new Map<string, number>();
-    for (const balance of balances) {
-      const location = balance.location || locationById.get(balance.location_id);
-      if (!isInventoryYardLocation(location)) continue;
-      quantities.set(
-        balance.hardware_item_id,
-        (quantities.get(balance.hardware_item_id) || 0) + balance.quantity,
-      );
-    }
-    return quantities;
-  }, [balances, locationById]);
-
-  const yardZeroItems = useMemo(
-    () => activeItems.filter((item) => (yardQuantityByItem.get(item.id) || 0) === 0),
-    [activeItems, yardQuantityByItem],
+  const activeItemById = useMemo(
+    () => new Map(activeItems.map((item) => [item.id, item])),
+    [activeItems],
   );
 
-  const alternateBalances = useMemo(() => balances.flatMap((balance): MatrixBalance[] => {
-    const item = yardZeroItems.find((candidate) => candidate.id === balance.hardware_item_id);
+  const positiveBalances = useMemo(() => balances.flatMap((balance): MatrixBalance[] => {
+    const item = activeItemById.get(balance.hardware_item_id);
     const location = balance.location || locationById.get(balance.location_id);
     if (
       !item
       || balance.quantity < 1
       || !location?.is_active
-      || isInventoryYardLocation(location)
     ) {
       return [];
     }
@@ -152,25 +137,25 @@ export function HardwareStockPanel({
   }).toSorted((a, b) => (
     a.item.name.localeCompare(b.item.name, undefined, { sensitivity: 'base' })
     || a.location.name.localeCompare(b.location.name, undefined, { sensitivity: 'base' })
-  )), [balances, locationById, yardZeroItems]);
+  )), [activeItemById, balances, locationById]);
 
-  const alternateLocations = useMemo(
-    () => [...new Map(alternateBalances.map((entry) => [entry.location.id, entry.location])).values()]
+  const stockLocations = useMemo(
+    () => [...new Map(positiveBalances.map((entry) => [entry.location.id, entry.location])).values()]
       .toSorted((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
-    [alternateBalances],
+    [positiveBalances],
   );
 
   const visibleItems = useMemo(
-    () => yardZeroItems.filter((item) => itemFilter === ALL_ITEMS || item.id === itemFilter),
-    [itemFilter, yardZeroItems],
+    () => activeItems.filter((item) => itemFilter === ALL_ITEMS || item.id === itemFilter),
+    [activeItems, itemFilter],
   );
 
   const visibleBalances = useMemo(
-    () => alternateBalances.filter((entry) => (
+    () => positiveBalances.filter((entry) => (
       visibleItems.some((item) => item.id === entry.item.id)
       && (locationFilter === ALL_LOCATIONS || entry.location.id === locationFilter)
     )),
-    [alternateBalances, locationFilter, visibleItems],
+    [locationFilter, positiveBalances, visibleItems],
   );
 
   const visibleBalancesByItem = useMemo(() => {
@@ -267,7 +252,7 @@ export function HardwareStockPanel({
       <CardHeader className="border-b border-slate-700">
         <CardTitle className="text-white">Hardware Stock Matrix</CardTitle>
         <p className="mt-1 text-sm text-muted-foreground">
-          Hardware items with no Yard stock. Expand an item to review positive stock held elsewhere.
+          All active Hardware items. Expand an item to review positive stock by location.
         </p>
       </CardHeader>
       <CardContent className="space-y-4 p-4">
@@ -278,18 +263,18 @@ export function HardwareStockPanel({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL_ITEMS}>All Hardware items</SelectItem>
-              {yardZeroItems.map((item) => (
+              {activeItems.map((item) => (
                 <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
           <Select value={locationFilter} onValueChange={setLocationFilter}>
-            <SelectTrigger className="border-slate-600 bg-slate-800" aria-label="Filter alternate stock location">
+            <SelectTrigger className="border-slate-600 bg-slate-800" aria-label="Filter stock location">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={ALL_LOCATIONS}>All positive non-Yard locations</SelectItem>
-              {alternateLocations.map((location) => (
+              <SelectItem value={ALL_LOCATIONS}>All positive stock locations</SelectItem>
+              {stockLocations.map((location) => (
                 <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>
               ))}
             </SelectContent>
@@ -304,7 +289,7 @@ export function HardwareStockPanel({
                 ? new Set(visibleBalances.map((entry) => entry.key))
                 : new Set());
             }}
-            aria-label="Select all visible non-Yard Hardware balances"
+            aria-label="Select all visible Hardware balances"
           />
           <Badge variant="outline" className="border-slate-600 text-slate-200">
             {selectedBalances.length} selected
@@ -338,7 +323,7 @@ export function HardwareStockPanel({
 
         <div className="max-h-[560px] overflow-auto rounded-lg border border-slate-700">
           <Table className="table-fixed">
-            <TableCaption className="sr-only">Hardware items with no stock at Yard</TableCaption>
+            <TableCaption className="sr-only">All active Hardware items</TableCaption>
             <TableHeader className="sticky top-0 z-10 bg-slate-900">
               <TableRow className="border-slate-700">
                 <TableHead>Hardware item</TableHead>
@@ -395,13 +380,13 @@ export function HardwareStockPanel({
                         <TableCell colSpan={3} className="p-3 sm:pl-9">
                           {itemBalances.length === 0 ? (
                             <p className="py-2 text-sm text-muted-foreground">
-                              No positive stock is held outside Yard.
+                              No positive stock is currently held.
                             </p>
                           ) : (
                             <div className="overflow-hidden rounded-md border border-slate-700">
                               <Table>
                                 <TableCaption className="sr-only">
-                                  Non-Yard location balances for {item.name}
+                                  Location balances for {item.name}
                                 </TableCaption>
                                 <TableHeader className="bg-slate-950/50">
                                   <TableRow className="border-slate-700">
@@ -439,7 +424,7 @@ export function HardwareStockPanel({
               {visibleItems.length === 0 ? (
                 <TableRow className="border-slate-800">
                   <TableCell colSpan={3} className="py-8 text-center text-sm text-muted-foreground">
-                    No Hardware items with zero Yard stock match the current filter.
+                    No Hardware items match the current filter.
                   </TableCell>
                 </TableRow>
               ) : null}

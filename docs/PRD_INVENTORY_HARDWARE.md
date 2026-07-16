@@ -27,9 +27,9 @@ Add quantity-based, non-serialised Hardware stock to the Inventory module withou
   treated as zero.
 - Overview search and location filters do not impose a Yard-balance or company-total
   filter. Expanded rows show positive location balances; zero balances are omitted.
-- The Settings Hardware Stock Matrix shows one grouped row per active item whose
-  Yard balance is zero, treating a missing Yard record as zero. Expanded matrix rows
-  show only positive non-Yard balances.
+- The Settings Hardware Stock Matrix shows one grouped row per active item,
+  including items with zero company-wide stock. Expanded matrix rows show positive
+  balances at every active location; missing and zero balances are omitted.
 
 ### HW-003: Stock adjustments
 
@@ -37,7 +37,7 @@ Add quantity-based, non-serialised Hardware stock to the Inventory module withou
 - Manager and admin adjustment workflows are available from Inventory Settings >
   Hardware Stock Matrix, not Inventory Overview.
 - Managers and admins can record an incoming Delivery directly from any
-  Yard-zero matrix item, including items with zero company-wide stock, by selecting an
+  matrix item, including items with zero company-wide stock, by selecting an
   active destination location and entering a positive whole-number quantity.
 - Every adjustment requires a standard reason: Delivery, Return, Used, Lost, Scrapped, Damaged, Stocktake correction, or Other.
 - Other requires a note. Notes are optional for standard reasons.
@@ -70,7 +70,7 @@ Add quantity-based, non-serialised Hardware stock to the Inventory module withou
 - The Overview tab shows every active Hardware type, its company-wide total,
   expandable non-zero location balances, search and location filters, and transfers.
   It does not expose stock adjustment or Add stock actions.
-- Inventory Settings includes the Yard-zero grouped Hardware Stock Matrix for
+- Inventory Settings includes the all-item grouped Hardware Stock Matrix for
   per-item stock entry and bulk adjustments, plus the Hardware Catalogue area for
   adding, renaming, and deleting unused Hardware item types.
 - The Hardware catalogue remains complete and actionable when an item has zero

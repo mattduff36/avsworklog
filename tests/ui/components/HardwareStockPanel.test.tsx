@@ -82,7 +82,7 @@ describe('HardwareStockPanel', () => {
     vi.unstubAllGlobals();
   });
 
-  it('keeps Yard-zero grouped rows with filtered alternate balances', () => {
+  it('shows every active item with positive balances at all locations', () => {
     const explicitZero = makeHardwareItem('explicit-zero', 'Explicit Zero');
     const missingYard = makeHardwareItem('missing-yard', 'Missing Yard');
     const positiveYard = makeHardwareItem('positive-yard', 'Positive Yard');
@@ -126,16 +126,16 @@ describe('HardwareStockPanel', () => {
     );
 
     const matrix = screen.getByRole('table', {
-      name: 'Hardware items with no stock at Yard',
+      name: 'All active Hardware items',
     });
     expect(within(matrix).getByRole('button', { name: 'Explicit Zero' })).toBeInTheDocument();
     expect(within(matrix).getByRole('button', { name: 'Missing Yard' })).toBeInTheDocument();
-    expect(within(matrix).queryByRole('button', { name: 'Positive Yard' })).not.toBeInTheDocument();
-    expect(within(matrix).getAllByRole('button', { name: 'Add stock' })).toHaveLength(2);
+    expect(within(matrix).getByRole('button', { name: 'Positive Yard' })).toBeInTheDocument();
+    expect(within(matrix).getAllByRole('button', { name: 'Add stock' })).toHaveLength(3);
 
     fireEvent.click(within(matrix).getByRole('button', { name: 'Explicit Zero' }));
     const balances = within(matrix).getByRole('table', {
-      name: 'Non-Yard location balances for Explicit Zero',
+      name: 'Location balances for Explicit Zero',
     });
     expect(within(balances).getByRole('columnheader', { name: 'Location' })).toBeInTheDocument();
     expect(within(balances).getByRole('columnheader', { name: 'Quantity' })).toBeInTheDocument();
@@ -144,7 +144,13 @@ describe('HardwareStockPanel', () => {
     expect(within(balances).queryByText('Empty Site')).not.toBeInTheDocument();
 
     fireEvent.click(within(matrix).getByRole('button', { name: 'Missing Yard' }));
-    expect(within(matrix).getByText('No positive stock is held outside Yard.')).toBeInTheDocument();
+    expect(within(matrix).getByText('No positive stock is currently held.')).toBeInTheDocument();
+
+    fireEvent.click(within(matrix).getByRole('button', { name: 'Positive Yard' }));
+    const yardBalances = within(matrix).getByRole('table', {
+      name: 'Location balances for Positive Yard',
+    });
+    expect(within(yardBalances).getByRole('row', { name: /Yard 2/ })).toBeInTheDocument();
   });
 
   it('adds stock from an accessible settings item action', async () => {
