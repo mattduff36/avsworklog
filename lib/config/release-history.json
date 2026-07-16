@@ -1,5 +1,24 @@
 [
   {
+    "version": "0726.11.4",
+    "updateKind": "minor",
+    "title": "Inventory improvements",
+    "description": "Remove post-confirmation kiosk prompts. Match kiosk status bar to navigation.",
+    "summary": "Remove post-confirmation kiosk prompts. Match kiosk status bar to navigation.",
+    "details": [
+      "Remove post-confirmation kiosk prompts, with changes to documentation.",
+      "Updated help and FAQ, with changes to documentation.",
+      "Updated navigation across 1 changed file."
+    ],
+    "areas": [
+      "Inventory"
+    ],
+    "areaKeys": [
+      "inventory"
+    ],
+    "pushedAt": "2026-07-16T14:54:06.501Z"
+  },
+  {
     "version": "0726.11.3",
     "updateKind": "minor",
     "title": "Inventory improvements",

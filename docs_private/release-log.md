@@ -2,6 +2,26 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.11.4
+
+**GIT COMMIT MESSAGE**
+`fix(inventory): match kiosk status bar to navigation`
+
+**PUSHED AT**
+2026-07-16T14:54:06.501Z
+
+**WHAT CHANGED**
+Remove post-confirmation kiosk prompts. Match kiosk status bar to navigation.
+
+**VERSION HISTORY DETAILS**
+- Remove post-confirmation kiosk prompts, with changes to documentation.
+- Updated help and FAQ, with changes to documentation.
+- Updated navigation across 1 changed file.
+
+**COMMITS IN THIS RELEASE**
+- `fix(inventory): remove post-confirmation kiosk prompts`
+- `fix(inventory): match kiosk status bar to navigation`
+
 ## 0726.11.3
 
 **GIT COMMIT MESSAGE**
