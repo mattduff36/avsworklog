@@ -702,24 +702,6 @@ export default function QuotesPage() {
     router.replace(`${pathname}?${nextParams.toString()}`, { scroll: false });
   }
 
-  async function handleDeleteQuote(quote: Quote) {
-    try {
-      const res = await fetch(`/api/quotes/${quote.id}`, { method: 'DELETE' });
-      if (!res.ok) {
-        throw await buildResponseError(res, 'Unable to delete this quote right now.');
-      }
-
-      toast.success(`Quote ${quote.quote_reference} deleted`);
-      if (detailQuoteId === quote.id) {
-        handleCloseQuoteDetails();
-      }
-      await fetchData();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to delete this quote right now.';
-      toast.error(message);
-    }
-  }
-
   if (permissionLoading || customerPermissionLoading || sensitiveAccess.loading || (sensitiveAccess.canAccess && loading)) {
     return <PageLoader message="Loading quotes..." />;
   }
@@ -899,8 +881,6 @@ export default function QuotesPage() {
           <QuoteSettingsTab
             activeTab={settingsTab}
             onTabChange={handleSettingsTabChange}
-            quotes={quotes}
-            onDeleteQuote={handleDeleteQuote}
             onRefresh={fetchData}
           />
         </TabsContent>

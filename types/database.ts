@@ -5127,6 +5127,108 @@ export type Database = {
           },
         ]
       }
+      quote_financial_adjustments: {
+        Row: {
+          id: string
+          adjustment_number: string
+          quote_thread_id: string
+          quote_id: string
+          invoice_id: string | null
+          related_adjustment_id: string | null
+          reverses_adjustment_id: string | null
+          adjustment_type: 'credit_note' | 'refund' | 'debit_adjustment' | 'quote_value_adjustment' | 'invoice_metadata_correction' | 'write_off' | 'invoice_void' | 'reversal'
+          amount: number
+          direction: 'increase' | 'decrease' | null
+          effective_date: string
+          reason: string
+          notes: string | null
+          external_reference: string | null
+          metadata_before: Json
+          metadata_after: Json
+          document_snapshot: Json
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          adjustment_number?: string
+          quote_thread_id: string
+          quote_id: string
+          invoice_id?: string | null
+          related_adjustment_id?: string | null
+          reverses_adjustment_id?: string | null
+          adjustment_type: 'credit_note' | 'refund' | 'debit_adjustment' | 'quote_value_adjustment' | 'invoice_metadata_correction' | 'write_off' | 'invoice_void' | 'reversal'
+          amount?: number
+          direction?: 'increase' | 'decrease' | null
+          effective_date?: string
+          reason: string
+          notes?: string | null
+          external_reference?: string | null
+          metadata_before?: Json
+          metadata_after?: Json
+          document_snapshot?: Json
+          created_by: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          adjustment_number?: string
+          quote_thread_id?: string
+          quote_id?: string
+          invoice_id?: string | null
+          related_adjustment_id?: string | null
+          reverses_adjustment_id?: string | null
+          adjustment_type?: 'credit_note' | 'refund' | 'debit_adjustment' | 'quote_value_adjustment' | 'invoice_metadata_correction' | 'write_off' | 'invoice_void' | 'reversal'
+          amount?: number
+          direction?: 'increase' | 'decrease' | null
+          effective_date?: string
+          reason?: string
+          notes?: string | null
+          external_reference?: string | null
+          metadata_before?: Json
+          metadata_after?: Json
+          document_snapshot?: Json
+          created_by?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'quote_financial_adjustments_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'quote_financial_adjustments_invoice_id_fkey'
+            columns: ['invoice_id']
+            isOneToOne: false
+            referencedRelation: 'quote_invoices'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'quote_financial_adjustments_quote_id_fkey'
+            columns: ['quote_id']
+            isOneToOne: false
+            referencedRelation: 'quotes'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'quote_financial_adjustments_related_adjustment_id_fkey'
+            columns: ['related_adjustment_id']
+            isOneToOne: false
+            referencedRelation: 'quote_financial_adjustments'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'quote_financial_adjustments_reverses_adjustment_id_fkey'
+            columns: ['reverses_adjustment_id']
+            isOneToOne: false
+            referencedRelation: 'quote_financial_adjustments'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       quote_invoice_allocations: {
         Row: {
           id: string

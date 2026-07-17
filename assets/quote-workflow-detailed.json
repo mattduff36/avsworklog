@@ -39,6 +39,10 @@
       "label": "Versions And Quote Threads"
     },
     {
+      "id": "financial_adjustments",
+      "label": "Financial Adjustments"
+    },
+    {
       "id": "rules_and_constraints",
       "label": "Key Rules"
     }
@@ -232,6 +236,34 @@
       "type": "note",
       "label": "Commercial Closed Is Separate",
       "description": "Commercial open/closed is an orthogonal flag and does not replace the main workflow status."
+    },
+    {
+      "id": "financial_adjustment",
+      "lane": "financial_adjustments",
+      "type": "action",
+      "label": "Record Financial Adjustment",
+      "description": "Accounts or an administrator records an immutable credit, refund, debit, quote-value correction, metadata correction, write-off, or invoice void."
+    },
+    {
+      "id": "effective_financial_totals",
+      "lane": "financial_adjustments",
+      "type": "state",
+      "label": "Effective Financial Totals",
+      "description": "Original values remain visible while adjusted per-version and consolidated quote-thread totals become primary."
+    },
+    {
+      "id": "reverse_and_replace",
+      "lane": "financial_adjustments",
+      "type": "action",
+      "label": "Reverse And Replace",
+      "description": "An incorrect adjustment is never edited or deleted. A linked reversal and replacement preserve the audit trail."
+    },
+    {
+      "id": "guard_adjustment_access",
+      "lane": "rules_and_constraints",
+      "type": "guardrail",
+      "label": "Financial Adjustment Access",
+      "description": "Accounts, Admin, and Super Admin can create or reverse adjustments. All Quotes-authorized users can view totals, history, and reference documents."
     }
   ],
   "edges": [
@@ -384,6 +416,31 @@
       "from": "accepted",
       "to": "commercial_closed",
       "label": "orthogonal commercial flag"
+    },
+    {
+      "from": "partially_invoiced",
+      "to": "financial_adjustment",
+      "label": "manual Sage reconciliation"
+    },
+    {
+      "from": "invoiced",
+      "to": "financial_adjustment",
+      "label": "credit refund or correction"
+    },
+    {
+      "from": "financial_adjustment",
+      "to": "effective_financial_totals",
+      "label": "recalculate"
+    },
+    {
+      "from": "financial_adjustment",
+      "to": "reverse_and_replace",
+      "label": "if entered incorrectly"
+    },
+    {
+      "from": "financial_adjustment",
+      "to": "guard_adjustment_access",
+      "label": "permission rule"
     }
   ],
   "layout_hints": {
@@ -404,6 +461,7 @@
     ],
     "approval_loop_position": "above_or_just_above_main_flow",
     "versions_lane_position": "below_main_flow",
+    "financial_adjustments_lane_position": "below_versions_lane",
     "rules_lane_position": "bottom_or_right_side_callouts",
     "keep_sent_and_accepted_as_distinct_states": true,
     "keep_versions_as_separate_parallel_lane": true,
@@ -436,6 +494,10 @@
     "Only the latest version can be edited, invoiced, or modified.",
     "Historical versions remain visible but read-only.",
     "Deleting is only allowed for the latest draft version.",
-    "A duplicate creates a separate quote thread, not a new version inside the same thread."
+    "A duplicate creates a separate quote thread, not a new version inside the same thread.",
+    "Financial adjustments are append-only and can target current or historical quote versions.",
+    "Effective totals use the newest original or revision plus extras, variations, and future work.",
+    "Refunds are cash movements and do not reduce net invoiced twice.",
+    "Adjustment Record PDFs are reconciliation references; Sage remains the accounting source of truth."
   ]
 }

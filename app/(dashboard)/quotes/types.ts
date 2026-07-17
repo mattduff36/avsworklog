@@ -68,6 +68,96 @@ export interface QuoteInvoice {
   allocations?: QuoteInvoiceAllocation[];
 }
 
+export type QuoteFinancialAdjustmentType =
+  | 'credit_note'
+  | 'refund'
+  | 'debit_adjustment'
+  | 'quote_value_adjustment'
+  | 'invoice_metadata_correction'
+  | 'write_off'
+  | 'invoice_void'
+  | 'reversal';
+
+export const FINANCIAL_ADJUSTMENT_SEARCH_MIN_LENGTH = 3;
+
+export interface QuoteFinancialAdjustment {
+  id: string;
+  adjustment_number: string;
+  quote_thread_id: string;
+  quote_id: string;
+  invoice_id: string | null;
+  related_adjustment_id: string | null;
+  reverses_adjustment_id: string | null;
+  adjustment_type: QuoteFinancialAdjustmentType;
+  amount: number;
+  direction: 'increase' | 'decrease' | null;
+  effective_date: string;
+  reason: string;
+  notes: string | null;
+  external_reference: string | null;
+  metadata_before: Record<string, unknown>;
+  metadata_after: Record<string, unknown>;
+  document_snapshot: Record<string, unknown>;
+  created_by: string;
+  created_at: string;
+  actor?: {
+    id: string;
+    full_name: string | null;
+  } | null;
+  is_reversed?: boolean;
+}
+
+export interface QuoteEffectiveInvoice extends QuoteInvoice {
+  effective_invoice_number: string;
+  effective_invoice_date: string;
+  effective_invoice_scope: 'full' | 'partial';
+  effective_comments: string | null;
+  credits_total: number;
+  debits_total: number;
+  voids_total: number;
+  refunds_total: number;
+  net_invoiced: number;
+  is_voided: boolean;
+}
+
+export interface QuoteVersionFinancialSummary {
+  quote_id: string;
+  original_quote_value: number;
+  quote_adjustments: number;
+  adjusted_quote_value: number;
+  gross_invoiced: number;
+  credits_total: number;
+  debits_total: number;
+  voids_total: number;
+  net_invoiced: number;
+  refunds_total: number;
+  write_offs_total: number;
+  pending_requested_total: number;
+  remaining_to_invoice: number;
+  available_to_request: number;
+  has_variance: boolean;
+}
+
+export interface QuoteThreadFinancialSummary extends QuoteVersionFinancialSummary {
+  quote_thread_id: string;
+  included_quote_ids: string[];
+  superseded_quote_ids: string[];
+  reconciliation_status: 'outstanding' | 'balanced' | 'over_invoiced' | 'written_off';
+  invoice_status: 'not_invoiced' | 'ready_to_invoice' | 'partially_invoiced' | 'invoiced';
+}
+
+export interface QuoteFinancialWorkspace {
+  quote_thread_id: string;
+  quote: Quote;
+  versions: Quote[];
+  invoices: QuoteEffectiveInvoice[];
+  invoice_requests: QuoteInvoiceRequest[];
+  adjustments: QuoteFinancialAdjustment[];
+  version_summaries: Record<string, QuoteVersionFinancialSummary>;
+  thread_summary: QuoteThreadFinancialSummary;
+  can_manage: boolean;
+}
+
 export interface QuoteInvoiceRequest {
   id: string;
   quote_id: string;
@@ -323,6 +413,7 @@ export interface Quote {
   rams_documents?: QuoteRamsDocument[];
   invoices?: QuoteInvoice[];
   invoice_requests?: QuoteInvoiceRequest[];
+  financial_adjustments?: QuoteFinancialAdjustment[];
   versions?: Quote[];
   previous_versions?: Quote[];
   timeline?: QuoteTimelineEvent[];
@@ -334,6 +425,7 @@ export interface Quote {
     lastInvoiceAt: string | null;
     status: 'not_invoiced' | 'ready_to_invoice' | 'partially_invoiced' | 'invoiced';
   };
+  financial_summary?: QuoteThreadFinancialSummary;
 }
 
 export interface QuoteListSummary {

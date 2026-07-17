@@ -102,11 +102,18 @@ describe('GET /api/quotes', () => {
       },
     ];
     const summaryRows = [
-      { status: 'draft', total: 1200 },
-      { status: 'in_progress', total: 2500 },
-      { status: 'invoiced', total: 3000 },
-      { status: 'lost', total: 900 },
+      { status: 'draft', total: 1200, quote_thread_id: 'thread-1' },
+      { status: 'in_progress', total: 2500, quote_thread_id: 'thread-2' },
+      { status: 'invoiced', total: 3000, quote_thread_id: 'thread-3' },
+      { status: 'lost', total: 900, quote_thread_id: 'thread-4' },
     ];
+    const financialVersionsQuery = createQueryableResult([
+      { id: 'quote-1', quote_thread_id: 'thread-1', total: 1200, revision_type: 'original', revision_number: 0, created_at: '2026-01-01' },
+      { id: 'quote-2', quote_thread_id: 'thread-2', total: 2500, revision_type: 'original', revision_number: 0, created_at: '2026-01-02' },
+      { id: 'quote-3', quote_thread_id: 'thread-3', total: 3000, revision_type: 'original', revision_number: 0, created_at: '2026-01-03' },
+      { id: 'quote-4', quote_thread_id: 'thread-4', total: 900, revision_type: 'original', revision_number: 0, created_at: '2026-01-04' },
+    ]);
+    const adjustmentsQuery = createQueryableResult([]);
     const { query: listQuery, order, range } = createPaginatedQuoteQuery(paginatedQuotes);
     const previousVersionsQuery = createQueryableResult([]);
     const summaryQuery = createQueryableResult(summaryRows);
@@ -129,8 +136,11 @@ describe('GET /api/quotes', () => {
         return previousVersionsQuery;
       }
 
-      if (columns === 'status, total') {
+      if (columns === 'status, total, quote_thread_id') {
         return summaryQuery;
+      }
+      if (columns === 'id, quote_thread_id, total, revision_type, revision_number, created_at') {
+        return financialVersionsQuery;
       }
 
       throw new Error(`Unexpected select columns: ${columns}`);
@@ -160,6 +170,9 @@ describe('GET /api/quotes', () => {
 
         if (table === 'quote_invoice_requests') {
           return { select: selectInvoiceRequests };
+        }
+        if (table === 'quote_financial_adjustments') {
+          return { select: vi.fn(() => adjustmentsQuery) };
         }
 
         throw new Error(`Unexpected table: ${table}`);

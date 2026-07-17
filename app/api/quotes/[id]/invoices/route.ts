@@ -39,6 +39,8 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       invoices: bundle.invoices,
       invoice_requests: bundle.invoiceRequests,
       invoice_summary: bundle.invoiceSummary,
+      financial_summary: bundle.financialSummary,
+      financial_adjustments: bundle.financialAdjustments,
     });
   } catch (error) {
     console.error('Error fetching quote invoices:', error);
@@ -179,12 +181,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
     }
 
-    const remainingBalance = Number(bundleBeforeInsert.invoiceSummary.remainingBalance || 0);
+    const remainingBalance = Number(
+      linkedRequest
+        ? bundleBeforeInsert.financialSummary?.remaining_to_invoice ??
+          bundleBeforeInsert.invoiceSummary.remainingBalance
+        : bundleBeforeInsert.financialSummary?.available_to_request ??
+          bundleBeforeInsert.invoiceSummary.remainingBalance,
+    );
 
     if (normalizedAmount - remainingBalance > 0.005) {
       return NextResponse.json(
         {
-          error: 'Invoice amount cannot be more than the remaining balance. Create a new version first if the amount has increased.',
+          error: 'Invoice amount cannot be more than the adjusted quote-thread balance. Record a quote-value adjustment first if the amount has increased.',
           field_errors: {
             amount: `This quote has £${remainingBalance.toLocaleString('en-GB', { minimumFractionDigits: 2 })} remaining.`,
           },
@@ -250,7 +258,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     const bundleAfterInsert = await fetchQuoteBundle(admin, id);
-    const isFullyInvoiced = bundleAfterInsert.invoiceSummary.remainingBalance <= 0;
+    const isFullyInvoiced = (
+      bundleAfterInsert.financialSummary?.remaining_to_invoice ??
+      bundleAfterInsert.invoiceSummary.remainingBalance
+    ) <= 0;
 
     const { error: quoteUpdateError } = await supabase
       .from('quotes')
@@ -354,6 +365,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       invoices: refreshedBundle.invoices,
       invoice_requests: refreshedBundle.invoiceRequests,
       invoice_summary: refreshedBundle.invoiceSummary,
+      financial_summary: refreshedBundle.financialSummary,
+      financial_adjustments: refreshedBundle.financialAdjustments,
     }, { status: 201 });
   } catch (error) {
     console.error('Error adding quote invoice:', error);

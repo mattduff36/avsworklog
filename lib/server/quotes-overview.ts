@@ -15,6 +15,12 @@ import type {
   QuoteOverviewRecordKind,
   QuoteOverviewSummary,
 } from '@/app/(dashboard)/quotes/overview-types';
+import type {
+  QuoteFinancialAdjustment,
+  QuoteInvoice,
+  QuoteInvoiceRequest,
+} from '@/app/(dashboard)/quotes/types';
+import { calculateQuoteFinancials } from '@/lib/utils/quote-financial-adjustments';
 
 type SupabaseAdminClient = ReturnType<typeof createAdminClient>;
 type QuoteRow = Database['public']['Tables']['quotes']['Row'];
@@ -821,6 +827,78 @@ async function loadOverviewSources(admin: SupabaseAdminClient): Promise<Overview
     loadInvoices(admin, quoteIds, quotes),
     loadLabourRowsByReference(admin, references),
   ]);
+  const threadIds = quotes.map(quote => quote.quote_thread_id);
+
+  if (threadIds.length > 0) {
+    const { data: versions, error: versionError } = await admin
+      .from('quotes')
+      .select('id, quote_thread_id, total, revision_type, revision_number, created_at')
+      .in('quote_thread_id', threadIds);
+    if (versionError) throw versionError;
+
+    const versionIds = (versions || []).map(version => version.id);
+    const [invoiceResult, requestResult, adjustmentResult] = await Promise.all([
+      admin.from('quote_invoices').select('*').in('quote_id', versionIds),
+      admin.from('quote_invoice_requests').select('*').in('quote_id', versionIds),
+      admin.from('quote_financial_adjustments').select('*').in('quote_thread_id', threadIds),
+    ]);
+    if (invoiceResult.error) throw invoiceResult.error;
+    if (requestResult.error) throw requestResult.error;
+    if (adjustmentResult.error) throw adjustmentResult.error;
+
+    for (const quote of quotes) {
+      const threadVersions = (versions || []).filter(
+        version => version.quote_thread_id === quote.quote_thread_id,
+      );
+      const threadVersionIds = new Set(threadVersions.map(version => version.id));
+      const calculation = calculateQuoteFinancials({
+        versions: threadVersions.map(version => ({
+          id: version.id,
+          quote_thread_id: version.quote_thread_id,
+          total: Number(version.total || 0),
+          revision_type: version.revision_type,
+          revision_number: Number(version.revision_number || 0),
+          created_at: version.created_at,
+        })),
+        invoices: (invoiceResult.data || [])
+          .filter(invoice => threadVersionIds.has(invoice.quote_id))
+          .map(invoice => ({ ...invoice, amount: Number(invoice.amount || 0) } as QuoteInvoice)),
+        requests: (requestResult.data || [])
+          .filter(request => threadVersionIds.has(request.quote_id))
+          .map(request => ({
+            ...request,
+            requested_amount: Number(request.requested_amount || 0),
+          } as QuoteInvoiceRequest)),
+        adjustments: (adjustmentResult.data || [])
+          .filter(adjustment => adjustment.quote_thread_id === quote.quote_thread_id)
+          .map(adjustment => ({
+            ...adjustment,
+            amount: Number(adjustment.amount || 0),
+            metadata_before: (adjustment.metadata_before || {}) as Record<string, unknown>,
+            metadata_after: (adjustment.metadata_after || {}) as Record<string, unknown>,
+            document_snapshot: (adjustment.document_snapshot || {}) as Record<string, unknown>,
+          } as QuoteFinancialAdjustment)),
+      });
+
+      quote.total = calculation.threadSummary.adjusted_quote_value;
+      invoicesByQuoteId.set(
+        quote.id,
+        calculation.effectiveInvoices.map(invoice => ({
+          id: invoice.id,
+          quote_id: quote.id,
+          invoice_number: invoice.effective_invoice_number,
+          invoice_date: invoice.effective_invoice_date,
+          amount: invoice.net_invoiced,
+          invoice_scope: invoice.effective_invoice_scope,
+          comments: invoice.effective_comments,
+          created_by: invoice.created_by,
+          created_at: invoice.created_at,
+          updated_at: invoice.updated_at,
+          invoice_request_id: invoice.invoice_request_id,
+        })),
+      );
+    }
+  }
 
   return {
     records: buildOverviewRecords({ quotes, projects, invoicesByQuoteId, labourRowsByReference }),

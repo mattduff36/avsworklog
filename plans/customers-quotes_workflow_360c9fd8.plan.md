@@ -214,3 +214,32 @@ flowchart TD
 - Handling partial invoicing cleanly without breaking totals or status logic.
 - Making approval/send notifications reliable without duplicating emails or reminders.
 
+## FIN-ADJ-001: Financial Adjustment Ledger
+
+The quote workflow requires an append-only manual reconciliation ledger so the application can mirror Sage corrections without rewriting sent or completed commercial records.
+
+### Scope
+
+- Accounts, Admin, and Super Admin users can create or reverse adjustments after completing the Quotes sensitive-access check. All users who can view Quotes can see effective totals, history, and reference documents.
+- Current and historical quote versions and their invoices are included. Draft quotes continue to use normal editing, and the separate legacy quote archive is excluded.
+- Supported events are credit note, refund, debit adjustment, quote-value correction, invoice metadata correction, write-off, invoice void, and reversal/replacement.
+- Every entry has an immutable system reference, effective date, reason, optional notes, optional Sage reference, actor, creation timestamp, and links to the affected quote version and invoice where applicable.
+- Entries cannot be edited or deleted. Incorrect entries are reversed and replaced.
+
+### Accounting invariants
+
+- Original quote and invoice values remain available. Adjusted/effective values are primary throughout quote lists, details, customer history, overview, and reports.
+- Credit notes, debit adjustments, voids, and invoice metadata corrections target one invoice. Refunds also link to the credit or void they settle and are reported as cash movements without reducing net invoiced twice.
+- Quote-value corrections and write-offs target one quote version.
+- Thread value uses the newest original or revision as the superseding base, then adds extras, variations, and future-work versions. Per-version breakdowns remain visible.
+- The commercial ledger reports adjusted quote value, gross invoiced, credits and voids, net invoiced, refunds, write-offs, pending requests, and remaining-to-invoice. It does not claim to be an accounts-receivable or payment ledger.
+- New invoice requests and invoices use adjusted consolidated thread availability. If an adjustment makes pending requests exceed availability, newest requests are automatically cancelled until the thread is valid.
+- Reconciliation variances may be saved only after explicit confirmation and remain visibly flagged.
+- Applying an adjustment leaves the quote workflow status unchanged unless the operator optionally chooses an existing status.
+
+### Audit and documents
+
+- Adjustment creation, reversal, status changes, and automatic request cancellations are recorded in the quote timeline.
+- The quote manager or requester receives in-app and email notifications for adjustments, reversals, and automatic request cancellations.
+- Each adjustment has a downloadable generic Adjustment Record PDF. It is a reconciliation reference, not an official invoice, credit note, or VAT document; Sage remains the accounting source of truth.
+

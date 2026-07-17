@@ -9,6 +9,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -305,6 +315,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   const [duplicateManagerProfileId, setDuplicateManagerProfileId] = useState('');
   const [poRequestDialogOpen, setPoRequestDialogOpen] = useState(false);
   const [poRequestRecipientEmails, setPoRequestRecipientEmails] = useState<string[]>([]);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [ramsComments, setRamsComments] = useState('');
   const [ramsDialogOpen, setRamsDialogOpen] = useState(false);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
@@ -342,8 +353,19 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   const canManageSage = Boolean(quote?.can_manage_sage);
   const canRequestPo = Boolean(isLatestVersion && quote && !quote.po_number && recipientEmail && (quote.sent_at || quote.customer_sent_at || quote.status === 'sent'));
   const hasMultipleVersions = (quote?.versions?.length ?? 0) > 1;
-  const availableToRequest = Number(quote?.invoice_summary?.availableToRequest ?? quote?.invoice_summary?.remainingBalance ?? quote?.total ?? 0);
-  const suggestedInvoiceAmount = Number(quote?.invoice_summary?.remainingBalance ?? quote?.total ?? 0);
+  const availableToRequest = Number(
+    quote?.financial_summary?.available_to_request ??
+      quote?.invoice_summary?.availableToRequest ??
+      quote?.invoice_summary?.remainingBalance ??
+      quote?.total ??
+      0,
+  );
+  const suggestedInvoiceAmount = Number(
+    quote?.financial_summary?.remaining_to_invoice ??
+      quote?.invoice_summary?.remainingBalance ??
+      quote?.total ??
+      0,
+  );
   const isQuoteOnSage = Boolean(quote?.sage_posted_at);
   const sagePostedDateLabel = quote?.sage_posted_at ? format(new Date(quote.sage_posted_at), 'dd MMM yyyy') : null;
   const sageCardClassName = cn(
@@ -360,7 +382,9 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   );
   const selectedInvoiceRequest = pendingInvoiceRequests.find(request => request.id === selectedInvoiceRequestId) || null;
   const pendingFullInvoiceRequest = pendingInvoiceRequests.find(request => request.requested_invoice_scope === 'full') || null;
-  const billingStatusConfig = getBillingStatusConfig(quote?.invoice_summary?.status);
+  const billingStatusConfig = getBillingStatusConfig(
+    quote?.financial_summary?.invoice_status || quote?.invoice_summary?.status,
+  );
   const duplicateManagerOptions = useMemo(
     () => managerOptions.filter(option => option.is_active || option.profile_id === quote?.requester_id),
     [managerOptions, quote?.requester_id]
@@ -629,9 +653,11 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
 
   const applyQuoteState = useCallback((nextQuote: Quote) => {
     const today = new Date().toISOString().slice(0, 10);
-    const nextInvoiceAmount = nextQuote.invoice_summary?.remainingBalance ? String(nextQuote.invoice_summary.remainingBalance) : '';
-    const nextInvoiceRequestAmount = nextQuote.invoice_summary?.availableToRequest ? String(nextQuote.invoice_summary.availableToRequest) : '';
-    const nextInvoiceRequestScope = nextQuote.invoice_summary?.availableToRequest === nextQuote.invoice_summary?.remainingBalance ? 'full' : 'partial';
+    const nextRemaining = nextQuote.financial_summary?.remaining_to_invoice ?? nextQuote.invoice_summary?.remainingBalance ?? 0;
+    const nextAvailable = nextQuote.financial_summary?.available_to_request ?? nextQuote.invoice_summary?.availableToRequest ?? 0;
+    const nextInvoiceAmount = nextRemaining ? String(nextRemaining) : '';
+    const nextInvoiceRequestAmount = nextAvailable ? String(nextAvailable) : '';
+    const nextInvoiceRequestScope = nextAvailable === nextRemaining ? 'full' : 'partial';
     const nextSelectedInvoiceRequestId = (nextQuote.invoice_requests || []).find(request => request.status === 'pending')?.id || '';
 
     setQuote(nextQuote);
@@ -644,7 +670,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
     setInvoiceNumber('');
     setInvoiceAmount(nextInvoiceAmount);
     setInvoiceDate(today);
-    setInvoiceScope(nextQuote.invoice_summary?.remainingBalance === 0 ? 'partial' : 'full');
+    setInvoiceScope(nextRemaining === 0 ? 'partial' : 'full');
     setInvoiceComments('');
     setInvoiceRequestAmount(nextInvoiceRequestAmount);
     setInvoiceRequestDate(today);
@@ -664,6 +690,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
     setInvoiceFieldErrors({});
     setAttachmentError(null);
     setDeleteError(null);
+    setDeleteDialogOpen(false);
     setRemovingAttachmentId(null);
     setReplacingAttachmentId(null);
     setDetailsBaselineSnapshot(buildDirtySnapshot({
@@ -676,7 +703,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
       invoiceNumber: '',
       invoiceAmount: nextInvoiceAmount,
       invoiceDate: today,
-      invoiceScope: nextQuote.invoice_summary?.remainingBalance === 0 ? 'partial' : 'full',
+      invoiceScope: nextRemaining === 0 ? 'partial' : 'full',
       invoiceComments: '',
       invoiceRequestAmount: nextInvoiceRequestAmount,
       invoiceRequestDate: today,
@@ -1097,14 +1124,6 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
       return;
     }
 
-    const confirmMessage = hasMultipleVersions
-      ? `Delete draft version ${quote.quote_reference}? This will only remove this draft version, not the whole quote history. This cannot be undone.`
-      : `Delete draft quote ${quote.quote_reference}? This cannot be undone.`;
-
-    if (!window.confirm(confirmMessage)) {
-      return;
-    }
-
     setActionLoading(true);
     setDeleteError(null);
     try {
@@ -1114,6 +1133,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
       }
 
       toast.success('Quote deleted');
+      setDeleteDialogOpen(false);
       onClose();
       onRefresh();
     } catch (error) {
@@ -1140,6 +1160,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
       >
         <DialogHeader className="sr-only">
           <DialogTitle>Quote Details</DialogTitle>
+          <DialogDescription>Review quote details and workflow actions.</DialogDescription>
         </DialogHeader>
         {loading ? (
           <PanelLoader message="Loading quote details..." className="py-12" />
@@ -1159,8 +1180,8 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
           </div>
         ) : (
           <>
-            <DialogHeader>
-              <div className="flex min-w-0 items-center justify-between">
+            <DialogHeader className="pr-8">
+              <div className="flex min-w-0 items-center justify-between gap-3">
                 <DialogTitle className="flex min-w-0 flex-wrap items-center gap-2 text-white">
                     <span className="font-mono text-sm text-avs-yellow">{quote.quote_reference}</span>
                     <Badge variant="outline" className={statusConfig?.color}>
@@ -1172,6 +1193,23 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                       </Badge>
                     )}
                 </DialogTitle>
+                {canDeleteDraft ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => {
+                      setDeleteError(null);
+                      setDeleteDialogOpen(true);
+                    }}
+                    disabled={actionLoading}
+                    aria-label={`Delete draft quote ${quote.quote_reference}`}
+                    title={`Delete draft quote ${quote.quote_reference}`}
+                    className="shrink-0 border-2 border-red-400 bg-red-950/70 text-red-100 shadow-sm hover:border-red-300 hover:bg-red-600 hover:text-white focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 disabled:border-slate-600 disabled:bg-slate-800 disabled:text-slate-500"
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                ) : null}
               </div>
             </DialogHeader>
 
@@ -1335,16 +1373,16 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
 
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-sm">
                     <div className="rounded-lg border border-slate-700 bg-slate-800/30 p-4">
-                      <p className="text-muted-foreground">Quote Total</p>
-                      <p className="mt-1 text-lg font-semibold text-white">£{Number(quote.total).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
+                      <p className="text-muted-foreground">Adjusted Quote</p>
+                      <p className="mt-1 text-lg font-semibold text-white">£{Number(quote.financial_summary?.adjusted_quote_value ?? quote.total).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
                     </div>
                     <div className="rounded-lg border border-slate-700 bg-slate-800/30 p-4">
-                      <p className="text-muted-foreground">Invoiced</p>
-                      <p className="mt-1 text-lg font-semibold text-white">£{Number(quote.invoice_summary?.invoicedTotal || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
+                      <p className="text-muted-foreground">Net Invoiced</p>
+                      <p className="mt-1 text-lg font-semibold text-white">£{Number(quote.financial_summary?.net_invoiced ?? quote.invoice_summary?.invoicedTotal ?? 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
                     </div>
                     <div className="rounded-lg border border-slate-700 bg-slate-800/30 p-4">
-                      <p className="text-muted-foreground">Remaining Balance</p>
-                      <p className="mt-1 text-lg font-semibold text-white">£{Number(quote.invoice_summary?.remainingBalance ?? quote.total).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
+                      <p className="text-muted-foreground">Remaining To Invoice</p>
+                      <p className="mt-1 text-lg font-semibold text-white">£{Number(quote.financial_summary?.remaining_to_invoice ?? quote.invoice_summary?.remainingBalance ?? quote.total).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
                     </div>
                     {canManageSage ? (
                       <button
@@ -1623,22 +1661,63 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
                     <div className="rounded-lg border border-slate-700 bg-slate-800/30 p-4 text-sm">
-                      <p className="text-muted-foreground">Quote Total</p>
-                      <p className="mt-1 text-lg font-semibold text-white">£{Number(quote.total).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
+                      <p className="text-muted-foreground">Adjusted Quote Value</p>
+                      <p className="mt-1 text-lg font-semibold text-white">£{Number(quote.financial_summary?.adjusted_quote_value ?? quote.total).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
+                      {quote.financial_summary && quote.financial_summary.adjusted_quote_value !== Number(quote.total) ? (
+                        <p className="mt-1 text-xs text-slate-500">Original version: £{Number(quote.total).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
+                      ) : null}
                     </div>
                     <div className="rounded-lg border border-slate-700 bg-slate-800/30 p-4 text-sm">
-                      <p className="text-muted-foreground">Actual Invoiced</p>
-                      <p className="mt-1 text-lg font-semibold text-white">£{Number(quote.invoice_summary?.invoicedTotal || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
+                      <p className="text-muted-foreground">Net Invoiced</p>
+                      <p className="mt-1 text-lg font-semibold text-white">£{Number(quote.financial_summary?.net_invoiced ?? quote.invoice_summary?.invoicedTotal ?? 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
                     </div>
                     <div className="rounded-lg border border-slate-700 bg-slate-800/30 p-4 text-sm">
                       <p className="text-muted-foreground">Pending Requested</p>
-                      <p className="mt-1 text-lg font-semibold text-white">£{Number(quote.invoice_summary?.pendingRequestedTotal || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
+                      <p className="mt-1 text-lg font-semibold text-white">£{Number(quote.financial_summary?.pending_requested_total ?? quote.invoice_summary?.pendingRequestedTotal ?? 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
                     </div>
                     <div className="rounded-lg border border-slate-700 bg-slate-800/30 p-4 text-sm">
                       <p className="text-muted-foreground">Available To Request</p>
                       <p className="mt-1 text-lg font-semibold text-white">£{availableToRequest.toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
                     </div>
                   </div>
+
+                  {quote.financial_summary ? (
+                    <div className="rounded-lg border border-slate-700 bg-slate-800/20 p-4">
+                      <div className="grid gap-3 text-sm sm:grid-cols-3">
+                        <div>
+                          <p className="text-muted-foreground">Credits and voids</p>
+                          <p className="mt-1 font-semibold text-white">£{Number(quote.financial_summary.credits_total + quote.financial_summary.voids_total).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Refunded cash</p>
+                          <p className="mt-1 font-semibold text-white">£{Number(quote.financial_summary.refunds_total).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Written off</p>
+                          <p className="mt-1 font-semibold text-white">£{Number(quote.financial_summary.write_offs_total).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
+                        </div>
+                      </div>
+                      {quote.financial_adjustments?.length ? (
+                        <div className="mt-4 space-y-2 border-t border-slate-700 pt-3">
+                          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Financial adjustment history</p>
+                          {quote.financial_adjustments.map(adjustment => (
+                            <div key={adjustment.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-slate-900/60 px-3 py-2">
+                              <div>
+                                <span className="text-sm font-medium text-white">{adjustment.adjustment_number}</span>
+                                <span className="ml-2 text-xs text-slate-400">{adjustment.reason}</span>
+                              </div>
+                              <Button asChild size="sm" variant="ghost">
+                                <a href={`/api/quotes/financial-adjustments/${adjustment.id}/document`} target="_blank" rel="noreferrer">
+                                  <FileDown className="h-3.5 w-3.5" />
+                                  PDF
+                                </a>
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
 
                   <div className="rounded-lg border border-slate-700 bg-slate-800/30 p-4 space-y-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -2253,12 +2332,6 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
               </Tabs>
 
               <div className="flex flex-wrap gap-2">
-                {deleteError ? (
-                  <div className="w-full rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-100">
-                    {deleteError}
-                  </div>
-                ) : null}
-
                 {canEditQuote && (
                   <Button
                     variant="outline"
@@ -2280,24 +2353,65 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                 >
                   <FileDown className="h-4 w-4 mr-1" /> Download PDF
                 </Button>
-
-                {canDeleteDraft ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void deleteQuote()}
-                    disabled={actionLoading}
-                    className="border-red-500/40 text-red-200 hover:bg-red-500/10 hover:text-red-100"
-                  >
-                    <Trash2 className="h-4 w-4 mr-1" /> {hasMultipleVersions ? 'Delete Draft Version' : 'Delete Draft Quote'}
-                  </Button>
-                ) : null}
               </div>
             </div>
           </>
         )}
       </DialogContent>
     </Dialog>
+    <AlertDialog
+      open={deleteDialogOpen}
+      onOpenChange={(nextOpen) => {
+        if (!actionLoading) setDeleteDialogOpen(nextOpen);
+      }}
+    >
+      <AlertDialogContent className="border border-red-500/50 bg-slate-900 text-white">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete draft quote?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will permanently delete{' '}
+            <span className="font-semibold text-white">{quote?.quote_reference || 'this draft quote'}</span>.
+            {hasMultipleVersions
+              ? ' The previous quote version will become the latest version again.'
+              : ''}
+            {' '}This action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        {deleteError ? (
+          <div role="alert" className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-100">
+            {deleteError}
+          </div>
+        ) : null}
+        <AlertDialogFooter>
+          <AlertDialogCancel
+            disabled={actionLoading}
+            className="border-slate-500 bg-slate-800 text-white hover:bg-slate-700 hover:text-white"
+          >
+            Cancel
+          </AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(event) => {
+              event.preventDefault();
+              void deleteQuote();
+            }}
+            disabled={actionLoading}
+            className="border border-red-400 bg-red-600 text-white hover:bg-red-500 focus-visible:ring-2 focus-visible:ring-red-300 disabled:border-slate-600 disabled:bg-slate-800 disabled:text-slate-500"
+          >
+            {actionLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Deleting...
+              </>
+            ) : (
+              <>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete Quote
+              </>
+            )}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     <Dialog open={poRequestDialogOpen} onOpenChange={handlePoRequestDialogOpenChange}>
       <DialogContent
         ref={poRequestDialogContentRef}

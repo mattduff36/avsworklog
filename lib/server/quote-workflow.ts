@@ -23,6 +23,11 @@ import {
   getInvoiceSummary,
   type InvoiceSummary,
 } from '@/lib/utils/quote-workflow';
+import { calculateQuoteFinancials } from '@/lib/utils/quote-financial-adjustments';
+import type {
+  QuoteFinancialAdjustment,
+  QuoteThreadFinancialSummary,
+} from '@/app/(dashboard)/quotes/types';
 
 const { Client } = pg;
 const QUOTE_NOTIFICATION_MODULE_KEY: NotificationModuleKey = 'quotes';
@@ -34,6 +39,7 @@ export type QuoteAttachmentRow = Database['public']['Tables']['quote_attachments
 export type QuoteInvoiceRow = Database['public']['Tables']['quote_invoices']['Row'];
 export type QuoteInvoiceRequestRow = Database['public']['Tables']['quote_invoice_requests']['Row'];
 export type QuoteInvoiceAllocationRow = Database['public']['Tables']['quote_invoice_allocations']['Row'];
+export type QuoteFinancialAdjustmentRow = Database['public']['Tables']['quote_financial_adjustments']['Row'];
 export type QuoteManagerSeriesRow = Database['public']['Tables']['quote_manager_series']['Row'];
 export type QuoteTimelineEventRow = Database['public']['Tables']['quote_timeline_events']['Row'];
 export type QuoteCustomerContactRecipientRow = Database['public']['Tables']['quote_customer_contact_recipients']['Row'];
@@ -137,6 +143,8 @@ export interface QuoteBundle {
   timeline: Array<QuoteTimelineEventRow & { actor?: { id: string; full_name: string | null } | null }>;
   selectedSecondaryContacts: CustomerContactRow[];
   invoiceSummary: InvoiceSummary;
+  financialAdjustments: QuoteFinancialAdjustment[];
+  financialSummary: QuoteThreadFinancialSummary;
 }
 
 export async function appendQuoteTimelineEvent(
@@ -412,6 +420,59 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
 
   const invoices = (invoicesResult.data || []) as QuoteInvoiceRow[];
   const invoiceRequests = (invoiceRequestsResult.data || []) as QuoteInvoiceRequestRow[];
+  const versions = (versionsResult.data || []) as QuoteRow[];
+  const versionIds = versions.map(version => version.id);
+  const [threadInvoicesResult, threadRequestsResult, financialAdjustmentsResult] = await Promise.all([
+    supabase
+      .from('quote_invoices')
+      .select('*')
+      .in('quote_id', versionIds)
+      .order('invoice_date', { ascending: false }),
+    supabase
+      .from('quote_invoice_requests')
+      .select('*')
+      .in('quote_id', versionIds)
+      .order('requested_at', { ascending: false }),
+    supabase
+      .from('quote_financial_adjustments')
+      .select('*')
+      .eq('quote_thread_id', typedQuote.quote_thread_id)
+      .order('effective_date', { ascending: false })
+      .order('created_at', { ascending: false }),
+  ]);
+
+  if (threadInvoicesResult.error) throw threadInvoicesResult.error;
+  if (threadRequestsResult.error) throw threadRequestsResult.error;
+  if (financialAdjustmentsResult.error) throw financialAdjustmentsResult.error;
+
+  const threadInvoices = ((threadInvoicesResult.data || []) as QuoteInvoiceRow[]).map(invoice => ({
+    ...invoice,
+    amount: Number(invoice.amount || 0),
+  }));
+  const threadRequests = ((threadRequestsResult.data || []) as QuoteInvoiceRequestRow[]).map(request => ({
+    ...request,
+    requested_amount: Number(request.requested_amount || 0),
+  }));
+  const financialAdjustments = ((financialAdjustmentsResult.data || []) as QuoteFinancialAdjustmentRow[]).map(adjustment => ({
+    ...adjustment,
+    amount: Number(adjustment.amount || 0),
+    metadata_before: (adjustment.metadata_before || {}) as Record<string, unknown>,
+    metadata_after: (adjustment.metadata_after || {}) as Record<string, unknown>,
+    document_snapshot: (adjustment.document_snapshot || {}) as Record<string, unknown>,
+  })) as QuoteFinancialAdjustment[];
+  const financialCalculation = calculateQuoteFinancials({
+    versions: versions.map(version => ({
+      id: version.id,
+      quote_thread_id: version.quote_thread_id,
+      total: Number(version.total || 0),
+      revision_type: version.revision_type,
+      revision_number: Number(version.revision_number || 0),
+      created_at: version.created_at,
+    })),
+    invoices: threadInvoices,
+    requests: threadRequests,
+    adjustments: financialAdjustments,
+  });
   const timeline = enrichQuoteTimelineEventDescriptions(
     (timelineResult.data || []) as QuoteBundle['timeline'],
     {
@@ -452,7 +513,7 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
     lineItems: (lineItemsResult.data || []) as QuoteLineItemRow[],
     attachments: (attachmentsResult.data || []) as QuoteAttachmentRow[],
     ramsDocuments: (ramsDocumentsResult.data || []) as RamsDocumentRow[],
-    versions: (versionsResult.data || []) as QuoteRow[],
+    versions,
     timeline,
     selectedSecondaryContacts: selectedContacts,
     invoices: invoices.map(invoice => ({
@@ -461,6 +522,8 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
     })),
     invoiceRequests,
     invoiceSummary,
+    financialAdjustments: financialCalculation.adjustments,
+    financialSummary: financialCalculation.threadSummary,
   };
 }
 

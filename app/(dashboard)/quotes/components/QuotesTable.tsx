@@ -157,9 +157,9 @@ function SageStatusBadge({ status }: { status: QuoteSageStatus }) {
 }
 
 function getInvoiceProgress(quote: Quote) {
-  const total = Number(quote.total || 0);
-  const invoicedTotal = Number(quote.invoice_summary?.invoicedTotal || 0);
-  const pendingRequestedTotal = Number(quote.invoice_summary?.pendingRequestedTotal || 0);
+  const total = Number(quote.financial_summary?.adjusted_quote_value ?? quote.total ?? 0);
+  const invoicedTotal = Number(quote.financial_summary?.net_invoiced ?? quote.invoice_summary?.invoicedTotal ?? 0);
+  const pendingRequestedTotal = Number(quote.financial_summary?.pending_requested_total ?? quote.invoice_summary?.pendingRequestedTotal ?? 0);
   const invoicedPercent = total > 0
     ? Math.min(100, Math.max(0, Math.round((invoicedTotal / total) * 100)))
     : 0;
@@ -377,7 +377,9 @@ export function QuotesTable({
     }
 
     if (invoiceFilters.length > 0) {
-      list = list.filter(q => invoiceFilters.includes(q.invoice_summary?.status as BillingFilter));
+      list = list.filter(q => invoiceFilters.includes(
+        (q.financial_summary?.invoice_status || q.invoice_summary?.status) as BillingFilter,
+      ));
     }
 
     if (sageFilters.length > 0) {
@@ -684,7 +686,7 @@ export function QuotesTable({
                       </td>
                       <td className="px-4 py-3 text-slate-300 text-xs">{format(new Date(quote.quote_date), 'dd/MM/yyyy')}</td>
                       <td className="px-4 py-3 text-right font-semibold text-white">
-                        {formatCurrency(quote.total)}
+                        {formatCurrency(quote.financial_summary?.adjusted_quote_value ?? quote.total)}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1">
@@ -803,7 +805,7 @@ export function QuotesTable({
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>{format(new Date(quote.quote_date), 'dd/MM/yyyy')}</span>
                   <span className="font-semibold text-white">
-                    {formatCurrency(quote.total)}
+                    {formatCurrency(quote.financial_summary?.adjusted_quote_value ?? quote.total)}
                   </span>
                 </div>
                 <div className="text-xs text-muted-foreground">

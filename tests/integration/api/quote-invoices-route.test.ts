@@ -130,7 +130,7 @@ describe('POST /api/quotes/[id]/invoices', () => {
     const payload = await response.json();
 
     expect(response.status).toBe(400);
-    expect(payload.error).toBe('Invoice amount cannot be more than the remaining balance. Create a new version first if the amount has increased.');
+    expect(payload.error).toBe('Invoice amount cannot be more than the adjusted quote-thread balance. Record a quote-value adjustment first if the amount has increased.');
     expect(payload.field_errors).toEqual({
       amount: 'This quote has £100.00 remaining.',
     });

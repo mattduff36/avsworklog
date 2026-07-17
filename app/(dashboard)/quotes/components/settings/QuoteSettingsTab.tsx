@@ -13,23 +13,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PanelLoader } from '@/components/ui/panel-loader';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { Quote, QuoteManagerOption } from '../../types';
+import type { QuoteManagerOption } from '../../types';
+import { QuoteFinancialAdjustmentsCard } from './QuoteFinancialAdjustmentsCard';
 
 export type QuoteSettingsSubTab = 'notifications' | 'managers' | 'sending' | 'schedule' | 'templates' | 'admin-tools';
 
@@ -100,8 +91,6 @@ interface QuoteEmailTemplatesPayload {
 interface QuoteSettingsTabProps {
   activeTab: QuoteSettingsSubTab;
   onTabChange: (tab: QuoteSettingsSubTab) => void;
-  quotes: Quote[];
-  onDeleteQuote: (quote: Quote) => Promise<void>;
   onRefresh: () => Promise<void>;
 }
 
@@ -205,8 +194,6 @@ function normalizeManagerRows(rows: QuoteManagerOption[]) {
 export function QuoteSettingsTab({
   activeTab,
   onTabChange,
-  quotes,
-  onDeleteQuote,
   onRefresh,
 }: QuoteSettingsTabProps) {
   const [settingsPayload, setSettingsPayload] = useState<QuoteSettingsPayload | null>(null);
@@ -225,16 +212,7 @@ export function QuoteSettingsTab({
   const [loadingManagers, setLoadingManagers] = useState(true);
   const [loadingTemplates, setLoadingTemplates] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
-  const [deleteQuoteId, setDeleteQuoteId] = useState('');
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
-  const deletableQuotes = useMemo(
-    () => [...quotes]
-      .filter(quote => quote.is_latest_version && quote.status === 'draft')
-      .sort((a, b) => a.quote_reference.localeCompare(b.quote_reference)),
-    [quotes]
-  );
-  const selectedDeleteQuote = deletableQuotes.find(quote => quote.id === deleteQuoteId) || null;
   const quoteUsers = useMemo(() => settingsPayload?.quote_users || [], [settingsPayload]);
   const accountsUsers = quoteUsers.filter(user => user.team_id === 'accounts');
   const additionalUsers = quoteUsers.filter(user => user.team_id !== 'accounts');
@@ -439,18 +417,6 @@ export function QuoteSettingsTab({
       await onRefresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to remove manager defaults.');
-    } finally {
-      setSaving(null);
-    }
-  }
-
-  async function confirmDeleteQuote() {
-    if (!selectedDeleteQuote) return;
-    setSaving('delete-quote');
-    try {
-      await onDeleteQuote(selectedDeleteQuote);
-      setDeleteDialogOpen(false);
-      setDeleteQuoteId('');
     } finally {
       setSaving(null);
     }
@@ -1067,51 +1033,7 @@ export function QuoteSettingsTab({
   }
 
   function renderAdminToolsPanel() {
-    return (
-      <Card className="border-slate-700 bg-slate-900/70">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-white">
-            <Trash2 className="h-5 w-5 text-red-300" />
-            Delete Draft Quote
-          </CardTitle>
-          <CardDescription>
-            Select a latest draft quote to permanently delete it. Confirmed, invoiced, archived, or older quote versions are protected.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-            <div className="space-y-2">
-              <Label htmlFor="delete-quote-select">Quote reference</Label>
-              <Select
-                value={deleteQuoteId}
-                onValueChange={setDeleteQuoteId}
-                disabled={deletableQuotes.length === 0 || saving === 'delete-quote'}
-              >
-                <SelectTrigger id="delete-quote-select" className="bg-slate-800 border-slate-600 text-white">
-                  <SelectValue placeholder={deletableQuotes.length > 0 ? 'Select a draft quote' : 'No draft quotes available'} />
-                </SelectTrigger>
-                <SelectContent>
-                  {deletableQuotes.map((quote) => (
-                    <SelectItem key={quote.id} value={quote.id}>
-                      {quote.quote_reference}{quote.customer?.company_name ? ` - ${quote.customer.company_name}` : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <Button
-              variant="destructive"
-              onClick={() => setDeleteDialogOpen(true)}
-              disabled={!selectedDeleteQuote || saving === 'delete-quote'}
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete Quote
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
+    return <QuoteFinancialAdjustmentsCard onRefresh={onRefresh} />;
   }
 
   return (
@@ -1153,39 +1075,6 @@ export function QuoteSettingsTab({
         </TabsContent>
       </Tabs>
 
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent className="border-border text-white">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete draft quote?</AlertDialogTitle>
-            <AlertDialogDescription className="text-muted-foreground">
-              {selectedDeleteQuote ? (
-                <>
-                  This will permanently delete quote{' '}
-                  <span className="font-semibold text-white">{selectedDeleteQuote.quote_reference}</span>.
-                  {selectedDeleteQuote.previous_versions?.length
-                    ? ' The previous quote version will become the latest version again. This action cannot be undone.'
-                    : ' This action cannot be undone.'}
-                </>
-              ) : (
-                'Select a draft quote before deleting.'
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={saving === 'delete-quote'}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(event) => {
-                event.preventDefault();
-                void confirmDeleteQuote();
-              }}
-              disabled={!selectedDeleteQuote || saving === 'delete-quote'}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {saving === 'delete-quote' ? 'Deleting...' : 'Delete Quote'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }

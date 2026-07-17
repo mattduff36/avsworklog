@@ -41,6 +41,10 @@ interface QuoteSummary {
   invoice_summary?: {
     remainingBalance: number;
   };
+  financial_summary?: {
+    adjusted_quote_value: number;
+    remaining_to_invoice: number;
+  };
 }
 
 interface PageProps {
@@ -124,7 +128,7 @@ export default function CustomerHistoryPage({ params }: PageProps) {
   const totalQuoteValue = quoteSummary?.accepted_value
     ?? quotes
       .filter((quote) => ACCEPTED_QUOTE_STATUSES.has(quote.status as QuoteStatus))
-      .reduce((sum, quote) => sum + Number(quote.total || 0), 0);
+      .reduce((sum, quote) => sum + Number(quote.financial_summary?.adjusted_quote_value ?? quote.total ?? 0), 0);
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -310,11 +314,11 @@ export default function CustomerHistoryPage({ params }: PageProps) {
                     <div className="flex items-center gap-3">
                       <span className="text-sm text-muted-foreground">{format(new Date(q.quote_date), 'dd/MM/yyyy')}</span>
                       <span className="text-sm font-semibold text-white">
-                        £{Number(q.total || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                        £{Number(q.financial_summary?.adjusted_quote_value ?? q.total ?? 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
                       </span>
-                      {typeof q.invoice_summary?.remainingBalance === 'number' && (
+                      {typeof (q.financial_summary?.remaining_to_invoice ?? q.invoice_summary?.remainingBalance) === 'number' && (
                         <span className="text-xs text-muted-foreground">
-                          Balance £{Number(q.invoice_summary.remainingBalance).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                          Remaining £{Number(q.financial_summary?.remaining_to_invoice ?? q.invoice_summary?.remainingBalance ?? 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
                         </span>
                       )}
                       <div className="flex flex-wrap gap-1">

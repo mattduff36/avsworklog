@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { ACCEPTED_QUOTE_STATUSES, ACTIVE_QUOTE_STATUS_ORDER, type QuoteStatus } from '@/app/(dashboard)/quotes/types';
+import {
+  ACCEPTED_QUOTE_STATUSES,
+  ACTIVE_QUOTE_STATUS_ORDER,
+  type QuoteFinancialAdjustment,
+  type QuoteInvoice,
+  type QuoteInvoiceRequest,
+  type QuoteStatus,
+  type QuoteThreadFinancialSummary,
+} from '@/app/(dashboard)/quotes/types';
 import type { Database } from '@/types/database';
 import {
   appendQuoteTimelineEvent,
@@ -19,6 +27,7 @@ import {
   validateSecondaryContactIdsForCustomer,
 } from '@/lib/server/quote-recipient-contacts';
 import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
+import { calculateQuoteFinancials } from '@/lib/utils/quote-financial-adjustments';
 
 type QuoteFieldErrors = Record<string, string>;
 type QuoteSageStatus = 'not_on_sage' | 'on_sage';
@@ -116,7 +125,7 @@ export async function GET(request: NextRequest) {
 
     let summaryQuery = supabase
       .from('quotes')
-      .select('status, total');
+      .select('status, total, quote_thread_id');
 
     if (customerId) {
       summaryQuery = summaryQuery.eq('customer_id', customerId);
@@ -163,47 +172,90 @@ export async function GET(request: NextRequest) {
     }
 
     const summaries = new Map<string, ReturnType<typeof getInvoiceSummary>>();
+    const financialSummaries = new Map<string, QuoteThreadFinancialSummary>();
     const allVisibleQuotes = [...quotes, ...previousVersions];
-    const summaryQuoteIds = allVisibleQuotes.map(quote => quote.id);
-    if (summaryQuoteIds.length > 0) {
+    const financialThreadIds = Array.from(new Set([
+      ...allVisibleQuotes.map(quote => quote.quote_thread_id),
+      ...(summaryRows || []).map(quote => quote.quote_thread_id),
+    ].filter(Boolean)));
+    if (financialThreadIds.length > 0) {
+      const visibleQuoteIdsForQuery = allVisibleQuotes.length > 0
+        ? allVisibleQuotes.map(quote => quote.id)
+        : ['00000000-0000-0000-0000-000000000000'];
       const [
+        { data: financialVersions, error: financialVersionsError },
         { data: invoices, error: invoiceError },
         { data: invoiceRequests, error: invoiceRequestError },
+        { data: adjustments, error: adjustmentError },
       ] = await Promise.all([
         supabase
+          .from('quotes')
+          .select('id, quote_thread_id, total, revision_type, revision_number, created_at')
+          .in('quote_thread_id', financialThreadIds),
+        supabase
           .from('quote_invoices')
-          .select('quote_id, amount, invoice_date')
-          .in('quote_id', summaryQuoteIds),
+          .select('*')
+          .in('quote_id', visibleQuoteIdsForQuery),
         supabase
           .from('quote_invoice_requests')
-          .select('quote_id, requested_amount, status')
-          .in('quote_id', summaryQuoteIds),
+          .select('*')
+          .in('quote_id', visibleQuoteIdsForQuery),
+        supabase
+          .from('quote_financial_adjustments')
+          .select('*')
+          .in('quote_thread_id', financialThreadIds),
       ]);
 
+      if (financialVersionsError) {
+        throw financialVersionsError;
+      }
       if (invoiceError) {
         throw invoiceError;
       }
       if (invoiceRequestError) {
         throw invoiceRequestError;
       }
+      if (adjustmentError) {
+        throw adjustmentError;
+      }
 
-      const invoicesByQuoteId = new Map<string, Array<{ quote_id: string; amount: number; invoice_date: string | null }>>();
-      (invoices || []).forEach((invoice) => {
+      const allFinancialQuoteIds = (financialVersions || []).map(version => version.id);
+      let allInvoices = invoices || [];
+      let allInvoiceRequests = invoiceRequests || [];
+      if (allFinancialQuoteIds.some(id => !allVisibleQuotes.some(quote => quote.id === id))) {
+        const [allInvoicesResult, allRequestsResult] = await Promise.all([
+          supabase.from('quote_invoices').select('*').in('quote_id', allFinancialQuoteIds),
+          supabase.from('quote_invoice_requests').select('*').in('quote_id', allFinancialQuoteIds),
+        ]);
+        if (allInvoicesResult.error) throw allInvoicesResult.error;
+        if (allRequestsResult.error) throw allRequestsResult.error;
+        allInvoices = allInvoicesResult.data || [];
+        allInvoiceRequests = allRequestsResult.data || [];
+      }
+
+      const invoicesByQuoteId = new Map<string, QuoteInvoice[]>();
+      allInvoices.forEach((invoice) => {
         if (!invoicesByQuoteId.has(invoice.quote_id)) {
           invoicesByQuoteId.set(invoice.quote_id, []);
         }
-        invoicesByQuoteId.get(invoice.quote_id)!.push(invoice);
+        invoicesByQuoteId.get(invoice.quote_id)!.push({
+          ...invoice,
+          amount: Number(invoice.amount || 0),
+        } as QuoteInvoice);
       });
 
-      const invoiceRequestsByQuoteId = new Map<string, Array<{ quote_id: string; requested_amount: number; status: string | null }>>();
-      (invoiceRequests || []).forEach((request) => {
+      const invoiceRequestsByQuoteId = new Map<string, QuoteInvoiceRequest[]>();
+      allInvoiceRequests.forEach((request) => {
         if (!invoiceRequestsByQuoteId.has(request.quote_id)) {
           invoiceRequestsByQuoteId.set(request.quote_id, []);
         }
-        invoiceRequestsByQuoteId.get(request.quote_id)!.push(request);
+        invoiceRequestsByQuoteId.get(request.quote_id)!.push({
+          ...request,
+          requested_amount: Number(request.requested_amount || 0),
+        } as QuoteInvoiceRequest);
       });
 
-      for (const quote of allVisibleQuotes) {
+      for (const quote of financialVersions || []) {
         summaries.set(
           quote.id,
           getInvoiceSummary({
@@ -212,6 +264,43 @@ export async function GET(request: NextRequest) {
             invoiceRequests: invoiceRequestsByQuoteId.get(quote.id) || [],
           })
         );
+      }
+
+      const versionsByThread = new Map<string, NonNullable<typeof financialVersions>>();
+      for (const version of financialVersions || []) {
+        const list = versionsByThread.get(version.quote_thread_id) || [];
+        list.push(version);
+        versionsByThread.set(version.quote_thread_id, list);
+      }
+      const adjustmentsByThread = new Map<string, QuoteFinancialAdjustment[]>();
+      for (const adjustment of adjustments || []) {
+        const list = adjustmentsByThread.get(adjustment.quote_thread_id) || [];
+        list.push({
+          ...adjustment,
+          amount: Number(adjustment.amount || 0),
+          metadata_before: (adjustment.metadata_before || {}) as Record<string, unknown>,
+          metadata_after: (adjustment.metadata_after || {}) as Record<string, unknown>,
+          document_snapshot: (adjustment.document_snapshot || {}) as Record<string, unknown>,
+        } as QuoteFinancialAdjustment);
+        adjustmentsByThread.set(adjustment.quote_thread_id, list);
+      }
+
+      for (const [threadId, versions] of versionsByThread) {
+        const versionIds = new Set(versions.map(version => version.id));
+        const calculation = calculateQuoteFinancials({
+          versions: versions.map(version => ({
+            id: version.id,
+            quote_thread_id: version.quote_thread_id,
+            total: Number(version.total || 0),
+            revision_type: version.revision_type,
+            revision_number: Number(version.revision_number || 0),
+            created_at: version.created_at,
+          })),
+          invoices: Array.from(versionIds).flatMap(id => invoicesByQuoteId.get(id) || []),
+          requests: Array.from(versionIds).flatMap(id => invoiceRequestsByQuoteId.get(id) || []),
+          adjustments: adjustmentsByThread.get(threadId) || [],
+        });
+        financialSummaries.set(threadId, calculation.threadSummary);
       }
     }
 
@@ -231,7 +320,11 @@ export async function GET(request: NextRequest) {
 
       if (ACCEPTED_QUOTE_STATUSES.has(status as QuoteStatus)) {
         acceptedQuotes += 1;
-        acceptedValue += Number(quote.total || 0);
+        acceptedValue += Number(
+          financialSummaries.get(quote.quote_thread_id)?.adjusted_quote_value ??
+            quote.total ??
+            0,
+        );
       }
     });
 
@@ -239,10 +332,12 @@ export async function GET(request: NextRequest) {
       quotes: quotes.map(quote => ({
         ...quote,
         invoice_summary: summaries.get(quote.id) || getInvoiceSummary({ total: Number(quote.total || 0), invoices: [] }),
+        financial_summary: financialSummaries.get(quote.quote_thread_id),
         sage_status: getQuoteSageStatus(quote),
         previous_versions: (previousVersionsByThreadId.get(quote.quote_thread_id) || []).map(version => ({
           ...version,
           invoice_summary: summaries.get(version.id) || getInvoiceSummary({ total: Number(version.total || 0), invoices: [] }),
+          financial_summary: financialSummaries.get(version.quote_thread_id),
           sage_status: getQuoteSageStatus(version),
         })),
       })),

@@ -146,6 +146,8 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
         versions: bundle.versions,
         timeline: bundle.timeline,
         invoice_summary: bundle.invoiceSummary,
+        financial_summary: bundle.financialSummary,
+        financial_adjustments: bundle.financialAdjustments,
       },
     });
   } catch (error) {
@@ -766,6 +768,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           versions: bundle.versions,
           timeline: bundle.timeline,
           invoice_summary: bundle.invoiceSummary,
+          financial_summary: bundle.financialSummary,
+          financial_adjustments: bundle.financialAdjustments,
         },
       });
     } else if (action) {
@@ -1063,6 +1067,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         versions: bundle.versions,
         timeline: bundle.timeline,
         invoice_summary: bundle.invoiceSummary,
+        financial_summary: bundle.financialSummary,
+        financial_adjustments: bundle.financialAdjustments,
       },
     });
   } catch (error) {

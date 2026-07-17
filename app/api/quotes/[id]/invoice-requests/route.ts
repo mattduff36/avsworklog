@@ -77,7 +77,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Only the latest quote version can be marked ready to invoice.' }, { status: 400 });
     }
 
-    const availableToRequest = Number(bundle.invoiceSummary.availableToRequest || 0);
+    const availableToRequest = Number(
+      bundle.financialSummary?.available_to_request ??
+        bundle.invoiceSummary.availableToRequest ??
+        0,
+    );
     if (availableToRequest <= 0.005) {
       return NextResponse.json(
         {
@@ -211,6 +215,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       invoice_request: refreshedBundle.invoiceRequests.find(item => item.id === invoiceRequest.id) || invoiceRequest,
       invoice_requests: refreshedBundle.invoiceRequests,
       invoice_summary: refreshedBundle.invoiceSummary,
+      financial_summary: refreshedBundle.financialSummary,
+      financial_adjustments: refreshedBundle.financialAdjustments,
     }, { status: 201 });
   } catch (error) {
     console.error('Error creating quote invoice request:', error);
@@ -289,6 +295,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({
       invoice_requests: refreshedBundle.invoiceRequests,
       invoice_summary: refreshedBundle.invoiceSummary,
+      financial_summary: refreshedBundle.financialSummary,
+      financial_adjustments: refreshedBundle.financialAdjustments,
     });
   } catch (error) {
     console.error('Error retracting quote invoice request:', error);
