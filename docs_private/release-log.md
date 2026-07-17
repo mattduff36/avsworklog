@@ -2,6 +2,27 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.12.1
+
+**GIT COMMIT MESSAGE**
+`docs(help): refresh full FAQ catalogue for current modules`
+
+**PUSHED AT**
+2026-07-17T14:21:25.982Z
+
+**WHAT CHANGED**
+Refresh full FAQ catalogue for current modules.
+
+**VERSION HISTORY DETAILS**
+- Refresh full FAQ catalogue for current modules, with changes to automation scripts and data storage.
+- Updated data storage, with changes to automation scripts and data storage.
+- Updated quotes, with changes to automation scripts.
+- Updated inventory, with changes to automation scripts.
+- Updated training, with changes to automation scripts.
+
+**COMMITS IN THIS RELEASE**
+- `docs(help): refresh full FAQ catalogue for current modules`
+
 ## 0726.12.0
 
 **GIT COMMIT MESSAGE**

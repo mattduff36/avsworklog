@@ -1,5 +1,26 @@
 [
   {
+    "version": "0726.12.1",
+    "updateKind": "minor",
+    "title": "Help and FAQ guidance update",
+    "description": "Refresh full FAQ catalogue for current modules.",
+    "summary": "Refresh full FAQ catalogue for current modules.",
+    "details": [
+      "Refresh full FAQ catalogue for current modules, with changes to automation scripts and data storage.",
+      "Updated data storage, with changes to automation scripts and data storage.",
+      "Updated quotes, with changes to automation scripts.",
+      "Updated inventory, with changes to automation scripts.",
+      "Updated training, with changes to automation scripts."
+    ],
+    "areas": [
+      "Help and FAQ"
+    ],
+    "areaKeys": [
+      "help"
+    ],
+    "pushedAt": "2026-07-17T14:21:25.982Z"
+  },
+  {
     "version": "0726.12.0",
     "updateKind": "major",
     "title": "Quotes update",
