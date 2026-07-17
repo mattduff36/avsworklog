@@ -2,6 +2,24 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.12.3
+
+**GIT COMMIT MESSAGE**
+`fix(errors): demote inventory unauthorized fetch noise`
+
+**PUSHED AT**
+2026-07-17T15:03:47.496Z
+
+**WHAT CHANGED**
+Demote inventory unauthorized fetch noise.
+
+**VERSION HISTORY DETAILS**
+- Demote inventory unauthorized fetch noise, with changes to shared logic and automated tests.
+- Updated inventory, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `fix(errors): demote inventory unauthorized fetch noise`
+
 ## 0726.12.2
 
 **GIT COMMIT MESSAGE**

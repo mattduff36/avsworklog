@@ -1,5 +1,23 @@
 [
   {
+    "version": "0726.12.3",
+    "updateKind": "minor",
+    "title": "Error reporting improvements",
+    "description": "Demote inventory unauthorized fetch noise.",
+    "summary": "Demote inventory unauthorized fetch noise.",
+    "details": [
+      "Demote inventory unauthorized fetch noise, with changes to shared logic and automated tests.",
+      "Updated inventory, with changes to app screens."
+    ],
+    "areas": [
+      "Error reporting"
+    ],
+    "areaKeys": [
+      "error-reporting"
+    ],
+    "pushedAt": "2026-07-17T15:03:47.496Z"
+  },
+  {
     "version": "0726.12.2",
     "updateKind": "minor",
     "title": "Debug tools improvements",
