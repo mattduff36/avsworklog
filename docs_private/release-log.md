@@ -2,6 +2,31 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.12.0
+
+**GIT COMMIT MESSAGE**
+`feat(quotes): update Quotes, Data storage, Customers, Reports, and PDF documents`
+
+**PUSHED AT**
+2026-07-17T12:30:45.589Z
+
+**WHAT CHANGED**
+Update Quotes, Data storage, Customers, Reports, and PDF documents. Demote transient fetch failures in timesheets and van inspections.
+
+**VERSION HISTORY DETAILS**
+- Updated Quotes, Data storage, Customers, Reports, and PDF documents, with changes to background routes, app screens, shared logic, automation scripts, automated tests, and data storage.
+- Updated data storage, with changes to shared typing, automation scripts, and data storage.
+- Updated PDF documents, with changes to shared logic.
+- Updated customers, with changes to app screens.
+- Demote transient fetch failures in timesheets and van inspections, with changes to shared logic and automated tests.
+- Updated timesheets, with changes to app screens.
+- Updated reports, with changes to background routes.
+- Updated daily tasks, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `feat(quotes): update Quotes, Data storage, Customers, Reports, and PDF documents`
+- `fix(errors): demote transient fetch failures in timesheets and van inspections`
+
 ## 0726.11.4
 
 **GIT COMMIT MESSAGE**
