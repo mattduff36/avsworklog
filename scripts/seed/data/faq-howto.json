@@ -3,492 +3,1697 @@
     {
       "slug": "getting-started",
       "name": "Getting Started",
+      "description": "General app access, dashboard, and installation guidance.",
+      "module_name": null,
       "sort_order": 1
     },
     {
       "slug": "timesheets",
       "name": "Timesheets",
+      "description": "Help for creating, editing, and tracking timesheets.",
+      "module_name": "timesheets",
       "sort_order": 2
     },
     {
       "slug": "inspections",
-      "name": "Vehicle Inspections",
+      "name": "Van Daily Checks",
+      "description": "Help for completing van daily checks and defect reporting.",
+      "module_name": "inspections",
       "sort_order": 3
     },
     {
-      "slug": "rams",
-      "name": "RAMS Documents",
+      "slug": "plant-daily-checks",
+      "name": "Plant Daily Checks",
+      "description": "Help for completing plant machinery daily checks.",
+      "module_name": "plant-inspections",
       "sort_order": 4
+    },
+    {
+      "slug": "hgv-daily-checks",
+      "name": "HGV Daily Checks",
+      "description": "Help for completing HGV daily checks.",
+      "module_name": "hgv-inspections",
+      "sort_order": 5
+    },
+    {
+      "slug": "projects",
+      "name": "Projects",
+      "description": "Help for project documents, signatures, and visitor sign-in.",
+      "module_name": "rams",
+      "sort_order": 6
     },
     {
       "slug": "absence",
       "name": "Absence & Leave",
-      "sort_order": 5
+      "description": "Help for annual leave, calendars, allowances, and absence reporting.",
+      "module_name": "absence",
+      "sort_order": 7
     },
     {
-      "slug": "fleet-maintenance",
-      "name": "Fleet & Maintenance",
-      "sort_order": 6
+      "slug": "maintenance",
+      "name": "Maintenance",
+      "description": "Help for maintenance schedules and service status.",
+      "module_name": "maintenance",
+      "sort_order": 8
+    },
+    {
+      "slug": "fleet",
+      "name": "Fleet",
+      "description": "Help for fleet assets, vans, plant, HGVs, and asset history.",
+      "module_name": "admin-vans",
+      "sort_order": 9
     },
     {
       "slug": "workshop-tasks",
       "name": "Workshop Tasks",
-      "sort_order": 7
+      "description": "Help for repair tasks, defects, comments, and workshop workflow.",
+      "module_name": "workshop-tasks",
+      "sort_order": 10
+    },
+    {
+      "slug": "inventory",
+      "name": "Inventory",
+      "description": "Help for small tools, minor plant, hardware stock, locations, and Yard kiosk.",
+      "module_name": "inventory",
+      "sort_order": 11
     },
     {
       "slug": "approvals",
-      "name": "Approvals (Managers)",
-      "sort_order": 8
+      "name": "Approvals",
+      "description": "Help for reviewing timesheets and absence requests.",
+      "module_name": "approvals",
+      "sort_order": 12
     },
     {
       "slug": "actions",
-      "name": "Actions (Legacy)",
-      "sort_order": 9
+      "name": "Manager Actions Hub",
+      "description": "Help for the manager action summary pages.",
+      "module_name": "actions",
+      "sort_order": 13
     },
     {
       "slug": "toolbox-talks",
       "name": "Toolbox Talks & Reminders",
-      "sort_order": 10
+      "description": "Help for sending and tracking safety messages.",
+      "module_name": "toolbox-talks",
+      "sort_order": 14
+    },
+    {
+      "slug": "training",
+      "name": "Training",
+      "description": "Help for training records, people, qualifications, and expiry tracking.",
+      "module_name": "training",
+      "sort_order": 15
+    },
+    {
+      "slug": "reminders",
+      "name": "Reminders",
+      "description": "Help for personal task reminders assigned in the app.",
+      "module_name": "reminders",
+      "sort_order": 16
     },
     {
       "slug": "reports",
       "name": "Reports",
-      "sort_order": 11
+      "description": "Help for operational reports and exports.",
+      "module_name": "reports",
+      "sort_order": 17
+    },
+    {
+      "slug": "suggestions",
+      "name": "Suggestions",
+      "description": "Help for reviewing and triaging user suggestions.",
+      "module_name": "suggestions",
+      "sort_order": 18
+    },
+    {
+      "slug": "customers",
+      "name": "Customers",
+      "description": "Help for managing customer records and history.",
+      "module_name": "customers",
+      "sort_order": 19
+    },
+    {
+      "slug": "quotes",
+      "name": "Quotes",
+      "description": "Help for creating, approving, invoicing, and adjusting customer quotes.",
+      "module_name": "quotes",
+      "sort_order": 20
     },
     {
       "slug": "admin-users",
-      "name": "User Management (Admin)",
-      "sort_order": 12
+      "name": "User Management",
+      "description": "Help for admin user and role management.",
+      "module_name": "admin-users",
+      "sort_order": 21
     },
     {
       "slug": "admin-roles",
-      "name": "Roles & Permissions (Admin)",
-      "sort_order": 13
+      "name": "Roles & Permissions",
+      "description": "Help for role and permission setup.",
+      "module_name": "admin-users",
+      "sort_order": 22
+    },
+    {
+      "slug": "admin-settings",
+      "name": "Admin Settings",
+      "description": "Help for admin-only settings and configuration.",
+      "module_name": "admin-settings",
+      "sort_order": 23
+    },
+    {
+      "slug": "faq-editor",
+      "name": "FAQ Editor",
+      "description": "Help for managing FAQ categories, articles, and visibility.",
+      "module_name": "faq-editor",
+      "sort_order": 24
+    },
+    {
+      "slug": "error-reports",
+      "name": "Error Reports",
+      "description": "Help for reviewing user-submitted error reports.",
+      "module_name": "error-reports",
+      "sort_order": 25
     },
     {
       "slug": "notifications",
       "name": "Notifications & Messages",
-      "sort_order": 14
+      "description": "Help for notifications, reminders, and message acknowledgements.",
+      "module_name": null,
+      "sort_order": 26
     },
     {
       "slug": "troubleshooting",
       "name": "Troubleshooting",
-      "sort_order": 15
+      "description": "General support, refresh, login, and access-denied guidance.",
+      "module_name": null,
+      "sort_order": 27
     }
   ],
   "articles": [
     {
       "category_slug": "getting-started",
       "slug": "what-is-squires-app",
-      "title": "What is the Squires App?",
-      "summary": "Overview of the Squires digital forms management system.",
-      "content_md": "# What is the Squires App?\n\nThe Squires App is a custom-built digital forms management system designed for A&V Squires Plant Co. Ltd. It replaces paper-based forms with a modern, mobile-first Progressive Web Application (PWA) accessible from any device.\n\n## Key Features\n\n- **Employee Timesheets** - Digital weekly timesheets with automatic hour calculations\n- **Vehicle Inspections** - Dynamic safety checklists based on vehicle type (Vans get 14 items, Trucks/Artics/Trailers get 26 items)\n- **RAMS Documents** - Risk Assessment & Method Statement management with visitor signatures\n- **Absence Management** - Request and track annual leave with calendar view\n- **Fleet Management** - Track MOT, tax, service schedules, and manage vehicles\n- **Workshop Tasks** - Manage vehicle repairs with categories, status tracking, and comments\n- **Approvals** - Manager review and approval workflows for timesheets and absences\n- **Reports** - Export data as PDF or Excel files\n\n## Access\n\nThe app is available at: https://avsworklog.mpdee.uk\n\nIt works on desktop, tablet, and mobile devices. For the best mobile experience, add it to your home screen as a PWA."
+      "title": "What is the SQUIRES App?",
+      "summary": "Overview of the SQUIRES digital work management system.",
+      "content_md": "# What is the SQUIRES App?\n\nSQUIRES is the A&V Squires digital work management app. It replaces paper forms and shared spreadsheets with a mobile-first web app for daily site and office workflows.\n\n## What it covers\n\nThe modules you see depend on your role and permissions. Common areas include:\n\n- Timesheets\n- Van, plant, and HGV daily checks\n- Projects documents and signatures\n- Absence and leave\n- Maintenance, fleet, workshop tasks, and inventory\n- Training records\n- Approvals, reports, customers, quotes, toolbox talks, reminders, suggestions, and admin tools\n\n## Access\n\nOpen the app at https://avsworklog.mpdee.uk and sign in with your work account.\n\nThe app works on desktop, tablet, and mobile. For regular phone or tablet use, install it from the Help page so it opens like a normal app.",
+      "sort_order": 0
     },
     {
       "category_slug": "getting-started",
       "slug": "how-to-login",
       "title": "How do I log in?",
       "summary": "Instructions for logging into the app.",
-      "content_md": "# How do I log in?\n\n1. Go to https://avsworklog.mpdee.uk\n2. Enter your email address\n3. Enter your password\n4. Click **Sign In**\n\n## First Time Login\n\nIf this is your first login, an admin will have created your account and sent you a temporary password by email. You'll be required to change this password on first login.\n\n## Forgot Password?\n\nContact your administrator to reset your password. They can generate a new temporary password from the User Management page."
+      "content_md": "# How do I log in?\n\n1. Go to https://avsworklog.mpdee.uk\n2. Enter your email address\n3. Enter your password\n4. Click **Sign In**\n\n## First time login\n\nIf this is your first login, an admin will have created your account and sent a temporary password. You may be asked to change that password on first login.\n\n## Forgot password?\n\nAsk an administrator to reset your password from User Management.",
+      "sort_order": 1
     },
     {
       "category_slug": "getting-started",
       "slug": "change-password",
       "title": "How do I change my password?",
       "summary": "Instructions for changing your password.",
-      "content_md": "# How do I change my password?\n\nIf you need to change your password (either because it's your first login or you want to update it):\n\n1. You'll be automatically redirected to the Change Password page if a change is required\n2. Enter your new password (must meet security requirements)\n3. Confirm the new password\n4. Click **Change Password**\n\n## Password Requirements\n\n- Minimum length as set by system\n- Should be unique and not easily guessed\n\n## Forgot Your Password?\n\nAsk your administrator to reset it from the User Management page."
+      "content_md": "# How do I change my password?\n\n1. Open the change-password page if the app redirects you there, or use the account password option available to you.\n2. Enter your new password.\n3. Confirm the new password.\n4. Save the change.\n\nIf you cannot sign in, ask an administrator to issue a temporary password.",
+      "sort_order": 2
     },
     {
       "category_slug": "getting-started",
       "slug": "dashboard-overview",
       "title": "Understanding the Dashboard",
-      "summary": "Guide to the main dashboard and navigation.",
-      "content_md": "# Understanding the Dashboard\n\nThe Dashboard is your home screen after logging in. It shows quick actions and important status information.\n\n## Welcome Section\n\nAt the top, you'll see a welcome message with your name and role.\n\n## Quick Actions (Large Square Buttons)\n\nBased on your permissions, you'll see large colored buttons for:\n- **Timesheets** (blue) - Create/view timesheets\n- **Inspections** (yellow) - Perform vehicle inspections\n- **RAMS** (green) - View assigned RAMS documents\n- **Absence** (purple) - Request annual leave\n- **Maintenance** (red) - View fleet maintenance schedules\n- **Workshop** (brown) - View workshop tasks\n- **Help** - Access this FAQ system\n\nIf you have RAMS documents to sign, a red badge shows the count.\n\n## Management Tools (Smaller Cards)\n\nManagers and Admins see additional cards:\n- **Approvals** (blue) - Review submitted forms\n- **Actions** (purple) - Legacy placeholder retained for future development\n- **Toolbox Talks** (red) - Send safety messages\n- **Reports** (green) - Download reports\n- **Users** (grey, Admin only) - Manage user accounts\n- **Vehicles** (grey, Admin only) - Manage fleet\n\n## Pending Approvals Card\n\nManagers see a summary card showing:\n- Pending timesheet count\n- Pending absence request count\n- Quick link to Approvals page"
+      "summary": "Guide to the main dashboard and permission-based navigation.",
+      "content_md": "# Understanding the Dashboard\n\nThe Dashboard is your home screen after signing in. It shows quick links for the modules you can access and hides modules that are not enabled for your role or team.\n\n## Quick actions\n\nDay-to-day cards can include Timesheets, Van Daily Checks, Plant Daily Checks, HGV Daily Checks, Projects, Absence, Maintenance, Fleet, Workshop Tasks, Inventory, Training, Reminders, and Help.\n\n## Management tools\n\nManagers and admins may also see Approvals, Actions, Toolbox Talks, Reports, Suggestions, Customers, Quotes, User Management, Admin Settings, FAQ Editor, and Error Reports.\n\n## Badges and alerts\n\nSome cards show counts for unsigned documents, pending approvals, unread notifications, or maintenance and workshop alerts.",
+      "sort_order": 3
     },
     {
       "category_slug": "getting-started",
       "slug": "mobile-pwa-install",
-      "title": "How to install the app on my phone",
-      "summary": "Add the Squires App to your home screen for the best mobile experience.",
-      "content_md": "# How to install the app on my phone\n\nThe Squires App is a Progressive Web App (PWA) that can be installed on your phone for an app-like experience.\n\n## iPhone (Safari)\n\n1. Open Safari and go to https://avsworklog.mpdee.uk\n2. Tap the **Share** button (square with arrow)\n3. Scroll down and tap **Add to Home Screen**\n4. Tap **Add** in the top right\n\n## Android (Chrome)\n\n1. Open Chrome and go to https://avsworklog.mpdee.uk\n2. Tap the **three dots** menu in the top right\n3. Tap **Add to Home screen**\n4. Tap **Add**\n\n## Benefits\n\n- Launch directly from your home screen\n- App-like full-screen experience\n- Works offline for viewing previously loaded data\n- Faster access without opening a browser"
+      "title": "How do I install the app on my phone?",
+      "summary": "Add SQUIRES to your home screen for the best mobile experience.",
+      "content_md": "# How do I install the app on my phone?\n\nSQUIRES is a Progressive Web App. Install it from the Help page install guidance or your browser menu.\n\n## iPhone (Safari)\n\n1. Open Safari and sign in to the app.\n2. Tap **Share**.\n3. Tap **Add to Home Screen**.\n\n## Android (Chrome)\n\n1. Open Chrome and sign in to the app.\n2. Open the browser menu.\n3. Tap **Add to Home screen** or **Install app**.\n\nYard tablets use a separate **Yard Inventory** install flow when pairing a kiosk device.",
+      "sort_order": 4
     },
     {
       "category_slug": "getting-started",
       "slug": "user-roles-explained",
       "title": "What are the different user roles?",
-      "summary": "Explanation of Employee, Manager, and Admin roles.",
-      "content_md": "# What are the different user roles?\n\nThe app has three main role types that determine what you can access:\n\n## Employee\n\n- Create and submit timesheets\n- Perform vehicle inspections\n- View and sign assigned RAMS documents\n- Request annual leave\n- View maintenance schedules\n- View assigned workshop tasks\n- Access the Help page\n\n## Manager\n\nEverything an Employee can do, plus:\n- Approve/reject timesheets and absences\n- View and manage Workshop Tasks\n- Send Toolbox Talks and Reminders\n- Download reports\n- Create timesheets/inspections on behalf of employees\n- View all employees' data\n- Manage suggestions\n\n## Admin\n\nEverything a Manager can do, plus:\n- Create, edit, and delete user accounts\n- Reset user passwords\n- Manage roles and permissions\n- Manage vehicle fleet and categories\n- Upload and manage RAMS documents\n- Edit FAQ content\n- Configure system settings\n\n## Super Admin\n\nA special protected account (admin@mpdee.co.uk) that cannot be locked out or modified by other admins. Has full system access and special developer tools."
+      "summary": "Explanation of Employee, Manager, Admin, and Super Admin access.",
+      "content_md": "# What are the different user roles?\n\nYour role and module permissions decide what you can see and do in SQUIRES.\n\n## Employee\n\nEmployees can use day-to-day modules enabled for them, such as Timesheets, daily checks, Projects, Absence, Maintenance, Workshop Tasks, Fleet, Inventory, Reminders, and Help.\n\n## Manager\n\nManagers may also have Approvals, Actions, Toolbox Talks, Reports, Suggestions, Training, and selected management workflows.\n\n## Admin\n\nAdmins can manage users, roles, permissions, customers, quotes, admin settings, FAQ content, fleet assets, and error reports when those modules are enabled.\n\n## Super Admin\n\nSuper Admin is a protected high-access account type used for system administration and recovery.",
+      "sort_order": 5
+    },
+    {
+      "category_slug": "getting-started",
+      "slug": "sensitive-module-pin",
+      "title": "What is the sensitive module PIN?",
+      "summary": "Why Quotes and Customers ask for a sensitive PIN.",
+      "content_md": "# What is the sensitive module PIN?\n\nSome modules, including **Quotes** and **Customers**, are protected by a sensitive-access PIN.\n\nWhen locked, the app asks you to enter your sensitive PIN before showing the module. Unlock lasts for the current sensitive session.\n\nAsk an admin if you need a PIN issued or reset.",
+      "sort_order": 6
+    },
+    {
+      "category_slug": "getting-started",
+      "slug": "view-as-role",
+      "title": "How does View As work?",
+      "summary": "Understanding View As when testing another role.",
+      "content_md": "# How does View As work?\n\nAdmins with the right access can use View As to preview the app as another role or user context.\n\nWhile View As is active, navigation and FAQ visibility follow the effective permissions of the selected role. Exit View As when you have finished testing so you return to your normal admin access.",
+      "sort_order": 7
     },
     {
       "category_slug": "timesheets",
       "slug": "create-timesheet",
       "title": "How do I create a new timesheet?",
-      "summary": "Step-by-step guide to creating and submitting a weekly timesheet.",
-      "content_md": "# How do I create a new timesheet?\n\n## Quick Steps\n\n1. Go to **Timesheets** from the dashboard or navigation\n2. Click the **New Timesheet** button\n3. Select the **Week Ending** date (must be a Sunday)\n4. The system checks if a timesheet already exists for that week\n5. Fill in each day's hours using the day tabs (Mon-Sun)\n6. Add your digital signature\n7. Click **Submit**\n\n## Week Selector\n\nBefore entering data, you'll see the Week Selector:\n- Choose which Sunday ends your timesheet week\n- Only Sundays can be selected\n- If a timesheet already exists for that week, you'll be prompted to edit it instead\n\n## Entering Daily Hours\n\nFor each day:\n1. Click the day tab (Mon, Tue, etc.)\n2. Enter **Start Time** and **End Time**\n3. Hours are calculated automatically\n4. Optionally add a **Job Number**\n5. Add any **Remarks** if needed\n\n## Special Options\n\n- **In Yard** - Mark if you worked in the yard that day\n- **Did Not Work** - Mark days you didn't work (sick, leave, weekend, etc.)\n\n## Important Rules\n\n- All 7 days must have hours entered OR be marked as \"Did Not Work\"\n- You cannot submit a timesheet for a week that already has one\n- A digital signature is required before submission\n\n## Saving Drafts\n\nClick **Save Draft** at any time to save your progress without submitting. You can return later to complete and submit."
+      "summary": "Creating and submitting a weekly timesheet.",
+      "content_md": "# How do I create a new timesheet?\n\n1. Go to **Timesheets**.\n2. Click **New Timesheet**.\n3. Choose the correct timesheet type when prompted.\n4. Select the week ending date.\n5. Complete each day with hours, job details, and remarks as required.\n6. Add your signature if required.\n7. Save a draft or submit.\n\nIf a timesheet already exists for that week and type, open the existing record instead of creating a duplicate.",
+      "sort_order": 0
+    },
+    {
+      "category_slug": "timesheets",
+      "slug": "timesheet-types",
+      "title": "What timesheet types are available?",
+      "summary": "Understanding different timesheet forms such as civils and plant.",
+      "content_md": "# What timesheet types are available?\n\nSQUIRES can show more than one timesheet form type, such as civils and plant styles, depending on your role and admin configuration.\n\nChoose the correct type when creating a timesheet so job fields, plant details, and approval routing stay accurate. Admins can configure type exceptions in Admin Settings when a person needs a non-default form.",
+      "sort_order": 1
+    },
+    {
+      "category_slug": "timesheets",
+      "slug": "timesheet-job-numbers",
+      "title": "How do job numbers work on timesheets?",
+      "summary": "Entering job numbers and related day details.",
+      "content_md": "# How do job numbers work on timesheets?\n\nWhen completing a day on your timesheet, enter the job number or job reference used for that work.\n\nAccurate job numbers help managers review labour against quotes, project numbers, and payroll reports. Add remarks when the job reference alone is not enough context.",
+      "sort_order": 2
     },
     {
       "category_slug": "timesheets",
       "slug": "edit-timesheet",
       "title": "How do I edit a timesheet?",
-      "summary": "Instructions for editing draft or rejected timesheets.",
-      "content_md": "# How do I edit a timesheet?\n\n## When Can I Edit?\n\nYou can only edit timesheets with these statuses:\n- **Draft** - Not yet submitted\n- **Rejected** - Returned by manager with comments\n\nApproved or processed timesheets cannot be edited.\n\n## How to Edit\n\n1. Go to **Timesheets**\n2. Find the timesheet in the list\n3. Click on it to open\n4. You'll be taken to the edit form automatically\n5. Make your changes\n6. Click **Save** or **Submit**\n\n## After Rejection\n\nIf your timesheet was rejected:\n1. Read the manager's comments (shown at the top or indicated by \"See manager comments\")\n2. Make the requested corrections\n3. Update your signature if needed\n4. Re-submit the timesheet"
+      "summary": "Editing draft or returned timesheets.",
+      "content_md": "# How do I edit a timesheet?\n\n1. Open **Timesheets**.\n2. Select the timesheet.\n3. Edit days, hours, job details, or remarks.\n4. Save draft or resubmit.\n\nSubmitted timesheets may be locked until a manager returns them. Approved timesheets normally cannot be edited by the employee.",
+      "sort_order": 3
     },
     {
       "category_slug": "timesheets",
       "slug": "timesheet-statuses",
       "title": "What do timesheet statuses mean?",
-      "summary": "Explanation of Draft, Submitted, Approved, Rejected, Processed, and Adjusted statuses.",
-      "content_md": "# What do timesheet statuses mean?\n\n## Draft\n\nTimesheet is saved but not submitted. Only you can see it. You can continue editing.\n\n## Submitted (shows as \"Pending\")\n\nTimesheet has been submitted for manager approval. You cannot edit until reviewed. Shows an amber clock icon.\n\n## Approved\n\nManager has approved the timesheet. Shows a green checkmark. It will be processed for payroll.\n\n## Rejected\n\nManager has returned the timesheet with comments. Shows a red X. Read the feedback, make corrections, and re-submit.\n\n## Processed\n\nTimesheet has been processed for payroll. Shows a blue package icon. This is the final status for normal timesheets.\n\n## Adjusted\n\nThe timesheet was adjusted after approval (rare case for corrections). Shows an amber warning icon."
+      "summary": "Draft, submitted, approved, and related statuses.",
+      "content_md": "# What do timesheet statuses mean?\n\nCommon statuses include:\n\n- **Draft** - saved but not submitted\n- **Submitted** - waiting for manager review\n- **Approved** - accepted for payroll/processing\n- **Rejected** or returned statuses - needs correction and resubmission\n\nCheck Approvals if you are a manager reviewing submitted timesheets.",
+      "sort_order": 4
     },
     {
       "category_slug": "timesheets",
       "slug": "timesheet-pdf-download",
-      "title": "How do I download a timesheet as PDF?",
-      "summary": "Instructions for downloading timesheet PDFs.",
-      "content_md": "# How do I download a timesheet as PDF?\n\nPDF download is available for submitted, approved, processed, and adjusted timesheets.\n\n## From the Timesheet List\n\n1. Go to **Timesheets**\n2. Find the timesheet you want\n3. Click the **Download PDF** button on the card\n4. The PDF will download to your device\n\n## What's Included\n\n- Employee name and details\n- Week ending date\n- Registration number (if assigned)\n- All daily entries with hours\n- Job numbers and remarks\n- Total hours\n- Employee signature\n- Submission date"
+      "title": "How do I download a timesheet PDF?",
+      "summary": "Downloading a timesheet PDF copy.",
+      "content_md": "# How do I download a timesheet PDF?\n\nOpen the timesheet and use the PDF download action when available. Managers can also export wider timesheet and payroll reports from **Reports**.",
+      "sort_order": 5
     },
     {
       "category_slug": "timesheets",
       "slug": "delete-timesheet",
-      "title": "Can I delete a timesheet?",
-      "summary": "Information about deleting timesheets.",
-      "content_md": "# Can I delete a timesheet?\n\n## For Employees\n\nEmployees cannot delete timesheets. If you have a draft you no longer need, you can leave it and create a new one for a different week.\n\n## For Managers\n\nManagers can delete any timesheet:\n\n1. Go to **Timesheets**\n2. Find the timesheet in the list\n3. Click the red **trash** icon\n4. Confirm the deletion\n\n**Warning:** Deleting a timesheet permanently removes it and all its entries. This cannot be undone."
+      "title": "How do I delete a timesheet?",
+      "summary": "Deleting a draft timesheet when allowed.",
+      "content_md": "# How do I delete a timesheet?\n\nDraft timesheets can usually be deleted by the owner or a manager with permission. Submitted or approved timesheets follow the approval process instead of simple deletion.\n\nIf you cannot delete a record, ask a manager to review it in Approvals.",
+      "sort_order": 6
     },
     {
       "category_slug": "timesheets",
       "slug": "timesheet-filters",
       "title": "How do I filter timesheets?",
-      "summary": "Using status filters and employee filters on the timesheets page.",
-      "content_md": "# How do I filter timesheets?\n\n## For Managers\n\nManagers have additional filtering options:\n\n### Employee Filter\n\nAt the top of the page:\n1. Click the **View timesheets for** dropdown\n2. Select a specific employee or \"All Employees\"\n\n### Status Filter\n\nFilter buttons to show:\n- **All** - Every timesheet\n- **Draft** - Saved but not submitted\n- **Pending** - Awaiting approval\n- **Approved** - Approved by manager\n- **Rejected** - Returned to employee\n- **Processed** - Processed for payroll\n- **Adjusted** - Modified after approval\n\n## For Employees\n\nEmployees see only their own timesheets. The list shows most recent first."
+      "summary": "Using timesheet list filters.",
+      "content_md": "# How do I filter timesheets?\n\nOn the Timesheets page, use the available filters to narrow by status, week, employee, or type depending on your permissions.\n\nManagers typically see more employees and filter options than employees reviewing their own records.",
+      "sort_order": 7
+    },
+    {
+      "category_slug": "timesheets",
+      "slug": "create-timesheet-for-employee",
+      "title": "How do I create a timesheet for an employee? (Managers)",
+      "summary": "Managers creating timesheets on behalf of employees.",
+      "content_md": "# How do I create a timesheet for an employee? (Managers)\n\nManagers with permission can create or complete timesheets for employees when needed.\n\n1. Open **Timesheets**.\n2. Start a new timesheet.\n3. Select the employee if the form allows it.\n4. Complete the week and submit or leave as draft according to your process.\n\nUse this when supporting payroll cut-off or correcting a missed submission.",
+      "sort_order": 8
     },
     {
       "category_slug": "inspections",
       "slug": "create-inspection",
-      "title": "How do I perform a vehicle inspection?",
-      "summary": "Step-by-step guide to completing a vehicle safety inspection.",
-      "content_md": "# How do I perform a vehicle inspection?\n\n## Quick Steps\n\n1. Go to **Inspections** from the dashboard\n2. Click **New Inspection**\n3. Select the **Vehicle** from the dropdown (or add a new one)\n4. Select the **Week Ending** date (must be a Sunday)\n5. Enter the current **Mileage**\n6. Complete the checklist for each day\n7. Click **Submit Inspection**\n\n## Vehicle Selection\n\nWhen you select a vehicle, the checklist automatically adjusts based on the vehicle type:\n- **Vans** get a 14-point checklist\n- **Trucks, Artics, Trailers** get a 26-point checklist\n\n## The Checklist\n\nFor each item, you must mark it as:\n- **Pass** (green tick) - Item is satisfactory\n- **Fail** (red X) - Item has a defect or issue\n\n**Important:** If you mark an item as **Fail**, you MUST add a comment explaining the defect.\n\n## Daily Tabs\n\nUse the Mon-Sun tabs to fill in each day:\n- A green checkmark on a tab indicates all items are complete for that day\n- Progress is shown at the top (e.g., \"45/98\" for a 14-item Van checklist over 7 days)\n\n## Locked Fields\n\nOnce you start filling the checklist, the vehicle and week ending become locked. This prevents accidentally mixing data between vehicles.\n\n## Save as Draft\n\nClick **Save Draft** at any time to save progress. Return later to complete and submit."
-    },
-    {
-      "category_slug": "inspections",
-      "slug": "inspection-checklists",
-      "title": "What items are on the inspection checklist?",
-      "summary": "Detailed list of inspection items for different vehicle types.",
-      "content_md": "# What items are on the inspection checklist?\n\nThe checklist varies based on vehicle category.\n\n## Van Checklist (14 Items)\n\n1. Oil, Fuel & Coolant Levels/Leaks\n2. Wheels & Nuts\n3. Tyres\n4. Windows & Wipers\n5. Mirrors\n6. Visual Body Condition\n7. Lights/Flashing Beacons\n8. Instrument Gauges/Horns\n9. Seat Belt\n10. Visual Interior Condition\n11. Locking Devices\n12. Steering\n13. Parking Brake\n14. Brake Test\n\n## Truck/Artic/Trailer Checklist (26 Items)\n\n1. Fuel - and ad-blu\n2. Mirrors - includes Class V & Class VI\n3. Safety Equipment - Cameras & Audible Alerts\n4. Warning Signage - VRU Sign\n5. FORS Stickers\n6. Oil\n7. Water\n8. Battery\n9. Tyres\n10. Brakes\n11. Steering\n12. Lights\n13. Reflectors\n14. Indicators\n15. Wipers\n16. Washers\n17. Horn\n18. Markers\n19. Sheets / Ropes / Chains\n20. Security of Load\n21. Side underbar/Rails\n22. Brake Hoses\n23. Couplings Secure\n24. Electrical Connections\n25. Trailer No. Plate\n26. Nil Defects"
+      "title": "How do I perform a van daily check?",
+      "summary": "Step-by-step guide to completing a van daily check.",
+      "content_md": "# How do I perform a van daily check?\n\n1. Go to **Van Daily Checks**.\n2. Click **New Daily Check**.\n3. Select the van and week ending date.\n4. Enter the current mileage.\n5. Complete each daily checklist tab.\n6. Add required comments for any failed item.\n7. Save a draft or submit the check.\n\nFailed items can create workshop follow-up for managers.",
+      "sort_order": 0
     },
     {
       "category_slug": "inspections",
       "slug": "inspection-defects",
-      "title": "What happens when I report a defect?",
-      "summary": "How defects are tracked, locked, and resolved.",
-      "content_md": "# What happens when I report a defect?\n\nWhen you mark an inspection item as **Fail** (defect):\n\n## Automatic Workshop Task Creation\n\n1. A Workshop Task is automatically created for the defect\n2. The task appears in the Workshop Tasks page\n3. Managers are notified to review\n\n## Adding Details\n\nAlways add:\n- **Comments** describing the defect (REQUIRED)\n- The more detail, the easier for workshop to fix\n\n## Defect Locking System\n\nOnce a manager marks a defect as **Logged**, **In Progress**, or **On Hold**:\n\n- The defect becomes **read-only** on future inspections\n- You'll see a \"🔒 LOGGED DEFECT\" badge on the item\n- The manager's comment is shown\n- The item is automatically marked as Failed for all days\n- You cannot change this status until management resolves it\n\nThis prevents conflicting reports while a defect is being worked on.\n\n## Resolving Previous Defects\n\nIf an item was defective in a previous inspection and you want to mark it OK:\n\n1. Select **Pass** on the item\n2. A **Resolution Required** dialog appears\n3. Enter an explanation (e.g., \"Light bulb replaced by Dave on Wednesday\")\n4. Click **Mark as Resolved**\n\nThis creates an audit trail showing how the defect was fixed."
+      "title": "What happens when I report a van defect?",
+      "summary": "How failed van check items become trackable workshop work.",
+      "content_md": "# What happens when I report a van defect?\n\nWhen you mark a van daily check item as **Fail**, the app records the defect with your comments.\n\nDefects can be reviewed in daily check reports and workshop workflows. Add practical detail such as what is wrong, which side is affected, and whether the vehicle can still be used safely.",
+      "sort_order": 1
+    },
+    {
+      "category_slug": "inspections",
+      "slug": "inspection-checklists",
+      "title": "What items are on the van daily check?",
+      "summary": "Summary of the van daily check checklist.",
+      "content_md": "# What items are on the van daily check?\n\nTypical van checklist areas include fluids and leaks, wheels and tyres, windows and wipers, mirrors, body condition, lights, gauges and horn, seat belt, interior condition, locking devices, steering, and brakes.\n\nPlant and HGV checks have their own modules because their forms and compliance needs are different.",
+      "sort_order": 2
     },
     {
       "category_slug": "inspections",
       "slug": "inspection-statuses",
-      "title": "What do inspection statuses mean?",
-      "summary": "Explanation of inspection status workflow.",
-      "content_md": "# What do inspection statuses mean?\n\n## Draft\n\nInspection is saved but not complete. You can continue editing. Shows as a grey file icon.\n\n## Submitted\n\nInspection is submitted. Any defects will be actioned by managers. Shows as a green checkmark.\n\nNote: Unlike timesheets, inspections don't require manager \"approval\" - they're submitted and defects are tracked separately through Workshop Tasks."
+      "title": "What do van daily check statuses mean?",
+      "summary": "Draft and submitted van daily check statuses.",
+      "content_md": "# What do van daily check statuses mean?\n\n## Draft\n\nSaved but not submitted. You can return to finish it.\n\n## Submitted\n\nSubmitted for review. Defects are available for manager and workshop follow-up.\n\nDaily checks do not use the same approval workflow as timesheets.",
+      "sort_order": 3
     },
     {
       "category_slug": "inspections",
       "slug": "add-vehicle-inspection",
-      "title": "How do I add a new vehicle during inspection?",
-      "summary": "Adding a vehicle that isn't in the system yet.",
-      "content_md": "# How do I add a new vehicle during inspection?\n\nIf the vehicle you're inspecting isn't in the dropdown list:\n\n1. Click the **Vehicle** dropdown\n2. Select **Add New Vehicle** at the top (highlighted in yellow)\n3. A dialog appears - enter:\n   - **Registration Number** (required)\n   - **Vehicle Category** (required) - Van, Truck, Artic, or Trailer\n4. Click **Add Vehicle**\n\nThe vehicle is added to the system and automatically selected. The checklist updates based on the category chosen."
+      "title": "How do I add a van during a daily check?",
+      "summary": "Adding a van that is not yet in the daily check list.",
+      "content_md": "# How do I add a van during a daily check?\n\nIf the van is missing from the selector and your permissions allow it, use the add option in the van selector. Enter the registration or identifier carefully.\n\nIf you cannot add a van, ask a manager or admin with Fleet access to create the asset first.",
+      "sort_order": 4
     },
     {
       "category_slug": "inspections",
       "slug": "duplicate-inspection",
-      "title": "Why can't I create an inspection?",
-      "summary": "Understanding duplicate inspection prevention.",
-      "content_md": "# Why can't I create an inspection?\n\nThe system prevents duplicate inspections for the same vehicle and week.\n\n## Duplicate Detection\n\nIf you see an error: \"An inspection for this vehicle and week already exists\"\n\nThis means:\n- An inspection already exists for that vehicle + week ending combination\n- You need to either:\n  - Select a different vehicle\n  - Select a different week ending date\n  - Edit the existing inspection instead\n\n## Finding Existing Inspections\n\n1. Go to **Inspections**\n2. Look for the inspection in the list\n3. Click to view or edit it"
+      "title": "Why can I not create a van daily check?",
+      "summary": "Understanding duplicate daily check prevention.",
+      "content_md": "# Why can I not create a van daily check?\n\nThe app prevents duplicate daily checks for the same van and reporting period.\n\nCheck for an existing draft, confirm the van and week ending, and open the existing check instead of creating a second one.",
+      "sort_order": 5
     },
     {
-      "category_slug": "rams",
+      "category_slug": "inspections",
+      "slug": "van-checks-vs-plant-hgv",
+      "title": "How are van, plant, and HGV daily checks different?",
+      "summary": "When to use each daily check module.",
+      "content_md": "# How are van, plant, and HGV daily checks different?\n\n- **Van Daily Checks** - vans and light vehicles\n- **Plant Daily Checks** - plant machinery and hours/meter readings\n- **HGV Daily Checks** - HGVs and HGV compliance items\n\nUse the module that matches the asset. Fleet history and workshop defects remain linked to the correct asset type.",
+      "sort_order": 6
+    },
+    {
+      "category_slug": "plant-daily-checks",
+      "slug": "create-plant-daily-check",
+      "title": "How do I complete a plant daily check?",
+      "summary": "Step-by-step guide to completing a plant machinery daily check.",
+      "content_md": "# How do I complete a plant daily check?\n\n1. Go to **Plant Daily Checks**.\n2. Click **New Plant Daily Check**.\n3. Select the plant item.\n4. Enter the required meter or hours reading.\n5. Complete the checklist.\n6. Add a comment for any failed item.\n7. Save a draft or submit.",
+      "sort_order": 0
+    },
+    {
+      "category_slug": "plant-daily-checks",
+      "slug": "plant-check-history",
+      "title": "Where do I find plant check history?",
+      "summary": "Reviewing submitted plant checks and fleet history.",
+      "content_md": "# Where do I find plant check history?\n\nOpen **Plant Daily Checks** for draft and submitted checks. Managers can also review longer-term plant history in **Fleet**.",
+      "sort_order": 1
+    },
+    {
+      "category_slug": "plant-daily-checks",
+      "slug": "plant-check-defects",
+      "title": "What happens when I report a plant defect?",
+      "summary": "Plant daily check defects and workshop follow-up.",
+      "content_md": "# What happens when I report a plant defect?\n\nMark failed checklist items clearly and describe the fault. Plant defects can feed workshop or maintenance follow-up after manager review.",
+      "sort_order": 2
+    },
+    {
+      "category_slug": "plant-daily-checks",
+      "slug": "plant-check-hours-readings",
+      "title": "How do plant hours or meter readings work?",
+      "summary": "Entering hours/meter values on plant daily checks.",
+      "content_md": "# How do plant hours or meter readings work?\n\nEnter the current hours or meter reading when completing a plant daily check. Accurate readings keep Fleet history and maintenance planning reliable.",
+      "sort_order": 3
+    },
+    {
+      "category_slug": "plant-daily-checks",
+      "slug": "plant-check-draft-submit",
+      "title": "How do draft and submit work for plant checks?",
+      "summary": "Saving plant check drafts and submitting completed checks.",
+      "content_md": "# How do draft and submit work for plant checks?\n\nSave a **Draft** if you need to finish later. Submit only when the checklist and readings are complete. Submitted checks become part of the plant compliance history.",
+      "sort_order": 4
+    },
+    {
+      "category_slug": "hgv-daily-checks",
+      "slug": "create-hgv-daily-check",
+      "title": "How do I complete an HGV daily check?",
+      "summary": "Step-by-step guide to completing an HGV daily check.",
+      "content_md": "# How do I complete an HGV daily check?\n\n1. Go to **HGV Daily Checks**.\n2. Click **New HGV Daily Check**.\n3. Select the HGV.\n4. Enter the mileage or odometer reading.\n5. Complete all required checklist items.\n6. Add defect comments where needed.\n7. Save a draft or submit.",
+      "sort_order": 0
+    },
+    {
+      "category_slug": "hgv-daily-checks",
+      "slug": "hgv-mileage-history",
+      "title": "How is HGV mileage used?",
+      "summary": "How HGV daily check mileage supports asset history.",
+      "content_md": "# How is HGV mileage used?\n\nMileage entered on HGV daily checks keeps the asset record current. Managers can review mileage movement with checks and maintenance history in **Fleet**.",
+      "sort_order": 1
+    },
+    {
+      "category_slug": "hgv-daily-checks",
+      "slug": "hgv-check-defects",
+      "title": "What happens when I report an HGV defect?",
+      "summary": "HGV daily check defects and follow-up.",
+      "content_md": "# What happens when I report an HGV defect?\n\nFailed HGV checklist items are recorded with your comments and can create workshop follow-up. Include enough detail for a safe repair decision.",
+      "sort_order": 2
+    },
+    {
+      "category_slug": "hgv-daily-checks",
+      "slug": "hgv-check-draft-submit",
+      "title": "How do draft and submit work for HGV checks?",
+      "summary": "Saving HGV check drafts and submitting completed checks.",
+      "content_md": "# How do draft and submit work for HGV checks?\n\nSave a draft to continue later. Submit when the mileage and checklist are complete so compliance history stays accurate.",
+      "sort_order": 3
+    },
+    {
+      "category_slug": "projects",
       "slug": "what-is-rams",
-      "title": "What is RAMS?",
-      "summary": "Overview of the RAMS document system.",
-      "content_md": "# What is RAMS?\n\nRAMS stands for **Risk Assessment and Method Statement**. These are important safety documents that outline:\n\n- Potential hazards for a task or site\n- Safety measures and procedures\n- Method of work to be followed\n\n## Legal Requirement\n\nRAMS documents are legally required to ensure workers understand the risks and safety procedures before starting work.\n\n## In the App\n\nManagers upload RAMS documents and assign them to relevant employees. You must:\n1. Read the document\n2. Sign to confirm you've read and understood it\n\n## Document Status\n\nEach RAMS document shows:\n- **Needs Signature** (red badge) - You haven't signed yet\n- **Signed** (green badge) - You've read and signed"
+      "title": "What are Projects documents?",
+      "summary": "Overview of the Projects document and signature workflow.",
+      "content_md": "# What are Projects documents?\n\nThe **Projects** module is where project documents, including RAMS-style safety documents, are uploaded, assigned, read, and signed.\n\nEmployees view and sign assigned documents. Managers upload, assign, track signatures, and capture visitor signatures when needed.",
+      "sort_order": 0
     },
     {
-      "category_slug": "rams",
+      "category_slug": "projects",
       "slug": "view-sign-rams",
-      "title": "How do I view and sign RAMS documents?",
-      "summary": "Instructions for reading and signing assigned RAMS.",
-      "content_md": "# How do I view and sign RAMS documents?\n\n## Viewing Your Assigned RAMS\n\n1. Go to **RAMS** from the dashboard or navigation\n2. You'll see a list of RAMS documents assigned to you\n3. Documents show status: **Needs Signature** or **Signed**\n\n## Filtering\n\nUse the filter buttons:\n- **All** - Show all documents\n- **Pending** - Documents needing signature\n- **Signed** - Documents you've already signed\n\nUse the search bar to find documents by title.\n\n## Signing a RAMS Document\n\n1. Click **Read & Sign** on a pending document\n2. Read the PDF document (it opens in a viewer)\n3. Scroll through to confirm you've read it\n4. Click the **Sign** button\n5. Your digital signature and timestamp are recorded\n\n## After Signing\n\nSigned documents remain accessible for reference. Click **View Document** to re-read them."
+      "title": "How do I view and sign project documents?",
+      "summary": "Reading and signing assigned project documents.",
+      "content_md": "# How do I view and sign project documents?\n\n1. Go to **Projects**.\n2. Open the document assigned to you.\n3. Read the PDF.\n4. Sign when you have read and understood it.\n\nPending documents may also appear on Dashboard badges.",
+      "sort_order": 1
     },
     {
-      "category_slug": "rams",
+      "category_slug": "projects",
       "slug": "rams-visitor-signature",
-      "title": "How do visitors sign RAMS documents?",
-      "summary": "Recording visitor signatures for site safety compliance.",
-      "content_md": "# How do visitors sign RAMS documents?\n\nFor site visitors who need to acknowledge RAMS documents but don't have app accounts.\n\n**Note:** You must have signed the document yourself before recording visitor signatures.\n\n## Recording a Visitor Signature\n\n1. Go to **RAMS**\n2. Find the relevant document (must be one you've signed)\n3. Click **Record Visitor** button\n4. A modal appears - enter:\n   - **Visitor's Full Name** (required)\n5. Have the visitor sign on the signature pad\n6. Click **Submit Signature**\n\n## What Gets Recorded\n\n- Visitor's name\n- Digital signature\n- Timestamp\n- Which RAMS document they signed\n- Who recorded the signature (you)\n\nThis creates a compliance record for site visitors."
+      "title": "How do visitors sign project documents?",
+      "summary": "Recording visitor signatures for project document compliance.",
+      "content_md": "# How do visitors sign project documents?\n\n1. Open the document in **Projects**.\n2. Choose the visitor signature option.\n3. Enter the visitor name.\n4. Capture the signature.\n5. Submit.\n\nThe app stores the visitor name, signature, timestamp, document, and the user who captured it.",
+      "sort_order": 2
     },
     {
-      "category_slug": "rams",
+      "category_slug": "projects",
       "slug": "upload-rams-manager",
-      "title": "How do I upload RAMS documents? (Managers)",
-      "summary": "Instructions for uploading and assigning RAMS documents.",
-      "content_md": "# How do I upload RAMS documents? (Managers)\n\n**Note:** This is for Managers and Admins only.\n\n## Accessing RAMS Management\n\n1. Go to **RAMS**\n2. Click **Manage RAMS** button (gear icon)\n\n## Uploading a New RAMS\n\n1. Click **Upload New RAMS**\n2. Fill in:\n   - **Title** - Clear name for the document\n   - **Description** - Brief summary\n   - **PDF File** - The RAMS document (PDF format, size limits apply)\n3. Click **Upload**\n\n## Assigning to Employees\n\nAfter uploading:\n1. Find the RAMS in the management list\n2. Click **Assign Employees** or the assign button\n3. Select employees who need to sign:\n   - Use checkboxes to select individuals\n   - Or use \"Select All\" for everyone\n4. Click **Assign**\n\nAssigned employees will see the document in their RAMS page with \"Needs Signature\" status."
+      "title": "How do I upload project documents? (Managers)",
+      "summary": "Uploading and assigning project documents.",
+      "content_md": "# How do I upload project documents? (Managers)\n\n1. Go to **Projects**.\n2. Open the management or settings area.\n3. Upload the PDF.\n4. Add a clear title and description.\n5. Assign it to the users who need to sign.\n\nAssigned users then see the document in Projects.",
+      "sort_order": 3
+    },
+    {
+      "category_slug": "projects",
+      "slug": "project-document-types",
+      "title": "What kinds of project documents are used?",
+      "summary": "Understanding project document types including RAMS-style files.",
+      "content_md": "# What kinds of project documents are used?\n\nProjects commonly stores RAMS-style safety documents and related PDF project paperwork that must be read and signed before work.\n\nUse clear titles so employees can recognise the correct document for the job or site.",
+      "sort_order": 4
+    },
+    {
+      "category_slug": "projects",
+      "slug": "assign-project-documents",
+      "title": "How do I assign project documents to employees?",
+      "summary": "Assigning project documents for signature.",
+      "content_md": "# How do I assign project documents to employees?\n\nFrom Projects management, upload or open the document and assign the employees who must read and sign it. Track outstanding signatures from the Projects management views and Dashboard badges.",
+      "sort_order": 5
     },
     {
       "category_slug": "absence",
       "slug": "request-absence",
-      "title": "How do I request annual leave?",
-      "summary": "Instructions for submitting an annual leave request.",
-      "content_md": "# How do I request annual leave?\n\n## Summary Card\n\nAt the top of the Absence page, you'll see your annual leave summary for the current UK financial year (April to April):\n- **Total Allowance** - Your yearly entitlement\n- **Approved Taken** - Days already used\n- **Pending** - Days in pending requests\n- **Remaining** - Days still available\n\n## Making a Request\n\n1. Go to **Absence** from the dashboard\n2. Click **Request Annual Leave** to expand the form\n3. Fill in:\n   - **Start Date** - First day of leave\n   - **End Date** - Last day (optional for single-day requests)\n   - **Half Day** - Check if taking only half a day (AM or PM)\n   - **Notes** - Any additional information\n4. Review the **Request Summary** showing calculated days\n5. Click **Submit Request**\n\n## Half-Day Requests\n\nFor half-days:\n1. Check the **Half Day** box\n2. Select **AM** or **PM**\n3. End date is automatically disabled (half-days are single-day only)\n\n## Allowance Check\n\nThe system prevents over-booking:\n- **Projected Remaining** shows what's left after this request\n- If negative, you'll see a warning and can't submit"
+      "title": "How do I request absence or leave?",
+      "summary": "Booking annual leave or other absence.",
+      "content_md": "# How do I request absence or leave?\n\n1. Open **Absence**.\n2. Create a new absence or leave request.\n3. Choose the dates and reason.\n4. Submit for approval.\n\nManagers review requests in Approvals or Absence manage views.",
+      "sort_order": 0
     },
     {
       "category_slug": "absence",
       "slug": "absence-calendar",
-      "title": "How do I use the absence calendar?",
-      "summary": "Understanding the calendar view and day interactions.",
-      "content_md": "# How do I use the absence calendar?\n\n## Calendar View\n\nThe calendar shows the current month in the UK financial year:\n- Use **arrows** to navigate months\n- Navigate through April (start) to March (end) of the financial year\n\n## Color Coding\n\n- 🟣 **Purple dot** - Approved annual leave\n- 🟡 **Amber dot** - Pending request\n- 🔵 **Blue dot** - Other absence type\n\n## For Managers/Admins\n\nManagers see all employees on the calendar:\n- Each day shows employee names with bullet points\n- Use the **Filter** button to select which employees to display\n- Click checkboxes to show/hide specific employees\n\n## Clicking a Day\n\nClick any day to:\n- See what absences are booked for that date\n- Start a new request for that day (if no absences)"
+      "title": "How does the absence calendar work?",
+      "summary": "Viewing leave on the absence calendar.",
+      "content_md": "# How does the absence calendar work?\n\nThe absence calendar shows booked and requested leave so teams can see coverage. Managers with manage access can review wider team calendars from Absence management.",
+      "sort_order": 1
     },
     {
       "category_slug": "absence",
       "slug": "cancel-absence",
       "title": "How do I cancel an absence request?",
-      "summary": "Instructions for cancelling a pending or approved absence.",
-      "content_md": "# How do I cancel an absence request?\n\n## From My Bookings Tab\n\n1. Go to **Absence**\n2. Click the **My Bookings** tab\n3. Find your request in the list\n4. Click **Cancel** button\n5. Confirm cancellation\n\n## When Can I Cancel?\n\nYou can cancel:\n- **Pending requests** - Any time before they're reviewed\n- **Approved requests** - Only if the start date is in the future\n\nYou cannot cancel:\n- Requests that have already started\n- Requests in the past"
+      "summary": "Cancelling leave that is still allowed to change.",
+      "content_md": "# How do I cancel an absence request?\n\nOpen the absence record and use the cancel action while your permissions and the request status allow it. If the booking is locked after approval, ask a manager to review it.",
+      "sort_order": 2
     },
     {
       "category_slug": "absence",
       "slug": "absence-management",
-      "title": "How do I manage absences? (Managers)",
-      "summary": "Approve/reject requests and configure settings.",
-      "content_md": "# How do I manage absences? (Managers)\n\n**Note:** This is for Managers and Admins only.\n\n## Accessing Management\n\n1. Go to **Absence**\n2. Click the **Manage Absence** button (top right)\n\n## What You Can Do\n\n### View All Requests\n\n- See pending requests from all employees\n- Filter by status (Pending, Approved, Rejected)\n\n### Approve/Reject\n\n- Click on a request to view details\n- **Approve** - Grant the leave request\n- **Reject** - Decline with optional reason\n\n### Configure Settings\n\n- Set absence reasons (Annual Leave, Sick, etc.)\n- Configure which reasons require approval\n- Manage employee allowances"
+      "title": "How do managers manage absence?",
+      "summary": "Using Absence manage tools for calendars, allowances, and reasons.",
+      "content_md": "# How do managers manage absence?\n\nManagers with access can open Absence management tools to review calendars, work shifts, allowances, reasons, and overview information.\n\nUse these tools to process bookings, check remaining allowance, and keep leave reasons consistent.",
+      "sort_order": 3
     },
     {
-      "category_slug": "fleet-maintenance",
-      "slug": "fleet-overview",
-      "title": "What is Fleet Management?",
-      "summary": "Overview of the Fleet page and its tabs.",
-      "content_md": "# What is Fleet Management?\n\nFleet Management is a unified page with three tabs for managing vehicles and their maintenance.\n\n## Accessing Fleet\n\nClick **Maintenance** from the dashboard, or go to **Fleet** directly.\n\n## Tabs\n\n### Maintenance Tab (All Users)\n\nView maintenance status for all vehicles:\n- Summary cards showing overdue and due soon counts\n- Searchable vehicle list\n- Status indicators for each maintenance type\n\n### Vehicles Tab (Managers/Admins)\n\nManage the vehicle fleet:\n- Add, edit, delete vehicles\n- Assign vehicle categories\n- View vehicle details\n\n### Settings Tab (Managers/Admins)\n\nConfigure maintenance settings:\n- Warning thresholds\n- Manage vehicle categories\n- Configure which maintenance types are tracked"
+      "category_slug": "absence",
+      "slug": "absence-reports",
+      "title": "What absence reports are available?",
+      "summary": "Overview of absence and leave reports in the Reports hub.",
+      "content_md": "# What absence reports are available?\n\nOpen **Reports** → **Absence & Leave** for:\n\n- **Absence & Leave Bookings**\n- **Absence Allowance Snapshot**\n- **Absence Weekly Print Sheet**\n\nSet the date controls before downloading.",
+      "sort_order": 4
     },
     {
-      "category_slug": "fleet-maintenance",
+      "category_slug": "absence",
+      "slug": "absence-allowance-year",
+      "title": "How do absence allowances and leave years work?",
+      "summary": "Understanding allowance totals and leave-year snapshots.",
+      "content_md": "# How do absence allowances and leave years work?\n\nManagers can review allowance totals and snapshots from Absence management and the **Absence Allowance Snapshot** report.\n\nAllowance figures help confirm remaining leave before approving new bookings. Use the snapshot date carefully when exporting totals.",
+      "sort_order": 5
+    },
+    {
+      "category_slug": "absence",
+      "slug": "manager-absence-settings",
+      "title": "How do manager absence settings work?",
+      "summary": "Reasons, shifts, and manage-side absence configuration.",
+      "content_md": "# How do manager absence settings work?\n\nIn Absence management, managers can maintain reasons, work-shift information, and related settings that control how bookings are recorded and reported.\n\nKeep reasons clear so Approvals and Reports stay consistent.",
+      "sort_order": 6
+    },
+    {
+      "category_slug": "inventory",
+      "slug": "inventory-overview",
+      "title": "What is Inventory?",
+      "summary": "Overview of small tools, minor plant, hardware stock, locations, checks, and Yard kiosk.",
+      "content_md": "# What is Inventory?\n\nInventory tracks small tools, minor plant, hardware stock, and where items are located across the yard, vans, HGVs, plant, and sites.\n\n## Manager and admin view\n\nOpen **Inventory**. You will see three main tabs:\n\n- **Overview** - Small Tools, Minor Plant, Hardware, and Retired Items\n- **Locations** - yard, vehicle, site, and manual locations\n- **Settings** - Categories, Groups, Hardware Catalogue, and Yard Kiosks\n\nUse **Add Item**, **Add Location**, and **Set My Location** from the page actions when available.\n\n## Employee view\n\nEmployees do not see the full manager tabs. Instead they set a location, view **My Inventory Items**, optionally work with a secondary **Site** location, transfer **Hardware**, and **Claim An Item**.\n\n## Related tools\n\nThe dedicated **Yard Inventory** kiosk at `/yard-kiosk` is used on trusted tablets to collect from or return stock to the Yard.",
+      "sort_order": 0
+    },
+    {
+      "category_slug": "inventory",
+      "slug": "inventory-employee-view",
+      "title": "How do I use Inventory as an employee?",
+      "summary": "Employee inventory workflow: location, items, hardware transfer, and claims.",
+      "content_md": "# How do I use Inventory as an employee?\n\n1. Open **Inventory**.\n2. Use **Set Your Inventory Location** or **Change My Location** to choose where you are working.\n3. Review **My Inventory Items** for tools assigned to your location.\n4. If a secondary site is assigned, review the **Site** section as well.\n5. Use **Hardware** and **Transfer** when you need to move hardware stock.\n6. Use **Claim An Item** when an item should be on your location but is not listed.\n\nIf your location is missing from the list, choose **Location not shown** and follow the prompt so a manager can help.",
+      "sort_order": 1
+    },
+    {
+      "category_slug": "inventory",
+      "slug": "inventory-select-location",
+      "title": "How do I select my inventory location or site?",
+      "summary": "Setting your primary inventory location and using secondary site locations.",
+      "content_md": "# How do I select my inventory location or site?\n\n## Primary location\n\nUse **Set Your Inventory Location** or **Change My Location**, choose the correct Yard, van, HGV, plant, site, or manual location, then click **Save Location**.\n\nYour primary location controls which items appear under **My Inventory Items**.\n\n## Secondary site locations\n\nManagers can assign site locations under **Site Location Assignments** with **Assign Site**. When assigned, employees may also see a **Site** section with a **Secondary Location** badge.\n\nManagers can optionally include **legacy quotes** when choosing site locations.",
+      "sort_order": 2
+    },
+    {
+      "category_slug": "inventory",
+      "slug": "inventory-item-types",
+      "title": "What are Small Tools, Minor Plant, and Hardware?",
+      "summary": "How the three inventory stock types differ.",
+      "content_md": "# What are Small Tools, Minor Plant, and Hardware?\n\nOn the Inventory **Overview** tab:\n\n## Small Tools\n\nIndividual tracked tools and equipment. They can be moved between locations, checked on an interval, grouped, and retired.\n\n## Minor Plant\n\nSmaller plant-style assets that can also be linked with fleet plant workflows. Managers can use actions such as **Move to Plant Assets** when an item should become a fleet plant record.\n\n## Hardware\n\nQuantity-based stock from the **Hardware Catalogue**. Hardware is managed in the **Hardware Stock Matrix** with add, remove, recount, and transfer actions rather than one record per unit.\n\n## Retired Items\n\nItems that have been retired leave the active lists and appear under **Retired Items**.",
+      "sort_order": 3
+    },
+    {
+      "category_slug": "inventory",
+      "slug": "inventory-add-edit-item",
+      "title": "How do I add or edit an inventory item?",
+      "summary": "Creating and updating small tools or minor plant items.",
+      "content_md": "# How do I add or edit an inventory item?\n\nManagers and admins with Inventory access can:\n\n1. Open **Inventory** → **Overview**.\n2. Choose **Small Tools** or **Minor Plant**.\n3. Click **Add Item** to create a new record, or open an existing item to edit it.\n4. Enter the name, category, group, location, and check settings as required.\n5. Save the item.\n\nOpen an item detail page from the list to review **Overview**, **Movements**, and **Checks**.",
+      "sort_order": 4
+    },
+    {
+      "category_slug": "inventory",
+      "slug": "inventory-item-detail",
+      "title": "How do I use an item detail page?",
+      "summary": "Overview, movements, checks, and PDFs on an inventory item.",
+      "content_md": "# How do I use an item detail page?\n\nOpen an item from Inventory to go to its detail page.\n\n## Tabs\n\n- **Overview** - item details, current location, and status\n- **Movements** - history of location and stock changes\n- **Checks** - checklist history and check PDFs where available\n\nUse this page to confirm where an item is, when it last moved, and whether checks are up to date.",
+      "sort_order": 5
+    },
+    {
+      "category_slug": "inventory",
+      "slug": "inventory-locations",
+      "title": "How do inventory locations work?",
+      "summary": "Location types, Yard, Unknown, fleet links, and site buckets.",
+      "content_md": "# How do inventory locations work?\n\nLocations describe where stock currently is.\n\n## Location types\n\n- **Yard** - main yard stock location\n- **Unknown** - items whose location is not confirmed\n- **Van**, **HGV**, **Plant** - fleet-linked locations\n- **Site** - site or quote/project linked locations\n- **Manual** - manually created locations\n\n## Managing locations\n\nManagers use the **Locations** tab to review and maintain locations, including **Add Location**.\n\nFleet-linked locations stay aligned with vans, HGVs, and plant assets. Site locations can come from quotes, project numbers, or legacy quotes when that option is enabled.",
+      "sort_order": 6
+    },
+    {
+      "category_slug": "inventory",
+      "slug": "inventory-location-types",
+      "title": "What inventory location types exist?",
+      "summary": "Yard, Unknown, Van, HGV, Plant, Site, and Manual explained.",
+      "content_md": "# What inventory location types exist?\n\n- **Yard** - default yard location for stock held on site\n- **Unknown** - temporary holding place when a location is unclear\n- **Van** - linked to a fleet van\n- **HGV** - linked to a fleet HGV\n- **Plant** - linked to a fleet plant asset\n- **Site** - site, quote, project, or legacy quote location\n- **Manual** - custom location created by a manager\n\nChoosing the correct type keeps employee views, Yard kiosk transfers, and reports accurate.",
+      "sort_order": 7
+    },
+    {
+      "category_slug": "inventory",
+      "slug": "inventory-manage-locations",
+      "title": "How do I manage inventory locations?",
+      "summary": "Using the Locations tab and adding locations.",
+      "content_md": "# How do I manage inventory locations?\n\n1. Open **Inventory** → **Locations**.\n2. Review existing Yard, vehicle, site, and manual locations.\n3. Click **Add Location** when a new bucket is needed.\n4. Keep names clear so employees can recognise them in **Change My Location**.\n\nUse **Site Location Assignments** when employees need a secondary site location in addition to their primary location.",
+      "sort_order": 8
+    },
+    {
+      "category_slug": "inventory",
+      "slug": "inventory-site-assignments",
+      "title": "How do site location assignments work?",
+      "summary": "Assigning secondary site locations to employees.",
+      "content_md": "# How do site location assignments work?\n\nManagers with site-location permission can open **Site Location Assignments** in Inventory.\n\n## Typical actions\n\n- Choose an employee\n- Click **Assign Site**\n- Select the site location\n- Optionally include **legacy quotes** when the required site comes from a legacy quote location\n\nAssigned employees then see a **Site** section with a **Secondary Location** badge alongside their primary inventory location.",
+      "sort_order": 9
+    },
+    {
+      "category_slug": "inventory",
+      "slug": "inventory-move-item",
+      "title": "How do I move an item between locations?",
+      "summary": "Moving single items or bulk-selected items.",
+      "content_md": "# How do I move an item between locations?\n\n## Single item\n\nOpen the item and use the move action to choose the destination location, or use the move controls from the Overview list.\n\n## Bulk move\n\n1. Open **Overview** → **Small Tools** or **Minor Plant**.\n2. Select the items.\n3. Click **Move Selected**.\n4. Choose the destination location and confirm.\n\nKeep destination names accurate so Yard kiosk and employee views stay correct.",
+      "sort_order": 10
+    },
+    {
+      "category_slug": "inventory",
+      "slug": "inventory-movements",
+      "title": "How do inventory movements work?",
+      "summary": "Understanding movement history on inventory items.",
+      "content_md": "# How do inventory movements work?\n\nEvery meaningful location or stock change is recorded as a movement.\n\nOpen an item → **Movements** to see:\n\n- When the item moved\n- From and to locations\n- Who recorded the change\n- Related notes or reasons where available\n\nHardware transfers and Yard kiosk collect/return actions also create movement history.",
+      "sort_order": 11
+    },
+    {
+      "category_slug": "inventory",
+      "slug": "inventory-complete-check",
+      "title": "How do I complete an inventory check?",
+      "summary": "Running checklist checks on inventory items.",
+      "content_md": "# How do I complete an inventory check?\n\n1. Open the item from Inventory.\n2. Go to the **Checks** tab or start the check action shown for due items.\n3. Set the **Check Date**.\n4. Mark each checklist line as **Pass**, **Fail**, or **N/A**.\n5. Review the overall result: **Pass**, **Fail**, or **Partial**.\n6. Click **Submit Check**.\n\nSome items show **Check required before leaving Yard**. Complete those checks before moving the item away from the Yard.",
+      "sort_order": 12
+    },
+    {
+      "category_slug": "inventory",
+      "slug": "inventory-check-statuses",
+      "title": "What do inventory check statuses mean?",
+      "summary": "Ok, Due Soon, Overdue, Needs Check, and No Check Required.",
+      "content_md": "# What do inventory check statuses mean?\n\nUse the **Check Status** filter on Overview lists.\n\n- **Ok** - check is current\n- **Due Soon** - check interval is approaching\n- **Overdue** - check is past due\n- **Needs Check** - a check is required now\n- **No Check Required** - the item is not on a check interval\n\nKeep overdue and needs-check items up to date before they leave the Yard or go to site.",
+      "sort_order": 13
+    },
+    {
+      "category_slug": "inventory",
+      "slug": "inventory-check-intervals",
+      "title": "How do inventory check intervals work?",
+      "summary": "Configuring how often items need checks.",
+      "content_md": "# How do inventory check intervals work?\n\nManagers set check intervals on items that need periodic inspection.\n\nThe interval drives the check status badges:\n\n- current checks stay **Ok**\n- approaching due dates become **Due Soon**\n- missed intervals become **Overdue** or **Needs Check**\n\nItems without an interval show **No Check Required**.",
+      "sort_order": 14
+    },
+    {
+      "category_slug": "inventory",
+      "slug": "inventory-retire-item",
+      "title": "How do I retire an inventory item?",
+      "summary": "Retiring items with Sold, Scrapped, Lost, Damaged, Returned, or Other.",
+      "content_md": "# How do I retire an inventory item?\n\n1. Open the item from Inventory.\n2. Choose the retire action.\n3. Select a reason: **Sold**, **Scrapped**, **Lost**, **Damaged**, **Returned**, or **Other**.\n4. Confirm that the item should move to **Retired Items**.\n\nRetired items leave the active Small Tools / Minor Plant lists but remain available under **Retired Items** for history and restore when needed.",
+      "sort_order": 15
+    },
+    {
+      "category_slug": "inventory",
+      "slug": "inventory-retired-tab",
+      "title": "How do I view retired inventory items?",
+      "summary": "Using the Retired Items overview tab.",
+      "content_md": "# How do I view retired inventory items?\n\n1. Open **Inventory** → **Overview**.\n2. Select **Retired Items**.\n3. Filter by **Retire Reason** if needed.\n4. Open an item to review its history or restore it when the business process allows.\n\nUse this tab for sold, scrapped, lost, damaged, returned, or other retired stock.",
+      "sort_order": 16
+    },
+    {
+      "category_slug": "inventory",
+      "slug": "inventory-hardware-catalogue",
+      "title": "How do I manage the Hardware catalogue and stock?",
+      "summary": "Hardware Catalogue settings and the Hardware Stock Matrix.",
+      "content_md": "# How do I manage the Hardware catalogue and stock?\n\n## Catalogue\n\nOpen **Inventory** → **Settings** → **Hardware Catalogue** to maintain the hardware items that can be stocked.\n\n## Stock matrix\n\nOpen **Overview** → **Hardware** to use the **Hardware Stock Matrix**.\n\nManagers can:\n\n- **Add stock**\n- **Remove** / **Remove stock**\n- **Recount**\n\nCommon reasons include **Delivery**, **Return**, **Used**, **Lost**, **Scrapped**, **Damaged**, **Stocktake correction**, and **Other**.",
+      "sort_order": 17
+    },
+    {
+      "category_slug": "inventory",
+      "slug": "inventory-hardware-stock-adjust",
+      "title": "How do I adjust Hardware quantities?",
+      "summary": "Add, remove, and recount hardware stock with reasons.",
+      "content_md": "# How do I adjust Hardware quantities?\n\n1. Open **Inventory** → **Overview** → **Hardware**.\n2. Find the hardware row and location in the **Hardware Stock Matrix**.\n3. Choose **Add stock**, **Remove**, or **Recount**.\n4. Enter the quantity and a reason.\n5. Confirm the adjustment.\n\nEmployees normally transfer hardware rather than adjusting catalogue totals. Manager adjustments should match a delivery, usage, loss, or stocktake correction.",
+      "sort_order": 18
+    },
+    {
+      "category_slug": "inventory",
+      "slug": "inventory-hardware-transfer",
+      "title": "How do I transfer Hardware stock?",
+      "summary": "Employee and manager hardware transfers between locations.",
+      "content_md": "# How do I transfer Hardware stock?\n\n1. Open **Inventory**.\n2. Find the **Hardware** section for your location, or open **Overview** → **Hardware** as a manager.\n3. Click **Transfer**.\n4. Choose the destination location and quantity.\n5. Confirm the transfer.\n\nYard tablet users can also move hardware through the **Yard Inventory** kiosk using **Collect** or **Return**.",
+      "sort_order": 19
+    },
+    {
+      "category_slug": "inventory",
+      "slug": "inventory-manage-categories",
+      "title": "How do I manage inventory categories?",
+      "summary": "Using Inventory Settings → Categories.",
+      "content_md": "# How do I manage inventory categories?\n\n1. Open **Inventory** → **Settings** → **Categories**.\n2. Add or edit categories used to organise Small Tools and Minor Plant.\n3. Keep category names short and consistent so filters and reports stay useful.\n\nCategories help managers search and group items without changing an item's physical location.",
+      "sort_order": 20
+    },
+    {
+      "category_slug": "inventory",
+      "slug": "inventory-manage-groups",
+      "title": "How do I manage inventory groups?",
+      "summary": "Using Inventory Settings → Groups for batch organisation.",
+      "content_md": "# How do I manage inventory groups?\n\n1. Open **Inventory** → **Settings** → **Groups**.\n2. Create or edit groups used to organise related items.\n3. Assign items to groups when creating or editing them.\n\nGroups make bulk moves and filtering easier when several tools belong together.",
+      "sort_order": 21
+    },
+    {
+      "category_slug": "inventory",
+      "slug": "inventory-kiosk-devices",
+      "title": "How do Yard kiosk devices work?",
+      "summary": "Pairing trusted Yard Inventory tablets and managing devices.",
+      "content_md": "# How do Yard kiosk devices work?\n\nYard kiosk tablets use a trusted-device flow so stock can be collected or returned without the full manager Inventory UI.\n\n## Pair a device\n\n1. Open **Inventory** → **Settings** → **Yard Kiosks**.\n2. Click **Start pairing**.\n3. On the tablet, open the Yard Inventory pair page and enter the **Pairing code**.\n4. Confirm the code in Inventory Settings.\n\n## Install the app\n\nUse **Install Yard Inventory** / **Add to Home screen** on the tablet so it launches like an app.\n\n## After pairing\n\nTrusted devices can open **Yard Inventory** and run **Collect** or **Return** transfers.",
+      "sort_order": 22
+    },
+    {
+      "category_slug": "inventory",
+      "slug": "inventory-yard-kiosk-use",
+      "title": "How do I use the Yard Inventory kiosk?",
+      "summary": "Collect and Return flows on a trusted Yard tablet.",
+      "content_md": "# How do I use the Yard Inventory kiosk?\n\nOn a paired Yard tablet:\n\n1. Open **Yard Inventory**.\n2. Choose **Collect** to start a collection, or **Return** to start a return.\n3. Follow the steps: choose direction, choose destination or source, choose stock, review the basket.\n4. Confirm with **Confirm transfer**.\n\n## Labels to expect\n\n- **Collecting for** / **Destination** when taking stock from the Yard\n- **Returning from** when bringing stock back\n\nWhen the transfer completes, the basket items move and Inventory movement history is updated.",
+      "sort_order": 23
+    },
+    {
+      "category_slug": "inventory",
+      "slug": "inventory-fleet-asset-link",
+      "title": "How do fleet asset links affect inventory?",
+      "summary": "How vans, HGVs, and plant link to inventory locations.",
+      "content_md": "# How do fleet asset links affect inventory?\n\nVan, HGV, and Plant inventory locations are linked to Fleet assets.\n\nThat means:\n\n- Employee location lists can include the vehicles and plant they use\n- Moves to a van, HGV, or plant location stay aligned with Fleet records\n- Minor Plant can be moved into Plant Assets when an item should become a fleet plant record\n\nIf a vehicle or plant asset is missing, ask a manager with Fleet access to create or update it first.",
+      "sort_order": 24
+    },
+    {
+      "category_slug": "inventory",
+      "slug": "inventory-view-assigned-items",
+      "title": "How do I view items on my van or site?",
+      "summary": "Finding items assigned to your current inventory locations.",
+      "content_md": "# How do I view items on my van or site?\n\n1. Open **Inventory**.\n2. Confirm your primary location under **Change My Location**.\n3. Review **My Inventory Items** for that location.\n4. If you have a secondary site assignment, review the **Site** section as well.\n\nUse search and filters where available. If an item should be present but is missing, use **Claim An Item** or ask a manager to move it.",
+      "sort_order": 25
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "quotes-overview",
+      "title": "How do I create and track quotes?",
+      "summary": "Overview of the Quotes module tabs, workflow, billing, and settings.",
+      "content_md": "# How do I create and track quotes?\n\nOpen **Quotes** after unlocking with your sensitive PIN if prompted.\n\n## Main tabs\n\n- **Overview** - quote thread and financial summary views\n- **Current** - active quotes\n- **Projects** - project numbers and cost tracking\n- **Archived** - archived quotes\n- **Legacy** - imported legacy quotes\n- **Settings** - notifications, managers, emails, schedule, templates, and admin tools\n\n## Common actions\n\n- Click **New Quote** to create a quote\n- Open a quote to use **Overview**, **Workflow**, **Invoices**, **Attachments**, **Timeline**, and **Versions**\n- Use **Work Calendar** for scheduled quoted work\n\nQuotes move through draft, approval, customer outcome, PO/acceptance, progress, completion, invoicing, and archive stages.",
+      "sort_order": 0
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "quote-sensitive-access",
+      "title": "Why do Quotes ask for a sensitive PIN?",
+      "summary": "Understanding the Quotes sensitive-module PIN unlock.",
+      "content_md": "# Why do Quotes ask for a sensitive PIN?\n\nQuotes is a sensitive module. When the session is locked you will see a prompt such as **Quotes locked. Enter your sensitive PIN to continue.**\n\nEnter your sensitive PIN to unlock Quotes for the current session. Customers uses the same sensitive-access pattern.\n\nIf you do not know your PIN, ask an admin to reset or issue it through the normal user administration process.",
+      "sort_order": 1
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "create-quote",
+      "title": "How do I create a quote?",
+      "summary": "Creating a new customer quotation.",
+      "content_md": "# How do I create a quote?\n\n1. Open **Quotes**.\n2. Unlock with your sensitive PIN if required.\n3. Click **New Quote**.\n4. Select or create the customer.\n5. Enter quote details, manager/reference information, and line items or pricing attachments.\n6. Save the quote as **Draft** until it is ready for internal confirmation.\n\nKeep customer details and titles clear so Overview, Projects, and reports stay accurate.",
+      "sort_order": 2
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "quote-line-items",
+      "title": "How do line items and totals work?",
+      "summary": "Adding priced lines and understanding quote totals.",
+      "content_md": "# How do line items and totals work?\n\nWhen creating or editing a quote, add line items for the priced work.\n\nLine items feed the quote total and later financial summary. Some quotes may also use attachment-based pricing; in that case keep the attachments clear under the **Attachments** tab and ensure the commercial total still reflects the agreed value.",
+      "sort_order": 3
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "quote-attachments",
+      "title": "How do quote attachments work?",
+      "summary": "Internal and client-facing quote attachments.",
+      "content_md": "# How do quote attachments work?\n\nOpen a quote → **Attachments**.\n\nUse attachments for:\n\n- Customer-facing pricing or supporting documents\n- Internal-only files that should not be treated as client pricing\n\nKeep filenames clear and upload the latest revision when a quote version changes.",
+      "sort_order": 4
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "quote-statuses",
+      "title": "What do quote statuses mean?",
+      "summary": "Draft through invoiced and archived status labels.",
+      "content_md": "# What do quote statuses mean?\n\nCommon status labels include:\n\n- **Draft** - still being prepared\n- **Pending Confirmation** - waiting for internal confirmation\n- **Approved** / **Changes Requested** / **Confirmed** - internal review outcome\n- **Won** / **Lost** - customer outcome\n- **Accepted** - PO or acceptance recorded\n- **In Progress** - work has started\n- **Completed In Part** / **Completed In Full** - completion state\n- **Ready To Invoice**, **Partially Invoiced**, **Invoiced** - billing state\n- **Archived** - closed archive state\n\nUnknown imported values may show as **Legacy Status**.",
+      "sort_order": 5
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "quote-internal-approval",
+      "title": "How does internal quote approval work?",
+      "summary": "Moving a quote through pending confirmation and approval.",
+      "content_md": "# How does internal quote approval work?\n\nUse the quote **Workflow** tab to move a draft through internal review.\n\nTypical path:\n\n1. Submit or mark the quote for confirmation so it becomes **Pending Confirmation**.\n2. An authorised manager reviews it.\n3. The quote becomes **Approved**, **Changes Requested**, or continues to **Confirmed** according to your process.\n\nUse Timeline and Versions if the commercial detail changes during review.",
+      "sort_order": 6
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "send-quote",
+      "title": "How do I send a quote to a customer?",
+      "summary": "Sending customer quote emails from the workflow.",
+      "content_md": "# How do I send a quote to a customer?\n\n1. Open the quote.\n2. Go to **Workflow**.\n3. Use the send-to-customer action when the quote is ready.\n4. Confirm the customer contact and any CC rules from **Settings** → **Emails**.\n\nEmail templates and notification toggles are managed under Quotes **Settings**.",
+      "sort_order": 7
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "quote-outcome",
+      "title": "How do I record won, lost, or changes requested?",
+      "summary": "Recording customer outcomes on a quote.",
+      "content_md": "# How do I record won, lost, or changes requested?\n\nFrom the quote **Workflow** tab, record the customer outcome:\n\n- **Won** - customer accepted commercially\n- **Lost** - customer declined\n- **Changes Requested** - customer asked for revisions\n\nIf changes are needed, update the quote or create a new version, then continue the workflow.",
+      "sort_order": 8
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "quote-po-received",
+      "title": "How do PO numbers and Accepted status work?",
+      "summary": "Recording purchase orders and acceptance.",
+      "content_md": "# How do PO numbers and Accepted status work?\n\nWhen a customer issues a purchase order or formal acceptance:\n\n1. Open the quote **Workflow** tab.\n2. Use **Request PO** if you are chasing a PO.\n3. Record the PO / acceptance details when received.\n4. The quote can move to **Accepted**.\n\nFilters such as **With PO** and **No PO** help managers review outstanding acceptances.",
+      "sort_order": 9
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "quote-schedule-progress",
+      "title": "How do schedule and in-progress work?",
+      "summary": "Start dates, start alerts, and In Progress status.",
+      "content_md": "# How do schedule and in-progress work?\n\nAfter acceptance, set or confirm the planned start details from **Workflow**.\n\n- Schedule defaults and start-alert behaviour are configured under **Settings** → **Schedule**\n- When work starts, the quote can move to **In Progress**\n- Use **Work Calendar** to see planned quoted work across dates\n\nStart alerts notify the configured recipients when a start is approaching or due.",
+      "sort_order": 10
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "quote-completion",
+      "title": "How do I complete a quote in part or in full?",
+      "summary": "Approve in part or in full completion outcomes.",
+      "content_md": "# How do I complete a quote in part or in full?\n\nFrom **Workflow**, choose the completion outcome:\n\n- **Approve in part** → **Completed In Part**\n- **Approve in full** → **Completed In Full**\n\nPartial completion is useful when some works are finished and ready to bill while other works continue.",
+      "sort_order": 11
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "archive-quote",
+      "title": "How do I archive or restore a quote?",
+      "summary": "Archiving completed quotes and restoring when needed.",
+      "content_md": "# How do I archive or restore a quote?\n\nUse **Archive Quote** from the quote actions when the record should leave the current lists.\n\nArchived quotes appear under the **Archived** tab. Use **Restore Quote** when the quote needs to return to the active workflow.",
+      "sort_order": 12
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "quote-versions",
+      "title": "How do quote versions and threads work?",
+      "summary": "Revisions, extras, variations, and version history.",
+      "content_md": "# How do quote versions and threads work?\n\nOpen a quote → **Versions**.\n\nVersions are used for revisions, extras, variations, future work, or duplicates linked to the same commercial thread. Each version keeps its own notes and history while Overview can summarise the thread.\n\nUse a new version when the commercial scope changes instead of overwriting the agreed record without a trail.",
+      "sort_order": 13
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "quote-invoice-request",
+      "title": "How do I request an invoice?",
+      "summary": "Marking a quote ready to invoice or requesting another invoice.",
+      "content_md": "# How do I request an invoice?\n\n1. Open the quote → **Invoices**.\n2. Click **Mark Ready To Invoice** or **Request Another Invoice**.\n3. Choose **Invoice in full** or **Partial invoice**.\n4. Confirm the request.\n\nThe Invoices tab shows **Pending Requested** and **Available To Request**. Use **Retract request** if a pending request was raised in error.",
+      "sort_order": 14
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "quote-add-invoice",
+      "title": "How do Accounts add invoice details?",
+      "summary": "Recording invoice details against a pending request.",
+      "content_md": "# How do Accounts add invoice details?\n\n1. Open the quote → **Invoices**.\n2. Review the **Pending Request**.\n3. Click **Add Invoice Details**.\n4. Enter the invoice information and confirm it matches the manager request when prompted.\n\nRecorded invoices update billing status such as **Partially Invoiced** or **Invoiced**.",
+      "sort_order": 15
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "quote-billing-statuses",
+      "title": "What do quote billing statuses mean?",
+      "summary": "Not billed, ready, part billed, and fully billed filters.",
+      "content_md": "# What do quote billing statuses mean?\n\nBilling filters and labels include:\n\n- **Not billed** - no invoice progress yet\n- **Ready to invoice** / **Ready To Invoice** - waiting for invoice action\n- **Part billed** / **Partially Invoiced** - some value invoiced\n- **Fully billed** / **Invoiced** - fully invoiced\n\nUse these filters on quote lists to find work that still needs Accounts attention.",
+      "sort_order": 16
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "quote-sage-status",
+      "title": "How does Sage status work on quotes?",
+      "summary": "Tracking whether a quote is on Sage.",
+      "content_md": "# How does Sage status work on quotes?\n\nQuotes can be tracked as **On Sage** or **Not on Sage**.\n\nUse the Sage marker when the quote or related billing has been entered in Sage. List filters help managers separate records that still need Sage updates.",
+      "sort_order": 17
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "quote-financial-adjustments",
+      "title": "How do financial adjustments work?",
+      "summary": "Credit notes, refunds, voids, write-offs, and related adjustments.",
+      "content_md": "# How do financial adjustments work?\n\nManagers with access can open **Quotes** → **Settings** → **Admin Tools** and use the **Financial Adjustment Ledger**.\n\n## Adjustment types\n\n- **Credit note**\n- **Refund**\n- **Debit adjustment**\n- **Void invoice**\n- **Correct invoice details**\n- **Correct quote value**\n- **Write off remaining value**\n\nHistory can also show **Reversed** entries.\n\n## Metrics\n\nThe ledger summarises values such as **Adjusted quote**, **Net invoiced**, **Credits & voids**, **Refunded cash**, and **Written off**.\n\nAttach supporting documents where the process requires them.",
+      "sort_order": 18
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "quote-financial-summary",
+      "title": "How do I read the financial summary on a quote?",
+      "summary": "Understanding quote value, invoices, and adjustments together.",
+      "content_md": "# How do I read the financial summary on a quote?\n\nOpen the quote Overview or thread overview to review the financial summary.\n\nUse it to compare:\n\n- Original / adjusted quote value\n- Invoices already recorded\n- Pending invoice requests\n- Credits, voids, refunds, and write-offs from financial adjustments\n\nThis is the quickest way to see what remains available to request or bill.",
+      "sort_order": 19
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "quotes-overview-tab",
+      "title": "How do I use the Quotes Overview tab?",
+      "summary": "Using Overview for quote threads and summaries.",
+      "content_md": "# How do I use the Quotes Overview tab?\n\nThe **Overview** tab helps managers review quote threads and financial summaries rather than only working from a flat current list.\n\nOpen a reference overview when you need labour, costs, and billing context together. You can also open overview routes by quote reference when following up from reports or messages.",
+      "sort_order": 20
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "quote-overview-by-reference",
+      "title": "How do I open a quote overview by reference?",
+      "summary": "Using the quote overview reference page.",
+      "content_md": "# How do I open a quote overview by reference?\n\nUse the quote overview page for a reference when you need the full thread summary.\n\nFrom Quotes Overview, open the relevant reference, or navigate to the overview route for that quote reference. This view is useful for labour, costs, and financial context across related versions.",
+      "sort_order": 21
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "quote-project-numbers",
+      "title": "How do project numbers work?",
+      "summary": "Creating and tracking project numbers linked to quotes.",
+      "content_md": "# How do project numbers work?\n\nOpen **Quotes** → **Projects**.\n\n## Typical actions\n\n- Click **New Project Number**\n- Complete **Create Project Number**\n- Track project status badges such as open, linked, converted, or cancelled\n- Record costs in categories such as materials, subcontractor, plant, labour, and other\n\nProject numbers help connect quoted work, site delivery, and cost tracking.",
+      "sort_order": 22
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "legacy-quotes",
+      "title": "What is the Legacy Quotes tab?",
+      "summary": "Reviewing imported legacy quote records.",
+      "content_md": "# What is the Legacy Quotes tab?\n\nOpen **Quotes** → **Legacy** to review imported legacy quotes.\n\nThese records may show **Legacy Status** when the old status does not map cleanly to the current workflow. Use Legacy for history and reference; create or continue current quotes in the **Current** tab for new work.",
+      "sort_order": 23
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "quotes-work-calendar",
+      "title": "What is the quotes work calendar?",
+      "summary": "Using Quote Work Calendar for planned quoted work.",
+      "content_md": "# What is the quotes work calendar?\n\nClick **Work Calendar** from Quotes, or open the Quote Work Calendar page.\n\nThe calendar shows planned or scheduled work linked to accepted and in-progress quotes. Use it to:\n\n- See upcoming starts\n- Avoid clashes\n- Review quote-related work by date\n\nAccess still requires Quotes permission and sensitive PIN unlock when the module is locked.",
+      "sort_order": 24
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "quote-settings-notifications",
+      "title": "How do quote notification settings work?",
+      "summary": "Turning quote notifications on or off.",
+      "content_md": "# How do quote notification settings work?\n\nOpen **Quotes** → **Settings** → **Notifications**.\n\nUse these controls to decide which quote events create notifications for the people who need them, such as approvals, customer sends, PO requests, start alerts, and invoice activity.",
+      "sort_order": 25
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "quote-settings-managers",
+      "title": "How do I manage quote managers?",
+      "summary": "Manager initials, number series, and sign-off settings.",
+      "content_md": "# How do I manage quote managers?\n\nOpen **Quotes** → **Settings** → **Managers**.\n\nConfigure the managers who own quote numbering, initials, and sign-off behaviour. Current and Archived lists can also filter by manager chips once managers are set up.",
+      "sort_order": 26
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "quote-settings-sending",
+      "title": "How do quote email and CC settings work?",
+      "summary": "Configuring email CC behaviour for quote events.",
+      "content_md": "# How do quote email and CC settings work?\n\nOpen **Quotes** → **Settings** → **Emails**.\n\nSet the CC matrix for events such as customer quote send, PO request, RAMS request, start alert, **Invoice Request**, and **Invoice Added**.\n\nThis keeps Accounts and managers copied on the right messages without changing each send manually.",
+      "sort_order": 27
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "quote-settings-schedule",
+      "title": "How do quote schedule settings work?",
+      "summary": "Start alert and duration defaults for quoted work.",
+      "content_md": "# How do quote schedule settings work?\n\nOpen **Quotes** → **Settings** → **Schedule**.\n\nConfigure start-alert timing and duration defaults used when quotes are accepted and scheduled. These defaults support the Work Calendar and start notifications.",
+      "sort_order": 28
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "quote-settings-templates",
+      "title": "How do quote email templates work?",
+      "summary": "Managing quote notification and email templates.",
+      "content_md": "# How do quote email templates work?\n\nOpen **Quotes** → **Settings** → **Templates**.\n\nTemplates control the wording used for customer and internal quote emails. Update templates when your commercial process or contact wording changes, then test with a known quote before sending widely.",
+      "sort_order": 29
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "quote-settings-admin-tools",
+      "title": "What are Quotes admin tools?",
+      "summary": "Admin Tools including the financial adjustment ledger.",
+      "content_md": "# What are Quotes admin tools?\n\nOpen **Quotes** → **Settings** → **Admin Tools**.\n\nThis area contains higher-risk commercial tools, including the **Financial Adjustment Ledger** for credit notes, refunds, voids, write-offs, and value corrections.\n\nOnly use admin tools when the commercial or Accounts process requires a formal adjustment.",
+      "sort_order": 30
+    },
+    {
+      "category_slug": "quotes",
+      "slug": "quote-rams-request",
+      "title": "How do I trigger a RAMS or project document request from a quote?",
+      "summary": "Sending a RAMS request linked to quoted work.",
+      "content_md": "# How do I trigger a RAMS or project document request from a quote?\n\nFrom the quote workflow actions, use **Trigger RAMS** or **Send RAMS Request** when project documents need to be raised for the accepted work.\n\nThis links the commercial quote process to the Projects document workflow so site paperwork can be prepared in time.",
+      "sort_order": 31
+    },
+    {
+      "category_slug": "training",
+      "slug": "training-overview",
+      "title": "What is Training?",
+      "summary": "Overview of training records, people, qualifications, and notes.",
+      "content_md": "# What is Training?\n\nOpen **Training** to track employee and subcontractor training records, cards, qualifications, and expiry dates.\n\n## Tabs\n\n- **Overview** - Active Records, Expired, Expiring Soon, Needs Review, Priority Training Records, and Import Health\n- **Records** - filterable training records\n- **People** - training people and profile links\n- **Qualifications** - qualification catalogue\n- **Notes** - Workbook Notes\n\nUse **Add Record**, **Refresh**, and **Export XLSX** from the page actions.",
+      "sort_order": 0
+    },
+    {
+      "category_slug": "training",
+      "slug": "training-records-filters",
+      "title": "How do I filter training records?",
+      "summary": "Using Records filters such as Expired and Expiring 90 Days.",
+      "content_md": "# How do I filter training records?\n\nOpen **Training** → **Records** and choose a filter:\n\n- **All Active**\n- **Expired**\n- **Expiring 90 Days**\n- **No Expiry**\n- **Needs NVQ**\n- **Awaiting Card**\n- **Training Booked**\n- **Manual Review**\n- **Subcontractors**\n- **Unlinked People**\n- **Archived**\n\nBadges such as **No expiry**, **Needs review**, and **Archived** help you scan the list quickly.",
+      "sort_order": 1
+    },
+    {
+      "category_slug": "training",
+      "slug": "add-training-record",
+      "title": "How do I add or edit a training record?",
+      "summary": "Creating and updating training records.",
+      "content_md": "# How do I add or edit a training record?\n\n1. Open **Training**.\n2. Click **Add Record**, or open a record and click **Edit**.\n3. Enter the person, qualification/card details, dates, and review flags.\n4. Save the record.\n\nUse **Archive** when a record should leave the active lists but remain available under the Archived filter.",
+      "sort_order": 2
+    },
+    {
+      "category_slug": "training",
+      "slug": "manage-training-people",
+      "title": "How do I manage training people and link profiles?",
+      "summary": "Editing training people and match status.",
+      "content_md": "# How do I manage training people and link profiles?\n\nOpen **Training** → **People**.\n\n1. Open a person from **Training People**.\n2. Use **Edit Training Person**.\n3. Review **Name**, **Profile ID**, **Match Status**, **Match Notes**, **DOB Values**, and **Source Sheets**.\n4. Click **Save Changes**.\n\nMatch statuses include **Matched**, **Ambiguous**, **Unmatched**, and **Not Attempted**. Records may show **No person link** until a profile is linked.",
+      "sort_order": 3
+    },
+    {
+      "category_slug": "training",
+      "slug": "manage-training-qualifications",
+      "title": "How do I manage qualifications?",
+      "summary": "Using the Qualification Catalogue.",
+      "content_md": "# How do I manage qualifications?\n\nOpen **Training** → **Qualifications** to use the **Qualification Catalogue**.\n\nQualification statuses can include:\n\n- **Needs Manual Review**\n- **Plant/Card Category**\n- **Standardised / Spelling Corrected**\n- **Note Mixed With Qualification**\n\nUse the status filter, including **All statuses**, to clean imported qualification names.",
+      "sort_order": 4
+    },
+    {
+      "category_slug": "training",
+      "slug": "training-expiry-alerts",
+      "title": "How do expiry and expiring in 90 days work?",
+      "summary": "Understanding expired and expiring-soon training records.",
+      "content_md": "# How do expiry and expiring in 90 days work?\n\nTraining Overview highlights:\n\n- **Expired**\n- **Expiring Soon**\n- **Needs Review**\n\nOn Records, use **Expired** and **Expiring 90 Days** to prioritise renewals. Import Health also surfaces issues such as No expiry, Needs NVQ, Awaiting card, Training booked, and Unlinked people.",
+      "sort_order": 5
+    },
+    {
+      "category_slug": "training",
+      "slug": "training-workbook-notes",
+      "title": "What are workbook notes?",
+      "summary": "Using the Workbook Notes tab.",
+      "content_md": "# What are workbook notes?\n\nOpen **Training** → **Notes** to review **Workbook Notes**.\n\nThese are read-only notes imported with training workbooks. Search the table by type, sheet/cell, value, or reason when cleaning data or investigating match issues.",
+      "sort_order": 6
+    },
+    {
+      "category_slug": "training",
+      "slug": "export-training-data",
+      "title": "How do I export training data?",
+      "summary": "Using Export XLSX from Training.",
+      "content_md": "# How do I export training data?\n\n1. Open **Training**.\n2. Apply any filters you need on Records or related views.\n3. Click **Export XLSX**.\n\nUse the export for offline review, audits, or sharing a snapshot with managers who need a spreadsheet.",
+      "sort_order": 7
+    },
+    {
+      "category_slug": "maintenance",
+      "slug": "maintenance-overview",
+      "title": "What is Maintenance?",
+      "summary": "Overview of the Maintenance page and service schedule checks.",
+      "content_md": "# What is Maintenance?\n\nMaintenance shows service, MOT, tax, and other due-date or mileage-based checks for assets you can access.\n\nThe page highlights overdue items, items due soon, and current maintenance status. Fleet asset management and history are covered under **Fleet**. Workshop repairs are covered under **Workshop Tasks**.",
+      "sort_order": 0
+    },
+    {
+      "category_slug": "maintenance",
       "slug": "view-maintenance",
-      "title": "How do I view vehicle maintenance status?",
-      "summary": "Understanding the maintenance overview.",
-      "content_md": "# How do I view vehicle maintenance status?\n\n## Maintenance Tab Overview\n\n### Summary Cards\n\nAt the top, you'll see:\n- **Overdue** (red) - Items past their due date\n- **Due Soon** (amber) - Items due within the warning period\n\n### Vehicle List\n\nEach vehicle row shows:\n- **Registration** and nickname (if set)\n- **Status columns** for each maintenance type:\n  - Tax\n  - MOT\n  - Service\n  - Cambelt (if applicable)\n  - First Aid Kit\n\n### Status Colors\n\n- 🟢 **Green** - OK (not due soon)\n- 🟡 **Amber** - Due Soon (within warning period)\n- 🔴 **Red** - Overdue\n- ⚪ **Grey (N/A)** - Not applicable or not tracked\n\n### Search\n\nUse the search bar to find vehicles by registration number.\n\n## Vehicle History\n\nClick on a vehicle row to see its maintenance history and update records."
+      "title": "How do I view maintenance status?",
+      "summary": "Understanding overdue and due-soon maintenance status.",
+      "content_md": "# How do I view maintenance status?\n\nOpen **Maintenance** to review asset maintenance status.\n\nCommon status colours:\n\n- **Green** - OK\n- **Amber** - due soon\n- **Red** - overdue\n- **Grey** - not applicable or not tracked",
+      "sort_order": 1
     },
     {
-      "category_slug": "fleet-maintenance",
+      "category_slug": "maintenance",
+      "slug": "maintenance-settings",
+      "title": "How do I configure maintenance settings? (Managers)",
+      "summary": "Configure maintenance thresholds and tracked categories.",
+      "content_md": "# How do I configure maintenance settings? (Managers)\n\nManagers with Maintenance access can configure warning periods, tracked categories, and related thresholds so due-soon and overdue states match company process.",
+      "sort_order": 2
+    },
+    {
+      "category_slug": "maintenance",
+      "slug": "update-maintenance-record",
+      "title": "How do I update a maintenance record?",
+      "summary": "Recording completed maintenance or service updates.",
+      "content_md": "# How do I update a maintenance record?\n\nOpen the relevant maintenance item or linked Fleet asset and record the completed service, MOT, tax, or inspection update. Accurate dates and mileage keep future due status correct.",
+      "sort_order": 3
+    },
+    {
+      "category_slug": "maintenance",
+      "slug": "maintenance-vs-workshop",
+      "title": "What is the difference between Maintenance and Workshop Tasks?",
+      "summary": "When to use Maintenance versus Workshop Tasks.",
+      "content_md": "# What is the difference between Maintenance and Workshop Tasks?\n\n- **Maintenance** - planned due dates and compliance schedules such as service, MOT, and tax\n- **Workshop Tasks** - repair jobs and defect follow-up work\n\nA failed daily check often creates workshop work, while Maintenance tracks recurring schedule obligations.",
+      "sort_order": 4
+    },
+    {
+      "category_slug": "fleet",
+      "slug": "fleet-overview",
+      "title": "What is Fleet?",
+      "summary": "Overview of fleet assets including vans, plant, and HGVs.",
+      "content_md": "# What is Fleet?\n\n**Fleet** is the asset register for vans, plant, and HGVs.\n\nUse it to review asset details, categories, inactive assets, and history. Inventory locations for vans, HGVs, and plant can link back to these Fleet records.",
+      "sort_order": 0
+    },
+    {
+      "category_slug": "fleet",
+      "slug": "fleet-asset-history",
+      "title": "How do I view asset history?",
+      "summary": "Reviewing checks, maintenance, and repair history for an asset.",
+      "content_md": "# How do I view asset history?\n\nOpen **Fleet**, select the asset, and open its history views. History can include daily checks, mileage or hours, maintenance, and workshop activity.",
+      "sort_order": 1
+    },
+    {
+      "category_slug": "fleet",
       "slug": "manage-vehicles",
-      "title": "How do I manage vehicles? (Admin)",
-      "summary": "Add, edit, and organize vehicles.",
-      "content_md": "# How do I manage vehicles? (Admin)\n\n**Note:** The Vehicles tab is for Managers and Admins only.\n\n## Accessing Vehicles Tab\n\n1. Go to **Fleet**\n2. Click the **Vehicles** tab\n\n## Adding a Vehicle\n\n1. Click **Add Vehicle**\n2. Enter:\n   - **Registration Number** (required)\n   - **Nickname** (optional friendly name)\n   - **Category** - Van, Truck, Artic, or Trailer\n   - **Status** - Active or Inactive\n3. Click **Save**\n\n## Editing a Vehicle\n\n1. Find the vehicle in the list\n2. Click the **Edit** (pencil) icon\n3. Update details\n4. Save changes\n\n## Vehicle Categories\n\nCategories determine:\n- Which inspection checklist is used\n- How vehicles are grouped\n\nManage categories from the **Settings** tab."
+      "title": "How do I manage fleet assets? (Admin)",
+      "summary": "Creating and editing vans, plant, and HGVs.",
+      "content_md": "# How do I manage fleet assets? (Admin)\n\nAdmins with Fleet access can create and edit assets, update identifiers such as registration, and keep categories and active/inactive status current.\n\nAccurate Fleet records keep daily checks and inventory vehicle locations working correctly.",
+      "sort_order": 2
     },
     {
-      "category_slug": "fleet-maintenance",
+      "category_slug": "fleet",
       "slug": "vehicle-categories",
-      "title": "How do I manage vehicle categories?",
-      "summary": "Creating and editing vehicle categories.",
-      "content_md": "# How do I manage vehicle categories?\n\n**Note:** This is for Managers and Admins only.\n\n## Accessing Category Management\n\n1. Go to **Fleet**\n2. Click the **Settings** tab\n3. Find the **Vehicle Categories** section\n\n## Adding a Category\n\n1. Click **Add Category**\n2. Enter:\n   - **Name** (e.g., \"7.5t Box Van\")\n   - **Description** (optional)\n3. Click **Save**\n\n## Editing Categories\n\n- Click the **Edit** icon to modify a category\n- Click the **Delete** icon to remove (only if no vehicles use it)\n\n## Standard Categories\n\nThe system includes:\n- **Van** - Uses 14-point inspection checklist\n- **Truck** - Uses 26-point inspection checklist\n- **Artic** - Uses 26-point inspection checklist\n- **Trailer** - Uses 26-point inspection checklist"
+      "title": "How do I manage fleet categories?",
+      "summary": "Organising fleet assets with categories.",
+      "content_md": "# How do I manage fleet categories?\n\nUse Fleet category management to group assets consistently. Clear categories make filters, reports, and daily-check selectors easier to use.",
+      "sort_order": 3
+    },
+    {
+      "category_slug": "fleet",
+      "slug": "fleet-vans-plant-hgv-tabs",
+      "title": "How are vans, plant, and HGVs organised in Fleet?",
+      "summary": "Using Fleet tabs for different asset types.",
+      "content_md": "# How are vans, plant, and HGVs organised in Fleet?\n\nFleet separates vans, plant, and HGVs so each asset type keeps the right fields and history. Open the relevant tab or filter before adding or editing an asset.",
+      "sort_order": 4
+    },
+    {
+      "category_slug": "fleet",
+      "slug": "fleet-inactive-assets",
+      "title": "How do inactive fleet assets work?",
+      "summary": "Hiding or retiring assets that are no longer in use.",
+      "content_md": "# How do inactive fleet assets work?\n\nMark assets inactive when they leave the working fleet so they stop appearing in day-to-day selectors. History remains available for audit and review.",
+      "sort_order": 5
     },
     {
       "category_slug": "workshop-tasks",
       "slug": "workshop-overview",
       "title": "What is Workshop Tasks?",
-      "summary": "Overview of the workshop task management system.",
-      "content_md": "# What is Workshop Tasks?\n\nWorkshop Tasks is a dedicated module for tracking vehicle repairs and maintenance work.\n\n## Accessing Workshop Tasks\n\nClick **Workshop** from the dashboard or navigation.\n\n## Key Features\n\n- **Task categories and subcategories** - Organize work by type\n- **Status tracking** - Pending → Logged → In Progress → On Hold → Completed\n- **Comments system** - Add notes and updates to tasks\n- **Auto-created from inspections** - Defects automatically create tasks\n- **Completion tracking** - Record mileage and completion notes\n\n## Task Sources\n\nTasks can come from:\n1. **Inspection Defects** - Automatically created when inspections have failures\n2. **Manual Creation** - Managers can create tasks directly\n\n## Who Can Access\n\n- **All users** can view Workshop Tasks (if permission granted)\n- **Managers/Admins** can create, edit, and manage tasks"
+      "summary": "Overview of workshop repair and defect task tracking.",
+      "content_md": "# What is Workshop Tasks?\n\n**Workshop Tasks** tracks repair jobs and defect follow-up for fleet assets.\n\nTasks can come from daily-check defects or be created directly by managers. Use statuses, categories, and comments to follow a job through to completion.",
+      "sort_order": 0
     },
     {
       "category_slug": "workshop-tasks",
       "slug": "view-workshop-tasks",
       "title": "How do I view workshop tasks?",
-      "summary": "Understanding the workshop tasks page layout.",
-      "content_md": "# How do I view workshop tasks?\n\n## Page Layout\n\nThe Workshop Tasks page shows tasks organized in collapsible sections:\n\n### Sections\n\n- **Pending** (open by default) - Tasks not yet started\n- **In Progress** (open by default) - Tasks being worked on\n- **On Hold** (collapsed) - Tasks paused\n- **Completed** (collapsed) - Finished tasks\n\nClick the section header to expand/collapse.\n\n## Filters\n\n### Status Filter\n\nUse the dropdown to show:\n- All tasks\n- Pending only\n- In Progress only\n- On Hold only\n- Completed only\n\n### Vehicle Filter\n\nFilter to show tasks for a specific vehicle.\n\n## Task Cards\n\nEach task shows:\n- **Vehicle** registration and nickname\n- **Category** and subcategory\n- **Description** of the work needed\n- **Priority** badge (if set)\n- **Status** indicator\n- **Created date**"
+      "summary": "Finding and filtering workshop tasks.",
+      "content_md": "# How do I view workshop tasks?\n\nOpen **Workshop Tasks** and use the list filters to find open, in-progress, or completed work. Open a task for details, comments, and linked asset information.",
+      "sort_order": 1
     },
     {
       "category_slug": "workshop-tasks",
       "slug": "create-workshop-task",
-      "title": "How do I create a workshop task? (Managers)",
-      "summary": "Creating manual workshop tasks.",
-      "content_md": "# How do I create a workshop task? (Managers)\n\n**Note:** Managers and Admins can create tasks. Tasks are also auto-created from inspection defects.\n\n## Creating a Task\n\n1. Go to **Workshop Tasks**\n2. Click **Add Task** button\n3. Fill in:\n   - **Vehicle** - Select from dropdown\n   - **Category** - Select task category\n   - **Subcategory** - Select if applicable\n   - **Description/Comments** - What needs doing\n   - **Mileage** - Current vehicle mileage (optional)\n4. Click **Create Task**\n\n## Auto-Created Tasks\n\nWhen someone submits a vehicle inspection with defects:\n- A workshop task is automatically created\n- Linked to the inspection\n- Shows the defect details\n- Appears in the Pending section"
+      "title": "How do I create a workshop task?",
+      "summary": "Creating a repair or defect follow-up task.",
+      "content_md": "# How do I create a workshop task?\n\n1. Open **Workshop Tasks**.\n2. Create a new task.\n3. Select the asset and category.\n4. Describe the fault or work required.\n5. Save the task.\n\nTasks may also be created from failed daily-check defects.",
+      "sort_order": 2
     },
     {
       "category_slug": "workshop-tasks",
       "slug": "update-workshop-task",
-      "title": "How do I update a workshop task status?",
-      "summary": "Changing task status and adding completion details.",
-      "content_md": "# How do I update a workshop task status?\n\n## Status Flow\n\nTasks follow this workflow:\n\n```\nPending → Logged → In Progress → Completed\n              ↓           ↓\n          On Hold ←───────┘\n```\n\n## Status Actions\n\nClick on a task to open it, then use the action buttons:\n\n### From Pending\n\n- **Mark In Progress** - Opens dialog for a short comment (e.g., \"Parts on order\")\n- **Mark Complete** - Jump straight to completion\n\n### From In Progress\n\n- **Put On Hold** - Pause the task (e.g., waiting for parts)\n- **Mark Complete** - Finish the task\n\n### From On Hold\n\n- **Resume** - Continue working (returns to In Progress)\n- **Mark Complete** - Finish the task\n\n## Marking Complete\n\nWhen completing a task:\n\n1. Click **Mark Complete**\n2. A dialog appears asking for:\n   - **Completion Notes** - What was done\n   - **Mileage** - Vehicle mileage at completion\n   - **Category Updates** - Depending on category, update service/cambelt dates\n3. Click **Complete Task**"
+      "title": "How do I update a workshop task?",
+      "summary": "Changing status and details on a workshop task.",
+      "content_md": "# How do I update a workshop task?\n\nOpen the task, update the status and details, and save. Keep the status current so managers can see what is logged, waiting, in progress, or complete.",
+      "sort_order": 3
     },
     {
       "category_slug": "workshop-tasks",
       "slug": "workshop-comments",
-      "title": "How do I add comments to a workshop task?",
-      "summary": "Using the comments system for task updates.",
-      "content_md": "# How do I add comments to a workshop task?\n\n## Accessing Comments\n\n1. Find the task in the list\n2. Click the **comments** (speech bubble) icon\n3. A drawer opens from the side showing the comment thread\n\n## Adding a Comment\n\n1. Type your message in the input field\n2. Click **Send** or press Enter\n3. Your comment is added with your name and timestamp\n\n## What to Include\n\n- Progress updates (\"Ordered replacement hose\")\n- Issues encountered (\"Waiting for specialist tool\")\n- Handover notes (\"Dave to continue Monday\")\n- Completion details (\"Replaced headlight bulb\")\n\n## Viewing History\n\nAll comments are preserved, creating a complete audit trail of the work done."
+      "title": "How do workshop comments work?",
+      "summary": "Adding progress notes to workshop tasks.",
+      "content_md": "# How do workshop comments work?\n\nOpen a workshop task and add comments to record diagnosis, parts waiting, or completion notes. Comments keep the repair history clear for the next person who opens the task.",
+      "sort_order": 4
     },
     {
       "category_slug": "workshop-tasks",
       "slug": "workshop-categories",
-      "title": "How do I manage workshop categories? (Managers)",
-      "summary": "Configure task categories and subcategories.",
-      "content_md": "# How do I manage workshop categories? (Managers)\n\n**Note:** This is for Managers and Admins only.\n\n## Accessing Settings\n\n1. Go to **Workshop Tasks**\n2. Click the **Settings** (gear) icon\n\n## Managing Categories\n\nThe settings panel shows all categories with:\n- **Name**\n- **Subcategory count**\n- **Active/Inactive status**\n\n### Add Category\n\n1. Click **Add Category**\n2. Enter the category name\n3. Save\n\n### Edit Category\n\n- Click the **Edit** icon to rename\n- Toggle **Active** status\n- Drag to reorder\n\n## Subcategories\n\nExpand a category to see its subcategories:\n\n1. Click the category row to expand\n2. Click **Add Subcategory**\n3. Enter the name\n4. Save\n\nSubcategories help organize tasks within a category (e.g., Category: \"Electrical\", Subcategories: \"Lights\", \"Battery\", \"Wiring\")."
+      "title": "How do workshop categories work?",
+      "summary": "Organising workshop tasks by category.",
+      "content_md": "# How do workshop categories work?\n\nWorkshop categories group repair types so lists and filters stay useful. Choose the closest category when creating a task, and ask a manager to adjust categories if the list needs updating.",
+      "sort_order": 5
+    },
+    {
+      "category_slug": "workshop-tasks",
+      "slug": "workshop-from-plant-hgv-defects",
+      "title": "How do daily-check defects become workshop tasks?",
+      "summary": "Following van, plant, or HGV defects into workshop work.",
+      "content_md": "# How do daily-check defects become workshop tasks?\n\nWhen a van, plant, or HGV daily check records a failed item, managers can create or update a linked Workshop Task.\n\nUse the defect comments from the check as the starting point, then track repair progress in Workshop Tasks.",
+      "sort_order": 6
     },
     {
       "category_slug": "approvals",
       "slug": "approvals-overview",
-      "title": "How do I review and approve submissions? (Managers)",
-      "summary": "Overview of the approvals page for managers.",
-      "content_md": "# How do I review and approve submissions? (Managers)\n\n**Note:** This is for Managers and Admins only.\n\n## Accessing Approvals\n\nClick **Approvals** in the sidebar menu.\n\n## Tabs\n\nThe page has two main tabs:\n\n### Timesheets Tab\n\n- View all submitted timesheets\n- Filter by status (Pending, Approved, Rejected, Processed, Adjusted, All)\n- Approve or reject timesheets\n\n### Absences Tab\n\n- View all absence requests\n- Approve or reject leave requests\n- See employee allowance information\n\n## Quick Actions\n\nFrom the list view:\n- **Approve** button - Approve immediately\n- **Reject** button - Opens dialog for rejection reason\n- Click on a row to view full details"
+      "title": "What is Approvals?",
+      "summary": "Overview of manager approval queues.",
+      "content_md": "# What is Approvals?\n\n**Approvals** is where managers review submitted timesheets and absence requests.\n\nOpen Approvals from the Dashboard or navigation, then work through the pending items for each type.",
+      "sort_order": 0
     },
     {
       "category_slug": "approvals",
       "slug": "approve-timesheet",
-      "title": "How do I approve or reject a timesheet?",
-      "summary": "Step-by-step timesheet approval process.",
-      "content_md": "# How do I approve or reject a timesheet?\n\n## Quick Approval\n\n1. Go to **Approvals** → **Timesheets** tab\n2. Find the pending timesheet (amber \"Pending\" badge)\n3. Click **Approve** button\n4. The status changes to Approved (green)\n\n## Quick Rejection\n\n1. Find the pending timesheet\n2. Click **Reject** button\n3. Enter comments explaining what needs correction\n4. Confirm rejection\n\nThe employee will be notified and can edit and resubmit.\n\n## Detailed Review\n\n1. Click on the timesheet row to open the detail view\n2. Review:\n   - Daily hours and entries\n   - Job numbers\n   - Remarks\n   - Employee signature\n3. Approve or reject from the detail view\n\n## Timesheet Actions After Approval\n\nApproved timesheets can be:\n- **Processed** - Marked as processed for payroll\n- **Adjusted** - Modified if corrections needed (rare)"
+      "title": "How do I approve a timesheet?",
+      "summary": "Reviewing and approving submitted timesheets.",
+      "content_md": "# How do I approve a timesheet?\n\n1. Open **Approvals**.\n2. Select the timesheet queue.\n3. Open a submitted timesheet.\n4. Approve it, or return/reject it with a clear reason.\n\nApproved timesheets feed payroll and timesheet reports.",
+      "sort_order": 1
     },
     {
       "category_slug": "approvals",
       "slug": "approve-absence",
-      "title": "How do I approve or reject absence requests?",
-      "summary": "Processing leave requests.",
-      "content_md": "# How do I approve or reject absence requests?\n\n## From the Absences Tab\n\n1. Go to **Approvals** → **Absences** tab\n2. Review pending requests showing:\n   - Employee name\n   - Absence type\n   - Dates and duration\n   - Current allowance summary\n3. Click **Approve** or **Reject**\n\n## Allowance Check\n\nThe card shows the employee's:\n- Total allowance\n- Days already taken\n- Days pending\n- Remaining balance\n\nThis helps you check if they have sufficient allowance.\n\n## Rejection\n\nWhen rejecting:\n1. Click **Reject**\n2. Optionally add a reason\n3. Confirm\n\nThe employee will be notified of the decision."
+      "title": "How do I approve an absence request?",
+      "summary": "Reviewing and approving leave requests.",
+      "content_md": "# How do I approve an absence request?\n\n1. Open **Approvals**.\n2. Select the absence queue.\n3. Check dates, reason, and remaining allowance where shown.\n4. Approve or decline with a clear reason.",
+      "sort_order": 2
+    },
+    {
+      "category_slug": "approvals",
+      "slug": "process-timesheet-payroll",
+      "title": "How do approvals relate to payroll reports?",
+      "summary": "Using approved timesheets with payroll exports.",
+      "content_md": "# How do approvals relate to payroll reports?\n\nTimesheets generally need to be approved before they are ready for payroll processing. After approval, managers with Reports access can use **Payroll Export** and related timesheet reports.",
+      "sort_order": 3
     },
     {
       "category_slug": "actions",
       "slug": "actions-overview",
-      "title": "What is the Actions page (legacy)?",
-      "summary": "Status of the retired legacy Actions module.",
-      "content_md": "# What is the Actions page (legacy)?\n\n**Note:** This page may still be visible to Managers and Admins with the legacy `Actions` permission.\n\n## Status\n\nThe Actions module has been retired and no longer provides an operational workflow.\n\n## Why it was retired\n\nThe responsibilities that were previously surfaced on this page are now handled in dedicated areas of the app, including Workshop Tasks, Maintenance, Suggestions, Error Reports, notifications, and dashboard indicators.\n\n## What to expect\n\n- The **Actions** tile and permission may still exist for compatibility\n- The page is retained as a legacy placeholder only\n- No live action management features are available here\n\n## Future use\n\nThis area is being retained for future development and may be repurposed in a later release."
+      "title": "What is the Manager Actions Hub?",
+      "summary": "Overview of the manager actions summary pages.",
+      "content_md": "# What is the Manager Actions Hub?\n\n**Actions** provides manager summary pages for outstanding items across key workflows.\n\nUse it as a quick launch point into the modules that still need attention. Some older action views are retained for compatibility while day-to-day work happens in the dedicated modules.",
+      "sort_order": 0
     },
     {
       "category_slug": "toolbox-talks",
       "slug": "toolbox-talks-overview",
       "title": "What are Toolbox Talks?",
-      "summary": "Overview of the messaging system for safety communications.",
-      "content_md": "# What are Toolbox Talks?\n\n**Note:** Sending is for Managers and Admins only. All employees can receive.\n\n## Purpose\n\nToolbox Talks are important safety messages that:\n- Communicate critical safety information\n- Require employee acknowledgment\n- Create a record of who has read and understood the message\n\n## Types of Messages\n\n### Toolbox Talk (High Priority)\n\n- **Blocking** - Employees cannot use the app until signed\n- Requires digital signature to acknowledge\n- Used for critical safety information\n\n### Reminder (Low Priority)\n\n- **Non-blocking** - Employees can dismiss after reading\n- General information or updates\n- No signature required"
+      "summary": "Overview of toolbox talk messages and acknowledgements.",
+      "content_md": "# What are Toolbox Talks?\n\nToolbox Talks are safety or briefing messages sent to employees who must acknowledge them.\n\nManagers create talks, target recipients, and track acknowledgements. Employees receive them through notifications and message views.",
+      "sort_order": 0
     },
     {
       "category_slug": "toolbox-talks",
       "slug": "create-toolbox-talk",
-      "title": "How do I send a Toolbox Talk?",
-      "summary": "Creating and sending important safety messages.",
-      "content_md": "# How do I send a Toolbox Talk?\n\n**Note:** This is for Managers and Admins only.\n\n## Steps\n\n1. Go to **Toolbox Talks** from the sidebar\n2. You'll be on the **Create Toolbox Talk** tab by default\n3. Fill in:\n   - **Title** - Clear, descriptive title\n   - **Message** - Full content of the talk\n   - **Recipients** - Select employees or \"All Employees\"\n4. Click **Send**\n\n## After Sending\n\n- Recipients receive a notification\n- When they next use the app, a blocking modal appears\n- They must sign to acknowledge before continuing\n- Track signatures in the Reports tab"
+      "title": "How do I create a toolbox talk?",
+      "summary": "Sending a toolbox talk to employees.",
+      "content_md": "# How do I create a toolbox talk?\n\n1. Open **Toolbox Talks**.\n2. Create a new toolbox talk.\n3. Enter the title and message.\n4. Choose the recipients.\n5. Send the talk.\n\nTrack acknowledgements after sending.",
+      "sort_order": 1
     },
     {
       "category_slug": "toolbox-talks",
       "slug": "create-reminder",
-      "title": "How do I send a Reminder?",
-      "summary": "Creating and sending low-priority reminder messages.",
-      "content_md": "# How do I send a Reminder?\n\n**Note:** This is for Managers and Admins only.\n\n## Steps\n\n1. Go to **Toolbox Talks** from the sidebar\n2. Click the **Create Reminder** tab\n3. Fill in:\n   - **Title** - Brief title\n   - **Message** - Content\n   - **Recipients** - Select employees\n4. Click **Send**\n\n## Difference from Toolbox Talk\n\nReminders are:\n- Non-blocking (employees can dismiss after reading)\n- Lower priority\n- No signature required\n- Good for general updates and announcements"
+      "title": "How do I create a toolbox reminder message?",
+      "summary": "Sending reminder-style toolbox messages.",
+      "content_md": "# How do I create a toolbox reminder message?\n\nFrom Toolbox Talks, create a reminder-style message when you need recipients to acknowledge a short instruction or notice.\n\nThis is different from the personal **Reminders** module, which tracks assigned task reminders for a user.",
+      "sort_order": 2
     },
     {
       "category_slug": "toolbox-talks",
       "slug": "toolbox-reports",
       "title": "How do I track Toolbox Talk signatures?",
-      "summary": "Viewing who has signed Toolbox Talks.",
-      "content_md": "# How do I track Toolbox Talk signatures?\n\n**Note:** This is for Managers and Admins only.\n\n## Accessing Reports\n\n1. Go to **Toolbox Talks**\n2. Click the **Reports** tab\n\n## What You'll See\n\nA list of sent Toolbox Talks and Reminders showing:\n- Message title and type\n- Date sent\n- Total recipients\n- Signed/Acknowledged count\n- Pending count\n\n## Checking Compliance\n\nExpand a message to see:\n- Who has signed (with timestamp)\n- Who is still pending\n\nFollow up with employees who haven't signed required Toolbox Talks."
+      "summary": "Reviewing toolbox talk acknowledgement reports.",
+      "content_md": "# How do I track Toolbox Talk signatures?\n\nUse Toolbox Talks reporting or acknowledgement views to see who has signed or still needs to respond. Follow up on outstanding recipients before the related work starts.",
+      "sort_order": 3
+    },
+    {
+      "category_slug": "toolbox-talks",
+      "slug": "acknowledge-toolbox-talk",
+      "title": "How do I acknowledge a toolbox talk?",
+      "summary": "Employee acknowledgement of a toolbox talk message.",
+      "content_md": "# How do I acknowledge a toolbox talk?\n\nOpen the toolbox talk from your notifications or messages, read it, and submit your acknowledgement or signature when prompted.\n\nOutstanding talks may also appear as badges until completed.",
+      "sort_order": 4
+    },
+    {
+      "category_slug": "reminders",
+      "slug": "reminders-overview",
+      "title": "What is the Reminders module?",
+      "summary": "Personal task reminders assigned in the app.",
+      "content_md": "# What is the Reminders module?\n\n**Reminders** shows personal task reminders assigned to you, such as checks or follow-up actions.\n\nThis is separate from Toolbox Talk reminder messages. If you have no items, you will see **No pending reminders**.",
+      "sort_order": 0
+    },
+    {
+      "category_slug": "reminders",
+      "slug": "action-assigned-reminder",
+      "title": "How do assigned reminders work?",
+      "summary": "Understanding reminders assigned to you.",
+      "content_md": "# How do assigned reminders work?\n\nReminders can show badges such as **Assigned to you** and due text like **Check required** or a days-remaining count.\n\nOpen the reminder and use its task link when provided to go straight to the work that needs completing.",
+      "sort_order": 1
+    },
+    {
+      "category_slug": "reminders",
+      "slug": "complete-reminder",
+      "title": "How do I complete a reminder?",
+      "summary": "Clearing a personal reminder by finishing the linked task.",
+      "content_md": "# How do I complete a reminder?\n\nOpen the reminder and complete the linked task in the relevant module, such as an inventory check or other assigned action.\n\nWhen the underlying work is done, the reminder leaves your pending list.",
+      "sort_order": 2
     },
     {
       "category_slug": "reports",
       "slug": "reports-overview",
-      "title": "How do I download reports?",
-      "summary": "Overview of available reports and exports.",
-      "content_md": "# How do I download reports?\n\n**Note:** This is for Managers and Admins only.\n\n## Accessing Reports\n\nClick **Reports** in the sidebar menu.\n\n## Setting Date Range\n\n1. Set **From** date\n2. Set **To** date\n3. Or click quick buttons:\n   - **Last Week** - Previous Mon-Sun\n   - **Last Month** - Previous calendar month\n\n## Available Reports\n\n### Timesheets Tab\n\n- **Excel Export** - All timesheets for date range in Excel format\n- **Bulk PDF Download** - All timesheet PDFs as a ZIP file\n\n### Inspections Tab\n\n- **Excel Export** - All inspections for date range\n- **Bulk PDF Download** - All inspection PDFs as a ZIP file\n\n## Downloading\n\n1. Set your date range\n2. Click the download button for the report you want\n3. Wait for generation (progress shown for large exports)\n4. File downloads to your device"
+      "title": "What reports can I download?",
+      "summary": "Overview of the Reports hub and current report groups.",
+      "content_md": "# What reports can I download?\n\nOpen **Reports** → **Overview** and choose a group:\n\n- **Timesheets** - Weekly Timesheet Summary, Payroll Export\n- **Daily Checks** - Daily Checks Compliance Summary, Daily Checks Defects Log, bulk PDFs\n- **Absence & Leave** - bookings, allowance snapshot, weekly print sheet\n- **Quotes** - Quotes Conversion Funnel\n- **More Reports** - future report placeholders\n\nUse **Settings** on the Reports page for report preferences where available.",
+      "sort_order": 0
     },
     {
       "category_slug": "reports",
       "slug": "bulk-pdf-download",
-      "title": "How do I bulk download PDFs?",
-      "summary": "Downloading multiple documents as PDFs.",
-      "content_md": "# How do I bulk download PDFs?\n\n**Note:** This is for Managers and Admins only.\n\n## Steps\n\n1. Go to **Reports**\n2. Select the **Timesheets** or **Inspections** tab\n3. Set your date range\n4. Click **Bulk Download PDFs**\n5. Wait for the progress bar to complete\n6. A ZIP file downloads containing all PDFs\n\n## Progress Tracking\n\nFor many documents:\n- Progress bar shows download status\n- Current document number shown\n- Download may be split into multiple parts for very large exports\n- Each part downloads as a separate ZIP\n\n## Use Cases\n\n- End of month payroll processing\n- Audit requirements\n- Record keeping\n- Archiving completed work"
+      "title": "How do I bulk download daily check PDFs?",
+      "summary": "Downloading multiple daily check PDFs from Reports.",
+      "content_md": "# How do I bulk download daily check PDFs?\n\n1. Open **Reports**.\n2. Choose **Daily Checks**.\n3. Use the bulk PDF download report/action.\n4. Set the date range and filters.\n5. Download the PDF pack.",
+      "sort_order": 1
+    },
+    {
+      "category_slug": "reports",
+      "slug": "suggest-report",
+      "title": "How do I suggest a new report?",
+      "summary": "Requesting an additional report from the Reports hub.",
+      "content_md": "# How do I suggest a new report?\n\nIn **Reports**, use the suggest/more-reports path to submit a report idea. Managers who review suggestions can also triage these from **Suggestions**.",
+      "sort_order": 2
+    },
+    {
+      "category_slug": "reports",
+      "slug": "timesheet-payroll-report",
+      "title": "How do I download the payroll export?",
+      "summary": "Using the Payroll Export timesheet report.",
+      "content_md": "# How do I download the payroll export?\n\n1. Open **Reports**.\n2. Choose **Timesheets**.\n3. Open **Payroll Export**.\n4. Set the date range.\n5. Download the export.\n\nApprove timesheets first when your payroll process depends on approved records.",
+      "sort_order": 3
+    },
+    {
+      "category_slug": "reports",
+      "slug": "daily-checks-compliance-report",
+      "title": "How do daily checks compliance and defects reports work?",
+      "summary": "Compliance summary and defects log reports.",
+      "content_md": "# How do daily checks compliance and defects reports work?\n\nUnder **Reports** → **Daily Checks** you can run:\n\n- **Daily Checks Compliance Summary** - who has completed required checks\n- **Daily Checks Defects Log** - recorded defects for follow-up\n\nUse these with Workshop Tasks when repairs are needed.",
+      "sort_order": 4
+    },
+    {
+      "category_slug": "reports",
+      "slug": "absence-weekly-print",
+      "title": "How do I print the weekly absence sheet?",
+      "summary": "Using the Absence Weekly Print Sheet report.",
+      "content_md": "# How do I print the weekly absence sheet?\n\n1. Open **Reports** → **Absence & Leave**.\n2. Choose **Absence Weekly Print Sheet**.\n3. Set the week/date controls.\n4. Download the printable PDF.",
+      "sort_order": 5
+    },
+    {
+      "category_slug": "reports",
+      "slug": "quotes-conversion-funnel-report",
+      "title": "How does the Quotes Conversion Funnel report work?",
+      "summary": "Reviewing quote conversion performance.",
+      "content_md": "# How does the Quotes Conversion Funnel report work?\n\nOpen **Reports** → **Quotes** → **Quotes Conversion Funnel**.\n\nUse it to review how quotes move through commercial stages over the selected period. This complements the Quotes module lists and financial summaries.",
+      "sort_order": 6
+    },
+    {
+      "category_slug": "suggestions",
+      "slug": "suggestions-manage-overview",
+      "title": "How do I manage suggestions?",
+      "summary": "Using Manage Suggestions to review user ideas.",
+      "content_md": "# How do I manage suggestions?\n\nOpen **Suggestions** / **Manage Suggestions** to review ideas submitted from Help or Reports.\n\nOpen a row to see **Suggestion Details**, then update its status as you triage it.",
+      "sort_order": 0
+    },
+    {
+      "category_slug": "suggestions",
+      "slug": "triage-suggestion",
+      "title": "How do I triage a suggestion?",
+      "summary": "Reviewing and updating a suggestion.",
+      "content_md": "# How do I triage a suggestion?\n\n1. Open **Manage Suggestions**.\n2. Open the suggestion.\n3. Review the details.\n4. Move it to the correct status and add any internal notes your process uses.\n\nKeep users informed through the status change rather than leaving items in **New** indefinitely.",
+      "sort_order": 1
+    },
+    {
+      "category_slug": "suggestions",
+      "slug": "suggestion-statuses",
+      "title": "What do suggestion statuses mean?",
+      "summary": "New, Under Review, Planned, Completed, and Declined.",
+      "content_md": "# What do suggestion statuses mean?\n\n- **New** - just submitted\n- **Under Review** - being assessed\n- **Planned** - accepted for future work\n- **Completed** - delivered\n- **Declined** - not going ahead",
+      "sort_order": 2
+    },
+    {
+      "category_slug": "customers",
+      "slug": "customers-overview",
+      "title": "How do I manage customers?",
+      "summary": "Overview of customer records, history, and settings.",
+      "content_md": "# How do I manage customers?\n\nOpen **Customers** after unlocking with your sensitive PIN if prompted.\n\n## What you can do\n\n- Use **Overview** to browse customers\n- Click **Add Customer** to create a record\n- Open a customer history page for detailed activity\n- Use **Settings** for customer-related configuration such as default validity\n\nCustomer records feed Quotes, so keep company and contact details accurate.",
+      "sort_order": 0
+    },
+    {
+      "category_slug": "customers",
+      "slug": "create-edit-customer",
+      "title": "How do I create or edit a customer?",
+      "summary": "Adding and updating customer records.",
+      "content_md": "# How do I create or edit a customer?\n\n1. Open **Customers**.\n2. Click **Add Customer**, or open an existing customer to edit.\n3. Enter company and contact details.\n4. Save the record.\n\nAccurate customer data keeps new quotes linked to the right organisation.",
+      "sort_order": 1
+    },
+    {
+      "category_slug": "customers",
+      "slug": "customer-secondary-contacts",
+      "title": "How do secondary customer contacts work?",
+      "summary": "Managing additional contacts on a customer.",
+      "content_md": "# How do secondary customer contacts work?\n\nCustomer records can store secondary contacts in addition to the primary contact.\n\nUse secondary contacts when quotes or emails need alternative site or accounts recipients. Keep names and emails up to date before sending quotes.",
+      "sort_order": 2
+    },
+    {
+      "category_slug": "customers",
+      "slug": "customer-history",
+      "title": "How do I view customer history?",
+      "summary": "Opening a customer history page.",
+      "content_md": "# How do I view customer history?\n\nFrom the Customers list, open the customer history page for that record. Use **Back to Customers** when you are finished.\n\nHistory helps you review previous quote and customer activity before creating new work.",
+      "sort_order": 3
+    },
+    {
+      "category_slug": "customers",
+      "slug": "customer-settings",
+      "title": "What are Customer Settings?",
+      "summary": "Customer module settings and defaults.",
+      "content_md": "# What are Customer Settings?\n\nOpen **Customers** → **Settings** for customer-module configuration such as default quote validity and related defaults.\n\nUse Settings when the commercial defaults should change for future customers or quotes.",
+      "sort_order": 4
+    },
+    {
+      "category_slug": "customers",
+      "slug": "customer-default-validity",
+      "title": "How does default quote validity work?",
+      "summary": "Setting default validity for customer quotes.",
+      "content_md": "# How does default quote validity work?\n\nCustomer settings can define a default validity period used when creating quotes.\n\nSet a sensible default so new quotes expire consistently unless a manager overrides the value on the individual quote.",
+      "sort_order": 5
     },
     {
       "category_slug": "admin-users",
       "slug": "user-management-overview",
       "title": "How do I manage users? (Admin)",
       "summary": "Overview of user administration.",
-      "content_md": "# How do I manage users? (Admin)\n\n**Note:** This is for Admins only.\n\n## Accessing User Management\n\nClick **Users** in the admin sidebar.\n\n## Users Tab\n\nView all users with:\n- Full name and email\n- Employee ID (if set)\n- Assigned role\n- Account creation date\n\n## Stats Cards\n\nQuick counts at the top:\n- **Total** users\n- **Admins** count\n- **Managers** count\n- **Employees** count\n\nClick a card to filter the list.\n\n## Search\n\nUse the search bar to find users by name, email, or employee ID.\n\n## Role Filter\n\nFilter dropdown to show:\n- All users\n- Admins only\n- Managers only\n- Employees only"
+      "content_md": "# How do I manage users? (Admin)\n\nAdmins with User Management access can open **Users** to:\n\n- Create users\n- Edit profile details\n- Reset passwords\n- Assign roles\n- Review user status\n- Deactivate or delete accounts according to company process\n\nRole and permission settings control which modules each user can access.",
+      "sort_order": 0
     },
     {
       "category_slug": "admin-users",
       "slug": "create-user",
-      "title": "How do I create a new user?",
-      "summary": "Adding new user accounts.",
-      "content_md": "# How do I create a new user?\n\n**Note:** This is for Admins only.\n\n## Steps\n\n1. Go to **Users**\n2. Click **Add User** button\n3. Fill in:\n   - **Email** (required) - Their login email address\n   - **Full Name** (required)\n   - **Phone Number** (optional)\n   - **Employee ID** (optional)\n   - **Role** (required) - Select their role from the dropdown\n4. Click **Create User**\n\n## Temporary Password\n\nA temporary password is:\n- Automatically generated\n- Sent to their email address\n- Also displayed to you (in case email fails)\n- Must be changed on first login\n\n## Copy Password\n\nIf the email doesn't arrive, you can:\n- Click **Copy** to copy the password\n- Share it with the user manually"
+      "title": "How do I create a user?",
+      "summary": "Creating a new app user account.",
+      "content_md": "# How do I create a user?\n\n1. Open **Users**.\n2. Create a new user.\n3. Enter name, email, and role/team details.\n4. Save and issue the temporary password according to your process.",
+      "sort_order": 1
     },
     {
       "category_slug": "admin-users",
       "slug": "edit-user",
       "title": "How do I edit a user?",
-      "summary": "Updating user account details.",
-      "content_md": "# How do I edit a user?\n\n**Note:** This is for Admins only.\n\n## Steps\n\n1. Go to **Users**\n2. Find the user in the list\n3. Click the **Edit** (pencil) icon\n4. Update their details:\n   - Full name\n   - Phone number\n   - Employee ID\n   - Role\n5. Click **Save**\n\n## What Can't Be Changed\n\n- **Email** - Cannot be changed after creation\n- **Password** - Use Reset Password instead"
+      "summary": "Updating user profile and access details.",
+      "content_md": "# How do I edit a user?\n\nOpen the user from **Users**, update the profile or role details, and save. Changes to roles affect module visibility immediately after the user refreshes or signs in again.",
+      "sort_order": 2
     },
     {
       "category_slug": "admin-users",
       "slug": "reset-user-password",
-      "title": "How do I reset a user's password?",
-      "summary": "Generating a new password for a user.",
-      "content_md": "# How do I reset a user's password?\n\n**Note:** This is for Admins only.\n\n## Steps\n\n1. Go to **Users**\n2. Find the user in the list\n3. Click the **Reset Password** (key) icon\n4. Confirm the reset\n5. A new temporary password is:\n   - Generated automatically\n   - Emailed to the user\n   - Displayed to you to share manually if needed\n\n## After Reset\n\nThe user:\n- Receives an email with the new password\n- Must change the password on their next login\n\n## Super Admin\n\nThe super admin (admin@mpdee.co.uk) password cannot be reset by other admins."
+      "title": "How do I reset a user password?",
+      "summary": "Issuing a temporary password for a user.",
+      "content_md": "# How do I reset a user password?\n\nFrom **Users**, open the account and use the reset-password action. Share the temporary password securely and ask the user to change it on next login.",
+      "sort_order": 3
     },
     {
       "category_slug": "admin-users",
       "slug": "delete-user",
-      "title": "How do I delete a user?",
-      "summary": "Removing user accounts and data options.",
-      "content_md": "# How do I delete a user?\n\n**Note:** This is for Admins only.\n\n## Steps\n\n1. Go to **Users**\n2. Find the user in the list\n3. Click **Delete** (trash) icon\n4. Choose deletion mode:\n\n### Keep Company Data (Recommended)\n\n- Personal account is deleted\n- Timesheets, inspections, etc. are preserved\n- User shown as \"Name (Deleted User)\" in historical records\n- Maintains audit trail for compliance\n\n### Delete All User Data\n\n- Everything is deleted permanently\n- Affects historical reports\n- **Cannot be undone**\n\n5. Type the user's email to confirm\n6. Click **Delete**\n\n## Restrictions\n\n- You cannot delete yourself\n- You cannot delete the super admin account"
+      "title": "How do I delete or remove a user?",
+      "summary": "Removing a user account when appropriate.",
+      "content_md": "# How do I delete or remove a user?\n\nUse the delete or deactivate action available in User Management according to company process.\n\nPrefer deactivation when you need to preserve history but stop sign-in. Use deletion only when your process allows permanent removal.",
+      "sort_order": 4
+    },
+    {
+      "category_slug": "admin-users",
+      "slug": "deactivate-vs-delete-user",
+      "title": "Should I deactivate or delete a user?",
+      "summary": "Choosing between deactivation and deletion.",
+      "content_md": "# Should I deactivate or delete a user?\n\n- **Deactivate** - stops access while keeping history linked to the person\n- **Delete** - removes the account when your process requires it\n\nIf you are unsure, deactivate first and confirm with your admin process before deleting.",
+      "sort_order": 5
     },
     {
       "category_slug": "admin-roles",
       "slug": "roles-overview",
       "title": "How do roles and permissions work?",
-      "summary": "Understanding the role-based access control system.",
-      "content_md": "# How do roles and permissions work?\n\n## The System\n\nSquires uses Role-Based Access Control (RBAC):\n- **Roles** define job types (Admin, Manager, Employee-Civils, etc.)\n- **Permissions** control which modules each role can access\n\n## Module Permissions\n\nEach role can have access to these modules:\n- Timesheets\n- Inspections\n- RAMS\n- Absence\n- Maintenance\n- Workshop Tasks\n- Toolbox Talks (receiving)\n\n## Role Types\n\n### Manager/Admin Roles\n\nMarked with \"Is Manager/Admin\" flag:\n- Automatically have full access to all modules\n- Can access Approvals, Actions, Reports\n- Can create items on behalf of employees\n\n### Employee Roles\n\nAccess controlled by individual permissions:\n- Each module can be enabled/disabled\n- Different employee types can have different access"
+      "summary": "Understanding role-based module access.",
+      "content_md": "# How do roles and permissions work?\n\nSQUIRES uses roles and team permissions to decide which modules a user can access.\n\nModules include Timesheets, Van/Plant/HGV Daily Checks, Projects, Absence, Maintenance, Fleet, Workshop Tasks, Inventory, Training, Reminders, Approvals, Actions, Toolbox Talks, Reports, Suggestions, Customers, Quotes, and admin tools.\n\nFAQ categories use the same module names, so restricted FAQ content is only shown to users with matching access.",
+      "sort_order": 0
     },
     {
       "category_slug": "admin-roles",
       "slug": "manage-roles",
-      "title": "How do I manage roles? (Admin)",
-      "summary": "Creating and configuring roles.",
-      "content_md": "# How do I manage roles? (Admin)\n\n**Note:** This is for Admins only.\n\n## Accessing Roles\n\n1. Go to **Users**\n2. Click the **Roles** tab\n\n## Viewing Roles\n\nSee all roles with:\n- Name and display name\n- Description\n- User count (how many users have this role)\n- Permission count (modules enabled)\n\n## Creating a New Role\n\n1. Click **Add Role**\n2. Enter:\n   - **Name** (internal identifier, e.g., \"employee-electrician\")\n   - **Display Name** (shown in UI, e.g., \"Electrician\")\n   - **Description** (optional)\n   - **Is Manager/Admin** - Toggle for full access\n3. Save the role\n\n## Editing Permissions\n\n1. Click on a role row to expand\n2. Toggle modules on/off using checkboxes:\n   - ☑️ Enabled - User can access this module\n   - ☐ Disabled - User cannot access\n3. Changes save automatically\n\n## Deleting Roles\n\nA role can only be deleted if no users are assigned to it."
+      "title": "How do I manage roles?",
+      "summary": "Creating and editing roles and module permissions.",
+      "content_md": "# How do I manage roles?\n\nOpen Roles & Permissions from admin navigation, edit the role, and set module access levels. Keep employee roles narrow and grant manager/admin modules only where needed.",
+      "sort_order": 1
     },
     {
       "category_slug": "admin-roles",
       "slug": "protected-roles",
-      "title": "What roles cannot be modified?",
-      "summary": "Understanding protected system roles.",
-      "content_md": "# What roles cannot be modified?\n\n## Protected Roles\n\nSome roles have restrictions:\n\n### Super Admin\n\n- Cannot be edited or deleted\n- Only the account admin@mpdee.co.uk has this\n- Cannot be locked out by other admins\n- Has all permissions always\n\n### Admin & Manager\n\n- Core permissions cannot be disabled\n- Always have full module access\n- \"Is Manager/Admin\" flag cannot be removed\n\n## Deleting Roles\n\nA role cannot be deleted if:\n- Users are still assigned to it\n- It's a protected system role\n\nReassign users to another role first, then delete."
+      "title": "What are protected roles?",
+      "summary": "Understanding protected high-access roles.",
+      "content_md": "# What are protected roles?\n\nSome roles or accounts are protected so they cannot be locked out or casually modified. Super Admin style accounts exist for recovery and system administration.\n\nTake care when changing permissions on high-access roles.",
+      "sort_order": 2
+    },
+    {
+      "category_slug": "admin-roles",
+      "slug": "team-permissions",
+      "title": "How do team permissions work?",
+      "summary": "Using team-based module permissions.",
+      "content_md": "# How do team permissions work?\n\nTeams can carry module permissions that combine with a user's role. Effective access is what the user can actually open after role and team permissions are applied.\n\nUse View As when you need to confirm the resulting experience.",
+      "sort_order": 3
+    },
+    {
+      "category_slug": "admin-roles",
+      "slug": "module-access-levels",
+      "title": "What do module access levels mean?",
+      "summary": "Understanding permission access levels on modules.",
+      "content_md": "# What do module access levels mean?\n\nModules can be granted at different access levels depending on your permissions setup.\n\nA user only sees navigation, pages, and FAQ content for modules they can access. Sensitive modules such as Quotes and Customers may still require a PIN after access is granted.",
+      "sort_order": 4
+    },
+    {
+      "category_slug": "admin-settings",
+      "slug": "admin-settings-overview",
+      "title": "What is Admin Settings?",
+      "summary": "Overview of admin-only configuration tools.",
+      "content_md": "# What is Admin Settings?\n\n**Admin Settings** contains configuration that affects the wider app.\n\nCurrent examples include display-board settings and timesheet type exceptions. Only admins with the Admin Settings permission can change these values.",
+      "sort_order": 0
+    },
+    {
+      "category_slug": "admin-settings",
+      "slug": "display-board-settings",
+      "title": "How do display board settings work?",
+      "summary": "Configuring the admin display board settings.",
+      "content_md": "# How do display board settings work?\n\nOpen **Admin Settings** and use the display board configuration card to control what the display board shows.\n\nSave changes carefully because they can affect shared screens used by the team.",
+      "sort_order": 1
+    },
+    {
+      "category_slug": "admin-settings",
+      "slug": "timesheet-type-exceptions",
+      "title": "How do timesheet type exceptions work?",
+      "summary": "Giving selected users a non-default timesheet type.",
+      "content_md": "# How do timesheet type exceptions work?\n\nOpen **Admin Settings** and use the timesheet type exceptions controls to assign a non-default timesheet form to specific people.\n\nUse this when one employee needs a different timesheet type from the normal role default.",
+      "sort_order": 2
+    },
+    {
+      "category_slug": "faq-editor",
+      "slug": "faq-editor-overview",
+      "title": "How do I manage FAQ categories and articles?",
+      "summary": "Using the FAQ Editor admin page.",
+      "content_md": "# How do I manage FAQ categories and articles?\n\nOpen **FAQ Editor** to create, edit, publish, and reorder FAQ categories and articles.\n\nArticle bodies use markdown. Keep formatting simple so the Help page renderer can display headings, lists, and emphasis correctly.",
+      "sort_order": 0
+    },
+    {
+      "category_slug": "faq-editor",
+      "slug": "faq-visibility",
+      "title": "How does FAQ visibility work?",
+      "summary": "Module gates that control which FAQ categories users see.",
+      "content_md": "# How does FAQ visibility work?\n\nEach FAQ category can be public or gated to a module such as Inventory, Quotes, Training, or Reminders.\n\nUsers only receive gated FAQ content when they can access that module. Public categories such as Getting Started and Troubleshooting remain available more widely.",
+      "sort_order": 1
+    },
+    {
+      "category_slug": "faq-editor",
+      "slug": "faq-sort-order",
+      "title": "How does FAQ sort order work?",
+      "summary": "Ordering categories and articles on the Help page.",
+      "content_md": "# How does FAQ sort order work?\n\nCategories and articles both have sort orders. Lower numbers appear first on **/help**.\n\nUse consistent spacing in sort values when you expect to insert articles later.",
+      "sort_order": 2
+    },
+    {
+      "category_slug": "error-reports",
+      "slug": "manage-error-reports",
+      "title": "How do I manage error reports? (Admin)",
+      "summary": "Reviewing user-submitted error reports.",
+      "content_md": "# How do I manage error reports? (Admin)\n\nOpen the Error Reports admin page to review issues submitted from Help.\n\nUse the report details, status, and notes to investigate, fix, or dismiss items according to your support process.",
+      "sort_order": 0
+    },
+    {
+      "category_slug": "error-reports",
+      "slug": "error-report-statuses",
+      "title": "What do error report statuses mean?",
+      "summary": "Tracking progress on submitted error reports.",
+      "content_md": "# What do error report statuses mean?\n\nError reports move through review statuses as admins investigate them.\n\nKeep status current so the team can see which items are new, in progress, fixed, or closed.",
+      "sort_order": 1
     },
     {
       "category_slug": "notifications",
       "slug": "notifications-overview",
       "title": "How do notifications work?",
-      "summary": "Understanding the notification system.",
-      "content_md": "# How do notifications work?\n\n## The Bell Icon\n\nClick the bell in the top navigation to see notifications.\n\n## Types of Notifications\n\n- **Toolbox Talks** - New safety messages requiring signature (blocking)\n- **Reminders** - Informational messages (dismissible)\n- **RAMS Assignments** - New documents to sign\n\n## Notification Badge\n\nThe red number on the bell shows unread notifications.\n\n## Clearing Notifications\n\nClick on a notification to:\n- View the full content\n- Mark as read\n- Take action (e.g., sign Toolbox Talk)\n\n## Blocking Messages\n\nToolbox Talks are blocking - you'll see a modal that must be signed before you can use the app."
+      "summary": "Overview of in-app notifications and messages.",
+      "content_md": "# How do notifications work?\n\nSQUIRES sends in-app notifications for events such as approvals, toolbox talks, quote activity, reminders, and other module updates you can access.\n\nOpen Notifications from the app header or Dashboard badges, then acknowledge or act on each item.",
+      "sort_order": 0
+    },
+    {
+      "category_slug": "notifications",
+      "slug": "notification-preferences",
+      "title": "How do notification preferences work?",
+      "summary": "Understanding which notifications you receive.",
+      "content_md": "# How do notification preferences work?\n\nWhich notifications you receive depends on your role, module access, and module-specific settings such as Quotes notification and email CC settings.\n\nIf you are missing an expected notification, check that you have the module permission and that the module's notification settings include your role or email.",
+      "sort_order": 1
+    },
+    {
+      "category_slug": "notifications",
+      "slug": "acknowledge-reminder",
+      "title": "How do I acknowledge a notification or reminder message?",
+      "summary": "Clearing notifications and message acknowledgements.",
+      "content_md": "# How do I acknowledge a notification or reminder message?\n\nOpen the notification or message, read it, and use the acknowledge or open-task action provided.\n\nToolbox Talk acknowledgements and personal Reminders tasks are related but separate: one confirms a message, the other completes an assigned task.",
+      "sort_order": 2
     },
     {
       "category_slug": "troubleshooting",
       "slug": "app-not-loading",
-      "title": "The app won't load - what should I do?",
-      "summary": "Troubleshooting loading issues.",
-      "content_md": "# The app won't load - what should I do?\n\n## Basic Steps\n\n1. **Check internet connection** - Ensure you have WiFi or mobile data\n2. **Refresh the page** - Pull down to refresh (mobile) or press F5 (desktop)\n3. **Clear browser cache** - In browser settings, clear cached data\n4. **Try a different browser** - Chrome or Safari recommended\n\n## PWA Issues\n\nIf using the installed app:\n1. Delete the app from home screen\n2. Clear browser cache\n3. Revisit the website\n4. Re-add to home screen\n\n## Still Not Working?\n\nContact your administrator with:\n- What you were trying to do\n- Any error messages shown\n- Your device type and browser"
+      "title": "The app is not loading. What should I try?",
+      "summary": "Basic recovery steps when the app will not load.",
+      "content_md": "# The app is not loading. What should I try?\n\n1. Check your internet connection.\n2. Refresh the page.\n3. Sign out and sign back in.\n4. Try another browser or device.\n5. If you use the installed PWA, close it fully and reopen it.\n\nIf the problem continues, report it from Help with the page name and what you were doing.",
+      "sort_order": 0
     },
     {
       "category_slug": "troubleshooting",
       "slug": "login-issues",
-      "title": "I can't log in - what should I do?",
-      "summary": "Troubleshooting login problems.",
-      "content_md": "# I can't log in - what should I do?\n\n## Check Credentials\n\n- **Email** - Make sure it's your work email (correctly spelled)\n- **Password** - Check caps lock, try typing in a text field first\n\n## Forgot Password?\n\nContact your administrator - they can reset it from User Management.\n\n## Account Locked?\n\nIf you've tried too many times, wait a few minutes before trying again.\n\n## New Account?\n\nIf you just joined:\n- Check your email for welcome message with temporary password\n- Password must be changed on first login\n\n## Still Not Working?\n\nAsk your administrator to:\n- Verify your account exists\n- Reset your password\n- Check your role permissions"
+      "title": "I cannot log in. What should I do?",
+      "summary": "Fixes for common sign-in problems.",
+      "content_md": "# I cannot log in. What should I do?\n\n- Confirm you are using your work email\n- Check caps lock and password spelling\n- Ask an admin to reset your password\n- Confirm your account is still active\n\nIf the sign-in page itself errors, report it from another device if possible.",
+      "sort_order": 1
     },
     {
       "category_slug": "troubleshooting",
       "slug": "data-not-saving",
-      "title": "My data isn't saving - what's wrong?",
-      "summary": "Troubleshooting data save issues.",
-      "content_md": "# My data isn't saving - what's wrong?\n\n## Check Connection\n\nYou need internet to save data. Check:\n- WiFi or mobile data is active\n- You're not in airplane mode\n- The offline banner isn't showing\n\n## Required Fields\n\nMake sure all required fields are filled:\n- Look for error messages in red\n- Required fields are marked with *\n- Defect comments are required when marking items as Failed\n\n## Session Expired\n\nIf you've been idle too long:\n- You may need to log in again\n- Try refreshing and logging back in\n\n## Validation Errors\n\n- Week ending must be a Sunday\n- Duplicate inspections for same vehicle/week aren't allowed\n- All days must have entries or be marked \"Did Not Work\"\n\n## Try Again\n\n1. Refresh the page\n2. Re-enter the data\n3. Click save again\n4. If still failing, note any error message and contact admin"
+      "title": "My data is not saving. What should I check?",
+      "summary": "Recovering from save or submit failures.",
+      "content_md": "# My data is not saving. What should I check?\n\n1. Check your connection.\n2. Look for validation messages on required fields.\n3. Refresh and reopen the draft if one was saved.\n4. Try again once.\n5. Report the error from Help with the module name and record you were editing.",
+      "sort_order": 2
     },
     {
       "category_slug": "troubleshooting",
       "slug": "permission-denied",
-      "title": "I'm getting 'Access Denied' - why?",
-      "summary": "Understanding permission errors.",
-      "content_md": "# I'm getting 'Access Denied' - why?\n\n## Role Permissions\n\nYou may not have permission for that feature:\n- Your role determines what you can access\n- Ask your admin if you need access\n\n## Manager-Only Features\n\nSome features require Manager or Admin role:\n- Approvals\n- Toolbox Talks (sending)\n- Reports\n- Workshop Tasks (creating/managing)\n\n## Admin-Only Features\n\nSome features require Admin role:\n- User Management\n- Role Management\n- Vehicle Management (Vehicles tab)\n- FAQ Editor\n- Fleet Settings\n\n## What To Do\n\n1. Check if the feature is appropriate for your role\n2. Contact your administrator if you need access\n3. They can update your role permissions"
+      "title": "I am getting Access Denied - why?",
+      "summary": "Why a page or FAQ article is hidden or blocked.",
+      "content_md": "# I am getting Access Denied - why?\n\nAccess Denied usually means your role or team does not include that module.\n\nExamples:\n\n- Inventory, Quotes, Training, or Reminders are module-gated\n- Quotes and Customers also need the sensitive PIN after access is granted\n- FAQ categories for restricted modules are hidden unless you can open the module\n\nAsk a manager or admin to review your role permissions if you should have access.",
+      "sort_order": 3
+    },
+    {
+      "category_slug": "troubleshooting",
+      "slug": "help-support-tools",
+      "title": "How do I report an error or suggest an improvement?",
+      "summary": "Using Help error reporting and suggestions.",
+      "content_md": "# How do I report an error or suggest an improvement?\n\nOpen **Help** and use the Errors or Suggest tabs.\n\n- Error reports go to admins for investigation\n- Suggestions can be triaged in **Manage Suggestions**\n\nInclude the page name, what you expected, and what happened.",
+      "sort_order": 4
+    },
+    {
+      "category_slug": "troubleshooting",
+      "slug": "offline-or-sync-issues",
+      "title": "What should I do if the app seems offline or out of date?",
+      "summary": "Recovering from offline or stale PWA data.",
+      "content_md": "# What should I do if the app seems offline or out of date?\n\n1. Confirm the device is online.\n2. Refresh the page.\n3. Close and reopen the installed app.\n4. Sign out and back in if data still looks stale.\n\nInstalled PWAs can keep an older shell until refreshed, so a full reopen often helps.",
+      "sort_order": 5
+    },
+    {
+      "category_slug": "troubleshooting",
+      "slug": "pwa-update-stuck",
+      "title": "The installed app will not update. What should I try?",
+      "summary": "Forcing a PWA refresh when a new version is available.",
+      "content_md": "# The installed app will not update. What should I try?\n\n1. Open the app and refresh.\n2. Close the installed app completely from the device app switcher.\n3. Reopen it from the home screen.\n4. If needed, open the site in the browser, sign in, and reinstall from Help.\n\nYard Inventory kiosks have their own install page and may need the tablet-specific install/pair flow after updates.",
+      "sort_order": 6
     }
   ]
 }

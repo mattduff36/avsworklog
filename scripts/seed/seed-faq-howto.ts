@@ -24,6 +24,7 @@ interface FAQCategory {
   name: string;
   sort_order: number;
   description?: string;
+  module_name?: string | null;
 }
 
 interface FAQArticle {
@@ -32,6 +33,7 @@ interface FAQArticle {
   title: string;
   summary: string;
   content_md: string;
+  sort_order?: number;
 }
 
 interface FAQData {
@@ -73,16 +75,23 @@ async function seedFAQ() {
     
     for (const category of faqData.categories) {
       const result = await client.query(`
-        INSERT INTO faq_categories (name, slug, description, sort_order, is_active)
-        VALUES ($1, $2, $3, $4, TRUE)
+        INSERT INTO faq_categories (name, slug, description, module_name, sort_order, is_active)
+        VALUES ($1, $2, $3, $4, $5, TRUE)
         ON CONFLICT (slug) 
         DO UPDATE SET 
           name = EXCLUDED.name,
           description = EXCLUDED.description,
+          module_name = EXCLUDED.module_name,
           sort_order = EXCLUDED.sort_order,
           updated_at = NOW()
         RETURNING id
-      `, [category.name, category.slug, category.description || null, category.sort_order]);
+      `, [
+        category.name,
+        category.slug,
+        category.description || null,
+        category.module_name ?? null,
+        category.sort_order,
+      ]);
       
       categoryIdMap[category.slug] = result.rows[0].id;
       console.log(`   ✅ ${category.name}`);
@@ -99,6 +108,8 @@ async function seedFAQ() {
         console.log(`   ⚠️  Skipping "${article.title}" - category "${article.category_slug}" not found`);
         continue;
       }
+
+      const sortOrder = typeof article.sort_order === 'number' ? article.sort_order : articleCount;
       
       await client.query(`
         INSERT INTO faq_articles (category_id, title, slug, summary, content_md, is_published, sort_order)
@@ -108,8 +119,10 @@ async function seedFAQ() {
           title = EXCLUDED.title,
           summary = EXCLUDED.summary,
           content_md = EXCLUDED.content_md,
+          sort_order = EXCLUDED.sort_order,
+          is_published = TRUE,
           updated_at = NOW()
-      `, [categoryId, article.title, article.slug, article.summary, article.content_md, articleCount]);
+      `, [categoryId, article.title, article.slug, article.summary, article.content_md, sortOrder]);
       
       articleCount++;
     }
