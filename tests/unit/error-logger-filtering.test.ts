@@ -98,6 +98,22 @@ describe('error logger filtering', () => {
     ).toBe(true);
   });
 
+  it('ignores handled inventory unauthorized fetch failures', () => {
+    expect(
+      shouldIgnoreConsoleErrorForLogging(
+        'Error fetching inventory data: Error: Unauthorized'
+      )
+    ).toBe(true);
+  });
+
+  it('ignores handled inventory network fetch failures', () => {
+    expect(
+      shouldIgnoreConsoleErrorForLogging(
+        'Error fetching inventory data: TypeError: Failed to fetch'
+      )
+    ).toBe(true);
+  });
+
   it('keeps application type errors without a transient network marker', () => {
     expect(
       shouldIgnoreConsoleErrorForLogging(

@@ -81,6 +81,17 @@ export function shouldIgnoreConsoleErrorForLogging(errorMessage: string): boolea
     return true;
   }
 
+  if (
+    normalized.includes('error fetching inventory data:') &&
+    (
+      normalized.includes('unauthorized') ||
+      normalized.includes('session is locked') ||
+      (normalized.includes('jwt') && normalized.includes('expired'))
+    )
+  ) {
+    return true;
+  }
+
   const hasTransientNetworkMarker = [
     'typeerror: load failed',
     'error: load failed',
@@ -101,6 +112,7 @@ export function shouldIgnoreConsoleErrorForLogging(errorMessage: string): boolea
     'error fetching timesheet type:',
     'failed to resolve timesheet off-day states:',
     'error loading previous defects:',
+    'error fetching inventory data:',
   ].some((context) => normalized.includes(context));
 }
 

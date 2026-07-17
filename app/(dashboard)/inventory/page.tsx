@@ -224,7 +224,25 @@ export default function InventoryPage() {
       setSiteAssignments(siteAssignmentsPayload.assignments || []);
       setInventoryLoadError(null);
     } catch (error) {
-      console.error('Error fetching inventory data:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      const normalizedMessage = message.toLowerCase();
+      const isNetworkFailure =
+        error instanceof TypeError ||
+        normalizedMessage.includes('failed to fetch') ||
+        normalizedMessage.includes('networkerror') ||
+        normalizedMessage.includes('network request failed');
+      const isUnauthorized =
+        normalizedMessage.includes('unauthorized') ||
+        normalizedMessage.includes('session is locked') ||
+        (normalizedMessage.includes('jwt') && normalizedMessage.includes('expired'));
+
+      if (isNetworkFailure || isUnauthorized) {
+        // Non-fatal: transient auth/network issues should not be captured as app errors.
+        console.warn('Inventory data fetch skipped (non-fatal):', error);
+      } else {
+        console.error('Error fetching inventory data:', error);
+      }
+
       const errorMessage = getInventoryLoadErrorMessage(error);
       setInventoryLoadError(errorMessage);
       toast.error(errorMessage, { id: 'inventory-load-error' });
@@ -1314,11 +1332,20 @@ function InventoryBetaBadge() {
 
 function getInventoryLoadErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : '';
+  const normalized = message.toLowerCase();
+
+  if (
+    normalized.includes('unauthorized') ||
+    normalized.includes('session is locked') ||
+    (normalized.includes('jwt') && normalized.includes('expired'))
+  ) {
+    return 'Your session could not be verified. Sign in again, then reload Inventory.';
+  }
 
   if (
     error instanceof TypeError ||
-    message.toLowerCase().includes('failed to fetch') ||
-    message.toLowerCase().includes('networkerror')
+    normalized.includes('failed to fetch') ||
+    normalized.includes('networkerror')
   ) {
     return 'Inventory is unavailable. Check your internet connection or try again shortly.';
   }
