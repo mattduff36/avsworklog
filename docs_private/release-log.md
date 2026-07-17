@@ -2,6 +2,24 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.12.2
+
+**GIT COMMIT MESSAGE**
+`fix(debug): remove sensitive PIN requirement for debug console`
+
+**PUSHED AT**
+2026-07-17T15:01:33.973Z
+
+**WHAT CHANGED**
+Remove sensitive PIN requirement for debug console.
+
+**VERSION HISTORY DETAILS**
+- Remove sensitive PIN requirement for debug console, with changes to app screens, shared logic, automation scripts, automated tests, and data storage.
+- Updated data storage, with changes to automation scripts and data storage.
+
+**COMMITS IN THIS RELEASE**
+- `fix(debug): remove sensitive PIN requirement for debug console`
+
 ## 0726.12.1
 
 **GIT COMMIT MESSAGE**

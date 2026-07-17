@@ -1,5 +1,23 @@
 [
   {
+    "version": "0726.12.2",
+    "updateKind": "minor",
+    "title": "Debug tools improvements",
+    "description": "Remove sensitive PIN requirement for debug console.",
+    "summary": "Remove sensitive PIN requirement for debug console.",
+    "details": [
+      "Remove sensitive PIN requirement for debug console, with changes to app screens, shared logic, automation scripts, automated tests, and data storage.",
+      "Updated data storage, with changes to automation scripts and data storage."
+    ],
+    "areas": [
+      "Debug tools"
+    ],
+    "areaKeys": [
+      "debug"
+    ],
+    "pushedAt": "2026-07-17T15:01:33.973Z"
+  },
+  {
     "version": "0726.12.1",
     "updateKind": "minor",
     "title": "Help and FAQ guidance update",
