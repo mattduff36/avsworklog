@@ -10,7 +10,6 @@ import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/ca
 import { PageLoader } from '@/components/ui/page-loader';
 import { PanelLoader } from '@/components/ui/panel-loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { SensitiveModuleGate, SensitiveModuleSessionManager, useSensitiveModuleAccess } from '@/components/security/SensitiveModuleGate';
 import { BarChart3, Bug, Car, FlaskConical, History, KeyRound, RefreshCw, Send, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { canAccessDebugConsole } from '@/lib/utils/debug-access';
@@ -112,9 +111,6 @@ export default function DebugPage() {
     isActualSuperAdmin,
     isViewingAs,
   });
-  const sensitiveAccess = useSensitiveModuleAccess('debug', {
-    enabled: Boolean(profile && canAccessDebugTools),
-  });
 
   useEffect(() => {
     if (authLoading) {
@@ -168,21 +164,8 @@ export default function DebugPage() {
     );
   }
 
-  if (sensitiveAccess.loading) {
-    return <PageLoader message="Checking sensitive debug access..." />;
-  }
-
-  if (!sensitiveAccess.canAccess) {
-    return (
-      <AppPageShell width="wide">
-        <SensitiveModuleGate moduleLabel="Debug Console" access={sensitiveAccess} />
-      </AppPageShell>
-    );
-  }
-
   return (
     <AppPageShell width="wide">
-      <SensitiveModuleSessionManager moduleLabel="Debug Console" access={sensitiveAccess} />
       <div className="rounded-lg bg-gradient-to-r from-red-600 to-orange-500 p-6 text-white shadow-sm">
         <div className="flex items-center gap-3">
           <Bug className="h-6 w-6 md:h-8 md:w-8" />
