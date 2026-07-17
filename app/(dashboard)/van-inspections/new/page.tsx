@@ -1223,7 +1223,11 @@ function NewInspectionContent() {
       setCheckboxStates(nextCheckboxStates);
       setComments(nextComments);
     } catch (err) {
-      console.error('Error loading previous defects:', err);
+      if (isNetworkFetchError(err) || isAuthErrorStatus(getErrorStatus(err))) {
+        console.warn('Error loading previous defects (non-fatal):', err);
+      } else {
+        console.error('Error loading previous defects:', err);
+      }
       setPreviousDefects(new Map());
       setLoggedDefects(new Map());
       setRecentlyCompletedDefects(new Map());

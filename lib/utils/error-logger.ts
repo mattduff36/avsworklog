@@ -99,6 +99,8 @@ export function shouldIgnoreConsoleErrorForLogging(errorMessage: string): boolea
     'error fetching notifications:',
     'error checking for existing timesheet:',
     'error fetching timesheet type:',
+    'failed to resolve timesheet off-day states:',
+    'error loading previous defects:',
   ].some((context) => normalized.includes(context));
 }
 

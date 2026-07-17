@@ -82,6 +82,22 @@ describe('error logger filtering', () => {
     ).toBe(true);
   });
 
+  it('ignores handled timesheet off-day state network failures', () => {
+    expect(
+      shouldIgnoreConsoleErrorForLogging(
+        'Failed to resolve timesheet off-day states: Error: TypeError: Failed to fetch'
+      )
+    ).toBe(true);
+  });
+
+  it('ignores handled previous defects network failures', () => {
+    expect(
+      shouldIgnoreConsoleErrorForLogging(
+        'Error loading previous defects: TypeError: Failed to fetch'
+      )
+    ).toBe(true);
+  });
+
   it('keeps application type errors without a transient network marker', () => {
     expect(
       shouldIgnoreConsoleErrorForLogging(

@@ -330,7 +330,11 @@ export function CivilsTimesheet({
         setOffDayStates(resolvedStates);
         setOffDayKey(requestKey);
       } catch (offDayError) {
-        console.error('Failed to resolve timesheet off-day states:', offDayError);
+        if (isNetworkFetchError(offDayError) || isAuthErrorStatus(getErrorStatus(offDayError))) {
+          console.warn('Failed to resolve timesheet off-day states (non-fatal):', offDayError);
+        } else {
+          console.error('Failed to resolve timesheet off-day states:', offDayError);
+        }
         if (!cancelled) {
           setOffDayStates(resolveTimesheetOffDayStates(weekEnding, [], null));
           setOffDayKey(requestKey);
