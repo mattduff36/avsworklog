@@ -56,11 +56,8 @@ export default function YardKioskPairPage() {
     setPhase('error');
   }, []);
 
-  const startPairing = useCallback(async () => {
+  const requestPairing = useCallback(async () => {
     if (navigatingRef.current) return;
-    setPhase('loading');
-    setUserError(null);
-    diagnosticIdRef.current = createYardKioskDiagnosticId();
     try {
       const response = await fetch('/api/inventory/kiosk/pairing', {
         method: 'POST',
@@ -92,9 +89,17 @@ export default function YardKioskPairPage() {
     }
   }, [showError]);
 
+  const startPairing = useCallback(() => {
+    if (navigatingRef.current) return;
+    setPhase('loading');
+    setUserError(null);
+    diagnosticIdRef.current = createYardKioskDiagnosticId();
+    void requestPairing();
+  }, [requestPairing]);
+
   useEffect(() => {
-    void startPairing();
-  }, [startPairing]);
+    void requestPairing();
+  }, [requestPairing]);
 
   useEffect(() => {
     if (payload?.status !== 'pairing' || navigatingRef.current) return;

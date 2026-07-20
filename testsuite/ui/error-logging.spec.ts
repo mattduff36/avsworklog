@@ -113,7 +113,9 @@ test.describe('@errors @critical Error Logging', () => {
     const accessDenied = /access denied|forbidden|unauthori|super\s*admin\s+only|actual role mode/i.test(bodyText);
     expect(onDebugRoute, 'Debug console should be accessible to the testsuite superadmin').toBeTruthy();
     expect(accessDenied, 'Debug console should not show a permissions error').toBeFalsy();
-    await expect(page.getByText('SuperAdmin Debug Console')).toBeVisible({ timeout: 15_000 });
+    await expect(
+      page.getByRole('heading', { name: 'SuperAdmin Debug Console' }),
+    ).toBeVisible({ timeout: 15_000 });
     await page.getByRole('tab', { name: /error log|errors/i }).click();
     await expect(page.getByText('Application Error Log')).toBeVisible({ timeout: 10_000 });
 

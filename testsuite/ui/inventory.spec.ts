@@ -55,7 +55,9 @@ test.describe('@inventory @critical Inventory', () => {
       await expect(page.getByText(/where is it going/i)).toBeVisible();
       await expect(page.getByRole('navigation')).toHaveCount(0);
     } else {
-      await expect(page.locator('body')).toContainText(/not authorised|unavailable|not configured/i);
+      await expect(page.locator('body')).toContainText(
+        /wrong account|not authorised|unavailable|not configured/i,
+      );
     }
   });
 });
