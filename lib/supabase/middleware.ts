@@ -15,11 +15,6 @@ import {
   DISPLAY_BOARD_LEGACY_TV_PATH,
   shouldUseLegacyDisplayBoardRoute,
 } from '@/lib/display-board/compatibility'
-import {
-  YARD_KIOSK_CANONICAL_HOST,
-  YARD_KIOSK_CANONICAL_ORIGIN,
-  YARD_KIOSK_WWW_HOST,
-} from '@/lib/inventory/kiosk-errors'
 import type { Database } from '@/types/database'
 
 interface MiddlewareSessionPayload extends Record<string, unknown> {
@@ -186,34 +181,7 @@ async function getSupabaseUser(
   }
 }
 
-function shouldCanonicalizeYardKioskHost(request: NextRequest): boolean {
-  const hostname = request.nextUrl.hostname.toLowerCase()
-  if (hostname !== YARD_KIOSK_WWW_HOST) {
-    return false
-  }
-
-  return (
-    request.nextUrl.pathname === '/yard-kiosk'
-    || request.nextUrl.pathname.startsWith('/yard-kiosk/')
-  )
-}
-
-function redirectYardKioskToCanonicalHost(request: NextRequest): NextResponse {
-  const target = new URL(
-    `${request.nextUrl.pathname}${request.nextUrl.search}`,
-    YARD_KIOSK_CANONICAL_ORIGIN,
-  )
-  return NextResponse.redirect(target, 308)
-}
-
 export async function updateSession(request: NextRequest) {
-  // Yard Inventory is a separate PWA. Always land kiosk routes on the apex host
-  // so __Host- cookies and the installed start URL stay on one origin.
-  // Do not rewrite the main Squires PWA or non-kiosk routes.
-  if (shouldCanonicalizeYardKioskHost(request)) {
-    return redirectYardKioskToCanonicalHost(request)
-  }
-
   const response = NextResponse.next({ request })
   const session = await getMiddlewareSession(request)
   await getSupabaseUser(request, response)

@@ -413,7 +413,3 @@ export function listYardKioskErrorCatalogue(): YardKioskErrorDefinition[] {
     getYardKioskErrorDefinition(code),
   );
 }
-
-export const YARD_KIOSK_CANONICAL_ORIGIN = 'https://squiresapp.com';
-export const YARD_KIOSK_CANONICAL_HOST = 'squiresapp.com';
-export const YARD_KIOSK_WWW_HOST = 'www.squiresapp.com';

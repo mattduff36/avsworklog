@@ -86,6 +86,10 @@ active Inventory location.
   scoped to `/yard-kiosk` and its child routes, and requests landscape
   orientation. The existing viewport guard remains the fallback when a browser
   or device does not enforce the manifest orientation.
+- The Yard Inventory PWA prefers Android fullscreen display so the native
+  light status bar does not appear above the kiosk. Browsers that do not
+  support fullscreen fall back to standalone mode with the status bar, page
+  theme, and launch background all set to the kiosk slate background.
 - Primary controls are large labelled tiles with visible focus states and
   keyboard alternatives.
 - The document does not scroll. Horizontal pagers use native touch scrolling
@@ -145,10 +149,12 @@ active Inventory location.
   transfers always require the live application. If a device outside the PWA
   scope requires normal login, Android opens that login in Chrome before the
   user returns to the kiosk route.
-- Yard Inventory is a separate PWA from the main Squires app. Production kiosk
-  routes under `/yard-kiosk` canonicalize from `www.squiresapp.com` to
-  `https://squiresapp.com` so trusted cookies and the installed start URL share
-  one host. The main Squires PWA manifest and non-kiosk routes are unchanged.
+- Yard Inventory is a separate PWA from the main Squires app. Production must
+  use one canonical host for the kiosk so trusted cookies and the installed
+  start URL share one origin. The intended canonical address is
+  `https://squiresapp.com/yard-kiosk`; this domain redirect is configured at
+  the hosting layer rather than by adding an opposing application redirect.
+  The main Squires PWA manifest and non-kiosk routes are unchanged.
 - Stale browser session cookies must never create redirect loops. Activation
   clears invalid app-session cookies before sending the tablet to pairing or
   recovery, and authenticated login redirects into Yard kiosk go through

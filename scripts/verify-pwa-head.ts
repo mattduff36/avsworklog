@@ -30,7 +30,7 @@ const publicRoutes: RouteCheck[] = [
   {
     path: '/yard-kiosk/install',
     label: 'Yard kiosk install',
-    manifestHref: '/manifest-yard-kiosk.json',
+    manifestHref: '/manifest-yard-kiosk.json?v=20260720-status-bar',
     appleAppTitle: 'Yard Inventory',
     themeColor: '#020617',
   },
@@ -179,8 +179,9 @@ async function verifyManifest(): Promise<void> {
   assert(kioskManifest.orientation === 'landscape', `manifest-yard-kiosk.json: expected orientation "landscape", got ${kioskManifest.orientation}`);
   assert(
     Array.isArray(kioskManifest.display_override)
+      && kioskManifest.display_override[0] === 'fullscreen'
       && kioskManifest.display_override.includes('standalone'),
-    'manifest-yard-kiosk.json: expected display_override to include "standalone"',
+    'manifest-yard-kiosk.json: expected fullscreen with standalone fallback',
   );
   assert(
     kioskManifest.icons?.some((icon) => icon.sizes === '192x192'),

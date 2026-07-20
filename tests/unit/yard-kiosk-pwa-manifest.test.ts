@@ -8,6 +8,7 @@ interface WebAppManifest {
   start_url: string;
   scope: string;
   display: string;
+  display_override: string[];
   theme_color: string;
   orientation: string;
   icons: Array<{
@@ -34,6 +35,11 @@ describe('Yard kiosk PWA manifest', () => {
     expect(kioskManifest.start_url).toBe('/yard-kiosk');
     expect(kioskManifest.scope).toBe('/yard-kiosk');
     expect(kioskManifest.display).toBe('standalone');
+    expect(kioskManifest.display_override).toEqual([
+      'fullscreen',
+      'standalone',
+    ]);
+    expect(siteManifest.display_override).toEqual(['standalone']);
   });
 
   it('requests landscape while leaving the main app portrait-first', () => {
@@ -43,6 +49,16 @@ describe('Yard kiosk PWA manifest', () => {
 
   it('matches the Android status bar to the kiosk navigation bar', () => {
     expect(kioskManifest.theme_color).toBe('#020617');
+
+    const kioskLayout = readFileSync(
+      resolve(process.cwd(), 'app/yard-kiosk/layout.tsx'),
+      'utf8',
+    );
+    expect(kioskLayout).toContain("const YARD_KIOSK_THEME_COLOR = '#020617'");
+    expect(kioskLayout).toContain(
+      "const YARD_KIOSK_MANIFEST_VERSION = '20260720-status-bar'",
+    );
+    expect(kioskLayout).toContain('<YardKioskStatusBar />');
   });
 
   it('provides Android launcher and maskable icon sizes', () => {

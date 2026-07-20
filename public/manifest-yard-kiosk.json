@@ -6,7 +6,7 @@
   "start_url": "/yard-kiosk",
   "scope": "/yard-kiosk",
   "display": "standalone",
-  "display_override": ["standalone"],
+  "display_override": ["fullscreen", "standalone"],
   "background_color": "#020617",
   "theme_color": "#020617",
   "orientation": "landscape",

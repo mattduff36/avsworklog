@@ -228,27 +228,6 @@ describe('supabase middleware cookie refresh', () => {
     expect(response.headers.get('x-middleware-next')).toBe('1');
   });
 
-  it('canonicalizes only Yard kiosk routes from www to the apex host', async () => {
-    mockSupabaseMiddlewareAuth({
-      user: null,
-    });
-    verifyJwtHS256Mock.mockResolvedValue(null);
-
-    const kioskResponse = await updateSession(
-      new NextRequest('https://www.squiresapp.com/yard-kiosk/pair'),
-    );
-    const mainResponse = await updateSession(
-      new NextRequest('https://www.squiresapp.com/login'),
-    );
-
-    expect(kioskResponse.status).toBe(308);
-    expect(kioskResponse.headers.get('location')).toBe(
-      'https://squiresapp.com/yard-kiosk/pair',
-    );
-    expect(mainResponse.status).toBe(200);
-    expect(mainResponse.headers.get('x-middleware-next')).toBe('1');
-  });
-
   it('sends authenticated Yard kiosk login redirects through activate', async () => {
     mockSupabaseMiddlewareAuth({
       user: null,
