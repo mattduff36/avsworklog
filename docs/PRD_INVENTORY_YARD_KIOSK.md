@@ -145,11 +145,41 @@ active Inventory location.
   transfers always require the live application. If a device outside the PWA
   scope requires normal login, Android opens that login in Chrome before the
   user returns to the kiosk route.
+- Yard Inventory is a separate PWA from the main Squires app. Production kiosk
+  routes under `/yard-kiosk` canonicalize from `www.squiresapp.com` to
+  `https://squiresapp.com` so trusted cookies and the installed start URL share
+  one host. The main Squires PWA manifest and non-kiosk routes are unchanged.
+- Stale browser session cookies must never create redirect loops. Activation
+  clears invalid app-session cookies before sending the tablet to pairing or
+  recovery, and authenticated login redirects into Yard kiosk go through
+  `/yard-kiosk/activate`.
+- Pairing shows explicit states for waiting, code confirmation, success, and
+  failure. A successful pair only shows that pairing completed and the kiosk is
+  starting. Failure copy uses plain English with a reference code.
 - The Yard Inventory logo remains available throughout the kiosk workflow.
   Holding it for three seconds reveals a hidden admin menu containing only
   `Log out`; logout requires confirmation and returns the device to sign-in.
 - Recoverable errors preserve the basket, offline state blocks submission, and
   duplicate submissions are prevented.
+- Every tablet-visible failure uses a stable error code, plain-English title,
+  what happened, what to do next, and a searchable diagnostic reference. The
+  tablet never shows raw database, JWT, or HTTP wording as the primary message.
+
+### YK-010: Diagnostics and remote recovery
+
+- Online tablets send an authenticated heartbeat with phase, app/deployment
+  version, and last sanitized error. Inventory managers see online/stale/offline
+  presence in Inventory Settings.
+- While a tablet remains online, managers may issue audited commands: ping,
+  refresh status/data, refresh session, reload app, reset workflow, log out,
+  and clear credentials for re-pairing. Reset, logout, and re-pair require an
+  explicit confirmation warning because they can discard an unfinished basket.
+- Commands are durable, expire safely, execute at most once, and record
+  accepted/completed/failed status. Offline transfer queues and service-worker
+  command delivery are out of scope.
+- Super-admin `/debug` includes a Yard Kiosk tab with device health, command
+  audit, error catalogue, and plain-English likely-cause guidance. Write
+  recovery controls remain in Inventory Settings.
 - In every active workflow state after the initial Collect/Return screen,
   pointer, touch, click, and keyboard activity restart a two-minute inactivity
   window. At 1 minute 45 seconds, an assertive, reduced-motion-safe warning

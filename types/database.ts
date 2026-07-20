@@ -2366,6 +2366,13 @@ export type Database = {
           pairing_session_id: string | null
           last_seen_at: string | null
           last_authenticated_at: string | null
+          last_heartbeat_at: string | null
+          last_phase: string | null
+          last_app_version: string | null
+          last_deployment_id: string | null
+          last_error_code: string | null
+          last_diagnostic_id: string | null
+          diagnostics: Record<string, unknown>
           revoked_at: string | null
           revoked_by: string | null
           created_at: string
@@ -2380,6 +2387,13 @@ export type Database = {
           pairing_session_id?: string | null
           last_seen_at?: string | null
           last_authenticated_at?: string | null
+          last_heartbeat_at?: string | null
+          last_phase?: string | null
+          last_app_version?: string | null
+          last_deployment_id?: string | null
+          last_error_code?: string | null
+          last_diagnostic_id?: string | null
+          diagnostics?: Record<string, unknown>
           revoked_at?: string | null
           revoked_by?: string | null
           created_at?: string
@@ -2394,6 +2408,13 @@ export type Database = {
           pairing_session_id?: string | null
           last_seen_at?: string | null
           last_authenticated_at?: string | null
+          last_heartbeat_at?: string | null
+          last_phase?: string | null
+          last_app_version?: string | null
+          last_deployment_id?: string | null
+          last_error_code?: string | null
+          last_diagnostic_id?: string | null
+          diagnostics?: Record<string, unknown>
           revoked_at?: string | null
           revoked_by?: string | null
           created_at?: string
@@ -2426,6 +2447,158 @@ export type Database = {
             columns: ['revoked_by']
             isOneToOne: false
             referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      inventory_kiosk_device_commands: {
+        Row: {
+          id: string
+          device_id: string
+          command_type:
+            | 'ping'
+            | 'refresh_status'
+            | 'refresh_session'
+            | 'reload_app'
+            | 'reset_workflow'
+            | 'logout'
+            | 'clear_credentials'
+          status:
+            | 'pending'
+            | 'accepted'
+            | 'completed'
+            | 'failed'
+            | 'expired'
+            | 'cancelled'
+          payload: Record<string, unknown>
+          idempotency_key: string
+          issued_by: string
+          issued_at: string
+          expires_at: string
+          accepted_at: string | null
+          completed_at: string | null
+          failed_at: string | null
+          result_code: string | null
+          error_message: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          device_id: string
+          command_type:
+            | 'ping'
+            | 'refresh_status'
+            | 'refresh_session'
+            | 'reload_app'
+            | 'reset_workflow'
+            | 'logout'
+            | 'clear_credentials'
+          status?:
+            | 'pending'
+            | 'accepted'
+            | 'completed'
+            | 'failed'
+            | 'expired'
+            | 'cancelled'
+          payload?: Record<string, unknown>
+          idempotency_key: string
+          issued_by: string
+          issued_at?: string
+          expires_at: string
+          accepted_at?: string | null
+          completed_at?: string | null
+          failed_at?: string | null
+          result_code?: string | null
+          error_message?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          device_id?: string
+          command_type?:
+            | 'ping'
+            | 'refresh_status'
+            | 'refresh_session'
+            | 'reload_app'
+            | 'reset_workflow'
+            | 'logout'
+            | 'clear_credentials'
+          status?:
+            | 'pending'
+            | 'accepted'
+            | 'completed'
+            | 'failed'
+            | 'expired'
+            | 'cancelled'
+          payload?: Record<string, unknown>
+          idempotency_key?: string
+          issued_by?: string
+          issued_at?: string
+          expires_at?: string
+          accepted_at?: string | null
+          completed_at?: string | null
+          failed_at?: string | null
+          result_code?: string | null
+          error_message?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'inventory_kiosk_device_commands_device_id_fkey'
+            columns: ['device_id']
+            isOneToOne: false
+            referencedRelation: 'inventory_kiosk_devices'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_kiosk_device_commands_issued_by_fkey'
+            columns: ['issued_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      inventory_kiosk_device_events: {
+        Row: {
+          id: string
+          device_id: string | null
+          event_type: string
+          error_code: string | null
+          diagnostic_id: string | null
+          message: string | null
+          details: Record<string, unknown>
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          device_id?: string | null
+          event_type: string
+          error_code?: string | null
+          diagnostic_id?: string | null
+          message?: string | null
+          details?: Record<string, unknown>
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          device_id?: string | null
+          event_type?: string
+          error_code?: string | null
+          diagnostic_id?: string | null
+          message?: string | null
+          details?: Record<string, unknown>
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'inventory_kiosk_device_events_device_id_fkey'
+            columns: ['device_id']
+            isOneToOne: false
+            referencedRelation: 'inventory_kiosk_devices'
             referencedColumns: ['id']
           },
         ]

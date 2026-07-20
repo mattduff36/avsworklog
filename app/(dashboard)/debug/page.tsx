@@ -10,7 +10,7 @@ import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/ca
 import { PageLoader } from '@/components/ui/page-loader';
 import { PanelLoader } from '@/components/ui/panel-loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BarChart3, Bug, Car, FlaskConical, History, KeyRound, RefreshCw, Send, type LucideIcon } from 'lucide-react';
+import { BarChart3, Bug, Car, FlaskConical, History, KeyRound, PackageOpen, RefreshCw, Send, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { canAccessDebugConsole } from '@/lib/utils/debug-access';
 
@@ -48,6 +48,10 @@ const UserAnalyticsDebugPanel = dynamic(
   () => import('./components/UserAnalyticsDebugPanel').then((mod) => ({ default: mod.UserAnalyticsDebugPanel })),
   { loading: debugTabLoading },
 );
+const YardKioskDebugPanel = dynamic(
+  () => import('./components/YardKioskDebugPanel').then((mod) => ({ default: mod.YardKioskDebugPanel })),
+  { loading: debugTabLoading },
+);
 
 type DebugTab =
   | 'error-log'
@@ -57,7 +61,8 @@ type DebugTab =
   | 'test-fleet'
   | 'job-code-corrections'
   | 'notification-settings'
-  | 'emulation-tests';
+  | 'emulation-tests'
+  | 'yard-kiosk';
 
 interface DebugTabConfig {
   value: DebugTab;
@@ -85,6 +90,8 @@ const DEBUG_TAB_ALIASES: Record<string, DebugTab> = {
   'notification-settings': 'notification-settings',
   emulation: 'emulation-tests',
   'emulation-tests': 'emulation-tests',
+  kiosk: 'yard-kiosk',
+  'yard-kiosk': 'yard-kiosk',
 };
 
 const DEBUG_TABS: DebugTabConfig[] = [
@@ -96,6 +103,7 @@ const DEBUG_TABS: DebugTabConfig[] = [
   { value: 'job-code-corrections', label: 'Job Codes', icon: KeyRound },
   { value: 'notification-settings', label: 'Notification Settings', icon: Send },
   { value: 'emulation-tests', label: 'Emulation Tests', icon: FlaskConical },
+  { value: 'yard-kiosk', label: 'Yard Kiosk', icon: PackageOpen },
 ];
 
 const tabTriggerClassName = 'min-h-10 gap-2 px-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground lg:px-3';
@@ -177,7 +185,7 @@ export default function DebugPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as DebugTab)} className="space-y-6">
-        <TabsList className="grid h-auto w-full grid-cols-4 gap-1 bg-slate-900/50 p-1 sm:grid-cols-8 lg:flex lg:w-auto lg:flex-wrap lg:justify-start lg:gap-0 lg:p-1.5">
+        <TabsList className="grid h-auto w-full grid-cols-4 gap-1 bg-slate-900/50 p-1 sm:grid-cols-9 lg:flex lg:w-auto lg:flex-wrap lg:justify-start lg:gap-0 lg:p-1.5">
           {DEBUG_TABS.map(({ value, label, icon: Icon }) => (
             <TabsTrigger
               key={value}
@@ -222,6 +230,10 @@ export default function DebugPage() {
 
         <TabsContent value="emulation-tests">
           <EmulationTestsDebugPanel />
+        </TabsContent>
+
+        <TabsContent value="yard-kiosk">
+          <YardKioskDebugPanel />
         </TabsContent>
 
       </Tabs>

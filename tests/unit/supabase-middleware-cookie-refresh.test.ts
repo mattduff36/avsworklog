@@ -228,6 +228,61 @@ describe('supabase middleware cookie refresh', () => {
     expect(response.headers.get('x-middleware-next')).toBe('1');
   });
 
+  it('canonicalizes only Yard kiosk routes from www to the apex host', async () => {
+    mockSupabaseMiddlewareAuth({
+      user: null,
+    });
+    verifyJwtHS256Mock.mockResolvedValue(null);
+
+    const kioskResponse = await updateSession(
+      new NextRequest('https://www.squiresapp.com/yard-kiosk/pair'),
+    );
+    const mainResponse = await updateSession(
+      new NextRequest('https://www.squiresapp.com/login'),
+    );
+
+    expect(kioskResponse.status).toBe(308);
+    expect(kioskResponse.headers.get('location')).toBe(
+      'https://squiresapp.com/yard-kiosk/pair',
+    );
+    expect(mainResponse.status).toBe(200);
+    expect(mainResponse.headers.get('x-middleware-next')).toBe('1');
+  });
+
+  it('sends authenticated Yard kiosk login redirects through activate', async () => {
+    mockSupabaseMiddlewareAuth({
+      user: null,
+    });
+
+    const response = await updateSession(
+      createRequest(
+        'https://squiresapp.com/login?redirect=%2Fyard-kiosk',
+        `${APP_SESSION_COOKIE_NAME}=valid-app-session`,
+      ),
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe(
+      'https://squiresapp.com/yard-kiosk/activate',
+    );
+  });
+
+  it('breaks authenticated /login?redirect=/login self-loops', async () => {
+    mockSupabaseMiddlewareAuth({
+      user: null,
+    });
+
+    const response = await updateSession(
+      createRequest(
+        'http://localhost/login?redirect=%2Flogin',
+        `${APP_SESSION_COOKIE_NAME}=valid-app-session`,
+      ),
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('http://localhost/dashboard');
+  });
+
   it('redirects legacy Samsung TV display board browsers to the fallback route', async () => {
     mockSupabaseMiddlewareAuth({
       user: null,

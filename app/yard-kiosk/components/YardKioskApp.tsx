@@ -20,7 +20,17 @@ import type {
   YardKioskReceipt,
   YardKioskStockItem,
 } from '@/lib/inventory/kiosk-types';
+import {
+  buildYardKioskUserError,
+  createYardKioskDiagnosticId,
+} from '@/lib/inventory/kiosk-errors';
+import {
+  logYardKioskHandledError,
+  yardKioskErrorFromApiPayload,
+  yardKioskOfflineError,
+} from '@/lib/inventory/kiosk-client-diagnostics';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { useYardKioskRemoteControl } from '@/lib/hooks/useYardKioskRemoteControl';
 import { YardKioskBasket } from './YardKioskBasket';
 import { YardKioskAdminMenu } from './YardKioskAdminMenu';
 import { YardKioskInactivityGuard } from './YardKioskInactivityGuard';
@@ -42,6 +52,7 @@ interface YardKioskAppProps {
 interface ApiErrorPayload {
   error?: string;
   code?: string;
+  diagnostic_id?: string;
   blocked_items?: Array<{
     id: string;
     item_number: string;
@@ -69,6 +80,13 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
     };
   }, []);
 
+  const handleWorkflowReset = useCallback(() => {
+    legacyLocationRequestIdRef.current += 1;
+    workflowSessionIdRef.current += 1;
+    setLocations(bootstrap.locations);
+    dispatch({ type: 'RESET' });
+  }, [bootstrap.locations]);
+
   const loadStock = useCallback(async (
     direction: YardKioskDirection,
     counterpart: YardKioskLocation,
@@ -83,17 +101,54 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
         cache: 'no-store',
       });
       const payload = await response.json() as ApiErrorPayload & { items?: YardKioskStockItem[] };
-      if (!response.ok) throw new Error(payload.error || 'Failed to load available stock');
+      if (!response.ok) {
+        const userError = yardKioskErrorFromApiPayload(response.status, {
+          ...payload,
+          code: payload.code || (response.status === 409 ? 'STOCK_STALE' : 'STOCK_LOAD_FAILED'),
+        });
+        void logYardKioskHandledError(userError, { action: 'load_stock' });
+        if (workflowSessionIdRef.current !== expectedSessionId) return;
+        dispatch({
+          type: 'STOCK_FAILED',
+          message: userError.title,
+          userError,
+        });
+        return;
+      }
       if (workflowSessionIdRef.current !== expectedSessionId) return;
       dispatch({ type: 'STOCK_LOADED', stock: payload.items || [] });
     } catch (error) {
       if (workflowSessionIdRef.current !== expectedSessionId) return;
+      const userError = !window.navigator.onLine
+        ? yardKioskOfflineError()
+        : buildYardKioskUserError('STOCK_LOAD_FAILED', {
+          diagnosticId: createYardKioskDiagnosticId(),
+          technicalDetail: error instanceof Error ? error.message : undefined,
+        });
+      void logYardKioskHandledError(userError, { action: 'load_stock' });
       dispatch({
         type: 'STOCK_FAILED',
-        message: error instanceof Error ? error.message : 'Failed to load available stock',
+        message: userError.title,
+        userError,
       });
     }
   }, []);
+
+  useYardKioskRemoteControl({
+    phase: state.phase,
+    offline,
+    lastErrorCode: state.userError?.code || null,
+    onResetWorkflow: handleWorkflowReset,
+    onReloadStock: () => {
+      if (state.direction && state.counterpart) {
+        void loadStock(state.direction, state.counterpart);
+      }
+    },
+    onRemoteNotice: (userError) => {
+      dispatch({ type: 'SET_USER_ERROR', userError });
+      void logYardKioskHandledError(userError, { action: 'remote_command' });
+    },
+  });
 
   function handleDirection(direction: YardKioskDirection) {
     legacyLocationRequestIdRef.current += 1;
@@ -132,6 +187,17 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
       || state.phase === 'submitting'
     ) return;
 
+    if (!window.navigator.onLine) {
+      const userError = yardKioskOfflineError();
+      dispatch({
+        type: 'SUBMIT_FAILED',
+        message: userError.title,
+        userError,
+      });
+      void logYardKioskHandledError(userError, { action: 'submit' });
+      return;
+    }
+
     const expectedSessionId = workflowSessionIdRef.current;
     dispatch({ type: 'SUBMIT_START' });
     try {
@@ -154,11 +220,18 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
       const payload = await response.json() as ApiErrorPayload & YardKioskReceipt;
       if (workflowSessionIdRef.current !== expectedSessionId) return;
       if (!response.ok) {
+        const userError = yardKioskErrorFromApiPayload(response.status, {
+          ...payload,
+          code: payload.code
+            || (response.status === 409 ? 'STOCK_STALE' : 'SUBMIT_FAILED'),
+        });
         dispatch({
           type: 'SUBMIT_FAILED',
-          message: payload.error || 'The transfer could not be completed',
+          message: userError.whatHappened,
           blockedItems: payload.blocked_items,
+          userError,
         });
+        void logYardKioskHandledError(userError, { action: 'submit', httpStatus: response.status });
         if (response.status === 409) {
           void loadStock(state.direction, state.counterpart, expectedSessionId);
         }
@@ -167,10 +240,16 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
       dispatch({ type: 'SUBMIT_SUCCEEDED', receipt: payload });
     } catch (error) {
       if (workflowSessionIdRef.current !== expectedSessionId) return;
+      const userError = buildYardKioskUserError('SUBMIT_UNCERTAIN', {
+        diagnosticId: createYardKioskDiagnosticId(),
+        technicalDetail: error instanceof Error ? error.message : undefined,
+      });
       dispatch({
         type: 'SUBMIT_FAILED',
-        message: error instanceof Error ? error.message : 'The transfer could not be completed',
+        message: userError.whatHappened,
+        userError,
       });
+      void logYardKioskHandledError(userError, { action: 'submit' });
     }
   }
 
@@ -184,13 +263,6 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
     setLocations(bootstrap.locations);
     dispatch({ type: 'BACK' });
   }
-
-  const handleWorkflowReset = useCallback(() => {
-    legacyLocationRequestIdRef.current += 1;
-    workflowSessionIdRef.current += 1;
-    setLocations(bootstrap.locations);
-    dispatch({ type: 'RESET' });
-  }, [bootstrap.locations]);
 
   function handleWorkflowForward() {
     if (state.phase === 'items') {
@@ -397,7 +469,7 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
           />
         ) : null}
 
-        {state.error ? (
+        {state.error || state.userError ? (
           <div
             role="alert"
             className="absolute bottom-5 left-1/2 z-30 w-[min(44rem,calc(100%-3rem))] -translate-x-1/2 rounded-2xl border border-red-300/30 bg-red-950/95 p-4 shadow-2xl backdrop-blur-xl"
@@ -405,14 +477,31 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
             <div className="flex items-start gap-3">
               <AlertCircle className="mt-0.5 h-6 w-6 flex-none text-red-300" />
               <div className="min-w-0 flex-1">
-                <p className="font-black text-red-50">{state.error}</p>
+                <p className="font-black text-red-50">
+                  {state.userError?.title || state.error}
+                </p>
+                {state.userError ? (
+                  <>
+                    <p className="mt-1 text-sm text-red-100/90">
+                      {state.userError.whatHappened}
+                    </p>
+                    <p className="mt-1 text-sm text-red-100/70">
+                      {state.userError.whatToDoNext}
+                    </p>
+                    <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.16em] text-red-200/60">
+                      Ref {state.userError.diagnosticId}
+                    </p>
+                  </>
+                ) : null}
                 {state.blockedItems.length > 0 ? (
                   <p className="mt-1 text-sm text-red-100/75">
                     {state.blockedItems.map((item) => `${item.item_number} · ${item.name}`).join(', ')}
                   </p>
                 ) : null}
               </div>
-              {state.loadingStock && state.counterpart && state.direction ? (
+              {(state.loadingStock || state.userError?.retryable)
+                && state.counterpart
+                && state.direction ? (
                 <button
                   type="button"
                   aria-label="Retry loading stock"

@@ -98,7 +98,7 @@ describe('Yard kiosk trusted-device activation route', () => {
     );
   });
 
-  it('preserves normal login when no pairing window or device credential exists', async () => {
+  it('sends unpaired browsers to recovery when no pairing window exists', async () => {
     activateInventoryKioskDevice.mockResolvedValue(null);
 
     const response = await activateKiosk(
@@ -107,8 +107,22 @@ describe('Yard kiosk trusted-device activation route', () => {
 
     expect(response.status).toBe(307);
     expect(response.headers.get('location')).toBe(
-      'http://localhost/login?redirect=%2Fyard-kiosk',
+      'http://localhost/yard-kiosk/recover?code=DEVICE_UNPAIRED',
     );
+  });
+
+  it('clears stale app-session cookies when activation cannot continue', async () => {
+    activateInventoryKioskDevice.mockResolvedValue(null);
+    const request = new NextRequest('http://localhost/yard-kiosk/activate', {
+      headers: {
+        Cookie: `${APP_SESSION_COOKIE_NAME}=stale-jwt`,
+      },
+    });
+
+    const response = await activateKiosk(request);
+
+    expect(response.status).toBe(307);
+    expect(response.cookies.get(APP_SESSION_COOKIE_NAME)?.value).toBe('');
   });
 
   it('never replaces an existing valid session', async () => {

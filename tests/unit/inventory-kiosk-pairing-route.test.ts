@@ -60,10 +60,11 @@ describe('Inventory kiosk public pairing route', () => {
     const payload = await response.json();
     const pairingCookie = response.cookies.get(KIOSK_PAIRING_COOKIE_NAME);
 
-    expect(payload).toEqual({
+    expect(payload).toMatchObject({
       status: 'pairing',
       pairing,
     });
+    expect(payload.diagnostic_id).toEqual(expect.any(String));
     expect(JSON.stringify(payload)).not.toContain('raw-pairing-secret');
     expect(pairingCookie?.value).toBe('raw-pairing-secret');
     expect(pairingCookie?.httpOnly).toBe(true);
@@ -93,10 +94,11 @@ describe('Inventory kiosk public pairing route', () => {
     expect(getInventoryKioskPairingStatus).toHaveBeenCalledWith(
       'raw-pairing-secret',
     );
-    expect(payload).toEqual({
+    expect(payload).toMatchObject({
       status: 'paired',
       pairing: null,
     });
+    expect(payload.diagnostic_id).toEqual(expect.any(String));
     expect(deviceCookie?.value).toBe('raw-pairing-secret');
     expect(deviceCookie?.httpOnly).toBe(true);
     expect(deviceCookie?.sameSite).toBe('strict');

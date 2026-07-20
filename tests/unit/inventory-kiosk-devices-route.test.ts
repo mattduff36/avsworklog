@@ -8,6 +8,9 @@ const {
   cancelInventoryKioskPairing,
   confirmInventoryKioskPairing,
   revokeInventoryKioskDevice,
+  listInventoryKioskOperationalDevices,
+  issueInventoryKioskDeviceCommand,
+  cancelInventoryKioskDeviceCommand,
 } = vi.hoisted(() => ({
   requireInventoryManagerAccess: vi.fn(),
   getInventoryKioskDeviceAdminState: vi.fn(),
@@ -15,6 +18,9 @@ const {
   cancelInventoryKioskPairing: vi.fn(),
   confirmInventoryKioskPairing: vi.fn(),
   revokeInventoryKioskDevice: vi.fn(),
+  listInventoryKioskOperationalDevices: vi.fn(),
+  issueInventoryKioskDeviceCommand: vi.fn(),
+  cancelInventoryKioskDeviceCommand: vi.fn(),
 }));
 
 vi.mock('@/lib/server/inventory-auth', () => ({
@@ -35,6 +41,12 @@ vi.mock('@/lib/server/inventory-kiosk-devices', () => ({
   cancelInventoryKioskPairing,
   confirmInventoryKioskPairing,
   revokeInventoryKioskDevice,
+}));
+
+vi.mock('@/lib/server/inventory-kiosk-remote', () => ({
+  listInventoryKioskOperationalDevices,
+  issueInventoryKioskDeviceCommand,
+  cancelInventoryKioskDeviceCommand,
 }));
 
 import {
@@ -65,6 +77,9 @@ describe('Inventory kiosk device management route', () => {
       isManagerOrAdmin: true,
     });
     getInventoryKioskDeviceAdminState.mockResolvedValue(emptyState);
+    listInventoryKioskOperationalDevices.mockResolvedValue([]);
+    issueInventoryKioskDeviceCommand.mockResolvedValue({ id: 'command-1' });
+    cancelInventoryKioskDeviceCommand.mockResolvedValue(undefined);
     startInventoryKioskPairing.mockResolvedValue(emptyState);
   });
 

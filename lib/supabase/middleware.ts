@@ -15,6 +15,11 @@ import {
   DISPLAY_BOARD_LEGACY_TV_PATH,
   shouldUseLegacyDisplayBoardRoute,
 } from '@/lib/display-board/compatibility'
+import {
+  YARD_KIOSK_CANONICAL_HOST,
+  YARD_KIOSK_CANONICAL_ORIGIN,
+  YARD_KIOSK_WWW_HOST,
+} from '@/lib/inventory/kiosk-errors'
 import type { Database } from '@/types/database'
 
 interface MiddlewareSessionPayload extends Record<string, unknown> {
@@ -181,7 +186,34 @@ async function getSupabaseUser(
   }
 }
 
+function shouldCanonicalizeYardKioskHost(request: NextRequest): boolean {
+  const hostname = request.nextUrl.hostname.toLowerCase()
+  if (hostname !== YARD_KIOSK_WWW_HOST) {
+    return false
+  }
+
+  return (
+    request.nextUrl.pathname === '/yard-kiosk'
+    || request.nextUrl.pathname.startsWith('/yard-kiosk/')
+  )
+}
+
+function redirectYardKioskToCanonicalHost(request: NextRequest): NextResponse {
+  const target = new URL(
+    `${request.nextUrl.pathname}${request.nextUrl.search}`,
+    YARD_KIOSK_CANONICAL_ORIGIN,
+  )
+  return NextResponse.redirect(target, 308)
+}
+
 export async function updateSession(request: NextRequest) {
+  // Yard Inventory is a separate PWA. Always land kiosk routes on the apex host
+  // so __Host- cookies and the installed start URL stay on one origin.
+  // Do not rewrite the main Squires PWA or non-kiosk routes.
+  if (shouldCanonicalizeYardKioskHost(request)) {
+    return redirectYardKioskToCanonicalHost(request)
+  }
+
   const response = NextResponse.next({ request })
   const session = await getMiddlewareSession(request)
   await getSupabaseUser(request, response)
@@ -306,6 +338,21 @@ export async function updateSession(request: NextRequest) {
     const redirectTarget = request.nextUrl.searchParams.get('redirect')
     if (isSafeInternalRedirectTarget(redirectTarget)) {
       const targetUrl = new URL(redirectTarget, request.nextUrl.origin)
+      // Avoid /login?redirect=/login self-loops and send Yard kiosk through
+      // activate so stale JWT cookies cannot bounce against DB session checks.
+      if (
+        targetUrl.pathname === '/login'
+        || targetUrl.pathname.startsWith('/login/')
+      ) {
+        url.pathname = '/dashboard'
+        url.search = ''
+        return redirectWithMiddlewareCookies(response, url)
+      }
+      if (targetUrl.pathname.startsWith('/yard-kiosk')) {
+        url.pathname = '/yard-kiosk/activate'
+        url.search = ''
+        return redirectWithMiddlewareCookies(response, url)
+      }
       url.pathname = shouldUseLegacyDisplayBoardRoute(targetUrl.pathname, request.headers.get('user-agent'))
         ? DISPLAY_BOARD_LEGACY_TV_PATH
         : targetUrl.pathname

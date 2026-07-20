@@ -8,6 +8,7 @@ import {
   setKioskDeviceCookie,
 } from '@/lib/server/inventory-kiosk-device-cookies';
 import {
+  InventoryKioskDeviceError,
   activateInventoryKioskDevice,
   hasActiveInventoryKioskPairing,
 } from '@/lib/server/inventory-kiosk-devices';
@@ -15,6 +16,21 @@ import { trackServerUsageEvent } from '@/lib/server/user-analytics';
 
 function redirectTo(request: NextRequest, pathname: string): NextResponse {
   return NextResponse.redirect(new URL(pathname, request.url), 307);
+}
+
+function redirectWithClearedAuth(
+  request: NextRequest,
+  pathname: string,
+  options: { expireDeviceCookie?: boolean } = {},
+): NextResponse {
+  const response = redirectTo(request, pathname);
+  // Stale JWT cookies otherwise look "authenticated" in middleware while
+  // validateAppSession rejects them, creating ERR_TOO_MANY_REDIRECTS.
+  clearAllAuthCookies(request, response);
+  if (options.expireDeviceCookie) {
+    expireKioskDeviceCookie(response);
+  }
+  return response;
 }
 
 export async function GET(request: NextRequest) {
@@ -29,10 +45,10 @@ export async function GET(request: NextRequest) {
     if (!activation) {
       const target = await hasActiveInventoryKioskPairing()
         ? '/yard-kiosk/pair'
-        : '/login?redirect=%2Fyard-kiosk';
-      const response = redirectTo(request, target);
-      if (rawDeviceToken) expireKioskDeviceCookie(response);
-      return response;
+        : '/yard-kiosk/recover?code=DEVICE_UNPAIRED';
+      return redirectWithClearedAuth(request, target, {
+        expireDeviceCookie: Boolean(rawDeviceToken),
+      });
     }
 
     await trackServerUsageEvent({
@@ -58,8 +74,17 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (error) {
     console.error('Yard kiosk trusted-device activation failed:', error);
-    const response = redirectTo(request, '/login?redirect=%2Fyard-kiosk');
-    expireKioskDeviceCookie(response);
-    return response;
+    const isCredentialRace = error instanceof InventoryKioskDeviceError
+      && error.status === 409;
+    return redirectWithClearedAuth(
+      request,
+      isCredentialRace
+        ? '/yard-kiosk/recover?code=DEVICE_CREDENTIAL_USED'
+        : '/yard-kiosk/recover?code=ACTIVATION_FAILED',
+      {
+        // Keep the device cookie on a credential race so Try again can succeed.
+        expireDeviceCookie: !isCredentialRace,
+      },
+    );
   }
 }

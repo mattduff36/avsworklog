@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -10,6 +10,12 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  buildYardKioskUserError,
+  createYardKioskDiagnosticId,
+  mapPairingStatusToYardKioskErrorCode,
+  type YardKioskUserError,
+} from '@/lib/inventory/kiosk-errors';
 
 interface PairingView {
   id: string;
@@ -25,59 +31,108 @@ interface PairingPayload {
   pairing?: PairingView | null;
   message?: string;
   error?: string;
+  code?: string;
 }
+
+type PairUiPhase = 'loading' | 'waiting' | 'code' | 'success' | 'error';
 
 export default function YardKioskPairPage() {
   const [payload, setPayload] = useState<PairingPayload | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [phase, setPhase] = useState<PairUiPhase>('loading');
+  const [userError, setUserError] = useState<YardKioskUserError | null>(null);
+  const navigatingRef = useRef(false);
+  const diagnosticIdRef = useRef(createYardKioskDiagnosticId());
+
+  const showError = useCallback((next: PairingPayload) => {
+    const code = mapPairingStatusToYardKioskErrorCode(
+      next.status,
+      next.error || next.message,
+    ) || 'PAIRING_NOT_STARTED';
+    setUserError(buildYardKioskUserError(code, {
+      diagnosticId: diagnosticIdRef.current,
+      technicalDetail: next.error || next.message,
+      whatHappened: next.error || next.message || undefined,
+    }));
+    setPhase('error');
+  }, []);
 
   const startPairing = useCallback(async () => {
-    setLoading(true);
+    if (navigatingRef.current) return;
+    setPhase('loading');
+    setUserError(null);
+    diagnosticIdRef.current = createYardKioskDiagnosticId();
     try {
       const response = await fetch('/api/inventory/kiosk/pairing', {
         method: 'POST',
         cache: 'no-store',
+        headers: {
+          'X-Yard-Kiosk-Diagnostic-Id': diagnosticIdRef.current,
+        },
       });
       const result = await response.json() as PairingPayload;
       setPayload(result);
+
+      if (result.status === 'pairing') {
+        setPhase(result.pairing?.confirmation_code ? 'code' : 'waiting');
+        return;
+      }
+      if (result.status === 'paired') {
+        setPhase('success');
+        navigatingRef.current = true;
+        window.location.replace('/yard-kiosk/activate');
+        return;
+      }
+      showError(result);
     } catch {
-      setPayload({
+      showError({
         status: 'unavailable',
         error: 'This device could not reach the pairing service.',
+        code: 'FLAKY_CONNECTION',
       });
-    } finally {
-      setLoading(false);
     }
-  }, []);
+  }, [showError]);
 
   useEffect(() => {
     void startPairing();
   }, [startPairing]);
 
   useEffect(() => {
-    if (payload?.status !== 'pairing') return;
+    if (payload?.status !== 'pairing' || navigatingRef.current) return;
 
     const interval = window.setInterval(async () => {
       try {
         const response = await fetch('/api/inventory/kiosk/pairing', {
           cache: 'no-store',
+          headers: {
+            'X-Yard-Kiosk-Diagnostic-Id': diagnosticIdRef.current,
+          },
         });
         const result = await response.json() as PairingPayload;
+
         if (result.status === 'paired') {
+          navigatingRef.current = true;
+          setPayload(result);
+          setPhase('success');
+          window.clearInterval(interval);
           window.location.replace('/yard-kiosk/activate');
           return;
         }
+
         setPayload(result);
+        if (result.status === 'pairing') {
+          setPhase(result.pairing?.confirmation_code ? 'code' : 'waiting');
+          return;
+        }
+        showError(result);
       } catch {
         // Keep the visible code in place through transient connection errors.
       }
     }, 2_000);
 
     return () => window.clearInterval(interval);
-  }, [payload?.status]);
+  }, [payload?.status, showError]);
 
   const pairing = payload?.pairing || null;
-  const isWaiting = loading || payload?.status === 'pairing';
 
   return (
     <main className="fixed inset-0 grid min-h-dvh place-items-center overflow-hidden bg-slate-950 p-6 text-white">
@@ -92,7 +147,23 @@ export default function YardKioskPairPage() {
             <span className="text-xl font-black">Yard Inventory</span>
           </div>
 
-          {pairing?.confirmation_code ? (
+          {phase === 'success' ? (
+            <>
+              <CheckCircle2 className="mx-auto mt-10 h-14 w-14 text-emerald-300" />
+              <h1 className="mt-5 text-3xl font-black">
+                Pairing complete — starting Yard Inventory
+              </h1>
+              <p className="mx-auto mt-3 max-w-xl text-lg leading-relaxed text-slate-300">
+                This tablet is trusted. Opening the kiosk now.
+              </p>
+              <div className="mx-auto mt-7 flex w-fit items-center gap-3 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-slate-300">
+                <Loader2 className="h-5 w-5 animate-spin text-emerald-300" />
+                Starting…
+              </div>
+            </>
+          ) : null}
+
+          {phase === 'code' && pairing?.confirmation_code ? (
             <>
               <ShieldCheck className="mx-auto mt-9 h-14 w-14 text-amber-300" />
               <p className="mt-4 text-sm font-black uppercase tracking-[0.24em] text-amber-200">
@@ -115,7 +186,9 @@ export default function YardKioskPairPage() {
                 Waiting for approval
               </div>
             </>
-          ) : isWaiting ? (
+          ) : null}
+
+          {phase === 'loading' || phase === 'waiting' ? (
             <>
               <Loader2 className="mx-auto mt-10 h-14 w-14 animate-spin text-amber-300" />
               <h1 className="mt-5 text-3xl font-black">Looking for an approved pairing window</h1>
@@ -123,22 +196,20 @@ export default function YardKioskPairPage() {
                 Ask an Inventory manager to open Settings and start Yard kiosk pairing.
               </p>
             </>
-          ) : (
+          ) : null}
+
+          {phase === 'error' && userError ? (
             <>
-              {payload?.status === 'paired' ? (
-                <CheckCircle2 className="mx-auto mt-10 h-14 w-14 text-emerald-300" />
-              ) : (
-                <AlertTriangle className="mx-auto mt-10 h-14 w-14 text-amber-300" />
-              )}
-              <h1 className="mt-5 text-3xl font-black">
-                {payload?.status === 'expired'
-                  ? 'Pairing window expired'
-                  : 'This kiosk is not ready to pair'}
-              </h1>
+              <AlertTriangle className="mx-auto mt-10 h-14 w-14 text-amber-300" />
+              <h1 className="mt-5 text-3xl font-black">{userError.title}</h1>
               <p className="mx-auto mt-3 max-w-xl text-lg leading-relaxed text-slate-300">
-                {payload?.error
-                  || payload?.message
-                  || 'Ask an Inventory manager to start a new pairing window.'}
+                {userError.whatHappened}
+              </p>
+              <p className="mx-auto mt-2 max-w-xl text-base text-slate-400">
+                {userError.whatToDoNext}
+              </p>
+              <p className="mx-auto mt-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+                Ref {userError.diagnosticId}
               </p>
               <Button
                 type="button"
@@ -149,7 +220,7 @@ export default function YardKioskPairPage() {
                 Try again
               </Button>
             </>
-          )}
+          ) : null}
         </div>
       </section>
     </main>

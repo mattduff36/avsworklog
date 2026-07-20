@@ -46,14 +46,30 @@ interface KioskPairing {
   expires_at: string;
 }
 
+interface KioskPendingCommand {
+  id: string;
+  command_type: string;
+  status: string;
+  issued_at: string;
+}
+
 interface KioskDevice {
   id: string;
   device_label: string;
   last_seen_at: string | null;
   last_authenticated_at: string | null;
+  last_heartbeat_at?: string | null;
+  last_phase?: string | null;
+  last_app_version?: string | null;
+  last_error_code?: string | null;
+  last_diagnostic_id?: string | null;
+  presence?: 'online' | 'stale' | 'offline' | 'revoked';
+  pending_commands?: KioskPendingCommand[];
   revoked_at: string | null;
   created_at: string;
 }
+
+type DestructiveCommand = 'reset_workflow' | 'logout' | 'clear_credentials';
 
 interface KioskDeviceState {
   success?: boolean;
@@ -77,6 +93,10 @@ export function InventoryKioskDevicesPanel() {
   const [state, setState] = useState<KioskDeviceState | null>(null);
   const [deviceLabel, setDeviceLabel] = useState('');
   const [revokeTarget, setRevokeTarget] = useState<KioskDevice | null>(null);
+  const [destructiveTarget, setDestructiveTarget] = useState<{
+    device: KioskDevice;
+    command: DestructiveCommand;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -109,12 +129,15 @@ export function InventoryKioskDevicesPanel() {
   }, [loadState]);
 
   useEffect(() => {
-    if (!state?.active_pairing) return;
+    const hasPendingCommands = (state?.devices || []).some(
+      (device) => (device.pending_commands || []).length > 0,
+    );
+    if (!state?.active_pairing && !hasPendingCommands) return;
     const interval = window.setInterval(() => {
       void loadState(true);
     }, 2_000);
     return () => window.clearInterval(interval);
-  }, [loadState, state?.active_pairing]);
+  }, [loadState, state?.active_pairing, state?.devices]);
 
   const runAction = useCallback(async (
     action: string,
@@ -171,6 +194,37 @@ export function InventoryKioskDevicesPanel() {
       device_id: revokeTarget.id,
     });
     if (succeeded) setRevokeTarget(null);
+  }
+
+  async function issueCommand(
+    device: KioskDevice,
+    commandType: string,
+    confirmedDestructive = false,
+  ) {
+    await runAction('issue_command', {
+      device_id: device.id,
+      command_type: commandType,
+      confirmed_destructive: confirmedDestructive,
+      idempotency_key: `${commandType}:${device.id}:${Date.now()}`,
+    });
+  }
+
+  async function confirmDestructiveCommand() {
+    if (!destructiveTarget) return;
+    const succeeded = await runAction('issue_command', {
+      device_id: destructiveTarget.device.id,
+      command_type: destructiveTarget.command,
+      confirmed_destructive: true,
+      idempotency_key: `${destructiveTarget.command}:${destructiveTarget.device.id}:${Date.now()}`,
+    });
+    if (succeeded) setDestructiveTarget(null);
+  }
+
+  function presenceLabel(device: KioskDevice): string {
+    if (device.presence === 'online') return 'Online';
+    if (device.presence === 'stale') return 'Recently seen';
+    if (device.presence === 'revoked') return 'Revoked';
+    return 'Offline';
   }
 
   if (loading && !state) {
@@ -234,7 +288,7 @@ export function InventoryKioskDevicesPanel() {
                   <span className="font-medium text-white">
                     squiresapp.com/yard-kiosk/install
                   </span>{' '}
-                  in Chrome. Install Yard Inventory, then pair the browser below.
+                  in Chrome (not www). Install Yard Inventory, then pair the browser below.
                 </p>
               </div>
             </div>
@@ -361,32 +415,124 @@ export function InventoryKioskDevicesPanel() {
               {activeDevices.length > 0 ? activeDevices.map((device) => (
                 <div
                   key={device.id}
-                  className="flex flex-col gap-3 rounded-xl border border-border bg-slate-950/40 p-4 sm:flex-row sm:items-center sm:justify-between"
+                  className="rounded-xl border border-border bg-slate-950/40 p-4"
                 >
-                  <div className="flex items-start gap-3">
-                    <div className="rounded-lg bg-inventory/10 p-2 text-inventory">
-                      <Tablet className="h-5 w-5" />
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex items-start gap-3">
+                      <div className="rounded-lg bg-inventory/10 p-2 text-inventory">
+                        <Tablet className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-semibold text-white">{device.device_label}</p>
+                          <Badge
+                            variant="outline"
+                            className={
+                              device.presence === 'online'
+                                ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
+                                : device.presence === 'stale'
+                                  ? 'border-amber-400/40 bg-amber-500/10 text-amber-200'
+                                  : 'border-slate-500/40 bg-slate-500/10 text-slate-300'
+                            }
+                          >
+                            {presenceLabel(device)}
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-sm text-slate-400">
+                          Paired {formatDateTime(device.created_at)}
+                        </p>
+                        <p className="text-sm text-slate-400">
+                          Last automatic login {formatDateTime(device.last_authenticated_at)}
+                        </p>
+                        <p className="text-sm text-slate-400">
+                          Last contact {formatDateTime(device.last_heartbeat_at || null)}
+                          {device.last_phase ? ` · ${device.last_phase}` : ''}
+                        </p>
+                        {device.last_error_code ? (
+                          <p className="mt-1 text-sm text-amber-200">
+                            Last issue {device.last_error_code}
+                            {device.last_diagnostic_id
+                              ? ` · Ref ${device.last_diagnostic_id}`
+                              : ''}
+                          </p>
+                        ) : null}
+                        {(device.pending_commands || []).length > 0 ? (
+                          <p className="mt-1 text-xs text-sky-200">
+                            Pending: {(device.pending_commands || [])
+                              .map((command) => `${command.command_type} (${command.status})`)
+                              .join(', ')}
+                          </p>
+                        ) : null}
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-semibold text-white">{device.device_label}</p>
-                      <p className="mt-1 text-sm text-slate-400">
-                        Paired {formatDateTime(device.created_at)}
-                      </p>
-                      <p className="text-sm text-slate-400">
-                        Last automatic login {formatDateTime(device.last_authenticated_at)}
-                      </p>
-                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setRevokeTarget(device)}
+                      disabled={saving}
+                      className="border-red-500/40 text-red-300 hover:bg-red-500/10"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Revoke
+                    </Button>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setRevokeTarget(device)}
-                    disabled={saving}
-                    className="border-red-500/40 text-red-300 hover:bg-red-500/10"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Revoke
-                  </Button>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={saving || device.presence === 'offline'}
+                      onClick={() => void issueCommand(device, 'ping')}
+                    >
+                      Ping
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={saving || device.presence === 'offline'}
+                      onClick={() => void issueCommand(device, 'reload_app')}
+                    >
+                      Reload app
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={saving || device.presence === 'offline'}
+                      onClick={() => setDestructiveTarget({
+                        device,
+                        command: 'reset_workflow',
+                      })}
+                    >
+                      Reset screen
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={saving || device.presence === 'offline'}
+                      onClick={() => setDestructiveTarget({
+                        device,
+                        command: 'logout',
+                      })}
+                    >
+                      Sign out
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={saving}
+                      onClick={() => setDestructiveTarget({
+                        device,
+                        command: 'clear_credentials',
+                      })}
+                      className="border-amber-500/40 text-amber-200"
+                    >
+                      Clear &amp; re-pair
+                    </Button>
+                  </div>
                 </div>
               )) : (
                 <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-slate-400">
@@ -416,7 +562,8 @@ export function InventoryKioskDevicesPanel() {
             <AlertDialogTitle>Revoke {revokeTarget?.device_label}?</AlertDialogTitle>
             <AlertDialogDescription>
               Automatic login stops immediately and active kiosk sessions from this
-              browser are revoked. Pair it again to restore access.
+              browser are revoked. If the tablet is online it will be signed out on
+              the next contact. Pair it again to restore access.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -431,6 +578,46 @@ export function InventoryKioskDevicesPanel() {
             >
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Revoke device
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={Boolean(destructiveTarget)}
+        onOpenChange={(open) => {
+          if (!open && !saving) setDestructiveTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {destructiveTarget?.command === 'reset_workflow'
+                ? `Reset ${destructiveTarget.device.device_label}?`
+                : destructiveTarget?.command === 'logout'
+                  ? `Sign out ${destructiveTarget.device.device_label}?`
+                  : `Clear saved login for ${destructiveTarget?.device.device_label}?`}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {destructiveTarget?.command === 'reset_workflow'
+                ? 'This clears the unfinished basket and returns the tablet to the start screen.'
+                : destructiveTarget?.command === 'logout'
+                  ? 'This signs the tablet out of Yard Inventory. Pairing may still remain until revoked.'
+                  : 'This revokes the trusted login and asks the tablet to open pairing again. The unfinished basket is discarded.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={saving}
+              onClick={(event) => {
+                event.preventDefault();
+                void confirmDestructiveCommand();
+              }}
+              className="bg-amber-500 text-slate-950 hover:bg-amber-400"
+            >
+              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Confirm
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

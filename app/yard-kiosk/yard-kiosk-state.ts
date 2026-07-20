@@ -6,6 +6,7 @@ import type {
   YardKioskReceipt,
   YardKioskStockItem,
 } from '@/lib/inventory/kiosk-types';
+import type { YardKioskUserError } from '@/lib/inventory/kiosk-errors';
 
 export type YardKioskPhase = 'mode' | 'location' | 'items' | 'submitting' | 'receipt';
 
@@ -19,6 +20,7 @@ export interface YardKioskState {
   category: string;
   loadingStock: boolean;
   error: string | null;
+  userError: YardKioskUserError | null;
   blockedItems: YardKioskBlockedItem[];
   receipt: YardKioskReceipt | null;
 }
@@ -39,6 +41,7 @@ export const INITIAL_YARD_KIOSK_STATE: YardKioskState = {
   category: 'all',
   loadingStock: false,
   error: null,
+  userError: null,
   blockedItems: [],
   receipt: null,
 };
@@ -47,7 +50,7 @@ export type YardKioskAction =
   | { type: 'SELECT_DIRECTION'; direction: YardKioskDirection }
   | { type: 'SELECT_LOCATION'; location: YardKioskLocation }
   | { type: 'STOCK_LOADED'; stock: YardKioskStockItem[] }
-  | { type: 'STOCK_FAILED'; message: string }
+  | { type: 'STOCK_FAILED'; message: string; userError?: YardKioskUserError }
   | { type: 'SET_SEARCH'; query: string }
   | { type: 'SET_CATEGORY'; category: string }
   | { type: 'ADD_SERIALIZED'; item: Extract<YardKioskStockItem, { kind: 'serialized' }> }
@@ -55,8 +58,14 @@ export type YardKioskAction =
   | { type: 'REMOVE_LINE'; kind: YardKioskBasketLine['kind']; itemId: string }
   | { type: 'CLEAR_BASKET' }
   | { type: 'SUBMIT_START' }
-  | { type: 'SUBMIT_FAILED'; message: string; blockedItems?: YardKioskBlockedItem[] }
+  | {
+      type: 'SUBMIT_FAILED';
+      message: string;
+      blockedItems?: YardKioskBlockedItem[];
+      userError?: YardKioskUserError;
+    }
   | { type: 'SUBMIT_SUCCEEDED'; receipt: YardKioskReceipt }
+  | { type: 'SET_USER_ERROR'; userError: YardKioskUserError }
   | { type: 'DISMISS_ERROR' }
   | { type: 'BACK' }
   | { type: 'RESET' };
@@ -83,6 +92,7 @@ export function yardKioskReducer(
         category: 'all',
         loadingStock: true,
         error: null,
+        userError: null,
         blockedItems: [],
       };
     case 'STOCK_LOADED':
@@ -91,6 +101,7 @@ export function yardKioskReducer(
         stock: action.stock,
         loadingStock: false,
         error: null,
+        userError: null,
       };
     case 'STOCK_FAILED':
       return {
@@ -98,6 +109,7 @@ export function yardKioskReducer(
         stock: [],
         loadingStock: false,
         error: action.message,
+        userError: action.userError || null,
       };
     case 'SET_SEARCH':
       return { ...state, searchQuery: action.query, category: action.query ? 'all' : state.category };
@@ -108,6 +120,7 @@ export function yardKioskReducer(
         return {
           ...state,
           error: `${action.item.item_number} needs an inventory check before it can leave Yard.`,
+          userError: null,
           blockedItems: [{
             id: action.item.id,
             item_number: action.item.item_number,
@@ -122,6 +135,7 @@ export function yardKioskReducer(
       return {
         ...state,
         error: null,
+        userError: null,
         blockedItems: [],
         basket: [...state.basket, {
           kind: 'serialized',
@@ -141,6 +155,7 @@ export function yardKioskReducer(
       return {
         ...state,
         error: null,
+        userError: null,
         blockedItems: [],
         basket: [...withoutItem, {
           kind: 'hardware',
@@ -159,14 +174,21 @@ export function yardKioskReducer(
         ),
       };
     case 'CLEAR_BASKET':
-      return { ...state, basket: [], error: null, blockedItems: [] };
+      return { ...state, basket: [], error: null, userError: null, blockedItems: [] };
     case 'SUBMIT_START':
-      return { ...state, phase: 'submitting', error: null, blockedItems: [] };
+      return {
+        ...state,
+        phase: 'submitting',
+        error: null,
+        userError: null,
+        blockedItems: [],
+      };
     case 'SUBMIT_FAILED':
       return {
         ...state,
         phase: 'items',
         error: action.message,
+        userError: action.userError || null,
         blockedItems: action.blockedItems || [],
       };
     case 'SUBMIT_SUCCEEDED':
@@ -175,10 +197,17 @@ export function yardKioskReducer(
         phase: 'receipt',
         receipt: action.receipt,
         error: null,
+        userError: null,
         blockedItems: [],
       };
+    case 'SET_USER_ERROR':
+      return {
+        ...state,
+        error: action.userError.title,
+        userError: action.userError,
+      };
     case 'DISMISS_ERROR':
-      return { ...state, error: null, blockedItems: [] };
+      return { ...state, error: null, userError: null, blockedItems: [] };
     case 'BACK':
       if (state.phase === 'items') {
         return {
