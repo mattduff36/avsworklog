@@ -1,5 +1,29 @@
 [
   {
+    "version": "0726.13.0",
+    "updateKind": "major",
+    "title": "Inventory update",
+    "description": "Updated Inventory and Error reporting. Remove Android status bar. Harden pairing redirects and add remote recovery.",
+    "summary": "Updated Inventory and Error reporting. Remove Android status bar. Harden pairing redirects and add remote recovery.",
+    "details": [
+      "Updated Inventory and Error reporting, with changes to background routes, app screens, shared logic, automation scripts, automated tests, data storage, and documentation.",
+      "Updated debug tools, with changes to background routes and app screens.",
+      "Updated data storage, with changes to shared typing, automation scripts, and data storage.",
+      "Updated help and FAQ, with changes to documentation.",
+      "Updated navigation across 1 changed file.",
+      "Updated error reporting, with changes to automated tests."
+    ],
+    "areas": [
+      "Inventory",
+      "Error reporting. Remove Android status bar. Harden pairing redirects",
+      "Remote recovery"
+    ],
+    "areaKeys": [
+      "inventory"
+    ],
+    "pushedAt": "2026-07-20T12:50:41.702Z"
+  },
+  {
     "version": "0726.12.3",
     "updateKind": "minor",
     "title": "Error reporting improvements",

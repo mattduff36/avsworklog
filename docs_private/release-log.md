@@ -2,6 +2,30 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.13.0
+
+**GIT COMMIT MESSAGE**
+`feat(inventory): update Inventory and Error reporting`
+
+**PUSHED AT**
+2026-07-20T12:50:41.702Z
+
+**WHAT CHANGED**
+Update Inventory and Error reporting. Remove Android status bar. Harden pairing redirects and add remote recovery.
+
+**VERSION HISTORY DETAILS**
+- Updated Inventory and Error reporting, with changes to background routes, app screens, shared logic, automation scripts, automated tests, data storage, and documentation.
+- Updated debug tools, with changes to background routes and app screens.
+- Updated data storage, with changes to shared typing, automation scripts, and data storage.
+- Updated help and FAQ, with changes to documentation.
+- Updated navigation across 1 changed file.
+- Updated error reporting, with changes to automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(inventory): update Inventory and Error reporting`
+- `fix(yard-kiosk): remove Android status bar`
+- `fix(yard-kiosk): harden pairing redirects and add remote recovery`
+
 ## 0726.12.3
 
 **GIT COMMIT MESSAGE**
