@@ -2,6 +2,28 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.14.0
+
+**GIT COMMIT MESSAGE**
+`feat(inventory): colour-code location surfaces`
+
+**PUSHED AT**
+2026-07-21T18:31:09.991Z
+
+**WHAT CHANGED**
+Colour-code location surfaces. Reduce location directory page size. Improve transfers and location discovery.
+
+**VERSION HISTORY DETAILS**
+- Colour-code location surfaces, with changes to background routes, app screens, shared logic, automation scripts, automated tests, data storage, and documentation.
+- Updated data storage, with changes to shared typing, automation scripts, and data storage.
+- Updated help and FAQ, with changes to documentation.
+- Updated quotes, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `feat(inventory): colour-code location surfaces`
+- `perf(inventory): reduce location directory page size`
+- `feat(inventory): improve transfers and location discovery`
+
 ## 0726.13.1
 
 **GIT COMMIT MESSAGE**

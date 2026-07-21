@@ -1,5 +1,26 @@
 [
   {
+    "version": "0726.14.0",
+    "updateKind": "major",
+    "title": "Inventory update",
+    "description": "Colour-code location surfaces. Reduce location directory page size. Improve transfers and location discovery.",
+    "summary": "Colour-code location surfaces. Reduce location directory page size. Improve transfers and location discovery.",
+    "details": [
+      "Colour-code location surfaces, with changes to background routes, app screens, shared logic, automation scripts, automated tests, data storage, and documentation.",
+      "Updated data storage, with changes to shared typing, automation scripts, and data storage.",
+      "Updated help and FAQ, with changes to documentation.",
+      "Updated quotes, with changes to app screens."
+    ],
+    "areas": [
+      "Inventory",
+      "Location discovery"
+    ],
+    "areaKeys": [
+      "inventory"
+    ],
+    "pushedAt": "2026-07-21T18:31:09.991Z"
+  },
+  {
     "version": "0726.13.1",
     "updateKind": "minor",
     "title": "Inventory improvements",
