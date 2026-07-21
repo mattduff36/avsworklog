@@ -71,12 +71,17 @@ Routes that update `inventory_items.location_id` directly must delegate to the s
 
 ## Location Discovery
 
-The Inventory Locations management tab must not preload the complete active
-location dataset. It performs server-side name search after at least three
-characters, clears stale results below that threshold, and returns a bounded,
-deterministically ordered result set. Operational location selectors use the
-same server-backed search so large location datasets are not sent to the client
-on initial Inventory load.
+The Inventory Locations management tab is a paginated directory. It loads the
+first 50 active locations on entry, then appends further server pages only when
+requested. Searches begin with the first character and match location name,
+type, external/site reference, and linked Van, HGV, or Plant identifiers. Every
+page is deterministically ordered by location name and id and reports the total
+matching count.
+
+Operational location selectors retain their three-character server-search
+threshold so large location datasets are not sent to compact pickers on initial
+Inventory load. Pickers may search immediately when their candidate locations
+are already loaded locally.
 
 Area-specific filters and stock views only materialise locations with a
 non-zero item count or quantity for that area. Empty assigned/current
@@ -89,7 +94,7 @@ Locations imported from historical quotes use `source_type = 'legacy_quote'`.
 They are excluded from Inventory location discovery by default so routine
 searches remain focused on current operational locations. Each location search,
 filter, assignment picker, and Yard Kiosk transaction provides a local
-**Include legacy sites** control when those locations are needed.
+**Include legacy locations** control when those locations are needed.
 
 The opt-in applies only to that open control or transaction. It is not stored
 in the URL or browser storage and resets when the control closes or the kiosk

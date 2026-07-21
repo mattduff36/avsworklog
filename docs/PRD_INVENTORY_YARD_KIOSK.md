@@ -203,7 +203,7 @@ active Inventory location.
 
 - Locations with `source_type = 'legacy_quote'` are excluded from the default
   counterpart-location list.
-- The location step provides a local **Include legacy sites** control for the
+- The location step provides a local **Include legacy locations** control for the
   current transaction only.
 - Enabling the control reloads the counterpart list with legacy locations;
   backing out, completing, or resetting the transaction restores the default

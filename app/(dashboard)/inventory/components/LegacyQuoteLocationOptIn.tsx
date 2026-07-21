@@ -33,7 +33,7 @@ export function LegacyQuoteLocationOptIn({
       )}
     >
       <History className="mr-2 h-4 w-4" />
-      {label ?? (enabled ? 'Legacy quotes included' : 'Include legacy quotes')}
+      {label ?? (enabled ? 'Legacy locations included' : 'Include legacy locations')}
     </Button>
   );
 }

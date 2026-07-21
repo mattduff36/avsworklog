@@ -21,7 +21,7 @@ import { PageLoader } from '@/components/ui/page-loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
-import { AlertTriangle, Archive, Boxes, CheckCircle2, MapPin, PackageSearch, Plus, Settings, ShieldCheck, Truck } from 'lucide-react';
+import { AlertTriangle, Archive, Boxes, CheckCircle2, MapPin, PackageSearch, Plus, Settings, ShieldCheck, Truck, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { ChangeInventoryLocationDialog } from './components/ChangeInventoryLocationDialog';
 import { InventoryCategoriesPanel } from './components/InventoryCategoriesPanel';
@@ -75,6 +75,7 @@ interface ConfirmActionState {
 }
 
 type InventoryOverviewTab = 'small_tools' | 'minor_plant' | 'hardware' | 'retired';
+type InventoryLocationsTab = 'directory' | 'site_assignments';
 
 function getInventoryOverviewHref(overviewTab: InventoryOverviewTab): string {
   const overviewByTab: Record<InventoryOverviewTab, string> = {
@@ -130,6 +131,7 @@ export default function InventoryPage() {
   const [inventoryLoadError, setInventoryLoadError] = useState<string | null>(null);
   const [pageTab, setPageTab] = useState<'overview' | 'locations' | 'settings'>('overview');
   const [overviewTab, setOverviewTab] = useState<InventoryOverviewTab>('small_tools');
+  const [locationsTab, setLocationsTab] = useState<InventoryLocationsTab>('directory');
   const [settingsTab, setSettingsTab] = useState<'categories' | 'groups' | 'hardware' | 'kiosk'>('categories');
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
@@ -265,9 +267,11 @@ export default function InventoryPage() {
     const requestedTab = searchParams.get('tab');
     const requestedSettings = searchParams.get('settings');
     const requestedOverview = searchParams.get('overview');
+    const requestedLocations = searchParams.get('locations');
 
     if (requestedTab === 'locations') {
       setPageTab('locations');
+      setLocationsTab(requestedLocations === 'site-assignments' ? 'site_assignments' : 'directory');
       return;
     }
 
@@ -280,6 +284,7 @@ export default function InventoryPage() {
     if (requestedTab === 'settings') {
       if (requestedSettings === 'locations') {
         setPageTab('locations');
+        setLocationsTab('directory');
         return;
       }
       setPageTab('settings');
@@ -1005,7 +1010,10 @@ export default function InventoryPage() {
           }
           if (value === 'locations') {
             setPageTab('locations');
-            router.push('/inventory?tab=locations', { scroll: false });
+            router.push(
+              `/inventory?tab=locations&locations=${locationsTab === 'site_assignments' ? 'site-assignments' : 'directory'}`,
+              { scroll: false },
+            );
             return;
           }
           setPageTab('overview');
@@ -1054,6 +1062,35 @@ export default function InventoryPage() {
                   <ShieldCheck className="h-4 w-4" />
                   Yard Kiosks
                 </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+        ) : null}
+
+        {pageTab === 'locations' ? (
+          <div className="mt-3 flex justify-end">
+            <Tabs
+              value={inventoryContext?.can_manage_site_locations ? locationsTab : 'directory'}
+              onValueChange={(value) => {
+                const nextLocationsTab = value as InventoryLocationsTab;
+                setLocationsTab(nextLocationsTab);
+                router.push(
+                  `/inventory?tab=locations&locations=${nextLocationsTab === 'site_assignments' ? 'site-assignments' : 'directory'}`,
+                  { scroll: false },
+                );
+              }}
+            >
+              <TabsList>
+                <TabsTrigger value="directory" className="gap-2">
+                  <MapPin className="h-4 w-4" />
+                  All Locations
+                </TabsTrigger>
+                {inventoryContext?.can_manage_site_locations ? (
+                  <TabsTrigger value="site_assignments" className="gap-2">
+                    <Users className="h-4 w-4" />
+                    Site Assignments
+                  </TabsTrigger>
+                ) : null}
               </TabsList>
             </Tabs>
           </div>
@@ -1152,17 +1189,27 @@ export default function InventoryPage() {
         </TabsContent>
 
         <TabsContent value="locations" className="mt-0 space-y-6">
-          <div className="flex justify-end">
-            <Button
-              variant="outline"
-              onClick={() => { setEditingLocation(null); setLocationDialogOpen(true); }}
-              className="border-slate-600"
-            >
-              <MapPin className="mr-2 h-4 w-4" />
-              Add Location
-            </Button>
-          </div>
-          {inventoryContext?.can_manage_site_locations ? (
+          {locationsTab === 'directory' || !inventoryContext?.can_manage_site_locations ? (
+            <>
+              <div className="flex justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => { setEditingLocation(null); setLocationDialogOpen(true); }}
+                  className="border-slate-600"
+                >
+                  <MapPin className="mr-2 h-4 w-4" />
+                  Add Location
+                </Button>
+              </div>
+              <InventoryLocationsPanel
+                fleetAssets={fleetAssets}
+                onEdit={(location) => { setEditingLocation(location); setLocationDialogOpen(true); }}
+                onRemove={handleRemoveLocation}
+                refreshVersion={locationSearchVersion}
+              />
+            </>
+          ) : null}
+          {locationsTab === 'site_assignments' && inventoryContext?.can_manage_site_locations ? (
             <InventorySiteAssignmentsPanel
               users={siteAssignmentUsers}
               activeSites={assignableSiteLocations}
@@ -1172,12 +1219,6 @@ export default function InventoryPage() {
               onIncludeLegacyQuotesChange={handleSiteAssignmentLegacyQuoteOptIn}
             />
           ) : null}
-          <InventoryLocationsPanel
-            fleetAssets={fleetAssets}
-            onEdit={(location) => { setEditingLocation(location); setLocationDialogOpen(true); }}
-            onRemove={handleRemoveLocation}
-            refreshVersion={locationSearchVersion}
-          />
         </TabsContent>
 
         <TabsContent value="settings" className="mt-0 space-y-6">

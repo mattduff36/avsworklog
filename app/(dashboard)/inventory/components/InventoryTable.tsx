@@ -49,6 +49,7 @@ import {
   type InventoryRetireReason,
 } from '../types';
 import { useLoadMorePagination } from '@/lib/hooks/useLoadMorePagination';
+import { InventoryMoveButton } from './InventoryMoveButton';
 import { LegacyQuoteLocationOptIn } from './LegacyQuoteLocationOptIn';
 
 type SortField = 'item_number' | 'serial_number' | 'name' | 'location' | 'last_checked_at';
@@ -650,9 +651,7 @@ export function InventoryTable({
                     <td className="w-36 px-4 py-3">
                       <div className="flex justify-end gap-2">
                         {!retiredMode ? (
-                          <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); onMove([item]); }} className="border-slate-600">
-                            Move
-                          </Button>
+                          <InventoryMoveButton onMove={() => onMove([item])} />
                         ) : null}
                         {retiredMode && onRestore ? (
                           <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); onRestore(item); }} className="border-green-500/40 text-green-200 hover:bg-green-500/10">
@@ -745,9 +744,7 @@ export function InventoryTable({
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {!retiredMode ? (
-                    <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); onMove([item]); }} className="flex-1 border-slate-600">
-                      Move
-                    </Button>
+                    <InventoryMoveButton onMove={() => onMove([item])} className="flex-1" />
                   ) : null}
                   {retiredMode && onRestore ? (
                     <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); onRestore(item); }} className="flex-1 border-green-500/40 text-green-200 hover:bg-green-500/10">

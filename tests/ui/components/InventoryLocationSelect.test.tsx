@@ -1,6 +1,7 @@
 /** @vitest-environment happy-dom */
 /// <reference types="@testing-library/jest-dom/vitest" />
 
+import { useState } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { InventoryLocationSelect } from '@/app/(dashboard)/inventory/components/InventoryLocationSelect';
@@ -29,6 +30,21 @@ const assignedLocation: InventoryLocation = {
   linked_asset_nickname: 'Jeff Mark',
   assigned_user_names: ['Matt Duffill'],
 };
+
+function RichLocationSelectHarness() {
+  const [value, setValue] = useState('');
+
+  return (
+    <InventoryLocationSelect
+      value={value}
+      onValueChange={setValue}
+      locations={[assignedLocation]}
+      getOptionDescription={(location) => (
+        `${location.location_type.toUpperCase()} · ${location.linked_asset_label} · ${location.assigned_user_names?.join(', ')}`
+      )}
+    />
+  );
+}
 
 describe('InventoryLocationSelect', () => {
   afterEach(() => {
@@ -72,5 +88,18 @@ describe('InventoryLocationSelect', () => {
         name: /\[FE24 TYH - Jeff Mark\] - Matt Duffill/i,
       })).toBeInTheDocument();
     });
+  });
+
+  it('renders contextual second-line details in options and the selected trigger', () => {
+    render(<RichLocationSelectHarness />);
+
+    fireEvent.click(screen.getByRole('combobox'));
+    const option = screen.getByRole('option', {
+      name: /\[FE24 TYH - Jeff Mark\] - Matt Duffill.*VAN.*FE24 TYH.*Matt Duffill/i,
+    });
+    expect(option).toBeInTheDocument();
+    fireEvent.click(option);
+
+    expect(screen.getByRole('combobox')).toHaveTextContent('VAN · FE24 TYH · Matt Duffill');
   });
 });

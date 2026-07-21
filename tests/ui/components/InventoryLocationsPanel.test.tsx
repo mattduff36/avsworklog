@@ -36,9 +36,30 @@ describe('InventoryLocationsPanel', () => {
     vi.unstubAllGlobals();
   });
 
-  it('does not request or render locations below three characters', async () => {
-    const fetchMock = vi.fn();
+  it('loads the first directory page immediately and appends more locations', async () => {
+    const secondLocation = {
+      ...yardLocation,
+      id: 'site',
+      name: 'North Site',
+      location_type: 'site' as const,
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          locations: [yardLocation],
+          pagination: { offset: 0, limit: 50, total: 2, has_more: true },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          locations: [secondLocation],
+          pagination: { offset: 1, limit: 50, total: 2, has_more: false },
+        }),
+      });
     vi.stubGlobal('fetch', fetchMock);
+
     render(
       <InventoryLocationsPanel
         fleetAssets={[]}
@@ -47,23 +68,41 @@ describe('InventoryLocationsPanel', () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText('Search inventory locations'), {
-      target: { value: 'ya' },
-    });
     await act(async () => {
-      vi.advanceTimersByTime(500);
+      vi.advanceTimersByTime(0);
+      await Promise.resolve();
+      await Promise.resolve();
     });
 
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(screen.getByText('Enter at least 3 characters to search locations.')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/inventory/locations?search=&limit=50&offset=0',
+      expect.objectContaining({ cache: 'no-store', signal: expect.any(AbortSignal) }),
+    );
+    expect(screen.getAllByText('Main Yard').length).toBeGreaterThan(0);
+    expect(screen.getByText('Showing 1 of 2 locations')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show More' }));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(screen.getAllByText('North Site').length).toBeGreaterThan(0);
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/inventory/locations?search=&limit=50&offset=1',
+      { cache: 'no-store' },
+    );
   });
 
-  it('searches after the threshold and clears stale results below it', async () => {
+  it('searches from the first character and resets the directory page', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ locations: [yardLocation] }),
+      json: async () => ({
+        locations: [yardLocation],
+        pagination: { offset: 0, limit: 50, total: 1, has_more: false },
+      }),
     });
     vi.stubGlobal('fetch', fetchMock);
+
     render(
       <InventoryLocationsPanel
         fleetAssets={[]}
@@ -72,8 +111,16 @@ describe('InventoryLocationsPanel', () => {
       />,
     );
 
-    const input = screen.getByLabelText('Search inventory locations');
-    fireEvent.change(input, { target: { value: 'yard' } });
+    await act(async () => {
+      vi.advanceTimersByTime(0);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    fetchMock.mockClear();
+
+    fireEvent.change(screen.getByLabelText('Search inventory locations'), {
+      target: { value: 'y' },
+    });
     await act(async () => {
       vi.advanceTimersByTime(300);
       await Promise.resolve();
@@ -81,14 +128,9 @@ describe('InventoryLocationsPanel', () => {
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/inventory/locations?search=yard&limit=50',
+      '/api/inventory/locations?search=y&limit=50&offset=0',
       expect.objectContaining({ cache: 'no-store', signal: expect.any(AbortSignal) }),
     );
     expect(screen.getAllByText('Main Yard').length).toBeGreaterThan(0);
-
-    fireEvent.change(input, { target: { value: 'ya' } });
-
-    expect(screen.queryByText('Main Yard')).not.toBeInTheDocument();
-    expect(screen.getByText('Enter at least 3 characters to search locations.')).toBeInTheDocument();
   });
 });

@@ -234,7 +234,7 @@ export function YardKioskLocationPager({
             enabled={includeLegacyQuotes}
             onEnabledChange={(enabled) => { void handleIncludeLegacyQuotesChange(enabled); }}
             size="default"
-            label="Include legacy sites"
+            label="Include legacy locations"
             className={[
               'border px-4 text-sm font-black',
               includeLegacyQuotes

@@ -119,7 +119,7 @@ describe('Yard kiosk touch controls', () => {
     expect(screen.getByRole('group', { name: 'Vans' })).toHaveClass('px-1');
     const search = screen.getByRole('searchbox', { name: 'Search locations' });
     const allFilter = screen.getByRole('radio', { name: 'All' });
-    const legacySites = screen.getByRole('button', { name: 'Include legacy sites' });
+    const legacySites = screen.getByRole('button', { name: 'Include legacy locations' });
     expect(search).toHaveClass('h-14', 'rounded-2xl', 'border');
     const filterGroup = screen.getByRole('radiogroup', { name: 'Filter locations' });
     expect(filterGroup).toHaveClass('gap-3');

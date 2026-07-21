@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { LoadMorePagination } from '@/components/ui/load-more-pagination';
 import { Link2, Loader2, MapPin, Pencil, Search, Trash2 } from 'lucide-react';
 import type { FleetAssetOption, InventoryLocation } from '../types';
 import { formatInventoryLocationTypeLabel } from '../utils';
@@ -17,10 +18,26 @@ interface InventoryLocationsPanelProps {
   refreshVersion?: number;
 }
 
-const MINIMUM_SEARCH_CHARACTERS = 3;
+const LOCATION_PAGE_SIZE = 50;
 const SEARCH_DEBOUNCE_MS = 300;
 
+interface InventoryLocationsResponse {
+  locations?: InventoryLocation[];
+  pagination?: {
+    offset: number;
+    limit: number;
+    total: number;
+    has_more: boolean;
+  };
+  error?: string;
+}
+
 function getLinkedAssetLabel(location: InventoryLocation, fleetAssets: FleetAssetOption[]): string | null {
+  const enrichedLabel = [location.linked_asset_label, location.linked_asset_nickname]
+    .filter(Boolean)
+    .join(' - ');
+  if (enrichedLabel) return enrichedLabel;
+
   const linkedAssetId = location.linked_van_id || location.linked_hgv_id || location.linked_plant_id;
   if (!linkedAssetId) return null;
   return fleetAssets.find((asset) => asset.id === linkedAssetId)?.label || 'Linked fleet asset';
@@ -35,41 +52,51 @@ export function InventoryLocationsPanel({
   const [searchQuery, setSearchQuery] = useState('');
   const [locations, setLocations] = useState<InventoryLocation[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const [includeLegacyQuotes, setIncludeLegacyQuotes] = useState(false);
+  const queryVersionRef = useRef(0);
   const normalizedSearch = searchQuery.trim();
 
   useEffect(() => {
-    if (normalizedSearch.length < MINIMUM_SEARCH_CHARACTERS) {
-      setLocations([]);
-      setLoading(false);
-      setError('');
-      return;
-    }
-
+    const queryVersion = queryVersionRef.current + 1;
+    queryVersionRef.current = queryVersion;
     setLocations([]);
+    setTotal(0);
+    setHasMore(false);
     setLoading(true);
     setError('');
     const controller = new AbortController();
     const timeoutId = window.setTimeout(async () => {
       try {
-        const params = new URLSearchParams({ search: normalizedSearch, limit: '50' });
+        const params = new URLSearchParams({
+          search: normalizedSearch,
+          limit: String(LOCATION_PAGE_SIZE),
+          offset: '0',
+        });
         if (includeLegacyQuotes) params.set('includeLegacyQuotes', 'true');
         const response = await fetch(
           `/api/inventory/locations?${params}`,
           { cache: 'no-store', signal: controller.signal },
         );
-        const payload = await response.json();
+        const payload = await response.json() as InventoryLocationsResponse;
         if (!response.ok) throw new Error(payload.error || 'Failed to search inventory locations');
+        if (queryVersionRef.current !== queryVersion) return;
         setLocations(payload.locations || []);
+        setTotal(payload.pagination?.total || payload.locations?.length || 0);
+        setHasMore(payload.pagination?.has_more || false);
       } catch (searchError) {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || queryVersionRef.current !== queryVersion) return;
         setLocations([]);
+        setTotal(0);
+        setHasMore(false);
         setError(searchError instanceof Error ? searchError.message : 'Failed to search inventory locations');
       } finally {
-        if (!controller.signal.aborted) setLoading(false);
+        if (!controller.signal.aborted && queryVersionRef.current === queryVersion) setLoading(false);
       }
-    }, SEARCH_DEBOUNCE_MS);
+    }, normalizedSearch ? SEARCH_DEBOUNCE_MS : 0);
 
     return () => {
       window.clearTimeout(timeoutId);
@@ -77,44 +104,88 @@ export function InventoryLocationsPanel({
     };
   }, [includeLegacyQuotes, normalizedSearch, refreshVersion]);
 
-  const status = normalizedSearch.length < MINIMUM_SEARCH_CHARACTERS
-    ? 'Enter at least 3 characters to search locations.'
-    : loading
-      ? 'Searching locations...'
-      : error
-        ? error
-        : locations.length === 0
+  async function loadMoreLocations() {
+    if (loadingMore || !hasMore) return;
+
+    const queryVersion = queryVersionRef.current;
+    setLoadingMore(true);
+    setError('');
+    try {
+      const params = new URLSearchParams({
+        search: normalizedSearch,
+        limit: String(LOCATION_PAGE_SIZE),
+        offset: String(locations.length),
+      });
+      if (includeLegacyQuotes) params.set('includeLegacyQuotes', 'true');
+      const response = await fetch(`/api/inventory/locations?${params}`, { cache: 'no-store' });
+      const payload = await response.json() as InventoryLocationsResponse;
+      if (!response.ok) throw new Error(payload.error || 'Failed to load more inventory locations');
+      if (queryVersionRef.current !== queryVersion) return;
+
+      setLocations((current) => {
+        const locationsById = new Map(current.map((location) => [location.id, location]));
+        (payload.locations || []).forEach((location) => locationsById.set(location.id, location));
+        return [...locationsById.values()];
+      });
+      setTotal(payload.pagination?.total || total);
+      setHasMore(payload.pagination?.has_more || false);
+    } catch (loadError) {
+      if (queryVersionRef.current !== queryVersion) return;
+      setError(loadError instanceof Error ? loadError.message : 'Failed to load more inventory locations');
+    } finally {
+      if (queryVersionRef.current === queryVersion) setLoadingMore(false);
+    }
+  }
+
+  const status = loading
+    ? 'Loading locations...'
+    : error && locations.length === 0
+      ? error
+      : locations.length === 0
+        ? normalizedSearch
           ? `No locations found matching “${normalizedSearch}”.`
-          : '';
+          : 'No active Inventory locations are available.'
+        : '';
 
   return (
     <Card className="border-slate-700 bg-slate-900/70">
+      <CardHeader className="border-b border-slate-700 bg-slate-950/30">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-white">
+              <MapPin className="h-5 w-5 text-inventory" />
+              All Locations
+            </CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Browse every active Inventory location and find locations by name, type, reference, or linked asset.
+            </p>
+          </div>
+          <Badge variant="outline" className="w-fit border-inventory/40 bg-inventory/10 text-inventory-light">
+            {total.toLocaleString()} {total === 1 ? 'location' : 'locations'}
+          </Badge>
+        </div>
+      </CardHeader>
       <CardContent className="p-0">
         <div className="border-b border-slate-700 p-4">
-          <div className="relative max-w-xl">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-            <Input
-              value={searchQuery}
-              onChange={(event) => {
-                const nextSearchQuery = event.target.value;
-                setSearchQuery(nextSearchQuery);
-                setLocations([]);
-                setError('');
-                setLoading(nextSearchQuery.trim().length >= MINIMUM_SEARCH_CHARACTERS);
-              }}
-              placeholder="Search locations (minimum 3 characters)"
-              className="border-slate-600 bg-slate-800 pl-9 text-white placeholder:text-slate-500"
-              aria-label="Search inventory locations"
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <Input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search all locations..."
+                className="border-slate-600 bg-slate-800 pl-9 text-white placeholder:text-slate-500"
+                aria-label="Search inventory locations"
+              />
+            </div>
+            <LegacyQuoteLocationOptIn
+              enabled={includeLegacyQuotes}
+              onEnabledChange={setIncludeLegacyQuotes}
             />
           </div>
-          <LegacyQuoteLocationOptIn
-            enabled={includeLegacyQuotes}
-            onEnabledChange={setIncludeLegacyQuotes}
-            className="mt-3"
-          />
-          <p className="mt-2 text-xs text-muted-foreground">
-            Search by location name. Up to 50 matching locations are shown.
-          </p>
+          <div className="mt-2 text-xs text-muted-foreground">
+            <p>Search starts immediately; results load from the server in groups of 50.</p>
+          </div>
         </div>
 
         {status ? (
@@ -233,6 +304,25 @@ export function InventoryLocationsPanel({
               </div>
             );
           })}
+        </div>
+        <div className="space-y-3 p-4">
+          {error ? (
+            <p className="text-center text-sm text-red-300" role="alert">{error}</p>
+          ) : null}
+          {loadingMore ? (
+            <div className="flex items-center justify-center gap-2 border-t border-slate-700/60 pt-4 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading more locations...
+            </div>
+          ) : (
+            <LoadMorePagination
+              visibleCount={locations.length}
+              totalCount={hasMore ? total : locations.length}
+              itemLabel="locations"
+              pageSize={LOCATION_PAGE_SIZE}
+              onShowMore={() => { void loadMoreLocations(); }}
+            />
+          )}
         </div>
         </>
         )}

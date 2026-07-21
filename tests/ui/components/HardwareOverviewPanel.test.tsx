@@ -158,6 +158,36 @@ describe('HardwareOverviewPanel', () => {
     expect(screen.getByRole('heading', { name: 'Transfer Hardware' })).toBeInTheDocument();
   });
 
+  it('prefills the Hardware item and source from a location Move action', () => {
+    render(
+      <HardwareOverviewPanel
+        items={[cones]}
+        balances={[{
+          id: 'cones-yard',
+          hardware_item_id: cones.id,
+          location_id: yard.id,
+          quantity: 24,
+          location: yard,
+        }]}
+        locations={[yard, van]}
+        onTransfer={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /cones/i }));
+    const balances = screen.getByRole('table', {
+      name: 'Locations and quantities for Cones',
+    });
+    fireEvent.click(within(balances).getByRole('button', { name: 'Move' }));
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveClass('max-w-3xl');
+    expect(within(dialog).getByRole('combobox', { name: 'Hardware item' })).toHaveTextContent('Cones');
+    expect(within(dialog).getByRole('button', { name: 'Source location' })).toHaveTextContent('Yard');
+    expect(within(dialog).queryByLabelText(/note/i)).not.toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Quantity')).toHaveValue(null);
+  });
+
   it('does not search legacy quote locations until explicitly enabled', () => {
     const legacySite: InventoryLocation = {
       ...makeLocation('legacy-site', 'Legacy quote - 9999'),
@@ -193,7 +223,7 @@ describe('HardwareOverviewPanel', () => {
     });
     expect(screen.queryByRole('button', { name: /cones/i })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Include legacy quotes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Include legacy locations' }));
     expect(screen.getByRole('button', { name: /cones/i })).toBeInTheDocument();
   });
 });

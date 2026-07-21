@@ -25,7 +25,10 @@ import type {
   InventoryLocation,
 } from '../types';
 import { isLegacyQuoteInventoryLocation } from '../utils';
-import { HardwareTransferDialog } from './HardwareTransferDialog';
+import {
+  HardwareTransferDialog,
+  type HardwareTransferPrefill,
+} from './HardwareTransferDialog';
 import { HardwareQuantityRow } from './HardwareQuantityRow';
 import { LegacyQuoteLocationOptIn } from './LegacyQuoteLocationOptIn';
 
@@ -49,6 +52,7 @@ export function HardwareOverviewPanel({
   const [includeLegacyQuotes, setIncludeLegacyQuotes] = useState(false);
   const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(new Set());
   const [transferOpen, setTransferOpen] = useState(false);
+  const [transferPrefill, setTransferPrefill] = useState<HardwareTransferPrefill | null>(null);
 
   const locationById = useMemo(() => {
     const mappedLocations = new Map(locations.map((location) => [location.id, location]));
@@ -137,6 +141,16 @@ export function HardwareOverviewPanel({
     });
   }
 
+  function openTransfer(prefill: HardwareTransferPrefill | null = null) {
+    setTransferPrefill(prefill);
+    setTransferOpen(true);
+  }
+
+  function closeTransfer() {
+    setTransferOpen(false);
+    setTransferPrefill(null);
+  }
+
   return (
     <div className="space-y-6">
       <Card className="overflow-hidden border-slate-700 bg-slate-900/70">
@@ -151,14 +165,14 @@ export function HardwareOverviewPanel({
                 View company-wide quantities and transfer Hardware.
               </p>
             </div>
-            <Button variant="outline" onClick={() => setTransferOpen(true)} className="border-slate-600">
+            <Button variant="outline" onClick={() => openTransfer()} className="border-slate-600">
               <ArrowRightLeft className="mr-2 h-4 w-4" />
               Transfer Stock
             </Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-4 p-4">
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px_auto] lg:items-center">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(360px,auto)] lg:items-center">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -168,27 +182,29 @@ export function HardwareOverviewPanel({
                 className="border-slate-600 bg-slate-800 pl-9"
               />
             </div>
-            <Select
-              value={locationFilter}
-              onValueChange={setLocationFilter}
-              onOpenChange={(open) => {
-                if (!open) setIncludeLegacyQuotes(false);
-              }}
-            >
-              <SelectTrigger className="border-slate-600 bg-slate-800" aria-label="Filter Hardware by location">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL_LOCATIONS}>All locations</SelectItem>
-                {activeLocations.map((location) => (
-                  <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <LegacyQuoteLocationOptIn
-              enabled={includeLegacyQuotes}
-              onEnabledChange={setIncludeLegacyQuotes}
-            />
+            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <Select
+                value={locationFilter}
+                onValueChange={setLocationFilter}
+                onOpenChange={(open) => {
+                  if (!open) setIncludeLegacyQuotes(false);
+                }}
+              >
+                <SelectTrigger className="border-slate-600 bg-slate-800" aria-label="Filter Hardware by location">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_LOCATIONS}>All locations</SelectItem>
+                  {activeLocations.map((location) => (
+                    <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <LegacyQuoteLocationOptIn
+                enabled={includeLegacyQuotes}
+                onEnabledChange={setIncludeLegacyQuotes}
+              />
+            </div>
           </div>
 
           <div className="overflow-hidden rounded-lg border border-slate-700">
@@ -247,6 +263,10 @@ export function HardwareOverviewPanel({
                                     label={location?.name || 'Unknown location'}
                                     quantity={balance.quantity}
                                     showLocationIcon
+                                    onMove={() => openTransfer({
+                                      itemId: item.id,
+                                      fromLocationId: balance.location_id,
+                                    })}
                                   />
                                 );
                               })}
@@ -268,7 +288,8 @@ export function HardwareOverviewPanel({
         items={items}
         balances={balances}
         locations={[...locationById.values()]}
-        onClose={() => setTransferOpen(false)}
+        prefill={transferPrefill}
+        onClose={closeTransfer}
         onSubmit={onTransfer}
       />
     </div>

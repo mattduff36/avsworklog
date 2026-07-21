@@ -174,7 +174,7 @@ describe('Yard kiosk location selection', () => {
     });
     fireEvent.click(next);
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Include legacy sites' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Include legacy locations' }));
     });
     expect(onIncludeLegacyQuotesChange).toHaveBeenCalledWith(true);
     expect(previous).toBeDisabled();
@@ -203,7 +203,7 @@ describe('Yard kiosk location selection', () => {
       />,
     );
 
-    const toggle = screen.getByRole('button', { name: 'Include legacy sites' });
+    const toggle = screen.getByRole('button', { name: 'Include legacy locations' });
     expect(toggle).toHaveAttribute('aria-pressed', 'false');
     expect(toggle).toHaveClass(
       'border-white/10',

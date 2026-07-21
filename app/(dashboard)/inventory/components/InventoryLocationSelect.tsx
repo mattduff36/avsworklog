@@ -34,12 +34,16 @@ interface InventoryLocationSelectProps {
   serverSearch?: boolean;
   locationFilter?: (location: InventoryLocation) => boolean;
   allowLegacyQuoteOptIn?: boolean;
+  includeLegacyQuotes?: boolean;
+  onIncludeLegacyQuotesChange?: (enabled: boolean) => void;
+  getOptionDescription?: (location: InventoryLocation) => string | undefined;
 }
 
 interface InventoryLocationSelectOption {
   value: string;
   label: string;
   searchLabel: string;
+  description?: string;
   className?: string;
   location?: InventoryLocation;
 }
@@ -60,13 +64,17 @@ export function InventoryLocationSelect({
   serverSearch = false,
   locationFilter,
   allowLegacyQuoteOptIn = true,
+  includeLegacyQuotes: controlledIncludeLegacyQuotes,
+  onIncludeLegacyQuotesChange,
+  getOptionDescription,
 }: InventoryLocationSelectProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<InventoryLocation[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
-  const [includeLegacyQuotes, setIncludeLegacyQuotes] = useState(false);
+  const [internalIncludeLegacyQuotes, setInternalIncludeLegacyQuotes] = useState(false);
+  const includeLegacyQuotes = controlledIncludeLegacyQuotes ?? internalIncludeLegacyQuotes;
   const [selectedServerLocation, setSelectedServerLocation] = useState<InventoryLocation | null>(
     locations.find((location) => location.id === value) || null,
   );
@@ -139,6 +147,7 @@ export function InventoryLocationSelect({
         return {
           value: location.id,
           label,
+          description: getOptionDescription?.(location),
           location,
           searchLabel: getInventoryLocationSearchLabel(location),
         };
@@ -151,7 +160,15 @@ export function InventoryLocationSelect({
         searchLabel: option.label,
       })),
     ];
-  }, [extraOptions, includeLegacyQuotes, locationFilter, locations, searchResults, serverSearch]);
+  }, [
+    extraOptions,
+    getOptionDescription,
+    includeLegacyQuotes,
+    locationFilter,
+    locations,
+    searchResults,
+    serverSearch,
+  ]);
 
   const selectedLocation = [...searchResults, ...locations].find((location) => location.id === value)
     || (selectedServerLocation?.id === value ? selectedServerLocation : null);
@@ -160,6 +177,7 @@ export function InventoryLocationSelect({
       ? {
         value: selectedLocation.id,
         label: formatInventoryLocationOptionLabel(selectedLocation),
+        description: getOptionDescription?.(selectedLocation),
         searchLabel: selectedLocation.name,
         location: selectedLocation,
       }
@@ -176,7 +194,7 @@ export function InventoryLocationSelect({
     setOpen(nextOpen);
     if (!nextOpen) {
       setSearchQuery('');
-      setIncludeLegacyQuotes(false);
+      if (controlledIncludeLegacyQuotes === undefined) setInternalIncludeLegacyQuotes(false);
     }
   }
 
@@ -198,11 +216,19 @@ export function InventoryLocationSelect({
           disabled={disabled}
           className={cn(
             'w-full justify-between border-slate-600 bg-slate-800 text-left font-normal text-white hover:bg-slate-700',
+            selectedOption?.description && 'h-auto min-h-12 py-2',
             !selectedOption && 'text-muted-foreground',
             triggerClassName
           )}
         >
-          <span className="min-w-0 flex-1 truncate">{selectedOption?.label || placeholder}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate">{selectedOption?.label || placeholder}</span>
+            {selectedOption?.description ? (
+              <span className="mt-0.5 block truncate text-xs text-slate-400">
+                {selectedOption.description}
+              </span>
+            ) : null}
+          </span>
           <ChevronDown className={cn('ml-2 h-4 w-4 shrink-0 opacity-70 transition-transform', open && 'rotate-180')} />
         </Button>
       </PopoverTrigger>
@@ -232,7 +258,10 @@ export function InventoryLocationSelect({
           {allowLegacyQuoteOptIn ? (
             <LegacyQuoteLocationOptIn
               enabled={includeLegacyQuotes}
-              onEnabledChange={setIncludeLegacyQuotes}
+              onEnabledChange={(enabled) => {
+                if (onIncludeLegacyQuotesChange) onIncludeLegacyQuotesChange(enabled);
+                else setInternalIncludeLegacyQuotes(enabled);
+              }}
               className="mt-2 w-full justify-center"
             />
           ) : null}
@@ -264,7 +293,14 @@ export function InventoryLocationSelect({
                 )}
               >
                 <Check className={cn('h-4 w-4 shrink-0', option.value === value ? 'opacity-100' : 'opacity-0')} />
-                <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate">{option.label}</span>
+                  {option.description ? (
+                    <span className="mt-0.5 block truncate text-xs text-slate-400">
+                      {option.description}
+                    </span>
+                  ) : null}
+                </span>
               </button>
             ))
           ) : (

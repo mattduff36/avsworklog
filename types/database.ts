@@ -9659,6 +9659,34 @@ export type Database = {
           hardware_line_count: number
         }[]
       }
+      inventory_search_locations: {
+        Args: {
+          p_search?: string
+          p_include_legacy?: boolean
+          p_limit?: number
+          p_offset?: number
+        }
+        Returns: {
+          id: string
+          name: string
+          description: string | null
+          is_active: boolean
+          linked_van_id: string | null
+          linked_hgv_id: string | null
+          linked_plant_id: string | null
+          location_type: string
+          source_type: string | null
+          source_id: string | null
+          external_reference: string | null
+          sync_status: string
+          source_synced_at: string | null
+          created_at: string
+          updated_at: string
+          created_by: string | null
+          updated_by: string | null
+          total_count: number
+        }[]
+      }
       inventory_transfer_hardware_stock: {
         Args: {
           p_lines: Json

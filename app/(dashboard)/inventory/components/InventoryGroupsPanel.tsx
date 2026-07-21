@@ -177,10 +177,6 @@ export function InventoryGroupsPanel({
                 onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
                 className="bg-slate-800 border-slate-600"
               />
-              <LegacyQuoteLocationOptIn
-                enabled={includeLegacyQuotes}
-                onEnabledChange={setIncludeLegacyQuotes}
-              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="group_description">Description</Label>
@@ -193,11 +189,17 @@ export function InventoryGroupsPanel({
               />
             </div>
             <div className="space-y-2">
-              <Label>Items</Label>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <Label>Items</Label>
+                <LegacyQuoteLocationOptIn
+                  enabled={includeLegacyQuotes}
+                  onEnabledChange={setIncludeLegacyQuotes}
+                />
+              </div>
               <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search items"
+                placeholder="Search items by name, number, or location"
                 className="bg-slate-800 border-slate-600"
               />
               <div className="max-h-72 space-y-2 overflow-y-auto rounded-md border border-slate-700 p-2">

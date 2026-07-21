@@ -137,7 +137,13 @@ export function InventorySiteAssignmentsPanel({
           </div>
 
           <div className="space-y-2">
-            <Label>Active Site Location</Label>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <Label>Active Site Location</Label>
+              <LegacyQuoteLocationOptIn
+                enabled={includeLegacyQuotes}
+                onEnabledChange={(enabled) => { void handleIncludeLegacyQuotesChange(enabled); }}
+              />
+            </div>
             <Select
               value={selectedLocationId}
               onValueChange={setSelectedLocationId}
@@ -157,11 +163,6 @@ export function InventorySiteAssignmentsPanel({
                 ))}
               </SelectContent>
             </Select>
-            <LegacyQuoteLocationOptIn
-              enabled={includeLegacyQuotes}
-              onEnabledChange={(enabled) => { void handleIncludeLegacyQuotesChange(enabled); }}
-              className="mt-2"
-            />
           </div>
 
           <Button

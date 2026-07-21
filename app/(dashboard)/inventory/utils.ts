@@ -232,6 +232,18 @@ export function formatInventoryLocationAssigneeLabel(location: InventoryLocation
     : 'Unassigned';
 }
 
+export function formatInventoryLocationContextLabel(location: InventoryLocation): string {
+  const details = [
+    formatInventoryLocationTypeLabel(location),
+    location.external_reference,
+    location.linked_asset_label,
+    location.linked_asset_nickname,
+    formatInventoryLocationAssigneeLabel(location),
+  ];
+
+  return [...new Set(details.map((detail) => detail?.trim()).filter(Boolean))].join(' · ');
+}
+
 export function getInventoryLocationSearchLabel(
   location: InventoryLocation,
   additionalLabels: readonly string[] = [],
