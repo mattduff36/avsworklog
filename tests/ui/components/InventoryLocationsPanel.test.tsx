@@ -48,14 +48,14 @@ describe('InventoryLocationsPanel', () => {
         ok: true,
         json: async () => ({
           locations: [yardLocation],
-          pagination: { offset: 0, limit: 50, total: 2, has_more: true },
+          pagination: { offset: 0, limit: 25, total: 2, has_more: true },
         }),
       })
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           locations: [secondLocation],
-          pagination: { offset: 1, limit: 50, total: 2, has_more: false },
+          pagination: { offset: 1, limit: 25, total: 2, has_more: false },
         }),
       });
     vi.stubGlobal('fetch', fetchMock);
@@ -75,7 +75,7 @@ describe('InventoryLocationsPanel', () => {
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/inventory/locations?search=&limit=50&offset=0',
+      '/api/inventory/locations?search=&limit=25&offset=0',
       expect.objectContaining({ cache: 'no-store', signal: expect.any(AbortSignal) }),
     );
     expect(screen.getAllByText('Main Yard').length).toBeGreaterThan(0);
@@ -88,7 +88,7 @@ describe('InventoryLocationsPanel', () => {
     });
     expect(screen.getAllByText('North Site').length).toBeGreaterThan(0);
     expect(fetchMock).toHaveBeenLastCalledWith(
-      '/api/inventory/locations?search=&limit=50&offset=1',
+      '/api/inventory/locations?search=&limit=25&offset=1',
       { cache: 'no-store' },
     );
   });
@@ -98,7 +98,7 @@ describe('InventoryLocationsPanel', () => {
       ok: true,
       json: async () => ({
         locations: [yardLocation],
-        pagination: { offset: 0, limit: 50, total: 1, has_more: false },
+        pagination: { offset: 0, limit: 25, total: 1, has_more: false },
       }),
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -128,7 +128,7 @@ describe('InventoryLocationsPanel', () => {
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/inventory/locations?search=y&limit=50&offset=0',
+      '/api/inventory/locations?search=y&limit=25&offset=0',
       expect.objectContaining({ cache: 'no-store', signal: expect.any(AbortSignal) }),
     );
     expect(screen.getAllByText('Main Yard').length).toBeGreaterThan(0);

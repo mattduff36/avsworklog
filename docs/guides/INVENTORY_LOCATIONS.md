@@ -72,7 +72,7 @@ Routes that update `inventory_items.location_id` directly must delegate to the s
 ## Location Discovery
 
 The Inventory Locations management tab is a paginated directory. It loads the
-first 50 active locations on entry, then appends further server pages only when
+first 25 active locations on entry, then appends further server pages only when
 requested. Searches begin with the first character and match location name,
 type, external/site reference, and linked Van, HGV, or Plant identifiers. Every
 page is deterministically ordered by location name and id and reports the total

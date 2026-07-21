@@ -18,7 +18,7 @@ interface InventoryLocationsPanelProps {
   refreshVersion?: number;
 }
 
-const LOCATION_PAGE_SIZE = 50;
+const LOCATION_PAGE_SIZE = 25;
 const SEARCH_DEBOUNCE_MS = 300;
 
 interface InventoryLocationsResponse {
@@ -184,7 +184,7 @@ export function InventoryLocationsPanel({
             />
           </div>
           <div className="mt-2 text-xs text-muted-foreground">
-            <p>Search starts immediately; results load from the server in groups of 50.</p>
+            <p>Search starts immediately; results load from the server in groups of 25.</p>
           </div>
         </div>
 
