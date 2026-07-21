@@ -2,6 +2,24 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.13.1
+
+**GIT COMMIT MESSAGE**
+`fix(inventory): restore CTA contrast and stock column layout`
+
+**PUSHED AT**
+2026-07-21T08:05:45.372Z
+
+**WHAT CHANGED**
+Update repository files. Restore CTA contrast and stock column layout.
+
+**VERSION HISTORY DETAILS**
+- Restore CTA contrast and stock column layout, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `chore(avsworklog-code-workspace): update repository files`
+- `fix(inventory): restore CTA contrast and stock column layout`
+
 ## 0726.13.0
 
 **GIT COMMIT MESSAGE**

@@ -1,5 +1,24 @@
 [
   {
+    "version": "0726.13.1",
+    "updateKind": "minor",
+    "title": "Inventory improvements",
+    "description": "Updated general app maintenance. Restore CTA contrast and stock column layout.",
+    "summary": "Updated general app maintenance. Restore CTA contrast and stock column layout.",
+    "details": [
+      "Restore CTA contrast and stock column layout, with changes to app screens."
+    ],
+    "areas": [
+      "Inventory",
+      "General app maintenance. Restore CTA contrast",
+      "Stock column layout"
+    ],
+    "areaKeys": [
+      "inventory"
+    ],
+    "pushedAt": "2026-07-21T08:05:45.372Z"
+  },
+  {
     "version": "0726.13.0",
     "updateKind": "major",
     "title": "Inventory update",
