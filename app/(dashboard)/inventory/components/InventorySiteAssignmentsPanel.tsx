@@ -12,9 +12,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 import { MapPin, Trash2, UserPlus } from 'lucide-react';
 import type { InventoryLocation } from '../types';
-import { isLegacyQuoteInventoryLocation } from '../utils';
+import {
+  getInventoryLocationTypePresentation,
+  isLegacyQuoteInventoryLocation,
+} from '../utils';
 import { LegacyQuoteLocationOptIn } from './LegacyQuoteLocationOptIn';
 
 export interface InventorySiteAssignmentUser {
@@ -180,13 +184,21 @@ export function InventorySiteAssignmentsPanel({
           {assignments.length > 0 ? assignments.map((assignment) => {
             const key = `${assignment.user_id}:${assignment.location_id}`;
             const site = assignment.location || activeSites.find((candidate) => candidate.id === assignment.location_id);
+            const presentation = getInventoryLocationTypePresentation(site || { location_type: 'site' });
 
             return (
-              <div key={key} className="flex flex-col gap-3 rounded-lg border border-slate-700 bg-slate-800/50 p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div
+                key={key}
+                data-location-type={site?.location_type || 'site'}
+                className={cn(
+                  'flex flex-col gap-3 rounded-lg border p-3 transition-colors sm:flex-row sm:items-center sm:justify-between',
+                  presentation.surfaceClassName,
+                )}
+              >
                 <div>
                   <div className="font-medium text-white">{getUserLabel(assignment.user)}</div>
                   <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                    <Badge variant="outline" className="border-blue-500/30 bg-blue-500/10 text-blue-300">
+                    <Badge variant="outline" className={presentation.badgeClassName}>
                       {getSiteLabel(site)}
                     </Badge>
                   </div>

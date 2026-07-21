@@ -6,9 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { LoadMorePagination } from '@/components/ui/load-more-pagination';
+import { cn } from '@/lib/utils';
 import { Link2, Loader2, MapPin, Pencil, Search, Trash2 } from 'lucide-react';
 import type { FleetAssetOption, InventoryLocation } from '../types';
-import { formatInventoryLocationTypeLabel } from '../utils';
+import { getInventoryLocationTypePresentation } from '../utils';
+import { InventoryLocationTypeBadge } from './InventoryLocationTypeBadge';
 import { LegacyQuoteLocationOptIn } from './LegacyQuoteLocationOptIn';
 
 interface InventoryLocationsPanelProps {
@@ -213,8 +215,13 @@ export function InventoryLocationsPanel({
             <tbody className="divide-y divide-slate-700/50">
               {locations.map((location) => {
                 const linkedAssetLabel = getLinkedAssetLabel(location, fleetAssets);
+                const presentation = getInventoryLocationTypePresentation(location);
                 return (
-                  <tr key={location.id} className="hover:bg-slate-800/50">
+                  <tr
+                    key={location.id}
+                    data-location-type={location.location_type}
+                    className={cn('border-l-2 transition-colors', presentation.surfaceClassName)}
+                  >
                     <td className="px-4 py-3">
                       <div className="font-medium text-white">{location.name}</div>
                       {location.description ? (
@@ -225,9 +232,7 @@ export function InventoryLocationsPanel({
                       ) : null}
                     </td>
                     <td className="px-4 py-3">
-                      <Badge variant="outline" className="border-slate-600 text-slate-200">
-                        {formatInventoryLocationTypeLabel(location)}
-                      </Badge>
+                      <InventoryLocationTypeBadge location={location} />
                       <div className="mt-1 text-xs text-muted-foreground">{location.sync_status}</div>
                     </td>
                     <td className="px-4 py-3">
@@ -265,12 +270,20 @@ export function InventoryLocationsPanel({
         <div className="space-y-3 p-4 md:hidden">
           {locations.map((location) => {
             const linkedAssetLabel = getLinkedAssetLabel(location, fleetAssets);
+            const presentation = getInventoryLocationTypePresentation(location);
             return (
-              <div key={location.id} className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
+              <div
+                key={location.id}
+                data-location-type={location.location_type}
+                className={cn(
+                  'rounded-lg border p-4 transition-colors',
+                  presentation.surfaceClassName,
+                )}
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2 font-semibold text-white">
-                      <MapPin className="h-4 w-4 text-inventory" />
+                      <MapPin className={cn('h-4 w-4', presentation.iconClassName)} />
                       {location.name}
                     </div>
                     {location.description ? (
@@ -280,9 +293,7 @@ export function InventoryLocationsPanel({
                   <Badge variant="outline">{location.item_count || 0} items</Badge>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Badge variant="outline" className="border-slate-600 text-slate-200">
-                    {formatInventoryLocationTypeLabel(location)}
-                  </Badge>
+                  <InventoryLocationTypeBadge location={location} />
                   <Badge variant="outline" className="border-slate-600 text-slate-200">
                     {location.sync_status}
                   </Badge>

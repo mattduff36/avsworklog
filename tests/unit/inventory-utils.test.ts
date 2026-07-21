@@ -15,6 +15,7 @@ import {
   getInventoryCheckStatus,
   getInventoryDueDate,
   getInventoryLocationSearchLabel,
+  getInventoryLocationTypePresentation,
   hasInventoryCheckLapsed,
   isInventoryUnknownLocation,
   isInventoryMoveCheckBlocked,
@@ -238,5 +239,24 @@ describe('inventory utils', () => {
     expect(getInventoryLocationSearchLabel(siteLocation, ['Sites'])).toContain(
       '12345-AB Matt Duffill Sites',
     );
+  });
+
+  it.each([
+    ['site', '--avs-yellow'],
+    ['van', '--inspection-primary'],
+    ['hgv', '--hgv-inspection-primary'],
+    ['plant', '--plant-inspection-primary'],
+    ['yard', '--workshop-primary'],
+    ['manual', '--inventory-primary'],
+    ['unknown', 'slate'],
+  ] as const)('maps %s locations to their established visual token', (locationType, token) => {
+    const presentation = getInventoryLocationTypePresentation({
+      location_type: locationType,
+    });
+
+    expect(presentation.surfaceClassName).toContain(token);
+    expect(presentation.optionClassName).toContain(token);
+    expect(presentation.badgeClassName).toBeTruthy();
+    expect(presentation.iconClassName).toBeTruthy();
   });
 });

@@ -80,6 +80,15 @@ describe('InventoryLocationsPanel', () => {
     );
     expect(screen.getAllByText('Main Yard').length).toBeGreaterThan(0);
     expect(screen.getByText('Showing 1 of 2 locations')).toBeInTheDocument();
+    expect(document.querySelector('tr[data-location-type="yard"]')).toHaveClass(
+      'bg-[hsl(var(--workshop-primary)/0.10)]',
+    );
+    const mobileYardCard = [...document.querySelectorAll('div[data-location-type="yard"]')]
+      .find((element) => element.classList.contains('rounded-lg'));
+    expect(mobileYardCard).toHaveClass('border-[hsl(var(--workshop-primary)/0.32)]');
+    const yardBadge = [...document.querySelectorAll('[data-location-type="yard"]')]
+      .find((element) => element.classList.contains('rounded-full'));
+    expect(yardBadge).toHaveClass('text-[hsl(var(--workshop-light))]');
 
     fireEvent.click(screen.getByRole('button', { name: 'Show More' }));
     await act(async () => {

@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import type { InventoryLocation } from '../types';
 import {
   formatInventoryLocationOptionLabel,
+  getInventoryLocationTypePresentation,
   getInventoryLocationSearchLabel,
   getInventoryLocationsWithYardFirst,
   isLegacyQuoteInventoryLocation,
@@ -148,6 +149,7 @@ export function InventoryLocationSelect({
           value: location.id,
           label,
           description: getOptionDescription?.(location),
+          className: getInventoryLocationTypePresentation(location).optionClassName,
           location,
           searchLabel: getInventoryLocationSearchLabel(location),
         };
@@ -184,6 +186,9 @@ export function InventoryLocationSelect({
       : undefined
   );
   const normalizedClientSearchQuery = normalizedSearchQuery.toLowerCase();
+  const selectedPresentation = selectedOption?.location
+    ? getInventoryLocationTypePresentation(selectedOption.location)
+    : null;
   const filteredOptions = normalizedClientSearchQuery
     ? options.filter((option) => option.searchLabel.toLowerCase().includes(normalizedClientSearchQuery))
     : options;
@@ -216,6 +221,7 @@ export function InventoryLocationSelect({
           disabled={disabled}
           className={cn(
             'w-full justify-between border-slate-600 bg-slate-800 text-left font-normal text-white hover:bg-slate-700',
+            selectedPresentation?.surfaceClassName,
             selectedOption?.description && 'h-auto min-h-12 py-2',
             !selectedOption && 'text-muted-foreground',
             triggerClassName
@@ -285,14 +291,21 @@ export function InventoryLocationSelect({
                 key={option.value}
                 type="button"
                 role="option"
+                data-location-type={option.location?.location_type}
                 aria-selected={option.value === value}
                 onClick={() => handleSelect(option)}
                 className={cn(
-                  'flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-slate-800 focus:bg-slate-800 focus:outline-none',
+                  'flex w-full items-center gap-2 rounded-sm border border-transparent px-3 py-2 text-left text-sm hover:bg-slate-800 focus:bg-slate-800 focus:outline-none',
                   option.className
                 )}
               >
-                <Check className={cn('h-4 w-4 shrink-0', option.value === value ? 'opacity-100' : 'opacity-0')} />
+                <Check
+                  className={cn(
+                    'h-4 w-4 shrink-0',
+                    option.location && getInventoryLocationTypePresentation(option.location).iconClassName,
+                    option.value === value ? 'opacity-100' : 'opacity-0',
+                  )}
+                />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate">{option.label}</span>
                   {option.description ? (

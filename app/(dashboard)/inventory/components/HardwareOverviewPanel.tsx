@@ -263,6 +263,7 @@ export function HardwareOverviewPanel({
                                     label={location?.name || 'Unknown location'}
                                     quantity={balance.quantity}
                                     showLocationIcon
+                                    location={location || { location_type: 'unknown' }}
                                     onMove={() => openTransfer({
                                       itemId: item.id,
                                       fromLocationId: balance.location_id,

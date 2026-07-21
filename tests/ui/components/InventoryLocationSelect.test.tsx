@@ -98,8 +98,12 @@ describe('InventoryLocationSelect', () => {
       name: /\[FE24 TYH - Jeff Mark\] - Matt Duffill.*VAN.*FE24 TYH.*Matt Duffill/i,
     });
     expect(option).toBeInTheDocument();
+    expect(option).toHaveAttribute('data-location-type', 'van');
+    expect(option).toHaveClass('bg-[hsl(var(--inspection-primary)/0.08)]');
     fireEvent.click(option);
 
-    expect(screen.getByRole('combobox')).toHaveTextContent('VAN · FE24 TYH · Matt Duffill');
+    const trigger = screen.getByRole('combobox');
+    expect(trigger).toHaveTextContent('VAN · FE24 TYH · Matt Duffill');
+    expect(trigger).toHaveClass('bg-[hsl(var(--inspection-primary)/0.10)]');
   });
 });

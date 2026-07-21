@@ -415,6 +415,7 @@ export function InventoryEmployeeView({
                         key={`${balance.hardware_item_id}:${location.id}`}
                         label={hardwareItemById.get(balance.hardware_item_id)?.name || 'Hardware item'}
                         quantity={balance.quantity}
+                        location={location}
                       />
                     ))}
                   </div>

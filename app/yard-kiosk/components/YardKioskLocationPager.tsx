@@ -11,6 +11,8 @@ import {
   Warehouse,
 } from 'lucide-react';
 import type { YardKioskDirection, YardKioskLocation } from '@/lib/inventory/kiosk-types';
+import { cn } from '@/lib/utils';
+import { getInventoryLocationTypePresentation } from '@/app/(dashboard)/inventory/utils';
 import {
   getPinnedYardKioskLocationIds,
   getRecentYardKioskLocationIds,
@@ -321,14 +323,20 @@ export function YardKioskLocationPager({
               {page.locations.map((location) => {
                 const Icon = getLocationIcon(location.location_type);
                 const isPinned = pinnedIds.includes(location.id);
+                const presentation = getInventoryLocationTypePresentation(location);
                 return (
                   <div key={location.id} className="relative min-h-0">
                     <button
                       type="button"
+                      data-location-type={location.location_type}
                       onClick={() => handleSelect(location)}
-                      className="flex h-full w-full flex-col items-start justify-between overflow-hidden rounded-2xl border border-white/10 bg-white/[0.06] p-4 pr-12 text-left transition hover:border-amber-300/50 hover:bg-amber-300/10 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-amber-300"
+                      className={cn(
+                        'flex h-full w-full flex-col items-start justify-between overflow-hidden rounded-2xl border p-4 pr-12 text-left transition',
+                        presentation.surfaceClassName,
+                        'hover:border-amber-300/50 hover:bg-amber-300/10 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-amber-300',
+                      )}
                     >
-                      <Icon className="h-8 w-8 text-amber-300" aria-hidden />
+                      <Icon className={cn('h-8 w-8', presentation.iconClassName)} aria-hidden />
                       <span className="min-w-0">
                         <span className="line-clamp-2 block text-lg font-black leading-tight text-white">
                           {location.name}

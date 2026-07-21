@@ -135,6 +135,10 @@ describe('HardwareOverviewPanel', () => {
     });
     expect(within(balances).getByText('Yard')).toBeInTheDocument();
     expect(within(balances).getByText('Van - TE57 VAN')).toBeInTheDocument();
+    expect(within(balances).getByText('Yard').closest('[data-location-type="yard"]'))
+      .toHaveClass('bg-[hsl(var(--workshop-primary)/0.10)]');
+    expect(within(balances).getByText('Van - TE57 VAN').closest('[data-location-type="van"]'))
+      .toHaveClass('bg-[hsl(var(--inspection-primary)/0.10)]');
 
     fireEvent.change(screen.getByPlaceholderText('Search Hardware or location...'), {
       target: { value: 'Cones' },

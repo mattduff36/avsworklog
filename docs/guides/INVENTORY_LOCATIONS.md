@@ -88,6 +88,26 @@ non-zero item count or quantity for that area. Empty assigned/current
 locations and destination selectors remain available where they are required
 for assignment, movement, or intentional empty-state workflows.
 
+### Location type presentation
+
+Location-centric rows, cards, picker options, and kiosk tiles use a shared,
+faint colour treatment based on `location_type`. Reuse
+`getInventoryLocationTypePresentation` and `InventoryLocationTypeBadge` for new
+Inventory location surfaces instead of adding local colour rules.
+
+- Site (including legacy quote Sites): Quotes/AVS yellow.
+- Van: daily-inspection orange.
+- HGV: HGV-inspection orange.
+- Plant: plant-inspection brown/orange.
+- Yard: Workshop brown.
+- Manual: Inventory grey.
+- Unknown: neutral slate.
+
+The type treatment is secondary to keyboard focus, selected, disabled, pinned,
+and other active interaction states. Item rows, movement history, page headers,
+and incidental location text remain neutral when the row itself does not
+represent a location.
+
 ### Legacy quote discovery
 
 Locations imported from historical quotes use `source_type = 'legacy_quote'`.

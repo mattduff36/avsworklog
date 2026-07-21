@@ -1,5 +1,10 @@
 import { addMonths, differenceInCalendarDays, format } from 'date-fns';
-import type { InventoryCheckStatus, InventoryItem, InventoryLocation } from './types';
+import type {
+  InventoryCheckStatus,
+  InventoryItem,
+  InventoryLocation,
+  InventoryLocationType,
+} from './types';
 
 const DAYS_PER_INVENTORY_CHECK_MONTH = 30;
 
@@ -262,6 +267,64 @@ export function getInventoryLocationSearchLabel(
 
 export function formatInventoryLocationOptionLabel(location: InventoryLocation): string {
   return `${formatInventoryLocationLabel(location)} - ${formatInventoryLocationAssigneeLabel(location)}`;
+}
+
+export interface InventoryLocationTypePresentation {
+  surfaceClassName: string;
+  optionClassName: string;
+  badgeClassName: string;
+  iconClassName: string;
+}
+
+const INVENTORY_LOCATION_TYPE_PRESENTATION = {
+  site: {
+    surfaceClassName: 'border-[hsl(var(--avs-yellow)/0.32)] bg-[hsl(var(--avs-yellow)/0.10)] hover:bg-[hsl(var(--avs-yellow)/0.17)]',
+    optionClassName: 'border-[hsl(var(--avs-yellow)/0.28)] bg-[hsl(var(--avs-yellow)/0.08)] hover:bg-[hsl(var(--avs-yellow)/0.16)] focus:bg-[hsl(var(--avs-yellow)/0.16)]',
+    badgeClassName: 'border-[hsl(var(--avs-yellow)/0.40)] bg-[hsl(var(--avs-yellow)/0.12)] text-avs-yellow',
+    iconClassName: 'text-avs-yellow',
+  },
+  van: {
+    surfaceClassName: 'border-[hsl(var(--inspection-primary)/0.32)] bg-[hsl(var(--inspection-primary)/0.10)] hover:bg-[hsl(var(--inspection-primary)/0.17)]',
+    optionClassName: 'border-[hsl(var(--inspection-primary)/0.28)] bg-[hsl(var(--inspection-primary)/0.08)] hover:bg-[hsl(var(--inspection-primary)/0.16)] focus:bg-[hsl(var(--inspection-primary)/0.16)]',
+    badgeClassName: 'border-[hsl(var(--inspection-primary)/0.40)] bg-[hsl(var(--inspection-primary)/0.12)] text-inspection',
+    iconClassName: 'text-inspection',
+  },
+  hgv: {
+    surfaceClassName: 'border-[hsl(var(--hgv-inspection-primary)/0.32)] bg-[hsl(var(--hgv-inspection-primary)/0.10)] hover:bg-[hsl(var(--hgv-inspection-primary)/0.17)]',
+    optionClassName: 'border-[hsl(var(--hgv-inspection-primary)/0.28)] bg-[hsl(var(--hgv-inspection-primary)/0.08)] hover:bg-[hsl(var(--hgv-inspection-primary)/0.16)] focus:bg-[hsl(var(--hgv-inspection-primary)/0.16)]',
+    badgeClassName: 'border-[hsl(var(--hgv-inspection-primary)/0.40)] bg-[hsl(var(--hgv-inspection-primary)/0.12)] text-[hsl(var(--hgv-inspection-light))]',
+    iconClassName: 'text-hgv-inspection',
+  },
+  plant: {
+    surfaceClassName: 'border-[hsl(var(--plant-inspection-primary)/0.32)] bg-[hsl(var(--plant-inspection-primary)/0.10)] hover:bg-[hsl(var(--plant-inspection-primary)/0.17)]',
+    optionClassName: 'border-[hsl(var(--plant-inspection-primary)/0.28)] bg-[hsl(var(--plant-inspection-primary)/0.08)] hover:bg-[hsl(var(--plant-inspection-primary)/0.16)] focus:bg-[hsl(var(--plant-inspection-primary)/0.16)]',
+    badgeClassName: 'border-[hsl(var(--plant-inspection-primary)/0.40)] bg-[hsl(var(--plant-inspection-primary)/0.12)] text-[hsl(var(--plant-inspection-light))]',
+    iconClassName: 'text-plant-inspection',
+  },
+  yard: {
+    surfaceClassName: 'border-[hsl(var(--workshop-primary)/0.32)] bg-[hsl(var(--workshop-primary)/0.10)] hover:bg-[hsl(var(--workshop-primary)/0.17)]',
+    optionClassName: 'border-[hsl(var(--workshop-primary)/0.28)] bg-[hsl(var(--workshop-primary)/0.08)] hover:bg-[hsl(var(--workshop-primary)/0.16)] focus:bg-[hsl(var(--workshop-primary)/0.16)]',
+    badgeClassName: 'border-[hsl(var(--workshop-primary)/0.40)] bg-[hsl(var(--workshop-primary)/0.12)] text-[hsl(var(--workshop-light))]',
+    iconClassName: 'text-workshop',
+  },
+  manual: {
+    surfaceClassName: 'border-[hsl(var(--inventory-primary)/0.32)] bg-[hsl(var(--inventory-primary)/0.12)] hover:bg-[hsl(var(--inventory-primary)/0.20)]',
+    optionClassName: 'border-[hsl(var(--inventory-primary)/0.28)] bg-[hsl(var(--inventory-primary)/0.10)] hover:bg-[hsl(var(--inventory-primary)/0.18)] focus:bg-[hsl(var(--inventory-primary)/0.18)]',
+    badgeClassName: 'border-inventory/40 bg-inventory-soft text-inventory-light',
+    iconClassName: 'text-inventory-light',
+  },
+  unknown: {
+    surfaceClassName: 'border-slate-600/40 bg-slate-700/20 hover:bg-slate-700/35',
+    optionClassName: 'border-slate-600/35 bg-slate-700/20 hover:bg-slate-700/35 focus:bg-slate-700/35',
+    badgeClassName: 'border-slate-500/40 bg-slate-700/30 text-slate-200',
+    iconClassName: 'text-slate-400',
+  },
+} satisfies Record<InventoryLocationType, InventoryLocationTypePresentation>;
+
+export function getInventoryLocationTypePresentation(
+  location: Pick<InventoryLocation, 'location_type'>
+): InventoryLocationTypePresentation {
+  return INVENTORY_LOCATION_TYPE_PRESENTATION[location.location_type];
 }
 
 export function getInventoryLocationsWithYardFirst<TLocation extends Pick<InventoryLocation, 'name'>>(

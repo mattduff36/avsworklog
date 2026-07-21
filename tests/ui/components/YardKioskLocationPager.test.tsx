@@ -85,9 +85,16 @@ describe('Yard kiosk location selection', () => {
     ]);
 
     expect(screen.getByRole('radio', { name: 'All' })).toBeChecked();
-    expect(screen.getByRole('button', { name: /^Manual Store/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^Van Alpha/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^Site Bravo/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Manual Store/ })).toHaveClass(
+      'bg-[hsl(var(--inventory-primary)/0.12)]',
+    );
+    expect(screen.getByRole('button', { name: /^Van Alpha/ })).toHaveClass(
+      'bg-[hsl(var(--inspection-primary)/0.10)]',
+      'focus-visible:ring-amber-300',
+    );
+    expect(screen.getByRole('button', { name: /^Site Bravo/ })).toHaveClass(
+      'bg-[hsl(var(--avs-yellow)/0.10)]',
+    );
 
     fireEvent.click(screen.getByRole('radio', { name: 'Manual' }));
     expect(screen.getByRole('button', { name: /^Manual Store/ })).toBeInTheDocument();

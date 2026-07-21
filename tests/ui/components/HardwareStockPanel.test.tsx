@@ -152,7 +152,9 @@ describe('HardwareStockPanel', () => {
     });
     expect(within(balances).getByRole('columnheader', { name: 'Location' })).toBeInTheDocument();
     expect(within(balances).getByRole('columnheader', { name: 'Quantity' })).toBeInTheDocument();
-    expect(within(balances).getByRole('row', { name: /Van - TE57 VAN 5/ })).toBeInTheDocument();
+    expect(within(balances).getByRole('row', { name: /Van - TE57 VAN 5/ })).toHaveClass(
+      'bg-[hsl(var(--inspection-primary)/0.10)]',
+    );
     expect(within(balances).queryByText('Yard')).not.toBeInTheDocument();
     expect(within(balances).queryByText('Empty Site')).not.toBeInTheDocument();
 
@@ -163,7 +165,9 @@ describe('HardwareStockPanel', () => {
     const yardBalances = within(matrix).getByRole('table', {
       name: 'Location balances for Positive Yard',
     });
-    expect(within(yardBalances).getByRole('row', { name: /Yard 2/ })).toBeInTheDocument();
+    expect(within(yardBalances).getByRole('row', { name: /Yard 2/ })).toHaveClass(
+      'bg-[hsl(var(--workshop-primary)/0.10)]',
+    );
   });
 
   it('adds stock from an accessible settings item action', async () => {

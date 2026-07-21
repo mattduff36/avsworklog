@@ -31,6 +31,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 import type {
   InventoryHardwareAdjustmentOperation,
   InventoryHardwareAdjustmentPayload,
@@ -40,7 +41,7 @@ import type {
   InventoryLocation,
 } from '../types';
 import { INVENTORY_HARDWARE_ADJUSTMENT_REASONS } from '../types';
-import { isInventoryYardLocation } from '../utils';
+import { getInventoryLocationTypePresentation, isInventoryYardLocation } from '../utils';
 import {
   HardwareStockQuantityDialog,
   type HardwareStockQuantityDialogCopy,
@@ -395,14 +396,24 @@ export function HardwareStockPanel({
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                  {itemBalances.map((entry) => (
-                                    <TableRow key={entry.key} className="border-slate-800">
-                                      <TableCell className="text-slate-200">{entry.location.name}</TableCell>
-                                      <TableCell className="text-right font-mono font-semibold text-white">
-                                        {entry.balance.quantity.toLocaleString()}
-                                      </TableCell>
-                                    </TableRow>
-                                  ))}
+                                  {itemBalances.map((entry) => {
+                                    const presentation = getInventoryLocationTypePresentation(entry.location);
+                                    return (
+                                      <TableRow
+                                        key={entry.key}
+                                        data-location-type={entry.location.location_type}
+                                        className={cn(
+                                          'border-l-2 border-slate-800 transition-colors',
+                                          presentation.surfaceClassName,
+                                        )}
+                                      >
+                                        <TableCell className="text-slate-200">{entry.location.name}</TableCell>
+                                        <TableCell className="text-right font-mono font-semibold text-white">
+                                          {entry.balance.quantity.toLocaleString()}
+                                        </TableCell>
+                                      </TableRow>
+                                    );
+                                  })}
                                 </TableBody>
                               </Table>
                             </div>
