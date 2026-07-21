@@ -146,7 +146,11 @@ export function HardwareCataloguePanel({
               />
             </div>
             <div className="flex gap-2">
-              <Button type="submit" disabled={!catalogueName.trim() || isSaving}>
+              <Button
+                type="submit"
+                className="bg-inventory text-white hover:bg-inventory-dark"
+                disabled={!catalogueName.trim() || isSaving}
+              >
                 {editingItem ? 'Save Changes' : 'Add Item'}
               </Button>
               {editingItem ? (

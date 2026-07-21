@@ -128,6 +128,11 @@ describe('HardwareStockPanel', () => {
     const matrix = screen.getByRole('table', {
       name: 'All active Hardware items',
     });
+    expect(matrix).toHaveClass('min-w-[900px]', 'table-fixed');
+    expect(within(matrix).getByRole('columnheader', { name: 'Total' }))
+      .toHaveClass('w-[15%]', 'text-center');
+    expect(within(matrix).getByRole('columnheader', { name: 'Actions' }))
+      .toHaveClass('w-[30%]', 'text-right');
     expect(within(matrix).getByRole('button', { name: 'Explicit Zero' })).toBeInTheDocument();
     expect(within(matrix).getByRole('button', { name: 'Missing Yard' })).toBeInTheDocument();
     expect(within(matrix).getByRole('button', { name: 'Positive Yard' })).toBeInTheDocument();
@@ -173,7 +178,9 @@ describe('HardwareStockPanel', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add Cones stock' }));
+    const addStockButton = screen.getByRole('button', { name: 'Add Cones stock' });
+    expect(addStockButton).toHaveClass('bg-inventory', 'text-white', 'hover:bg-inventory-dark');
+    fireEvent.click(addStockButton);
     const dialog = screen.getByRole('dialog');
     await waitFor(() => {
       expect(within(dialog).getByRole('button', { name: 'Destination location' })).toHaveTextContent('Yard');
@@ -254,7 +261,9 @@ describe('HardwareStockPanel', () => {
     fireEvent.change(within(dialog).getByLabelText('New counted quantity'), {
       target: { value: '0' },
     });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Save recount' }));
+    const saveRecountButton = within(dialog).getByRole('button', { name: 'Save recount' });
+    expect(saveRecountButton).toHaveClass('bg-inventory', 'text-white', 'hover:bg-inventory-dark');
+    fireEvent.click(saveRecountButton);
 
     await waitFor(() => {
       expect(onAdjust).toHaveBeenCalledWith({

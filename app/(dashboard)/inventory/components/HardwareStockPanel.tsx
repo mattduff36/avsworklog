@@ -300,13 +300,13 @@ export function HardwareStockPanel({
         </div>
 
         <div className="max-h-[560px] overflow-auto rounded-lg border border-slate-700">
-          <Table className="table-fixed">
+          <Table className="min-w-[900px] table-fixed">
             <TableCaption className="sr-only">All active Hardware items</TableCaption>
             <TableHeader className="sticky top-0 z-10 bg-slate-900">
               <TableRow className="border-slate-700">
-                <TableHead>Hardware item</TableHead>
-                <TableHead className="w-28 text-right">Total</TableHead>
-                <TableHead className="w-[290px] text-right">Actions</TableHead>
+                <TableHead className="w-[55%]">Hardware item</TableHead>
+                <TableHead className="w-[15%] text-center">Total</TableHead>
+                <TableHead className="w-[30%] text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -334,13 +334,14 @@ export function HardwareStockPanel({
                           <span className="break-words">{item.name}</span>
                         </button>
                       </TableCell>
-                      <TableCell className="px-3 py-2 text-right font-mono font-semibold text-white">
+                      <TableCell className="px-3 py-2 text-center font-mono font-semibold text-white">
                         {total.toLocaleString()}
                       </TableCell>
                       <TableCell className="px-3 py-2 text-right">
                         <div className="flex justify-end gap-2">
                           <Button
                             size="sm"
+                            className="bg-inventory text-white hover:bg-inventory-dark"
                             onClick={() => setStockEntry({
                               items: [item],
                               copy: {
@@ -507,6 +508,7 @@ export function HardwareStockPanel({
               </Button>
               <Button
                 type="submit"
+                className="bg-inventory text-white hover:bg-inventory-dark"
                 disabled={
                   isAdjusting
                   || !adjustmentLocationId

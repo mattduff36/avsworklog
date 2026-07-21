@@ -69,7 +69,9 @@ describe('HardwareCataloguePanel', () => {
     );
 
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Road Plates' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Add Item' }));
+    const addItemButton = screen.getByRole('button', { name: 'Add Item' });
+    expect(addItemButton).toHaveClass('bg-inventory', 'text-white', 'hover:bg-inventory-dark');
+    fireEvent.click(addItemButton);
     await waitFor(() => {
       expect(onCreateItem).toHaveBeenCalledWith({ name: 'Road Plates' });
     });

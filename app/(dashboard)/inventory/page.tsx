@@ -1302,7 +1302,11 @@ function InventoryConfirmActionDialog({ action, onClose }: InventoryConfirmActio
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isRunning}>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={(event) => { event.preventDefault(); void handleConfirm(); }} disabled={isRunning}>
+          <AlertDialogAction
+            className="bg-inventory text-white hover:bg-inventory-dark"
+            onClick={(event) => { event.preventDefault(); void handleConfirm(); }}
+            disabled={isRunning}
+          >
             {action?.actionLabel || 'Confirm'}
           </AlertDialogAction>
         </AlertDialogFooter>
