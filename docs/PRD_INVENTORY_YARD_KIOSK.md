@@ -17,6 +17,11 @@ active Inventory location.
   trusted Yard kiosk device through Inventory Settings. Pairing uses a
   short-lived, manager-confirmed code and never collects a hardware MAC address
   or browser fingerprint.
+- The resulting trusted-device credential is a stable random secret stored as a
+  server-side hash. Normal activation does not rotate it, so an interrupted
+  response cannot leave the tablet holding an invalid previous credential.
+  Its browser cookie uses Chromium's 400-day maximum lifetime and refreshes on
+  each trusted activation; server-side revocation remains immediate.
 - A paired, active device visiting `/yard-kiosk` authenticates as the configured
   kiosk profile without entering that profile's password. An unpaired device
   continues through the normal password or biometric login.
@@ -152,13 +157,19 @@ active Inventory location.
 - Yard Inventory is a separate PWA from the main Squires app. Production must
   use one canonical host for the kiosk so trusted cookies and the installed
   start URL share one origin. The intended canonical address is
-  `https://squiresapp.com/yard-kiosk`; this domain redirect is configured at
+  `https://www.squiresapp.com/yard-kiosk`; other production domains redirect at
   the hosting layer rather than by adding an opposing application redirect.
   The main Squires PWA manifest and non-kiosk routes are unchanged.
 - Stale browser session cookies must never create redirect loops. Activation
   clears invalid app-session cookies before sending the tablet to pairing or
   recovery, and authenticated login redirects into Yard kiosk go through
   `/yard-kiosk/activate`.
+- Reboots, ordinary browser/PWA updates, app closes, transient activation
+  failures, and app-session expiry preserve the trusted-device credential.
+  Activation refreshes its lifetime without changing its value. Explicit
+  device revocation, clearing browser site data, uninstalling with site-data
+  removal, or changing origin still requires pairing because browsers expose
+  no durable MAC-address identity to web applications.
 - Pairing shows explicit states for waiting, code confirmation, success, and
   failure. A successful pair only shows that pairing completed and the kiosk is
   starting. Failure copy uses plain English with a reference code.

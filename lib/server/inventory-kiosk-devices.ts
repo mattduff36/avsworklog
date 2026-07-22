@@ -3,7 +3,7 @@ import 'server-only';
 import { randomInt, timingSafeEqual } from 'node:crypto';
 import { getAppSessionHashSecret } from '@/lib/server/app-auth/constants';
 import { randomToken, sha256Hex } from '@/lib/server/app-auth/jwt';
-import { issueAppSession, revokeAppSession } from '@/lib/server/app-auth/session';
+import { issueAppSession } from '@/lib/server/app-auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { Database } from '@/types/database';
 
@@ -52,7 +52,7 @@ export interface InventoryKioskPairingResult {
 
 export interface ActivatedInventoryKioskDevice {
   device: DeviceRow;
-  nextToken: string;
+  deviceToken: string;
   appSession: Awaited<ReturnType<typeof issueAppSession>>;
 }
 
@@ -455,12 +455,17 @@ export async function activateInventoryKioskDevice(
   const config = await loadEnabledKioskConfig();
   const currentHash = await hashInventoryKioskDeviceToken(deviceToken);
   const admin = createAdminClient();
+  const nowIso = new Date().toISOString();
   const { data, error } = await admin
     .from('inventory_kiosk_devices')
-    .select('*')
+    .update({
+      last_seen_at: nowIso,
+      last_authenticated_at: nowIso,
+    })
     .eq('device_token_hash', currentHash)
     .eq('kiosk_user_id', config.kiosk_user_id)
     .is('revoked_at', null)
+    .select('*')
     .maybeSingle();
 
   if (error) throw new InventoryKioskDeviceError(error.message, 500);
@@ -475,38 +480,9 @@ export async function activateInventoryKioskDevice(
     actorProfileId: device.kiosk_user_id,
   });
 
-  try {
-    const nextToken = randomToken();
-    const nextTokenHash = await hashInventoryKioskDeviceToken(nextToken);
-    const nowIso = new Date().toISOString();
-    const { data: rotated, error: rotateError } = await admin
-      .from('inventory_kiosk_devices')
-      .update({
-        device_token_hash: nextTokenHash,
-        last_seen_at: nowIso,
-        last_authenticated_at: nowIso,
-      })
-      .eq('id', device.id)
-      .eq('device_token_hash', currentHash)
-      .is('revoked_at', null)
-      .select('*')
-      .maybeSingle();
-
-    if (rotateError) throw new InventoryKioskDeviceError(rotateError.message, 500);
-    if (!rotated) {
-      throw new InventoryKioskDeviceError(
-        'This kiosk device credential was already used',
-        409,
-      );
-    }
-
-    return {
-      device: rotated as DeviceRow,
-      nextToken,
-      appSession,
-    };
-  } catch (error) {
-    await revokeAppSession(appSession.row.id, 'kiosk_device_activation_failed');
-    throw error;
-  }
+  return {
+    device,
+    deviceToken,
+    appSession,
+  };
 }

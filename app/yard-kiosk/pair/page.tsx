@@ -140,7 +140,7 @@ export default function YardKioskPairPage() {
   const pairing = payload?.pairing || null;
 
   return (
-    <main className="fixed inset-0 grid min-h-dvh place-items-center overflow-hidden bg-slate-950 p-6 text-white">
+    <main className="fixed inset-x-0 top-0 grid h-[var(--yard-kiosk-viewport-height,100svh)] place-items-center overflow-hidden bg-slate-950 p-6 text-white">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,rgba(251,191,36,0.16),transparent_34%),radial-gradient(circle_at_85%_85%,rgba(14,165,233,0.1),transparent_30%)]" />
       <div className="pointer-events-none absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] [background-size:42px_42px]" />
 

@@ -289,7 +289,7 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
   return (
     <main
       data-yard-kiosk="true"
-      className="fixed inset-0 z-[100] grid h-dvh w-screen grid-rows-[4.75rem_1fr] overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.12),_transparent_32%),linear-gradient(135deg,#020617_0%,#0f172a_52%,#111827_100%)] text-white"
+      className="fixed inset-x-0 top-0 z-[100] grid h-[var(--yard-kiosk-viewport-height,100svh)] w-screen grid-rows-[4.75rem_1fr] overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.12),_transparent_32%),linear-gradient(135deg,#020617_0%,#0f172a_52%,#111827_100%)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)] text-white"
     >
       <BiometricEnrollmentPrompt
         profileId={profile?.id}

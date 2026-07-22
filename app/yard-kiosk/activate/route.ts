@@ -8,7 +8,6 @@ import {
   setKioskDeviceCookie,
 } from '@/lib/server/inventory-kiosk-device-cookies';
 import {
-  InventoryKioskDeviceError,
   activateInventoryKioskDevice,
   hasActiveInventoryKioskPairing,
 } from '@/lib/server/inventory-kiosk-devices';
@@ -34,12 +33,14 @@ function redirectWithClearedAuth(
 }
 
 export async function GET(request: NextRequest) {
+  const rawDeviceToken = getKioskDeviceCookie(request);
   const currentSession = await validateAppSession();
   if (currentSession.status === 'active') {
-    return redirectTo(request, '/yard-kiosk');
+    const response = redirectTo(request, '/yard-kiosk');
+    if (rawDeviceToken) setKioskDeviceCookie(response, rawDeviceToken);
+    return response;
   }
 
-  const rawDeviceToken = getKioskDeviceCookie(request);
   try {
     const activation = await activateInventoryKioskDevice(rawDeviceToken);
     if (!activation) {
@@ -70,21 +71,13 @@ export async function GET(request: NextRequest) {
       activation.appSession.cookieValue,
       activation.appSession.cookieExpiresAt,
     );
-    setKioskDeviceCookie(response, activation.nextToken);
+    setKioskDeviceCookie(response, activation.deviceToken);
     return response;
   } catch (error) {
     console.error('Yard kiosk trusted-device activation failed:', error);
-    const isCredentialRace = error instanceof InventoryKioskDeviceError
-      && error.status === 409;
     return redirectWithClearedAuth(
       request,
-      isCredentialRace
-        ? '/yard-kiosk/recover?code=DEVICE_CREDENTIAL_USED'
-        : '/yard-kiosk/recover?code=ACTIVATION_FAILED',
-      {
-        // Keep the device cookie on a credential race so Try again can succeed.
-        expireDeviceCookie: !isCredentialRace,
-      },
+      '/yard-kiosk/recover?code=ACTIVATION_FAILED',
     );
   }
 }

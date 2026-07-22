@@ -43,13 +43,13 @@ describe('Yard kiosk trusted-device activation route', () => {
     trackServerUsageEvent.mockResolvedValue(undefined);
   });
 
-  it('issues the dedicated app session and rotates the device cookie', async () => {
+  it('issues the dedicated app session and refreshes the stable device cookie', async () => {
     activateInventoryKioskDevice.mockResolvedValue({
       device: {
         id: 'device-1',
         kiosk_user_id: 'kiosk-user-1',
       },
-      nextToken: 'rotated-device-secret',
+      deviceToken: 'current-device-secret',
       appSession: {
         row: { id: 'session-1' },
         cookieValue: 'signed-app-session',
@@ -73,7 +73,7 @@ describe('Yard kiosk trusted-device activation route', () => {
       'signed-app-session',
     );
     expect(response.cookies.get(KIOSK_DEVICE_COOKIE_NAME)?.value).toBe(
-      'rotated-device-secret',
+      'current-device-secret',
     );
     expect(trackServerUsageEvent).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -125,6 +125,24 @@ describe('Yard kiosk trusted-device activation route', () => {
     expect(response.cookies.get(APP_SESSION_COOKIE_NAME)?.value).toBe('');
   });
 
+  it('preserves the trusted-device cookie through transient activation failures', async () => {
+    activateInventoryKioskDevice.mockRejectedValue(
+      new Error('Temporary database connection failure'),
+    );
+    const request = new NextRequest('http://localhost/yard-kiosk/activate', {
+      headers: {
+        Cookie: `${KIOSK_DEVICE_COOKIE_NAME}=stable-device-secret`,
+      },
+    });
+
+    const response = await activateKiosk(request);
+
+    expect(response.headers.get('location')).toBe(
+      'http://localhost/yard-kiosk/recover?code=ACTIVATION_FAILED',
+    );
+    expect(response.cookies.get(KIOSK_DEVICE_COOKIE_NAME)).toBeUndefined();
+  });
+
   it('never replaces an existing valid session', async () => {
     validateAppSession.mockResolvedValue({
       status: 'active',
@@ -136,6 +154,25 @@ describe('Yard kiosk trusted-device activation route', () => {
     );
 
     expect(response.headers.get('location')).toBe('http://localhost/yard-kiosk');
+    expect(activateInventoryKioskDevice).not.toHaveBeenCalled();
+  });
+
+  it('refreshes the device-cookie lifetime when an app session is already active', async () => {
+    validateAppSession.mockResolvedValue({
+      status: 'active',
+      session: { id: 'existing-session' },
+    });
+    const request = new NextRequest('http://localhost/yard-kiosk/activate', {
+      headers: {
+        Cookie: `${KIOSK_DEVICE_COOKIE_NAME}=stable-device-secret`,
+      },
+    });
+
+    const response = await activateKiosk(request);
+
+    expect(response.cookies.get(KIOSK_DEVICE_COOKIE_NAME)?.value).toBe(
+      'stable-device-secret',
+    );
     expect(activateInventoryKioskDevice).not.toHaveBeenCalled();
   });
 });

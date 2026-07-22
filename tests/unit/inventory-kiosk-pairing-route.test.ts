@@ -23,6 +23,7 @@ vi.mock('@/lib/server/inventory-kiosk-devices', () => ({
 }));
 
 import {
+  KIOSK_DEVICE_COOKIE_MAX_AGE_SECONDS,
   KIOSK_DEVICE_COOKIE_NAME,
   KIOSK_PAIRING_COOKIE_NAME,
 } from '@/lib/server/inventory-kiosk-device-cookies';
@@ -102,6 +103,7 @@ describe('Inventory kiosk public pairing route', () => {
     expect(deviceCookie?.value).toBe('raw-pairing-secret');
     expect(deviceCookie?.httpOnly).toBe(true);
     expect(deviceCookie?.sameSite).toBe('strict');
+    expect(deviceCookie?.maxAge).toBe(KIOSK_DEVICE_COOKIE_MAX_AGE_SECONDS);
     expect(expiredPairingCookie?.value).toBe('');
     expect(expiredPairingCookie?.maxAge).toBe(0);
   });

@@ -115,7 +115,7 @@ export function YardKioskRecoveryScreen({
   const isInfo = error.severity === 'info';
 
   return (
-    <main className="fixed inset-0 z-[100] grid min-h-dvh place-items-center overflow-hidden bg-slate-950 p-6 text-white">
+    <main className="fixed inset-x-0 top-0 z-[100] grid h-[var(--yard-kiosk-viewport-height,100svh)] place-items-center overflow-hidden bg-slate-950 p-6 text-white">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,rgba(251,191,36,0.16),transparent_34%),radial-gradient(circle_at_85%_85%,rgba(14,165,233,0.1),transparent_30%)]" />
       <section className="relative w-full max-w-2xl overflow-hidden rounded-[2rem] border border-white/10 bg-slate-900/85 shadow-2xl shadow-black/40 backdrop-blur-xl">
         <div className="h-2 bg-amber-300" />
