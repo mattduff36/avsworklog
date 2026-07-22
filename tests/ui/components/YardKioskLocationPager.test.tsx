@@ -14,6 +14,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { InventoryLocationType } from '@/app/(dashboard)/inventory/types';
 import { YardKioskLocationPager } from '@/app/yard-kiosk/components/YardKioskLocationPager';
 import type { YardKioskLocation } from '@/lib/inventory/kiosk-types';
+import type { YardKioskLocationUiState } from '@/lib/inventory/kiosk-remote-types';
+import {
+  getPinnedYardKioskLocationIds,
+  getRecentYardKioskLocationIds,
+} from '@/app/yard-kiosk/yard-kiosk-storage';
+
+function createUiState(): YardKioskLocationUiState {
+  return {
+    query: '',
+    active_filter: 'all',
+    page_index: 0,
+    include_legacy_quotes: false,
+    recent_ids: getRecentYardKioskLocationIds(),
+    pinned_ids: getPinnedYardKioskLocationIds(),
+  };
+}
 
 function makeLocation(
   name: string,
@@ -38,14 +54,34 @@ function makeLocation(
 function renderPager(locations: YardKioskLocation[]) {
   const onIncludeLegacyQuotesChange = vi.fn(async () => undefined);
   const result = render(
-    <YardKioskLocationPager
-      direction="take"
+    <ControlledLocationPager
       locations={locations}
-      onSelect={vi.fn()}
       onIncludeLegacyQuotesChange={onIncludeLegacyQuotesChange}
     />,
   );
   return { ...result, onIncludeLegacyQuotesChange };
+}
+
+function ControlledLocationPager({
+  locations,
+  direction = 'take',
+  onIncludeLegacyQuotesChange = vi.fn(async () => undefined),
+}: {
+  locations: YardKioskLocation[];
+  direction?: 'take' | 'return';
+  onIncludeLegacyQuotesChange?: (enabled: boolean) => Promise<void>;
+}) {
+  const [uiState, setUiState] = useState(createUiState);
+  return (
+    <YardKioskLocationPager
+      direction={direction}
+      locations={locations}
+      uiState={uiState}
+      onUiStateChange={setUiState}
+      onSelect={vi.fn()}
+      onIncludeLegacyQuotesChange={onIncludeLegacyQuotesChange}
+    />
+  );
 }
 
 function LegacyLocationHarness({
@@ -56,11 +92,14 @@ function LegacyLocationHarness({
   legacyLocation: YardKioskLocation;
 }) {
   const [locations, setLocations] = useState(standardLocations);
+  const [uiState, setUiState] = useState(createUiState);
 
   return (
     <YardKioskLocationPager
       direction="take"
       locations={locations}
+      uiState={uiState}
+      onUiStateChange={setUiState}
       onSelect={vi.fn()}
       onIncludeLegacyQuotesChange={async (includeLegacyQuotes) => {
         setLocations(includeLegacyQuotes
@@ -288,11 +327,9 @@ describe('Yard kiosk location selection', () => {
       );
 
       const firstEntry = render(
-        <YardKioskLocationPager
-          direction={direction}
+        <ControlledLocationPager
           locations={locations}
-          onSelect={vi.fn()}
-          onIncludeLegacyQuotesChange={vi.fn(async () => undefined)}
+          direction={direction}
         />,
       );
 
@@ -308,16 +345,14 @@ describe('Yard kiosk location selection', () => {
 
       fireEvent.click(next);
       expect(previous).toBeEnabled();
-      expect(screen.getByRole('button', { name: 'Go to Vans 1 / 2' }))
+      expect(screen.getByRole('button', { name: 'Go to Vans' }))
         .toHaveAttribute('aria-current', 'page');
 
       firstEntry.unmount();
       render(
-        <YardKioskLocationPager
-          direction={direction}
+        <ControlledLocationPager
           locations={locations}
-          onSelect={vi.fn()}
-          onIncludeLegacyQuotesChange={vi.fn(async () => undefined)}
+          direction={direction}
         />,
       );
 

@@ -48,6 +48,7 @@ describe('InventoryKioskDevicesPanel', () => {
           body: JSON.stringify({
             action: 'start_pairing',
             device_label: 'Yard Tablet 1',
+            replace_existing: false,
           }),
         }),
       );
@@ -76,5 +77,30 @@ describe('InventoryKioskDevicesPanel', () => {
     expect(await screen.findByText('Yard Tablet 1')).toBeInTheDocument();
     expect(screen.getByText(/Last automatic login/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Revoke' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open kiosk control' }))
+      .toHaveAttribute('href', '/inventory/kiosk-control');
+    expect(screen.queryByRole('button', { name: 'Start pairing' }))
+      .not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText('e.g. Yard Tablet 1'), {
+      target: { value: 'Replacement Tablet' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Replace existing kiosk' }));
+    expect(screen.getByText('Replace the linked Yard kiosk?')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Start replacement' }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/inventory/kiosk/devices',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'start_pairing',
+            device_label: 'Replacement Tablet',
+            replace_existing: true,
+          }),
+        }),
+      );
+    });
   });
 });

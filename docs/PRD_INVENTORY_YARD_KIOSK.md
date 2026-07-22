@@ -17,6 +17,11 @@ active Inventory location.
   trusted Yard kiosk device through Inventory Settings. Pairing uses a
   short-lived, manager-confirmed code and never collects a hardware MAC address
   or browser fingerprint.
+- Exactly one non-revoked Yard kiosk device may exist. Starting another pairing
+  requires an explicit **Replace existing kiosk** confirmation. The current
+  tablet remains active until the replacement code is confirmed; cancellation
+  or expiry leaves it untouched. Confirmation revokes the old device and its
+  sessions and activates the replacement atomically.
 - The resulting trusted-device credential is a stable random secret stored as a
   server-side hash. Normal activation does not rotate it, so an interrupted
   response cannot leave the tablet holding an invalid previous credential.
@@ -209,6 +214,26 @@ active Inventory location.
   and timers. A server transaction that already completed is never reversed.
 - Success shows a large receipt and automatically resets for the next
   transaction after a short countdown.
+
+### YK-011: Manager live replica and control
+
+- Inventory managers open `/inventory/kiosk-control` from Inventory Settings.
+  It shows a structured state-synchronised replica of the single linked tablet,
+  not a video stream, with a target delay of one to two seconds.
+- The replica opens read-only. **Take control** acquires one short renewable
+  lease. Only the lease holder may send validated, size-bounded, idempotent
+  control actions; a second manager cannot take over an unexpired lease.
+- While a lease is active, the physical tablet visibly locks local input,
+  accelerates heartbeat polling, applies actions against its current bootstrap
+  and stock IDs, and publishes the resulting workflow snapshot and revision.
+  Remote actions restart the tablet inactivity timer.
+- Releasing control, closing or disconnecting the manager browser, or lease
+  expiry unlocks the physical tablet automatically. Stale commands expire and
+  cannot execute after their lease.
+- The authenticated physical tablet remains authoritative. The manager browser
+  never calls the inventory transfer endpoint; a remote confirmation is queued
+  to the tablet, which revalidates and submits the transfer using its kiosk
+  session.
 
 ### YK-009: Legacy quote locations
 

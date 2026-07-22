@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
       deployment_id: body.deployment_id,
       last_error_code: body.last_error_code,
       diagnostic_id: body.diagnostic_id,
+      workflow_snapshot: body.workflow_snapshot,
     });
 
     if (heartbeat.revoked) {
@@ -80,6 +81,7 @@ export async function POST(request: NextRequest) {
         revoked: false,
         device_id: heartbeat.device?.id || null,
         commands: heartbeat.commands,
+        control_lease: heartbeat.controlLease,
       },
       { headers: { 'Cache-Control': 'no-store' } },
     );

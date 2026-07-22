@@ -10,13 +10,18 @@ import {
   YARD_KIOSK_INACTIVITY_WARNING_MS,
 } from '@/app/yard-kiosk/components/YardKioskInactivityGuard';
 
-const { signOutMock, useAuthMock } = vi.hoisted(() => ({
+const { signOutMock, useAuthMock, useRemoteControlMock } = vi.hoisted(() => ({
   signOutMock: vi.fn(),
   useAuthMock: vi.fn(),
+  useRemoteControlMock: vi.fn(),
 }));
 
 vi.mock('@/lib/hooks/useAuth', () => ({
   useAuth: useAuthMock,
+}));
+
+vi.mock('@/lib/hooks/useYardKioskRemoteControl', () => ({
+  useYardKioskRemoteControl: useRemoteControlMock,
 }));
 
 interface BiometricPromptProps {
@@ -64,6 +69,7 @@ describe('YardKioskApp', () => {
       loading: false,
       signOut: signOutMock,
     });
+    useRemoteControlMock.mockReturnValue({ isRemotelyControlled: false });
   });
 
   afterEach(() => {
@@ -84,6 +90,16 @@ describe('YardKioskApp', () => {
       .toHaveAttribute('data-profile-id', 'kiosk-profile');
     expect(screen.getByTestId('biometric-enrollment-prompt'))
       .toHaveAttribute('data-can-check', 'true');
+  });
+
+  it('locks physical input while a manager holds remote control', () => {
+    useRemoteControlMock.mockReturnValue({ isRemotelyControlled: true });
+
+    render(<YardKioskApp bootstrap={bootstrap} />);
+
+    expect(screen.getByTestId('yard-kiosk-remote-lock')).toHaveTextContent(
+      'Remote control active — tablet input locked',
+    );
   });
 
   it('waits for kiosk authentication to finish before checking enrollment', () => {

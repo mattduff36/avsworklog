@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import {
   Building2,
   HardHat,
@@ -11,11 +11,10 @@ import {
   Warehouse,
 } from 'lucide-react';
 import type { YardKioskDirection, YardKioskLocation } from '@/lib/inventory/kiosk-types';
+import type { YardKioskLocationUiState } from '@/lib/inventory/kiosk-remote-types';
 import { cn } from '@/lib/utils';
 import { getInventoryLocationTypePresentation } from '@/app/(dashboard)/inventory/utils';
 import {
-  getPinnedYardKioskLocationIds,
-  getRecentYardKioskLocationIds,
   rememberYardKioskLocation,
   togglePinnedYardKioskLocation,
 } from '../yard-kiosk-storage';
@@ -29,7 +28,7 @@ import {
 
 const PAGE_SIZE = 8;
 
-type LocationFilter = 'all' | 'manual' | 'vans' | 'sites';
+type LocationFilter = YardKioskLocationUiState['active_filter'];
 
 const LOCATION_FILTERS: Array<{ value: LocationFilter; label: string }> = [
   { value: 'all', label: 'All' },
@@ -47,8 +46,11 @@ interface LocationPage {
 interface YardKioskLocationPagerProps {
   direction: YardKioskDirection;
   locations: YardKioskLocation[];
+  uiState: YardKioskLocationUiState;
+  onUiStateChange: (state: YardKioskLocationUiState) => void;
   onSelect: (location: YardKioskLocation) => void;
   onIncludeLegacyQuotesChange: (includeLegacyQuotes: boolean) => Promise<void>;
+  persistPreferences?: boolean;
 }
 
 function chunkLocations(
@@ -86,23 +88,25 @@ function matchesLocationFilter(
 export function YardKioskLocationPager({
   direction,
   locations,
+  uiState,
+  onUiStateChange,
   onSelect,
   onIncludeLegacyQuotesChange,
+  persistPreferences = true,
 }: YardKioskLocationPagerProps) {
   const pagerRef = useRef<HTMLDivElement>(null);
-  const [query, setQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<LocationFilter>('all');
-  const [pageIndex, setPageIndex] = useState(0);
-  const [recentIds, setRecentIds] = useState<string[]>([]);
-  const [pinnedIds, setPinnedIds] = useState<string[]>([]);
-  const [includeLegacyQuotes, setIncludeLegacyQuotes] = useState(false);
   const legacyRequestIdRef = useRef(0);
+  const {
+    query,
+    active_filter: activeFilter,
+    page_index: pageIndex,
+    include_legacy_quotes: includeLegacyQuotes,
+    recent_ids: recentIds,
+    pinned_ids: pinnedIds,
+  } = uiState;
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setPageIndex(0);
-      setRecentIds(getRecentYardKioskLocationIds());
-      setPinnedIds(getPinnedYardKioskLocationIds());
       pagerRef.current?.scrollTo({ left: 0, behavior: 'auto' });
     }, 0);
     return () => window.clearTimeout(timer);
@@ -146,12 +150,16 @@ export function YardKioskLocationPager({
       const location = byId.get(id);
       return location ? [location] : [];
     });
-    const vans = matchingLocations.filter((location) => location.location_type === 'van');
-    const sites = matchingLocations.filter((location) => location.location_type === 'site');
-    const fleet = matchingLocations.filter(
+    const prioritySet = new Set(priority.map((location) => location.id));
+    const remainingLocations = matchingLocations.filter(
+      (location) => !prioritySet.has(location.id),
+    );
+    const vans = remainingLocations.filter((location) => location.location_type === 'van');
+    const sites = remainingLocations.filter((location) => location.location_type === 'site');
+    const fleet = remainingLocations.filter(
       (location) => ['hgv', 'plant'].includes(location.location_type),
     );
-    const other = matchingLocations.filter(
+    const other = remainingLocations.filter(
       (location) => !['van', 'site', 'hgv', 'plant'].includes(location.location_type),
     );
 
@@ -166,20 +174,18 @@ export function YardKioskLocationPager({
   const currentPageIndex = Math.min(pageIndex, Math.max(0, pages.length - 1));
 
   function handleQueryChange(value: string) {
-    setQuery(value);
-    setPageIndex(0);
+    onUiStateChange({ ...uiState, query: value, page_index: 0 });
     pagerRef.current?.scrollTo({ left: 0, behavior: 'smooth' });
   }
 
   function handleFilterChange(filter: LocationFilter) {
-    setActiveFilter(filter);
-    setPageIndex(0);
+    onUiStateChange({ ...uiState, active_filter: filter, page_index: 0 });
     pagerRef.current?.scrollTo({ left: 0, behavior: 'smooth' });
   }
 
   function goToPage(index: number) {
     const nextIndex = Math.max(0, Math.min(pages.length - 1, index));
-    setPageIndex(nextIndex);
+    onUiStateChange({ ...uiState, page_index: nextIndex });
     pagerRef.current?.scrollTo({
       left: pagerRef.current.clientWidth * nextIndex,
       behavior: 'smooth',
@@ -189,33 +195,59 @@ export function YardKioskLocationPager({
   function handleScroll() {
     const element = pagerRef.current;
     if (!element?.clientWidth) return;
-    setPageIndex(Math.min(
-      Math.max(0, pages.length - 1),
-      Math.round(element.scrollLeft / element.clientWidth),
-    ));
+    onUiStateChange({
+      ...uiState,
+      page_index: Math.min(
+        Math.max(0, pages.length - 1),
+        Math.round(element.scrollLeft / element.clientWidth),
+      ),
+    });
   }
 
   function handleSelect(location: YardKioskLocation) {
-    setRecentIds(rememberYardKioskLocation(location.id));
+    const nextRecentIds = persistPreferences
+      ? rememberYardKioskLocation(location.id)
+      : [
+          location.id,
+          ...recentIds.filter((id) => id !== location.id),
+        ].slice(0, 8);
+    onUiStateChange({
+      ...uiState,
+      recent_ids: nextRecentIds,
+    });
     onSelect(location);
   }
 
   function handlePin(locationId: string) {
-    setPinnedIds(togglePinnedYardKioskLocation(locationId));
+    const nextPinnedIds = persistPreferences
+      ? togglePinnedYardKioskLocation(locationId)
+      : pinnedIds.includes(locationId)
+        ? pinnedIds.filter((id) => id !== locationId)
+        : [...pinnedIds, locationId];
+    onUiStateChange({
+      ...uiState,
+      pinned_ids: nextPinnedIds,
+    });
   }
 
   async function handleIncludeLegacyQuotesChange(nextIncludeLegacyQuotes: boolean) {
     const requestId = legacyRequestIdRef.current + 1;
     legacyRequestIdRef.current = requestId;
-    setIncludeLegacyQuotes(nextIncludeLegacyQuotes);
-    setQuery('');
-    setPageIndex(0);
+    onUiStateChange({
+      ...uiState,
+      include_legacy_quotes: nextIncludeLegacyQuotes,
+      query: '',
+      page_index: 0,
+    });
     pagerRef.current?.scrollTo({ left: 0, behavior: 'smooth' });
     try {
       await onIncludeLegacyQuotesChange(nextIncludeLegacyQuotes);
     } catch {
       if (legacyRequestIdRef.current === requestId) {
-        setIncludeLegacyQuotes(!nextIncludeLegacyQuotes);
+        onUiStateChange({
+          ...uiState,
+          include_legacy_quotes: !nextIncludeLegacyQuotes,
+        });
       }
     }
   }

@@ -10,6 +10,7 @@ import type {
   YardKioskBasketLine,
   YardKioskStockItem,
 } from '@/lib/inventory/kiosk-types';
+import type { YardKioskItemUiState } from '@/lib/inventory/kiosk-remote-types';
 
 function makeSerializedItem(index: number, category = 'tools'): YardKioskStockItem {
   return {
@@ -41,6 +42,11 @@ interface ControlledPickerProps {
 function ControlledPicker({ items, basket = [] }: ControlledPickerProps) {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('all');
+  const [uiState, setUiState] = useState<YardKioskItemUiState>({
+    page_index: 0,
+    hardware_item_id: null,
+    hardware_quantity: 1,
+  });
 
   return (
     <YardKioskItemPicker
@@ -53,6 +59,8 @@ function ControlledPicker({ items, basket = [] }: ControlledPickerProps) {
       searchQuery={query}
       activeCategory={category}
       loading={false}
+      uiState={uiState}
+      onUiStateChange={setUiState}
       onSearchChange={(nextQuery) => {
         setQuery(nextQuery);
         if (nextQuery) setCategory('all');

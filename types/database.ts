@@ -2373,6 +2373,16 @@ export type Database = {
           last_error_code: string | null
           last_diagnostic_id: string | null
           diagnostics: Record<string, unknown>
+          revoked_reason: string | null
+          superseded_by_device_id: string | null
+          supersedes_device_id: string | null
+          last_workflow_snapshot: Record<string, unknown>
+          workflow_state_version: number
+          last_snapshot_at: string | null
+          control_holder_user_id: string | null
+          control_session_id: string | null
+          control_acquired_at: string | null
+          control_lease_expires_at: string | null
           revoked_at: string | null
           revoked_by: string | null
           created_at: string
@@ -2394,6 +2404,16 @@ export type Database = {
           last_error_code?: string | null
           last_diagnostic_id?: string | null
           diagnostics?: Record<string, unknown>
+          revoked_reason?: string | null
+          superseded_by_device_id?: string | null
+          supersedes_device_id?: string | null
+          last_workflow_snapshot?: Record<string, unknown>
+          workflow_state_version?: number
+          last_snapshot_at?: string | null
+          control_holder_user_id?: string | null
+          control_session_id?: string | null
+          control_acquired_at?: string | null
+          control_lease_expires_at?: string | null
           revoked_at?: string | null
           revoked_by?: string | null
           created_at?: string
@@ -2415,12 +2435,29 @@ export type Database = {
           last_error_code?: string | null
           last_diagnostic_id?: string | null
           diagnostics?: Record<string, unknown>
+          revoked_reason?: string | null
+          superseded_by_device_id?: string | null
+          supersedes_device_id?: string | null
+          last_workflow_snapshot?: Record<string, unknown>
+          workflow_state_version?: number
+          last_snapshot_at?: string | null
+          control_holder_user_id?: string | null
+          control_session_id?: string | null
+          control_acquired_at?: string | null
+          control_lease_expires_at?: string | null
           revoked_at?: string | null
           revoked_by?: string | null
           created_at?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: 'inventory_kiosk_devices_control_holder_user_id_fkey'
+            columns: ['control_holder_user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
           {
             foreignKeyName: 'inventory_kiosk_devices_kiosk_user_id_fkey'
             columns: ['kiosk_user_id']
@@ -2449,6 +2486,20 @@ export type Database = {
             referencedRelation: 'profiles'
             referencedColumns: ['id']
           },
+          {
+            foreignKeyName: 'inventory_kiosk_devices_superseded_by_device_id_fkey'
+            columns: ['superseded_by_device_id']
+            isOneToOne: false
+            referencedRelation: 'inventory_kiosk_devices'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_kiosk_devices_supersedes_device_id_fkey'
+            columns: ['supersedes_device_id']
+            isOneToOne: false
+            referencedRelation: 'inventory_kiosk_devices'
+            referencedColumns: ['id']
+          },
         ]
       }
       inventory_kiosk_device_commands: {
@@ -2463,6 +2514,7 @@ export type Database = {
             | 'reset_workflow'
             | 'logout'
             | 'clear_credentials'
+            | 'control_action'
           status:
             | 'pending'
             | 'accepted'
@@ -2494,6 +2546,7 @@ export type Database = {
             | 'reset_workflow'
             | 'logout'
             | 'clear_credentials'
+            | 'control_action'
           status?:
             | 'pending'
             | 'accepted'
@@ -2525,6 +2578,7 @@ export type Database = {
             | 'reset_workflow'
             | 'logout'
             | 'clear_credentials'
+            | 'control_action'
           status?:
             | 'pending'
             | 'accepted'
@@ -2616,6 +2670,7 @@ export type Database = {
           confirmed_by: string | null
           confirmed_at: string | null
           consumed_at: string | null
+          replaces_device_id: string | null
           expires_at: string
           created_at: string
           updated_at: string
@@ -2632,6 +2687,7 @@ export type Database = {
           confirmed_by?: string | null
           confirmed_at?: string | null
           consumed_at?: string | null
+          replaces_device_id?: string | null
           expires_at: string
           created_at?: string
           updated_at?: string
@@ -2648,6 +2704,7 @@ export type Database = {
           confirmed_by?: string | null
           confirmed_at?: string | null
           consumed_at?: string | null
+          replaces_device_id?: string | null
           expires_at?: string
           created_at?: string
           updated_at?: string
@@ -2665,6 +2722,13 @@ export type Database = {
             columns: ['kiosk_user_id']
             isOneToOne: false
             referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_kiosk_pairing_sessions_replaces_device_id_fkey'
+            columns: ['replaces_device_id']
+            isOneToOne: false
+            referencedRelation: 'inventory_kiosk_devices'
             referencedColumns: ['id']
           },
           {
@@ -9632,6 +9696,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      inventory_kiosk_confirm_device_pairing: {
+        Args: {
+          p_manager_user_id: string
+          p_pairing_id: string
+          p_confirmation_code: string
+          p_confirmed_replacement?: boolean
+        }
+        Returns: {
+          new_device_id: string
+          replaced_device_id: string | null
+        }[]
+      }
       inventory_apply_hardware_adjustments: {
         Args: {
           p_operation_type: string

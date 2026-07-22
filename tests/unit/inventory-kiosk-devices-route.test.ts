@@ -106,6 +106,22 @@ describe('Inventory kiosk device management route', () => {
     expect(startInventoryKioskPairing).toHaveBeenCalledWith(
       'manager-1',
       'Yard Tablet 1',
+      false,
+    );
+  });
+
+  it('requires explicit replacement intent when starting a second pairing', async () => {
+    const response = await updateDevices(actionRequest({
+      action: 'start_pairing',
+      device_label: 'Replacement Tablet',
+      replace_existing: true,
+    }));
+
+    expect(response.status).toBe(200);
+    expect(startInventoryKioskPairing).toHaveBeenCalledWith(
+      'manager-1',
+      'Replacement Tablet',
+      true,
     );
   });
 
@@ -121,6 +137,24 @@ describe('Inventory kiosk device management route', () => {
       'manager-1',
       'pairing-1',
       '123456',
+      false,
+    );
+  });
+
+  it('passes replacement confirmation to the atomic pairing operation', async () => {
+    const response = await updateDevices(actionRequest({
+      action: 'confirm_pairing',
+      pairing_id: 'pairing-1',
+      confirmation_code: '123456',
+      confirmed_replacement: true,
+    }));
+
+    expect(response.status).toBe(200);
+    expect(confirmInventoryKioskPairing).toHaveBeenCalledWith(
+      'manager-1',
+      'pairing-1',
+      '123456',
+      true,
     );
   });
 

@@ -1,10 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
+  LockKeyhole,
   MapPinned,
   PackageOpen,
   RefreshCw,
@@ -20,6 +21,12 @@ import type {
   YardKioskReceipt,
   YardKioskStockItem,
 } from '@/lib/inventory/kiosk-types';
+import type {
+  YardKioskControlAction,
+  YardKioskItemUiState,
+  YardKioskLocationUiState,
+  YardKioskWorkflowSnapshot,
+} from '@/lib/inventory/kiosk-remote-types';
 import {
   buildYardKioskUserError,
   createYardKioskDiagnosticId,
@@ -44,6 +51,12 @@ import {
   INITIAL_YARD_KIOSK_STATE,
   yardKioskReducer,
 } from '../yard-kiosk-state';
+import {
+  getPinnedYardKioskLocationIds,
+  getRecentYardKioskLocationIds,
+  rememberYardKioskLocation,
+  togglePinnedYardKioskLocation,
+} from '../yard-kiosk-storage';
 
 interface YardKioskAppProps {
   bootstrap: YardKioskBootstrapResponse;
@@ -61,13 +74,32 @@ interface ApiErrorPayload {
   }>;
 }
 
+const INITIAL_LOCATION_UI_STATE: YardKioskLocationUiState = {
+  query: '',
+  active_filter: 'all',
+  page_index: 0,
+  include_legacy_quotes: false,
+  recent_ids: [],
+  pinned_ids: [],
+};
+
+const INITIAL_ITEM_UI_STATE: YardKioskItemUiState = {
+  page_index: 0,
+  hardware_item_id: null,
+  hardware_quantity: 1,
+};
+
 export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
   const { profile, loading: authLoading } = useAuth();
   const [state, dispatch] = useReducer(yardKioskReducer, INITIAL_YARD_KIOSK_STATE);
   const [offline, setOffline] = useState(false);
   const [locations, setLocations] = useState<YardKioskLocation[]>(bootstrap.locations);
+  const [locationUiState, setLocationUiState] = useState(INITIAL_LOCATION_UI_STATE);
+  const [itemUiState, setItemUiState] = useState(INITIAL_ITEM_UI_STATE);
+  const [remoteActivityRevision, setRemoteActivityRevision] = useState(0);
   const legacyLocationRequestIdRef = useRef(0);
   const workflowSessionIdRef = useRef(0);
+  const snapshotRevisionRef = useRef(Date.now());
 
   useEffect(() => {
     const updateOnlineStatus = () => setOffline(!window.navigator.onLine);
@@ -80,10 +112,24 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
     };
   }, []);
 
+  useEffect(() => {
+    setLocationUiState((current) => ({
+      ...current,
+      recent_ids: getRecentYardKioskLocationIds(),
+      pinned_ids: getPinnedYardKioskLocationIds(),
+    }));
+  }, []);
+
   const handleWorkflowReset = useCallback(() => {
     legacyLocationRequestIdRef.current += 1;
     workflowSessionIdRef.current += 1;
     setLocations(bootstrap.locations);
+    setLocationUiState((current) => ({
+      ...INITIAL_LOCATION_UI_STATE,
+      recent_ids: current.recent_ids,
+      pinned_ids: current.pinned_ids,
+    }));
+    setItemUiState(INITIAL_ITEM_UI_STATE);
     dispatch({ type: 'RESET' });
   }, [bootstrap.locations]);
 
@@ -134,26 +180,16 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
     }
   }, []);
 
-  useYardKioskRemoteControl({
-    phase: state.phase,
-    offline,
-    lastErrorCode: state.userError?.code || null,
-    onResetWorkflow: handleWorkflowReset,
-    onReloadStock: () => {
-      if (state.direction && state.counterpart) {
-        void loadStock(state.direction, state.counterpart);
-      }
-    },
-    onRemoteNotice: (userError) => {
-      dispatch({ type: 'SET_USER_ERROR', userError });
-      void logYardKioskHandledError(userError, { action: 'remote_command' });
-    },
-  });
-
   function handleDirection(direction: YardKioskDirection) {
     legacyLocationRequestIdRef.current += 1;
     workflowSessionIdRef.current += 1;
     setLocations(bootstrap.locations);
+    setLocationUiState((current) => ({
+      ...INITIAL_LOCATION_UI_STATE,
+      recent_ids: current.recent_ids,
+      pinned_ids: current.pinned_ids,
+    }));
+    setItemUiState(INITIAL_ITEM_UI_STATE);
     dispatch({ type: 'SELECT_DIRECTION', direction });
   }
 
@@ -161,6 +197,7 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
     if (!state.direction) return;
     legacyLocationRequestIdRef.current += 1;
     setLocations(bootstrap.locations);
+    setItemUiState(INITIAL_ITEM_UI_STATE);
     dispatch({ type: 'SELECT_LOCATION', location });
     void loadStock(state.direction, location, workflowSessionIdRef.current);
   }
@@ -261,6 +298,12 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
     legacyLocationRequestIdRef.current += 1;
     workflowSessionIdRef.current += 1;
     setLocations(bootstrap.locations);
+    setLocationUiState((current) => ({
+      ...INITIAL_LOCATION_UI_STATE,
+      recent_ids: current.recent_ids,
+      pinned_ids: current.pinned_ids,
+    }));
+    setItemUiState(INITIAL_ITEM_UI_STATE);
     dispatch({ type: 'BACK' });
   }
 
@@ -271,6 +314,185 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
     }
     if (state.phase === 'receipt') handleWorkflowReset();
   }
+
+  const workflowSnapshot = useMemo<YardKioskWorkflowSnapshot>(() => {
+    snapshotRevisionRef.current = Math.max(
+      Date.now(),
+      snapshotRevisionRef.current + 1,
+    );
+    return {
+      schema_version: 1,
+      revision: snapshotRevisionRef.current,
+      state: state as unknown as Record<string, unknown>,
+      bootstrap,
+      locations,
+      offline,
+      location_ui: locationUiState,
+      item_ui: itemUiState,
+      recorded_at: new Date().toISOString(),
+    };
+  }, [bootstrap, itemUiState, locationUiState, locations, offline, state]);
+
+  function handleControlAction(action: YardKioskControlAction) {
+    setRemoteActivityRevision((revision) => revision + 1);
+
+    switch (action.type) {
+      case 'select_direction':
+        handleDirection(action.direction);
+        break;
+      case 'select_location': {
+        const location = locations.find((candidate) => candidate.id === action.location_id);
+        if (location) {
+          setLocationUiState((current) => ({
+            ...current,
+            recent_ids: rememberYardKioskLocation(location.id),
+          }));
+          handleLocation(location);
+        }
+        break;
+      }
+      case 'set_location_search':
+        setLocationUiState((current) => ({
+          ...current,
+          query: action.query,
+          page_index: 0,
+        }));
+        break;
+      case 'set_location_filter':
+        setLocationUiState((current) => ({
+          ...current,
+          active_filter: action.filter,
+          page_index: 0,
+        }));
+        break;
+      case 'set_location_page':
+        setLocationUiState((current) => ({
+          ...current,
+          page_index: action.page_index,
+        }));
+        break;
+      case 'set_include_legacy_quotes':
+        setLocationUiState((current) => ({
+          ...current,
+          include_legacy_quotes: action.enabled,
+          query: '',
+          page_index: 0,
+        }));
+        void handleLegacyQuoteLocationOptIn(action.enabled);
+        break;
+      case 'toggle_location_pin':
+        setLocationUiState((current) => ({
+          ...current,
+          pinned_ids: togglePinnedYardKioskLocation(action.location_id),
+        }));
+        break;
+      case 'back':
+        handleWorkflowBack();
+        break;
+      case 'forward':
+        handleWorkflowForward();
+        break;
+      case 'set_item_search':
+        dispatch({ type: 'SET_SEARCH', query: action.query });
+        setItemUiState((current) => ({ ...current, page_index: 0 }));
+        break;
+      case 'set_item_category':
+        dispatch({ type: 'SET_CATEGORY', category: action.category });
+        setItemUiState((current) => ({ ...current, page_index: 0 }));
+        break;
+      case 'set_item_page':
+        setItemUiState((current) => ({
+          ...current,
+          page_index: action.page_index,
+        }));
+        break;
+      case 'add_serialized': {
+        const item = state.stock.find((candidate) => (
+          candidate.kind === 'serialized' && candidate.id === action.item_id
+        ));
+        if (item?.kind === 'serialized') {
+          dispatch({ type: 'ADD_SERIALIZED', item });
+        }
+        break;
+      }
+      case 'open_hardware_quantity': {
+        const item = state.stock.find((candidate) => (
+          candidate.kind === 'hardware' && candidate.id === action.item_id
+        ));
+        if (item?.kind !== 'hardware') break;
+        const existing = state.basket.find((line) => (
+          line.kind === 'hardware' && line.item_id === item.id
+        ));
+        setItemUiState((current) => ({
+          ...current,
+          hardware_item_id: item.id,
+          hardware_quantity: existing?.kind === 'hardware' ? existing.quantity : 1,
+        }));
+        break;
+      }
+      case 'set_hardware_dialog_quantity':
+        setItemUiState((current) => ({
+          ...current,
+          hardware_quantity: action.quantity,
+        }));
+        break;
+      case 'set_hardware_quantity': {
+        const item = state.stock.find((candidate) => (
+          candidate.kind === 'hardware' && candidate.id === action.item_id
+        ));
+        if (item?.kind === 'hardware') {
+          dispatch({
+            type: 'SET_HARDWARE_QUANTITY',
+            item,
+            quantity: action.quantity,
+          });
+          setItemUiState((current) => ({
+            ...current,
+            hardware_item_id: null,
+            hardware_quantity: action.quantity,
+          }));
+        }
+        break;
+      }
+      case 'close_hardware_quantity':
+        setItemUiState((current) => ({ ...current, hardware_item_id: null }));
+        break;
+      case 'remove_line':
+        dispatch({
+          type: 'REMOVE_LINE',
+          kind: action.kind,
+          itemId: action.item_id,
+        });
+        break;
+      case 'clear_basket':
+        dispatch({ type: 'CLEAR_BASKET' });
+        break;
+      case 'dismiss_error':
+        dispatch({ type: 'DISMISS_ERROR' });
+        break;
+      case 'reset':
+        handleWorkflowReset();
+        break;
+    }
+  }
+
+  const { isRemotelyControlled } = useYardKioskRemoteControl({
+    phase: state.phase,
+    offline,
+    lastErrorCode: state.userError?.code || null,
+    workflowSnapshot,
+    onResetWorkflow: handleWorkflowReset,
+    onReloadStock: () => {
+      if (state.direction && state.counterpart) {
+        void loadStock(state.direction, state.counterpart);
+      }
+    },
+    onControlAction: handleControlAction,
+    onRemoteNotice: (userError) => {
+      dispatch({ type: 'SET_USER_ERROR', userError });
+      void logYardKioskHandledError(userError, { action: 'remote_command' });
+    },
+  });
 
   const guidance = getYardKioskGuidance(state);
   const workflowBackLabel = state.phase === 'location'
@@ -387,7 +609,10 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
 
       <div className="relative min-h-0 overflow-hidden">
         {state.phase !== 'mode' ? (
-          <YardKioskInactivityGuard onTimeout={handleWorkflowReset} />
+          <YardKioskInactivityGuard
+            key={remoteActivityRevision}
+            onTimeout={handleWorkflowReset}
+          />
         ) : null}
 
         {guidance.instructionKey && guidance.message ? (
@@ -406,6 +631,8 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
             key={`${state.direction}:location`}
             direction={state.direction}
             locations={locations}
+            uiState={locationUiState}
+            onUiStateChange={setLocationUiState}
             onSelect={handleLocation}
             onIncludeLegacyQuotesChange={handleLegacyQuoteLocationOptIn}
           />
@@ -429,6 +656,8 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
                 searchQuery={state.searchQuery}
                 activeCategory={state.category}
                 loading={state.loadingStock}
+                uiState={itemUiState}
+                onUiStateChange={setItemUiState}
                 onSearchChange={(query) => dispatch({ type: 'SET_SEARCH', query })}
                 onCategoryChange={(category) => dispatch({ type: 'SET_CATEGORY', category })}
                 onAddSerialized={(item) => dispatch({ type: 'ADD_SERIALIZED', item })}
@@ -533,6 +762,20 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
           </div>
         ) : null}
       </div>
+
+      {isRemotelyControlled ? (
+        <div
+          role="status"
+          aria-live="assertive"
+          data-testid="yard-kiosk-remote-lock"
+          className="absolute inset-0 z-[190] cursor-not-allowed bg-slate-950/5"
+        >
+          <div className="absolute left-1/2 top-24 flex -translate-x-1/2 items-center gap-2 rounded-full border border-cyan-300/40 bg-slate-950/95 px-5 py-3 text-sm font-black text-cyan-100 shadow-2xl">
+            <LockKeyhole className="h-5 w-5 text-cyan-300" />
+            Remote control active — tablet input locked
+          </div>
+        </div>
+      ) : null}
 
       <div className="absolute inset-0 z-[200] hidden place-items-center bg-slate-950 p-8 text-center max-[1023px]:grid max-h-[599px]:grid">
         <div>

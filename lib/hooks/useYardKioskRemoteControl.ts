@@ -1,24 +1,32 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   buildYardKioskUserError,
   createYardKioskDiagnosticId,
   type YardKioskUserError,
 } from '@/lib/inventory/kiosk-errors';
-import type { YardKioskRemoteCommandView } from '@/lib/inventory/kiosk-remote-types';
+import type {
+  YardKioskControlAction,
+  YardKioskControlLeaseView,
+  YardKioskRemoteCommandView,
+  YardKioskWorkflowSnapshot,
+} from '@/lib/inventory/kiosk-remote-types';
 import { forceAppRefresh } from '@/lib/client/force-app-refresh';
 
 interface UseYardKioskRemoteControlOptions {
   phase: string;
   offline: boolean;
   lastErrorCode: string | null;
+  workflowSnapshot: YardKioskWorkflowSnapshot;
   onResetWorkflow: () => void;
   onReloadStock: () => void;
+  onControlAction: (action: YardKioskControlAction) => void;
   onRemoteNotice: (error: YardKioskUserError) => void;
 }
 
 const HEARTBEAT_MS = 12_000;
+const CONTROL_HEARTBEAT_MS = 1_000;
 
 async function ackCommand(
   command: YardKioskRemoteCommandView,
@@ -46,32 +54,51 @@ export function useYardKioskRemoteControl({
   phase,
   offline,
   lastErrorCode,
+  workflowSnapshot,
   onResetWorkflow,
   onReloadStock,
+  onControlAction,
   onRemoteNotice,
-}: UseYardKioskRemoteControlOptions): void {
+}: UseYardKioskRemoteControlOptions): { isRemotelyControlled: boolean } {
   const handledRef = useRef(new Set<string>());
+  const [isRemotelyControlled, setIsRemotelyControlled] = useState(false);
+  const statusRef = useRef({ phase, offline, lastErrorCode, workflowSnapshot });
   const callbacksRef = useRef({
     onResetWorkflow,
     onReloadStock,
+    onControlAction,
     onRemoteNotice,
   });
+
+  useEffect(() => {
+    statusRef.current = { phase, offline, lastErrorCode, workflowSnapshot };
+  }, [lastErrorCode, offline, phase, workflowSnapshot]);
 
   useEffect(() => {
     callbacksRef.current = {
       onResetWorkflow,
       onReloadStock,
+      onControlAction,
       onRemoteNotice,
     };
-  }, [onReloadStock, onRemoteNotice, onResetWorkflow]);
+  }, [onControlAction, onReloadStock, onRemoteNotice, onResetWorkflow]);
 
   useEffect(() => {
     let cancelled = false;
+    let heartbeatTimer: number | null = null;
+    let hasActiveControlLease = false;
+    let controlLeaseExpiresAt = 0;
 
     async function runHeartbeat() {
-      if (cancelled || offline) return;
+      if (cancelled) return;
+      const currentStatus = statusRef.current;
+      if (hasActiveControlLease && controlLeaseExpiresAt <= Date.now()) {
+        hasActiveControlLease = false;
+        controlLeaseExpiresAt = 0;
+        setIsRemotelyControlled(false);
+      }
 
-      try {
+      if (!currentStatus.offline) try {
         const deploymentId = typeof document !== 'undefined'
           ? document.querySelector('meta[name="avs-deployment-id"]')?.getAttribute('content')
           : null;
@@ -81,11 +108,12 @@ export function useYardKioskRemoteControl({
           headers: { 'Content-Type': 'application/json' },
           cache: 'no-store',
           body: JSON.stringify({
-            phase,
-            offline,
+            phase: currentStatus.phase,
+            offline: currentStatus.offline,
             app_version: process.env.NEXT_PUBLIC_APP_VERSION || null,
             deployment_id: deploymentId,
-            last_error_code: lastErrorCode,
+            last_error_code: currentStatus.lastErrorCode,
+            workflow_snapshot: currentStatus.workflowSnapshot,
           }),
         });
 
@@ -98,16 +126,27 @@ export function useYardKioskRemoteControl({
           return;
         }
 
-        if (!response.ok) return;
+        if (!response.ok) throw new Error('Yard kiosk heartbeat failed');
         const payload = await response.json() as {
           commands?: YardKioskRemoteCommandView[];
           revoked?: boolean;
+          control_lease?: YardKioskControlLeaseView | null;
         };
 
         if (payload.revoked) {
           window.location.replace('/yard-kiosk/recover?code=DEVICE_REVOKED');
           return;
         }
+
+        hasActiveControlLease = Boolean(
+          payload.control_lease?.is_active
+          && payload.control_lease.expires_at
+          && new Date(payload.control_lease.expires_at).getTime() > Date.now(),
+        );
+        controlLeaseExpiresAt = hasActiveControlLease && payload.control_lease?.expires_at
+          ? new Date(payload.control_lease.expires_at).getTime()
+          : 0;
+        setIsRemotelyControlled(hasActiveControlLease);
 
         for (const command of payload.commands || []) {
           if (handledRef.current.has(command.id)) continue;
@@ -154,6 +193,25 @@ export function useYardKioskRemoteControl({
                 }).catch(() => undefined);
                 window.location.replace('/yard-kiosk/recover?code=REMOTE_REPAIR');
                 break;
+              case 'control_action': {
+                const controlSessionId = command.payload.control_session_id;
+                const action = command.payload.action;
+                if (
+                  !hasActiveControlLease
+                  || typeof controlSessionId !== 'string'
+                  || controlSessionId !== payload.control_lease?.session_id
+                  || !action
+                  || typeof action !== 'object'
+                ) {
+                  await ackCommand(command, 'failed', 'CONTROL_LEASE_EXPIRED');
+                  break;
+                }
+                callbacksRef.current.onControlAction(
+                  action as YardKioskControlAction,
+                );
+                await ackCommand(command, 'completed', 'CONTROL_ACTION_APPLIED');
+                break;
+              }
               default:
                 await ackCommand(command, 'failed', 'UNSUPPORTED');
             }
@@ -173,16 +231,21 @@ export function useYardKioskRemoteControl({
       } catch {
         // Heartbeat is best-effort while online.
       }
+
+      if (cancelled) return;
+      heartbeatTimer = window.setTimeout(
+        () => void runHeartbeat(),
+        hasActiveControlLease ? CONTROL_HEARTBEAT_MS : HEARTBEAT_MS,
+      );
     }
 
     void runHeartbeat();
-    const interval = window.setInterval(() => {
-      void runHeartbeat();
-    }, HEARTBEAT_MS);
 
     return () => {
       cancelled = true;
-      window.clearInterval(interval);
+      if (heartbeatTimer !== null) window.clearTimeout(heartbeatTimer);
     };
-  }, [lastErrorCode, offline, phase]);
+  }, []);
+
+  return { isRemotelyControlled };
 }

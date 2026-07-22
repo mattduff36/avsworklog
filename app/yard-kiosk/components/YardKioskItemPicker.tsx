@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef } from 'react';
 import {
   AlertTriangle,
   Box,
@@ -25,6 +25,7 @@ import type {
   YardKioskCategory,
   YardKioskStockItem,
 } from '@/lib/inventory/kiosk-types';
+import type { YardKioskItemUiState } from '@/lib/inventory/kiosk-remote-types';
 import { YardKioskPagerNavigation } from './YardKioskPagerNavigation';
 
 const ITEMS_PER_PAGE = 6;
@@ -44,6 +45,8 @@ interface YardKioskItemPickerProps {
   searchQuery: string;
   activeCategory: string;
   loading: boolean;
+  uiState: YardKioskItemUiState;
+  onUiStateChange: (state: YardKioskItemUiState) => void;
   onSearchChange: (query: string) => void;
   onCategoryChange: (category: string) => void;
   onAddSerialized: (item: Extract<YardKioskStockItem, { kind: 'serialized' }>) => void;
@@ -75,14 +78,20 @@ export function YardKioskItemPicker({
   searchQuery,
   activeCategory,
   loading,
+  uiState,
+  onUiStateChange,
   onSearchChange,
   onCategoryChange,
   onAddSerialized,
   onSetHardwareQuantity,
 }: YardKioskItemPickerProps) {
   const pagerRef = useRef<HTMLDivElement>(null);
-  const [hardwareItem, setHardwareItem] = useState<Extract<YardKioskStockItem, { kind: 'hardware' }> | null>(null);
-  const [quantity, setQuantity] = useState(1);
+  const hardwareItem = items.find(
+    (item): item is Extract<YardKioskStockItem, { kind: 'hardware' }> => (
+      item.kind === 'hardware' && item.id === uiState.hardware_item_id
+    ),
+  ) || null;
+  const quantity = uiState.hardware_quantity;
 
   const categoryLabels = useMemo(
     () => new Map(categories.map((category) => [category.slug, category.name])),
@@ -123,14 +132,13 @@ export function YardKioskItemPicker({
     requiresNarrowing,
     searchQuery,
   ]);
-  const pagerContextKey = `${activeCategory}:${searchQuery}:${requiresNarrowing}`;
-  const [pagerState, setPagerState] = useState({ contextKey: pagerContextKey, index: 0 });
-  const currentPageIndex = pagerState.contextKey === pagerContextKey
-    ? Math.min(pagerState.index, Math.max(0, pages.length - 1))
-    : 0;
+  const currentPageIndex = Math.min(
+    uiState.page_index,
+    Math.max(0, pages.length - 1),
+  );
 
   function resetPager() {
-    setPagerState({ contextKey: pagerContextKey, index: 0 });
+    onUiStateChange({ ...uiState, page_index: 0 });
     pagerRef.current?.scrollTo({ left: 0, behavior: 'smooth' });
   }
 
@@ -146,7 +154,7 @@ export function YardKioskItemPicker({
 
   function goToPage(index: number) {
     const nextIndex = Math.max(0, Math.min(pages.length - 1, index));
-    setPagerState({ contextKey: pagerContextKey, index: nextIndex });
+    onUiStateChange({ ...uiState, page_index: nextIndex });
     pagerRef.current?.scrollTo({
       left: pagerRef.current.clientWidth * nextIndex,
       behavior: 'smooth',
@@ -157,9 +165,9 @@ export function YardKioskItemPicker({
     const element = pagerRef.current;
     if (!element?.clientWidth) return;
     const nextIndex = Math.round(element.scrollLeft / element.clientWidth);
-    setPagerState({
-      contextKey: pagerContextKey,
-      index: Math.min(Math.max(0, pages.length - 1), nextIndex),
+    onUiStateChange({
+      ...uiState,
+      page_index: Math.min(Math.max(0, pages.length - 1), nextIndex),
     });
   }
 
@@ -169,14 +177,17 @@ export function YardKioskItemPicker({
 
   function openHardwareQuantity(item: Extract<YardKioskStockItem, { kind: 'hardware' }>) {
     const existing = getBasketLine(item);
-    setQuantity(existing?.kind === 'hardware' ? existing.quantity : 1);
-    setHardwareItem(item);
+    onUiStateChange({
+      ...uiState,
+      hardware_item_id: item.id,
+      hardware_quantity: existing?.kind === 'hardware' ? existing.quantity : 1,
+    });
   }
 
   function saveHardwareQuantity() {
     if (!hardwareItem) return;
     onSetHardwareQuantity(hardwareItem, quantity);
-    setHardwareItem(null);
+    onUiStateChange({ ...uiState, hardware_item_id: null });
   }
 
   return (
@@ -363,7 +374,12 @@ export function YardKioskItemPicker({
         ) : <div className="h-2" aria-hidden="true" />}
       </section>
 
-      <Dialog open={Boolean(hardwareItem)} onOpenChange={(open) => { if (!open) setHardwareItem(null); }}>
+      <Dialog
+        open={Boolean(hardwareItem)}
+        onOpenChange={(open) => {
+          if (!open) onUiStateChange({ ...uiState, hardware_item_id: null });
+        }}
+      >
         <DialogContent className="max-w-md border-white/10 bg-slate-950 text-white">
           <DialogHeader>
             <DialogTitle className="text-2xl font-black">{hardwareItem?.name || 'Hardware quantity'}</DialogTitle>
@@ -375,7 +391,10 @@ export function YardKioskItemPicker({
             <button
               type="button"
               aria-label="Decrease quantity"
-              onClick={() => setQuantity((value) => Math.max(0, value - 1))}
+              onClick={() => onUiStateChange({
+                ...uiState,
+                hardware_quantity: Math.max(0, quantity - 1),
+              })}
               className="grid h-16 place-items-center rounded-2xl border border-white/10 bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
             >
               <Minus className="h-8 w-8" />
@@ -385,16 +404,25 @@ export function YardKioskItemPicker({
               min={0}
               max={hardwareItem?.available_quantity || 0}
               value={quantity}
-              onChange={(event) => setQuantity(Math.min(
-                hardwareItem?.available_quantity || 0,
-                Math.max(0, Number.parseInt(event.target.value || '0', 10)),
-              ))}
+              onChange={(event) => onUiStateChange({
+                ...uiState,
+                hardware_quantity: Math.min(
+                  hardwareItem?.available_quantity || 0,
+                  Math.max(0, Number.parseInt(event.target.value || '0', 10)),
+                ),
+              })}
               className="h-20 rounded-2xl border border-amber-300/40 bg-amber-300/10 text-center text-4xl font-black text-white outline-none focus:ring-2 focus:ring-amber-300"
             />
             <button
               type="button"
               aria-label="Increase quantity"
-              onClick={() => setQuantity((value) => Math.min(hardwareItem?.available_quantity || 0, value + 1))}
+              onClick={() => onUiStateChange({
+                ...uiState,
+                hardware_quantity: Math.min(
+                  hardwareItem?.available_quantity || 0,
+                  quantity + 1,
+                ),
+              })}
               className="grid h-16 place-items-center rounded-2xl border border-white/10 bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
             >
               <Plus className="h-8 w-8" />

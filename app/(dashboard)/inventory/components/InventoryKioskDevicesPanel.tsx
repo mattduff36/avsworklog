@@ -43,6 +43,7 @@ interface KioskPairing {
   confirmation_code: string | null;
   status: 'active' | 'confirmed' | 'consumed' | 'cancelled' | 'expired';
   candidate_seen_at: string | null;
+  replaces_device_id: string | null;
   expires_at: string;
 }
 
@@ -93,6 +94,7 @@ export function InventoryKioskDevicesPanel() {
   const [state, setState] = useState<KioskDeviceState | null>(null);
   const [deviceLabel, setDeviceLabel] = useState('');
   const [revokeTarget, setRevokeTarget] = useState<KioskDevice | null>(null);
+  const [isReplaceDialogOpen, setIsReplaceDialogOpen] = useState(false);
   const [destructiveTarget, setDestructiveTarget] = useState<{
     device: KioskDevice;
     command: DestructiveCommand;
@@ -169,14 +171,20 @@ export function InventoryKioskDevicesPanel() {
     }
   }, []);
 
-  async function startPairing() {
+  async function startPairing(replaceExisting = false) {
     const label = deviceLabel.trim();
     if (!label) {
       setError('Enter a name for the kiosk device');
       return;
     }
-    const succeeded = await runAction('start_pairing', { device_label: label });
-    if (succeeded) setDeviceLabel('');
+    const succeeded = await runAction('start_pairing', {
+      device_label: label,
+      replace_existing: replaceExisting,
+    });
+    if (succeeded) {
+      setDeviceLabel('');
+      setIsReplaceDialogOpen(false);
+    }
   }
 
   async function confirmPairing() {
@@ -185,6 +193,7 @@ export function InventoryKioskDevicesPanel() {
     await runAction('confirm_pairing', {
       pairing_id: pairing.id,
       confirmation_code: pairing.confirmation_code,
+      confirmed_replacement: Boolean(pairing.replaces_device_id),
     });
   }
 
@@ -305,9 +314,15 @@ export function InventoryKioskDevicesPanel() {
               <div className="max-w-2xl">
                 <p className="font-semibold text-white">Pair a new kiosk browser</p>
                 <p className="mt-1 text-sm leading-relaxed text-slate-400">
-                  Start a five-minute pairing window, then open{' '}
+                  {activeDevices.length > 0
+                    ? 'Only one kiosk can be linked. Replacing it keeps the current tablet active until you confirm the new tablet code.'
+                    : 'Start a five-minute pairing window, then open '}{' '}
+                  {activeDevices.length === 0 ? (
+                    <>
                   <span className="font-medium text-slate-200">squiresapp.com/yard-kiosk</span>{' '}
                   on the device and compare the six-digit code.
+                    </>
+                  ) : null}
                 </p>
               </div>
               {!pairing ? (
@@ -327,16 +342,30 @@ export function InventoryKioskDevicesPanel() {
                   </div>
                   <Button
                     type="button"
-                    onClick={() => void startPairing()}
+                    onClick={() => {
+                      if (activeDevices.length > 0) {
+                        if (!deviceLabel.trim()) {
+                          setError('Enter a name for the replacement kiosk device');
+                          return;
+                        }
+                        setIsReplaceDialogOpen(true);
+                        return;
+                      }
+                      void startPairing();
+                    }}
                     disabled={saving}
-                    className="bg-inventory text-white hover:bg-inventory-dark"
+                    className={
+                      activeDevices.length > 0
+                        ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
+                        : 'bg-inventory text-white hover:bg-inventory-dark'
+                    }
                   >
                     {saving ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
                       <Search className="mr-2 h-4 w-4" />
                     )}
-                    Start pairing
+                    {activeDevices.length > 0 ? 'Replace existing kiosk' : 'Start pairing'}
                   </Button>
                 </div>
               ) : null}
@@ -353,6 +382,9 @@ export function InventoryKioskDevicesPanel() {
                       <>
                         <p className="mt-1 text-sm text-slate-300">
                           Confirm only if this matches the code on the kiosk screen.
+                          {pairing.replaces_device_id
+                            ? ' This will immediately revoke the existing kiosk.'
+                            : ''}
                         </p>
                         <p className="mt-3 font-mono text-4xl font-black tracking-[0.22em] text-white">
                           {pairing.confirmation_code}
@@ -387,7 +419,9 @@ export function InventoryKioskDevicesPanel() {
                       className="bg-inventory text-white hover:bg-inventory-dark"
                     >
                       <CheckCircle2 className="mr-2 h-4 w-4" />
-                      Confirm matching code
+                      {pairing.replaces_device_id
+                        ? 'Confirm and replace kiosk'
+                        : 'Confirm matching code'}
                     </Button>
                   </div>
                 </div>
@@ -404,9 +438,13 @@ export function InventoryKioskDevicesPanel() {
                 </p>
               </div>
               <Button asChild variant="outline" size="sm">
-                <a href="/yard-kiosk" target="_blank" rel="noopener noreferrer">
+                <a
+                  href="/inventory/kiosk-control"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   <ExternalLink className="mr-2 h-4 w-4" />
-                  Open kiosk
+                  Open kiosk control
                 </a>
               </Button>
             </div>
@@ -550,6 +588,38 @@ export function InventoryKioskDevicesPanel() {
           ) : null}
         </CardContent>
       </Card>
+
+      <AlertDialog
+        open={isReplaceDialogOpen}
+        onOpenChange={(open) => {
+          if (!saving) setIsReplaceDialogOpen(open);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Replace the linked Yard kiosk?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The current tablet remains linked while the replacement pairing window is
+              open. It is revoked only after you confirm the matching six-digit code on
+              the new tablet. Cancelling or letting the window expire changes nothing.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Keep current kiosk</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={saving}
+              onClick={(event) => {
+                event.preventDefault();
+                void startPairing(true);
+              }}
+              className="bg-amber-500 text-slate-950 hover:bg-amber-400"
+            >
+              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Start replacement
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={Boolean(revokeTarget)}

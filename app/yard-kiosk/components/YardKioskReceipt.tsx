@@ -15,6 +15,7 @@ interface YardKioskReceiptProps {
   counterpart: YardKioskLocation;
   receipt: YardKioskReceiptData;
   onReset: () => void;
+  autoReset?: boolean;
 }
 
 export function YardKioskReceipt({
@@ -22,10 +23,12 @@ export function YardKioskReceipt({
   counterpart,
   receipt,
   onReset,
+  autoReset = true,
 }: YardKioskReceiptProps) {
   const [seconds, setSeconds] = useState(RESET_SECONDS);
 
   useEffect(() => {
+    if (!autoReset) return;
     const timer = window.setInterval(() => {
       setSeconds((value) => {
         if (value <= 1) {
@@ -37,7 +40,7 @@ export function YardKioskReceipt({
       });
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [onReset]);
+  }, [autoReset, onReset]);
 
   return (
     <section className="grid h-full place-items-center p-6" aria-live="polite">
@@ -74,9 +77,11 @@ export function YardKioskReceipt({
           <RotateCcw className="h-6 w-6" />
           New transfer
         </button>
-        <p className="mt-3 text-sm font-medium text-slate-400">
-          Resetting automatically in {seconds} second{seconds === 1 ? '' : 's'}
-        </p>
+        {autoReset ? (
+          <p className="mt-3 text-sm font-medium text-slate-400">
+            Resetting automatically in {seconds} second{seconds === 1 ? '' : 's'}
+          </p>
+        ) : null}
       </div>
     </section>
   );

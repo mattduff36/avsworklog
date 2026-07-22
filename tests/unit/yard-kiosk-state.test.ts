@@ -73,6 +73,29 @@ describe('Yard kiosk state', () => {
     });
   });
 
+  it('round-trips reducer state through the remote snapshot JSON format', () => {
+    const withSerialized = yardKioskReducer(INITIAL_YARD_KIOSK_STATE, {
+      type: 'ADD_SERIALIZED',
+      item: serializedItem,
+    });
+    const restored = JSON.parse(JSON.stringify(withSerialized)) as typeof withSerialized;
+    const next = yardKioskReducer(restored, {
+      type: 'SET_HARDWARE_QUANTITY',
+      item: hardwareItem,
+      quantity: 3,
+    });
+
+    expect(restored).toEqual(withSerialized);
+    expect(next.basket).toEqual([
+      ...withSerialized.basket,
+      expect.objectContaining({
+        kind: 'hardware',
+        item_id: hardwareItem.id,
+        quantity: 3,
+      }),
+    ]);
+  });
+
   it('does not add a Yard-exit item whose check is blocked', () => {
     const state = yardKioskReducer(INITIAL_YARD_KIOSK_STATE, {
       type: 'ADD_SERIALIZED',

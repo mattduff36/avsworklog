@@ -98,6 +98,15 @@ describe('Yard kiosk touch controls', () => {
       <YardKioskLocationPager
         direction="take"
         locations={[counterpart]}
+        uiState={{
+          query: '',
+          active_filter: 'all',
+          page_index: 0,
+          include_legacy_quotes: false,
+          recent_ids: [],
+          pinned_ids: [],
+        }}
+        onUiStateChange={vi.fn()}
         onSelect={vi.fn()}
         onIncludeLegacyQuotesChange={vi.fn(async () => undefined)}
       />,
@@ -154,6 +163,12 @@ describe('Yard kiosk touch controls', () => {
         searchQuery=""
         activeCategory="all"
         loading={false}
+        uiState={{
+          page_index: 0,
+          hardware_item_id: null,
+          hardware_quantity: 1,
+        }}
+        onUiStateChange={vi.fn()}
         onSearchChange={vi.fn()}
         onCategoryChange={vi.fn()}
         onAddSerialized={vi.fn()}

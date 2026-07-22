@@ -31,6 +31,8 @@ interface DeviceActionBody {
   command_id?: string;
   idempotency_key?: string;
   confirmed_destructive?: boolean;
+  replace_existing?: boolean;
+  confirmed_replacement?: boolean;
 }
 
 function errorResponse(error: unknown) {
@@ -109,6 +111,7 @@ export async function POST(request: NextRequest) {
       const state = await startInventoryKioskPairing(
         manager.userId,
         body.device_label,
+        Boolean(body.replace_existing),
       );
       return NextResponse.json({ success: true, ...state });
     }
@@ -126,6 +129,7 @@ export async function POST(request: NextRequest) {
         manager.userId,
         body.pairing_id,
         body.confirmation_code,
+        Boolean(body.confirmed_replacement),
       );
     } else if (body.action === 'revoke_device') {
       if (!body.device_id) {

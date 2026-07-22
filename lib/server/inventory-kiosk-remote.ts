@@ -10,10 +10,13 @@ import {
 import {
   YARD_KIOSK_DESTRUCTIVE_COMMANDS,
   YARD_KIOSK_ONLINE_THRESHOLD_MS,
+  type YardKioskControlAction,
+  type YardKioskControlLeaseView,
   type YardKioskHeartbeatInput,
   type YardKioskRemoteCommandStatus,
   type YardKioskRemoteCommandType,
   type YardKioskRemoteCommandView,
+  type YardKioskWorkflowSnapshot,
 } from '@/lib/inventory/kiosk-remote-types';
 import { getYardKioskErrorDefinition, listYardKioskErrorCatalogue } from '@/lib/inventory/kiosk-errors';
 import type { Database } from '@/types/database';
@@ -23,6 +26,10 @@ type CommandRow = Database['public']['Tables']['inventory_kiosk_device_commands'
 type EventRow = Database['public']['Tables']['inventory_kiosk_device_events']['Row'];
 
 const COMMAND_TTL_MS = 5 * 60 * 1000;
+const CONTROL_COMMAND_TTL_MS = 20_000;
+const CONTROL_LEASE_MS = 20_000;
+const MAX_SNAPSHOT_BYTES = 512 * 1024;
+const MAX_CONTROL_ACTION_BYTES = 2 * 1024;
 const ALLOWED_COMMANDS = new Set<YardKioskRemoteCommandType>([
   'ping',
   'refresh_status',
@@ -48,6 +55,10 @@ export interface YardKioskDeviceOperationalView {
   created_at: string;
   presence: 'online' | 'stale' | 'offline' | 'revoked';
   pending_commands: YardKioskRemoteCommandView[];
+  workflow_snapshot: YardKioskWorkflowSnapshot | null;
+  workflow_state_version: number;
+  last_snapshot_at: string | null;
+  control_lease: YardKioskControlLeaseView;
 }
 
 function toCommandView(row: CommandRow): YardKioskRemoteCommandView {
@@ -63,7 +74,150 @@ function toCommandView(row: CommandRow): YardKioskRemoteCommandView {
     failed_at: row.failed_at,
     result_code: row.result_code,
     error_message: row.error_message,
+    payload: row.payload,
   };
+}
+
+function isUuid(value: unknown): value is string {
+  return typeof value === 'string'
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function serializedByteLength(value: unknown): number {
+  try {
+    return Buffer.byteLength(JSON.stringify(value), 'utf8');
+  } catch {
+    return Number.POSITIVE_INFINITY;
+  }
+}
+
+function controlLeaseForDevice(device: DeviceRow): YardKioskControlLeaseView {
+  const expiresAt = device.control_lease_expires_at;
+  return {
+    session_id: device.control_session_id,
+    holder_user_id: device.control_holder_user_id,
+    acquired_at: device.control_acquired_at,
+    expires_at: expiresAt,
+    is_active: Boolean(expiresAt && new Date(expiresAt).getTime() > Date.now()),
+  };
+}
+
+export function validateYardKioskWorkflowSnapshot(
+  input: unknown,
+): YardKioskWorkflowSnapshot {
+  if (
+    !input
+    || typeof input !== 'object'
+    || Array.isArray(input)
+    || serializedByteLength(input) > MAX_SNAPSHOT_BYTES
+  ) {
+    throw new InventoryKioskDeviceError('Invalid or oversized kiosk workflow snapshot');
+  }
+
+  const snapshot = input as Partial<YardKioskWorkflowSnapshot>;
+  if (
+    snapshot.schema_version !== 1
+    || !Number.isSafeInteger(snapshot.revision)
+    || Number(snapshot.revision) < 0
+    || !snapshot.state
+    || typeof snapshot.state !== 'object'
+    || Array.isArray(snapshot.state)
+    || !snapshot.bootstrap
+    || typeof snapshot.bootstrap !== 'object'
+    || !Array.isArray(snapshot.locations)
+    || typeof snapshot.offline !== 'boolean'
+    || !snapshot.location_ui
+    || !snapshot.item_ui
+    || typeof snapshot.recorded_at !== 'string'
+    || Number.isNaN(Date.parse(snapshot.recorded_at))
+  ) {
+    throw new InventoryKioskDeviceError('Invalid kiosk workflow snapshot');
+  }
+
+  const locationUi = snapshot.location_ui;
+  const itemUi = snapshot.item_ui;
+  if (
+    typeof locationUi.query !== 'string'
+    || locationUi.query.length > 200
+    || !['all', 'manual', 'vans', 'sites'].includes(locationUi.active_filter)
+    || !Number.isSafeInteger(locationUi.page_index)
+    || locationUi.page_index < 0
+    || typeof locationUi.include_legacy_quotes !== 'boolean'
+    || !Array.isArray(locationUi.recent_ids)
+    || !Array.isArray(locationUi.pinned_ids)
+    || locationUi.recent_ids.length > 100
+    || locationUi.pinned_ids.length > 100
+    || locationUi.recent_ids.some((id) => !isUuid(id))
+    || locationUi.pinned_ids.some((id) => !isUuid(id))
+    || !Number.isSafeInteger(itemUi.page_index)
+    || itemUi.page_index < 0
+    || (itemUi.hardware_item_id !== null && !isUuid(itemUi.hardware_item_id))
+    || !Number.isSafeInteger(itemUi.hardware_quantity)
+    || itemUi.hardware_quantity < 0
+  ) {
+    throw new InventoryKioskDeviceError('Invalid kiosk workflow controls');
+  }
+
+  return snapshot as YardKioskWorkflowSnapshot;
+}
+
+export function validateYardKioskControlAction(input: unknown): YardKioskControlAction {
+  if (
+    !input
+    || typeof input !== 'object'
+    || Array.isArray(input)
+    || serializedByteLength(input) > MAX_CONTROL_ACTION_BYTES
+  ) {
+    throw new InventoryKioskDeviceError('Invalid or oversized kiosk control action');
+  }
+
+  const action = input as Record<string, unknown>;
+  const type = action.type;
+  if (typeof type !== 'string') {
+    throw new InventoryKioskDeviceError('Kiosk control action type is required');
+  }
+
+  if (['back', 'forward', 'clear_basket', 'dismiss_error', 'reset', 'close_hardware_quantity'].includes(type)) {
+    return { type } as YardKioskControlAction;
+  }
+  if (type === 'select_direction' && (action.direction === 'take' || action.direction === 'return')) {
+    return { type, direction: action.direction };
+  }
+  if (['select_location', 'toggle_location_pin', 'add_serialized', 'open_hardware_quantity'].includes(type) && isUuid(action[type === 'select_location' || type === 'toggle_location_pin' ? 'location_id' : 'item_id'])) {
+    return type === 'select_location' || type === 'toggle_location_pin'
+      ? { type, location_id: action.location_id as string }
+      : { type, item_id: action.item_id as string } as YardKioskControlAction;
+  }
+  if (type === 'remove_line' && (action.kind === 'serialized' || action.kind === 'hardware') && isUuid(action.item_id)) {
+    return { type, kind: action.kind, item_id: action.item_id };
+  }
+  if (type === 'set_hardware_quantity' && isUuid(action.item_id) && Number.isSafeInteger(action.quantity) && Number(action.quantity) >= 0) {
+    return { type, item_id: action.item_id, quantity: Number(action.quantity) };
+  }
+  if (type === 'set_hardware_dialog_quantity' && Number.isSafeInteger(action.quantity) && Number(action.quantity) >= 0) {
+    return { type, quantity: Number(action.quantity) };
+  }
+  if (
+    (type === 'set_location_search' || type === 'set_item_search')
+    && typeof action.query === 'string'
+    && action.query.length <= 200
+  ) {
+    return { type, query: action.query } as YardKioskControlAction;
+  }
+  if (type === 'set_location_filter' && ['all', 'manual', 'vans', 'sites'].includes(String(action.filter))) {
+    return { type, filter: action.filter } as YardKioskControlAction;
+  }
+  if (type === 'set_item_category' && typeof action.category === 'string' && /^[a-z0-9_-]{1,80}$/i.test(action.category)) {
+    return { type, category: action.category };
+  }
+  if ((type === 'set_location_page' || type === 'set_item_page') && Number.isSafeInteger(action.page_index) && Number(action.page_index) >= 0) {
+    return { type, page_index: Number(action.page_index) } as YardKioskControlAction;
+  }
+  if (type === 'set_include_legacy_quotes' && typeof action.enabled === 'boolean') {
+    return { type, enabled: action.enabled };
+  }
+
+  throw new InventoryKioskDeviceError('Unsupported or invalid kiosk control action');
 }
 
 function presenceForDevice(device: DeviceRow): YardKioskDeviceOperationalView['presence'] {
@@ -85,6 +239,23 @@ async function expireStaleCommands(deviceId?: string): Promise<void> {
   if (deviceId) {
     query = query.eq('device_id', deviceId);
   }
+  const { error } = await query;
+  if (error) throw new InventoryKioskDeviceError(error.message, 500);
+}
+
+async function expireStaleControlLeases(deviceId?: string): Promise<void> {
+  const admin = createAdminClient();
+  let query = admin
+    .from('inventory_kiosk_devices')
+    .update({
+      control_holder_user_id: null,
+      control_session_id: null,
+      control_acquired_at: null,
+      control_lease_expires_at: null,
+    })
+    .not('control_session_id', 'is', null)
+    .lt('control_lease_expires_at', new Date().toISOString());
+  if (deviceId) query = query.eq('id', deviceId);
   const { error } = await query;
   if (error) throw new InventoryKioskDeviceError(error.message, 500);
 }
@@ -113,15 +284,25 @@ export async function recordInventoryKioskDeviceHeartbeat(
   device: DeviceRow | null;
   commands: YardKioskRemoteCommandView[];
   revoked: boolean;
+  controlLease: YardKioskControlLeaseView | null;
 }> {
   const device = await resolveActiveKioskDeviceFromSession();
   if (!device) {
-    return { device: null, commands: [], revoked: true };
+    return { device: null, commands: [], revoked: true, controlLease: null };
   }
 
-  await expireStaleCommands(device.id);
+  await Promise.all([
+    expireStaleCommands(device.id),
+    expireStaleControlLeases(device.id),
+  ]);
   const nowIso = new Date().toISOString();
   const admin = createAdminClient();
+  const snapshot = input.workflow_snapshot === undefined
+    ? null
+    : validateYardKioskWorkflowSnapshot(input.workflow_snapshot);
+  const shouldStoreSnapshot = Boolean(
+    snapshot && snapshot.revision >= device.workflow_state_version,
+  );
   const { data: updated, error } = await admin
     .from('inventory_kiosk_devices')
     .update({
@@ -136,6 +317,11 @@ export async function recordInventoryKioskDeviceHeartbeat(
         offline: Boolean(input.offline),
         recorded_at: nowIso,
       },
+      ...(shouldStoreSnapshot && snapshot ? {
+        last_workflow_snapshot: snapshot,
+        workflow_state_version: snapshot.revision,
+        last_snapshot_at: nowIso,
+      } : {}),
     })
     .eq('id', device.id)
     .is('revoked_at', null)
@@ -144,7 +330,7 @@ export async function recordInventoryKioskDeviceHeartbeat(
 
   if (error) throw new InventoryKioskDeviceError(error.message, 500);
   if (!updated) {
-    return { device, commands: [], revoked: true };
+    return { device, commands: [], revoked: true, controlLease: null };
   }
 
   const { data: commands, error: commandError } = await admin
@@ -162,6 +348,7 @@ export async function recordInventoryKioskDeviceHeartbeat(
     device: updated as DeviceRow,
     commands: ((commands || []) as CommandRow[]).map(toCommandView),
     revoked: false,
+    controlLease: controlLeaseForDevice(updated as DeviceRow),
   };
 }
 
@@ -293,6 +480,206 @@ export async function issueInventoryKioskDeviceCommand(input: {
   return toCommandView(inserted as CommandRow);
 }
 
+export async function getInventoryKioskControlState(): Promise<{
+  device: YardKioskDeviceOperationalView | null;
+}> {
+  const devices = await listInventoryKioskOperationalDevices();
+  return {
+    device: devices.find((device) => !device.revoked_at) || null,
+  };
+}
+
+export async function takeInventoryKioskControl(input: {
+  managerUserId: string;
+  deviceId: string;
+  controlSessionId: string;
+}): Promise<YardKioskControlLeaseView> {
+  if (!isUuid(input.deviceId) || !isUuid(input.controlSessionId)) {
+    throw new InventoryKioskDeviceError('Invalid kiosk control session');
+  }
+
+  await expireStaleControlLeases(input.deviceId);
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const expiresAt = new Date(now.getTime() + CONTROL_LEASE_MS).toISOString();
+  const { data, error } = await createAdminClient()
+    .from('inventory_kiosk_devices')
+    .update({
+      control_holder_user_id: input.managerUserId,
+      control_session_id: input.controlSessionId,
+      control_acquired_at: nowIso,
+      control_lease_expires_at: expiresAt,
+    })
+    .eq('id', input.deviceId)
+    .is('revoked_at', null)
+    .or(
+      `control_session_id.is.null,control_lease_expires_at.lt.${nowIso},control_session_id.eq.${input.controlSessionId}`,
+    )
+    .select('*')
+    .maybeSingle();
+
+  if (error) throw new InventoryKioskDeviceError(error.message, 500);
+  if (!data) {
+    throw new InventoryKioskDeviceError(
+      'Another manager is currently controlling this Yard kiosk',
+      409,
+    );
+  }
+
+  await recordInventoryKioskDeviceEvent({
+    deviceId: input.deviceId,
+    eventType: 'control_lease_taken',
+    message: 'A manager took remote control of the Yard kiosk.',
+    details: {
+      manager_user_id: input.managerUserId,
+      control_session_id: input.controlSessionId,
+      expires_at: expiresAt,
+    },
+  });
+
+  return controlLeaseForDevice(data as DeviceRow);
+}
+
+export async function renewInventoryKioskControl(input: {
+  managerUserId: string;
+  deviceId: string;
+  controlSessionId: string;
+}): Promise<YardKioskControlLeaseView> {
+  if (!isUuid(input.deviceId) || !isUuid(input.controlSessionId)) {
+    throw new InventoryKioskDeviceError('Invalid kiosk control session');
+  }
+
+  const nowIso = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + CONTROL_LEASE_MS).toISOString();
+  const { data, error } = await createAdminClient()
+    .from('inventory_kiosk_devices')
+    .update({ control_lease_expires_at: expiresAt })
+    .eq('id', input.deviceId)
+    .eq('control_holder_user_id', input.managerUserId)
+    .eq('control_session_id', input.controlSessionId)
+    .gt('control_lease_expires_at', nowIso)
+    .is('revoked_at', null)
+    .select('*')
+    .maybeSingle();
+
+  if (error) throw new InventoryKioskDeviceError(error.message, 500);
+  if (!data) {
+    throw new InventoryKioskDeviceError('The Yard kiosk control lease expired', 409);
+  }
+  return controlLeaseForDevice(data as DeviceRow);
+}
+
+export async function releaseInventoryKioskControl(input: {
+  managerUserId: string;
+  deviceId: string;
+  controlSessionId: string;
+}): Promise<void> {
+  if (!isUuid(input.deviceId) || !isUuid(input.controlSessionId)) {
+    throw new InventoryKioskDeviceError('Invalid kiosk control session');
+  }
+
+  const { data, error } = await createAdminClient()
+    .from('inventory_kiosk_devices')
+    .update({
+      control_holder_user_id: null,
+      control_session_id: null,
+      control_acquired_at: null,
+      control_lease_expires_at: null,
+    })
+    .eq('id', input.deviceId)
+    .eq('control_holder_user_id', input.managerUserId)
+    .eq('control_session_id', input.controlSessionId)
+    .select('id')
+    .maybeSingle();
+
+  if (error) throw new InventoryKioskDeviceError(error.message, 500);
+  if (!data) return;
+
+  await recordInventoryKioskDeviceEvent({
+    deviceId: input.deviceId,
+    eventType: 'control_lease_released',
+    message: 'A manager released remote control of the Yard kiosk.',
+    details: {
+      manager_user_id: input.managerUserId,
+      control_session_id: input.controlSessionId,
+    },
+  });
+}
+
+export async function issueInventoryKioskControlAction(input: {
+  managerUserId: string;
+  deviceId: string;
+  controlSessionId: string;
+  action: unknown;
+  idempotencyKey?: string;
+}): Promise<YardKioskRemoteCommandView> {
+  if (!isUuid(input.deviceId) || !isUuid(input.controlSessionId)) {
+    throw new InventoryKioskDeviceError('Invalid kiosk control session');
+  }
+  const action = validateYardKioskControlAction(input.action);
+  const nowIso = new Date().toISOString();
+  const admin = createAdminClient();
+  const { data: device, error: deviceError } = await admin
+    .from('inventory_kiosk_devices')
+    .select('id')
+    .eq('id', input.deviceId)
+    .eq('control_holder_user_id', input.managerUserId)
+    .eq('control_session_id', input.controlSessionId)
+    .gt('control_lease_expires_at', nowIso)
+    .is('revoked_at', null)
+    .maybeSingle();
+
+  if (deviceError) throw new InventoryKioskDeviceError(deviceError.message, 500);
+  if (!device) {
+    throw new InventoryKioskDeviceError('Take control before using the Yard kiosk', 409);
+  }
+
+  const idempotencyKey = input.idempotencyKey?.trim() || randomUUID();
+  if (idempotencyKey.length > 160) {
+    throw new InventoryKioskDeviceError('Invalid kiosk action idempotency key');
+  }
+  const { data: existing, error: existingError } = await admin
+    .from('inventory_kiosk_device_commands')
+    .select('*')
+    .eq('device_id', input.deviceId)
+    .eq('idempotency_key', idempotencyKey)
+    .maybeSingle();
+  if (existingError) throw new InventoryKioskDeviceError(existingError.message, 500);
+  if (existing) return toCommandView(existing as CommandRow);
+
+  const { data: inserted, error } = await admin
+    .from('inventory_kiosk_device_commands')
+    .insert({
+      device_id: input.deviceId,
+      command_type: 'control_action',
+      status: 'pending',
+      payload: {
+        control_session_id: input.controlSessionId,
+        action,
+      },
+      idempotency_key: idempotencyKey,
+      issued_by: input.managerUserId,
+      expires_at: new Date(Date.now() + CONTROL_COMMAND_TTL_MS).toISOString(),
+    })
+    .select('*')
+    .single();
+
+  if (error) throw new InventoryKioskDeviceError(error.message, 500);
+  await recordInventoryKioskDeviceEvent({
+    deviceId: input.deviceId,
+    eventType: 'control_action_issued',
+    message: 'A manager issued a validated Yard kiosk control action.',
+    details: {
+      manager_user_id: input.managerUserId,
+      control_session_id: input.controlSessionId,
+      command_id: inserted.id,
+      action_type: action.type,
+    },
+  });
+
+  return toCommandView(inserted as CommandRow);
+}
+
 export async function cancelInventoryKioskDeviceCommand(
   managerUserId: string,
   commandId: string,
@@ -331,7 +718,10 @@ export async function recordInventoryKioskDeviceEvent(input: {
 }
 
 export async function listInventoryKioskOperationalDevices(): Promise<YardKioskDeviceOperationalView[]> {
-  await expireStaleCommands();
+  await Promise.all([
+    expireStaleCommands(),
+    expireStaleControlLeases(),
+  ]);
   const admin = createAdminClient();
   const { data: devices, error } = await admin
     .from('inventory_kiosk_devices')
@@ -377,6 +767,13 @@ export async function listInventoryKioskOperationalDevices(): Promise<YardKioskD
     created_at: device.created_at,
     presence: presenceForDevice(device),
     pending_commands: commandsByDevice.get(device.id) || [],
+    workflow_snapshot:
+      device.last_workflow_snapshot?.schema_version === 1
+        ? device.last_workflow_snapshot as unknown as YardKioskWorkflowSnapshot
+        : null,
+    workflow_state_version: device.workflow_state_version,
+    last_snapshot_at: device.last_snapshot_at,
+    control_lease: controlLeaseForDevice(device),
   }));
 }
 

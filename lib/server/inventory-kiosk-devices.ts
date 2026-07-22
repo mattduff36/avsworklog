@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { randomInt, timingSafeEqual } from 'node:crypto';
+import { randomInt } from 'node:crypto';
 import { getAppSessionHashSecret } from '@/lib/server/app-auth/constants';
 import { randomToken, sha256Hex } from '@/lib/server/app-auth/jwt';
 import { issueAppSession } from '@/lib/server/app-auth/session';
@@ -26,6 +26,7 @@ export interface InventoryKioskPairingView {
   confirmation_code: string | null;
   status: PairingRow['status'];
   candidate_seen_at: string | null;
+  replaces_device_id: string | null;
   expires_at: string;
 }
 
@@ -73,6 +74,7 @@ function toPairingView(row: PairingRow): InventoryKioskPairingView {
     confirmation_code: row.confirmation_code,
     status: row.status,
     candidate_seen_at: row.candidate_seen_at,
+    replaces_device_id: row.replaces_device_id,
     expires_at: row.expires_at,
   };
 }
@@ -103,11 +105,6 @@ function normalizeDeviceLabel(input: unknown): string {
 
 function createConfirmationCode(): string {
   return String(randomInt(0, 1_000_000)).padStart(6, '0');
-}
-
-function codesMatch(left: string, right: string): boolean {
-  if (left.length !== right.length) return false;
-  return timingSafeEqual(Buffer.from(left), Buffer.from(right));
 }
 
 export async function hashInventoryKioskDeviceToken(token: string): Promise<string> {
@@ -193,11 +190,27 @@ Promise<InventoryKioskDeviceAdminState> {
 export async function startInventoryKioskPairing(
   managerUserId: string,
   rawDeviceLabel: unknown,
+  replaceExisting = false,
 ): Promise<InventoryKioskDeviceAdminState> {
   const config = await loadEnabledKioskConfig();
   const deviceLabel = normalizeDeviceLabel(rawDeviceLabel);
   const admin = createAdminClient();
   await expireStalePairings();
+
+  const { data: activeDevice, error: activeDeviceError } = await admin
+    .from('inventory_kiosk_devices')
+    .select('id')
+    .is('revoked_at', null)
+    .maybeSingle();
+  if (activeDeviceError) {
+    throw new InventoryKioskDeviceError(activeDeviceError.message, 500);
+  }
+  if (activeDevice && !replaceExisting) {
+    throw new InventoryKioskDeviceError(
+      'A Yard kiosk is already linked. Confirm that you want to replace it.',
+      409,
+    );
+  }
 
   const { error: cancelError } = await admin
     .from('inventory_kiosk_pairing_sessions')
@@ -212,6 +225,7 @@ export async function startInventoryKioskPairing(
       kiosk_user_id: config.kiosk_user_id,
       device_label: deviceLabel,
       started_by: managerUserId,
+      replaces_device_id: activeDevice?.id || null,
       status: 'active',
       expires_at: new Date(Date.now() + PAIRING_WINDOW_MS).toISOString(),
     });
@@ -354,6 +368,7 @@ export async function confirmInventoryKioskPairing(
   managerUserId: string,
   pairingId: string,
   rawConfirmationCode: unknown,
+  confirmedReplacement = false,
 ): Promise<void> {
   const confirmationCode =
     typeof rawConfirmationCode === 'string' ? rawConfirmationCode.trim() : '';
@@ -361,62 +376,36 @@ export async function confirmInventoryKioskPairing(
     throw new InventoryKioskDeviceError('Enter the six-digit code shown on the kiosk');
   }
 
-  await expireStalePairings();
-  const config = await loadEnabledKioskConfig();
-  const admin = createAdminClient();
-  const { data, error } = await admin
-    .from('inventory_kiosk_pairing_sessions')
-    .select('*')
-    .eq('id', pairingId)
-    .eq('kiosk_user_id', config.kiosk_user_id)
-    .eq('status', 'active')
-    .gt('expires_at', new Date().toISOString())
-    .maybeSingle();
+  const { error } = await createAdminClient().rpc(
+    'inventory_kiosk_confirm_device_pairing',
+    {
+      p_manager_user_id: managerUserId,
+      p_pairing_id: pairingId,
+      p_confirmation_code: confirmationCode,
+      p_confirmed_replacement: confirmedReplacement,
+    },
+  );
 
-  if (error) throw new InventoryKioskDeviceError(error.message, 500);
-  const pairing = data as PairingRow | null;
-  if (!pairing) {
+  if (!error) return;
+  if (error.message.includes('KIOSK_PAIRING_EXPIRED')) {
     throw new InventoryKioskDeviceError('This pairing window has expired', 409);
   }
-  if (
-    !pairing.confirmation_code
-    || !pairing.pairing_token_hash
-    || !codesMatch(pairing.confirmation_code, confirmationCode)
-  ) {
+  if (error.message.includes('KIOSK_PAIRING_CODE_MISMATCH')) {
     throw new InventoryKioskDeviceError('The confirmation code does not match');
   }
-
-  const { data: existingDevice, error: existingError } = await admin
-    .from('inventory_kiosk_devices')
-    .select('id')
-    .eq('pairing_session_id', pairing.id)
-    .maybeSingle();
-  if (existingError) throw new InventoryKioskDeviceError(existingError.message, 500);
-
-  if (!existingDevice) {
-    const { error: deviceError } = await admin
-      .from('inventory_kiosk_devices')
-      .insert({
-        kiosk_user_id: pairing.kiosk_user_id,
-        device_token_hash: pairing.pairing_token_hash,
-        device_label: pairing.device_label,
-        paired_by: managerUserId,
-        pairing_session_id: pairing.id,
-        last_seen_at: new Date().toISOString(),
-      });
-    if (deviceError) throw new InventoryKioskDeviceError(deviceError.message, 500);
+  if (error.message.includes('KIOSK_REPLACEMENT_CONFIRMATION_REQUIRED')) {
+    throw new InventoryKioskDeviceError(
+      'The linked Yard kiosk changed. Start replacement again and reconfirm it.',
+      409,
+    );
   }
-
-  const { error: confirmError } = await admin
-    .from('inventory_kiosk_pairing_sessions')
-    .update({
-      status: 'confirmed',
-      confirmed_by: managerUserId,
-      confirmed_at: new Date().toISOString(),
-    })
-    .eq('id', pairing.id)
-    .eq('status', 'active');
-  if (confirmError) throw new InventoryKioskDeviceError(confirmError.message, 500);
+  if (error.code === '23505') {
+    throw new InventoryKioskDeviceError(
+      'Another Yard kiosk became active. Refresh and try again.',
+      409,
+    );
+  }
+  throw new InventoryKioskDeviceError(error.message, 500);
 }
 
 export async function revokeInventoryKioskDevice(
@@ -431,6 +420,11 @@ export async function revokeInventoryKioskDevice(
     .update({
       revoked_at: nowIso,
       revoked_by: managerUserId,
+      revoked_reason: 'manager_revoked',
+      control_holder_user_id: null,
+      control_session_id: null,
+      control_acquired_at: null,
+      control_lease_expires_at: null,
     })
     .eq('id', deviceId)
     .eq('kiosk_user_id', config.kiosk_user_id)
