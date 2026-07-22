@@ -30,10 +30,12 @@ describe('InventoryKioskDevicesPanel', () => {
     render(<InventoryKioskDevicesPanel />);
 
     expect(await screen.findByText('Yard kiosk trusted devices')).toBeInTheDocument();
-    expect(screen.getByText(/No MAC address or browser fingerprint is collected/i))
-      .toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Tablet setup page' }))
-      .toHaveAttribute('href', '/yard-kiosk/install');
+    expect(screen.queryByText(/No MAC address or browser fingerprint is collected/i))
+      .not.toBeInTheDocument();
+    expect(screen.queryByText('Install the dedicated Android app'))
+      .not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Tablet setup page' }))
+      .not.toBeInTheDocument();
 
     fireEvent.change(screen.getByPlaceholderText('e.g. Yard Tablet 1'), {
       target: { value: 'Yard Tablet 1' },

@@ -16,7 +16,7 @@ Open **Inventory**. You will see three main tabs:
 
 - **Overview** - Small Tools, Minor Plant, Hardware, and Retired Items
 - **Locations** - yard, vehicle, site, and manual locations
-- **Settings** - Categories, Groups, Hardware Catalogue, and Yard Kiosks
+- **Settings** - Categories, Groups, Hardware Catalogue, and Yard Kiosk
 
 Use **Add Item**, **Add Location**, and **Set My Location** from the page actions when available.
 
@@ -422,7 +422,7 @@ Yard kiosk tablets use a trusted-device flow so stock can be collected or return
 
 ## Pair a device
 
-1. Open **Inventory** → **Settings** → **Yard Kiosks**.
+1. Open **Inventory** → **Settings** → **Yard Kiosk**.
 2. Click **Start pairing**.
 3. On the tablet, open the Yard Inventory pair page and enter the **Pairing code**.
 4. Confirm the code in Inventory Settings.

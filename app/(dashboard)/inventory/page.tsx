@@ -1060,7 +1060,7 @@ export default function InventoryPage() {
                 </TabsTrigger>
                 <TabsTrigger value="kiosk" className="gap-2">
                   <ShieldCheck className="h-4 w-4" />
-                  Yard Kiosks
+                  Yard Kiosk
                 </TabsTrigger>
               </TabsList>
             </Tabs>
