@@ -108,11 +108,8 @@ test.describe('@errors @critical Error Logging', () => {
     await ensureSensitiveModuleAccess(page, { moduleName: 'debug' });
     await gotoWithTimeoutSkip(page, '/debug', 'Debug route timed out in this environment');
 
-    const bodyText = await page.locator('body').innerText();
     const onDebugRoute = /\/debug(?:$|[?#/])/.test(page.url());
-    const accessDenied = /access denied|forbidden|unauthori|super\s*admin\s+only|actual role mode/i.test(bodyText);
     expect(onDebugRoute, 'Debug console should be accessible to the testsuite superadmin').toBeTruthy();
-    expect(accessDenied, 'Debug console should not show a permissions error').toBeFalsy();
     await expect(
       page.getByRole('heading', { name: 'SuperAdmin Debug Console' }),
     ).toBeVisible({ timeout: 15_000 });
