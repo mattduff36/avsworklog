@@ -79,13 +79,15 @@ function createDevice(isHeld: boolean) {
 
 describe('Yard kiosk manager controller', () => {
   const fetchMock = vi.fn();
+  const sendBeaconMock = vi.fn(() => true);
 
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(controlSessionId);
     vi.stubGlobal('fetch', fetchMock);
     Object.defineProperty(window.navigator, 'sendBeacon', {
       configurable: true,
-      value: vi.fn(() => true),
+      value: sendBeaconMock,
     });
   });
 
@@ -136,5 +138,26 @@ describe('Yard kiosk manager controller', () => {
     expect(await screen.findByText('You have control')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^collect/i })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Release control' })).toBeEnabled();
+  });
+
+  it('does not release control when the one-second device poll refreshes state', async () => {
+    fetchMock.mockImplementation(async () => new Response(JSON.stringify({
+      success: true,
+      device: createDevice(true),
+    }), { status: 200 }));
+
+    const view = render(<YardKioskController />);
+    expect(await screen.findByText('You have control')).toBeInTheDocument();
+
+    await waitFor(() => {
+      const getRequests = fetchMock.mock.calls.filter(
+        ([, init]) => !(init as RequestInit | undefined)?.method,
+      );
+      expect(getRequests.length).toBeGreaterThanOrEqual(2);
+    }, { timeout: 1_600 });
+    expect(sendBeaconMock).not.toHaveBeenCalled();
+
+    view.unmount();
+    expect(sendBeaconMock).toHaveBeenCalledTimes(1);
   });
 });

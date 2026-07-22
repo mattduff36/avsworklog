@@ -82,6 +82,7 @@ export function YardKioskController() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const holdsControlRef = useRef(false);
+  const activeDeviceId = device?.id ?? null;
 
   const loadState = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -127,7 +128,7 @@ export function YardKioskController() {
     operation: 'take' | 'renew' | 'release',
     quiet = false,
   ): Promise<boolean> => {
-    if (!device) return false;
+    if (!activeDeviceId) return false;
     if (!quiet) setSaving(true);
     try {
       const response = await fetch('/api/inventory/kiosk/control', {
@@ -136,7 +137,7 @@ export function YardKioskController() {
         cache: 'no-store',
         body: JSON.stringify({
           operation,
-          device_id: device.id,
+          device_id: activeDeviceId,
           control_session_id: controlSessionId,
         }),
       });
@@ -158,7 +159,7 @@ export function YardKioskController() {
     } finally {
       if (!quiet) setSaving(false);
     }
-  }, [controlSessionId, device, loadState]);
+  }, [activeDeviceId, controlSessionId, loadState]);
 
   useEffect(() => {
     if (!holdsControl) return;
@@ -169,12 +170,12 @@ export function YardKioskController() {
   }, [holdsControl, runOperation]);
 
   useEffect(() => {
-    if (!device) return;
+    if (!activeDeviceId) return;
     const releaseOnExit = () => {
       if (!holdsControlRef.current) return;
       const body = JSON.stringify({
         operation: 'release',
-        device_id: device.id,
+        device_id: activeDeviceId,
         control_session_id: controlSessionId,
       });
       navigator.sendBeacon(
@@ -187,12 +188,12 @@ export function YardKioskController() {
       window.removeEventListener('pagehide', releaseOnExit);
       releaseOnExit();
     };
-  }, [controlSessionId, device]);
+  }, [activeDeviceId, controlSessionId]);
 
   const sendAction = useCallback(async (
     action: YardKioskControlAction,
   ): Promise<void> => {
-    if (!device || !holdsControlRef.current) return;
+    if (!activeDeviceId || !holdsControlRef.current) return;
     try {
       const response = await fetch('/api/inventory/kiosk/control', {
         method: 'POST',
@@ -200,7 +201,7 @@ export function YardKioskController() {
         cache: 'no-store',
         body: JSON.stringify({
           operation: 'action',
-          device_id: device.id,
+          device_id: activeDeviceId,
           control_session_id: controlSessionId,
           control_action: action,
           idempotency_key: `${controlSessionId}:${Date.now()}:${action.type}`,
@@ -219,7 +220,7 @@ export function YardKioskController() {
       );
       await loadState(true);
     }
-  }, [controlSessionId, device, loadState]);
+  }, [activeDeviceId, controlSessionId, loadState]);
 
   const snapshot = device?.workflow_snapshot || null;
   const state = useMemo(() => getWorkflowState(snapshot), [snapshot]);
