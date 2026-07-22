@@ -2,6 +2,25 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.16.0
+
+**GIT COMMIT MESSAGE**
+`feat(inventory): add yard kiosk live control`
+
+**PUSHED AT**
+2026-07-22T23:01:47.014Z
+
+**WHAT CHANGED**
+Add yard kiosk live control.
+
+**VERSION HISTORY DETAILS**
+- Added yard kiosk live control, with changes to background routes, app screens, shared logic, automation scripts, automated tests, data storage, and documentation.
+- Updated data storage, with changes to shared typing, automation scripts, automated tests, and data storage.
+- Updated help and FAQ, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `feat(inventory): add yard kiosk live control`
+
 ## 0726.15.0
 
 **GIT COMMIT MESSAGE**

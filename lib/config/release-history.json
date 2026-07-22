@@ -1,5 +1,25 @@
 [
   {
+    "version": "0726.16.0",
+    "updateKind": "major",
+    "title": "Inventory update",
+    "description": "Added yard kiosk live control.",
+    "summary": "Added yard kiosk live control.",
+    "details": [
+      "Added yard kiosk live control, with changes to background routes, app screens, shared logic, automation scripts, automated tests, data storage, and documentation.",
+      "Updated data storage, with changes to shared typing, automation scripts, automated tests, and data storage.",
+      "Updated help and FAQ, with changes to documentation."
+    ],
+    "areas": [
+      "Inventory",
+      "Yard kiosk live control"
+    ],
+    "areaKeys": [
+      "inventory"
+    ],
+    "pushedAt": "2026-07-22T23:01:47.014Z"
+  },
+  {
     "version": "0726.15.0",
     "updateKind": "major",
     "title": "Error reporting update",
