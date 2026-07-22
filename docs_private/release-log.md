@@ -2,6 +2,26 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.15.0
+
+**GIT COMMIT MESSAGE**
+`feat(error-reports): update error reporting`
+
+**PUSHED AT**
+2026-07-22T22:23:06.779Z
+
+**WHAT CHANGED**
+Update error reporting. Preserve tablet pairing.
+
+**VERSION HISTORY DETAILS**
+- Updated inventory, with changes to shared logic, automated tests, and documentation.
+- Updated help and FAQ, with changes to documentation.
+- Updated error reporting, with changes to automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(error-reports): update error reporting`
+- `fix(yard-kiosk): preserve tablet pairing`
+
 ## 0726.14.0
 
 **GIT COMMIT MESSAGE**

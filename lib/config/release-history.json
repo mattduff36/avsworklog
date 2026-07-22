@@ -1,5 +1,24 @@
 [
   {
+    "version": "0726.15.0",
+    "updateKind": "major",
+    "title": "Error reporting update",
+    "description": "Updated error reporting. Preserve tablet pairing.",
+    "summary": "Updated error reporting. Preserve tablet pairing.",
+    "details": [
+      "Updated inventory, with changes to shared logic, automated tests, and documentation.",
+      "Updated help and FAQ, with changes to documentation.",
+      "Updated error reporting, with changes to automated tests."
+    ],
+    "areas": [
+      "Error reporting. Preserve tablet pairing"
+    ],
+    "areaKeys": [
+      "error-reporting"
+    ],
+    "pushedAt": "2026-07-22T22:23:06.779Z"
+  },
+  {
     "version": "0726.14.0",
     "updateKind": "major",
     "title": "Inventory update",
