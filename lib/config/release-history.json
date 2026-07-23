@@ -1,5 +1,22 @@
 [
   {
+    "version": "0726.19.0",
+    "updateKind": "major",
+    "title": "Inventory update",
+    "description": "Updated inventory.",
+    "summary": "Updated inventory.",
+    "details": [
+      "Updated inventory, with changes to app screens and automated tests."
+    ],
+    "areas": [
+      "Inventory"
+    ],
+    "areaKeys": [
+      "inventory"
+    ],
+    "pushedAt": "2026-07-23T14:38:37.644Z"
+  },
+  {
     "version": "0726.18.0",
     "updateKind": "major",
     "title": "Inventory update",

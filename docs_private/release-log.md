@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.19.0
+
+**GIT COMMIT MESSAGE**
+`feat(inventory): update inventory`
+
+**PUSHED AT**
+2026-07-23T14:38:37.644Z
+
+**WHAT CHANGED**
+Update inventory.
+
+**VERSION HISTORY DETAILS**
+- Updated inventory, with changes to app screens and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(inventory): update inventory`
+
 ## 0726.18.0
 
 **GIT COMMIT MESSAGE**
