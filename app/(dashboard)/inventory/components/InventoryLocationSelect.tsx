@@ -75,7 +75,8 @@ function getMobilePickerViewportStyle(isInsideDialog: boolean): CSSProperties {
   const visibleHeight = Math.max(0, viewportHeight - (MOBILE_PICKER_MARGIN_PX * 2));
 
   return {
-    position: isInsideDialog ? 'absolute' : 'fixed',
+    position: 'absolute',
+    zIndex: 1,
     top: `${(isInsideDialog ? 0 : viewportTop) + MOBILE_PICKER_MARGIN_PX}px`,
     left: `${(isInsideDialog ? 0 : viewportLeft) + MOBILE_PICKER_MARGIN_PX}px`,
     width: `${visibleWidth}px`,
@@ -393,6 +394,9 @@ export function InventoryLocationSelect({
               role="option"
               data-location-type={option.location?.location_type}
               aria-selected={option.value === value}
+              onPointerDown={(event) => {
+                if (event.pointerType !== 'mouse') event.preventDefault();
+              }}
               onClick={() => handleSelect(option)}
               className={cn(
                 'flex min-h-11 w-full items-center gap-2 rounded-sm border border-transparent px-3 py-2 text-left text-sm hover:bg-slate-800 focus:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-inventory/60',
@@ -470,11 +474,17 @@ export function InventoryLocationSelect({
         </PopoverContent>
       ) : null}
       {open && isMobilePicker && mobilePickerPortalHost ? createPortal(
-        <>
+        <div
+          data-mobile-location-picker-layer="true"
+          data-mobile-scroll-lock="true"
+          className={cn('inset-0', isMobilePickerInsideDialog ? 'absolute' : 'fixed')}
+          style={{ zIndex: 220 }}
+        >
           <div
             aria-hidden="true"
             data-mobile-scroll-lock="true"
-            className={cn('inset-0 z-[218] bg-black/70', isMobilePickerInsideDialog ? 'absolute' : 'fixed')}
+            className="absolute inset-0 bg-black/70"
+            style={{ zIndex: 0 }}
             onPointerDown={() => handleOpenChange(false)}
           />
           <div
@@ -487,7 +497,7 @@ export function InventoryLocationSelect({
           >
             {pickerContent}
           </div>
-        </>,
+        </div>,
         mobilePickerPortalHost,
       ) : null}
     </Popover>

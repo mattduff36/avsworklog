@@ -124,8 +124,10 @@ test.describe('@inventory Inventory mobile dialogs', () => {
     expect(saveButtonBox?.height || 0, 'Mobile dialog actions should be at least 44px high')
       .toBeGreaterThanOrEqual(44);
 
-    await locationDialog.getByRole('combobox').click();
-    await expect(page.getByRole('dialog', { name: 'Choose inventory location' })).toBeVisible();
+    const locationTrigger = locationDialog.getByRole('combobox');
+    await locationTrigger.click();
+    const locationPicker = page.getByRole('dialog', { name: 'Choose inventory location' });
+    await expect(locationPicker).toBeVisible();
     const searchInput = page.getByLabel(/search locations/i);
     await expect(searchInput).toBeVisible();
     const searchFontSize = await searchInput.evaluate(
@@ -133,5 +135,10 @@ test.describe('@inventory Inventory mobile dialogs', () => {
     );
     expect(searchFontSize, 'Mobile inputs should stay at 16px to avoid iOS focus zoom')
       .toBeGreaterThanOrEqual(16);
+
+    await locationPicker.getByRole('option').first().tap();
+    await expect(locationPicker).toBeHidden();
+    await expect(locationTrigger).not.toContainText(/select location/i);
+    await expect(saveButton).toBeEnabled();
   });
 });

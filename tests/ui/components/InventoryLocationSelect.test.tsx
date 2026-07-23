@@ -146,7 +146,10 @@ describe('InventoryLocationSelect', () => {
     fireEvent.click(screen.getByRole('combobox'));
     const picker = await screen.findByRole('dialog', { name: 'Choose inventory location' });
     expect(picker).toHaveAttribute('data-mobile-scroll-lock', 'true');
-    expect(picker.style.position).toBe('fixed');
+    expect(picker.style.position).toBe('absolute');
+    expect(picker.style.zIndex).toBe('1');
+    expect(picker.parentElement).toHaveAttribute('data-mobile-location-picker-layer', 'true');
+    expect(picker.parentElement?.style.zIndex).toBe('220');
     expect(picker.style.height).toContain('484px');
     expect(screen.getByRole('listbox', { name: 'Inventory locations' }))
       .toHaveAttribute('data-mobile-scroll-lock', 'true');
@@ -157,5 +160,34 @@ describe('InventoryLocationSelect', () => {
     await waitFor(() => {
       expect(picker.style.height).toContain('304px');
     });
+  });
+
+  it('keeps touch selection stable while the mobile keyboard is open', async () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({
+      matches: true,
+      media: '(max-width: 639px)',
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })));
+
+    render(<RichLocationSelectHarness />);
+
+    fireEvent.click(screen.getByRole('combobox'));
+    const option = await screen.findByRole('option', {
+      name: /\[FE24 TYH - Jeff Mark\] - Matt Duffill.*VAN.*FE24 TYH.*Matt Duffill/i,
+    });
+
+    expect(fireEvent.pointerDown(option, { pointerType: 'touch' })).toBe(false);
+    fireEvent.click(option);
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Choose inventory location' }))
+        .not.toBeInTheDocument();
+    });
+    expect(screen.getByRole('combobox')).toHaveTextContent('VAN · FE24 TYH · Matt Duffill');
   });
 });
