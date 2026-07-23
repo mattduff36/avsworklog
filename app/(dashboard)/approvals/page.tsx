@@ -58,6 +58,7 @@ import {
 import { isClientSessionPausedError } from '@/lib/app-auth/session-error';
 import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 import {
+  canLoadApprovalsFilterDirectory,
   getApprovalsTimesheetStatuses,
   getApprovalsDefaultStatusFilters,
   shouldIncludeTimesheetInAllSubmittedFilter,
@@ -126,6 +127,10 @@ function ApprovalsContent() {
   const hasAccountsVisibilityOverride = hasAccountsTimesheetFullVisibilityOverride(
     absenceSecondarySnapshot?.role_name,
     absenceSecondarySnapshot?.team_name
+  );
+  const canLoadFilterDirectory = canLoadApprovalsFilterDirectory(
+    canViewApprovals,
+    absenceSecondarySnapshot?.role_tier
   );
   const isAdminTier = Boolean(isAdmin || isSuperAdmin || hasAccountsVisibilityOverride);
   const activeTab: ApprovalsTab = tabParam === 'absences' ? 'absences' : 'timesheets';
@@ -313,7 +318,11 @@ function ApprovalsContent() {
   }, [filteredEmployeeOptions, selectedEmployeeId]);
 
   useEffect(() => {
-    if (!canViewApprovals) return;
+    if (!canLoadFilterDirectory) {
+      setEmployees([]);
+      setEmployeesLoading(false);
+      return;
+    }
     let isMounted = true;
 
     async function loadEmployees() {
@@ -332,6 +341,10 @@ function ApprovalsContent() {
           }))
         );
       } catch (error) {
+        if (isAuthErrorStatus(getErrorStatus(error))) {
+          if (isMounted) setEmployees([]);
+          return;
+        }
         const errorContextId = 'approvals-load-filters-error';
         console.error('Error loading approvals filters:', error, { errorContextId });
         if (isMounted) {
@@ -349,7 +362,7 @@ function ApprovalsContent() {
     return () => {
       isMounted = false;
     };
-  }, [canViewApprovals]);
+  }, [canLoadFilterDirectory]);
 
   const scopedAbsences = useMemo(() => {
     if (!canAuthoriseBookings) return [] as AbsenceWithRelations[];

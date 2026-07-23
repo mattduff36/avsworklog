@@ -1,10 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import {
+  canLoadApprovalsFilterDirectory,
   getApprovalsTimesheetStatuses,
   getApprovalsDefaultStatusFilters,
   isAccountsTeam,
   shouldIncludeTimesheetInAllSubmittedFilter,
 } from '@/lib/utils/approvals-filters';
+
+describe('canLoadApprovalsFilterDirectory', () => {
+  it('loads employee filters only for directory-authorized approval roles', () => {
+    expect(canLoadApprovalsFilterDirectory(true, 'admin')).toBe(true);
+    expect(canLoadApprovalsFilterDirectory(true, 'manager')).toBe(true);
+    expect(canLoadApprovalsFilterDirectory(true, 'supervisor')).toBe(true);
+    expect(canLoadApprovalsFilterDirectory(true, 'employee')).toBe(false);
+  });
+
+  it('does not load filters before approvals access and role scope are known', () => {
+    expect(canLoadApprovalsFilterDirectory(false, 'manager')).toBe(false);
+    expect(canLoadApprovalsFilterDirectory(true, null)).toBe(false);
+  });
+});
 
 describe('getApprovalsDefaultStatusFilters', () => {
   it('uses the Accounts defaults for Accounts team members', () => {

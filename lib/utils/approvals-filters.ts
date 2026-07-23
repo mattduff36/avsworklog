@@ -1,5 +1,6 @@
 import type { AbsenceStatusFilter, TimesheetStatusFilter } from '@/types/common';
 import type { Timesheet } from '@/types/timesheet';
+import type { AbsenceSecondaryRoleTier } from '@/types/absence-permissions';
 
 export interface ApprovalsDefaultStatusFilters {
   timesheets: TimesheetStatusFilter;
@@ -28,6 +29,17 @@ export function getApprovalsDefaultStatusFilters(
 
 export function shouldIncludeTimesheetInAllSubmittedFilter(status: string): boolean {
   return status.trim().toLowerCase() !== 'draft';
+}
+
+export function canLoadApprovalsFilterDirectory(
+  canViewApprovals: boolean,
+  roleTier: AbsenceSecondaryRoleTier | null | undefined
+): boolean {
+  return Boolean(
+    canViewApprovals &&
+    roleTier &&
+    roleTier !== 'employee'
+  );
 }
 
 const APPROVALS_TIMESHEET_STATUS_MAP: Record<TimesheetStatusFilter, readonly Timesheet['status'][]> = {
