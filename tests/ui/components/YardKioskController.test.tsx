@@ -110,6 +110,10 @@ describe('Yard kiosk manager controller', () => {
     render(<YardKioskController />);
 
     expect(await screen.findByText('Read-only mirror')).toBeInTheDocument();
+    expect(screen.getByTestId('yard-kiosk-virtual-screen')).toHaveClass(
+      'h-[600px]',
+      'w-[1024px]',
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Take control' }));
 
     await waitFor(() => {

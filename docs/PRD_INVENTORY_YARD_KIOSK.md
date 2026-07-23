@@ -220,6 +220,9 @@ active Inventory location.
 - Inventory managers open `/inventory/kiosk-control` from Inventory Settings.
   It shows a structured state-synchronised replica of the single linked tablet,
   not a video stream, with a target delay of one to two seconds.
+- The replica uses the same fixed 1024 by 600 pixel design viewport as the
+  physical kiosk. Narrow manager pages scroll the replica horizontally instead
+  of stretching or reflowing its internal layout.
 - The replica opens read-only. **Take control** acquires one short renewable
   lease. Only the lease holder may send validated, size-bounded, idempotent
   control actions; a second manager cannot take over an unexpired lease.

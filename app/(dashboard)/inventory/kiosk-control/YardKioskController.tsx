@@ -377,7 +377,10 @@ export function YardKioskController() {
       ) : null}
 
       <div className="overflow-x-auto rounded-2xl border border-white/10 bg-slate-950 p-3 shadow-2xl">
-        <div className="mx-auto grid h-[600px] min-w-[1024px] max-w-[1200px] grid-rows-[4.75rem_1fr] overflow-hidden rounded-xl bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.12),_transparent_32%),linear-gradient(135deg,#020617_0%,#0f172a_52%,#111827_100%)] text-white">
+        <div
+          data-testid="yard-kiosk-virtual-screen"
+          className="mx-auto grid h-[600px] w-[1024px] shrink-0 grid-rows-[4.75rem_1fr] overflow-hidden rounded-xl bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.12),_transparent_32%),linear-gradient(135deg,#020617_0%,#0f172a_52%,#111827_100%)] text-white"
+        >
           {!device || !snapshot || !state ? (
             <div className="col-span-full row-span-full grid place-items-center p-8 text-center">
               <div>
