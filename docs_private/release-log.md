@@ -2,6 +2,27 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.18.0
+
+**GIT COMMIT MESSAGE**
+`feat(inventory): update Inventory and Navigation`
+
+**PUSHED AT**
+2026-07-23T14:15:45.128Z
+
+**WHAT CHANGED**
+Update Inventory and Navigation. Harden mobile layouts. Match kiosk replica resolution.
+
+**VERSION HISTORY DETAILS**
+- Updated Inventory and Navigation, with changes to app screens, automated tests, and documentation.
+- Updated navigation, with changes to interface components.
+- Updated help and FAQ, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `feat(inventory): update Inventory and Navigation`
+- `fix(inventory): harden mobile layouts`
+- `fix(inventory): match kiosk replica resolution`
+
 ## 0726.17.1
 
 **GIT COMMIT MESSAGE**

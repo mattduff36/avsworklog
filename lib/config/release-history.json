@@ -1,5 +1,25 @@
 [
   {
+    "version": "0726.18.0",
+    "updateKind": "major",
+    "title": "Inventory update",
+    "description": "Updated Inventory and Navigation. Harden mobile layouts. Match kiosk replica resolution.",
+    "summary": "Updated Inventory and Navigation. Harden mobile layouts. Match kiosk replica resolution.",
+    "details": [
+      "Updated Inventory and Navigation, with changes to app screens, automated tests, and documentation.",
+      "Updated navigation, with changes to interface components.",
+      "Updated help and FAQ, with changes to documentation."
+    ],
+    "areas": [
+      "Inventory",
+      "Navigation. Harden mobile layouts. Match kiosk replica resolution"
+    ],
+    "areaKeys": [
+      "inventory"
+    ],
+    "pushedAt": "2026-07-23T14:15:45.128Z"
+  },
+  {
     "version": "0726.17.1",
     "updateKind": "minor",
     "title": "Inventory guidance update",
