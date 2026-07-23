@@ -2,6 +2,25 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.16.1
+
+**GIT COMMIT MESSAGE**
+`fix(inventory): retain yard kiosk control lease`
+
+**PUSHED AT**
+2026-07-23T00:02:55.587Z
+
+**WHAT CHANGED**
+Simplify yard kiosk settings. Retain yard kiosk control lease.
+
+**VERSION HISTORY DETAILS**
+- Simplify yard kiosk settings, with changes to app screens, automation scripts, and automated tests.
+- Updated help and FAQ, with changes to automation scripts.
+
+**COMMITS IN THIS RELEASE**
+- `refactor(inventory): simplify yard kiosk settings`
+- `fix(inventory): retain yard kiosk control lease`
+
 ## 0726.16.0
 
 **GIT COMMIT MESSAGE**

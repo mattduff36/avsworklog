@@ -1,5 +1,23 @@
 [
   {
+    "version": "0726.16.1",
+    "updateKind": "minor",
+    "title": "Inventory improvements",
+    "description": "Simplify yard kiosk settings. Retain yard kiosk control lease.",
+    "summary": "Simplify yard kiosk settings. Retain yard kiosk control lease.",
+    "details": [
+      "Simplify yard kiosk settings, with changes to app screens, automation scripts, and automated tests.",
+      "Updated help and FAQ, with changes to automation scripts."
+    ],
+    "areas": [
+      "Inventory"
+    ],
+    "areaKeys": [
+      "inventory"
+    ],
+    "pushedAt": "2026-07-23T00:02:55.587Z"
+  },
+  {
     "version": "0726.16.0",
     "updateKind": "major",
     "title": "Inventory update",
