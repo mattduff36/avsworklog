@@ -1,5 +1,22 @@
 [
   {
+    "version": "0726.19.1",
+    "updateKind": "minor",
+    "title": "Help and FAQ improvements",
+    "description": "Collapse version history by default.",
+    "summary": "Collapse version history by default.",
+    "details": [
+      "Collapse version history by default, with changes to app screens."
+    ],
+    "areas": [
+      "Help and FAQ"
+    ],
+    "areaKeys": [
+      "help"
+    ],
+    "pushedAt": "2026-07-23T19:42:59.855Z"
+  },
+  {
     "version": "0726.19.0",
     "updateKind": "major",
     "title": "Inventory update",

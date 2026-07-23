@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.19.1
+
+**GIT COMMIT MESSAGE**
+`fix(help): collapse version history by default`
+
+**PUSHED AT**
+2026-07-23T19:42:59.855Z
+
+**WHAT CHANGED**
+Collapse version history by default.
+
+**VERSION HISTORY DETAILS**
+- Collapse version history by default, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `fix(help): collapse version history by default`
+
 ## 0726.19.0
 
 **GIT COMMIT MESSAGE**
