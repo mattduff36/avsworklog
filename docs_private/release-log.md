@@ -2,6 +2,25 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.17.0
+
+**GIT COMMIT MESSAGE**
+`feat(inventory): update Inventory, Help and FAQ, and Data storage`
+
+**PUSHED AT**
+2026-07-23T13:20:35.895Z
+
+**WHAT CHANGED**
+Update Inventory, Help and FAQ, and Data storage.
+
+**VERSION HISTORY DETAILS**
+- Updated Inventory, Help and FAQ, and Data storage, with changes to background routes, app screens, shared logic, automated tests, data storage, and documentation.
+- Updated data storage, with changes to data storage.
+- Updated help and FAQ, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `feat(inventory): update Inventory, Help and FAQ, and Data storage`
+
 ## 0726.16.2
 
 **GIT COMMIT MESSAGE**

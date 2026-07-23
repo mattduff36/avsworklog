@@ -1,5 +1,28 @@
 [
   {
+    "version": "0726.17.0",
+    "updateKind": "major",
+    "title": "Inventory update",
+    "description": "Updated Inventory, Help and FAQ, and Data storage.",
+    "summary": "Updated Inventory, Help and FAQ, and Data storage.",
+    "details": [
+      "Updated Inventory, Help and FAQ, and Data storage, with changes to background routes, app screens, shared logic, automated tests, data storage, and documentation.",
+      "Updated data storage, with changes to data storage.",
+      "Updated help and FAQ, with changes to documentation."
+    ],
+    "areas": [
+      "Inventory",
+      "Help",
+      "FAQ",
+      "Data storage"
+    ],
+    "areaKeys": [
+      "inventory",
+      "data-storage"
+    ],
+    "pushedAt": "2026-07-23T13:20:35.895Z"
+  },
+  {
     "version": "0726.16.2",
     "updateKind": "minor",
     "title": "Approvals improvements",
