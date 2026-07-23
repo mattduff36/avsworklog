@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.16.2
+
+**GIT COMMIT MESSAGE**
+`fix(approvals): avoid forbidden directory filters`
+
+**PUSHED AT**
+2026-07-23T10:43:47.626Z
+
+**WHAT CHANGED**
+Avoid forbidden directory filters.
+
+**VERSION HISTORY DETAILS**
+- Avoid forbidden directory filters, with changes to app screens, shared logic, and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(approvals): avoid forbidden directory filters`
+
 ## 0726.16.1
 
 **GIT COMMIT MESSAGE**

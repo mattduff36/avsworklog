@@ -1,5 +1,22 @@
 [
   {
+    "version": "0726.16.2",
+    "updateKind": "minor",
+    "title": "Approvals improvements",
+    "description": "Avoid forbidden directory filters.",
+    "summary": "Avoid forbidden directory filters.",
+    "details": [
+      "Avoid forbidden directory filters, with changes to app screens, shared logic, and automated tests."
+    ],
+    "areas": [
+      "Approvals"
+    ],
+    "areaKeys": [
+      "approvals"
+    ],
+    "pushedAt": "2026-07-23T10:43:47.626Z"
+  },
+  {
     "version": "0726.16.1",
     "updateKind": "minor",
     "title": "Inventory improvements",
