@@ -56,6 +56,11 @@ interface YardKioskItemPickerProps {
   ) => void;
 }
 
+function getYardKioskCategoryLabel(category: Pick<YardKioskCategory, 'slug' | 'name'>): string {
+  if (category.slug === 'van_stock') return 'Small Tools';
+  return category.name;
+}
+
 function chunkItemPages(
   category: string,
   title: string,
@@ -94,7 +99,10 @@ export function YardKioskItemPicker({
   const quantity = uiState.hardware_quantity;
 
   const categoryLabels = useMemo(
-    () => new Map(categories.map((category) => [category.slug, category.name])),
+    () => new Map(categories.map((category) => [
+      category.slug,
+      getYardKioskCategoryLabel(category),
+    ])),
     [categories],
   );
 
@@ -217,7 +225,7 @@ export function YardKioskItemPicker({
                   : 'border border-white/10 bg-white/5 text-slate-300'
               }`}
             >
-              {category.name}
+              {getYardKioskCategoryLabel(category)}
             </button>
           ))}
         </div>

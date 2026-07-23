@@ -8,6 +8,7 @@ import { YardKioskBasket } from '@/app/yard-kiosk/components/YardKioskBasket';
 import { YardKioskItemPicker } from '@/app/yard-kiosk/components/YardKioskItemPicker';
 import type {
   YardKioskBasketLine,
+  YardKioskCategory,
   YardKioskStockItem,
 } from '@/lib/inventory/kiosk-types';
 import type { YardKioskItemUiState } from '@/lib/inventory/kiosk-remote-types';
@@ -37,9 +38,19 @@ function makeHardwareItem(index: number): YardKioskStockItem {
 interface ControlledPickerProps {
   items: YardKioskStockItem[];
   basket?: YardKioskBasketLine[];
+  categories?: YardKioskCategory[];
 }
 
-function ControlledPicker({ items, basket = [] }: ControlledPickerProps) {
+const DEFAULT_CATEGORIES: YardKioskCategory[] = [
+  { id: 'tools', slug: 'tools', name: 'Tools', sort_order: 1 },
+  { id: 'plant', slug: 'plant', name: 'Minor Plant', sort_order: 2 },
+];
+
+function ControlledPicker({
+  items,
+  basket = [],
+  categories = DEFAULT_CATEGORIES,
+}: ControlledPickerProps) {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('all');
   const [uiState, setUiState] = useState<YardKioskItemUiState>({
@@ -50,10 +61,7 @@ function ControlledPicker({ items, basket = [] }: ControlledPickerProps) {
 
   return (
     <YardKioskItemPicker
-      categories={[
-        { id: 'tools', slug: 'tools', name: 'Tools', sort_order: 1 },
-        { id: 'plant', slug: 'plant', name: 'Minor Plant', sort_order: 2 },
-      ]}
+      categories={categories}
       items={items}
       basket={basket}
       searchQuery={query}
@@ -76,6 +84,23 @@ function ControlledPicker({ items, basket = [] }: ControlledPickerProps) {
 }
 
 describe('Yard kiosk item result threshold', () => {
+  it('labels the Van Stock category as Small Tools', () => {
+    render(
+      <ControlledPicker
+        items={[makeSerializedItem(1, 'van_stock')]}
+        categories={[{
+          id: 'van-stock',
+          slug: 'van_stock',
+          name: 'Van Stock',
+          sort_order: 1,
+        }]}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Small Tools' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Van Stock' })).not.toBeInTheDocument();
+  });
+
   it('suppresses tiles and pagination above 24 matches', () => {
     render(
       <ControlledPicker
