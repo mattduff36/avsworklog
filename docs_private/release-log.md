@@ -2,6 +2,26 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.17.1
+
+**GIT COMMIT MESSAGE**
+`docs(inventory): align secondary location guidance`
+
+**PUSHED AT**
+2026-07-23T13:25:54.834Z
+
+**WHAT CHANGED**
+Label kiosk tab small tools. Align secondary location guidance.
+
+**VERSION HISTORY DETAILS**
+- Updated help and FAQ, with changes to automation scripts, data storage, and documentation.
+- Label kiosk tab small tools, with changes to automation scripts and documentation.
+- Updated data storage, with changes to data storage.
+
+**COMMITS IN THIS RELEASE**
+- `fix(inventory): label kiosk tab small tools`
+- `docs(inventory): align secondary location guidance`
+
 ## 0726.17.0
 
 **GIT COMMIT MESSAGE**

@@ -1,5 +1,24 @@
 [
   {
+    "version": "0726.17.1",
+    "updateKind": "minor",
+    "title": "Inventory guidance update",
+    "description": "Label kiosk tab small tools. Align secondary location guidance.",
+    "summary": "Label kiosk tab small tools. Align secondary location guidance.",
+    "details": [
+      "Updated help and FAQ, with changes to automation scripts, data storage, and documentation.",
+      "Label kiosk tab small tools, with changes to automation scripts and documentation.",
+      "Updated data storage, with changes to data storage."
+    ],
+    "areas": [
+      "Inventory"
+    ],
+    "areaKeys": [
+      "inventory"
+    ],
+    "pushedAt": "2026-07-23T13:25:54.834Z"
+  },
+  {
     "version": "0726.17.0",
     "updateKind": "major",
     "title": "Inventory update",
