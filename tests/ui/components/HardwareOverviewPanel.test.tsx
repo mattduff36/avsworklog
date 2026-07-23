@@ -185,7 +185,7 @@ describe('HardwareOverviewPanel', () => {
     fireEvent.click(within(balances).getByRole('button', { name: 'Move' }));
 
     const dialog = screen.getByRole('dialog');
-    expect(dialog).toHaveClass('max-w-3xl');
+    expect(dialog).toHaveClass('sm:max-w-3xl');
     expect(within(dialog).getByRole('combobox', { name: 'Hardware item' })).toHaveTextContent('Cones');
     expect(within(dialog).getByRole('button', { name: 'Source location' })).toHaveTextContent('Yard');
     expect(within(dialog).queryByLabelText(/note/i)).not.toBeInTheDocument();

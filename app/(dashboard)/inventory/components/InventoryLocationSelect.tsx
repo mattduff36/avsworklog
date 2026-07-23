@@ -76,11 +76,11 @@ function getMobilePickerViewportStyle(isInsideDialog: boolean): CSSProperties {
 
   return {
     position: isInsideDialog ? 'absolute' : 'fixed',
-    top: `calc(${(isInsideDialog ? 0 : viewportTop) + MOBILE_PICKER_MARGIN_PX}px + env(safe-area-inset-top, 0px))`,
-    left: `calc(${(isInsideDialog ? 0 : viewportLeft) + MOBILE_PICKER_MARGIN_PX}px + env(safe-area-inset-left, 0px))`,
-    width: `calc(${visibleWidth}px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))`,
-    height: `calc(${visibleHeight}px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))`,
-    maxHeight: `calc(${visibleHeight}px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))`,
+    top: `${(isInsideDialog ? 0 : viewportTop) + MOBILE_PICKER_MARGIN_PX}px`,
+    left: `${(isInsideDialog ? 0 : viewportLeft) + MOBILE_PICKER_MARGIN_PX}px`,
+    width: `${visibleWidth}px`,
+    height: `${visibleHeight}px`,
+    maxHeight: `${visibleHeight}px`,
   };
 }
 

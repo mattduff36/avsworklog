@@ -715,11 +715,13 @@ input[type="date"]::-webkit-datetime-edit-year-field {
     font-size: 16px;
   }
 
+  html:has(.inventory-mobile-ui) .h-9 { height: 2.75rem !important; }
   html:has(.inventory-mobile-ui) .h-10 { height: 2.75rem !important; }
   html:has(.inventory-mobile-ui) .h-11 { height: 2.75rem !important; }
   html:has(.inventory-mobile-ui) .h-12 { height: 3rem !important; }
   html:has(.inventory-mobile-ui) .h-14 { height: 3.5rem !important; }
   html:has(.inventory-mobile-ui) .min-h-11 { min-height: 2.75rem !important; }
+  html:has(.inventory-mobile-ui) .w-9 { width: 2.75rem !important; }
   html:has(.inventory-mobile-ui) .w-11 { width: 2.75rem !important; }
 
   html:has(.inventory-mobile-ui) .text-xs { font-size: 0.75rem !important; }
