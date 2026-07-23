@@ -8,6 +8,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  dialogContentViewportClassName,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -137,17 +138,28 @@ export function MoveInventoryDialog({
 
   return (
     <>
-    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen && !saving && !savingCheck) onClose(); }}>
-      <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto bg-slate-900 text-white border-slate-700">
-        <form onSubmit={handleSubmit}>
-          <DialogHeader>
+    <Dialog open={open && !checkingItem} onOpenChange={(isOpen) => { if (!isOpen && !saving && !savingCheck && !checkingItem) onClose(); }}>
+      <DialogContent
+        mobileKeyboardSafe
+        data-keyboard-safe-dialog="true"
+        className={dialogContentViewportClassName({
+          size: 'lg',
+          scroll: 'content',
+          className: 'top-0 h-[100dvh] max-h-none w-screen max-w-none translate-y-0 gap-0 rounded-none border-slate-700 bg-slate-900 p-0 text-white sm:top-1/2 sm:h-auto sm:max-h-[calc(100dvh-1rem)] sm:w-[calc(100vw-1rem)] sm:max-w-lg sm:-translate-y-1/2 sm:rounded-xl',
+        })}
+      >
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <DialogHeader className="shrink-0 px-6 pb-4 pt-[max(1.25rem,env(safe-area-inset-top))] sm:pt-6">
             <DialogTitle>{isBulkMove ? `Move ${items.length} Items` : 'Move Inventory Item'}</DialogTitle>
             <DialogDescription className="text-muted-foreground">
               Select the new location bucket. The move will be written to the item movement history.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4 py-4">
+          <div
+            data-mobile-scroll-lock="true"
+            className="grid min-h-0 flex-1 gap-4 overflow-y-auto overscroll-contain px-6 py-4"
+          >
             {!isBulkMove && items[0] ? (
               <div className="rounded-md border border-slate-700 bg-slate-800/60 p-3 text-sm">
                 <div className="font-medium text-white">{items[0].name}</div>
@@ -224,7 +236,7 @@ export function MoveInventoryDialog({
                         size="sm"
                         variant="outline"
                         onClick={() => setCheckingItem(item)}
-                        className="shrink-0 border-amber-400/40 text-amber-100 hover:bg-amber-500/10"
+                        className="min-h-11 shrink-0 border-amber-400/40 text-amber-100 hover:bg-amber-500/10"
                       >
                         Check Now
                       </Button>
@@ -235,7 +247,7 @@ export function MoveInventoryDialog({
             ) : null}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="shrink-0 border-t border-slate-700 px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:pb-6">
             <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
               Cancel
             </Button>

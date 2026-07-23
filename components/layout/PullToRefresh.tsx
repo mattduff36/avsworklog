@@ -3,8 +3,38 @@
 import { useEffect, useState, useRef } from 'react';
 import { RefreshCw } from 'lucide-react';
 
+const PULL_THRESHOLD = 80;
+const FOCUSED_FORM_CONTROL_SELECTOR = [
+  'input:not([type="hidden"])',
+  'textarea',
+  'select',
+  'button',
+  '[contenteditable]:not([contenteditable="false"])',
+  '[role="textbox"]',
+  '[role="combobox"]',
+  '[role="spinbutton"]',
+].join(',');
+
 function isInsideMobileScrollLock(target: EventTarget | null): boolean {
   return target instanceof Element && Boolean(target.closest('[data-mobile-scroll-lock="true"]'));
+}
+
+function isFormControlFocused(): boolean {
+  const activeElement = document.activeElement;
+  return activeElement instanceof Element
+    && Boolean(activeElement.closest(FOCUSED_FORM_CONTROL_SELECTOR));
+}
+
+function hasOpenMobileScrollLock(): boolean {
+  return Boolean(document.querySelector(
+    '[data-mobile-scroll-lock="true"]:not([data-state="closed"]):not([hidden]):not([aria-hidden="true"])',
+  ));
+}
+
+function shouldIgnorePullToRefresh(target: EventTarget | null): boolean {
+  return isFormControlFocused()
+    || isInsideMobileScrollLock(target)
+    || hasOpenMobileScrollLock();
 }
 
 export function PullToRefresh() {
@@ -16,7 +46,6 @@ export function PullToRefresh() {
   const isPulling = useRef(false);
   const pullDistanceRef = useRef(0);
   const isRefreshingRef = useRef(false);
-  const threshold = 80; // Distance in pixels to trigger refresh
 
   // Sync refs with state
   useEffect(() => {
@@ -42,22 +71,37 @@ export function PullToRefresh() {
     // Only enable pull-to-refresh in PWA mode
     if (!isPWA) return;
 
+    const resetPullGesture = () => {
+      touchStartY.current = null;
+      touchCurrentY.current = null;
+      isPulling.current = false;
+      pullDistanceRef.current = 0;
+      setPullDistance(0);
+    };
+
     const handleTouchStart = (e: TouchEvent) => {
-      if (isInsideMobileScrollLock(e.target)) {
-        touchStartY.current = null;
-        isPulling.current = false;
+      if (shouldIgnorePullToRefresh(e.target)) {
+        resetPullGesture();
         return;
       }
 
       // Only trigger if at the top of the page
       if (window.scrollY === 0) {
         touchStartY.current = e.touches[0].clientY;
+        touchCurrentY.current = null;
         isPulling.current = true;
+        pullDistanceRef.current = 0;
+        setPullDistance(0);
+      } else {
+        resetPullGesture();
       }
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (isInsideMobileScrollLock(e.target)) return;
+      if (shouldIgnorePullToRefresh(e.target)) {
+        resetPullGesture();
+        return;
+      }
       if (!isPulling.current || touchStartY.current === null) return;
 
       touchCurrentY.current = e.touches[0].clientY;
@@ -67,19 +111,25 @@ export function PullToRefresh() {
       if (distance > 0 && window.scrollY === 0) {
         // Prevent default scroll behavior
         e.preventDefault();
+        pullDistanceRef.current = distance;
         setPullDistance(distance);
       } else {
         // Reset if scrolling up or page has scrolled
-        isPulling.current = false;
-        setPullDistance(0);
+        resetPullGesture();
       }
     };
 
-    const handleTouchEnd = () => {
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (shouldIgnorePullToRefresh(e.target)) {
+        resetPullGesture();
+        return;
+      }
+
       const currentDistance = pullDistanceRef.current;
       const refreshing = isRefreshingRef.current;
       
-      if (currentDistance >= threshold && !refreshing) {
+      if (currentDistance >= PULL_THRESHOLD && !refreshing) {
+        isRefreshingRef.current = true;
         setIsRefreshing(true);
         // Trigger refresh after a short delay to show the animation
         setTimeout(() => {
@@ -87,6 +137,7 @@ export function PullToRefresh() {
         }, 300);
       } else {
         // Reset if threshold not reached
+        pullDistanceRef.current = 0;
         setPullDistance(0);
       }
       isPulling.current = false;
@@ -110,9 +161,9 @@ export function PullToRefresh() {
   if (!isPWA) return null;
 
   // Calculate rotation and opacity based on pull distance
-  const rotation = Math.min(pullDistance / threshold * 360, 360);
-  const opacity = Math.min(pullDistance / threshold, 1);
-  const translateY = Math.min(pullDistance * 0.5, threshold * 0.5);
+  const rotation = Math.min(pullDistance / PULL_THRESHOLD * 360, 360);
+  const opacity = Math.min(pullDistance / PULL_THRESHOLD, 1);
+  const translateY = Math.min(pullDistance * 0.5, PULL_THRESHOLD * 0.5);
 
   return (
     <div

@@ -129,19 +129,19 @@ export function InventoryGroupsPanel({
             groups.map((group) => (
               <div key={group.id} className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <div className="font-semibold text-white">{group.name}</div>
+                  <div className="min-w-0">
+                    <div className="break-words font-semibold text-white">{group.name}</div>
                     {group.description ? <p className="mt-1 text-sm text-muted-foreground">{group.description}</p> : null}
                     <Badge variant="outline" className="mt-2 border-purple-500/30 bg-purple-500/10 text-purple-200">
                       {(group.members || []).length} item{(group.members || []).length === 1 ? '' : 's'}
                     </Badge>
                   </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setEditingGroup(group)}>
+                  <div className="grid grid-cols-2 gap-2 sm:flex">
+                    <Button size="sm" variant="outline" onClick={() => setEditingGroup(group)} className="min-h-11">
                       <Pencil className="mr-2 h-3 w-3" />
                       Edit
                     </Button>
-                    <Button size="sm" variant="outline" className="border-red-500/30 text-red-300 hover:bg-red-500/10" onClick={() => onRemove(group)}>
+                    <Button size="sm" variant="outline" className="min-h-11 border-red-500/30 text-red-300 hover:bg-red-500/10" onClick={() => onRemove(group)}>
                       <Trash2 className="mr-2 h-3 w-3" />
                       Remove
                     </Button>
@@ -149,7 +149,7 @@ export function InventoryGroupsPanel({
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {(group.members || []).map((member) => (
-                    <Badge key={member.id} variant="outline" className="border-slate-600 text-slate-200">
+                    <Badge key={member.id} variant="outline" className="max-w-full whitespace-normal break-words border-slate-600 text-slate-200">
                       {member.item?.item_number || member.item_id} · {member.item?.name || 'Inventory item'}
                     </Badge>
                   ))}
@@ -204,25 +204,25 @@ export function InventoryGroupsPanel({
               />
               <div className="max-h-72 space-y-2 overflow-y-auto rounded-md border border-slate-700 p-2">
                 {selectableItems.map((item) => (
-                  <label key={item.id} className="flex items-start gap-2 rounded-md p-2 text-sm hover:bg-slate-800">
+                  <label key={item.id} className="flex min-h-11 items-start gap-3 rounded-md p-2 text-sm hover:bg-slate-800">
                     <Checkbox
                       checked={form.item_ids.includes(item.id)}
                       onCheckedChange={(checked) => toggleItem(item.id, checked === true)}
                     />
-                    <span>
-                      <span className="block font-medium text-white">{item.name}</span>
-                      <span className="text-xs text-muted-foreground">{item.item_number} · {item.location?.name || 'No location assigned'}</span>
+                    <span className="min-w-0">
+                      <span className="block break-words font-medium text-white">{item.name}</span>
+                      <span className="break-words text-xs text-muted-foreground">{item.item_number} · {item.location?.name || 'No location assigned'}</span>
                     </span>
                   </label>
                 ))}
               </div>
             </div>
-            <div className="flex gap-2">
-              <Button type="submit" className="bg-inventory text-white hover:bg-inventory-dark" disabled={isSaving || !form.name.trim()}>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button type="submit" className="min-h-11 bg-inventory text-white hover:bg-inventory-dark" disabled={isSaving || !form.name.trim()}>
                 {editingGroup ? 'Save Group' : 'Create Group'}
               </Button>
               {editingGroup ? (
-                <Button type="button" variant="outline" onClick={() => setEditingGroup(null)} disabled={isSaving}>
+                <Button type="button" variant="outline" onClick={() => setEditingGroup(null)} disabled={isSaving} className="min-h-11">
                   Cancel
                 </Button>
               ) : null}

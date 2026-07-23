@@ -150,7 +150,7 @@ export function InventoryLocationsPanel({
         : '';
 
   return (
-    <Card className="border-slate-700 bg-slate-900/70">
+    <Card className="min-w-0 overflow-hidden border-slate-700 bg-slate-900/70">
       <CardHeader className="border-b border-slate-700 bg-slate-950/30">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -280,17 +280,17 @@ export function InventoryLocationsPanel({
                   presentation.surfaceClassName,
                 )}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2 font-semibold text-white">
-                      <MapPin className={cn('h-4 w-4', presentation.iconClassName)} />
-                      {location.name}
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 items-start gap-2 font-semibold text-white">
+                      <MapPin className={cn('mt-0.5 h-4 w-4 shrink-0', presentation.iconClassName)} />
+                      <span className="min-w-0 break-words">{location.name}</span>
                     </div>
                     {location.description ? (
                       <div className="mt-1 text-xs text-muted-foreground">{location.description}</div>
                     ) : null}
                   </div>
-                  <Badge variant="outline">{location.item_count || 0} items</Badge>
+                  <Badge variant="outline" className="shrink-0 whitespace-normal text-center">{location.item_count || 0} items</Badge>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <InventoryLocationTypeBadge location={location} />
@@ -298,16 +298,16 @@ export function InventoryLocationsPanel({
                     {location.sync_status}
                   </Badge>
                 </div>
-                <div className="mt-3 text-xs text-muted-foreground">
+                <div className="mt-3 break-words text-xs text-muted-foreground">
                   {linkedAssetLabel ? `Linked to ${linkedAssetLabel}` : 'No linked asset'}
                   {location.external_reference ? ` · Ref: ${location.external_reference}` : ''}
                 </div>
-                <div className="mt-4 flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => onEdit(location)} className="flex-1 border-slate-600">
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <Button size="sm" variant="outline" onClick={() => onEdit(location)} className="min-h-11 border-slate-600">
                     Edit
                   </Button>
                   {location.location_type === 'manual' ? (
-                    <Button size="sm" variant="outline" onClick={() => onRemove(location)} className="flex-1 border-red-500/30 text-red-300">
+                    <Button size="sm" variant="outline" onClick={() => onRemove(location)} className="min-h-11 border-red-500/30 text-red-300">
                       Remove
                     </Button>
                   ) : null}

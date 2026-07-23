@@ -842,7 +842,7 @@ export default function InventoryPage() {
 
   if (inventoryLoadError && !inventoryContext) {
     return (
-      <AppPageShell width="wide">
+      <AppPageShell width="wide" className="inventory-mobile-ui">
         <InventoryDevelopmentBanner />
 
         <AppPageHeader
@@ -861,7 +861,7 @@ export default function InventoryPage() {
 
   if (!isManagerOrAdmin) {
     return (
-      <AppPageShell width="wide">
+      <AppPageShell width="wide" className="inventory-mobile-ui">
         <InventoryDevelopmentBanner />
 
         <AppPageHeader
@@ -870,7 +870,7 @@ export default function InventoryPage() {
           description={employeeLocationName ? `Current location: ${employeeLocationName}` : 'Set your location, view assigned inventory, and claim or move items.'}
           icon={<PackageSearch className="h-5 w-5" />}
           actions={employeeLocationName ? (
-            <Button variant="outline" onClick={() => setChangeLocationDialogOpen(true)} className="border-slate-600">
+            <Button variant="outline" onClick={() => setChangeLocationDialogOpen(true)} className="min-h-11 border-slate-600">
               Change My Location
             </Button>
           ) : null}
@@ -929,7 +929,7 @@ export default function InventoryPage() {
   }
 
   return (
-    <AppPageShell width="wide">
+    <AppPageShell width="wide" className="inventory-mobile-ui">
       <InventoryDevelopmentBanner />
 
       <AppPageHeader
@@ -941,17 +941,17 @@ export default function InventoryPage() {
         }
         icon={<PackageSearch className="h-5 w-5" />}
         actions={(
-          <div className="flex flex-wrap gap-2">
+          <div className="flex w-full flex-wrap gap-2 sm:w-auto">
             <Button
               variant="outline"
               onClick={() => setChangeLocationDialogOpen(true)}
-              className="border-slate-600"
+              className="min-h-11 w-full border-slate-600 sm:w-auto"
             >
               {employeeLocationName ? 'Change My Location' : 'Set My Location'}
             </Button>
             <Button
               onClick={() => setItemDialogOpen(true)}
-              className="bg-inventory text-white hover:bg-inventory-dark"
+              className="min-h-11 w-full bg-inventory text-white hover:bg-inventory-dark sm:w-auto"
             >
               <Plus className="mr-2 h-4 w-4" />
               Add Item
@@ -964,7 +964,7 @@ export default function InventoryPage() {
         <InventoryLoadErrorNotice message={inventoryLoadError} onRetry={fetchInventoryData} />
       ) : null}
 
-      <div className="hidden grid-cols-5 gap-2 min-[430px]:grid lg:gap-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 lg:gap-4">
         <SummaryCard
           label="Active Items"
           value={summary.total}
@@ -1020,23 +1020,25 @@ export default function InventoryPage() {
           router.push(getInventoryOverviewHref(overviewTab), { scroll: false });
         }}
       >
-        <TabsList>
-          <TabsTrigger value="overview" className="gap-2">
-            <PackageSearch className="h-4 w-4" />
-            Overview
-          </TabsTrigger>
-          <TabsTrigger value="locations" className="gap-2">
-            <MapPin className="h-4 w-4" />
-            Locations
-          </TabsTrigger>
-          <TabsTrigger value="settings" className="gap-2">
-            <Settings className="h-4 w-4" />
-            Settings
-          </TabsTrigger>
-        </TabsList>
+        <div className="-mx-1 overflow-x-auto px-1 pb-1">
+          <TabsList className="w-max max-w-none flex-nowrap justify-start">
+            <TabsTrigger value="overview" className="min-h-11 gap-2">
+              <PackageSearch className="h-4 w-4" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="locations" className="min-h-11 gap-2">
+              <MapPin className="h-4 w-4" />
+              Locations
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="min-h-11 gap-2">
+              <Settings className="h-4 w-4" />
+              Settings
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {pageTab === 'settings' ? (
-          <div className="mt-3 flex justify-end">
+          <div className="-mx-1 mt-3 overflow-x-auto px-1 pb-1">
             <Tabs
               value={settingsTab}
               onValueChange={(value) => {
@@ -1045,20 +1047,20 @@ export default function InventoryPage() {
                 router.push(`/inventory?tab=settings&settings=${nextSettingsTab}`, { scroll: false });
               }}
             >
-              <TabsList>
-                <TabsTrigger value="categories" className="gap-2">
+              <TabsList className="w-max max-w-none flex-nowrap justify-start">
+                <TabsTrigger value="categories" className="min-h-11 gap-2">
                   <PackageSearch className="h-4 w-4" />
                   Categories
                 </TabsTrigger>
-                <TabsTrigger value="groups" className="gap-2">
+                <TabsTrigger value="groups" className="min-h-11 gap-2">
                   <PackageSearch className="h-4 w-4" />
                   Groups
                 </TabsTrigger>
-                <TabsTrigger value="hardware" className="gap-2">
+                <TabsTrigger value="hardware" className="min-h-11 gap-2">
                   <Boxes className="h-4 w-4" />
                   Hardware Catalogue
                 </TabsTrigger>
-                <TabsTrigger value="kiosk" className="gap-2">
+                <TabsTrigger value="kiosk" className="min-h-11 gap-2">
                   <ShieldCheck className="h-4 w-4" />
                   Yard Kiosk
                 </TabsTrigger>
@@ -1068,7 +1070,7 @@ export default function InventoryPage() {
         ) : null}
 
         {pageTab === 'locations' ? (
-          <div className="mt-3 flex justify-end">
+          <div className="-mx-1 mt-3 overflow-x-auto px-1 pb-1">
             <Tabs
               value={inventoryContext?.can_manage_site_locations ? locationsTab : 'directory'}
               onValueChange={(value) => {
@@ -1080,13 +1082,13 @@ export default function InventoryPage() {
                 );
               }}
             >
-              <TabsList>
-                <TabsTrigger value="directory" className="gap-2">
+              <TabsList className="w-max max-w-none flex-nowrap justify-start">
+                <TabsTrigger value="directory" className="min-h-11 gap-2">
                   <MapPin className="h-4 w-4" />
                   All Locations
                 </TabsTrigger>
                 {inventoryContext?.can_manage_site_locations ? (
-                  <TabsTrigger value="site_assignments" className="gap-2">
+                  <TabsTrigger value="site_assignments" className="min-h-11 gap-2">
                     <Users className="h-4 w-4" />
                     Location Assignments
                   </TabsTrigger>
@@ -1105,21 +1107,21 @@ export default function InventoryPage() {
               router.push(getInventoryOverviewHref(nextOverviewTab), { scroll: false });
             }}
           >
-            <div className="flex justify-end">
-              <TabsList>
-                <TabsTrigger value="small_tools" className="gap-2">
+            <div className="-mx-1 overflow-x-auto px-1 pb-1">
+              <TabsList className="w-max max-w-none flex-nowrap justify-start">
+                <TabsTrigger value="small_tools" className="min-h-11 gap-2">
                   <PackageSearch className="h-4 w-4" />
                   Small Tools
                 </TabsTrigger>
-                <TabsTrigger value="minor_plant" className="gap-2">
+                <TabsTrigger value="minor_plant" className="min-h-11 gap-2">
                   <Truck className="h-4 w-4" />
                   Minor Plant
                 </TabsTrigger>
-                <TabsTrigger value="hardware" className="gap-2">
+                <TabsTrigger value="hardware" className="min-h-11 gap-2">
                   <Boxes className="h-4 w-4" />
                   Hardware
                 </TabsTrigger>
-                <TabsTrigger value="retired" className="gap-2">
+                <TabsTrigger value="retired" className="min-h-11 gap-2">
                   <Archive className="h-4 w-4" />
                   Retired Items ({retiredItems.length})
                 </TabsTrigger>
@@ -1191,11 +1193,11 @@ export default function InventoryPage() {
         <TabsContent value="locations" className="mt-0 space-y-6">
           {locationsTab === 'directory' || !inventoryContext?.can_manage_site_locations ? (
             <>
-              <div className="flex justify-end">
+              <div className="flex justify-start sm:justify-end">
                 <Button
                   variant="outline"
                   onClick={() => { setEditingLocation(null); setLocationDialogOpen(true); }}
-                  className="border-slate-600"
+                  className="min-h-11 w-full border-slate-600 sm:w-auto"
                 >
                   <MapPin className="mr-2 h-4 w-4" />
                   Add Location
@@ -1447,7 +1449,7 @@ function SummaryCard({ label, value, icon, tone = 'default', onClick }: SummaryC
 
   const card = (
     <Card className={`h-full border-slate-700 bg-slate-900/70 transition-colors ${onClick ? 'hover:border-slate-500 hover:bg-slate-800/70' : ''}`}>
-      <CardContent className="flex min-h-[88px] flex-col items-start justify-center gap-2 p-2 min-[900px]:min-h-0 min-[900px]:flex-row min-[900px]:items-center min-[900px]:gap-3 min-[900px]:p-4">
+      <CardContent className="flex min-h-[88px] flex-row items-center gap-2 p-3 sm:min-h-[104px] sm:flex-col sm:items-start sm:justify-center sm:p-2 min-[900px]:min-h-0 min-[900px]:flex-row min-[900px]:items-center min-[900px]:gap-3 min-[900px]:p-4">
         <div className={`rounded-lg p-1.5 min-[900px]:p-2 [&_svg]:h-4 [&_svg]:w-4 min-[900px]:[&_svg]:h-5 min-[900px]:[&_svg]:w-5 ${toneClassName}`}>
           {icon}
         </div>

@@ -14,6 +14,8 @@ const viewports = [
   { name: 'Mobile', width: 375, height: 812 },
 ];
 
+const inventoryMobileWidths = [320, 375, 390, 430];
+
 const pages = [
   { name: 'Dashboard', path: '/dashboard' },
   { name: 'Workshop Tasks', path: '/workshop-tasks' },
@@ -77,3 +79,59 @@ for (const viewport of viewports) {
     }
   });
 }
+
+for (const width of inventoryMobileWidths) {
+  test.describe(`@inventory Inventory mobile – ${width}px`, () => {
+    test.use({
+      viewport: { width, height: 812 },
+      hasTouch: true,
+      isMobile: true,
+    });
+
+    test('keeps summaries, tabs, and page width usable', async ({ page }) => {
+      await gotoWithInfraSkip(page, '/inventory', 'Inventory', `${width}px mobile`);
+
+      await expect(page.getByRole('button', { name: /filter inventory by active items/i }))
+        .toBeVisible();
+      await expect(page.getByRole('tab', { name: /overview/i }).first()).toBeVisible();
+
+      const overflowPixels = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflowPixels, 'Inventory should not overflow the document viewport').toBeLessThanOrEqual(1);
+    });
+  });
+}
+
+test.describe('@inventory Inventory mobile dialogs', () => {
+  test.use({
+    viewport: { width: 375, height: 812 },
+    hasTouch: true,
+    isMobile: true,
+  });
+
+  test('keeps location selection and dialog actions reachable', async ({ page }) => {
+    await gotoWithInfraSkip(page, '/inventory', 'Inventory', '375px mobile dialog');
+
+    await page.getByRole('button', { name: /change my location|set my location/i }).first().click();
+    const locationDialog = page.getByRole('dialog', {
+      name: /change inventory location|set inventory location/i,
+    });
+    await expect(locationDialog).toBeVisible();
+    const saveButton = locationDialog.getByRole('button', { name: /save location/i });
+    await expect(saveButton).toBeVisible();
+    const saveButtonBox = await saveButton.boundingBox();
+    expect(saveButtonBox?.height || 0, 'Mobile dialog actions should be at least 44px high')
+      .toBeGreaterThanOrEqual(44);
+
+    await locationDialog.getByRole('combobox').click();
+    await expect(page.getByRole('dialog', { name: 'Choose inventory location' })).toBeVisible();
+    const searchInput = page.getByLabel(/search locations/i);
+    await expect(searchInput).toBeVisible();
+    const searchFontSize = await searchInput.evaluate(
+      (element) => Number.parseFloat(window.getComputedStyle(element).fontSize),
+    );
+    expect(searchFontSize, 'Mobile inputs should stay at 16px to avoid iOS focus zoom')
+      .toBeGreaterThanOrEqual(16);
+  });
+});

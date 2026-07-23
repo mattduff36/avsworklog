@@ -303,11 +303,11 @@ export function YardKioskController() {
       : null;
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-4 rounded-2xl border border-border bg-slate-900/70 p-5 shadow-xl lg:flex-row lg:items-center lg:justify-between">
-        <div>
+    <div className="min-w-0 space-y-4 sm:space-y-5">
+      <div className="flex min-w-0 flex-col gap-4 rounded-2xl border border-border bg-slate-900/70 p-3 shadow-xl sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-black text-white">Yard kiosk live control</h1>
+            <h1 className="break-words text-xl font-black text-white sm:text-2xl">Yard kiosk live control</h1>
             <Badge
               variant="outline"
               className={
@@ -326,18 +326,19 @@ export function YardKioskController() {
               </Badge>
             ) : null}
           </div>
-          <p className="mt-1 text-sm text-slate-400">
+          <p className="mt-1 break-words text-sm text-slate-400">
             {device
               ? `${device.device_label} · state-synchronised replica`
               : 'No active Yard kiosk is linked.'}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid w-full grid-cols-2 gap-2 lg:flex lg:w-auto lg:flex-wrap">
           <Button
             type="button"
             variant="outline"
             onClick={() => void loadState()}
             disabled={loading || saving}
+            className="min-h-11 min-w-0"
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
@@ -347,7 +348,7 @@ export function YardKioskController() {
               type="button"
               onClick={() => void runOperation('release')}
               disabled={saving}
-              className="bg-slate-200 text-slate-950 hover:bg-white"
+              className="min-h-11 min-w-0 bg-slate-200 px-2 text-slate-950 hover:bg-white sm:px-4"
             >
               <Unlock className="mr-2 h-4 w-4" />
               Release control
@@ -357,7 +358,7 @@ export function YardKioskController() {
               type="button"
               onClick={() => void runOperation('take')}
               disabled={saving || !device || !isTabletOnline || leaseIsActive}
-              className="bg-cyan-300 text-slate-950 hover:bg-cyan-200"
+              className="min-h-11 min-w-0 whitespace-normal bg-cyan-300 px-2 text-slate-950 hover:bg-cyan-200 sm:px-4"
             >
               <MonitorSmartphone className="mr-2 h-4 w-4" />
               {leaseIsActive ? 'Controlled by another manager' : 'Take control'}
@@ -376,7 +377,16 @@ export function YardKioskController() {
         </div>
       ) : null}
 
-      <div className="overflow-x-auto rounded-2xl border border-white/10 bg-slate-950 p-3 shadow-2xl">
+      <p className="text-xs text-slate-400 lg:hidden">
+        Swipe or scroll horizontally to inspect the fixed 1024 × 600 kiosk replica.
+      </p>
+
+      <div
+        className="w-full max-w-full touch-pan-x overflow-x-auto overscroll-x-contain rounded-2xl border border-white/10 bg-slate-950 p-2 shadow-2xl sm:p-3"
+        role="region"
+        aria-label="Scrollable Yard kiosk replica"
+        tabIndex={0}
+      >
         <div
           data-testid="yard-kiosk-virtual-screen"
           className="mx-auto grid h-[600px] w-[1024px] shrink-0 grid-rows-[4.75rem_1fr] overflow-hidden rounded-xl bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.12),_transparent_32%),linear-gradient(135deg,#020617_0%,#0f172a_52%,#111827_100%)] text-white"

@@ -97,14 +97,14 @@ export function HardwareCataloguePanel({
                 key={item.id}
                 className="flex flex-col gap-3 rounded-lg border border-slate-700 bg-slate-800/50 p-3 sm:flex-row sm:items-center sm:justify-between"
               >
-                <div>
-                  <span className="font-semibold text-white">{item.name}</span>
+                <div className="min-w-0">
+                  <span className="break-words font-semibold text-white">{item.name}</span>
                   <p className="mt-1 text-xs text-muted-foreground">
                     Total stock: {total.toLocaleString()} units
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="outline" onClick={() => setEditingItem(item)}>
+                  <Button size="sm" variant="outline" onClick={() => setEditingItem(item)} className="min-h-11">
                     <Pencil className="mr-1 h-3.5 w-3.5" />
                     Edit
                   </Button>
@@ -117,7 +117,7 @@ export function HardwareCataloguePanel({
                       : 'Hardware items with stock balances or audit history cannot be deleted'}
                     aria-label={`Delete ${item.name}`}
                     onClick={() => onRemoveItem(item)}
-                    className="border-red-500/30 text-red-300 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="h-11 w-11 border-red-500/30 text-red-300 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -145,16 +145,16 @@ export function HardwareCataloguePanel({
                 className="border-slate-600 bg-slate-800"
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <Button
                 type="submit"
-                className="bg-inventory text-white hover:bg-inventory-dark"
+                className="min-h-11 bg-inventory text-white hover:bg-inventory-dark"
                 disabled={!catalogueName.trim() || isSaving}
               >
                 {editingItem ? 'Save Changes' : 'Add Item'}
               </Button>
               {editingItem ? (
-                <Button type="button" variant="outline" onClick={() => setEditingItem(null)}>
+                <Button type="button" variant="outline" onClick={() => setEditingItem(null)} className="min-h-11">
                   Cancel
                 </Button>
               ) : null}

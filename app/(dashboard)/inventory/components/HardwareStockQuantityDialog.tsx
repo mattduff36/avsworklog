@@ -11,6 +11,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  dialogContentViewportClassName,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -164,8 +165,16 @@ export function HardwareStockQuantityDialog({
         if (!nextOpen && !isSubmitting) onClose();
       }}
     >
-      <DialogContent className="border-slate-700 bg-slate-900 sm:max-w-lg">
-        <DialogHeader>
+      <DialogContent
+        mobileKeyboardSafe
+        data-keyboard-safe-dialog="true"
+        className={dialogContentViewportClassName({
+          size: 'lg',
+          scroll: 'content',
+          className: 'top-0 h-[100dvh] max-h-none w-screen max-w-none translate-y-0 gap-0 rounded-none border-slate-700 bg-slate-900 p-0 sm:top-1/2 sm:h-auto sm:max-h-[calc(100dvh-1rem)] sm:w-[calc(100vw-1rem)] sm:max-w-lg sm:-translate-y-1/2 sm:rounded-xl',
+        })}
+      >
+        <DialogHeader className="shrink-0 px-6 pb-4 pt-[max(1.25rem,env(safe-area-inset-top))] sm:pt-6">
           <DialogTitle className="flex items-center gap-2 text-white">
             <PackagePlus className="h-5 w-5 text-inventory" aria-hidden="true" />
             {copy.title}
@@ -173,7 +182,11 @@ export function HardwareStockQuantityDialog({
           <DialogDescription>{copy.description}</DialogDescription>
         </DialogHeader>
 
-        <form className="space-y-4" onSubmit={handleSubmit}>
+        <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleSubmit}>
+          <div
+            data-mobile-scroll-lock="true"
+            className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-6 py-4"
+          >
           <div className="space-y-2">
             <Label id="hardware_stock_quantity_location_label">Destination location</Label>
             <InventoryLocationSelect
@@ -254,8 +267,9 @@ export function HardwareStockQuantityDialog({
           {errorMessage ? (
             <p className="text-sm text-red-300" role="alert">{errorMessage}</p>
           ) : null}
+          </div>
 
-          <DialogFooter>
+          <DialogFooter className="shrink-0 border-t border-slate-700 px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:pb-6">
             <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
               Cancel
             </Button>

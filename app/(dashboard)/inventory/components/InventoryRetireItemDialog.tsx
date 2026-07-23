@@ -2,7 +2,15 @@
 
 import { useState } from 'react';
 import { Archive, Loader2 } from 'lucide-react';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  dialogContentViewportClassName,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -48,8 +56,16 @@ export function InventoryRetireItemDialog({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!saving) onOpenChange(isOpen); }}>
-      <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-md overflow-y-auto border-border bg-slate-900 text-white">
-        <DialogHeader>
+      <DialogContent
+        mobileKeyboardSafe
+        data-keyboard-safe-dialog="true"
+        className={dialogContentViewportClassName({
+          size: 'md',
+          scroll: 'content',
+          className: 'top-0 h-[100dvh] max-h-none w-screen max-w-none translate-y-0 gap-0 rounded-none border-border bg-slate-900 p-0 text-white sm:top-1/2 sm:h-auto sm:max-h-[calc(100dvh-1rem)] sm:w-[calc(100vw-1rem)] sm:max-w-md sm:-translate-y-1/2 sm:rounded-xl',
+        })}
+      >
+        <DialogHeader className="shrink-0 px-6 pb-4 pt-[max(1.25rem,env(safe-area-inset-top))] sm:pt-6">
           <DialogTitle className="flex items-center gap-2 text-inventory">
             <Archive className="h-5 w-5" />
             Retire Inventory Item
@@ -59,7 +75,10 @@ export function InventoryRetireItemDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div
+          data-mobile-scroll-lock="true"
+          className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-6 py-4"
+        >
           {error ? (
             <div className="rounded-lg border border-red-800 bg-red-900/20 p-3">
               <p className="text-sm text-red-300">{error}</p>
@@ -98,7 +117,7 @@ export function InventoryRetireItemDialog({
           </div>
         </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="shrink-0 gap-2 border-t border-slate-700 px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:pb-6">
           <Button
             type="button"
             variant="outline"

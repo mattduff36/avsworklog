@@ -293,7 +293,7 @@ export function InventoryKioskDevicesPanel() {
                     : 'Start a five-minute pairing window, then open '}{' '}
                   {activeDevices.length === 0 ? (
                     <>
-                  <span className="font-medium text-slate-200">squiresapp.com/yard-kiosk</span>{' '}
+                  <span className="break-all font-medium text-slate-200">squiresapp.com/yard-kiosk</span>{' '}
                   on the device and compare the six-digit code.
                     </>
                   ) : null}
@@ -301,7 +301,7 @@ export function InventoryKioskDevicesPanel() {
               </div>
               {!pairing ? (
                 <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
-                  <div className="min-w-64 space-y-1.5">
+                  <div className="w-full min-w-0 space-y-1.5 sm:min-w-64">
                     <Label htmlFor="kiosk-device-label" className="sr-only">
                       Device name
                     </Label>
@@ -328,11 +328,11 @@ export function InventoryKioskDevicesPanel() {
                       void startPairing();
                     }}
                     disabled={saving}
-                    className={
+                    className={`min-h-11 w-full sm:w-auto ${
                       activeDevices.length > 0
                         ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
                         : 'bg-inventory text-white hover:bg-inventory-dark'
-                    }
+                    }`}
                   >
                     {saving ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -360,7 +360,7 @@ export function InventoryKioskDevicesPanel() {
                             ? ' This will immediately revoke the existing kiosk.'
                             : ''}
                         </p>
-                        <p className="mt-3 font-mono text-4xl font-black tracking-[0.22em] text-white">
+                        <p className="mt-3 break-all font-mono text-3xl font-black tracking-[0.16em] text-white min-[380px]:text-4xl min-[380px]:tracking-[0.22em]">
                           {pairing.confirmation_code}
                         </p>
                       </>
@@ -381,7 +381,7 @@ export function InventoryKioskDevicesPanel() {
                       variant="outline"
                       onClick={() => void runAction('cancel_pairing')}
                       disabled={saving}
-                      className="border-amber-500/40 text-amber-200 hover:bg-amber-500/10"
+                      className="min-h-11 border-amber-500/40 text-amber-200 hover:bg-amber-500/10"
                     >
                       <XCircle className="mr-2 h-4 w-4" />
                       Cancel
@@ -390,7 +390,7 @@ export function InventoryKioskDevicesPanel() {
                       type="button"
                       onClick={() => void confirmPairing()}
                       disabled={saving || !pairing.confirmation_code}
-                      className="bg-inventory text-white hover:bg-inventory-dark"
+                      className="min-h-11 bg-inventory text-white hover:bg-inventory-dark"
                     >
                       <CheckCircle2 className="mr-2 h-4 w-4" />
                       {pairing.replaces_device_id
@@ -404,14 +404,14 @@ export function InventoryKioskDevicesPanel() {
           </div>
 
           <div>
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
+            <div className="mb-3 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
                 <p className="font-semibold text-white">Trusted browsers</p>
                 <p className="text-sm text-slate-400">
                   Access continues until revoked here or browser cookies are cleared.
                 </p>
               </div>
-              <Button asChild variant="outline" size="sm">
+              <Button asChild variant="outline" size="sm" className="min-h-11 w-full sm:w-auto">
                 <a
                   href="/inventory/kiosk-control"
                   target="_blank"
@@ -430,11 +430,11 @@ export function InventoryKioskDevicesPanel() {
                   className="rounded-xl border border-border bg-slate-950/40 p-4"
                 >
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="flex items-start gap-3">
+                    <div className="flex min-w-0 items-start gap-3">
                       <div className="rounded-lg bg-inventory/10 p-2 text-inventory">
                         <Tablet className="h-5 w-5" />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="font-semibold text-white">{device.device_label}</p>
                           <Badge
@@ -450,18 +450,18 @@ export function InventoryKioskDevicesPanel() {
                             {presenceLabel(device)}
                           </Badge>
                         </div>
-                        <p className="mt-1 text-sm text-slate-400">
+                        <p className="mt-1 break-words text-sm text-slate-400">
                           Paired {formatDateTime(device.created_at)}
                         </p>
-                        <p className="text-sm text-slate-400">
+                        <p className="break-words text-sm text-slate-400">
                           Last automatic login {formatDateTime(device.last_authenticated_at)}
                         </p>
-                        <p className="text-sm text-slate-400">
+                        <p className="break-words text-sm text-slate-400">
                           Last contact {formatDateTime(device.last_heartbeat_at || null)}
                           {device.last_phase ? ` · ${device.last_phase}` : ''}
                         </p>
                         {device.last_error_code ? (
-                          <p className="mt-1 text-sm text-amber-200">
+                          <p className="mt-1 break-words text-sm text-amber-200">
                             Last issue {device.last_error_code}
                             {device.last_diagnostic_id
                               ? ` · Ref ${device.last_diagnostic_id}`
@@ -469,7 +469,7 @@ export function InventoryKioskDevicesPanel() {
                           </p>
                         ) : null}
                         {(device.pending_commands || []).length > 0 ? (
-                          <p className="mt-1 text-xs text-sky-200">
+                          <p className="mt-1 break-words text-xs text-sky-200">
                             Pending: {(device.pending_commands || [])
                               .map((command) => `${command.command_type} (${command.status})`)
                               .join(', ')}
@@ -482,17 +482,18 @@ export function InventoryKioskDevicesPanel() {
                       variant="outline"
                       onClick={() => setRevokeTarget(device)}
                       disabled={saving}
-                      className="border-red-500/40 text-red-300 hover:bg-red-500/10"
+                      className="min-h-11 w-full border-red-500/40 text-red-300 hover:bg-red-500/10 sm:w-auto"
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
                       Revoke
                     </Button>
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                     <Button
                       type="button"
                       size="sm"
                       variant="outline"
+                      className="min-h-11"
                       disabled={saving || device.presence === 'offline'}
                       onClick={() => void issueCommand(device, 'ping')}
                     >
@@ -502,6 +503,7 @@ export function InventoryKioskDevicesPanel() {
                       type="button"
                       size="sm"
                       variant="outline"
+                      className="min-h-11"
                       disabled={saving || device.presence === 'offline'}
                       onClick={() => void issueCommand(device, 'reload_app')}
                     >
@@ -511,6 +513,7 @@ export function InventoryKioskDevicesPanel() {
                       type="button"
                       size="sm"
                       variant="outline"
+                      className="min-h-11"
                       disabled={saving || device.presence === 'offline'}
                       onClick={() => setDestructiveTarget({
                         device,
@@ -523,6 +526,7 @@ export function InventoryKioskDevicesPanel() {
                       type="button"
                       size="sm"
                       variant="outline"
+                      className="min-h-11"
                       disabled={saving || device.presence === 'offline'}
                       onClick={() => setDestructiveTarget({
                         device,
@@ -540,7 +544,7 @@ export function InventoryKioskDevicesPanel() {
                         device,
                         command: 'clear_credentials',
                       })}
-                      className="border-amber-500/40 text-amber-200"
+                      className="min-h-11 border-amber-500/40 text-amber-200"
                     >
                       Clear &amp; re-pair
                     </Button>

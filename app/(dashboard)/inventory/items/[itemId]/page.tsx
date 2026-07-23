@@ -8,7 +8,14 @@ import { BackButton } from '@/components/ui/back-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  dialogContentViewportClassName,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PageLoader } from '@/components/ui/page-loader';
@@ -293,7 +300,7 @@ export default function InventoryItemDetailPage() {
   if (loading) return <PageLoader message="Loading inventory item..." />;
   if (!payload) {
     return (
-      <AppPageShell width="wide">
+      <AppPageShell width="wide" className="inventory-mobile-ui">
         <BackButton fallbackHref="/inventory" />
         <Card className="border-slate-700 bg-slate-900/70">
           <CardContent className="py-12 text-center text-muted-foreground">Inventory item not found.</CardContent>
@@ -321,18 +328,23 @@ export default function InventoryItemDetailPage() {
   const isUnknownLocationSelected = isInventoryUnknownLocation(selectedEditLocation);
 
   return (
-    <AppPageShell width="wide">
-      <div className="flex items-center gap-3">
-        <BackButton fallbackHref="/inventory" />
+    <AppPageShell width="wide" className="inventory-mobile-ui">
+      <div className="flex min-w-0 flex-col items-stretch gap-3 sm:flex-row sm:items-start">
+        <div className="self-start">
+          <BackButton fallbackHref="/inventory" />
+        </div>
         <AppPageHeader
           title={item.name}
           description={`${item.item_number} · ${item.location?.name || 'No location assigned'}`}
           icon={<PackageSearch className="h-5 w-5" />}
           actions={(
-            <Badge variant="outline" className={getStatusBadgeClass(item)}>
+            <Badge variant="outline" className={`max-w-full whitespace-normal text-center ${getStatusBadgeClass(item)}`}>
               {isRetired ? 'Retired' : getCheckStatusLabel(checkStatus)}
             </Badge>
           )}
+          className="min-w-0 flex-1"
+          titleClassName="text-2xl sm:text-3xl"
+          descriptionClassName="break-words"
         />
       </div>
 
@@ -398,12 +410,14 @@ export default function InventoryItemDetailPage() {
         </Card>
       ) : null}
 
-      <Tabs defaultValue="overview">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="movements">Movements</TabsTrigger>
-          <TabsTrigger value="checks">Checks</TabsTrigger>
-        </TabsList>
+      <Tabs defaultValue="overview" className="min-w-0">
+        <div className="-mx-1 overflow-x-auto px-1 pb-1">
+          <TabsList className="w-max max-w-none flex-nowrap justify-start">
+            <TabsTrigger value="overview" className="min-h-11">Overview</TabsTrigger>
+            <TabsTrigger value="movements" className="min-h-11">Movements</TabsTrigger>
+            <TabsTrigger value="checks" className="min-h-11">Checks</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="overview" className="mt-0 grid gap-6 lg:grid-cols-2">
           <Card className="border-slate-700 bg-slate-900/70">
@@ -417,13 +431,13 @@ export default function InventoryItemDetailPage() {
                 </div>
                 {!isRetired ? (
                   isEditingDetails ? (
-                    <div className="flex gap-2">
-                      <Button type="button" variant="outline" onClick={handleCancelDetailsEdit} disabled={savingDetails}>
+                    <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
+                      <Button type="button" variant="outline" onClick={handleCancelDetailsEdit} disabled={savingDetails} className="min-h-11">
                         Cancel
                       </Button>
                       <Button
                         type="submit"
-                        className="bg-inventory text-white hover:bg-inventory-dark"
+                        className="min-h-11 bg-inventory text-white hover:bg-inventory-dark"
                         disabled={savingDetails || !editForm.location_id}
                       >
                         {savingDetails && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -431,7 +445,7 @@ export default function InventoryItemDetailPage() {
                       </Button>
                     </div>
                   ) : (
-                    <Button type="button" variant="outline" onClick={() => setIsEditingDetails(true)} className="border-slate-600">
+                    <Button type="button" variant="outline" onClick={() => setIsEditingDetails(true)} className="min-h-11 w-full border-slate-600 sm:w-auto">
                       Edit Details
                     </Button>
                   )
@@ -593,7 +607,7 @@ export default function InventoryItemDetailPage() {
                 </div>
                 <Button
                   type="button"
-                  className="bg-inventory text-white hover:bg-inventory-dark"
+                  className="min-h-11 w-full bg-inventory text-white hover:bg-inventory-dark sm:w-auto"
                   onClick={() => setShowCheckTypeModal(true)}
                   disabled={savingCheck || !checkedAt || isRetired}
                 >
@@ -651,7 +665,14 @@ export default function InventoryItemDetailPage() {
       ) : null}
 
       <Dialog open={showCheckTypeModal} onOpenChange={setShowCheckTypeModal}>
-        <DialogContent className="border border-border bg-slate-950 text-white sm:max-w-lg">
+        <DialogContent
+          mobileKeyboardSafe
+          className={dialogContentViewportClassName({
+            size: 'lg',
+            scroll: 'body',
+            className: 'border border-border bg-slate-950 text-white',
+          })}
+        >
           <DialogHeader>
             <DialogTitle>Choose Check Type</DialogTitle>
             <DialogDescription>
@@ -663,7 +684,7 @@ export default function InventoryItemDetailPage() {
               <button
                 key={checklistDefinition.version}
                 type="button"
-                className="rounded-xl border border-slate-700 bg-slate-900/70 p-4 text-left transition-colors hover:border-inventory/70 hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inventory/60"
+                className="min-h-11 rounded-xl border border-slate-700 bg-slate-900/70 p-4 text-left transition-colors hover:border-inventory/70 hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inventory/60"
                 onClick={() => handleChooseCheckType(checklistDefinition)}
                 disabled={savingCheck}
               >
@@ -692,9 +713,9 @@ export default function InventoryItemDetailPage() {
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between gap-4 border-b border-slate-800 pb-2 last:border-b-0">
+    <div className="flex min-w-0 flex-col gap-1 border-b border-slate-800 pb-2 last:border-b-0 sm:flex-row sm:justify-between sm:gap-4">
       <span className="text-muted-foreground">{label}</span>
-      <span className="text-right font-medium capitalize text-white">{value}</span>
+      <span className="break-words font-medium capitalize text-white sm:text-right">{value}</span>
     </div>
   );
 }
@@ -797,7 +818,7 @@ function InventoryCheckTimelineEntry({
             type="button"
             variant="outline"
             size="sm"
-            className="h-8 border-slate-600"
+            className="min-h-11 border-slate-600 sm:h-8 sm:min-h-8"
             onClick={onDownloadPdf}
             disabled={downloading}
           >

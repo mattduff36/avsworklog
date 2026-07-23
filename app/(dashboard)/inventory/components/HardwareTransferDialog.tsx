@@ -10,6 +10,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  dialogContentViewportClassName,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -163,8 +164,16 @@ export function HardwareTransferDialog({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}>
-      <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-3xl overflow-y-auto border-slate-700 bg-slate-900 sm:max-w-3xl">
-        <DialogHeader>
+      <DialogContent
+        mobileKeyboardSafe
+        data-keyboard-safe-dialog="true"
+        className={dialogContentViewportClassName({
+          size: '3xl',
+          scroll: 'content',
+          className: 'top-0 h-[100dvh] max-h-none w-screen max-w-none translate-y-0 gap-0 rounded-none border-slate-700 bg-slate-900 p-0 sm:top-1/2 sm:h-auto sm:max-h-[calc(100dvh-1rem)] sm:w-[calc(100vw-1rem)] sm:max-w-3xl sm:-translate-y-1/2 sm:rounded-xl',
+        })}
+      >
+        <DialogHeader className="shrink-0 px-6 pb-4 pt-[max(1.25rem,env(safe-area-inset-top))] sm:pt-6">
           <DialogTitle className="flex items-center gap-2 text-white">
             <ArrowRightLeft className="h-5 w-5 text-inventory" />
             Transfer Hardware
@@ -174,7 +183,11 @@ export function HardwareTransferDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form className="space-y-4" onSubmit={handleSubmit}>
+        <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleSubmit}>
+          <div
+            data-mobile-scroll-lock="true"
+            className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-6 py-4"
+          >
           <div className="space-y-2">
             <Label>Hardware item</Label>
             <Select value={itemId} onValueChange={handleItemChange}>
@@ -270,8 +283,9 @@ export function HardwareTransferDialog({
               </p>
             ) : null}
           </div>
+          </div>
 
-          <DialogFooter>
+          <DialogFooter className="shrink-0 border-t border-slate-700 px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:pb-6">
             <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
               Cancel
             </Button>

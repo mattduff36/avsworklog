@@ -204,8 +204,9 @@ export function MultiSelectFilter<TValue extends string>({
       {open ? (
         <div
           id={panelId}
+          data-mobile-scroll-lock="true"
           className={cn(
-            'absolute left-0 top-full z-40 mt-1 max-h-72 w-full overflow-y-auto rounded-md border border-slate-700 bg-slate-950 p-1 text-sm text-slate-200 shadow-xl',
+            'absolute left-0 top-full z-40 mt-1 max-h-[min(18rem,calc(100dvh-1rem))] w-full overflow-y-auto overscroll-contain touch-pan-y rounded-md border border-slate-700 bg-slate-950 p-1 text-sm text-slate-200 shadow-xl',
             panelClassName
           )}
         >

@@ -116,20 +116,42 @@ function renderLocationWithHint(item: InventoryItem) {
   }
 
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span className={`cursor-help underline decoration-slate-500 decoration-dotted underline-offset-4 ${isMutedLocation ? 'italic text-slate-400' : ''}`}>
-          {locationName}
-        </span>
-      </TooltipTrigger>
-      <TooltipContent className="max-w-xs space-y-1">
-        <div className="font-medium text-white">Spreadsheet location</div>
-        <div>{item.source_location_hint}</div>
-        {item.source_location_rows ? (
-          <div className="text-[11px] text-slate-300">COMPLETE LIST row(s): {item.source_location_rows}</div>
-        ) : null}
-      </TooltipContent>
-    </Tooltip>
+    <>
+      <span className="hidden md:inline">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className={`cursor-help underline decoration-slate-500 decoration-dotted underline-offset-4 ${isMutedLocation ? 'italic text-slate-400' : ''}`}>
+              {locationName}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs space-y-1">
+            <div className="font-medium text-white">Spreadsheet location</div>
+            <div>{item.source_location_hint}</div>
+            {item.source_location_rows ? (
+              <div className="text-[11px] text-slate-300">COMPLETE LIST row(s): {item.source_location_rows}</div>
+            ) : null}
+          </TooltipContent>
+        </Tooltip>
+      </span>
+      <details
+        className="min-w-0 md:hidden"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <summary className={`flex min-h-11 cursor-pointer list-none flex-wrap items-center gap-x-2 gap-y-1 rounded-md py-1 pr-2 underline decoration-slate-500 decoration-dotted underline-offset-4 ${isMutedLocation ? 'italic text-slate-400' : ''}`}>
+          <span className="break-words">{locationName}</span>
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-inventory-light">
+            View hint
+          </span>
+        </summary>
+        <div className="mt-1 rounded-md border border-slate-600 bg-slate-950/60 p-2 not-italic text-slate-200">
+          <div className="font-medium">Spreadsheet location</div>
+          <div className="mt-1 break-words">{item.source_location_hint}</div>
+          {item.source_location_rows ? (
+            <div className="mt-1 text-[11px] text-slate-400">COMPLETE LIST row(s): {item.source_location_rows}</div>
+          ) : null}
+        </div>
+      </details>
+    </>
   );
 }
 
@@ -455,7 +477,7 @@ export function InventoryTable({
 
   return (
     <TooltipProvider delayDuration={150}>
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -471,7 +493,7 @@ export function InventoryTable({
           <Button
             variant="outline"
             onClick={() => (onBulkAction || onMove)(selectedItems)}
-            className="border-slate-600 text-white hover:bg-slate-800"
+            className="min-h-11 w-full border-slate-600 text-white hover:bg-slate-800 sm:w-auto"
           >
             <Truck className="mr-2 h-4 w-4" />
             {bulkActionLabel || 'Move Selected'} ({selectedItems.length})
@@ -493,7 +515,7 @@ export function InventoryTable({
               variant="outline"
               size="sm"
               onClick={clearFilters}
-              className="border-slate-600 text-muted-foreground hover:bg-slate-700/50"
+              className="min-h-11 border-slate-600 text-muted-foreground hover:bg-slate-700/50 sm:min-h-8"
             >
               Reset Filters
             </Button>
@@ -506,7 +528,7 @@ export function InventoryTable({
               selectedValues={statusFilters}
               options={statusFilterOptions}
               onSelectedValuesChange={setStatusFilters}
-              triggerClassName="sm:w-[170px]"
+              triggerClassName="min-h-11 sm:min-h-9 sm:w-[170px]"
             />
           ) : null}
 
@@ -517,7 +539,7 @@ export function InventoryTable({
               selectedValues={categoryFilters}
               options={categoryFilterOptions}
               onSelectedValuesChange={setCategoryFilters}
-              triggerClassName="sm:w-[170px]"
+              triggerClassName="min-h-11 sm:min-h-9 sm:w-[170px]"
             />
           ) : null}
 
@@ -528,7 +550,7 @@ export function InventoryTable({
               selectedValues={retireReasonFilters}
               options={retireReasonFilterOptions}
               onSelectedValuesChange={setRetireReasonFilters}
-              triggerClassName="sm:w-[170px]"
+              triggerClassName="min-h-11 sm:min-h-9 sm:w-[170px]"
             />
           ) : null}
 
@@ -539,8 +561,8 @@ export function InventoryTable({
               selectedValues={locationFilters}
               options={locationFilterOptions}
               onSelectedValuesChange={setLocationFilters}
-              triggerClassName="sm:w-[260px]"
-              panelClassName="left-auto right-0 max-h-[min(36rem,calc(100vh-8rem))] w-[min(28rem,calc(100vw-2rem))]"
+              triggerClassName="min-h-11 sm:min-h-9 sm:w-[260px]"
+              panelClassName="left-auto right-0 max-h-[min(36rem,calc(100dvh-8rem))] w-[min(28rem,calc(100vw-2rem))]"
               searchable
               searchPlaceholder="Search locations..."
               emptyLabel="No locations found"
@@ -693,11 +715,11 @@ export function InventoryTable({
             return (
               <div
                 key={item.id}
-                className={onOpenDetails ? 'cursor-pointer rounded-lg border border-slate-700 bg-slate-800/50 p-4' : 'rounded-lg border border-slate-700 bg-slate-800/50 p-4'}
+                className={onOpenDetails ? 'min-w-0 cursor-pointer overflow-hidden rounded-lg border border-slate-700 bg-slate-800/50 p-3 min-[380px]:p-4' : 'min-w-0 overflow-hidden rounded-lg border border-slate-700 bg-slate-800/50 p-3 min-[380px]:p-4'}
                 onClick={() => onOpenDetails?.(item)}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex gap-3">
+                  <div className="flex min-w-0 gap-3">
                     {!retiredMode ? (
                       <Checkbox
                         checked={selectedItemIds.has(item.id)}
@@ -706,10 +728,10 @@ export function InventoryTable({
                         aria-label={`Select ${item.name}`}
                       />
                     ) : null}
-                    <div>
-                      <div className="flex items-center gap-2 font-semibold text-white">
-                        <PackageSearch className="h-4 w-4 text-inventory" />
-                        {item.name}
+                    <div className="min-w-0">
+                      <div className="flex min-w-0 items-start gap-2 font-semibold text-white">
+                        <PackageSearch className="mt-0.5 h-4 w-4 shrink-0 text-inventory" />
+                        <span className="min-w-0 break-words">{item.name}</span>
                       </div>
                       <div className="text-xs text-muted-foreground">{item.item_number}</div>
                       {showSerialNumberColumn ? (
@@ -723,18 +745,18 @@ export function InventoryTable({
                     </div>
                   </div>
                   {retiredMode ? (
-                    <Badge variant="outline" className={getRetireReasonBadgeClass(item.retire_reason)}>
+                    <Badge variant="outline" className={`max-w-[45%] shrink-0 whitespace-normal text-center ${getRetireReasonBadgeClass(item.retire_reason)}`}>
                       {item.retire_reason || 'Other'}
                     </Badge>
                   ) : (
-                    <Badge variant="outline" className={getStatusBadgeClass(checkStatus, item)}>
+                    <Badge variant="outline" className={`max-w-[45%] shrink-0 whitespace-normal text-center ${getStatusBadgeClass(checkStatus, item)}`}>
                       {getCheckStatusLabel(checkStatus)}
                     </Badge>
                   )}
                 </div>
                 <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                  <div className="flex items-start gap-1">
-                    <MapPin className="mt-0.5 h-3 w-3" />
+                  <div className="flex min-w-0 items-start gap-1">
+                    <MapPin className="mt-1 h-3 w-3 shrink-0" />
                     {renderLocationDetails(item)}
                   </div>
                   <span>{retiredMode ? 'Retired' : 'Last'}: {formatInventoryDate(retiredMode ? item.retired_at : item.last_checked_at)}</span>
@@ -744,10 +766,10 @@ export function InventoryTable({
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {!retiredMode ? (
-                    <InventoryMoveButton onMove={() => onMove([item])} className="flex-1" />
+                    <InventoryMoveButton onMove={() => onMove([item])} className="min-h-11 flex-1" />
                   ) : null}
                   {retiredMode && onRestore ? (
-                    <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); onRestore(item); }} className="flex-1 border-green-500/40 text-green-200 hover:bg-green-500/10">
+                    <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); onRestore(item); }} className="min-h-11 flex-1 border-green-500/40 text-green-200 hover:bg-green-500/10">
                       <RotateCcw className="mr-2 h-4 w-4" />
                       Restore
                     </Button>
@@ -757,7 +779,7 @@ export function InventoryTable({
                       onClick={(event) => { event.stopPropagation(); onDelete(item); }}
                       variant="ghost"
                       size="sm"
-                      className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950"
+                      className="h-11 w-11 p-0 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950"
                       aria-label={`Retire ${item.name}`}
                       title="Retire item"
                     >

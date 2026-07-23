@@ -11,6 +11,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  dialogContentViewportClassName,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -277,7 +278,7 @@ export function HardwareStockPanel({
       <CardContent className="space-y-4 p-4">
         <div className="grid gap-3 md:grid-cols-2">
           <Select value={itemFilter} onValueChange={setItemFilter}>
-            <SelectTrigger className="border-slate-600 bg-slate-800" aria-label="Filter Hardware item">
+            <SelectTrigger className="min-h-11 border-slate-600 bg-slate-800 md:min-h-9" aria-label="Filter Hardware item">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -288,7 +289,7 @@ export function HardwareStockPanel({
             </SelectContent>
           </Select>
           <Select value={locationFilter} onValueChange={setLocationFilter}>
-            <SelectTrigger className="border-slate-600 bg-slate-800" aria-label="Filter stock location">
+            <SelectTrigger className="min-h-11 border-slate-600 bg-slate-800 md:min-h-9" aria-label="Filter stock location">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -300,7 +301,7 @@ export function HardwareStockPanel({
           </Select>
         </div>
 
-        <div className="max-h-[560px] overflow-auto rounded-lg border border-slate-700">
+        <div className="hidden max-h-[560px] overflow-auto rounded-lg border border-slate-700 md:block">
           <Table className="min-w-[900px] table-fixed">
             <TableCaption className="sr-only">All active Hardware items</TableCaption>
             <TableHeader className="sticky top-0 z-10 bg-slate-900">
@@ -434,6 +435,119 @@ export function HardwareStockPanel({
             </TableBody>
           </Table>
         </div>
+
+        <div
+          role="list"
+          aria-label="Hardware stock mobile list"
+          className="space-y-3 md:hidden"
+        >
+          {visibleItems.map((item) => {
+            const itemBalances = visibleBalancesByItem.get(item.id) || [];
+            const total = itemBalances.reduce((sum, entry) => sum + entry.balance.quantity, 0);
+            const hasPositiveStock = (positiveBalancesByItem.get(item.id)?.length || 0) > 0;
+            const isExpanded = expandedItemIds.has(item.id);
+            const detailsId = `hardware-mobile-details-${item.id}`;
+
+            return (
+              <div
+                key={item.id}
+                role="listitem"
+                className="overflow-hidden rounded-lg border border-slate-700 bg-slate-950/30"
+              >
+                <button
+                  type="button"
+                  aria-controls={detailsId}
+                  aria-expanded={isExpanded}
+                  onClick={() => toggleExpandedItem(item.id)}
+                  className="flex min-h-14 w-full items-center gap-3 px-3 py-2 text-left"
+                >
+                  <ChevronDown
+                    aria-hidden="true"
+                    className={`h-5 w-5 shrink-0 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                  />
+                  <span className="min-w-0 flex-1 break-words font-semibold text-white">{item.name}</span>
+                  <span className="shrink-0 text-right">
+                    <span className="block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Total</span>
+                    <span className="font-mono font-semibold text-white">{total.toLocaleString()}</span>
+                  </span>
+                </button>
+
+                {isExpanded ? (
+                  <div id={detailsId} className="border-t border-slate-700 px-3 py-3">
+                    {itemBalances.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        No positive stock is currently held.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {itemBalances.map((entry) => {
+                          const presentation = getInventoryLocationTypePresentation(entry.location);
+                          return (
+                            <div
+                              key={entry.key}
+                              data-location-type={entry.location.location_type}
+                              className={cn(
+                                'flex min-h-11 items-center justify-between gap-3 rounded-md border-l-2 px-3 py-2',
+                                presentation.surfaceClassName,
+                              )}
+                            >
+                              <span className="min-w-0 break-words text-sm text-slate-200">
+                                {entry.location.name}
+                              </span>
+                              <span className="shrink-0 font-mono font-semibold text-white">
+                                {entry.balance.quantity.toLocaleString()}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+
+                <div className="grid grid-cols-3 gap-2 border-t border-slate-700 p-3">
+                  <Button
+                    className="min-h-11 min-w-0 bg-inventory px-2 text-white hover:bg-inventory-dark"
+                    onClick={() => setStockEntry({
+                      items: [item],
+                      copy: {
+                        ...ITEM_STOCK_COPY,
+                        description: `Record incoming stock of ${item.name} at an active Inventory location.`,
+                      },
+                    })}
+                    aria-label={`Add ${item.name} stock`}
+                  >
+                    <PackagePlus className="h-4 w-4" />
+                    Add
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="min-h-11 min-w-0 px-2"
+                    disabled={!hasPositiveStock}
+                    onClick={() => openAdjustment('remove', item)}
+                    aria-label={`Remove ${item.name} stock`}
+                  >
+                    Remove
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="min-h-11 min-w-0 px-2"
+                    onClick={() => openAdjustment('recount', item)}
+                    aria-label={`Recount ${item.name} stock`}
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    Recount
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+          {visibleItems.length === 0 ? (
+            <div className="rounded-lg border border-slate-700 px-4 py-8 text-center text-sm text-muted-foreground">
+              No Hardware items match the current filter.
+            </div>
+          ) : null}
+        </div>
       </CardContent>
 
       <Dialog
@@ -442,8 +556,15 @@ export function HardwareStockPanel({
           if (!open) closeAdjustment();
         }}
       >
-        <DialogContent className="border-slate-700 bg-slate-900 sm:max-w-lg">
-          <DialogHeader>
+        <DialogContent
+          mobileKeyboardSafe
+          className={dialogContentViewportClassName({
+            size: 'lg',
+            scroll: 'content',
+            className: 'border-slate-700 bg-slate-900',
+          })}
+        >
+          <DialogHeader className="shrink-0">
             <DialogTitle className="text-white">
               {adjustmentOperation === 'remove' ? 'Remove' : 'Recount'} {adjustmentItem?.name} stock
             </DialogTitle>
@@ -453,73 +574,75 @@ export function HardwareStockPanel({
                 : 'Set the counted stock level at one location.'}
             </DialogDescription>
           </DialogHeader>
-          <form className="space-y-4" onSubmit={submitAdjustment}>
-            <div className="space-y-2">
-              <Label>Location</Label>
-              <InventoryLocationSelect
-                value={adjustmentLocationId}
-                onValueChange={setAdjustmentLocationId}
-                locations={adjustmentLocationOptions}
-                serverSearch={adjustmentOperation === 'recount'}
-                ariaLabel="Adjustment location"
-                searchPlaceholder="Search locations..."
-              />
-              {adjustmentOperation === 'remove' && selectedAdjustmentBalance ? (
-                <p className="text-xs text-muted-foreground">
-                  Available: {selectedAdjustmentBalance.balance.quantity.toLocaleString()}
-                </p>
-              ) : null}
+          <form className="flex min-h-0 flex-1 flex-col gap-4" onSubmit={submitAdjustment}>
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-1">
+              <div className="space-y-2">
+                <Label>Location</Label>
+                <InventoryLocationSelect
+                  value={adjustmentLocationId}
+                  onValueChange={setAdjustmentLocationId}
+                  locations={adjustmentLocationOptions}
+                  serverSearch={adjustmentOperation === 'recount'}
+                  ariaLabel="Adjustment location"
+                  searchPlaceholder="Search locations..."
+                />
+                {adjustmentOperation === 'remove' && selectedAdjustmentBalance ? (
+                  <p className="text-xs text-muted-foreground">
+                    Available: {selectedAdjustmentBalance.balance.quantity.toLocaleString()}
+                  </p>
+                ) : null}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="hardware_matrix_adjustment_quantity">
+                  {adjustmentOperation === 'recount' ? 'New counted quantity' : 'Quantity'}
+                </Label>
+                <Input
+                  id="hardware_matrix_adjustment_quantity"
+                  type="number"
+                  min={adjustmentOperation === 'recount' ? 0 : 1}
+                  max={adjustmentOperation === 'remove'
+                    ? selectedAdjustmentBalance?.balance.quantity
+                    : undefined}
+                  step={1}
+                  value={adjustmentQuantity}
+                  onChange={(event) => setAdjustmentQuantity(event.target.value)}
+                  className="border-slate-600 bg-slate-800"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Reason</Label>
+                <Select
+                  value={adjustmentReason}
+                  onValueChange={(value) => setAdjustmentReason(value as InventoryHardwareAdjustmentReason)}
+                >
+                  <SelectTrigger className="border-slate-600 bg-slate-800"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {INVENTORY_HARDWARE_ADJUSTMENT_REASONS.map((reason) => (
+                      <SelectItem key={reason} value={reason}>{reason}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="hardware_matrix_adjustment_note">
+                  Note {adjustmentReason === 'Other' ? '(required)' : '(optional)'}
+                </Label>
+                <Textarea
+                  id="hardware_matrix_adjustment_note"
+                  value={adjustmentNote}
+                  onChange={(event) => setAdjustmentNote(event.target.value)}
+                  className="border-slate-600 bg-slate-800"
+                  rows={3}
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="hardware_matrix_adjustment_quantity">
-                {adjustmentOperation === 'recount' ? 'New counted quantity' : 'Quantity'}
-              </Label>
-              <Input
-                id="hardware_matrix_adjustment_quantity"
-                type="number"
-                min={adjustmentOperation === 'recount' ? 0 : 1}
-                max={adjustmentOperation === 'remove'
-                  ? selectedAdjustmentBalance?.balance.quantity
-                  : undefined}
-                step={1}
-                value={adjustmentQuantity}
-                onChange={(event) => setAdjustmentQuantity(event.target.value)}
-                className="border-slate-600 bg-slate-800"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Reason</Label>
-              <Select
-                value={adjustmentReason}
-                onValueChange={(value) => setAdjustmentReason(value as InventoryHardwareAdjustmentReason)}
-              >
-                <SelectTrigger className="border-slate-600 bg-slate-800"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {INVENTORY_HARDWARE_ADJUSTMENT_REASONS.map((reason) => (
-                    <SelectItem key={reason} value={reason}>{reason}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="hardware_matrix_adjustment_note">
-                Note {adjustmentReason === 'Other' ? '(required)' : '(optional)'}
-              </Label>
-              <Textarea
-                id="hardware_matrix_adjustment_note"
-                value={adjustmentNote}
-                onChange={(event) => setAdjustmentNote(event.target.value)}
-                className="border-slate-600 bg-slate-800"
-                rows={3}
-              />
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={closeAdjustment} disabled={isAdjusting}>
+            <DialogFooter className="shrink-0">
+              <Button type="button" variant="outline" onClick={closeAdjustment} disabled={isAdjusting} className="min-h-11">
                 Cancel
               </Button>
               <Button
                 type="submit"
-                className="bg-inventory text-white hover:bg-inventory-dark"
+                className="min-h-11 bg-inventory text-white hover:bg-inventory-dark"
                 disabled={
                   isAdjusting
                   || !adjustmentLocationId

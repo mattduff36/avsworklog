@@ -99,15 +99,15 @@ export function InventoryCategoriesPanel({
             sortedCategories.map((category) => (
               <div key={category.id} className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <div className="font-semibold text-white">{category.name}</div>
+                  <div className="min-w-0">
+                    <div className="break-words font-semibold text-white">{category.name}</div>
                     <Badge variant="outline" className="mt-3 border-slate-600 text-slate-200">
                       <Boxes className="mr-1 h-3 w-3" />
                       {category.item_count || 0} item{category.item_count === 1 ? '' : 's'}
                     </Badge>
                   </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setEditingCategory(category)} className="border-slate-600">
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setEditingCategory(category)} className="min-h-11 border-slate-600">
                       <Pencil className="mr-2 h-3 w-3" />
                       Edit
                     </Button>
@@ -118,7 +118,7 @@ export function InventoryCategoriesPanel({
                       disabled={(category.item_count || 0) > 0}
                       title={(category.item_count || 0) > 0 ? 'Move items to another category before deleting' : 'Delete category'}
                       aria-label={`Delete ${category.name}`}
-                      className="border-red-500/30 text-red-300 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="h-11 w-11 border-red-500/30 text-red-300 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -149,12 +149,12 @@ export function InventoryCategoriesPanel({
               />
             </div>
 
-            <div className="flex gap-2">
-              <Button type="submit" className="bg-inventory text-white hover:bg-inventory-dark" disabled={isSaving || !form.name.trim()}>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button type="submit" className="min-h-11 bg-inventory text-white hover:bg-inventory-dark" disabled={isSaving || !form.name.trim()}>
                 {editingCategory ? 'Save Category' : 'Create Category'}
               </Button>
               {editingCategory ? (
-                <Button type="button" variant="outline" onClick={() => setEditingCategory(null)} disabled={isSaving}>
+                <Button type="button" variant="outline" onClick={() => setEditingCategory(null)} disabled={isSaving} className="min-h-11">
                   Cancel
                 </Button>
               ) : null}

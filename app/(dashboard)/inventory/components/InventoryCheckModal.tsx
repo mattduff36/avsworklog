@@ -202,12 +202,18 @@ export function InventoryCheckModal({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         ref={contentRef}
-        className={dialogContentViewportClassName({ size: '6xl', scroll: 'content', className: 'border border-border bg-slate-950 p-0 text-white' })}
+        mobileKeyboardSafe
+        data-keyboard-safe-dialog="true"
+        className={dialogContentViewportClassName({
+          size: '6xl',
+          scroll: 'content',
+          className: 'top-0 h-[100dvh] max-h-none w-screen max-w-none translate-y-0 gap-0 rounded-none border border-border bg-slate-950 p-0 text-white sm:top-1/2 sm:h-auto sm:max-h-[calc(100dvh-1rem)] sm:w-[calc(100vw-1rem)] sm:max-w-6xl sm:-translate-y-1/2 sm:rounded-xl',
+        })}
         onInteractOutside={handleInteractOutside}
         onEscapeKeyDown={handleEscapeKeyDown}
       >
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-          <DialogHeader className="border-b border-border px-6 py-5 md:px-8 md:py-6">
+          <DialogHeader className="shrink-0 border-b border-border px-6 pb-5 pt-[max(1.25rem,env(safe-area-inset-top))] sm:pt-5 md:px-8 md:py-6">
             <DialogTitle className="text-xl text-white">{checklistDefinition.modalTitle}</DialogTitle>
             <DialogDescription>
               {checklistDefinition.modalDescription}
@@ -226,7 +232,10 @@ export function InventoryCheckModal({
             </div>
           </DialogHeader>
 
-          <ScrollArea className="min-h-0 flex-1 px-6 py-6 md:px-8 md:py-8">
+          <ScrollArea
+            data-mobile-scroll-lock="true"
+            className="min-h-0 flex-1 px-6 py-6 md:px-8 md:py-8"
+          >
             <div className="space-y-6">
               {error ? (
                 <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-100">
@@ -310,32 +319,31 @@ export function InventoryCheckModal({
                   );
                 })}
               </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="inventory_check_general_comments">Comments</Label>
+                <Textarea
+                  id="inventory_check_general_comments"
+                  value={generalComments}
+                  onChange={(event) => {
+                    setGeneralComments(event.target.value);
+                    setError(null);
+                  }}
+                  placeholder="Add any necessary details for this check..."
+                  className="min-h-24 border-slate-600 bg-slate-950 text-white"
+                  disabled={saving}
+                />
+              </div>
             </div>
           </ScrollArea>
 
-          <DialogFooter className="flex-col gap-4 border-t border-border px-6 py-4 sm:flex-col sm:items-stretch sm:justify-start md:px-8 md:py-5">
-            <div className="grid gap-2">
-              <Label htmlFor="inventory_check_general_comments">Comments</Label>
-              <Textarea
-                id="inventory_check_general_comments"
-                value={generalComments}
-                onChange={(event) => {
-                  setGeneralComments(event.target.value);
-                  setError(null);
-                }}
-                placeholder="Add any necessary details for this check..."
-                className="min-h-24 border-slate-600 bg-slate-950 text-white"
-                disabled={saving}
-              />
-            </div>
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button type="button" variant="outline" onClick={discard} disabled={saving}>
-                {isFormDirty ? 'Discard Changes' : 'Cancel'}
-              </Button>
-              <Button type="submit" className="bg-inventory text-white hover:bg-inventory-dark" disabled={saving}>
-                {saving ? 'Submitting...' : 'Submit Check'}
-              </Button>
-            </div>
+          <DialogFooter className="shrink-0 border-t border-border px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 md:px-8 md:pb-5">
+            <Button type="button" variant="outline" onClick={discard} disabled={saving}>
+              {isFormDirty ? 'Discard Changes' : 'Cancel'}
+            </Button>
+            <Button type="submit" className="bg-inventory text-white hover:bg-inventory-dark" disabled={saving}>
+              {saving ? 'Submitting...' : 'Submit Check'}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

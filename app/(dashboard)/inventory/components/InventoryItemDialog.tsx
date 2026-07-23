@@ -8,6 +8,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  dialogContentViewportClassName,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -103,16 +104,27 @@ export function InventoryItemDialog({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen && !saving) onClose(); }}>
-      <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-2xl overflow-y-auto bg-slate-900 text-white border-slate-700">
-        <form onSubmit={handleSubmit}>
-          <DialogHeader>
+      <DialogContent
+        mobileKeyboardSafe
+        data-keyboard-safe-dialog="true"
+        className={dialogContentViewportClassName({
+          size: '2xl',
+          scroll: 'content',
+          className: 'top-0 h-[100dvh] max-h-none w-screen max-w-none translate-y-0 gap-0 rounded-none border-slate-700 bg-slate-900 p-0 text-white sm:top-1/2 sm:h-auto sm:max-h-[calc(100dvh-1rem)] sm:w-[calc(100vw-1rem)] sm:max-w-2xl sm:-translate-y-1/2 sm:rounded-xl',
+        })}
+      >
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <DialogHeader className="shrink-0 px-6 pb-4 pt-[max(1.25rem,env(safe-area-inset-top))] sm:pt-6">
             <DialogTitle>Add Inventory Item</DialogTitle>
             <DialogDescription className="text-muted-foreground">
               Track item identity, location, and the last check date.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4 py-4">
+          <div
+            data-mobile-scroll-lock="true"
+            className="grid min-h-0 flex-1 gap-4 overflow-y-auto overscroll-contain px-6 py-4"
+          >
             <div className="rounded-md border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-100">
               Fleet Plant guidance: anything with an engine, valued over £1000, or too large for a standard van should normally be added to Fleet Plant instead of Inventory. This is guidance only for this phase.
             </div>
@@ -214,7 +226,7 @@ export function InventoryItemDialog({
 
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="shrink-0 border-t border-slate-700 px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:pb-6">
             <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
               Cancel
             </Button>

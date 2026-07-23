@@ -131,7 +131,7 @@ export function InventorySiteAssignmentsPanel({
               setSelectedUserId(value);
               setSelectedLocationId('');
             }}>
-              <SelectTrigger className="border-slate-600 bg-slate-800">
+              <SelectTrigger className="min-h-11 border-slate-600 bg-slate-800">
                 <SelectValue placeholder="Select employee" />
               </SelectTrigger>
               <SelectContent>
@@ -160,7 +160,7 @@ export function InventorySiteAssignmentsPanel({
                 }
               }}
             >
-              <SelectTrigger className="border-slate-600 bg-slate-800">
+              <SelectTrigger className="min-h-11 border-slate-600 bg-slate-800">
                 <SelectValue placeholder="Select location" />
               </SelectTrigger>
               <SelectContent>
@@ -177,7 +177,7 @@ export function InventorySiteAssignmentsPanel({
             type="button"
             onClick={handleAssign}
             disabled={saving || !selectedUserId || !selectedLocationId}
-            className="bg-inventory text-white hover:bg-inventory-dark"
+            className="min-h-11 w-full bg-inventory text-white hover:bg-inventory-dark md:w-auto"
           >
             <UserPlus className="mr-2 h-4 w-4" />
             Assign Location
@@ -200,21 +200,20 @@ export function InventorySiteAssignmentsPanel({
                   presentation.surfaceClassName,
                 )}
               >
-                <div>
-                  <div className="font-medium text-white">{getUserLabel(assignment.user)}</div>
+                <div className="min-w-0">
+                  <div className="break-words font-medium text-white">{getUserLabel(assignment.user)}</div>
                   <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                    <Badge variant="outline" className={presentation.badgeClassName}>
+                    <Badge variant="outline" className={cn('max-w-full whitespace-normal break-words text-left', presentation.badgeClassName)}>
                       {getLocationLabel(location)}
                     </Badge>
                   </div>
                 </div>
                 <Button
                   type="button"
-                  size="sm"
                   variant="outline"
                   onClick={() => { void handleRemove(assignment); }}
                   disabled={removingKey === key}
-                  className="border-red-500/30 text-red-300 hover:bg-red-500/10"
+                  className="min-h-11 w-full border-red-500/30 text-red-300 hover:bg-red-500/10 sm:w-auto"
                 >
                   <Trash2 className="mr-2 h-3 w-3" />
                   Remove

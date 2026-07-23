@@ -61,3 +61,28 @@ test.describe('@inventory @critical Inventory', () => {
     }
   });
 });
+
+test.describe('@inventory Inventory kiosk control on mobile', () => {
+  test.use({
+    viewport: { width: 375, height: 812 },
+    hasTouch: true,
+    isMobile: true,
+  });
+
+  test('keeps the fixed kiosk replica inside a horizontal scroll region', async ({ page }) => {
+    await gotoWithTimeoutSkip(
+      page,
+      '/inventory/kiosk-control',
+      'Inventory kiosk control timed out in this environment',
+    );
+
+    const replicaRegion = page.getByRole('region', { name: 'Scrollable Yard kiosk replica' });
+    await expect(replicaRegion).toBeVisible();
+    await expect(page.getByTestId('yard-kiosk-virtual-screen')).toHaveCSS('width', '1024px');
+
+    const documentOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(documentOverflow).toBeLessThanOrEqual(1);
+  });
+});

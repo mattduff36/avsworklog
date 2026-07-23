@@ -146,6 +146,13 @@ describe('HardwareStockPanel', () => {
     expect(within(matrix).queryByRole('checkbox')).not.toBeInTheDocument();
     expect(screen.queryByText(/Select an item to adjust all shown locations/i)).not.toBeInTheDocument();
 
+    const mobileList = screen.getByRole('list', { name: 'Hardware stock mobile list' });
+    expect(within(mobileList).getAllByRole('listitem')).toHaveLength(3);
+    expect(within(mobileList).getByRole('button', { name: 'Add Explicit Zero stock' }))
+      .toHaveClass('min-h-11');
+    expect(within(mobileList).getByRole('button', { name: 'Remove Missing Yard stock' }))
+      .toBeDisabled();
+
     fireEvent.click(within(matrix).getByRole('button', { name: 'Explicit Zero' }));
     const balances = within(matrix).getByRole('table', {
       name: 'Location balances for Explicit Zero',
@@ -182,7 +189,8 @@ describe('HardwareStockPanel', () => {
       />,
     );
 
-    const addStockButton = screen.getByRole('button', { name: 'Add Cones stock' });
+    const matrix = screen.getByRole('table', { name: 'All active Hardware items' });
+    const addStockButton = within(matrix).getByRole('button', { name: 'Add Cones stock' });
     expect(addStockButton).toHaveClass('bg-inventory', 'text-white', 'hover:bg-inventory-dark');
     fireEvent.click(addStockButton);
     const dialog = screen.getByRole('dialog');
@@ -224,7 +232,8 @@ describe('HardwareStockPanel', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove Road Plates stock' }));
+    const matrix = screen.getByRole('table', { name: 'All active Hardware items' });
+    fireEvent.click(within(matrix).getByRole('button', { name: 'Remove Road Plates stock' }));
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByRole('button', { name: 'Adjustment location' })).toHaveTextContent(
       'Van - TE57 VAN',
@@ -259,7 +268,8 @@ describe('HardwareStockPanel', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Recount Generator stock' }));
+    const matrix = screen.getByRole('table', { name: 'All active Hardware items' });
+    fireEvent.click(within(matrix).getByRole('button', { name: 'Recount Generator stock' }));
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByRole('button', { name: 'Adjustment location' })).toHaveTextContent('Yard');
     fireEvent.change(within(dialog).getByLabelText('New counted quantity'), {

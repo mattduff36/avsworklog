@@ -210,7 +210,7 @@ export function InventoryEmployeeView({
             <Button
               type="submit"
               disabled={!suggestedName.trim() || isRequestingLocation}
-              className="bg-inventory text-white hover:bg-inventory-dark"
+              className="min-h-11 w-full bg-inventory text-white hover:bg-inventory-dark sm:w-auto"
             >
               <Send className="mr-2 h-4 w-4" />
               Send Request
@@ -266,7 +266,7 @@ export function InventoryEmployeeView({
             <Button
               onClick={handleSetLocation}
               disabled={!selectedLocationId || isRequestingMissingLocation || isSavingLocation}
-              className="bg-inventory text-white hover:bg-inventory-dark"
+              className="min-h-11 w-full bg-inventory text-white hover:bg-inventory-dark sm:w-auto"
             >
               Save Location
             </Button>
@@ -281,15 +281,15 @@ export function InventoryEmployeeView({
   return (
     <div className="space-y-6">
       <Card className="border-slate-700 bg-slate-900/70">
-        <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="flex items-center gap-2 text-sm font-medium text-white">
-              <MapPin className="h-4 w-4 text-inventory" />
-              Current inventory location: {activeLocation.name}
+        <CardContent className="flex flex-col gap-4 p-3 min-[380px]:p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="flex min-w-0 items-start gap-2 text-sm font-medium text-white">
+              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-inventory" />
+              <span className="break-words">Current inventory location: {activeLocation.name}</span>
             </div>
             {currentFleetAssignment ? (
               <div className="mt-2">
-                <Badge variant="outline" className="border-blue-500/30 bg-blue-500/10 text-blue-300">
+                <Badge variant="outline" className="max-w-full whitespace-normal break-words border-blue-500/30 bg-blue-500/10 text-blue-300">
                   <Truck className="mr-1 h-3 w-3" />
                   Linked {currentFleetAssignment.asset_type.toUpperCase()}: {[
                     currentFleetAssignment.asset_label,
@@ -303,7 +303,7 @@ export function InventoryEmployeeView({
               </p>
             )}
           </div>
-          <Button variant="outline" onClick={onChangeLocation} className="border-slate-600">
+          <Button variant="outline" onClick={onChangeLocation} className="min-h-11 w-full border-slate-600 sm:w-auto">
             Change Location
           </Button>
         </CardContent>
@@ -342,9 +342,9 @@ export function InventoryEmployeeView({
             return (
               <Card key={secondaryLocation.location_id} className="border-slate-700 bg-slate-900/70">
                 <CardHeader>
-                  <CardTitle className="flex flex-wrap items-center gap-2 text-white">
-                    <MapPin className="h-5 w-5 text-inventory" />
-                    {locationTypeLabel}: {location.name}
+                  <CardTitle className="flex min-w-0 flex-wrap items-center gap-2 text-white">
+                    <MapPin className="h-5 w-5 shrink-0 text-inventory" />
+                    <span className="min-w-0 break-words">{locationTypeLabel}: {location.name}</span>
                     <Badge variant="outline" className="border-blue-500/30 bg-blue-500/10 text-blue-300">
                       Secondary Location
                     </Badge>
@@ -378,8 +378,8 @@ export function InventoryEmployeeView({
       ) : null}
 
       <Card className="border-slate-700 bg-slate-900/70">
-        <CardHeader className="flex flex-row items-center justify-between gap-4">
-          <div>
+        <CardHeader className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
             <CardTitle className="flex items-center gap-2 text-white">
               <Boxes className="h-5 w-5 text-inventory" />
               Hardware
@@ -389,7 +389,7 @@ export function InventoryEmployeeView({
             </p>
           </div>
           {onTransferHardware && hasTransferableHardware ? (
-            <Button variant="outline" onClick={() => setHardwareTransferOpen(true)} className="shrink-0 border-slate-600">
+            <Button variant="outline" onClick={() => setHardwareTransferOpen(true)} className="min-h-11 w-full shrink-0 border-slate-600 sm:w-auto">
               <ArrowRightLeft className="mr-2 h-4 w-4" />
               Transfer
             </Button>
@@ -413,9 +413,9 @@ export function InventoryEmployeeView({
 
               return (
                 <div key={location.id} className="overflow-hidden rounded-lg border border-slate-700">
-                  <div className="flex items-center gap-2 border-b border-slate-700 bg-slate-950/40 px-4 py-3">
-                    <MapPin className="h-4 w-4 text-inventory" />
-                    <span className="font-semibold text-white">{location.name}</span>
+                  <div className="flex min-w-0 items-center gap-2 border-b border-slate-700 bg-slate-950/40 px-3 py-3 min-[380px]:px-4">
+                    <MapPin className="h-4 w-4 shrink-0 text-inventory" />
+                    <span className="min-w-0 break-words font-semibold text-white">{location.name}</span>
                   </div>
                   <div className="divide-y divide-slate-800">
                     {locationBalances.map((balance) => (
@@ -450,12 +450,12 @@ export function InventoryEmployeeView({
             onEnabledChange={setIncludeLegacyQuoteClaims}
           />
           {claimableItems.map((item) => (
-            <div key={item.id} className="flex flex-col gap-3 rounded-lg border border-slate-700 bg-slate-800/50 p-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="font-medium text-white">{item.name}</div>
-                <div className="text-xs text-muted-foreground">{item.item_number} · Currently at {item.location?.name || 'No location assigned'}</div>
+            <div key={item.id} className="flex min-w-0 flex-col gap-3 rounded-lg border border-slate-700 bg-slate-800/50 p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <div className="break-words font-medium text-white">{item.name}</div>
+                <div className="break-words text-xs text-muted-foreground">{item.item_number} · Currently at {item.location?.name || 'No location assigned'}</div>
               </div>
-              <Button size="sm" className="bg-inventory text-white hover:bg-inventory-dark" onClick={() => handleClaim(item)}>
+              <Button size="sm" className="min-h-11 w-full bg-inventory text-white hover:bg-inventory-dark sm:w-auto" onClick={() => handleClaim(item)}>
                 Claim
               </Button>
             </div>

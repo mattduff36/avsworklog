@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { Check, ChevronDown, Loader2, Search } from 'lucide-react';
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
+import { Check, ChevronDown, Loader2, Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -51,6 +52,37 @@ interface InventoryLocationSelectOption {
 
 const MINIMUM_SERVER_SEARCH_CHARACTERS = 3;
 const SERVER_SEARCH_DEBOUNCE_MS = 300;
+const MOBILE_PICKER_MEDIA_QUERY = '(max-width: 639px)';
+const MOBILE_PICKER_MARGIN_PX = 8;
+
+function getIsMobilePickerViewport(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (typeof window.matchMedia === 'function') {
+    return window.matchMedia(MOBILE_PICKER_MEDIA_QUERY).matches;
+  }
+  return window.innerWidth < 640;
+}
+
+function getMobilePickerViewportStyle(isInsideDialog: boolean): CSSProperties {
+  if (typeof window === 'undefined') return {};
+
+  const visualViewport = window.visualViewport;
+  const viewportTop = visualViewport?.offsetTop ?? 0;
+  const viewportLeft = visualViewport?.offsetLeft ?? 0;
+  const viewportWidth = visualViewport?.width ?? window.innerWidth;
+  const viewportHeight = visualViewport?.height ?? window.innerHeight;
+  const visibleWidth = Math.max(0, viewportWidth - (MOBILE_PICKER_MARGIN_PX * 2));
+  const visibleHeight = Math.max(0, viewportHeight - (MOBILE_PICKER_MARGIN_PX * 2));
+
+  return {
+    position: isInsideDialog ? 'absolute' : 'fixed',
+    top: `calc(${(isInsideDialog ? 0 : viewportTop) + MOBILE_PICKER_MARGIN_PX}px + env(safe-area-inset-top, 0px))`,
+    left: `calc(${(isInsideDialog ? 0 : viewportLeft) + MOBILE_PICKER_MARGIN_PX}px + env(safe-area-inset-left, 0px))`,
+    width: `calc(${visibleWidth}px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))`,
+    height: `calc(${visibleHeight}px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))`,
+    maxHeight: `calc(${visibleHeight}px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))`,
+  };
+}
 
 export function InventoryLocationSelect({
   locations = [],
@@ -79,7 +111,72 @@ export function InventoryLocationSelect({
   const [selectedServerLocation, setSelectedServerLocation] = useState<InventoryLocation | null>(
     locations.find((location) => location.id === value) || null,
   );
+  const [isMobilePicker, setIsMobilePicker] = useState(false);
+  const [mobilePickerStyle, setMobilePickerStyle] = useState<CSSProperties>({});
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const listboxId = useId();
   const normalizedSearchQuery = searchQuery.trim();
+
+  useEffect(() => {
+    const mediaQuery = typeof window.matchMedia === 'function'
+      ? window.matchMedia(MOBILE_PICKER_MEDIA_QUERY)
+      : null;
+    const syncMobilePicker = () => {
+      setIsMobilePicker(mediaQuery?.matches ?? getIsMobilePickerViewport());
+    };
+
+    syncMobilePicker();
+    mediaQuery?.addEventListener('change', syncMobilePicker);
+    window.addEventListener('resize', syncMobilePicker);
+
+    return () => {
+      mediaQuery?.removeEventListener('change', syncMobilePicker);
+      window.removeEventListener('resize', syncMobilePicker);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!open || !isMobilePicker) {
+      setMobilePickerStyle({});
+      return;
+    }
+
+    let viewportAnimationFrame = 0;
+    let focusAnimationFrame = 0;
+    const visualViewport = window.visualViewport;
+    const syncPickerViewport = () => {
+      window.cancelAnimationFrame(viewportAnimationFrame);
+      viewportAnimationFrame = window.requestAnimationFrame(() => {
+        const isInsideDialog = Boolean(triggerRef.current?.closest('[role="dialog"]'));
+        setMobilePickerStyle(getMobilePickerViewportStyle(isInsideDialog));
+      });
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      setOpen(false);
+      setSearchQuery('');
+      if (controlledIncludeLegacyQuotes === undefined) setInternalIncludeLegacyQuotes(false);
+      window.requestAnimationFrame(() => triggerRef.current?.focus());
+    };
+
+    syncPickerViewport();
+    focusAnimationFrame = window.requestAnimationFrame(() => searchInputRef.current?.focus());
+    visualViewport?.addEventListener('resize', syncPickerViewport);
+    visualViewport?.addEventListener('scroll', syncPickerViewport);
+    window.addEventListener('orientationchange', syncPickerViewport);
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.cancelAnimationFrame(viewportAnimationFrame);
+      window.cancelAnimationFrame(focusAnimationFrame);
+      visualViewport?.removeEventListener('resize', syncPickerViewport);
+      visualViewport?.removeEventListener('scroll', syncPickerViewport);
+      window.removeEventListener('orientationchange', syncPickerViewport);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [controlledIncludeLegacyQuotes, isMobilePicker, open]);
 
   useEffect(() => {
     if (!value) {
@@ -196,10 +293,17 @@ export function InventoryLocationSelect({
     && normalizedSearchQuery.length < MINIMUM_SERVER_SEARCH_CHARACTERS;
 
   function handleOpenChange(nextOpen: boolean) {
+    if (nextOpen && isMobilePicker) {
+      const isInsideDialog = Boolean(triggerRef.current?.closest('[role="dialog"]'));
+      setMobilePickerStyle(getMobilePickerViewportStyle(isInsideDialog));
+    }
     setOpen(nextOpen);
     if (!nextOpen) {
       setSearchQuery('');
       if (controlledIncludeLegacyQuotes === undefined) setInternalIncludeLegacyQuotes(false);
+      if (isMobilePicker) {
+        window.requestAnimationFrame(() => triggerRef.current?.focus());
+      }
     }
   }
 
@@ -209,14 +313,133 @@ export function InventoryLocationSelect({
     handleOpenChange(false);
   }
 
+  const pickerContent = (
+    <>
+      <div className="shrink-0 border-b border-slate-800 bg-slate-950 p-2">
+        <div className="flex items-center gap-2">
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+            <Input
+              ref={searchInputRef}
+              value={searchQuery}
+              onChange={(event) => {
+                const nextSearchQuery = event.target.value;
+                setSearchQuery(nextSearchQuery);
+                if (serverSearch) {
+                  setSearchResults([]);
+                  setSearchError('');
+                  setSearching(nextSearchQuery.trim().length >= MINIMUM_SERVER_SEARCH_CHARACTERS);
+                }
+              }}
+              placeholder={searchPlaceholder}
+              className="h-11 border-slate-700 bg-slate-900 pl-9 text-base text-white placeholder:text-slate-500 sm:h-9 sm:text-sm"
+              aria-label={searchPlaceholder}
+              aria-controls={listboxId}
+              aria-expanded={open}
+              aria-autocomplete="list"
+            />
+          </div>
+          {isMobilePicker ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => handleOpenChange(false)}
+              aria-label="Close location picker"
+              className="h-11 w-11 shrink-0 border border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white"
+            >
+              <X className="h-5 w-5" aria-hidden="true" />
+            </Button>
+          ) : null}
+        </div>
+        {allowLegacyQuoteOptIn ? (
+          <LegacyQuoteLocationOptIn
+            enabled={includeLegacyQuotes}
+            onEnabledChange={(enabled) => {
+              if (onIncludeLegacyQuotesChange) onIncludeLegacyQuotesChange(enabled);
+              else setInternalIncludeLegacyQuotes(enabled);
+            }}
+            className="mt-2 w-full justify-center"
+          />
+        ) : null}
+      </div>
+      <div
+        id={listboxId}
+        role="listbox"
+        aria-label="Inventory locations"
+        data-mobile-scroll-lock="true"
+        className={cn(
+          'overflow-y-auto overscroll-contain p-1',
+          isMobilePicker ? 'min-h-0 flex-1' : 'max-h-64',
+        )}
+      >
+        {showMinimumSearchHint ? (
+          <div className="px-3 py-2 text-center text-xs text-slate-500" aria-live="polite">
+            Type at least 3 characters to search all locations.
+          </div>
+        ) : null}
+        {searching ? (
+          <div className="flex items-center justify-center gap-2 px-3 py-6 text-sm text-slate-300" aria-live="polite">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Searching locations...
+          </div>
+        ) : searchError ? (
+          <div className="px-3 py-6 text-center text-sm text-red-300" role="alert">{searchError}</div>
+        ) : filteredOptions.length > 0 ? (
+          filteredOptions.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              role="option"
+              data-location-type={option.location?.location_type}
+              aria-selected={option.value === value}
+              onClick={() => handleSelect(option)}
+              className={cn(
+                'flex min-h-11 w-full items-center gap-2 rounded-sm border border-transparent px-3 py-2 text-left text-sm hover:bg-slate-800 focus:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-inventory/60',
+                option.className,
+              )}
+            >
+              <Check
+                className={cn(
+                  'h-4 w-4 shrink-0',
+                  option.location && getInventoryLocationTypePresentation(option.location).iconClassName,
+                  option.value === value ? 'opacity-100' : 'opacity-0',
+                )}
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate">{option.label}</span>
+                {option.description ? (
+                  <span className="mt-0.5 block truncate text-xs text-slate-400">
+                    {option.description}
+                  </span>
+                ) : null}
+              </span>
+            </button>
+          ))
+        ) : (
+          <div className="px-3 py-6 text-center text-sm text-slate-400">No locations found</div>
+        )}
+      </div>
+    </>
+  );
+  const mobilePickerPortalHost = typeof document !== 'undefined'
+    ? triggerRef.current?.closest('[role="dialog"]') || document.body
+    : null;
+  const isMobilePickerInsideDialog = Boolean(
+    mobilePickerPortalHost && mobilePickerPortalHost !== document.body,
+  );
+
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
+          ref={triggerRef}
           type="button"
           variant="outline"
           role="combobox"
           aria-expanded={open}
+          aria-controls={open ? listboxId : undefined}
+          aria-haspopup="listbox"
           aria-label={ariaLabel}
           disabled={disabled}
           className={cn(
@@ -238,89 +461,35 @@ export function InventoryLocationSelect({
           <ChevronDown className={cn('ml-2 h-4 w-4 shrink-0 opacity-70 transition-transform', open && 'rotate-180')} />
         </Button>
       </PopoverTrigger>
-      <PopoverContent
-        align="start"
-        className="w-[var(--radix-popover-trigger-width)] border-slate-700 bg-slate-950 p-0 text-slate-200"
-      >
-        <div className="sticky top-0 z-10 border-b border-slate-800 bg-slate-950 p-2">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-            <Input
-              value={searchQuery}
-              onChange={(event) => {
-                const nextSearchQuery = event.target.value;
-                setSearchQuery(nextSearchQuery);
-                if (serverSearch) {
-                  setSearchResults([]);
-                  setSearchError('');
-                  setSearching(nextSearchQuery.trim().length >= MINIMUM_SERVER_SEARCH_CHARACTERS);
-                }
-              }}
-              placeholder={searchPlaceholder}
-              className="h-9 border-slate-700 bg-slate-900 pl-9 text-white placeholder:text-slate-500"
-              aria-label={searchPlaceholder}
-            />
+      {!isMobilePicker ? (
+        <PopoverContent
+          align="start"
+          className="z-[210] w-[var(--radix-popover-trigger-width)] border-slate-700 bg-slate-950 p-0 text-slate-200"
+        >
+          {pickerContent}
+        </PopoverContent>
+      ) : null}
+      {open && isMobilePicker && mobilePickerPortalHost ? createPortal(
+        <>
+          <div
+            aria-hidden="true"
+            data-mobile-scroll-lock="true"
+            className={cn('inset-0 z-[218] bg-black/70', isMobilePickerInsideDialog ? 'absolute' : 'fixed')}
+            onPointerDown={() => handleOpenChange(false)}
+          />
+          <div
+            role="dialog"
+            aria-modal="false"
+            aria-label="Choose inventory location"
+            data-mobile-scroll-lock="true"
+            className="z-[220] flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-700 bg-slate-950 text-slate-200 shadow-2xl"
+            style={mobilePickerStyle}
+          >
+            {pickerContent}
           </div>
-          {allowLegacyQuoteOptIn ? (
-            <LegacyQuoteLocationOptIn
-              enabled={includeLegacyQuotes}
-              onEnabledChange={(enabled) => {
-                if (onIncludeLegacyQuotesChange) onIncludeLegacyQuotesChange(enabled);
-                else setInternalIncludeLegacyQuotes(enabled);
-              }}
-              className="mt-2 w-full justify-center"
-            />
-          ) : null}
-        </div>
-        <div className="max-h-64 overflow-y-auto p-1">
-          {showMinimumSearchHint ? (
-            <div className="px-3 py-2 text-center text-xs text-slate-500" aria-live="polite">
-              Type at least 3 characters to search all locations.
-            </div>
-          ) : null}
-          {searching ? (
-            <div className="flex items-center justify-center gap-2 px-3 py-6 text-sm text-slate-300" aria-live="polite">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Searching locations...
-            </div>
-          ) : searchError ? (
-            <div className="px-3 py-6 text-center text-sm text-red-300" role="alert">{searchError}</div>
-          ) : filteredOptions.length > 0 ? (
-            filteredOptions.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                role="option"
-                data-location-type={option.location?.location_type}
-                aria-selected={option.value === value}
-                onClick={() => handleSelect(option)}
-                className={cn(
-                  'flex w-full items-center gap-2 rounded-sm border border-transparent px-3 py-2 text-left text-sm hover:bg-slate-800 focus:bg-slate-800 focus:outline-none',
-                  option.className
-                )}
-              >
-                <Check
-                  className={cn(
-                    'h-4 w-4 shrink-0',
-                    option.location && getInventoryLocationTypePresentation(option.location).iconClassName,
-                    option.value === value ? 'opacity-100' : 'opacity-0',
-                  )}
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate">{option.label}</span>
-                  {option.description ? (
-                    <span className="mt-0.5 block truncate text-xs text-slate-400">
-                      {option.description}
-                    </span>
-                  ) : null}
-                </span>
-              </button>
-            ))
-          ) : (
-            <div className="px-3 py-6 text-center text-sm text-slate-400">No locations found</div>
-          )}
-        </div>
-      </PopoverContent>
+        </>,
+        mobilePickerPortalHost,
+      ) : null}
     </Popover>
   );
 }

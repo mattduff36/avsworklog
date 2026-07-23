@@ -106,4 +106,56 @@ describe('InventoryLocationSelect', () => {
     expect(trigger).toHaveTextContent('VAN · FE24 TYH · Matt Duffill');
     expect(trigger).toHaveClass('bg-[hsl(var(--inspection-primary)/0.10)]');
   });
+
+  it('uses the visible viewport for the mobile location picker', async () => {
+    const viewportListeners = new Map<string, Set<EventListener>>();
+    const visualViewport = {
+      width: 390,
+      height: 500,
+      offsetTop: 40,
+      offsetLeft: 0,
+      addEventListener: vi.fn((event: string, listener: EventListener) => {
+        const listeners = viewportListeners.get(event) || new Set<EventListener>();
+        listeners.add(listener);
+        viewportListeners.set(event, listeners);
+      }),
+      removeEventListener: vi.fn((event: string, listener: EventListener) => {
+        viewportListeners.get(event)?.delete(listener);
+      }),
+    };
+    vi.stubGlobal('matchMedia', vi.fn(() => ({
+      matches: true,
+      media: '(max-width: 639px)',
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })));
+    vi.stubGlobal('visualViewport', visualViewport);
+
+    render(
+      <InventoryLocationSelect
+        value=""
+        onValueChange={vi.fn()}
+        locations={[assignedLocation]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('combobox'));
+    const picker = await screen.findByRole('dialog', { name: 'Choose inventory location' });
+    expect(picker).toHaveAttribute('data-mobile-scroll-lock', 'true');
+    expect(picker.style.position).toBe('fixed');
+    expect(picker.style.height).toContain('484px');
+    expect(screen.getByRole('listbox', { name: 'Inventory locations' }))
+      .toHaveAttribute('data-mobile-scroll-lock', 'true');
+
+    visualViewport.height = 320;
+    viewportListeners.get('resize')?.forEach((listener) => listener(new Event('resize')));
+
+    await waitFor(() => {
+      expect(picker.style.height).toContain('304px');
+    });
+  });
 });
