@@ -121,7 +121,7 @@ export default function InventoryPage() {
   const [fleetAssets, setFleetAssets] = useState<FleetAssetOption[]>([]);
   const [inventoryContext, setInventoryContext] = useState<InventoryContext | null>(null);
   const [siteAssignmentUsers, setSiteAssignmentUsers] = useState<InventorySiteAssignmentUser[]>([]);
-  const [assignableSiteLocations, setAssignableSiteLocations] = useState<InventoryLocation[]>([]);
+  const [assignableLocations, setAssignableLocations] = useState<InventoryLocation[]>([]);
   const [siteAssignments, setSiteAssignments] = useState<InventorySiteAssignment[]>([]);
   const [groups, setGroups] = useState<InventoryItemGroup[]>([]);
   const [categories, setCategories] = useState<InventoryItemCategory[]>([]);
@@ -208,9 +208,9 @@ export default function InventoryPage() {
 
       const siteAssignmentsPayload = siteAssignmentsResponse
         ? await siteAssignmentsResponse.json()
-        : { active_sites: [], users: [], assignments: [] };
+        : { active_locations: [], users: [], assignments: [] };
       if (siteAssignmentsResponse && !siteAssignmentsResponse.ok) {
-        throw new Error(siteAssignmentsPayload.error || 'Failed to fetch Site assignments');
+        throw new Error(siteAssignmentsPayload.error || 'Failed to fetch location assignments');
       }
 
       setInventoryContext(contextPayload);
@@ -222,7 +222,7 @@ export default function InventoryPage() {
       setHardwareBalances(hardwarePayload.balances || []);
       setGroups(groupsPayload.groups || []);
       setSiteAssignmentUsers(siteAssignmentsPayload.users || []);
-      setAssignableSiteLocations(siteAssignmentsPayload.active_sites || []);
+      setAssignableLocations(siteAssignmentsPayload.active_locations || []);
       setSiteAssignments(siteAssignmentsPayload.assignments || []);
       setInventoryLoadError(null);
     } catch (error) {
@@ -368,10 +368,10 @@ export default function InventoryPage() {
       ...hardwareLocations,
       inventoryContext?.user_location?.location,
       ...(inventoryContext?.secondary_site_locations || []).map((entry) => entry.location),
-      ...assignableSiteLocations,
+      ...assignableLocations,
     ]),
     [
-      assignableSiteLocations,
+      assignableLocations,
       hardwareLocations,
       inventoryContext?.secondary_site_locations,
       inventoryContext?.user_location?.location,
@@ -639,34 +639,34 @@ export default function InventoryPage() {
     toast.success('Location request sent');
   }
 
-  async function handleAssignSiteLocation({ userId, locationId }: { userId: string; locationId: string }) {
+  async function handleAssignLocation({ userId, locationId }: { userId: string; locationId: string }) {
     const response = await fetch('/api/inventory/site-assignments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: userId, location_id: locationId }),
     });
-    await parseJsonResponse(response, 'Failed to assign Site location');
-    toast.success('Site location assigned');
+    await parseJsonResponse(response, 'Failed to assign location');
+    toast.success('Location assigned');
     await fetchInventoryData();
   }
 
-  async function handleRemoveSiteLocationAssignment({ userId, locationId }: { userId: string; locationId: string }) {
+  async function handleRemoveLocationAssignment({ userId, locationId }: { userId: string; locationId: string }) {
     const response = await fetch('/api/inventory/site-assignments', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: userId, location_id: locationId }),
     });
-    await parseJsonResponse(response, 'Failed to remove Site location assignment');
-    toast.success('Site location assignment removed');
+    await parseJsonResponse(response, 'Failed to remove location assignment');
+    toast.success('Location assignment removed');
     await fetchInventoryData();
   }
 
   async function handleSiteAssignmentLegacyQuoteOptIn(includeLegacyQuotes: boolean) {
     const params = includeLegacyQuotes ? '?includeLegacyQuotes=true' : '';
     const response = await fetch(`/api/inventory/site-assignments${params}`, { cache: 'no-store' });
-    const payload = await parseJsonResponse(response, 'Failed to fetch Site assignments');
+    const payload = await parseJsonResponse(response, 'Failed to fetch location assignments');
     setSiteAssignmentUsers(payload.users || []);
-    setAssignableSiteLocations(payload.active_sites || []);
+    setAssignableLocations(payload.active_locations || []);
     setSiteAssignments(payload.assignments || []);
   }
 
@@ -883,10 +883,10 @@ export default function InventoryPage() {
         {inventoryContext?.can_manage_site_locations ? (
           <InventorySiteAssignmentsPanel
             users={siteAssignmentUsers}
-            activeSites={assignableSiteLocations}
+            assignableLocations={assignableLocations}
             assignments={siteAssignments}
-            onAssign={handleAssignSiteLocation}
-            onRemove={handleRemoveSiteLocationAssignment}
+            onAssign={handleAssignLocation}
+            onRemove={handleRemoveLocationAssignment}
             onIncludeLegacyQuotesChange={handleSiteAssignmentLegacyQuoteOptIn}
           />
         ) : null}
@@ -1088,7 +1088,7 @@ export default function InventoryPage() {
                 {inventoryContext?.can_manage_site_locations ? (
                   <TabsTrigger value="site_assignments" className="gap-2">
                     <Users className="h-4 w-4" />
-                    Site Assignments
+                    Location Assignments
                   </TabsTrigger>
                 ) : null}
               </TabsList>
@@ -1212,10 +1212,10 @@ export default function InventoryPage() {
           {locationsTab === 'site_assignments' && inventoryContext?.can_manage_site_locations ? (
             <InventorySiteAssignmentsPanel
               users={siteAssignmentUsers}
-              activeSites={assignableSiteLocations}
+              assignableLocations={assignableLocations}
               assignments={siteAssignments}
-              onAssign={handleAssignSiteLocation}
-              onRemove={handleRemoveSiteLocationAssignment}
+              onAssign={handleAssignLocation}
+              onRemove={handleRemoveLocationAssignment}
               onIncludeLegacyQuotesChange={handleSiteAssignmentLegacyQuoteOptIn}
             />
           ) : null}

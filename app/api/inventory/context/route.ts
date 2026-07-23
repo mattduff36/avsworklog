@@ -6,6 +6,7 @@ import type { Database } from '@/types/database';
 
 type InventoryLocationRow = Database['public']['Tables']['inventory_locations']['Row'];
 type InventoryUserSiteLocationRow = Database['public']['Tables']['inventory_user_site_locations']['Row'];
+const SECONDARY_LOCATION_TYPES = new Set(['site', 'manual']);
 
 interface InventoryContextUserLocationRow {
   location_id: string | null;
@@ -77,7 +78,10 @@ export async function GET() {
         ...row,
         location: pickSiteLocationRelation(row.location),
       }))
-      .filter((row) => row.location?.is_active === true && row.location.location_type === 'site');
+      .filter((row) => (
+        row.location?.is_active === true
+        && SECONDARY_LOCATION_TYPES.has(row.location.location_type)
+      ));
 
     return NextResponse.json({
       user_id: access.userId,

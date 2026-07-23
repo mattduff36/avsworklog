@@ -58,6 +58,18 @@ const siteLocation: InventoryLocation = {
   updated_by: null,
 };
 
+const manualLocation: InventoryLocation = {
+  ...siteLocation,
+  id: 'manual-location',
+  name: 'Storage Container',
+  description: 'Secure stores',
+  location_type: 'manual',
+  source_type: 'manual',
+  source_id: null,
+  external_reference: null,
+  sync_status: 'manual',
+};
+
 const yardLocation: InventoryLocation = {
   ...primaryLocation,
   id: 'yard-location',
@@ -136,7 +148,37 @@ describe('InventoryEmployeeView', () => {
     expect(screen.getByText('Current inventory location: Van - AB12 CDE')).toBeInTheDocument();
     expect(screen.getByText('Site: Site - 12345 - Yard Entrance')).toBeInTheDocument();
     expect(screen.getByText('Secondary Location')).toBeInTheDocument();
-    expect(screen.getByText(/site 12345: Site Barrier/)).toBeInTheDocument();
+    expect(screen.getByText(/Site 12345: Site Barrier/)).toBeInTheDocument();
+  });
+
+  it('renders assigned Manual locations as separate secondary sections', () => {
+    render(
+      <InventoryEmployeeView
+        items={[makeItem('tool-3', 'Stored Saw', manualLocation)]}
+        locations={[primaryLocation]}
+        userLocation={{
+          user_id: 'user-1',
+          location_id: primaryLocation.id,
+          location: primaryLocation,
+        }}
+        secondarySiteLocations={[{
+          user_id: 'user-1',
+          location_id: manualLocation.id,
+          assigned_by: 'supervisor-1',
+          assigned_at: '2026-07-05T00:00:00.000Z',
+          note: null,
+          location: manualLocation,
+        }]}
+        currentFleetAssignment={null}
+        onSetUserLocation={vi.fn()}
+        onRequestLocation={vi.fn()}
+        onOpenMoveDialog={vi.fn()}
+        onChangeLocation={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Manual: Storage Container')).toBeInTheDocument();
+    expect(screen.getByText(/Storage Container: Stored Saw/)).toBeInTheDocument();
   });
 
   it('groups positive Hardware balances by responsible location and hides zero balances', () => {

@@ -39,7 +39,7 @@ export interface InventorySiteAssignment {
 
 interface InventorySiteAssignmentsPanelProps {
   users: InventorySiteAssignmentUser[];
-  activeSites: InventoryLocation[];
+  assignableLocations: InventoryLocation[];
   assignments: InventorySiteAssignment[];
   onAssign: (payload: { userId: string; locationId: string }) => Promise<void>;
   onRemove: (payload: { userId: string; locationId: string }) => Promise<void>;
@@ -53,14 +53,16 @@ function getUserLabel(user: InventorySiteAssignmentUser | null | undefined): str
     .join(' ');
 }
 
-function getSiteLabel(site: InventoryLocation | null | undefined): string {
-  if (!site) return 'Unknown Site';
-  return site.external_reference ? `${site.external_reference} - ${site.name}` : site.name;
+function getLocationLabel(location: InventoryLocation | null | undefined): string {
+  if (!location) return 'Unknown location';
+  return location.external_reference
+    ? `${location.external_reference} - ${location.name}`
+    : location.name;
 }
 
 export function InventorySiteAssignmentsPanel({
   users,
-  activeSites,
+  assignableLocations,
   assignments,
   onAssign,
   onRemove,
@@ -72,18 +74,18 @@ export function InventorySiteAssignmentsPanel({
   const [removingKey, setRemovingKey] = useState<string | null>(null);
   const [includeLegacyQuotes, setIncludeLegacyQuotes] = useState(false);
 
-  const assignedSiteIdsForSelectedUser = useMemo(() => new Set(
+  const assignedLocationIdsForSelectedUser = useMemo(() => new Set(
     assignments
       .filter((assignment) => assignment.user_id === selectedUserId)
       .map((assignment) => assignment.location_id)
   ), [assignments, selectedUserId]);
 
-  const availableSites = useMemo(
-    () => activeSites.filter((site) => (
-      !assignedSiteIdsForSelectedUser.has(site.id)
-      && (includeLegacyQuotes || !isLegacyQuoteInventoryLocation(site))
+  const availableLocations = useMemo(
+    () => assignableLocations.filter((location) => (
+      !assignedLocationIdsForSelectedUser.has(location.id)
+      && (includeLegacyQuotes || !isLegacyQuoteInventoryLocation(location))
     )),
-    [activeSites, assignedSiteIdsForSelectedUser, includeLegacyQuotes]
+    [assignableLocations, assignedLocationIdsForSelectedUser, includeLegacyQuotes]
   );
 
   async function handleIncludeLegacyQuotesChange(nextIncludeLegacyQuotes: boolean) {
@@ -118,7 +120,7 @@ export function InventorySiteAssignmentsPanel({
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-white">
           <MapPin className="h-5 w-5 text-inventory" />
-          Site Location Assignments
+          Location Assignments
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -142,7 +144,7 @@ export function InventorySiteAssignmentsPanel({
 
           <div className="space-y-2">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <Label>Active Site Location</Label>
+              <Label>Active Site or Manual Location</Label>
               <LegacyQuoteLocationOptIn
                 enabled={includeLegacyQuotes}
                 onEnabledChange={(enabled) => { void handleIncludeLegacyQuotesChange(enabled); }}
@@ -159,11 +161,13 @@ export function InventorySiteAssignmentsPanel({
               }}
             >
               <SelectTrigger className="border-slate-600 bg-slate-800">
-                <SelectValue placeholder="Select Site" />
+                <SelectValue placeholder="Select location" />
               </SelectTrigger>
               <SelectContent>
-                {availableSites.map((site) => (
-                  <SelectItem key={site.id} value={site.id}>{getSiteLabel(site)}</SelectItem>
+                {availableLocations.map((location) => (
+                  <SelectItem key={location.id} value={location.id}>
+                    {getLocationLabel(location)}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -176,20 +180,21 @@ export function InventorySiteAssignmentsPanel({
             className="bg-inventory text-white hover:bg-inventory-dark"
           >
             <UserPlus className="mr-2 h-4 w-4" />
-            Assign Site
+            Assign Location
           </Button>
         </div>
 
         <div className="space-y-3">
           {assignments.length > 0 ? assignments.map((assignment) => {
             const key = `${assignment.user_id}:${assignment.location_id}`;
-            const site = assignment.location || activeSites.find((candidate) => candidate.id === assignment.location_id);
-            const presentation = getInventoryLocationTypePresentation(site || { location_type: 'site' });
+            const location = assignment.location
+              || assignableLocations.find((candidate) => candidate.id === assignment.location_id);
+            const presentation = getInventoryLocationTypePresentation(location || { location_type: 'site' });
 
             return (
               <div
                 key={key}
-                data-location-type={site?.location_type || 'site'}
+                data-location-type={location?.location_type || 'site'}
                 className={cn(
                   'flex flex-col gap-3 rounded-lg border p-3 transition-colors sm:flex-row sm:items-center sm:justify-between',
                   presentation.surfaceClassName,
@@ -199,7 +204,7 @@ export function InventorySiteAssignmentsPanel({
                   <div className="font-medium text-white">{getUserLabel(assignment.user)}</div>
                   <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
                     <Badge variant="outline" className={presentation.badgeClassName}>
-                      {getSiteLabel(site)}
+                      {getLocationLabel(location)}
                     </Badge>
                   </div>
                 </div>
@@ -218,7 +223,7 @@ export function InventorySiteAssignmentsPanel({
             );
           }) : (
             <p className="rounded-lg border border-slate-700 bg-slate-800/40 p-4 text-sm text-muted-foreground">
-              No Site locations are assigned yet.
+              No Site or Manual locations are assigned yet.
             </p>
           )}
         </div>

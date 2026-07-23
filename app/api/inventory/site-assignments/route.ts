@@ -8,6 +8,7 @@ type InventoryLocationRow = Database['public']['Tables']['inventory_locations'][
 type InventoryUserSiteLocationRow = Database['public']['Tables']['inventory_user_site_locations']['Row'];
 
 const SUPABASE_PAGE_SIZE = 1000;
+const ASSIGNABLE_SECONDARY_LOCATION_TYPES = ['site', 'manual'] as const;
 
 interface SiteAssignmentRequestBody {
   user_id?: string;
@@ -37,7 +38,16 @@ function normalizeAssignment(row: AssignmentRelationRow) {
   };
 }
 
-async function loadActiveSiteLocation(
+function isAssignableSecondaryLocation(
+  location: InventoryLocationRow | null | undefined,
+): location is InventoryLocationRow {
+  return location?.is_active === true
+    && ASSIGNABLE_SECONDARY_LOCATION_TYPES.some((locationType) => (
+      location.location_type === locationType
+    ));
+}
+
+async function loadActiveAssignableLocation(
   admin: ReturnType<typeof createAdminClient>,
   locationId: string
 ): Promise<InventoryLocationRow | null> {
@@ -45,15 +55,15 @@ async function loadActiveSiteLocation(
     .from('inventory_locations')
     .select('*')
     .eq('id', locationId)
-    .eq('location_type', 'site')
     .eq('is_active', true)
+    .in('location_type', [...ASSIGNABLE_SECONDARY_LOCATION_TYPES])
     .maybeSingle();
 
   if (error) throw error;
   return data;
 }
 
-async function loadActiveSiteLocations(
+async function loadActiveAssignableLocations(
   admin: ReturnType<typeof createAdminClient>,
   includeLegacyQuotes: boolean,
 ): Promise<InventoryLocationRow[]> {
@@ -64,7 +74,7 @@ async function loadActiveSiteLocations(
       .from('inventory_locations')
       .select('*')
       .eq('is_active', true)
-      .eq('location_type', 'site');
+      .in('location_type', [...ASSIGNABLE_SECONDARY_LOCATION_TYPES]);
     if (!includeLegacyQuotes) {
       query = query.neq('source_type', 'legacy_quote');
     }
@@ -92,7 +102,7 @@ export async function GET(request?: NextRequest) {
     const admin = createAdminClient();
     const includeLegacyQuotes = request?.nextUrl.searchParams.get('includeLegacyQuotes') === 'true';
     const inventoryUserIdsPromise = getUsersWithPermission('inventory');
-    const activeSitesPromise = loadActiveSiteLocations(admin, includeLegacyQuotes);
+    const activeLocationsPromise = loadActiveAssignableLocations(admin, includeLegacyQuotes);
     const assignmentsPromise = admin
       .from('inventory_user_site_locations')
       .select(`
@@ -106,15 +116,15 @@ export async function GET(request?: NextRequest) {
       `)
       .order('assigned_at', { ascending: false });
 
-    const [inventoryUserIds, activeSitesResult, assignmentsResult] = await Promise.all([
+    const [inventoryUserIds, activeLocationsResult, assignmentsResult] = await Promise.all([
       inventoryUserIdsPromise,
-      activeSitesPromise,
+      activeLocationsPromise,
       assignmentsPromise,
     ]);
 
     if (assignmentsResult.error) throw assignmentsResult.error;
 
-    const activeSites = activeSitesResult;
+    const activeLocations = activeLocationsResult;
     const users = inventoryUserIds.length > 0
       ? await admin
         .from('profiles')
@@ -127,13 +137,10 @@ export async function GET(request?: NextRequest) {
 
     const assignments = ((assignmentsResult.data || []) as unknown as AssignmentRelationRow[])
       .map(normalizeAssignment)
-      .filter((assignment) => (
-        assignment.location?.is_active === true
-        && assignment.location.location_type === 'site'
-      ));
+      .filter((assignment) => isAssignableSecondaryLocation(assignment.location));
 
     return NextResponse.json({
-      active_sites: activeSites,
+      active_locations: activeLocations,
       users: users.data || [],
       assignments,
     });
@@ -154,13 +161,13 @@ export async function POST(request: NextRequest) {
     const userId = body.user_id?.trim();
     const locationId = body.location_id?.trim();
     if (!userId || !locationId) {
-      return NextResponse.json({ error: 'User and Site location are required' }, { status: 400 });
+      return NextResponse.json({ error: 'User and location are required' }, { status: 400 });
     }
 
     const admin = createAdminClient();
-    const siteLocation = await loadActiveSiteLocation(admin, locationId);
-    if (!siteLocation) {
-      return NextResponse.json({ error: 'Active Site location not found' }, { status: 400 });
+    const assignableLocation = await loadActiveAssignableLocation(admin, locationId);
+    if (!assignableLocation) {
+      return NextResponse.json({ error: 'Active Site or Manual location not found' }, { status: 400 });
     }
 
     const { data, error } = await admin
@@ -195,7 +202,7 @@ export async function DELETE(request: NextRequest) {
     const userId = body.user_id?.trim();
     const locationId = body.location_id?.trim();
     if (!userId || !locationId) {
-      return NextResponse.json({ error: 'User and Site location are required' }, { status: 400 });
+      return NextResponse.json({ error: 'User and location are required' }, { status: 400 });
     }
 
     const { error } = await createAdminClient()

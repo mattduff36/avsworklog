@@ -14,6 +14,7 @@ export const HARDWARE_ADJUSTMENT_REASONS: InventoryHardwareAdjustmentReason[] = 
   'Stocktake correction',
   'Other',
 ];
+const SECONDARY_HARDWARE_LOCATION_TYPES = new Set(['site', 'manual']);
 
 export function isHardwareAdjustmentOperation(
   value: unknown,
@@ -63,7 +64,10 @@ export async function getResponsibleHardwareLocationIds(
   const locationIds = new Set<string>([primary.location_id]);
   for (const row of secondary || []) {
     const location = Array.isArray(row.location) ? row.location[0] : row.location;
-    if (location?.is_active === true && location.location_type === 'site') {
+    if (
+      location?.is_active === true
+      && SECONDARY_HARDWARE_LOCATION_TYPES.has(location.location_type)
+    ) {
       locationIds.add(row.location_id);
     }
   }

@@ -22,7 +22,10 @@ import { InventoryLocationSelect } from './InventoryLocationSelect';
 import { InventoryTable } from './InventoryTable';
 import { HardwareQuantityRow } from './HardwareQuantityRow';
 import { HardwareTransferDialog } from './HardwareTransferDialog';
-import { isLegacyQuoteInventoryLocation } from '../utils';
+import {
+  formatInventoryLocationTypeLabel,
+  isLegacyQuoteInventoryLocation,
+} from '../utils';
 import { LegacyQuoteLocationOptIn } from './LegacyQuoteLocationOptIn';
 
 const LOCATION_NOT_SHOWN_VALUE = '__location_not_shown__';
@@ -89,21 +92,21 @@ export function InventoryEmployeeView({
     return nextItemsByLocationId;
   }, [items]);
   const locationItems = activeLocation ? activeItemsByLocationId.get(activeLocation.id) || [] : [];
-  const activeSecondarySiteLocations = useMemo(
-    () => secondarySiteLocations.filter((siteLocation) => (
-      siteLocation.location?.is_active === true &&
-      siteLocation.location.location_type === 'site'
+  const activeSecondaryLocations = useMemo(
+    () => secondarySiteLocations.filter((secondaryLocation) => (
+      secondaryLocation.location?.is_active === true
+      && ['site', 'manual'].includes(secondaryLocation.location.location_type)
     )),
     [secondarySiteLocations]
   );
   const responsibleHardwareLocations = useMemo(
     () => [
       ...(activeLocation ? [activeLocation] : []),
-      ...activeSecondarySiteLocations.flatMap((siteLocation) => (
-        siteLocation.location ? [siteLocation.location] : []
+      ...activeSecondaryLocations.flatMap((secondaryLocation) => (
+        secondaryLocation.location ? [secondaryLocation.location] : []
       )),
     ],
-    [activeLocation, activeSecondarySiteLocations],
+    [activeLocation, activeSecondaryLocations],
   );
   const hardwareItemById = useMemo(
     () => new Map(hardwareItems.map((item) => [item.id, item])),
@@ -328,38 +331,43 @@ export function InventoryEmployeeView({
         </CardContent>
       </Card>
 
-      {activeSecondarySiteLocations.length > 0 ? (
+      {activeSecondaryLocations.length > 0 ? (
         <div className="space-y-4">
-          {activeSecondarySiteLocations.map((siteLocation) => {
-            const site = siteLocation.location;
-            if (!site) return null;
-            const siteItems = activeItemsByLocationId.get(site.id) || [];
+          {activeSecondaryLocations.map((secondaryLocation) => {
+            const location = secondaryLocation.location;
+            if (!location) return null;
+            const secondaryLocationItems = activeItemsByLocationId.get(location.id) || [];
+            const locationTypeLabel = formatInventoryLocationTypeLabel(location);
 
             return (
-              <Card key={siteLocation.location_id} className="border-slate-700 bg-slate-900/70">
+              <Card key={secondaryLocation.location_id} className="border-slate-700 bg-slate-900/70">
                 <CardHeader>
                   <CardTitle className="flex flex-wrap items-center gap-2 text-white">
                     <MapPin className="h-5 w-5 text-inventory" />
-                    Site: {site.name}
+                    {locationTypeLabel}: {location.name}
                     <Badge variant="outline" className="border-blue-500/30 bg-blue-500/10 text-blue-300">
                       Secondary Location
                     </Badge>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {site.description ? (
-                    <p className="mb-4 text-sm text-muted-foreground">{site.description}</p>
+                  {location.description ? (
+                    <p className="mb-4 text-sm text-muted-foreground">{location.description}</p>
                   ) : null}
-                  {siteItems.length === 0 ? (
-                    <p className="py-8 text-center text-sm text-muted-foreground">No active inventory items are currently assigned to this Site location.</p>
+                  {secondaryLocationItems.length === 0 ? (
+                    <p className="py-8 text-center text-sm text-muted-foreground">
+                      No active inventory items are currently assigned to this location.
+                    </p>
                   ) : (
                     <InventoryTable
-                      items={siteItems}
+                      items={secondaryLocationItems}
                       selectedItemIds={selectedItemIds}
                       onSelectedItemIdsChange={setSelectedItemIds}
                       onMove={onOpenMoveDialog}
                       categoryLabels={categoryLabels}
-                      tableLabel={site.external_reference ? `site ${site.external_reference}` : site.name}
+                      tableLabel={location.external_reference
+                        ? `${locationTypeLabel} ${location.external_reference}`
+                        : location.name}
                     />
                   )}
                 </CardContent>

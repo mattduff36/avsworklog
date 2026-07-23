@@ -25,45 +25,43 @@ function buildRequest(method: 'POST' | 'DELETE', body: Record<string, unknown>) 
   });
 }
 
-function buildAdmin() {
+interface LocationQuery {
+  select: () => LocationQuery;
+  eq: () => LocationQuery;
+  in: () => LocationQuery;
+  maybeSingle: () => Promise<{
+    data: {
+      id: string;
+      name: string;
+      location_type: 'site' | 'manual';
+      is_active: boolean;
+    };
+    error: null;
+  }>;
+}
+
+function buildAdmin(locationType: 'site' | 'manual' = 'site') {
   const state = {
     upserts: [] as Array<Record<string, unknown>>,
     deletes: [] as Array<Record<string, unknown>>,
   };
+  const locationQuery = {} as LocationQuery;
+  locationQuery.select = () => locationQuery;
+  locationQuery.eq = () => locationQuery;
+  locationQuery.in = () => locationQuery;
+  locationQuery.maybeSingle = async () => ({
+    data: {
+      id: `${locationType}-location`,
+      name: locationType === 'site' ? 'Site - 12345' : 'Storage Container',
+      location_type: locationType,
+      is_active: true,
+    },
+    error: null,
+  });
 
   const admin = {
     from(table: string) {
-      if (table === 'inventory_locations') {
-        return {
-          select() {
-            return {
-              eq() {
-                return {
-                  eq() {
-                    return {
-                      eq() {
-                        return {
-                          async maybeSingle() {
-                            return {
-                              data: {
-                                id: 'site-location',
-                                name: 'Site - 12345',
-                                location_type: 'site',
-                                is_active: true,
-                              },
-                              error: null,
-                            };
-                          },
-                        };
-                      },
-                    };
-                  },
-                };
-              },
-            };
-          },
-        };
-      }
+      if (table === 'inventory_locations') return locationQuery;
 
       if (table === 'inventory_user_site_locations') {
         return {
@@ -102,7 +100,7 @@ function buildAdmin() {
   return { admin, state };
 }
 
-describe('inventory Site assignments route', () => {
+describe('inventory location assignments route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -146,6 +144,31 @@ describe('inventory Site assignments route', () => {
       expect.objectContaining({
         user_id: 'user-1',
         location_id: 'site-location',
+        assigned_by: 'supervisor-1',
+      }),
+    ]);
+  });
+
+  it('allows supervisors to assign active Manual locations', async () => {
+    vi.mocked(requireInventorySupervisorAccess).mockResolvedValue({
+      allowed: true,
+      status: 200,
+      userId: 'supervisor-1',
+      roleName: 'supervisor',
+    });
+    const { admin, state } = buildAdmin('manual');
+    vi.mocked(createAdminClient).mockReturnValue(admin as never);
+
+    const response = await POST(buildRequest('POST', {
+      user_id: 'user-1',
+      location_id: 'manual-location',
+    }));
+
+    expect(response.status).toBe(200);
+    expect(state.upserts).toEqual([
+      expect.objectContaining({
+        user_id: 'user-1',
+        location_id: 'manual-location',
         assigned_by: 'supervisor-1',
       }),
     ]);

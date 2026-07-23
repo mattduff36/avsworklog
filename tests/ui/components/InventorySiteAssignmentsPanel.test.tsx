@@ -43,12 +43,23 @@ const assignment: InventorySiteAssignment = {
   location: site,
 };
 
+const manualLocation: InventoryLocation = {
+  ...site,
+  id: 'manual-1',
+  name: 'Storage Container',
+  location_type: 'manual',
+  source_type: 'manual',
+  source_id: null,
+  external_reference: null,
+  sync_status: 'manual',
+};
+
 describe('InventorySiteAssignmentsPanel', () => {
   it('uses the Site presentation for assignment rows and location badges', () => {
     render(
       <InventorySiteAssignmentsPanel
         users={[assignment.user!]}
-        activeSites={[site]}
+        assignableLocations={[site]}
         assignments={[assignment]}
         onAssign={vi.fn(async () => undefined)}
         onRemove={vi.fn(async () => undefined)}
@@ -63,5 +74,28 @@ describe('InventorySiteAssignmentsPanel', () => {
       'border-[hsl(var(--avs-yellow)/0.40)]',
       'text-avs-yellow',
     );
+  });
+
+  it('renders Manual location assignments with the Manual presentation', () => {
+    const manualAssignment = {
+      ...assignment,
+      location_id: manualLocation.id,
+      location: manualLocation,
+    };
+
+    render(
+      <InventorySiteAssignmentsPanel
+        users={[assignment.user!]}
+        assignableLocations={[site, manualLocation]}
+        assignments={[manualAssignment]}
+        onAssign={vi.fn(async () => undefined)}
+        onRemove={vi.fn(async () => undefined)}
+        onIncludeLegacyQuotesChange={vi.fn(async () => undefined)}
+      />,
+    );
+
+    expect(screen.getByText('Storage Container'))
+      .toHaveClass('border-inventory/40', 'text-inventory-light');
+    expect(screen.getByText('Active Site or Manual Location')).toBeInTheDocument();
   });
 });
