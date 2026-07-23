@@ -564,7 +564,7 @@
       "slug": "inventory-overview",
       "title": "What is Inventory?",
       "summary": "Overview of small tools, minor plant, hardware stock, locations, checks, and Yard kiosk.",
-      "content_md": "# What is Inventory?\n\nInventory tracks small tools, minor plant, hardware stock, and where items are located across the yard, vans, HGVs, plant, and sites.\n\n## Manager and admin view\n\nOpen **Inventory**. You will see three main tabs:\n\n- **Overview** - Small Tools, Minor Plant, Hardware, and Retired Items\n- **Locations** - yard, vehicle, site, and manual locations\n- **Settings** - Categories, Groups, Hardware Catalogue, and Yard Kiosks\n\nUse **Add Item**, **Add Location**, and **Set My Location** from the page actions when available.\n\n## Employee view\n\nEmployees do not see the full manager tabs. Instead they set a location, view **My Inventory Items**, optionally work with a secondary **Site** location, transfer **Hardware**, and **Claim An Item**.\n\n## Related tools\n\nThe dedicated **Yard Inventory** kiosk at `/yard-kiosk` is used on trusted tablets to collect from or return stock to the Yard.",
+      "content_md": "# What is Inventory?\n\nInventory tracks small tools, minor plant, hardware stock, and where items are located across the yard, vans, HGVs, plant, and sites.\n\n## Manager and admin view\n\nOpen **Inventory**. You will see three main tabs:\n\n- **Overview** - Small Tools, Minor Plant, Hardware, and Retired Items\n- **Locations** - yard, vehicle, site, and manual locations\n- **Settings** - Categories, Groups, Hardware Catalogue, and Yard Kiosk\n\nUse **Add Item**, **Add Location**, and **Set My Location** from the page actions when available.\n\n## Employee view\n\nEmployees do not see the full manager tabs. Instead they set a location, view **My Inventory Items**, optionally work with secondary **Site** or **Manual** locations, transfer **Hardware**, and **Claim An Item**.\n\n## Related tools\n\nThe dedicated **Yard Inventory** kiosk at `/yard-kiosk` is used on trusted tablets to collect from or return stock to the Yard.",
       "sort_order": 0
     },
     {
@@ -572,15 +572,15 @@
       "slug": "inventory-employee-view",
       "title": "How do I use Inventory as an employee?",
       "summary": "Employee inventory workflow: location, items, hardware transfer, and claims.",
-      "content_md": "# How do I use Inventory as an employee?\n\n1. Open **Inventory**.\n2. Use **Set Your Inventory Location** or **Change My Location** to choose where you are working.\n3. Review **My Inventory Items** for tools assigned to your location.\n4. If a secondary site is assigned, review the **Site** section as well.\n5. Use **Hardware** and **Transfer** when you need to move hardware stock.\n6. Use **Claim An Item** when an item should be on your location but is not listed.\n\nIf your location is missing from the list, choose **Location not shown** and follow the prompt so a manager can help.",
+      "content_md": "# How do I use Inventory as an employee?\n\n1. Open **Inventory**.\n2. Use **Set Your Inventory Location** or **Change My Location** to choose where you are working.\n3. Review **My Inventory Items** for tools assigned to your location.\n4. If a secondary location is assigned, review its **Site** or **Manual** section as well.\n5. Use **Hardware** and **Transfer** when you need to move hardware stock.\n6. Use **Claim An Item** when an item should be on your location but is not listed.\n\nIf your location is missing from the list, choose **Location not shown** and follow the prompt so a manager can help.",
       "sort_order": 1
     },
     {
       "category_slug": "inventory",
       "slug": "inventory-select-location",
-      "title": "How do I select my inventory location or site?",
-      "summary": "Setting your primary inventory location and using secondary site locations.",
-      "content_md": "# How do I select my inventory location or site?\n\n## Primary location\n\nUse **Set Your Inventory Location** or **Change My Location**, choose the correct Yard, van, HGV, plant, site, or manual location, then click **Save Location**.\n\nYour primary location controls which items appear under **My Inventory Items**.\n\n## Secondary site locations\n\nManagers can assign site locations under **Site Location Assignments** with **Assign Site**. When assigned, employees may also see a **Site** section with a **Secondary Location** badge.\n\nManagers can optionally include **legacy quotes** when choosing site locations.",
+      "title": "How do I select primary and secondary inventory locations?",
+      "summary": "Setting your primary inventory location and using secondary Site or Manual locations.",
+      "content_md": "# How do I select primary and secondary inventory locations?\n\n## Primary location\n\nUse **Set Your Inventory Location** or **Change My Location**, choose the correct Yard, van, HGV, plant, or Manual location, then click **Save Location**.\n\nYour primary location controls which items appear under **My Inventory Items**.\n\n## Secondary locations\n\nSupervisors and managers can assign active Site or Manual locations under **Location Assignments** with **Assign Location**. When assigned, employees also see the matching **Site** or **Manual** section with a **Secondary Location** badge.\n\nLegacy quote locations remain hidden by default and can be included when choosing a Site location.",
       "sort_order": 2
     },
     {
@@ -628,15 +628,15 @@
       "slug": "inventory-manage-locations",
       "title": "How do I manage inventory locations?",
       "summary": "Using the Locations tab and adding locations.",
-      "content_md": "# How do I manage inventory locations?\n\n1. Open **Inventory** → **Locations**.\n2. Review existing Yard, vehicle, site, and manual locations.\n3. Click **Add Location** when a new bucket is needed.\n4. Keep names clear so employees can recognise them in **Change My Location**.\n\nUse **Site Location Assignments** when employees need a secondary site location in addition to their primary location.",
+      "content_md": "# How do I manage inventory locations?\n\n1. Open **Inventory** → **Locations**.\n2. Review existing Yard, vehicle, site, and manual locations.\n3. Click **Add Location** when a new bucket is needed.\n4. Keep names clear so employees can recognise them in **Change My Location**.\n\nUse **Location Assignments** when employees need a secondary Site or Manual location in addition to their primary location.",
       "sort_order": 8
     },
     {
       "category_slug": "inventory",
       "slug": "inventory-site-assignments",
-      "title": "How do site location assignments work?",
-      "summary": "Assigning secondary site locations to employees.",
-      "content_md": "# How do site location assignments work?\n\nManagers with site-location permission can open **Site Location Assignments** in Inventory.\n\n## Typical actions\n\n- Choose an employee\n- Click **Assign Site**\n- Select the site location\n- Optionally include **legacy quotes** when the required site comes from a legacy quote location\n\nAssigned employees then see a **Site** section with a **Secondary Location** badge alongside their primary inventory location.",
+      "title": "How do inventory location assignments work?",
+      "summary": "Assigning secondary Site or Manual locations to employees.",
+      "content_md": "# How do inventory location assignments work?\n\nSupervisors and managers with permission can open **Location Assignments** in Inventory.\n\n## Typical actions\n\n- Choose an employee\n- Select an active Site or Manual location\n- Click **Assign Location**\n- Optionally include **legacy quotes** when the required site comes from a legacy quote location\n\nAssigned employees then see a **Site** or **Manual** section with a **Secondary Location** badge alongside their primary inventory location.",
       "sort_order": 9
     },
     {
@@ -740,7 +740,7 @@
       "slug": "inventory-kiosk-devices",
       "title": "How do Yard kiosk devices work?",
       "summary": "Pairing trusted Yard Inventory tablets and managing devices.",
-      "content_md": "# How do Yard kiosk devices work?\n\nYard kiosk tablets use a trusted-device flow so stock can be collected or returned without the full manager Inventory UI.\n\n## Pair a device\n\n1. Open **Inventory** → **Settings** → **Yard Kiosks**.\n2. Click **Start pairing**.\n3. On the tablet, open the Yard Inventory pair page and enter the **Pairing code**.\n4. Confirm the code in Inventory Settings.\n\n## Install the app\n\nUse **Install Yard Inventory** / **Add to Home screen** on the tablet so it launches like an app.\n\n## After pairing\n\nTrusted devices can open **Yard Inventory** and run **Collect** or **Return** transfers.",
+      "content_md": "# How do Yard kiosk devices work?\n\nYard kiosk tablets use a trusted-device flow so stock can be collected or returned without the full manager Inventory UI.\n\n## Pair a device\n\n1. Open **Inventory** → **Settings** → **Yard Kiosk**.\n2. Click **Start pairing**.\n3. On the tablet, open the Yard Inventory pair page and enter the **Pairing code**.\n4. Confirm the code in Inventory Settings.\n\n## Install the app\n\nUse **Install Yard Inventory** / **Add to Home screen** on the tablet so it launches like an app.\n\n## After pairing\n\nTrusted devices can open **Yard Inventory** and run **Collect** or **Return** transfers.",
       "sort_order": 22
     },
     {
@@ -764,7 +764,7 @@
       "slug": "inventory-view-assigned-items",
       "title": "How do I view items on my van or site?",
       "summary": "Finding items assigned to your current inventory locations.",
-      "content_md": "# How do I view items on my van or site?\n\n1. Open **Inventory**.\n2. Confirm your primary location under **Change My Location**.\n3. Review **My Inventory Items** for that location.\n4. If you have a secondary site assignment, review the **Site** section as well.\n\nUse search and filters where available. If an item should be present but is missing, use **Claim An Item** or ask a manager to move it.",
+      "content_md": "# How do I view items on my van or site?\n\n1. Open **Inventory**.\n2. Confirm your primary location under **Change My Location**.\n3. Review **My Inventory Items** for that location.\n4. If you have a secondary assignment, review its **Site** or **Manual** section as well.\n\nUse search and filters where available. If an item should be present but is missing, use **Claim An Item** or ask a manager to move it.",
       "sort_order": 25
     },
     {

@@ -52,7 +52,9 @@ Generated van and site locations are maintained by sync services. Normal manager
 
 `inventory_user_locations` stores a user's selected inventory location. The UI should ask the user to set a location only when the saved location is missing, inactive, or invalid.
 
-When the selected location is linked to a fleet asset, the app also records a current profile fleet assignment. Only one current user may be assigned to a fleet asset at a time. Moving a user to Yard, Unknown, manual, or site locations ends their current fleet assignment.
+When the selected location is linked to a fleet asset, the app also records a current profile fleet assignment. Only one current user may be assigned to a fleet asset at a time. Moving a user to Yard, Unknown, or Manual locations ends their current fleet assignment. Site locations are not valid primary locations.
+
+`inventory_user_site_locations` retains its legacy table name but stores supervisor-assigned secondary locations. Active Site and Manual locations are eligible. Secondary assignments do not replace the user's primary location or fleet assignment.
 
 The inventory location selection remains the source event for this assignment; profile fleet assignment history is used by admin/profile views and future tracking features.
 
@@ -134,7 +136,7 @@ Hardware quantity changes must use the dedicated atomic stock functions:
 - Transfer creates paired source and destination lines in one batch.
 - Managers and admins may transfer between any active locations.
 - Employees may transfer between active locations when at least one side is
-  their valid primary location or an assigned secondary Site location.
+  their valid primary location or an assigned secondary Site or Manual location.
 - The configured Yard kiosk profile may transfer only between the active Yard
   and one active non-Yard location. This exception is isolated to the kiosk API
   and does not broaden ordinary employee transfer permissions.

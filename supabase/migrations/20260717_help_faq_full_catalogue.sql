@@ -874,13 +874,13 @@ Open **Inventory**. You will see three main tabs:
 
 - **Overview** - Small Tools, Minor Plant, Hardware, and Retired Items
 - **Locations** - yard, vehicle, site, and manual locations
-- **Settings** - Categories, Groups, Hardware Catalogue, and Yard Kiosks
+- **Settings** - Categories, Groups, Hardware Catalogue, and Yard Kiosk
 
 Use **Add Item**, **Add Location**, and **Set My Location** from the page actions when available.
 
 ## Employee view
 
-Employees do not see the full manager tabs. Instead they set a location, view **My Inventory Items**, optionally work with a secondary **Site** location, transfer **Hardware**, and **Claim An Item**.
+Employees do not see the full manager tabs. Instead they set a location, view **My Inventory Items**, optionally work with secondary **Site** or **Manual** locations, transfer **Hardware**, and **Claim An Item**.
 
 ## Related tools
 
@@ -898,7 +898,7 @@ SELECT pg_temp.upsert_faq_article(
 1. Open **Inventory**.
 2. Use **Set Your Inventory Location** or **Change My Location** to choose where you are working.
 3. Review **My Inventory Items** for tools assigned to your location.
-4. If a secondary site is assigned, review the **Site** section as well.
+4. If a secondary location is assigned, review its **Site** or **Manual** section as well.
 5. Use **Hardware** and **Transfer** when you need to move hardware stock.
 6. Use **Claim An Item** when an item should be on your location but is not listed.
 
@@ -908,22 +908,22 @@ If your location is missing from the list, choose **Location not shown** and fol
 
 SELECT pg_temp.upsert_faq_article(
   'inventory',
-  'How do I select my inventory location or site?',
+  'How do I select primary and secondary inventory locations?',
   'inventory-select-location',
-  'Setting your primary inventory location and using secondary site locations.',
-  $md$# How do I select my inventory location or site?
+  'Setting your primary inventory location and using secondary Site or Manual locations.',
+  $md$# How do I select primary and secondary inventory locations?
 
 ## Primary location
 
-Use **Set Your Inventory Location** or **Change My Location**, choose the correct Yard, van, HGV, plant, site, or manual location, then click **Save Location**.
+Use **Set Your Inventory Location** or **Change My Location**, choose the correct Yard, van, HGV, plant, or Manual location, then click **Save Location**.
 
 Your primary location controls which items appear under **My Inventory Items**.
 
-## Secondary site locations
+## Secondary locations
 
-Managers can assign site locations under **Site Location Assignments** with **Assign Site**. When assigned, employees may also see a **Site** section with a **Secondary Location** badge.
+Supervisors and managers can assign active Site or Manual locations under **Location Assignments** with **Assign Location**. When assigned, employees also see the matching **Site** or **Manual** section with a **Secondary Location** badge.
 
-Managers can optionally include **legacy quotes** when choosing site locations.$md$,
+Legacy quote locations remain hidden by default and can be included when choosing a Site location.$md$,
   2
 );
 
@@ -1048,27 +1048,27 @@ SELECT pg_temp.upsert_faq_article(
 3. Click **Add Location** when a new bucket is needed.
 4. Keep names clear so employees can recognise them in **Change My Location**.
 
-Use **Site Location Assignments** when employees need a secondary site location in addition to their primary location.$md$,
+Use **Location Assignments** when employees need a secondary Site or Manual location in addition to their primary location.$md$,
   8
 );
 
 SELECT pg_temp.upsert_faq_article(
   'inventory',
-  'How do site location assignments work?',
+  'How do inventory location assignments work?',
   'inventory-site-assignments',
-  'Assigning secondary site locations to employees.',
-  $md$# How do site location assignments work?
+  'Assigning secondary Site or Manual locations to employees.',
+  $md$# How do inventory location assignments work?
 
-Managers with site-location permission can open **Site Location Assignments** in Inventory.
+Supervisors and managers with permission can open **Location Assignments** in Inventory.
 
 ## Typical actions
 
 - Choose an employee
-- Click **Assign Site**
-- Select the site location
+- Select an active Site or Manual location
+- Click **Assign Location**
 - Optionally include **legacy quotes** when the required site comes from a legacy quote location
 
-Assigned employees then see a **Site** section with a **Secondary Location** badge alongside their primary inventory location.$md$,
+Assigned employees then see a **Site** or **Manual** section with a **Secondary Location** badge alongside their primary inventory location.$md$,
   9
 );
 
@@ -1302,7 +1302,7 @@ Yard kiosk tablets use a trusted-device flow so stock can be collected or return
 
 ## Pair a device
 
-1. Open **Inventory** → **Settings** → **Yard Kiosks**.
+1. Open **Inventory** → **Settings** → **Yard Kiosk**.
 2. Click **Start pairing**.
 3. On the tablet, open the Yard Inventory pair page and enter the **Pairing code**.
 4. Confirm the code in Inventory Settings.
@@ -1369,7 +1369,7 @@ SELECT pg_temp.upsert_faq_article(
 1. Open **Inventory**.
 2. Confirm your primary location under **Change My Location**.
 3. Review **My Inventory Items** for that location.
-4. If you have a secondary site assignment, review the **Site** section as well.
+4. If you have a secondary assignment, review its **Site** or **Manual** section as well.
 
 Use search and filters where available. If an item should be present but is missing, use **Claim An Item** or ask a manager to move it.$md$,
   25
