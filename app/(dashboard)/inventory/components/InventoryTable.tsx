@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/ui/search-input';
 import { LoadMorePagination } from '@/components/ui/load-more-pagination';
 import { MultiSelectFilter, type MultiSelectFilterOption } from '@/components/ui/multi-select-filter';
 import {
@@ -20,7 +20,6 @@ import {
   MapPin,
   PackageSearch,
   RotateCcw,
-  Search,
   Truck,
 } from 'lucide-react';
 import {
@@ -479,13 +478,13 @@ export function InventoryTable({
     <TooltipProvider delayDuration={150}>
     <div className="min-w-0 space-y-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="relative max-w-sm flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
+        <div className="max-w-sm flex-1">
+          <SearchInput
             placeholder={`Search ${tableLabel}...`}
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            className="bg-slate-800 border-slate-600 pl-9 text-white placeholder:text-muted-foreground"
+            containerClassName="border-slate-600 bg-slate-800"
+            className="text-white placeholder:text-muted-foreground"
           />
         </div>
 

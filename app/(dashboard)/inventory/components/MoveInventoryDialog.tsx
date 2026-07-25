@@ -149,7 +149,7 @@ export function MoveInventoryDialog({
         })}
       >
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-          <DialogHeader className="shrink-0 px-6 pb-4 pt-[max(1.25rem,env(safe-area-inset-top))] sm:pt-6">
+          <DialogHeader className="shrink-0 px-6 pb-4 pt-5 sm:pt-6">
             <DialogTitle>{isBulkMove ? `Move ${items.length} Items` : 'Move Inventory Item'}</DialogTitle>
             <DialogDescription className="text-muted-foreground">
               Select the new location bucket. The move will be written to the item movement history.
@@ -247,7 +247,7 @@ export function MoveInventoryDialog({
             ) : null}
           </div>
 
-          <DialogFooter className="shrink-0 border-t border-slate-700 px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:pb-6">
+          <DialogFooter className="shrink-0 border-t border-slate-700 px-6 pb-4 pt-4 sm:pb-6">
             <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
               Cancel
             </Button>

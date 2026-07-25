@@ -213,7 +213,7 @@ export function InventoryCheckModal({
         onEscapeKeyDown={handleEscapeKeyDown}
       >
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-          <DialogHeader className="shrink-0 border-b border-border px-6 pb-5 pt-[max(1.25rem,env(safe-area-inset-top))] sm:pt-5 md:px-8 md:py-6">
+          <DialogHeader className="shrink-0 border-b border-border px-6 pb-5 pt-5 md:px-8 md:py-6">
             <DialogTitle className="text-xl text-white">{checklistDefinition.modalTitle}</DialogTitle>
             <DialogDescription>
               {checklistDefinition.modalDescription}
@@ -337,7 +337,7 @@ export function InventoryCheckModal({
             </div>
           </ScrollArea>
 
-          <DialogFooter className="shrink-0 border-t border-border px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 md:px-8 md:pb-5">
+          <DialogFooter className="shrink-0 border-t border-border px-6 pb-4 pt-4 md:px-8 md:pb-5">
             <Button type="button" variant="outline" onClick={discard} disabled={saving}>
               {isFormDirty ? 'Discard Changes' : 'Cancel'}
             </Button>

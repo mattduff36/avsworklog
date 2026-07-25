@@ -107,7 +107,7 @@ export function InventoryLocationDialog({
         })}
       >
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-          <DialogHeader className="shrink-0 px-6 pb-4 pt-[max(1.25rem,env(safe-area-inset-top))] sm:pt-6">
+          <DialogHeader className="shrink-0 px-6 pb-4 pt-5 sm:pt-6">
             <DialogTitle>{isEditing ? 'Edit Location' : 'Add Location'}</DialogTitle>
             <DialogDescription className="text-muted-foreground">
               {canEditLinkedAsset
@@ -191,7 +191,7 @@ export function InventoryLocationDialog({
             ) : null}
           </div>
 
-          <DialogFooter className="shrink-0 border-t border-slate-700 px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:pb-6">
+          <DialogFooter className="shrink-0 border-t border-slate-700 px-6 pb-4 pt-4 sm:pb-6">
             <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
               Cancel
             </Button>

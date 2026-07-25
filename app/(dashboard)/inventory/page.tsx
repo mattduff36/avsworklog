@@ -1020,17 +1020,17 @@ export default function InventoryPage() {
           router.push(getInventoryOverviewHref(overviewTab), { scroll: false });
         }}
       >
-        <div className="-mx-1 overflow-x-auto px-1 pb-1">
-          <TabsList className="w-max max-w-none flex-nowrap justify-start">
-            <TabsTrigger value="overview" className="min-h-11 gap-2">
+        <div className="-mx-1 px-1 pb-1">
+          <TabsList className="grid w-full grid-cols-3 gap-1 sm:inline-flex sm:w-auto">
+            <TabsTrigger value="overview" className="min-h-11 w-full gap-2 px-2 sm:w-auto sm:px-3">
               <PackageSearch className="h-4 w-4" />
               Overview
             </TabsTrigger>
-            <TabsTrigger value="locations" className="min-h-11 gap-2">
+            <TabsTrigger value="locations" className="min-h-11 w-full gap-2 px-2 sm:w-auto sm:px-3">
               <MapPin className="h-4 w-4" />
               Locations
             </TabsTrigger>
-            <TabsTrigger value="settings" className="min-h-11 gap-2">
+            <TabsTrigger value="settings" className="min-h-11 w-full gap-2 px-2 sm:w-auto sm:px-3">
               <Settings className="h-4 w-4" />
               Settings
             </TabsTrigger>
@@ -1038,7 +1038,7 @@ export default function InventoryPage() {
         </div>
 
         {pageTab === 'settings' ? (
-          <div className="-mx-1 mt-3 overflow-x-auto px-1 pb-1">
+          <div className="-mx-1 mt-3 px-1 pb-1">
             <Tabs
               value={settingsTab}
               onValueChange={(value) => {
@@ -1047,20 +1047,20 @@ export default function InventoryPage() {
                 router.push(`/inventory?tab=settings&settings=${nextSettingsTab}`, { scroll: false });
               }}
             >
-              <TabsList className="w-max max-w-none flex-nowrap justify-start">
-                <TabsTrigger value="categories" className="min-h-11 gap-2">
+              <TabsList className="grid w-full grid-cols-2 gap-1 sm:inline-flex sm:w-auto">
+                <TabsTrigger value="categories" className="min-h-11 w-full gap-2 px-2 sm:w-auto sm:px-3">
                   <PackageSearch className="h-4 w-4" />
                   Categories
                 </TabsTrigger>
-                <TabsTrigger value="groups" className="min-h-11 gap-2">
+                <TabsTrigger value="groups" className="min-h-11 w-full gap-2 px-2 sm:w-auto sm:px-3">
                   <PackageSearch className="h-4 w-4" />
                   Groups
                 </TabsTrigger>
-                <TabsTrigger value="hardware" className="min-h-11 gap-2">
+                <TabsTrigger value="hardware" className="min-h-11 w-full gap-2 px-2 sm:w-auto sm:px-3">
                   <Boxes className="h-4 w-4" />
                   Hardware Catalogue
                 </TabsTrigger>
-                <TabsTrigger value="kiosk" className="min-h-11 gap-2">
+                <TabsTrigger value="kiosk" className="min-h-11 w-full gap-2 px-2 sm:w-auto sm:px-3">
                   <ShieldCheck className="h-4 w-4" />
                   Yard Kiosk
                 </TabsTrigger>
@@ -1070,7 +1070,7 @@ export default function InventoryPage() {
         ) : null}
 
         {pageTab === 'locations' ? (
-          <div className="-mx-1 mt-3 overflow-x-auto px-1 pb-1">
+          <div className="-mx-1 mt-3 px-1 pb-1">
             <Tabs
               value={inventoryContext?.can_manage_site_locations ? locationsTab : 'directory'}
               onValueChange={(value) => {
@@ -1082,13 +1082,13 @@ export default function InventoryPage() {
                 );
               }}
             >
-              <TabsList className="w-max max-w-none flex-nowrap justify-start">
-                <TabsTrigger value="directory" className="min-h-11 gap-2">
+              <TabsList className="grid w-full grid-cols-2 gap-1 sm:inline-flex sm:w-auto">
+                <TabsTrigger value="directory" className="min-h-11 w-full gap-2 px-2 sm:w-auto sm:px-3">
                   <MapPin className="h-4 w-4" />
                   All Locations
                 </TabsTrigger>
                 {inventoryContext?.can_manage_site_locations ? (
-                  <TabsTrigger value="site_assignments" className="min-h-11 gap-2">
+                  <TabsTrigger value="site_assignments" className="min-h-11 w-full gap-2 px-2 sm:w-auto sm:px-3">
                     <Users className="h-4 w-4" />
                     Location Assignments
                   </TabsTrigger>
@@ -1107,21 +1107,21 @@ export default function InventoryPage() {
               router.push(getInventoryOverviewHref(nextOverviewTab), { scroll: false });
             }}
           >
-            <div className="-mx-1 overflow-x-auto px-1 pb-1">
-              <TabsList className="w-max max-w-none flex-nowrap justify-start">
-                <TabsTrigger value="small_tools" className="min-h-11 gap-2">
+            <div className="-mx-1 px-1 pb-1">
+              <TabsList className="grid w-full grid-cols-2 gap-1 sm:inline-flex sm:w-auto">
+                <TabsTrigger value="small_tools" className="min-h-11 w-full gap-2 px-2 sm:w-auto sm:px-3">
                   <PackageSearch className="h-4 w-4" />
                   Small Tools
                 </TabsTrigger>
-                <TabsTrigger value="minor_plant" className="min-h-11 gap-2">
+                <TabsTrigger value="minor_plant" className="min-h-11 w-full gap-2 px-2 sm:w-auto sm:px-3">
                   <Truck className="h-4 w-4" />
                   Minor Plant
                 </TabsTrigger>
-                <TabsTrigger value="hardware" className="min-h-11 gap-2">
+                <TabsTrigger value="hardware" className="min-h-11 w-full gap-2 px-2 sm:w-auto sm:px-3">
                   <Boxes className="h-4 w-4" />
                   Hardware
                 </TabsTrigger>
-                <TabsTrigger value="retired" className="min-h-11 gap-2">
+                <TabsTrigger value="retired" className="min-h-11 w-full gap-2 px-2 sm:w-auto sm:px-3">
                   <Archive className="h-4 w-4" />
                   Retired Items ({retiredItems.length})
                 </TabsTrigger>

@@ -69,6 +69,11 @@ const DIALOG_CONTENT_SCROLL_CLASSNAME: Record<DialogContentScroll, string> = {
   viewport: 'max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)]',
 }
 
+const DIALOG_SAFE_VIEWPORT_STYLE: React.CSSProperties = {
+  top: 'calc(max(0.5rem, env(safe-area-inset-top, 0px)) + (100dvh - max(0.5rem, env(safe-area-inset-top, 0px)) - max(0.5rem, env(safe-area-inset-bottom, 0px))) / 2)',
+  maxHeight: 'calc(100dvh - max(0.5rem, env(safe-area-inset-top, 0px)) - max(0.5rem, env(safe-area-inset-bottom, 0px)))',
+}
+
 function dialogContentViewportClassName({
   size,
   scroll = 'body',
@@ -125,19 +130,19 @@ const DialogContent = React.forwardRef<
           "fixed left-[50%] top-[50%] z-[200] grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-6 border-0 bg-slate-900 p-6 shadow-2xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-xl text-slate-900 dark:text-slate-100",
           className,
           mobileKeyboardSafe && [
-            "left-0 right-0 top-[var(--dialog-visual-viewport-top,0px)]",
-            "flex h-[var(--dialog-visual-viewport-height,100dvh)] max-h-[var(--dialog-visual-viewport-height,100dvh)] min-h-0 w-auto translate-x-0 translate-y-0 flex-col overflow-hidden overscroll-contain rounded-none",
+            "left-0 right-0 top-[calc(var(--dialog-visual-viewport-top,0px)+env(safe-area-inset-top,0px))]",
+            "flex h-[calc(var(--dialog-visual-viewport-height,100dvh)-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] max-h-[calc(var(--dialog-visual-viewport-height,100dvh)-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] min-h-0 w-auto translate-x-0 translate-y-0 flex-col overflow-hidden overscroll-contain rounded-none",
             "data-[state=closed]:slide-out-to-left-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-left-0 data-[state=open]:slide-in-from-top-2",
             "sm:left-[50%] sm:right-auto sm:top-[50%] sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:w-[calc(100vw-2rem)] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-xl",
             "sm:data-[state=closed]:slide-out-to-left-1/2 sm:data-[state=closed]:slide-out-to-top-[48%] sm:data-[state=open]:slide-in-from-left-1/2 sm:data-[state=open]:slide-in-from-top-[48%]",
           ]
         )}
-        style={{ ...visualViewportStyle, ...style }}
+        style={{ ...(mobileKeyboardSafe ? {} : DIALOG_SAFE_VIEWPORT_STYLE), ...visualViewportStyle, ...style }}
         {...props}
       >
         {children}
         {!hideCloseButton && (
-          <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+          <DialogPrimitive.Close className="absolute right-[max(1rem,env(safe-area-inset-right,0px))] top-[max(1rem,env(safe-area-inset-top,0px))] rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground sm:right-4 sm:top-4">
             <Cross2Icon className="h-4 w-4 text-slate-100" />
             <span className="sr-only">Close</span>
           </DialogPrimitive.Close>

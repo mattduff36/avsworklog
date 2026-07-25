@@ -65,7 +65,7 @@ export function InventoryRetireItemDialog({
           className: 'top-0 h-[100dvh] max-h-none w-screen max-w-none translate-y-0 gap-0 rounded-none border-border bg-slate-900 p-0 text-white sm:top-1/2 sm:h-auto sm:max-h-[calc(100dvh-1rem)] sm:w-[calc(100vw-1rem)] sm:max-w-md sm:-translate-y-1/2 sm:rounded-xl',
         })}
       >
-        <DialogHeader className="shrink-0 px-6 pb-4 pt-[max(1.25rem,env(safe-area-inset-top))] sm:pt-6">
+        <DialogHeader className="shrink-0 px-6 pb-4 pt-5 sm:pt-6">
           <DialogTitle className="flex items-center gap-2 text-inventory">
             <Archive className="h-5 w-5" />
             Retire Inventory Item
@@ -117,7 +117,7 @@ export function InventoryRetireItemDialog({
           </div>
         </div>
 
-        <DialogFooter className="shrink-0 gap-2 border-t border-slate-700 px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:pb-6">
+        <DialogFooter className="shrink-0 gap-2 border-t border-slate-700 px-6 pb-4 pt-4 sm:pb-6">
           <Button
             type="button"
             variant="outline"

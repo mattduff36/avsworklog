@@ -4,10 +4,10 @@ import { useEffect, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/ui/search-input';
 import { LoadMorePagination } from '@/components/ui/load-more-pagination';
 import { cn } from '@/lib/utils';
-import { Link2, Loader2, MapPin, Pencil, Search, Trash2 } from 'lucide-react';
+import { Link2, Loader2, MapPin, Pencil, Trash2 } from 'lucide-react';
 import type { FleetAssetOption, InventoryLocation } from '../types';
 import { getInventoryLocationTypePresentation } from '../utils';
 import { InventoryLocationTypeBadge } from './InventoryLocationTypeBadge';
@@ -170,13 +170,14 @@ export function InventoryLocationsPanel({
       <CardContent className="p-0">
         <div className="border-b border-slate-700 p-4">
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-              <Input
+            <div>
+              <SearchInput
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder="Search all locations..."
-                className="border-slate-600 bg-slate-800 pl-9 text-white placeholder:text-slate-500"
+                containerClassName="border-slate-600 bg-slate-800"
+                className="text-white placeholder:text-slate-500"
+                iconClassName="text-slate-500"
                 aria-label="Search inventory locations"
               />
             </div>

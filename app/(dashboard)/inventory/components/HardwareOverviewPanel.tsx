@@ -5,12 +5,11 @@ import {
   ArrowRightLeft,
   Boxes,
   ChevronDown,
-  Search,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/ui/search-input';
 import {
   Select,
   SelectContent,
@@ -173,13 +172,12 @@ export function HardwareOverviewPanel({
         </CardHeader>
         <CardContent className="space-y-4 p-4">
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(360px,auto)] lg:items-center">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
+            <div>
+              <SearchInput
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search Hardware or location..."
-                className="border-slate-600 bg-slate-800 pl-9"
+                containerClassName="border-slate-600 bg-slate-800"
               />
             </div>
             <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">

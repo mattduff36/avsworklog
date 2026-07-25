@@ -8,6 +8,7 @@ import {
   DialogTitle,
   dialogContentViewportClassName,
 } from '@/components/ui/dialog';
+import { SearchInput } from '@/components/ui/search-input';
 
 describe('UI standardisation helpers', () => {
   afterEach(() => {
@@ -44,8 +45,12 @@ describe('UI standardisation helpers', () => {
     const scrollArea = screen.getByTestId('dialog-scroll-area');
 
     expect(dialog).toHaveAttribute('data-mobile-scroll-lock', 'true');
-    expect(dialog.className).toContain('top-[var(--dialog-visual-viewport-top,0px)]');
-    expect(dialog.className).toContain('h-[var(--dialog-visual-viewport-height,100dvh)]');
+    expect(dialog.className).toContain(
+      'top-[calc(var(--dialog-visual-viewport-top,0px)+env(safe-area-inset-top,0px))]',
+    );
+    expect(dialog.className).toContain(
+      'h-[calc(var(--dialog-visual-viewport-height,100dvh)-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))]',
+    );
     expect(dialog.className).toContain('sm:top-[50%]');
     expect(dialog.className).toContain('sm:translate-y-[-50%]');
     expect(scrollArea.className).toContain('min-h-0');
@@ -87,6 +92,34 @@ describe('UI standardisation helpers', () => {
     await waitFor(() => {
       expect(dialog.style.getPropertyValue('--dialog-visual-viewport-height')).toBe('300px');
     });
+  });
+
+  it('keeps dialog controls and ordinary dialog content inside native safe areas', () => {
+    render(
+      <Dialog open>
+        <DialogContent>
+          <DialogTitle>Safe dialog</DialogTitle>
+        </DialogContent>
+      </Dialog>,
+    );
+
+    const dialog = screen.getByRole('dialog', { name: 'Safe dialog' });
+    const closeButton = screen.getByRole('button', { name: 'Close' });
+
+    expect(dialog.getAttribute('style')).toContain('safe-area-inset-top');
+    expect(dialog.getAttribute('style')).toContain('safe-area-inset-bottom');
+    expect(closeButton.className).toContain(
+      'top-[max(1rem,env(safe-area-inset-top,0px))]',
+    );
+  });
+
+  it('lays out search icons beside placeholder text', () => {
+    render(<SearchInput placeholder="Search inventory" />);
+
+    const input = screen.getByPlaceholderText('Search inventory');
+    expect(input.parentElement).toHaveClass('items-center');
+    expect(input).toHaveClass('p-0');
+    expect(input.parentElement?.querySelector('svg')).toBeInTheDocument();
   });
 
   it('keeps table/card view toggle callbacks generic', () => {

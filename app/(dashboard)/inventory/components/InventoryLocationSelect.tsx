@@ -2,10 +2,10 @@
 
 import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, ChevronDown, Loader2, Search, X } from 'lucide-react';
+import { Check, ChevronDown, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { SearchInput } from '@/components/ui/search-input';
 import { cn } from '@/lib/utils';
 import type { InventoryLocation } from '../types';
 import {
@@ -318,9 +318,8 @@ export function InventoryLocationSelect({
     <>
       <div className="shrink-0 border-b border-slate-800 bg-slate-950 p-2">
         <div className="flex items-center gap-2">
-          <div className="relative min-w-0 flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-            <Input
+          <div className="min-w-0 flex-1">
+            <SearchInput
               ref={searchInputRef}
               value={searchQuery}
               onChange={(event) => {
@@ -333,7 +332,9 @@ export function InventoryLocationSelect({
                 }
               }}
               placeholder={searchPlaceholder}
-              className="h-11 border-slate-700 bg-slate-900 pl-9 text-base text-white placeholder:text-slate-500 sm:h-9 sm:text-sm"
+              containerClassName="h-11 border-slate-700 bg-slate-900 sm:h-9"
+              className="text-base text-white placeholder:text-slate-500 sm:text-sm"
+              iconClassName="text-slate-500"
               aria-label={searchPlaceholder}
               aria-controls={listboxId}
               aria-expanded={open}
