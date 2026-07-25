@@ -1,5 +1,22 @@
 [
   {
+    "version": "0726.20.1",
+    "updateKind": "minor",
+    "title": "Inventory improvements",
+    "description": "Keep transfer fields visible above keyboard.",
+    "summary": "Keep transfer fields visible above keyboard.",
+    "details": [
+      "Keep transfer fields visible above keyboard, with changes to app screens."
+    ],
+    "areas": [
+      "Inventory"
+    ],
+    "areaKeys": [
+      "inventory"
+    ],
+    "pushedAt": "2026-07-25T22:00:54.610Z"
+  },
+  {
     "version": "0726.20.0",
     "updateKind": "major",
     "title": "Timesheets update",

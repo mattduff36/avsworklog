@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.20.1
+
+**GIT COMMIT MESSAGE**
+`fix(inventory): keep transfer fields visible above keyboard`
+
+**PUSHED AT**
+2026-07-25T22:00:54.610Z
+
+**WHAT CHANGED**
+Keep transfer fields visible above keyboard.
+
+**VERSION HISTORY DETAILS**
+- Keep transfer fields visible above keyboard, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `fix(inventory): keep transfer fields visible above keyboard`
+
 ## 0726.20.0
 
 **GIT COMMIT MESSAGE**
