@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { logServerError } from '@/lib/utils/server-error-logger';
 import { requireInventoryAccess, requireInventoryManagerAccess } from '@/lib/server/inventory-auth';
 import { canShareInventoryPrimaryLocation } from '@/app/(dashboard)/inventory/utils';
 import {
@@ -172,6 +173,15 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'This fleet asset is already assigned to another user' }, { status: 400 });
     }
     console.error('Error updating user inventory location:', error);
+    await logServerError({
+      error: error as Error,
+      request,
+      componentName: '/api/inventory/me/location',
+      additionalData: {
+        endpoint: '/api/inventory/me/location',
+        method: 'PATCH',
+      },
+    });
     return NextResponse.json({ error: 'Failed to update user inventory location' }, { status: 500 });
   }
 }

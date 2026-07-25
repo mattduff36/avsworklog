@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { validateRegistrationNumber, formatRegistrationForStorage } from '@/lib/utils/registration';
@@ -8,19 +8,6 @@ import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { createDVLAApiService } from '@/lib/services/dvla-api';
 import { createMotHistoryService } from '@/lib/services/mot-history-api';
 import { isRoadEligibleRegistration, runFleetDvlaSync } from '@/lib/services/fleet-dvla-sync';
-
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    }
-  );
-}
 
 function normalizeRegistration(registrationNumber: string | null | undefined): string {
   return registrationNumber?.replace(/\s+/g, '').trim().toUpperCase() || '';
@@ -46,7 +33,7 @@ export async function PUT(
       );
     }
 
-    const supabase = await createServerClient();
+    const supabase = createAdminClient();
     const vanId = (await params).id;
     const body = await request.json();
     const { reg_number, category_id, status, nickname } = body;
@@ -130,7 +117,7 @@ export async function PUT(
       .update(updates)
       .eq('id', vanId)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) {
       if (error.code === '23505') {
@@ -140,6 +127,12 @@ export async function PUT(
         );
       }
       throw error;
+    }
+    if (!data) {
+      return NextResponse.json(
+        { error: 'Van not found' },
+        { status: 404 }
+      );
     }
 
     let syncResult: unknown = null;
@@ -236,7 +229,7 @@ export async function DELETE(
     const reason = body.reason || 'Other';
 
     // Check for open workshop tasks
-    const adminSupabase = getSupabaseAdmin();
+    const adminSupabase = createAdminClient();
     const { data: openTasks, error: tasksError } = await adminSupabase
       .from('actions')
       .select('id, status, workshop_comments')

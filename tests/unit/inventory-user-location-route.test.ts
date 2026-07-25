@@ -9,9 +9,13 @@ vi.mock('@/lib/server/inventory-auth', () => ({
 vi.mock('@/lib/supabase/admin', () => ({
   createAdminClient: vi.fn(),
 }));
+vi.mock('@/lib/utils/server-error-logger', () => ({
+  logServerError: vi.fn(),
+}));
 
 import { requireInventoryAccess } from '@/lib/server/inventory-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { logServerError } from '@/lib/utils/server-error-logger';
 import { PATCH } from '@/app/api/inventory/me/location/route';
 
 interface LocationRow {
@@ -25,6 +29,7 @@ interface BuildAdminOptions {
   location: LocationRow;
   conflictingAssignments?: Array<{ user_id: string }>;
   existingUserLocation?: { location_id: string | null; location?: { is_active: boolean | null } | null } | null;
+  rpcError?: { code: string; message: string } | null;
 }
 
 function buildRequest(locationId: string) {
@@ -39,6 +44,7 @@ function buildAdmin({
   location,
   conflictingAssignments = [],
   existingUserLocation = null,
+  rpcError = null,
 }: BuildAdminOptions) {
   const state = {
     conflictQueryCount: 0,
@@ -49,7 +55,7 @@ function buildAdmin({
   const admin = {
     async rpc(name: string, payload: Record<string, unknown>) {
       state.rpcs.push({ name, payload });
-      return { data: null, error: null };
+      return { data: null, error: rpcError };
     },
     from(table: string) {
       if (table === 'inventory_locations') {
@@ -257,5 +263,31 @@ describe('inventory user location route', () => {
     expect(state.conflictQueryCount).toBe(0);
     expect(state.upserts).toHaveLength(0);
     expect(state.rpcs).toHaveLength(0);
+  });
+
+  it('records unexpected assignment failures for server-side investigation', async () => {
+    const rpcError = { code: 'XX000', message: 'Unexpected assignment failure' };
+    const { admin } = buildAdmin({
+      location: {
+        id: 'manual-location',
+        name: 'Manual location',
+        is_active: true,
+        location_type: 'manual',
+      },
+      rpcError,
+    });
+    vi.mocked(createAdminClient).mockReturnValue(admin as never);
+
+    const response = await PATCH(buildRequest('manual-location'));
+
+    expect(response.status).toBe(500);
+    expect(logServerError).toHaveBeenCalledWith(expect.objectContaining({
+      error: rpcError,
+      componentName: '/api/inventory/me/location',
+      additionalData: {
+        endpoint: '/api/inventory/me/location',
+        method: 'PATCH',
+      },
+    }));
   });
 });

@@ -1,23 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { validateRegistrationNumber, formatRegistrationForStorage } from '@/lib/utils/registration';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
-
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    }
-  );
-}
 
 // PUT - Update an HGV
 export async function PUT(
@@ -39,7 +26,7 @@ export async function PUT(
       );
     }
 
-    const supabase = await createServerClient();
+    const supabase = createAdminClient();
     const hgvId = (await params).id;
     const body = await request.json();
     const { reg_number, category_id, status, nickname } = body;
@@ -67,11 +54,19 @@ export async function PUT(
     }
 
     if ('reg_number' in updates || 'category_id' in updates) {
-      const { data: currentHgv } = await supabase
+      const { data: currentHgv, error: currentHgvError } = await supabase
         .from('hgvs')
         .select('reg_number, category_id')
         .eq('id', hgvId)
-        .single();
+        .maybeSingle();
+
+      if (currentHgvError) throw currentHgvError;
+      if (!currentHgv) {
+        return NextResponse.json(
+          { error: 'HGV not found' },
+          { status: 404 }
+        );
+      }
 
       const finalRegNumber = updates.reg_number || currentHgv?.reg_number;
       const finalCategoryId = updates.category_id || currentHgv?.category_id;
@@ -96,7 +91,7 @@ export async function PUT(
       .update(updates)
       .eq('id', hgvId)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) {
       if (error.code === '23505') {
@@ -106,6 +101,12 @@ export async function PUT(
         );
       }
       throw error;
+    }
+    if (!data) {
+      return NextResponse.json(
+        { error: 'HGV not found' },
+        { status: 404 }
+      );
     }
 
     return NextResponse.json({ hgv: data });
@@ -153,7 +154,7 @@ export async function DELETE(
     const body = await request.json().catch(() => ({}));
     const reason = body.reason || 'Other';
 
-    const adminSupabase = getSupabaseAdmin();
+    const adminSupabase = createAdminClient();
     const { data: openTasks, error: tasksError } = await adminSupabase
       .from('actions')
       .select('id, status, workshop_comments')

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -66,6 +67,11 @@ export function ChangeInventoryLocationDialog({
     try {
       await onSubmit({ locationId, reason });
       onClose();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to update your inventory location',
+        { id: 'inventory-location-update-error' },
+      );
     } finally {
       setIsSaving(false);
     }
@@ -78,6 +84,11 @@ export function ChangeInventoryLocationDialog({
     try {
       await onUnset();
       onClose();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to unset your inventory location',
+        { id: 'inventory-location-unset-error' },
+      );
     } finally {
       setIsUnsetting(false);
     }
