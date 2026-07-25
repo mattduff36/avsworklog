@@ -1,5 +1,26 @@
 [
   {
+    "version": "0726.20.2",
+    "updateKind": "minor",
+    "title": "Error reporting improvements",
+    "description": "Guard fleet assignment conflicts. Harden inventory and fleet updates.",
+    "summary": "Guard fleet assignment conflicts. Harden inventory and fleet updates.",
+    "details": [
+      "Guard fleet assignment conflicts, with changes to background routes, app screens, and automated tests.",
+      "Updated fleet, with changes to background routes and automated tests."
+    ],
+    "areas": [
+      "Error reporting",
+      "Guard fleet assignment conflicts. Harden inventory",
+      "Fleet updates"
+    ],
+    "areaKeys": [
+      "inventory",
+      "error-reporting"
+    ],
+    "pushedAt": "2026-07-25T22:15:47.359Z"
+  },
+  {
     "version": "0726.20.1",
     "updateKind": "minor",
     "title": "Inventory improvements",

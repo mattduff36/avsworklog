@@ -2,6 +2,25 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.20.2
+
+**GIT COMMIT MESSAGE**
+`fix(errors): harden inventory and fleet updates`
+
+**PUSHED AT**
+2026-07-25T22:15:47.359Z
+
+**WHAT CHANGED**
+Guard fleet assignment conflicts. Harden inventory and fleet updates.
+
+**VERSION HISTORY DETAILS**
+- Guard fleet assignment conflicts, with changes to background routes, app screens, and automated tests.
+- Updated fleet, with changes to background routes and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(inventory): guard fleet assignment conflicts`
+- `fix(errors): harden inventory and fleet updates`
+
 ## 0726.20.1
 
 **GIT COMMIT MESSAGE**
