@@ -1,0 +1,1349 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light">
+  <title>Squires App — Timesheet &amp; Payroll Rules Review</title>
+  <style>
+    :root {
+      --ink: #0f172a;
+      --steel: #334155;
+      --muted: #64748b;
+      --line: #cbd5e1;
+      --paper: #ffffff;
+      --canvas: #e8edf2;
+      --yellow: #f1d64a;
+      --yellow-soft: #fff8d6;
+      --yellow-deep: #b49300;
+      --blue-soft: #eff6ff;
+      --blue: #1d4ed8;
+      --green-soft: #ecfdf5;
+      --green: #047857;
+      --red-soft: #fff1f2;
+      --red: #be123c;
+      --radius: 14px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background:
+        linear-gradient(135deg, rgba(15, 23, 42, 0.06) 25%, transparent 25%) 0 0 / 24px 24px,
+        var(--canvas);
+      color: var(--ink);
+      font-family: "Aptos", "Segoe UI", sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.55;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    .document {
+      width: min(210mm, calc(100% - 32px));
+      margin: 32px auto;
+      overflow: hidden;
+      background: var(--paper);
+      box-shadow: 0 24px 70px rgba(15, 23, 42, 0.2);
+    }
+
+    .cover {
+      position: relative;
+      min-height: 282mm;
+      padding: 24mm 20mm 20mm;
+      overflow: hidden;
+      color: #fff;
+      background:
+        linear-gradient(120deg, rgba(241, 214, 74, 0.05), transparent 48%),
+        var(--ink);
+    }
+
+    .cover::before {
+      position: absolute;
+      top: -105mm;
+      right: -70mm;
+      width: 190mm;
+      height: 190mm;
+      border: 2px solid rgba(241, 214, 74, 0.34);
+      border-radius: 50%;
+      content: "";
+    }
+
+    .cover::after {
+      position: absolute;
+      right: -28mm;
+      bottom: -42mm;
+      width: 126mm;
+      height: 126mm;
+      background: var(--yellow);
+      clip-path: polygon(24% 0, 100% 0, 76% 100%, 0 100%);
+      content: "";
+      opacity: 0.96;
+    }
+
+    .brand {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-mark {
+      display: grid;
+      width: 58px;
+      height: 58px;
+      place-items: center;
+      border-radius: 8px 8px 20px 8px;
+      background: var(--yellow);
+      color: var(--ink);
+      font-family: "Bahnschrift Condensed", "Aptos Display", sans-serif;
+      font-size: 21px;
+      font-weight: 900;
+      letter-spacing: -1px;
+      box-shadow: 8px 8px 0 rgba(241, 214, 74, 0.14);
+    }
+
+    .brand-name {
+      font-family: "Bahnschrift", "Aptos Display", sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+
+    .brand-subtitle {
+      display: block;
+      margin-top: 2px;
+      color: #94a3b8;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+    }
+
+    .cover-content {
+      position: relative;
+      z-index: 1;
+      max-width: 148mm;
+      margin-top: 56mm;
+    }
+
+    .eyebrow {
+      display: inline-block;
+      margin: 0 0 18px;
+      padding: 6px 10px 5px;
+      border: 1px solid rgba(241, 214, 74, 0.5);
+      color: var(--yellow);
+      font-family: "Bahnschrift", "Aptos Display", sans-serif;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4 {
+      font-family: "Bahnschrift", "Aptos Display", sans-serif;
+      line-height: 1.15;
+    }
+
+    h1 {
+      max-width: 150mm;
+      margin: 0;
+      color: #fff;
+      font-size: 36pt;
+      font-weight: 800;
+      letter-spacing: -0.035em;
+    }
+
+    .cover-lead {
+      max-width: 126mm;
+      margin: 18px 0 0;
+      color: #cbd5e1;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 15pt;
+      line-height: 1.5;
+    }
+
+    .cover-meta {
+      position: absolute;
+      z-index: 2;
+      right: 20mm;
+      bottom: 22mm;
+      left: 20mm;
+      display: grid;
+      grid-template-columns: 1.4fr 1fr 1fr;
+      gap: 1px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(8px);
+    }
+
+    .cover-meta div {
+      padding: 12px 14px;
+      background: rgba(15, 23, 42, 0.82);
+    }
+
+    .cover-meta strong {
+      display: block;
+      margin-bottom: 3px;
+      color: var(--yellow);
+      font-size: 7.5pt;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .cover-meta span {
+      font-size: 9.5pt;
+    }
+
+    main {
+      padding: 17mm 17mm 20mm;
+    }
+
+    .section {
+      margin-bottom: 16mm;
+    }
+
+    .section-heading {
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 12px;
+      align-items: start;
+      margin-bottom: 18px;
+    }
+
+    .section-number {
+      display: grid;
+      width: 34px;
+      height: 34px;
+      place-items: center;
+      border-radius: 4px 4px 12px 4px;
+      background: var(--yellow);
+      color: var(--ink);
+      font-family: "Bahnschrift", sans-serif;
+      font-size: 11pt;
+      font-weight: 800;
+    }
+
+    h2 {
+      margin: 0;
+      color: var(--ink);
+      font-size: 20pt;
+      letter-spacing: -0.02em;
+    }
+
+    .section-intro {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 11pt;
+    }
+
+    h3 {
+      margin: 24px 0 10px;
+      color: var(--ink);
+      font-size: 13pt;
+    }
+
+    h4 {
+      margin: 0 0 6px;
+      color: var(--steel);
+      font-size: 10.5pt;
+      letter-spacing: 0.02em;
+    }
+
+    p {
+      margin: 0 0 10px;
+    }
+
+    .lead {
+      color: var(--steel);
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 12.5pt;
+      line-height: 1.6;
+    }
+
+    .callout {
+      margin: 18px 0;
+      padding: 16px 18px;
+      border-left: 5px solid var(--yellow);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      background: var(--yellow-soft);
+    }
+
+    .callout strong {
+      color: #715d00;
+    }
+
+    .status-strip {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin: 20px 0;
+    }
+
+    .status-card {
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #f8fafc;
+    }
+
+    .status-card .value {
+      display: block;
+      margin-bottom: 3px;
+      color: var(--ink);
+      font-family: "Bahnschrift", sans-serif;
+      font-size: 18pt;
+      font-weight: 800;
+    }
+
+    .status-card .label {
+      color: var(--muted);
+      font-size: 8.5pt;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+
+    .rule-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 16px;
+    }
+
+    .rule-card {
+      position: relative;
+      overflow: hidden;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      break-inside: avoid;
+    }
+
+    .rule-card::before {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 5px;
+      background: var(--yellow);
+      content: "";
+    }
+
+    .rule-card h3 {
+      margin: 0 0 12px;
+      font-size: 15pt;
+    }
+
+    .rule-list,
+    .scope-list,
+    .check-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .rule-list li,
+    .scope-list li,
+    .check-list li {
+      position: relative;
+      margin: 0 0 8px;
+      padding-left: 18px;
+    }
+
+    .rule-list li::before,
+    .scope-list li::before {
+      position: absolute;
+      top: 0.55em;
+      left: 0;
+      width: 7px;
+      height: 7px;
+      border-radius: 2px;
+      background: var(--yellow);
+      content: "";
+      transform: rotate(45deg);
+    }
+
+    .tag {
+      display: inline-block;
+      margin: 3px 4px 3px 0;
+      padding: 3px 7px;
+      border: 1px solid #dbe4ee;
+      border-radius: 999px;
+      background: #f8fafc;
+      color: var(--steel);
+      font-size: 8pt;
+      font-weight: 700;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      margin: 14px 0;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      font-size: 9pt;
+    }
+
+    th,
+    td {
+      padding: 10px 11px;
+      border-bottom: 1px solid #e2e8f0;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--ink);
+      color: #fff;
+      font-family: "Bahnschrift", sans-serif;
+      font-size: 8pt;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    td:first-child {
+      color: var(--ink);
+      font-weight: 700;
+    }
+
+    .question {
+      margin: 0 0 18px;
+      overflow: hidden;
+      border: 2px solid #efc919;
+      border-radius: var(--radius);
+      background: #fff;
+      break-inside: avoid;
+    }
+
+    .question-header {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      padding: 13px 16px;
+      background: var(--yellow);
+    }
+
+    .question-id {
+      display: grid;
+      flex: 0 0 27px;
+      width: 27px;
+      height: 27px;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--ink);
+      color: #fff;
+      font-family: "Bahnschrift", sans-serif;
+      font-weight: 800;
+    }
+
+    .question-header h3 {
+      margin: 0;
+      font-size: 12pt;
+    }
+
+    .question-body {
+      padding: 16px;
+    }
+
+    .evidence {
+      margin: 12px 0;
+      padding: 12px 14px;
+      border-left: 3px solid var(--blue);
+      background: var(--blue-soft);
+      color: #1e3a8a;
+    }
+
+    .choice {
+      display: flex;
+      gap: 9px;
+      align-items: flex-start;
+      margin: 9px 0;
+      padding: 9px 10px;
+      border: 1px solid #dbe4ee;
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+
+    .choice input {
+      width: 16px;
+      height: 16px;
+      margin: 2px 0 0;
+      accent-color: var(--yellow-deep);
+    }
+
+    .choice label {
+      flex: 1;
+      cursor: pointer;
+    }
+
+    .answer-label {
+      display: block;
+      margin: 14px 0 5px;
+      color: var(--steel);
+      font-size: 8.5pt;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .answer-line,
+    textarea,
+    select {
+      width: 100%;
+      border: 1px solid #94a3b8;
+      border-radius: 7px;
+      background: #fff;
+      color: var(--ink);
+    }
+
+    .answer-line {
+      min-height: 40px;
+      padding: 9px 10px;
+    }
+
+    textarea {
+      min-height: 68px;
+      padding: 9px 10px;
+      resize: vertical;
+    }
+
+    select {
+      min-height: 38px;
+      padding: 7px 9px;
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .field label {
+      display: block;
+      margin-bottom: 5px;
+      color: var(--steel);
+      font-size: 8.5pt;
+      font-weight: 800;
+    }
+
+    .steps {
+      position: relative;
+      margin: 20px 0 0;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 37px 1fr;
+      gap: 13px;
+      padding-bottom: 17px;
+      break-inside: avoid;
+    }
+
+    .step-marker {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      width: 37px;
+      height: 37px;
+      place-items: center;
+      border: 2px solid var(--ink);
+      border-radius: 50%;
+      background: #fff;
+      font-family: "Bahnschrift", sans-serif;
+      font-weight: 800;
+    }
+
+    .step:not(:last-child) .step-marker::after {
+      position: absolute;
+      top: 35px;
+      left: 16px;
+      width: 2px;
+      height: 36px;
+      background: var(--line);
+      content: "";
+    }
+
+    .step h3 {
+      margin: 1px 0 3px;
+      font-size: 11pt;
+    }
+
+    .step p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .decision-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .decision {
+      padding: 13px 14px;
+      border: 1px solid #a7f3d0;
+      border-radius: 10px;
+      background: var(--green-soft);
+      break-inside: avoid;
+    }
+
+    .decision strong {
+      display: block;
+      margin-bottom: 3px;
+      color: var(--green);
+    }
+
+    .risk {
+      padding: 13px 14px;
+      border: 1px solid #fecdd3;
+      border-radius: 10px;
+      background: var(--red-soft);
+      color: #881337;
+    }
+
+    .check-list li {
+      padding-left: 24px;
+    }
+
+    .check-list li::before {
+      position: absolute;
+      top: 1px;
+      left: 0;
+      color: var(--green);
+      content: "✓";
+      font-size: 12pt;
+      font-weight: 900;
+    }
+
+    .approval {
+      margin-top: 24px;
+      padding: 18px;
+      border: 2px solid var(--ink);
+      border-radius: var(--radius);
+    }
+
+    .signature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+      margin-top: 28px;
+    }
+
+    .signature-line {
+      min-height: 42px;
+      border-bottom: 1px solid var(--ink);
+    }
+
+    .signature-caption {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 8pt;
+    }
+
+    footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 13px 17mm;
+      border-top: 1px solid var(--line);
+      background: #f8fafc;
+      color: var(--muted);
+      font-size: 8pt;
+    }
+
+    .print-button {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 10;
+      padding: 11px 16px;
+      border: 0;
+      border-radius: 999px;
+      background: var(--yellow);
+      color: var(--ink);
+      font-weight: 800;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.25);
+      cursor: pointer;
+    }
+
+    .print-button:hover {
+      background: #e3c534;
+      transform: translateY(-1px);
+    }
+
+    .page-break {
+      break-before: page;
+    }
+
+    .keep-together {
+      break-inside: avoid;
+    }
+
+    @page {
+      size: A4;
+      margin: 12mm;
+    }
+
+    @media (max-width: 760px) {
+      .document {
+        width: 100%;
+        margin: 0;
+      }
+
+      .cover {
+        min-height: 100vh;
+        padding: 28px 24px;
+      }
+
+      .cover-content {
+        margin-top: 24vh;
+      }
+
+      h1 {
+        font-size: 29pt;
+      }
+
+      .cover-meta {
+        right: 24px;
+        bottom: 28px;
+        left: 24px;
+        grid-template-columns: 1fr;
+      }
+
+      main {
+        padding: 28px 20px;
+      }
+
+      .rule-grid,
+      .decision-grid,
+      .field-grid,
+      .status-strip,
+      .signature-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .print-button {
+        right: 14px;
+        bottom: 14px;
+      }
+    }
+
+    @media print {
+      body {
+        background: #fff;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+      }
+
+      .document {
+        width: auto;
+        margin: 0;
+        overflow: visible;
+        box-shadow: none;
+      }
+
+      .cover {
+        min-height: 270mm;
+        break-after: page;
+      }
+
+      main {
+        padding: 4mm;
+      }
+
+      .print-button {
+        display: none;
+      }
+
+      .section {
+        margin-bottom: 12mm;
+      }
+
+      .question,
+      .rule-card,
+      .decision,
+      .approval,
+      .table-wrap {
+        break-inside: avoid;
+      }
+
+      footer {
+        padding-right: 4mm;
+        padding-left: 4mm;
+      }
+    }
+  </style>
+</head>
+<body>
+  <button class="print-button" type="button" onclick="window.print()">Print / Save as PDF</button>
+
+  <article class="document">
+    <header class="cover">
+      <div class="brand">
+        <div class="brand-mark" aria-label="AVS">AVS</div>
+        <div class="brand-name">
+          Squires App
+          <span class="brand-subtitle">A&amp;V Squires Plant Co. Ltd.</span>
+        </div>
+      </div>
+
+      <div class="cover-content">
+        <p class="eyebrow">Client review document</p>
+        <h1>Timesheet &amp; Payroll Rules</h1>
+        <p class="cover-lead">
+          Proposed calculation logic, administration controls and the final decisions required
+          before development can be completed safely.
+        </p>
+      </div>
+
+      <div class="cover-meta">
+        <div>
+          <strong>Prepared for</strong>
+          <span>A&amp;V Squires Plant Co. Ltd.</span>
+        </div>
+        <div>
+          <strong>Date</strong>
+          <span>25 July 2026</span>
+        </div>
+        <div>
+          <strong>Status</strong>
+          <span>Client review required</span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="section">
+        <div class="section-heading">
+          <span class="section-number">01</span>
+          <div>
+            <h2>Purpose of this review</h2>
+            <p class="section-intro">Confirm the business rules before they become payroll logic.</p>
+          </div>
+        </div>
+
+        <p class="lead">
+          The existing Squires App uses one general set of payroll calculations. The supplied
+          requirements introduce separate rules for Lorries, Civils, Plant and Others, together
+          with new handling for travel, IPR, night shifts, paid leave and subsistence.
+        </p>
+
+        <div class="callout">
+          <strong>No unclear payroll value will be guessed.</strong>
+          The proposed system will keep incomplete rule sets in draft and prevent them from being
+          activated until the outstanding client answers in Section 04 have been confirmed.
+        </div>
+
+        <div class="status-strip" aria-label="Review summary">
+          <div class="status-card">
+            <span class="value">4</span>
+            <span class="label">Payroll rule sets</span>
+          </div>
+          <div class="status-card">
+            <span class="value">7</span>
+            <span class="label">Agreed design decisions</span>
+          </div>
+          <div class="status-card">
+            <span class="value">4</span>
+            <span class="label">Client answers required</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-heading">
+          <span class="section-number">02</span>
+          <div>
+            <h2>Rules understood from the email</h2>
+            <p class="section-intro">This is the calculation matrix proposed for implementation.</p>
+          </div>
+        </div>
+
+        <div class="rule-grid">
+          <article class="rule-card">
+            <h3>Lorries</h3>
+            <ul class="rule-list">
+              <li><strong>Monday–Friday:</strong> all payable hours at Basic.</li>
+              <li><strong>Saturday:</strong> first 4 payable hours at Overtime; remaining hours at Double Time.</li>
+              <li><strong>Sunday:</strong> all payable hours at Double Time.</li>
+              <li>Deduct a 30-minute unpaid break when elapsed work is more than 6 hours.</li>
+              <li>No separate night-shift premium was specified.</li>
+            </ul>
+          </article>
+
+          <article class="rule-card">
+            <h3>Civils</h3>
+            <ul class="rule-list">
+              <li><strong>Monday–Friday:</strong> all payable hours at Basic.</li>
+              <li><strong>Saturday–Sunday daytime:</strong> all payable hours at Overtime.</li>
+              <li><strong>Night shift:</strong> the whole shift at Double Time.</li>
+              <li>Deduct a 30-minute unpaid break when elapsed work is more than 6 hours.</li>
+            </ul>
+          </article>
+
+          <article class="rule-card">
+            <h3>Plant</h3>
+            <ul class="rule-list">
+              <li><strong>Monday–Thursday:</strong> first 8 payable hours at Basic; remaining hours at Overtime.</li>
+              <li><strong>Friday:</strong> first 7 payable hours at Basic; remaining hours at Overtime.</li>
+              <li><strong>Saturday:</strong> first 4 payable hours at Overtime; remaining hours at Double Time.</li>
+              <li><strong>Sunday or night shift:</strong> the whole shift at Double Time.</li>
+              <li>Deduct a 30-minute unpaid break when elapsed work is more than 6 hours.</li>
+              <li>Operator travel is totalled separately for the week and excluded from pay-band hours.</li>
+              <li>IPR is 0.2 units per worked day, capped at 5 days / 1.0 unit per week.</li>
+            </ul>
+          </article>
+
+          <article class="rule-card">
+            <h3>Others</h3>
+            <ul class="rule-list">
+              <li><strong>Monday–Thursday:</strong> first 8 payable hours at Basic; remaining hours at Overtime.</li>
+              <li><strong>Friday:</strong> first 7 payable hours at Basic; remaining hours at Overtime.</li>
+              <li><strong>Saturday:</strong> first 4 payable hours at Overtime; remaining hours at Double Time.</li>
+              <li><strong>Sunday:</strong> all payable hours at Double Time.</li>
+              <li>Deduct a 30-minute unpaid break when elapsed work is more than 6 hours.</li>
+              <li>No separate night-shift premium was specified.</li>
+            </ul>
+          </article>
+        </div>
+
+        <h3>Rules applying across the system</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Area</th>
+                <th>Proposed behaviour</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Break calculation</td>
+                <td>When elapsed work exceeds 6 hours, deduct 0.5 hours before splitting the remaining payable hours into Basic, Overtime or Double Time.</td>
+              </tr>
+              <tr>
+                <td>Night shifts</td>
+                <td>The employee or authorised editor selects “Night Shift” for the day. Where the assigned rule set includes a night premium, the whole shift is paid at that band.</td>
+              </tr>
+              <tr>
+                <td>Time precision</td>
+                <td>Use exact entered minutes. Do not round start or finish times to 15-minute intervals. Display and export final totals to two decimal places.</td>
+              </tr>
+              <tr>
+                <td>Subsistence</td>
+                <td>Retain the manual “Stayed Away” marker for all employees. Export the number of qualifying days and the relevant day names; payroll applies the payment externally.</td>
+              </tr>
+              <tr>
+                <td>Paid leave</td>
+                <td>Use contracted weekday hours held in the employee’s effective payroll rule. A half day contributes half the configured full-day value.</td>
+              </tr>
+              <tr>
+                <td>Historical records</td>
+                <td>Once approved, the calculation is stored as an immutable snapshot. Later rule edits cannot silently change a previously approved or processed payroll result.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="section page-break">
+        <div class="section-heading">
+          <span class="section-number">03</span>
+          <div>
+            <h2>Proposed employee assignment</h2>
+            <p class="section-intro">Rules follow the employee, with a controlled exception mechanism.</p>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Current team / employee</th>
+                <th>Initial payroll rule</th>
+                <th>Method</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Transport team</td>
+                <td>Lorries</td>
+                <td>Team assignment</td>
+              </tr>
+              <tr>
+                <td>Civils team</td>
+                <td>Civils</td>
+                <td>Team assignment</td>
+              </tr>
+              <tr>
+                <td>Plant team</td>
+                <td>Plant</td>
+                <td>Team assignment</td>
+              </tr>
+              <tr>
+                <td>Alistar MacFarlane, Ben Rick and Antony Newton</td>
+                <td>Others</td>
+                <td>Admin selects the actual user accounts before launch</td>
+              </tr>
+              <tr>
+                <td>Workshop, Accounts, SHEQ or no assigned team</td>
+                <td>Civils</td>
+                <td>Safe fallback unless an admin adds an override</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          An employee-specific override takes priority over a team assignment. This allows future
+          exceptions without moving an employee to a different operational team.
+        </p>
+      </section>
+
+      <section class="section">
+        <div class="section-heading">
+          <span class="section-number">04</span>
+          <div>
+            <h2>Client answers required</h2>
+            <p class="section-intro">Please complete each item before the new rules are activated.</p>
+          </div>
+        </div>
+
+        <article class="question">
+          <div class="question-header">
+            <span class="question-id">1</span>
+            <h3>Plant example: 07:30 to 18:00</h3>
+          </div>
+          <div class="question-body">
+            <p>
+              The email states that this shift produces <strong>8 Basic hours and 1 Overtime hour</strong>.
+              The arithmetic does not currently reconcile:
+            </p>
+            <div class="evidence">
+              07:30–18:00 = 10.5 elapsed hours. Less a 0.5-hour unpaid break = 10 payable hours.
+              With an 8-hour Basic limit, this normally produces <strong>8 Basic + 2 Overtime</strong>.
+            </div>
+
+            <p><strong>Please select the intended result:</strong></p>
+            <div class="choice">
+              <input id="plant-a" name="plant-example" type="radio">
+              <label for="plant-a">8 Basic + 2 Overtime. The “1 hour Overtime” in the email was a typo.</label>
+            </div>
+            <div class="choice">
+              <input id="plant-b" name="plant-example" type="radio">
+              <label for="plant-b">8 Basic + 1 Overtime. Please explain how the remaining 1 hour should be treated.</label>
+            </div>
+            <div class="choice">
+              <input id="plant-c" name="plant-example" type="radio">
+              <label for="plant-c">A different result applies; details are provided below.</label>
+            </div>
+
+            <label class="answer-label" for="plant-notes">Client explanation / notes</label>
+            <textarea id="plant-notes"></textarea>
+          </div>
+        </article>
+
+        <article class="question">
+          <div class="question-header">
+            <span class="question-id">2</span>
+            <h3>Paid-leave hours for Lorries and Civils</h3>
+          </div>
+          <div class="question-body">
+            <p>
+              Plant and Others have a stated contracted week of 8 hours Monday–Thursday and
+              7 hours Friday. Equivalent paid-leave values were not provided for Lorries or Civils.
+            </p>
+
+            <div class="field-grid">
+              <div class="field">
+                <label for="lorries-mon-thu">Lorries — full day Monday–Thursday</label>
+                <input id="lorries-mon-thu" class="answer-line" type="text" placeholder="e.g. 8 hours">
+              </div>
+              <div class="field">
+                <label for="lorries-fri">Lorries — full day Friday</label>
+                <input id="lorries-fri" class="answer-line" type="text" placeholder="e.g. 7 hours">
+              </div>
+              <div class="field">
+                <label for="civils-mon-thu">Civils — full day Monday–Thursday</label>
+                <input id="civils-mon-thu" class="answer-line" type="text" placeholder="e.g. 8 hours">
+              </div>
+              <div class="field">
+                <label for="civils-fri">Civils — full day Friday</label>
+                <input id="civils-fri" class="answer-line" type="text" placeholder="e.g. 7 hours">
+              </div>
+            </div>
+
+            <label class="answer-label" for="leave-notes">Any different values for other weekdays or half days?</label>
+            <textarea id="leave-notes" placeholder="Half days will default to half the full-day value unless instructed otherwise."></textarea>
+          </div>
+        </article>
+
+        <article class="question">
+          <div class="question-header">
+            <span class="question-id">3</span>
+            <h3>Bank-holiday treatment</h3>
+          </div>
+          <div class="question-body">
+            <p>
+              The current app treats bank-holiday work as Double Time. The new email does not
+              mention bank holidays. The new system can configure this independently for each rule set.
+            </p>
+
+            <div class="field-grid">
+              <div class="field">
+                <label for="bank-lorries">Lorries</label>
+                <select id="bank-lorries">
+                  <option selected>Please select</option>
+                  <option>Use the normal day rule</option>
+                  <option>Overtime</option>
+                  <option>Double Time</option>
+                  <option>Other — explain below</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="bank-civils">Civils</label>
+                <select id="bank-civils">
+                  <option selected>Please select</option>
+                  <option>Use the normal day rule</option>
+                  <option>Overtime</option>
+                  <option>Double Time</option>
+                  <option>Other — explain below</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="bank-plant">Plant</label>
+                <select id="bank-plant">
+                  <option selected>Please select</option>
+                  <option>Use the normal day rule</option>
+                  <option>Overtime</option>
+                  <option>Double Time</option>
+                  <option>Other — explain below</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="bank-others">Others</label>
+                <select id="bank-others">
+                  <option selected>Please select</option>
+                  <option>Use the normal day rule</option>
+                  <option>Overtime</option>
+                  <option>Double Time</option>
+                  <option>Other — explain below</option>
+                </select>
+              </div>
+            </div>
+
+            <label class="answer-label" for="bank-notes">Bank-holiday notes</label>
+            <textarea id="bank-notes"></textarea>
+          </div>
+        </article>
+
+        <article class="question">
+          <div class="question-header">
+            <span class="question-id">4</span>
+            <h3>Overtime rate label</h3>
+          </div>
+          <div class="question-body">
+            <p>
+              The existing payroll report labels standard Overtime as <strong>1.5×</strong>.
+              The email uses the word “overtime” without restating the multiplier.
+            </p>
+
+            <div class="choice">
+              <input id="ot-a" name="overtime-rate" type="radio">
+              <label for="ot-a">Confirm Overtime remains 1.5×.</label>
+            </div>
+            <div class="choice">
+              <input id="ot-b" name="overtime-rate" type="radio">
+              <label for="ot-b">Use a different multiplier or payroll label, explained below.</label>
+            </div>
+
+            <label class="answer-label" for="ot-notes">Alternative multiplier / notes</label>
+            <textarea id="ot-notes"></textarea>
+          </div>
+        </article>
+      </section>
+
+      <section class="section page-break">
+        <div class="section-heading">
+          <span class="section-number">05</span>
+          <div>
+            <h2>Proposed administration controls</h2>
+            <p class="section-intro">A controlled rules area inside the existing Squires App.</p>
+          </div>
+        </div>
+
+        <p class="lead">
+          A new panel will be added under <strong>Admin Settings → Timesheets</strong>. Full Admin
+          and Super Admin users will be able to view, add, update, assign and retire payroll rule sets.
+        </p>
+
+        <div class="decision-grid">
+          <div class="decision">
+            <strong>Structured editor</strong>
+            Admins choose controlled fields such as break threshold, daily Basic limit and weekend bands.
+            Arbitrary formulas or executable code cannot be entered.
+          </div>
+          <div class="decision">
+            <strong>Effective dates</strong>
+            Every activated version has a start week. Edits create a new version rather than silently
+            rewriting the past.
+          </div>
+          <div class="decision">
+            <strong>Safe deletion</strong>
+            Unused drafts can be deleted. A rule already used for payroll is archived and remains
+            available for audit.
+          </div>
+          <div class="decision">
+            <strong>Test calculator</strong>
+            Admins can enter example times and preview the result before activating a rule.
+          </div>
+        </div>
+
+        <div class="risk" style="margin-top: 14px;">
+          <strong>Activation safeguard:</strong> a rule cannot become active while a required value is
+          missing or contradictory. Payroll export will explain the missing configuration rather than
+          calculate an assumed result.
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-heading">
+          <span class="section-number">06</span>
+          <div>
+            <h2>How calculations will appear</h2>
+            <p class="section-intro">The same result will be visible throughout the workflow.</p>
+          </div>
+        </div>
+
+        <div class="steps">
+          <div class="step">
+            <span class="step-marker">1</span>
+            <div>
+              <h3>Employee entry and confirmation</h3>
+              <p>The employee enters exact start/finish times, travel, subsistence and any Night Shift selection, then sees the calculated weekly breakdown before submission.</p>
+            </div>
+          </div>
+          <div class="step">
+            <span class="step-marker">2</span>
+            <div>
+              <h3>Manager approval</h3>
+              <p>The approver sees Basic, Overtime, Double Time, leave, travel, IPR and subsistence totals alongside the original entries.</p>
+            </div>
+          </div>
+          <div class="step">
+            <span class="step-marker">3</span>
+            <div>
+              <h3>Approved snapshot</h3>
+              <p>Approval locks the rule version and calculated result used for that timesheet, protecting the payroll audit trail.</p>
+            </div>
+          </div>
+          <div class="step">
+            <span class="step-marker">4</span>
+            <div>
+              <h3>PDF and payroll reports</h3>
+              <p>The approved detail, PDF and Excel payroll export all use the same locked calculation, including weekly Plant travel, IPR and subsistence.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-heading">
+          <span class="section-number">07</span>
+          <div>
+            <h2>Quality and payroll safeguards</h2>
+            <p class="section-intro">Testing will focus on boundary cases and historical stability.</p>
+          </div>
+        </div>
+
+        <ul class="check-list">
+          <li>Test every weekday and weekend rule for Lorries, Civils, Plant and Others.</li>
+          <li>Test the break boundary at exactly 6 hours and immediately above 6 hours.</li>
+          <li>Test Saturday’s first 4 hours and the transition into Double Time.</li>
+          <li>Test exact-minute entries, overnight shifts and manual Night Shift selection.</li>
+          <li>Test full-day and half-day paid leave against contracted weekday hours.</li>
+          <li>Test Plant weekly travel and the IPR five-day / 1.0-unit cap.</li>
+          <li>Test team assignment, employee overrides and Civils fallback behaviour.</li>
+          <li>Test that later rule edits cannot alter approved or processed historical payroll.</li>
+          <li>Test Admin permissions, draft validation, safe deletion and rule archiving.</li>
+          <li>Cross-check employee preview, manager view, PDF and Excel export totals.</li>
+        </ul>
+      </section>
+
+      <section class="section">
+        <div class="section-heading">
+          <span class="section-number">08</span>
+          <div>
+            <h2>Client confirmation</h2>
+            <p class="section-intro">Return the completed answers in Section 04 with any amendments.</p>
+          </div>
+        </div>
+
+        <div class="approval">
+          <p>
+            Please confirm that the calculation matrix in Section 02 accurately reflects the intended
+            payroll rules, subject to the answers and amendments supplied in Section 04.
+          </p>
+
+          <div class="choice">
+            <input id="approval-a" name="approval" type="radio">
+            <label for="approval-a">Approved to proceed once the Section 04 answers are incorporated.</label>
+          </div>
+          <div class="choice">
+            <input id="approval-b" name="approval" type="radio">
+            <label for="approval-b">Amendments are required; details are supplied below.</label>
+          </div>
+
+          <label class="answer-label" for="approval-notes">Additional amendments / comments</label>
+          <textarea id="approval-notes"></textarea>
+
+          <div class="signature-grid">
+            <div>
+              <div class="signature-line"></div>
+              <div class="signature-caption">Name and position</div>
+            </div>
+            <div>
+              <div class="signature-line"></div>
+              <div class="signature-caption">Date</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>Squires App · Timesheet &amp; Payroll Rules Review</span>
+      <span>Prepared for A&amp;V Squires Plant Co. Ltd. · 25 July 2026</span>
+    </footer>
+  </article>
+</body>
+</html>
