@@ -31,6 +31,7 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 interface DialogContentProps extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
   hideCloseButton?: boolean
   mobileKeyboardSafe?: boolean
+  resizeForMobileKeyboard?: boolean
 }
 
 type DialogContentSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | '6xl'
@@ -89,11 +90,11 @@ function dialogContentViewportClassName({
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   DialogContentProps
->(({ className, children, hideCloseButton = false, mobileKeyboardSafe = false, style, ...props }, ref) => {
+>(({ className, children, hideCloseButton = false, mobileKeyboardSafe = false, resizeForMobileKeyboard = true, style, ...props }, ref) => {
   const [visualViewportStyle, setVisualViewportStyle] = React.useState<DialogVisualViewportStyle>({})
 
   React.useEffect(() => {
-    if (!mobileKeyboardSafe) {
+    if (!mobileKeyboardSafe || !resizeForMobileKeyboard) {
       setVisualViewportStyle({})
       return
     }
@@ -118,7 +119,7 @@ const DialogContent = React.forwardRef<
       window.removeEventListener('resize', syncVisualViewport)
       window.removeEventListener('orientationchange', syncVisualViewport)
     }
-  }, [mobileKeyboardSafe])
+  }, [mobileKeyboardSafe, resizeForMobileKeyboard])
 
   return (
     <DialogPortal>
@@ -126,6 +127,7 @@ const DialogContent = React.forwardRef<
       <DialogPrimitive.Content
         ref={ref}
         data-mobile-scroll-lock={mobileKeyboardSafe ? "true" : undefined}
+        data-mobile-keyboard-resize={mobileKeyboardSafe ? String(resizeForMobileKeyboard) : undefined}
         className={cn(
           "fixed left-[50%] top-[50%] z-[200] grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-6 border-0 bg-slate-900 p-6 shadow-2xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-xl text-slate-900 dark:text-slate-100",
           className,

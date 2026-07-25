@@ -2,7 +2,7 @@
 /// <reference types="@testing-library/jest-dom/vitest" />
 
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HardwareTransferDialog } from '@/app/(dashboard)/inventory/components/HardwareTransferDialog';
 import type {
   InventoryHardwareItem,
@@ -40,6 +40,11 @@ function makeLocation(
 }
 
 describe('HardwareTransferDialog', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
   it('uses rich location options and submits a prefilled transfer without a note', async () => {
     const cones: InventoryHardwareItem = {
       id: 'cones',
@@ -92,6 +97,58 @@ describe('HardwareTransferDialog', () => {
           to_location_id: van.id,
           quantity: 5,
         }],
+      });
+    });
+  });
+
+  it('scrolls the focused field above the keyboard without resizing the footer', async () => {
+    const resizeListeners = new Set<EventListener>();
+    const visualViewport = {
+      width: 390,
+      height: 844,
+      offsetTop: 0,
+      offsetLeft: 0,
+      addEventListener: vi.fn((event: string, listener: EventListener) => {
+        if (event === 'resize') resizeListeners.add(listener);
+      }),
+      removeEventListener: vi.fn((event: string, listener: EventListener) => {
+        if (event === 'resize') resizeListeners.delete(listener);
+      }),
+    };
+    vi.stubGlobal('innerHeight', 844);
+    vi.stubGlobal('visualViewport', visualViewport);
+
+    render(
+      <HardwareTransferDialog
+        open
+        items={[]}
+        balances={[]}
+        locations={[]}
+        onClose={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    const dialog = screen.getByRole('dialog');
+    const scrollArea = dialog.querySelector<HTMLElement>('[data-hardware-transfer-scroll-area="true"]');
+    const quantityInput = within(dialog).getByLabelText('Quantity');
+    const scrollBy = vi.fn();
+    if (!scrollArea) throw new Error('Hardware transfer scroll area was not rendered');
+    Object.defineProperty(scrollArea, 'scrollBy', { configurable: true, value: scrollBy });
+    vi.spyOn(quantityInput, 'getBoundingClientRect').mockReturnValue({
+      bottom: 700,
+    } as DOMRect);
+
+    expect(dialog).toHaveAttribute('data-mobile-keyboard-resize', 'false');
+    fireEvent.focus(quantityInput);
+    visualViewport.height = 400;
+    resizeListeners.forEach((listener) => listener(new Event('resize')));
+
+    await waitFor(() => {
+      expect(scrollArea?.style.getPropertyValue('--hardware-transfer-keyboard-overlap')).toBe('444px');
+      expect(scrollBy).toHaveBeenCalledWith({
+        top: 316,
+        behavior: 'smooth',
       });
     });
   });

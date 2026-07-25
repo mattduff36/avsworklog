@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRightLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -66,6 +66,8 @@ export function HardwareTransferDialog({
   const [quantity, setQuantity] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [includeLegacyQuotes, setIncludeLegacyQuotes] = useState(false);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const focusedControlRef = useRef<HTMLElement | null>(null);
 
   const responsibleIds = useMemo(
     () => new Set(responsibleLocationIds || []),
@@ -135,6 +137,61 @@ export function HardwareTransferDialog({
     setIncludeLegacyQuotes(false);
   }, [open, prefill?.fromLocationId, prefill?.itemId]);
 
+  useEffect(() => {
+    if (!open) return;
+
+    const visualViewport = window.visualViewport;
+    let layoutViewportHeight = Math.max(
+      window.innerHeight,
+      (visualViewport?.offsetTop || 0) + (visualViewport?.height || window.innerHeight),
+    );
+    let revealFrame: number | null = null;
+
+    function syncKeyboardOverlap() {
+      const scrollArea = scrollAreaRef.current;
+      if (!scrollArea) return;
+
+      const currentViewport = window.visualViewport;
+      const visibleViewportBottom = (currentViewport?.offsetTop || 0)
+        + (currentViewport?.height || window.innerHeight);
+      layoutViewportHeight = Math.max(layoutViewportHeight, window.innerHeight, visibleViewportBottom);
+      const keyboardOverlap = Math.max(0, layoutViewportHeight - visibleViewportBottom);
+      scrollArea.style.setProperty('--hardware-transfer-keyboard-overlap', `${keyboardOverlap}px`);
+
+      if (revealFrame !== null) {
+        window.cancelAnimationFrame(revealFrame);
+      }
+      revealFrame = window.requestAnimationFrame(() => {
+        const activeElement = focusedControlRef.current || document.activeElement;
+        if (!(activeElement instanceof HTMLElement) || !scrollArea.contains(activeElement)) return;
+
+        const visibleBottom = (window.visualViewport?.offsetTop || 0)
+          + (window.visualViewport?.height || window.innerHeight);
+        const activeElementBottom = activeElement.getBoundingClientRect().bottom;
+        if (activeElementBottom <= visibleBottom) return;
+
+        scrollArea.scrollBy({
+          top: activeElementBottom - visibleBottom + 16,
+          behavior: 'smooth',
+        });
+      });
+    }
+
+    syncKeyboardOverlap();
+    visualViewport?.addEventListener('resize', syncKeyboardOverlap);
+    visualViewport?.addEventListener('scroll', syncKeyboardOverlap);
+    window.addEventListener('resize', syncKeyboardOverlap);
+
+    return () => {
+      visualViewport?.removeEventListener('resize', syncKeyboardOverlap);
+      visualViewport?.removeEventListener('scroll', syncKeyboardOverlap);
+      window.removeEventListener('resize', syncKeyboardOverlap);
+      if (revealFrame !== null) {
+        window.cancelAnimationFrame(revealFrame);
+      }
+    };
+  }, [open]);
+
   function handleItemChange(value: string) {
     setItemId(value);
     setFromLocationId('');
@@ -166,6 +223,7 @@ export function HardwareTransferDialog({
     <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}>
       <DialogContent
         mobileKeyboardSafe
+        resizeForMobileKeyboard={false}
         data-keyboard-safe-dialog="true"
         className={dialogContentViewportClassName({
           size: '3xl',
@@ -185,8 +243,13 @@ export function HardwareTransferDialog({
 
         <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleSubmit}>
           <div
+            ref={scrollAreaRef}
+            data-hardware-transfer-scroll-area="true"
             data-mobile-scroll-lock="true"
-            className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-6 py-4"
+            onFocusCapture={(event) => {
+              focusedControlRef.current = event.target as HTMLElement;
+            }}
+            className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-6 pb-[calc(1rem+var(--hardware-transfer-keyboard-overlap,0px))] pt-4"
           >
           <div className="space-y-2">
             <Label>Hardware item</Label>
