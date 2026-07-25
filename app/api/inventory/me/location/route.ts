@@ -29,6 +29,14 @@ interface InventoryLocationRow {
   linked_plant_id: string | null;
 }
 
+function isUniqueViolation(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+
+  const code = 'code' in error ? String(error.code || '') : '';
+  const message = 'message' in error ? String(error.message || '') : '';
+  return code === '23505' || /duplicate key|unique constraint|23505/i.test(message);
+}
+
 function pickExistingLocation(
   location: ExistingUserLocationRow['location']
 ): { is_active: boolean | null } | null {
@@ -120,6 +128,31 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    const linkedAsset = typedLocation.linked_van_id
+      ? { column: 'linked_van_id', id: typedLocation.linked_van_id }
+      : typedLocation.linked_hgv_id
+        ? { column: 'linked_hgv_id', id: typedLocation.linked_hgv_id }
+        : typedLocation.linked_plant_id
+          ? { column: 'linked_plant_id', id: typedLocation.linked_plant_id }
+          : null;
+    if (linkedAsset) {
+      const { data: conflictingFleetAssignments, error: fleetConflictError } = await admin
+        .from('profile_fleet_assignments')
+        .select('user_id')
+        .eq(linkedAsset.column, linkedAsset.id)
+        .is('ended_at', null)
+        .neq('user_id', access.userId)
+        .limit(1);
+
+      if (fleetConflictError) throw fleetConflictError;
+      if ((conflictingFleetAssignments || []).length > 0) {
+        return NextResponse.json(
+          { error: 'This fleet asset is already assigned to another user' },
+          { status: 400 },
+        );
+      }
+    }
+
     const { data: existingUserLocation, error: existingError } = await admin
       .from('inventory_user_locations')
       .select(`
@@ -169,7 +202,7 @@ export async function PATCH(request: NextRequest) {
       current_fleet_assignment: currentFleetAssignment,
     });
   } catch (error) {
-    if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') {
+    if (isUniqueViolation(error)) {
       return NextResponse.json({ error: 'This fleet asset is already assigned to another user' }, { status: 400 });
     }
     console.error('Error updating user inventory location:', error);

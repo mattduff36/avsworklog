@@ -23,13 +23,17 @@ interface LocationRow {
   name: string;
   is_active: boolean;
   location_type?: 'yard' | 'unknown' | 'van' | 'hgv' | 'plant' | 'site' | 'manual';
+  linked_van_id?: string | null;
+  linked_hgv_id?: string | null;
+  linked_plant_id?: string | null;
 }
 
 interface BuildAdminOptions {
   location: LocationRow;
   conflictingAssignments?: Array<{ user_id: string }>;
+  conflictingFleetAssignments?: Array<{ user_id: string }>;
   existingUserLocation?: { location_id: string | null; location?: { is_active: boolean | null } | null } | null;
-  rpcError?: { code: string; message: string } | null;
+  rpcError?: { code?: string; message: string } | null;
 }
 
 function buildRequest(locationId: string) {
@@ -43,11 +47,13 @@ function buildRequest(locationId: string) {
 function buildAdmin({
   location,
   conflictingAssignments = [],
+  conflictingFleetAssignments = [],
   existingUserLocation = null,
   rpcError = null,
 }: BuildAdminOptions) {
   const state = {
     conflictQueryCount: 0,
+    fleetConflictQueryCount: 0,
     upserts: [] as Array<Record<string, unknown>>,
     rpcs: [] as Array<{ name: string; payload: Record<string, unknown> }>,
   };
@@ -138,7 +144,28 @@ function buildAdmin({
 
       if (table === 'profile_fleet_assignments') {
         return {
-          select() {
+          select(columns: string) {
+            if (columns.trim() === 'user_id') {
+              return {
+                eq() {
+                  return {
+                    is() {
+                      return {
+                        neq() {
+                          return {
+                            async limit() {
+                              state.fleetConflictQueryCount += 1;
+                              return { data: conflictingFleetAssignments, error: null };
+                            },
+                          };
+                        },
+                      };
+                    },
+                  };
+                },
+              };
+            }
+
             return {
               eq() {
                 return {
@@ -263,6 +290,52 @@ describe('inventory user location route', () => {
     expect(state.conflictQueryCount).toBe(0);
     expect(state.upserts).toHaveLength(0);
     expect(state.rpcs).toHaveLength(0);
+  });
+
+  it('rejects a fleet location when its linked asset is already assigned', async () => {
+    const { admin, state } = buildAdmin({
+      location: {
+        id: 'van-location',
+        name: 'Van - AB12 CDE',
+        is_active: true,
+        location_type: 'van',
+        linked_van_id: 'van-1',
+      },
+      conflictingFleetAssignments: [{ user_id: 'user-2' }],
+    });
+    vi.mocked(createAdminClient).mockReturnValue(admin as never);
+
+    const response = await PATCH(buildRequest('van-location'));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: 'This fleet asset is already assigned to another user',
+    });
+    expect(state.fleetConflictQueryCount).toBe(1);
+    expect(state.rpcs).toHaveLength(0);
+  });
+
+  it('maps message-only duplicate assignment errors to a controlled conflict response', async () => {
+    const { admin } = buildAdmin({
+      location: {
+        id: 'manual-location',
+        name: 'Manual location',
+        is_active: true,
+        location_type: 'manual',
+      },
+      rpcError: {
+        message: 'duplicate key value violates unique constraint profile_fleet_assignments_current_van_uidx',
+      },
+    });
+    vi.mocked(createAdminClient).mockReturnValue(admin as never);
+
+    const response = await PATCH(buildRequest('manual-location'));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: 'This fleet asset is already assigned to another user',
+    });
+    expect(logServerError).not.toHaveBeenCalled();
   });
 
   it('records unexpected assignment failures for server-side investigation', async () => {
