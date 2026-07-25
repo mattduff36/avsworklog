@@ -2,6 +2,27 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.20.0
+
+**GIT COMMIT MESSAGE**
+`feat(timesheets): update Timesheets and Help and FAQ`
+
+**PUSHED AT**
+2026-07-25T21:48:01.699Z
+
+**WHAT CHANGED**
+Update Timesheets and Help and FAQ. Complete mobile safe-area handling. Improve mobile navigation and safe areas.
+
+**VERSION HISTORY DETAILS**
+- Improved mobile navigation and safe areas, with changes to app screens and automated tests.
+- Updated Timesheets and Help and FAQ, with changes to documentation.
+- Updated help and FAQ, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `feat(timesheets): update Timesheets and Help and FAQ`
+- `fix(ui): complete mobile safe-area handling`
+- `fix(inventory): improve mobile navigation and safe areas`
+
 ## 0726.19.1
 
 **GIT COMMIT MESSAGE**

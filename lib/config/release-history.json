@@ -1,5 +1,31 @@
 [
   {
+    "version": "0726.20.0",
+    "updateKind": "major",
+    "title": "Timesheets update",
+    "description": "Updated Timesheets and Help and FAQ. Complete mobile safe-area handling. Improve mobile navigation and safe areas.",
+    "summary": "Updated Timesheets and Help and FAQ. Complete mobile safe-area handling. Improve mobile navigation and safe areas.",
+    "details": [
+      "Improved mobile navigation and safe areas, with changes to app screens and automated tests.",
+      "Updated Timesheets and Help and FAQ, with changes to documentation.",
+      "Updated help and FAQ, with changes to documentation."
+    ],
+    "areas": [
+      "Timesheets",
+      "App screens",
+      "Inventory",
+      "Help",
+      "FAQ. Complete mobile safe-area handling. Improve mobile navigation",
+      "Safe areas"
+    ],
+    "areaKeys": [
+      "timesheets",
+      "app-screens",
+      "inventory"
+    ],
+    "pushedAt": "2026-07-25T21:48:01.699Z"
+  },
+  {
     "version": "0726.19.1",
     "updateKind": "minor",
     "title": "Help and FAQ improvements",
